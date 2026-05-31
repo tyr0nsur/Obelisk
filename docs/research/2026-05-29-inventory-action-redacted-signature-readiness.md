@@ -199,7 +199,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_redacted_ufunction_signatures.py
   --json
 ```
 
-Expected current result:
+This boundary is now a dedicated mechanical assertion:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_inventory_action_fixture_boundary.py --json
+```
+
+The checker regenerates the report from committed fixtures and fails closed unless the
+current result is exactly:
 
 - `signature_count=2`;
 - `target_set_coverage.status=complete`;
@@ -208,6 +215,11 @@ Expected current result:
 - `safety_summary.copied_scalar_by_kind.integer=1`;
 - `safety_summary.redacted_by_reason.struct=2`;
 - `safety_summary.redacted_by_reason.object_ref=3`.
+
+It also scans `docs/public_sdk_surfaces.json` `public_contract` and `payload_contract`
+entries and fails if `ItemId`, `ItemID1`, `AdditionalData`,
+`ServerRequestInventoryUseItem`, `ServerRequestInventoryUseItemWithActor`, or
+`inventory-action-compact-intake` crosses into the public contract.
 
 The public boundary stays unchanged:
 

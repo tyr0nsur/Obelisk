@@ -961,6 +961,72 @@ def build_operator_next_commands(
     }
 
 
+def compact_count(value: Any) -> int | None:
+    return value if type(value) is int else None
+
+
+def build_progress_signal(
+    *,
+    status: str,
+    ready: bool,
+    inventory_ready: bool,
+    coverage_targets: Any,
+    coverage_comparable: Any,
+    coverage_blocked: Any,
+    second_source_missing: int | None,
+    second_source_inconclusive: int | None,
+    second_source_rejected: int | None,
+    missing_targets: list[str],
+    lifecycle_diagnosis: dict[str, Any],
+    next_blocker: dict[str, Any],
+    operator_next_commands: dict[str, Any],
+) -> dict[str, Any]:
+    """Small operator-facing summary derived from the report's existing gates."""
+
+    target_count = compact_count(coverage_targets)
+    comparable_count = compact_count(coverage_comparable)
+    blocked_count = compact_count(coverage_blocked)
+    if target_count is not None and comparable_count is not None:
+        fixture_targets = f"{comparable_count}/{target_count}"
+    else:
+        fixture_targets = "unknown"
+
+    accepted_start_targets = string_list(lifecycle_diagnosis.get("accepted_start_targets"))
+    accepted_end_targets = string_list(lifecycle_diagnosis.get("accepted_end_targets"))
+    missing_inputs = string_list(operator_next_commands.get("missing_inputs"))
+    primary_blocker = next_blocker.get("code") if isinstance(next_blocker.get("code"), str) else "unknown"
+
+    return {
+        "status": status,
+        "ready": ready,
+        "primary_blocker": primary_blocker,
+        "coverage": {
+            "target_set": PLAYER_IDENTITY_TARGET_SET,
+            "reflection_inventory_accepted": inventory_ready,
+            "fixture_targets": fixture_targets,
+            "fixture_blocked_targets": blocked_count,
+            "second_source": {
+                "missing": second_source_missing,
+                "inconclusive": second_source_inconclusive,
+                "rejected": second_source_rejected,
+            },
+        },
+        "missing": {
+            "required_targets": missing_targets,
+            "operator_inputs": missing_inputs,
+        },
+        "accepted_anchors": {
+            "session_start": lifecycle_diagnosis.get("session_start_accepted") is True,
+            "session_end": lifecycle_diagnosis.get("session_end_accepted") is True,
+            "start_targets": accepted_start_targets,
+            "end_targets": accepted_end_targets,
+        },
+        "non_claims": [
+            "compact status only; does not promote reflection inventory, lifecycle identity, runtime hooks, public SDK, lookup, ResourceHandle, mutation, or return override",
+        ],
+    }
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     inventory_result, inventory_payload = run_json_command(
         [
@@ -1143,12 +1209,29 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         reflection_inventory_pattern=reflection_inventory_pattern,
         next_operator_recipe=next_operator_recipe,
     )
+    status = "candidate_ready" if not blockers else "blocked"
+    ready = not blockers
+    progress_signal = build_progress_signal(
+        status=status,
+        ready=ready,
+        inventory_ready=inventory_ready,
+        coverage_targets=coverage_targets,
+        coverage_comparable=coverage_comparable,
+        coverage_blocked=coverage_blocked,
+        second_source_missing=second_source_missing,
+        second_source_inconclusive=second_source_inconclusive,
+        second_source_rejected=second_source_rejected,
+        missing_targets=missing_targets,
+        lifecycle_diagnosis=lifecycle_diagnosis,
+        next_blocker=next_blocker,
+        operator_next_commands=operator_next_commands,
+    )
 
     return {
         "schema": REPORT_SCHEMA,
-        "status": "candidate_ready" if not blockers else "blocked",
-        "ready": not blockers,
-        "accepted_for_internal_planning": not blockers,
+        "status": status,
+        "ready": ready,
+        "accepted_for_internal_planning": ready,
         "not_artifact_gate": True,
         "promotion_ready": False,
         "artifact_root": str(args.artifact_root),
@@ -1158,6 +1241,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "blockers": blockers,
         "deferred_until_reflection_inventory_ready": [] if inventory_ready else downstream_blockers,
         "primary_blocker": next_blocker.get("code"),
+        "progress_signal": progress_signal,
         "next_required_artifacts": [] if inventory_ready else [
             {
                 "schema": "obelisk.core-dump-evidence-pack.v1",

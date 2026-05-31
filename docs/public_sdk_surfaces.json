@@ -57,6 +57,7 @@
   "v1_sdk_completion_blockers": [
     "obelisk.player_identity.v1",
     "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.structure_census.v1",
@@ -68,6 +69,7 @@
   ],
   "post_v1_or_excluded_surfaces": [
     "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.lifecycle_ops_recovery.v1",
@@ -97,12 +99,14 @@
     "Installed SDK package/component validation, including CMake COMPONENTS SDK, is package-shape evidence only and is not a v1.0 completion marker.",
     "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "That dependency chain must not be documented as permissions/admin being the immediate next public slice; groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.",
+    "Commands/replies also depend on obelisk.command_chat_response_path.v1; while that command/chat response path is post-v1, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted.",
     "Before identity/principal is promoted, release-supported Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity release-supported seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
     "Lifecycle/config/logging foundation does not satisfy lifecycle ops recovery demand; plugin watchdogs, hot reload, process restart orchestration, server recovery, operator reload commands, and restart-state semantics must be promoted separately or explicitly excluded/post-v1.",
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Player identity/principal planning requires a non-protected complete core evidence pack plus a reviewed UFunction reflection-inventory pack; an offline ShooterGameServer binary, copied core, manual roots, or direct core/bin planning alone is not public SDK or promotion evidence.",
+    "While player identity waits on copied core/reflection evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
     "No surface may be listed as promoted unless its status is promoted.",
@@ -739,10 +743,13 @@
       ]
     },
     {
-      "id": "obelisk.commands_replies.v1",
-      "category": "commands",
+      "id": "obelisk.command_chat_response_path.v1",
+      "category": "command/chat response",
       "status": "post-v1",
       "support_tier": "blocked",
+      "public_name": "Command/chat response path",
+      "public_abi": false,
+      "adds_obelisk_api": false,
       "public_contract": [],
       "depends_on": [
         "obelisk.player_identity.v1",
@@ -752,9 +759,66 @@
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,
         "promotion_requires": [
+          "promoted player identity/principal semantics and promoted permission/authority checks for directed responses",
+          "no public CallProcessEvent path; replies, send-chat, broadcast/notices, and moderation require their own copied response ABI instead of the legacy debug escape hatch",
+          "no raw UE pointers, raw ProcessEvent params, raw FString storage, UObject, UFunction, FName/GObjects indices, or lookup handles in the public ABI",
+          "append-only POD C ABI design with a named capability bit, nonzero plugin_owner_token, owner-token handles, owner-scoped unregister, plugin-owner cleanup, and callback/lifecycle drain semantics",
+          "privacy, redaction, rate-limit, abuse, audit, and cross-instance routing semantics for command/chat responses",
+          "ABI layout tests and SDK consumer tests before any response path is promoted"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.command_chat_response_path.v1 as post-v1 or excluded",
+          "the v1 release statement states that no command/chat response path, public CallProcessEvent path, chat reply API, send-chat API, broadcast/notices API, moderation API, raw UE pointer response API, raw ProcessEvent response API, or raw FString response API is included in v1",
+          "v1_completion_required changes only after this dependency is promoted or that explicit exclusion is recorded"
+        ]
+      },
+      "blockers": [
+        "No promoted player identity/principal semantics or promoted permission/authority model for directed responses.",
+        "No public CallProcessEvent response path; the legacy CallProcessEvent slot remains a debug/init-window escape hatch only.",
+        "No raw UE pointers, raw ProcessEvent params, raw FString storage, UObject, UFunction, FName/GObjects indices, or lookup handles may cross this public boundary.",
+        "No reply, send-chat, broadcast/notices, or moderation API is available until this surface is separately promoted.",
+        "Needs owner-token, capability, lifecycle cleanup, privacy/redaction, rate-limit, abuse, audit, and SDK consumer coverage."
+      ],
+      "audit_units": [
+        "command/chat response path",
+        "chat replies",
+        "send-chat",
+        "broadcast/notices",
+        "moderation response authority",
+        "public CallProcessEvent exclusion"
+      ],
+      "exclusions": [
+        "public CallProcessEvent path",
+        "raw UE pointers",
+        "raw ProcessEvent params",
+        "raw FString storage",
+        "UObject pointers",
+        "UFunction pointers",
+        "FName/GObjects indices",
+        "chat reply API",
+        "send-chat API",
+        "broadcast/notices API",
+        "moderation API"
+      ]
+    },
+    {
+      "id": "obelisk.commands_replies.v1",
+      "category": "commands",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "depends_on": [
+        "obelisk.player_identity.v1",
+        "obelisk.permissions_admin.v1",
+        "obelisk.command_chat_response_path.v1"
+      ],
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
           "promoted player identity/principal semantics",
           "promoted permission/authority model",
-          "safe response path for replies/send-chat",
+          "obelisk.command_chat_response_path.v1 dependency resolved through its own future promotion gate for replies/send-chat",
           "command lifecycle, abuse, rate-limit, and moderation boundaries",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
         ],

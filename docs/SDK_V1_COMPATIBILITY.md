@@ -16,9 +16,10 @@ promote each important modding category through copied ABI contracts and evidenc
 explicitly exclude that category from the `v1.0` support statement.
 The machine-readable `v1_sdk_completion_blockers` list records the high-demand categories
 that currently prevent a complete SDK claim: player identity, permissions/admin,
-commands/replies, inventory/items mutation, structure census/build policy, gameplay
-modules including buffs, player services/economy/mobility/areas, and operator
-ingress/storage. Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`
+command/chat response path, commands/replies, inventory/items mutation, structure
+census/build policy, gameplay modules including buffs, player
+services/economy/mobility/areas, and operator ingress/storage. Lifecycle ops recovery is
+tracked as `obelisk.lifecycle_ops_recovery.v1`
 so lifecycle/config/logging cannot be mistaken for watchdog, reload, restart, or server
 recovery APIs. Gameplay/server tick callbacks are also tracked as a separate
 post-v1 blocker so process-local timers are not mistaken for UE gameplay tick hooks.
@@ -118,9 +119,9 @@ SDK/router, sender identity, permissions, replies, send-chat, moderation, blocki
 mutation, return override, UE lookup, or raw UE/`FString`/params exposure.
 
 Commands/replies is post-v1 and blocked as a combined surface. It depends on a promoted
-player identity/principal contract, a promoted permission/authority model, and a safe
-response path for replies/send-chat before any public command router or reply API can be
-claimed.
+player identity/principal contract, a promoted permission/authority model, and the
+post-v1 `obelisk.command_chat_response_path.v1` command/chat response path before any
+public command router or reply API can be claimed.
 Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency
 chain: if any of those surfaces remains blocked, planning, or post-v1, no complete v1 SDK
 claim is valid.
@@ -131,6 +132,14 @@ public permissions or command claims.
 That ordering is a dependency guardrail, not a declaration that permissions/admin is the
 immediate next public slice; the only post-identity candidate inside permissions/admin is
 query-only fail-closed permission checks, and groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.
+
+The command/chat response path is a named planning dependency only, not a promoted
+surface. Until it is separately promoted, Obelisk v1 exposes no public `CallProcessEvent`
+response path, raw UE pointer response API, raw `ProcessEvent` parameter response API,
+raw `FString` response API, reply API, send-chat API, broadcast/notices API, or
+moderation API. A future response path must use a copied append-only C ABI with a named
+capability bit, nonzero owner token, owner-scoped lifecycle cleanup, privacy/redaction,
+abuse/rate-limit, audit, and SDK consumer evidence.
 
 Future command/principal routing is a lifecycle and callback-ownership change, not a
 parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design
@@ -172,10 +181,14 @@ The shortest useful route toward a complete v1 SDK is:
    support privacy, invalidation, and multi-instance semantics.
 2. Build a fail-closed permissions/admin query layer on that principal model, initially
    limited to query-only checks.
-3. Promote commands/replies as a new owner-token copied callback/response surface, not as
-   a parser-only extension to `ChatMessageEvent`.
-4. Advance structure census as an offline side-lane candidate, and inventory/items through
-   narrow copied APIs, or explicitly exclude them from the first v1 support statement.
+3. Promote the command/chat response path, then promote commands/replies as a new
+   owner-token copied callback/response surface, not as a parser-only extension to
+   `ChatMessageEvent`.
+4. While identity waits on copied core evidence, treat inventory/item copied signals as
+   the higher-value side lane than structure census because they already ride copied
+   `GameplayPolicyEvent` evidence. Keep that work experimental and non-completion; keep
+   structure census offline planning/consume-only unless a future promotion gate accepts
+   it. Promote or explicitly exclude each surface in the first v1 support statement.
 5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID:
    mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas,
    operator ingress/storage, and gameplay/server tick callbacks.
@@ -231,7 +244,8 @@ experimental, or debug-only surfaces as release exclusions.
 | --- | --- | --- | --- |
 | `obelisk.player_identity.v1` | `promoted` or `excluded` | accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source | Name player identity, principal, player lookup, permission principal, economy identity, and send-chat identity. |
 | `obelisk.permissions_admin.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal | Name permission groups, admin groups, grant/revoke, storage/persistence, operator ingress, command router, replies/send-chat, moderation, and ban/kick. |
-| `obelisk.commands_replies.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity and permissions/admin plus safe response path | Name command router, console/RCON commands, player/admin commands, chat replies, send-chat, broadcast/notices, and moderation. |
+| `obelisk.command_chat_response_path.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal and permissions/admin | Name command/chat response path, public CallProcessEvent response path, raw UE pointer/ProcessEvent/FString response APIs, chat replies, send-chat, broadcast/notices, and moderation. |
+| `obelisk.commands_replies.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity, permissions/admin, and command/chat response path | Name command router, console/RCON commands, player/admin commands, chat replies, send-chat, broadcast/notices, and moderation. |
 | `obelisk.inventory_items_mutation.v1` | `promoted`, `excluded`, or `post-v1` | player/inventory/item identity plus rollback/privacy controls | Name Inventory SDK, Items SDK, give/remove item, kits/rewards, engrams/progression, lookup, item handles, mutation, return override, and `ResourceHandle`. |
 | `obelisk.structure_census.v1` | `promoted` or `excluded` | copied structure evidence, privacy/redaction, identity policy if exposed | Name StructureEvents SDK, structure census, structure identity, lookup, build placement policy, no-collision policy, and ownership lookup. |
 | `obelisk.mission_transfer_dino_tribe.v1` | `promoted` or `excluded` | each module promoted as a narrow copied ABI or explicitly left out | Name Mission SDK, Transfer SDK, Dino SDK, dino colors/cosmetics/carry rules, Tribe SDK, tribe MOTD/notices/policy, Buff/status SDK, teleport/spawn, ownership lookup, and cross-map correlation. |

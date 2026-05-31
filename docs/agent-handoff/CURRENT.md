@@ -57,19 +57,19 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   local tags as invalid until revalidated against the intended ref; stale local tags must
   not be reused or pushed.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list
-  for a complete SDK claim. Player identity, permissions/admin, commands/replies,
-  inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe,
-  player services/economy/mobility, operator ingress/storage, and lifecycle ops recovery
-  remain unresolved unless promoted or explicitly excluded in a reviewed v1 release
-  statement.
+  for a complete SDK claim. Player identity, permissions/admin, the command/chat response
+  path, commands/replies, inventory/items mutation, structure census/build policy,
+  mission/transfer/dino/tribe, player services/economy/mobility, operator
+  ingress/storage, and lifecycle ops recovery remain unresolved unless promoted or
+  explicitly excluded in a reviewed v1 release statement.
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the
   current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`,
   or `production SDK` in public sinks unless that gate allows the stable SDK claim.
-- The public SDK completion checker now also blocks promoted commands/replies or
-  permissions/admin claims when their dependency rows are not promoted, and promoted
-  player identity must name `obelisk.core-dump-evidence-pack.v1`,
-  `obelisk.reflection-inventory-pack.v1`, `ServerListPlayers`, and `ServerKickPlayer`
-  evidence terms.
+- The public SDK completion checker now also blocks promoted permissions/admin,
+  command/chat response path, or commands/replies claims when their dependency rows are
+  not promoted, and promoted player identity must name
+  `obelisk.core-dump-evidence-pack.v1`, `obelisk.reflection-inventory-pack.v1`,
+  `ServerListPlayers`, and `ServerKickPlayer` evidence terms.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership,
   capability and `struct_size` gates, lifecycle cleanup, privacy rules, accepted evidence,
   ABI tests, and installed SDK consumer tests.
@@ -95,8 +95,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   completion.
 - Chat/commands near-term value remains plugin-local parsing over copied
   `ChatMessageEvent`. Do not promote a public command router, replies, send-chat,
-  moderation, or player permissions until copied player identity, permissions, and a safe
-  response path are separately promoted.
+  moderation, or player permissions until copied player identity, permissions, and
+  `obelisk.command_chat_response_path.v1` are separately promoted.
+- `obelisk.command_chat_response_path.v1` is a named post-v1 planning dependency only. It
+  adds no ABI symbols and keeps public `CallProcessEvent`, raw UE pointer/params/FString
+  response APIs, replies, send-chat, broadcast/notices, and moderation blocked until a
+  future copied owner-token/capability/lifecycle/privacy promotion gate accepts it or a v1
+  statement explicitly excludes it.
 - Future command/principal routing is a new copied C ABI lifecycle/callback-ownership
   surface, not a parser-only extension. Current planning note:
   `docs/research/2026-05-31-commands-principal-routing-contract.md`.
@@ -118,6 +123,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `next_actionable_blocker.code=non_protected_core_input_missing`; the expected copied
   core path pattern is
   `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/core`.
+  Its top-level `progress_signal` is a compact status mirror only:
+  `fixture_targets=10/12`, missing `ServerListPlayers` and `ServerKickPlayer`,
+  no accepted lifecycle anchors, and `primary_blocker=non_protected_core_input_missing`;
+  it is not promotion, SDK, runtime, lookup, mutation, or ResourceHandle evidence.
 - `scripts/prepare_player_identity_offline_raw_layout.py` may stage explicit
   non-protected offline `ShooterGameServer` and core inputs into the raw sibling layout
   under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/`.
@@ -172,9 +181,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   broad offline FName/GObjects scan.
 - Structure, Inventory item-return, Mission, Transfer, Dino, Buff, Tribe, and
   ResourceHandle lanes stay internal/candidate unless promoted through their own copied
-  ABI, privacy, lifecycle, and evidence gates. Structure census is a useful offline side
-  lane, but identity -> permissions/admin -> commands/replies is the highest-impact v1
-  unblock route.
+  ABI, privacy, lifecycle, and evidence gates. While identity waits on copied core
+  evidence, inventory copied signals are the higher-value side lane because they already
+  ride promoted-experimental `GameplayPolicyEvent` copied signals; structure census
+  remains useful offline planning/consume-only work. Neither side lane displaces
+  identity -> permissions/admin -> commands/replies as the highest-impact v1 unblock
+  route.
 
 ## Priority Next Steps
 
@@ -186,9 +198,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `obelisk.reflection-inventory-pack.v1`, then plan only `ServerListPlayers` and
   `ServerKickPlayer` focal snapshots.
 - If no copied core is available, keep progressing offline by tightening guardrails,
-  permission/admin query-only minimum design, command/principal contract, and structure
-  census side-lane consume/promote-blocked checks without claiming SDK promotion. This
-  does not authorize Transfer runtime work.
+  permission/admin query-only minimum design, command/principal contract, inventory
+  copied-signal evidence hygiene, and structure census consume/promote-blocked checks
+  without claiming SDK promotion. Prefer inventory copied-signal hygiene over structure
+  census when choosing one side lane, because it has more near-term Plugin Hub value while
+  identity remains core-blocked. This does not authorize Transfer runtime work.
 - Permissions/admin now has a machine-readable pre-ABI decision contract in
   `docs/permissions_admin_public_contract_decisions.json`. Future permission checks must
   consume promoted copied principal semantics with generation/scope fail-closed behavior;

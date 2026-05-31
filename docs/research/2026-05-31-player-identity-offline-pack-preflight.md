@@ -65,6 +65,22 @@ The combined preflight currently reports:
 - `first_evidence.missing_required_targets=[ServerKickPlayer, ServerListPlayers]`;
 - `next_step=produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack`.
 
+It also emits a top-level `progress_signal` field for leads/operators who need the
+current blocker without reading the whole report. The field is only a compact rendering
+of existing gates:
+
+- `progress_signal.coverage.fixture_targets=10/12`;
+- `progress_signal.coverage.reflection_inventory_accepted=false`;
+- `progress_signal.missing.required_targets=[ServerKickPlayer, ServerListPlayers]`;
+- `progress_signal.accepted_anchors.session_start=false`;
+- `progress_signal.accepted_anchors.session_end=false`;
+- `progress_signal.primary_blocker=<next_actionable_blocker.code>`.
+
+If a matching non-protected `ShooterGameServer` is present but the non-protected core
+input is absent, `progress_signal.primary_blocker` reports
+`non_protected_core_input_missing` and the top-level `status` remains `blocked`.
+The signal must not be read as progress beyond the underlying fail-closed checks.
+
 The durable root currently contains normalized artifact packs and a ScriptStruct inventory
 pack, but no UFunction reflection-inventory pack with
 `schema=obelisk.reflection-inventory-pack.v1`. That means the next player-identity

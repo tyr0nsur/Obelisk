@@ -16,6 +16,7 @@ CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
     "obelisk.chat.local_routing.v1",
     "obelisk.chat_message.v1",
+    "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
     "obelisk.debug_raw_process_event.v1",
     "obelisk.descriptors.v1",
@@ -37,6 +38,7 @@ CANONICAL_V1_COMPLETION_BLOCKERS = {
     "obelisk.player_identity.v1",
     "obelisk.permissions_admin.v1",
     "obelisk.commands_replies.v1",
+    "obelisk.command_chat_response_path.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.structure_census.v1",
@@ -64,6 +66,20 @@ PROMOTION_EVIDENCE_REQUIRED_TERMS = {
         "obelisk.reflection-inventory-pack.v1",
         "ServerListPlayers",
         "ServerKickPlayer",
+    ),
+}
+REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
+    "obelisk.permissions_admin.v1": (
+        "obelisk.player_identity.v1",
+    ),
+    "obelisk.command_chat_response_path.v1": (
+        "obelisk.player_identity.v1",
+        "obelisk.permissions_admin.v1",
+    ),
+    "obelisk.commands_replies.v1": (
+        "obelisk.player_identity.v1",
+        "obelisk.permissions_admin.v1",
+        "obelisk.command_chat_response_path.v1",
     ),
 }
 PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS = {
@@ -490,7 +506,13 @@ def unresolved_promoted_surface_dependencies(
     if surface.get("status") != "promoted":
         return []
     unresolved: list[str] = []
-    for dependency_id in as_string_list(surface.get("depends_on")):
+    dependency_ids = as_string_list(surface.get("depends_on"))
+    surface_id = surface.get("id")
+    if isinstance(surface_id, str):
+        for required_dependency_id in REQUIRED_PROMOTED_SURFACE_DEPENDENCIES.get(surface_id, ()):
+            if required_dependency_id not in dependency_ids:
+                dependency_ids.append(required_dependency_id)
+    for dependency_id in dependency_ids:
         dependency = surfaces_by_id.get(dependency_id)
         if not isinstance(dependency, dict) or dependency.get("status") != "promoted":
             unresolved.append(dependency_id)

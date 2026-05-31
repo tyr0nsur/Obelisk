@@ -64,13 +64,19 @@ priorities, and do not use history files as the active source of truth.
   `docs/public_sdk_surfaces.json`, with human guidance in `docs/SDK_V1_COMPATIBILITY.md`;
   both are planning-contract artifacts until a future release gate packages or supersedes
   them.
-- The v1 completion checker must reject promoted permissions/admin or commands/replies
-  rows whose dependencies are not promoted, and promoted player identity must name the
-  reviewed core/reflection evidence terms before supporting public permissions or command
-  claims.
+- The v1 completion checker must reject promoted permissions/admin, command/chat response
+  path, or commands/replies rows whose dependencies are not promoted, and promoted player
+  identity must name the reviewed core/reflection evidence terms before supporting public
+  permissions or command claims.
 - After player identity, the permissions/admin candidate is query-only fail-closed checks;
-  commands/replies still require identity, permissions/admin, and a safe response path,
-  while structure census remains an offline side-lane candidate.
+  commands/replies still require identity, permissions/admin, and the named post-v1
+  `obelisk.command_chat_response_path.v1` planning dependency. That response path adds no
+  ABI today and keeps public `CallProcessEvent`, raw UE pointer/params/FString response
+  APIs, replies, send-chat, broadcast/notices, and moderation blocked until promoted or
+  explicitly excluded.
+  While identity waits on copied core evidence, inventory copied signals are the more
+  valuable side lane than structure census because they already ride copied
+  `GameplayPolicyEvent` evidence; structure census remains offline planning/consume-only.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied

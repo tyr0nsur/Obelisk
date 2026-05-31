@@ -98,6 +98,31 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["runtime_ready"])
         self.assertEqual(payload["target_set"], "players-identity-lifecycle-intake")
         self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
+        progress_signal = payload["progress_signal"]
+        self.assertEqual(progress_signal["status"], "blocked")
+        self.assertFalse(progress_signal["ready"])
+        self.assertEqual(progress_signal["primary_blocker"], "offline_binary_and_core_input_missing")
+        self.assertFalse(progress_signal["coverage"]["reflection_inventory_accepted"])
+        self.assertEqual(progress_signal["coverage"]["fixture_targets"], "10/12")
+        self.assertEqual(progress_signal["coverage"]["fixture_blocked_targets"], 2)
+        self.assertEqual(progress_signal["coverage"]["second_source"]["missing"], 10)
+        self.assertEqual(
+            progress_signal["missing"]["required_targets"],
+            [
+                "ShooterPlayerController.ServerKickPlayer",
+                "ShooterPlayerController.ServerListPlayers",
+            ],
+        )
+        self.assertEqual(
+            progress_signal["missing"]["operator_inputs"],
+            [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+        )
+        self.assertFalse(progress_signal["accepted_anchors"]["session_start"])
+        self.assertFalse(progress_signal["accepted_anchors"]["session_end"])
+        self.assertIn("does not promote reflection inventory", " ".join(progress_signal["non_claims"]))
         self.assertNotIn("fixture_coverage_incomplete", payload["blockers"])
         self.assertNotIn("second_source_evidence_missing", payload["blockers"])
         self.assertNotIn("players_identity_first_evidence_not_buildable", payload["blockers"])
@@ -523,6 +548,78 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "non_protected_core_dump_input",
         )
 
+    def test_report_stays_blocked_when_non_protected_core_input_is_missing(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, {"ready": False, "accepted_pack": None, "reasons": []}
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 10,
+                        "blocked": 2,
+                        "second_source_missing": 10,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "missing",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return subprocess.CompletedProcess(
+                    ["mock"],
+                    1,
+                    "{}",
+                    "missing_required_target:ShooterPlayerController.ServerKickPlayer",
+                ), {}
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={
+                    "status": "offline_binary_present_core_like_input_missing",
+                    "ready_to_build_core_evidence_pack": False,
+                    "shooter_game_server_candidates": [
+                        {
+                            "path": "/tmp/player-identity-artifacts/player-identity-offline-a/raw/ShooterGameServer",
+                            "matches_current_binary": True,
+                        }
+                    ],
+                    "core_like_candidates": [],
+                },
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["primary_blocker"], "non_protected_core_input_missing")
+        self.assertEqual(payload["next_actionable_blocker"]["code"], "non_protected_core_input_missing")
+        self.assertEqual(payload["progress_signal"]["status"], "blocked")
+        self.assertFalse(payload["progress_signal"]["ready"])
+        self.assertEqual(payload["progress_signal"]["primary_blocker"], "non_protected_core_input_missing")
+        self.assertFalse(payload["progress_signal"]["coverage"]["reflection_inventory_accepted"])
+        self.assertEqual(payload["progress_signal"]["missing"]["operator_inputs"], ["non_protected_core_dump_input"])
+
     def test_next_actionable_blocker_reports_unpaired_core_and_binary(self) -> None:
         blocker = checker.next_actionable_blocker(
             inventory_ready=False,
@@ -705,6 +802,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
+        self.assertEqual(payload["progress_signal"]["status"], "candidate_ready")
+        self.assertTrue(payload["progress_signal"]["ready"])
+        self.assertTrue(payload["progress_signal"]["coverage"]["reflection_inventory_accepted"])
+        self.assertEqual(payload["progress_signal"]["coverage"]["fixture_targets"], "12/12")
+        self.assertTrue(payload["progress_signal"]["accepted_anchors"]["session_start"])
+        self.assertTrue(payload["progress_signal"]["accepted_anchors"]["session_end"])
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
 
     def test_ready_inventory_payload_without_core_evidence_chain_still_blocks(self) -> None:
