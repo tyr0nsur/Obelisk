@@ -823,6 +823,17 @@ def public_callback_typedefs(header: str) -> list[str]:
     )
 
 
+def c_like_includes(source: str) -> list[str]:
+    return [
+        match.group("header")
+        for match in re.finditer(
+            r"^\s*#\s*include\s*[<\"](?P<header>[^>\"]+)[>\"]",
+            strip_c_comments(source),
+            re.MULTILINE,
+        )
+    ]
+
+
 def exported_shutdown_body(source: str) -> str:
     marker = "ObeliskPlugin_Shutdown"
     marker_index = source.find(marker)
@@ -2227,6 +2238,120 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(f'"{managed_subpath}"', installer)
                 self.assertIn(f"`{managed_subpath}`", install_doc)
         self.assertNotIn("include/obelisk/*.h", install_doc)
+
+    def test_installed_sdk_target_exports_only_public_header_include_dir(self) -> None:
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        package_config = (REPO_ROOT / "cmake" / "ObeliskConfig.cmake.in").read_text(encoding="utf-8")
+        offenders: list[str] = []
+
+        self.assertIn("add_library(obelisk_sdk INTERFACE)", root_cmake)
+        self.assertRegex(
+            root_cmake,
+            r"target_include_directories\s*\(\s*obelisk_sdk\s+INTERFACE\s+"
+            r"\$<BUILD_INTERFACE:\$\{CMAKE_CURRENT_SOURCE_DIR\}/include>\s+"
+            r"\$<INSTALL_INTERFACE:\$\{CMAKE_INSTALL_INCLUDEDIR\}>\s*\)",
+        )
+
+        for match in re.finditer(
+            r"target_link_libraries\s*\(\s*obelisk_sdk\b(?P<body>.*?)\)",
+            root_cmake,
+            flags=re.DOTALL,
+        ):
+            offenders.append(
+                "CMakeLists.txt: obelisk_sdk must not export link dependencies: "
+                f"{normalized(match.group('body'))}"
+            )
+
+        sdk_include_match = re.search(
+            r"target_include_directories\s*\(\s*obelisk_sdk\b(?P<body>.*?)\)",
+            root_cmake,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(sdk_include_match)
+        if sdk_include_match is not None:
+            body = sdk_include_match.group("body")
+            for forbidden in (
+                "${CMAKE_CURRENT_SOURCE_DIR}/core",
+                "${CMAKE_CURRENT_SOURCE_DIR}/hooks",
+                "${CMAKE_CURRENT_SOURCE_DIR}/ue",
+                "${CMAKE_CURRENT_SOURCE_DIR}/runtime",
+                "${CMAKE_CURRENT_SOURCE_DIR}/api",
+                "${CMAKE_CURRENT_SOURCE_DIR}/extern",
+                "fmt",
+                "spdlog",
+                "subhook",
+                "nlohmann",
+            ):
+                if forbidden in body:
+                    offenders.append(f"CMakeLists.txt: obelisk_sdk include leak {forbidden}")
+
+        for forbidden in ("find_dependency", "fmt", "spdlog", "subhook", "nlohmann", "core/", "hooks/", "ue/"):
+            if forbidden in package_config:
+                offenders.append(f"cmake/ObeliskConfig.cmake.in: package dependency leak {forbidden}")
+
+        self.assertEqual(offenders, [])
+
+    def test_creator_facing_sdk_examples_do_not_depend_on_private_headers_or_repo_deps(self) -> None:
+        forbidden_include_prefixes = (
+            "api/",
+            "core/",
+            "hooks/",
+            "plugins/",
+            "runtime/",
+            "ue/",
+            "fmt/",
+            "spdlog/",
+            "subhook/",
+            "nlohmann/",
+        )
+        forbidden_include_names = {
+            "subhook.h",
+            "nlohmann/json.hpp",
+        }
+        forbidden_cmake_tokens = (
+            "target_include_directories",
+            "include_directories",
+            "add_subdirectory",
+            "FetchContent",
+            "fmt::",
+            "spdlog::",
+            "subhook",
+            "nlohmann",
+            "${CMAKE_CURRENT_SOURCE_DIR}/..",
+            "${PROJECT_SOURCE_DIR}/..",
+        )
+        offenders: list[str] = []
+
+        for path in sorted((REPO_ROOT / "examples").rglob("*")):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            text = path.read_text(encoding="utf-8")
+            if path.suffix in {".c", ".cpp", ".h", ".hpp"}:
+                for header in c_like_includes(text):
+                    if header in forbidden_include_names or header.startswith(forbidden_include_prefixes):
+                        offenders.append(f"{relative}: forbidden include {header}")
+            if path.name == "CMakeLists.txt":
+                self.assertIn(
+                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED)",
+                    re.sub(r"\s+", " ", text),
+                    f"{relative} must consume the installed Obelisk package",
+                )
+                self.assertIn("Obelisk::obelisk_sdk", text, f"{relative} must link the public SDK target")
+                for token in forbidden_cmake_tokens:
+                    if token in text:
+                        offenders.append(f"{relative}: forbidden CMake token {token}")
+                for match in re.finditer(
+                    r"target_link_libraries\s*\((?P<body>.*?)\)",
+                    text,
+                    flags=re.DOTALL,
+                ):
+                    body = normalized(match.group("body"))
+                    for token in ("fmt", "spdlog", "subhook", "nlohmann", "dl", "pthread"):
+                        if re.search(rf"\b{re.escape(token)}\b", body):
+                            offenders.append(f"{relative}: example links non-SDK dependency {token}")
+
+        self.assertEqual(offenders, [])
 
     def test_nextgenplugins_absolute_path_stays_out_of_public_docs_and_skills(self) -> None:
         offenders: list[str] = []
@@ -5278,6 +5403,63 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("`mission-compact-intake` example remains\ncandidate-only", fixture_readme)
         self.assertIn("missions", status)
         self.assertIn("remain roadmap items", status)
+
+    def test_status_tracks_v1_as_complete_sdk_not_runtime_only(self) -> None:
+        status = (REPO_ROOT / "docs/STATUS.md").read_text(encoding="utf-8")
+        compact = normalized(status)
+
+        for term in (
+            "`v1.0` complete-SDK track",
+            "This track is not a\nruntime-only stability track",
+            "complete Obelisk SDK milestone, not just a\nstable loader/runtime milestone",
+            "umbrella blockers such as gameplay modules, player services, and operator/storage",
+            "dino, tribe, buff/status, chat send/broadcast,\n  player progression/engrams, economy, mobility, and operator ingress/storage",
+            "narrow copied C ABI surface or an explicit named exclusion",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
+
+        self.assertNotIn("v1.0` core-stability track", status)
+
+    def test_player_identity_preflight_keeps_admin_snapshots_separate_from_principal_promotion(self) -> None:
+        note = (REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-offline-pack-preflight.md").read_text(
+            encoding="utf-8"
+        )
+        compact = normalized(note)
+
+        for term in (
+            "ROOT=/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>",
+            "--obelisk-commit \"${COMMIT}\"",
+            "--fname-root-slot verified_fname_root_slot=0x5956f30",
+            "--gobjects-candidate gobjects=0x595b7e0",
+            "--ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+            "Do not use `--skip-core-sha256`",
+            "do not use `--allow-partial-gdb`",
+            "at least one real session-start anchor and one real\nsession-end anchor",
+            "`ChatMessageEvent` must continue to treat `principal=unknown`",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
+
+    def test_offline_artifact_pack_docs_block_unsupported_static_field_window_children(self) -> None:
+        packs = (REPO_ROOT / "docs" / "OFFLINE_ARTIFACT_PACKS.md").read_text(encoding="utf-8")
+        route = (REPO_ROOT / "docs" / "research" / "2026-05-31-fname-gobjects-offline-route.md").read_text(
+            encoding="utf-8"
+        )
+        compact = normalized(packs + "\n" + route)
+
+        for term in (
+            "unknown `obelisk.*` child schema\nis a blocker",
+            "`obelisk.fuobjectarray-field-window-redacted.v1`",
+            "`obelisk.offline-artifact-gate-result.v1`",
+            "`obelisk.static-artifact-provenance.v1`",
+            "`unsupported_manifest_schema`",
+            "Normalizing a directory also does not rewrite absolute paths inside\nchild manifests",
+            "the blocker is the pack schema, not local tooling",
+            "Copying the `/tmp` manifest tree into a normalized pack is not enough",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
 
     def test_offline_snapshot_fixtures_remain_candidate_only_not_public_sdk(self) -> None:
         fixture_roots = {

@@ -63,6 +63,24 @@ cross-binary portability.
   root. The normalizer treats them as payload; a zero-byte or stale JSON summary then
   blocks the consume gate as malformed or drifted child evidence.
 
+## Supported Child Manifests
+
+Only schemas explicitly supported by `scripts/validate_offline_artifact_gate.py` should
+be placed in a normalized artifact pack as authoritative child manifests. Generic
+sidecars and reports may be useful payload files, but an unknown `obelisk.*` child schema
+is a blocker, even when its contents look hygienic.
+
+The current strict static FUObjectArray field-window evidence is still a scratch evidence
+record, not a durable supported pack input. A pack that directly embeds
+`obelisk.fuobjectarray-field-window-redacted.v1`,
+`obelisk.offline-artifact-gate-result.v1`, or
+`obelisk.static-artifact-provenance.v1` as child manifests can fail with
+`unsupported_manifest_schema` unless the gate is first extended to support those exact
+schemas or the files are stored as non-authoritative payloads with a supported manifest
+owning their hashes. Normalizing a directory also does not rewrite absolute paths inside
+child manifests; regenerate manifests with pack-relative paths instead of copying `/tmp`
+scratch manifests into a durable root.
+
 ## Normalize And Check
 
 Normalize once after the pack contents are final:

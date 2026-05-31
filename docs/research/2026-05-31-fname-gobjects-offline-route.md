@@ -108,6 +108,13 @@ normalized artifact-pack shape exists for the redacted field-window input. It st
 not promote public `GObjects`, `ResourceHandle`, object identity, lookup, mutation,
 return override, runtime hooks, or any SDK surface.
 
+Follow-up audit confirmed the blocker is the pack schema, not local tooling. `radare2`,
+`r2`, and Ghidra `analyzeHeadless` are available on the machine, while `rizin` remains
+optional. A durable pack must regenerate pack-relative child manifests or teach the
+offline artifact gate how to consume the field-window, gate-result, and provenance
+schemas. Copying the `/tmp` manifest tree into a normalized pack is not enough because
+unknown `obelisk.*` child schemas and absolute scratch paths remain fail-closed blockers.
+
 ## Fastest Offline Route
 
 1. Do not rerun broad FName/GObjects scans for the current binary. If the artifact already

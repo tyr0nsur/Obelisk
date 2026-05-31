@@ -18,11 +18,12 @@ for the refreshed RC evidence root and gate result. RC public scope remains limi
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
 `v0.1.0-rc.2` also includes process-local owner-token timers as core runtime API without
 promoting gameplay/module timers.
-Post-RC development continues toward the broader `v1.0` core-stability track: general
+Post-RC development continues toward the broader `v1.0` complete-SDK track: general
 reflection evidence, copied-data module APIs, operator lifecycle safety, metadata-only
 reference plugins such as `oDescriptorCatalog`, and ArkApi-demand-informed
 Obelisk-native plugin replacement capacity without copying or porting ArkApi/NextGen
-implementations or retroactively expanding the published RC tag.
+implementations or retroactively expanding the published RC tag. This track is not a
+runtime-only stability track.
 
 The intended `v1.0` stable milestone is a complete Obelisk SDK milestone, not just a
 stable loader/runtime milestone. `v1.0` should give plugin authors a coherent Linux-native
@@ -114,6 +115,10 @@ define or protect runtime behavior.
   inventory/item, structure, dino, tribe/player, mission/transfer, and operator-facing
   extension paths to be either promoted with evidence or explicitly excluded from the
   `v1.0` compatibility statement;
+- umbrella blockers such as gameplay modules, player services, and operator/storage must
+  name high-demand families explicitly: dino, tribe, buff/status, chat send/broadcast,
+  player progression/engrams, economy, mobility, and operator ingress/storage each need a
+  narrow copied C ABI surface or an explicit named exclusion;
 - copied C ABI payloads with ownership, unregister, shutdown, privacy, and multi-instance
   behavior documented and tested;
 - no public dependency on UE4 internals, raw `ProcessEvent` params, borrowed `UObject`,

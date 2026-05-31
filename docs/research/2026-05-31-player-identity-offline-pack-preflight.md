@@ -112,6 +112,51 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
   --output-dir /tmp/obelisk-reflection-inventory-identity-pack
 ```
 
+If only non-protected copied core and binary files are available, first stage them outside
+both `/servidor/ark` and the repository, then build the core evidence pack explicitly
+without relying on Git or default candidate scans:
+
+```bash
+ROOT=/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>
+BIN=${ROOT}/raw/ShooterGameServer
+CORE=${ROOT}/raw/core
+COMMIT=<reviewed-obelisk-id>
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py \
+  --binary "${BIN}" \
+  --core "${CORE}" \
+  --output-dir "${ROOT}/core-evidence-pack" \
+  --obelisk-commit "${COMMIT}" \
+  --no-default-candidates \
+  --no-default-fname-roots \
+  --no-default-fname-indices \
+  --fname-root-slot verified_fname_root_slot=0x5956f30 \
+  --fname-index None=0 \
+  --fname-index ClientMessage=4884 \
+  --fname-index ServerChat=9619 \
+  --fname-index SetActiveMissionDebugFlags=9622 \
+  --gobjects-candidate gobjects=0x595b7e0 \
+  --gobjects-sample-index 0 \
+  --gobjects-sample-index 1 \
+  --gobjects-sample-index 25447
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
+  --evidence-pack-manifest "${ROOT}/core-evidence-pack/manifest.json" \
+  --evidence-pack-fname-root-label verified_fname_root_slot \
+  --evidence-pack-gobjects-label gobjects \
+  --ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --target-set players-identity-lifecycle-intake \
+  --include-functions \
+  --output-dir "${ROOT}/reflection-inventory-pack"
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_inventory_pack_readiness.py \
+  --root "${ROOT}/reflection-inventory-pack"
+```
+
+This direct staged-input route requires a matching offline `ShooterGameServer` and ELF
+core file. Do not use `--skip-core-sha256`, do not use `--allow-partial-gdb`, and do not
+reuse `0x5956f30` or `0x595b7e0` for a different ARK binary hash without new evidence.
+
 This command shape is still offline and candidate-only. It must not use direct or
 symlinked `/servidor/ark` paths without a current scoped approval.
 
@@ -121,3 +166,13 @@ The two missing snapshots close only the admin-surface fixture gap. They do not 
 login/logout lifecycle anchors, principal validity, identity privacy, permission
 authority, command routing, economy identity, runtime readiness, mutation, return
 override, `ResourceHandle`, or player lookup.
+
+After those admin snapshots exist, the player identity lane still remains planning-only
+until a separate candidate pack proves at least one real session-start anchor and one real
+session-end anchor. That pack must record exact `Outer.Function`, `ParmsSize`, property
+order, offsets, sizes, property classes, and a distinct second-source/static comparison.
+It also needs a copied opaque-principal policy, forced redaction for names, IP-like
+values, tribe ids, object references, raw params, and UE pointers, plus fail-closed
+invalidation for disconnect, transfer, reconnect, stale controller, and restart cases.
+`ChatMessageEvent` must continue to treat `principal=unknown` until that lifecycle and
+privacy work is promoted.
