@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Recorded the next post-RC research route: reuse current FName/GObjects candidates for
+  target-set-driven offline snapshots, keep copied chat commands repo-local/docs-first,
+  define the first player-identity evidence package, and prioritize Mission copied-bool as
+  the next internal v0.2 module lane without public SDK promotion.
 - Hardened Plugin Hub foundation and evidence gates so contributor docs classify seeds
   before install/release, descriptor catalog consumers prove shutdown cleanup,
   `GameplayPolicyEvent` backing stays limited to current copied lanes, and

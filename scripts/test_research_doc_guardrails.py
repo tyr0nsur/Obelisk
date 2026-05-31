@@ -671,6 +671,29 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("Do not expose a public plugin ABI callback-by-name", text)
         self.assertIn("operator-side name-to-index workflow", text)
 
+    def test_chat_command_readiness_stays_plugin_local_docs_tests_only(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-05-31-chat-command-readiness.md"
+        text = note.read_text(encoding="utf-8")
+        compact = normalized(text)
+
+        for phrase in (
+            "The current surface is enough for plugin-local command parsing tests.",
+            "The narrowest next hardening step before beta-player testing is docs/tests, not runtime code and not an approved live test.",
+            "This is not enough for a public command SDK, player-facing authority, or beta-player command behavior.",
+            "plugin may subscribe to copied `ChatMessageEvent`, validate ABI/size/flags/send-mode, copy callback-scope message bytes into plugin-owned memory",
+            "route to local handlers with `principal=unknown`",
+            "`scripts/test_chat_command_parser_contract.py` covers copied-text parsing",
+            "`plugins/oBaseEvents/oBaseEvents.cpp` contains a disabled-by-default helper",
+            "`plugins/oChatLogger` and `plugins/oChatAudit` remain experimental copied-data examples",
+            "Not accepted for beta-player command behavior:",
+            "Any command that needs a real sender, player, admin, tribe, connection, platform ID, map authority, or persistent identity.",
+            "Any first-party `oCommand*` plugin, runtime command router, new `ObeliskApi` function, capability bit, event struct, command registry, or installed helper target.",
+            "Do docs/tests next.",
+            "this note does not create that approval",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, compact)
+
 
 if __name__ == "__main__":
     unittest.main()

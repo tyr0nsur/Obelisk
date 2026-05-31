@@ -1746,6 +1746,66 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                             f"{relative} must null-check/use {slot} for {surface['name']}",
                         )
 
+    def test_public_sdk_consumers_keep_owner_token_registrations_owner_scoped(self) -> None:
+        owner_token_surfaces = [
+            surface for surface in PUBLIC_SDK_OPTIONAL_API_SURFACES
+            if "WithOwnerToken" in surface["trigger"] or surface["name"] == "timers"
+        ]
+
+        for path in PUBLIC_SDK_OPTIONAL_API_CONSUMERS:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            owner_token_triggers = [
+                surface["trigger"] for surface in owner_token_surfaces
+                if surface["trigger"] in text
+            ]
+            if not owner_token_triggers:
+                continue
+
+            with self.subTest(file=relative, check="context-token-required"):
+                self.assertRegex(
+                    text,
+                    r"context->plugin_owner_token\s*(?:!=|==)\s*0",
+                    f"{relative} must validate a nonzero plugin_owner_token before registration",
+                )
+
+            with self.subTest(file=relative, check="captured-owner-token"):
+                self.assertIn(
+                    "g_OwnerToken = context->plugin_owner_token",
+                    text,
+                    f"{relative} must capture the init owner token for matching unregister",
+                )
+
+            forbidden_zero_owner_calls = re.findall(
+                r"(?:Register|Unregister)[A-Za-z0-9_]*WithOwnerToken[A-Za-z0-9_]*\s*\(\s*0\s*,",
+                text,
+            )
+            with self.subTest(file=relative, check="no-zero-owner-calls"):
+                self.assertEqual(forbidden_zero_owner_calls, [])
+
+            for surface in owner_token_surfaces:
+                trigger = surface["trigger"]
+                if trigger not in text:
+                    continue
+                unregister_slot = surface["terminal_slot"]
+                unregister_alias = surface.get("terminal_slot_alias", unregister_slot)
+                trigger_alias = "OBELISK_CONCAT(Register, TimerWithOwnerTokenHandle)" \
+                    if trigger == "RegisterTimerWithOwnerTokenHandle" else trigger
+
+                with self.subTest(file=relative, surface=surface["name"], call="register-owner"):
+                    self.assertRegex(
+                        text,
+                        rf"{re.escape(trigger_alias)}\s*\(\s*g_OwnerToken\s*,",
+                        f"{relative} must register {surface['name']} with the captured owner token",
+                    )
+
+                with self.subTest(file=relative, surface=surface["name"], call="unregister-owner"):
+                    self.assertRegex(
+                        text,
+                        rf"{re.escape(unregister_alias)}\s*\(\s*g_OwnerToken\s*,",
+                        f"{relative} must unregister {surface['name']} with the same captured owner token",
+                    )
+
     def test_public_sdk_optional_api_consumers_export_shutdown(self) -> None:
         for path in PUBLIC_SDK_OPTIONAL_API_CONSUMERS:
             text = path.read_text(encoding="utf-8")

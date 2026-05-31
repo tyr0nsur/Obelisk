@@ -167,10 +167,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 - Current post-RC focus: preserve RC scope, reduce architecture debt, improve evidence
   tooling, and promote only copied module APIs through strict gates.
-- `mission-copied-bool-policy-slice` is the next best internal offline copied-data lane:
-  it is now planning-only/consume-only, blocks release/public promotion, and keeps
-  `GetPlayerUsableItems` recognition-only with no Mission SDK, identity, mutation, or
-  return override.
+- `mission-copied-bool-policy-slice` remains the best next internal v0.2 module lane:
+  planning-only/consume-only, release/public promotion blocked, `GetPlayerUsableItems`
+  recognition-only, and no Mission SDK, identity, mutation, return override, or runtime
+  observer. See `2026-05-31-v02-module-priority.md`.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact
@@ -187,6 +187,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   a distinct second-source compare. Fixture/rootless
   reports remain negative guardrails; do not add these keys to release target sets, ABI
   enums, descriptors, dispatchers, public docs, or runtime gates.
+- For general reflected decoding, reuse current FName root `0x5956f30` and GObjects candidate `0x595b7e0` through closed target-set snapshots and second-source comparison; do not repeat broad FName/GObjects/core scans for this binary.
 - Plugin Hub planning starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
   `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`: classify seeds before install/release;
   production seeds are lifecycle/config/logging, descriptor/catalog, and process-local
