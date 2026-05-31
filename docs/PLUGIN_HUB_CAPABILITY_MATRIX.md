@@ -62,6 +62,8 @@ not mistake a partial primitive for a complete Ark server modding framework.
 
 ## Contributor Triage Rule
 
+Start with `PLUGIN_HUB_SEED_BOUNDARY.md` before classifying a proposal.
+
 When selecting a Plugin Hub seed, start only from rows marked `production seed available`.
 Rows marked `experimental seed only` may be used for clearly labeled pattern examples, not
 production modules. Rows marked `blocked` or `blocked except experimental auditing` should

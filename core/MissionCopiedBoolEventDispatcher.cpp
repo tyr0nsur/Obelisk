@@ -222,7 +222,15 @@ namespace Obelisk::Core
                                   return item.Id == registrationId;
                               }));
             if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
                 return false;
+            }
             removed.reserve(matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
@@ -281,7 +289,15 @@ namespace Obelisk::Core
                                   return item.Owner == owner && item.Id == registrationId;
                               }));
             if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
                 return false;
+            }
             removed.reserve(matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
@@ -340,7 +356,15 @@ namespace Obelisk::Core
                                   return item.Owner == owner;
                               }));
             if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
                 return 0;
+            }
             removed.reserve(matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);

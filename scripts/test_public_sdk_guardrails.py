@@ -1347,6 +1347,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("Every v1_sdk_completion_blocker", release_guardrails)
         self.assertIn("before v1_completion_required can become true", release_guardrails)
         self.assertIn("Every promoted-experimental-only surface", release_guardrails)
+        self.assertIn(
+            "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
+            release_guardrails,
+        )
 
         non_public_statuses = {"planning", "post-v1", "excluded", "debug-only"}
         for surface in manifest["surfaces"]:

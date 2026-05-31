@@ -354,6 +354,50 @@ if ! readelf -d "${INSTALL_ROOT}/lib/libobelisk.so" | grep -F 'Library runpath: 
     exit 1
 fi
 
+SDK_VERSIONLESS_CHECK_DIR="${WORK_DIR}/sdk_versionless_package_check"
+mkdir -p "${SDK_VERSIONLESS_CHECK_DIR}"
+cat > "${SDK_VERSIONLESS_CHECK_DIR}/CMakeLists.txt" <<'CMAKE'
+cmake_minimum_required(VERSION 3.22)
+project(ObeliskSdkVersionlessPackageCheck LANGUAGES C)
+
+find_package(Obelisk CONFIG REQUIRED COMPONENTS SDK)
+
+if(NOT TARGET Obelisk::obelisk_sdk)
+    message(FATAL_ERROR "Installed Obelisk package did not define Obelisk::obelisk_sdk")
+endif()
+if(NOT Obelisk_SDK_FOUND)
+    message(FATAL_ERROR "Installed Obelisk package did not report SDK component found")
+endif()
+if(NOT Obelisk_VERSION STREQUAL "0.1.0")
+    message(FATAL_ERROR "Unexpected Obelisk package version: ${Obelisk_VERSION}")
+endif()
+if(NOT Obelisk_VERSION_MAJOR EQUAL 0)
+    message(FATAL_ERROR "Unexpected Obelisk package version major: ${Obelisk_VERSION_MAJOR}")
+endif()
+if(NOT Obelisk_VERSION_MINOR EQUAL 1)
+    message(FATAL_ERROR "Unexpected Obelisk package version minor: ${Obelisk_VERSION_MINOR}")
+endif()
+if(NOT Obelisk_VERSION_PATCH EQUAL 0)
+    message(FATAL_ERROR "Unexpected Obelisk package version patch: ${Obelisk_VERSION_PATCH}")
+endif()
+
+add_library(versionless_sdk_check SHARED versionless_sdk_check.c)
+target_link_libraries(versionless_sdk_check PRIVATE Obelisk::obelisk_sdk)
+CMAKE
+cat > "${SDK_VERSIONLESS_CHECK_DIR}/versionless_sdk_check.c" <<'C'
+#include <obelisk/ObeliskApi.h>
+
+_Static_assert(OBELISK_API_ABI_VERSION == 1u, "unexpected Obelisk API ABI version");
+
+unsigned obelisk_sdk_versionless_package_check(void) {
+    return OBELISK_API_ABI_VERSION;
+}
+C
+cmake -S "${SDK_VERSIONLESS_CHECK_DIR}" -B "${SDK_VERSIONLESS_CHECK_DIR}/build" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}"
+cmake --build "${SDK_VERSIONLESS_CHECK_DIR}/build" --parallel
+
 "${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" --backup-existing "${INSTALL_ROOT}" >/tmp/obelisk-install-layout-reinstall.log
 obelisk_backup_count="$(find "${INSTALL_ROOT}/lib" -maxdepth 1 -name 'libobelisk.so.*.bak' | wc -l)"
 subhook_backup_count="$(find "${INSTALL_ROOT}/lib" -maxdepth 1 -name 'libsubhook.so.*.bak' | wc -l)"

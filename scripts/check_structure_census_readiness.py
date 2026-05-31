@@ -64,6 +64,21 @@ FORBIDDEN_COPIED_RE = re.compile(
     r"object_refs|public_sdk|resource_handle|return_override|runtime|ue_pointer)",
     re.IGNORECASE,
 )
+STRUCTURE_CENSUS_WIRING_TOKEN_RE = re.compile(r"\bStructureAggregateCensus(?:\.h)?\b")
+STRUCTURE_CENSUS_BLOCKED_SOURCE_PREFIXES = (
+    "hooks/",
+    "include/obelisk/",
+    "loader/",
+    "plugins/",
+    "runtime/",
+)
+STRUCTURE_CENSUS_BLOCKED_SOURCE_PATHS = {
+    "core/EventManager.cpp",
+    "core/EventManager.h",
+    "core/PluginManager.cpp",
+    "core/PluginManager.h",
+}
+SOURCE_SCAN_SUFFIXES = {".cpp", ".h", ".hpp", ".c", ".cc", ".cxx"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -250,6 +265,54 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     }
 
 
+def is_blocked_structure_census_wiring_path(relative_path: str) -> bool:
+    return (
+        relative_path in STRUCTURE_CENSUS_BLOCKED_SOURCE_PATHS
+        or any(relative_path.startswith(prefix) for prefix in STRUCTURE_CENSUS_BLOCKED_SOURCE_PREFIXES)
+    )
+
+
+def validate_source_isolation(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    scanned = 0
+    violations: list[str] = []
+    for path in repo_root.rglob("*"):
+        if not path.is_file() or path.suffix not in SOURCE_SCAN_SUFFIXES:
+            continue
+        try:
+            relative = path.relative_to(repo_root).as_posix()
+        except ValueError:
+            continue
+        if relative.startswith(("build/", "local/", ".git/")):
+            continue
+        if not is_blocked_structure_census_wiring_path(relative):
+            continue
+        scanned += 1
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError as exc:
+            append_blocker(blockers, "structure_census_source_scan_failed", path=relative, detail=str(exc))
+            continue
+        if STRUCTURE_CENSUS_WIRING_TOKEN_RE.search(text):
+            violations.append(relative)
+
+    if violations:
+        append_blocker(
+            blockers,
+            "structure_census_runtime_wiring_detected",
+            paths=sorted(violations),
+        )
+
+    return {
+        "status": "isolated" if not violations else "blocked",
+        "blocked_prefixes": list(STRUCTURE_CENSUS_BLOCKED_SOURCE_PREFIXES),
+        "blocked_paths": sorted(STRUCTURE_CENSUS_BLOCKED_SOURCE_PATHS),
+        "scanned_blocked_source_files": scanned,
+        "violations": sorted(violations),
+    }
+
+
 def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     root = safe_path(root_arg, "--root", blockers)
@@ -257,6 +320,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
     manifest = safe_path(manifest_path, "--manifest", blockers)
 
     summary: dict[str, Any] = {}
+    source_isolation = validate_source_isolation(REPO_ROOT, blockers)
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
     if root is not None and manifest is not None:
@@ -315,6 +379,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         "manifest": str(manifest if manifest is not None else manifest_path),
         "consume_gate": consume_gate,
         "promote_gate": promote_gate,
+        "source_isolation": source_isolation,
         "summary": summary,
         "blockers": blockers,
         "non_claims": [

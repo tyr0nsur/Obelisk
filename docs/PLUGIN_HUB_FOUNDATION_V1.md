@@ -1,5 +1,8 @@
 # Plugin Hub Foundation V1
 
+Read `PLUGIN_HUB_SEED_BOUNDARY.md` first: Plugin Hub seeds are not evidence that the
+Obelisk v1 SDK is complete.
+
 Plugin Hub Foundation V1 is the minimum contributor-facing contract for Linux-native
 Obelisk plugins that consume `include/obelisk/ObeliskApi.h`.
 

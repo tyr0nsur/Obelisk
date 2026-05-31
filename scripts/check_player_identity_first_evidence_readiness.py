@@ -561,8 +561,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
     return {
         "schema": REPORT_SCHEMA,
-        "status": "ready" if not blockers else "blocked",
+        "status": "candidate_ready" if not blockers else "blocked",
         "ready": not blockers,
+        "accepted_for_internal_planning": not blockers,
+        "not_artifact_gate": True,
+        "promotion_ready": False,
         "artifact_root": str(args.artifact_root),
         "snapshot_root": str(args.snapshot_root),
         "candidate_root": str(args.candidate_root) if args.candidate_root else None,

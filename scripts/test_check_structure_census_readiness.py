@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,11 @@ DEFAULT_ROOT = Path(
     "/home/flowcommunity-ark/obelisk-artifacts/structure-aggregate-census-policy-slice-20260531T034715Z"
 )
 DEFAULT_MANIFEST = DEFAULT_ROOT / "structure-aggregate-census-policy-slice.json"
+
+SPEC = importlib.util.spec_from_file_location("check_structure_census_readiness", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+CHECKER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(CHECKER)
 
 
 class CheckStructureCensusReadinessTests(unittest.TestCase):
@@ -49,6 +55,7 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertFalse(payload["promotion_ready"])
         self.assertEqual(payload["consume_gate"]["status"], "accepted")
         self.assertEqual(payload["promote_gate"]["status"], "blocked")
+        self.assertEqual(payload["source_isolation"]["status"], "isolated")
         self.assertEqual(
             set(payload["promote_gate"]["blocker_reasons"]),
             {
@@ -61,6 +68,26 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertEqual(len(payload["summary"]["redacted_fields"]), 5)
         self.assertEqual(len(payload["summary"]["explicitly_excluded_fields"]), 2)
         self.assertIn("candidate readiness is internal planning evidence only", " ".join(payload["non_claims"]))
+
+    def test_source_isolation_blocks_runtime_or_public_wiring(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            blocked = root / "hooks" / "ProcessEventHook.cpp"
+            blocked.parent.mkdir(parents=True)
+            blocked.write_text('#include "core/StructureAggregateCensus.h"\n', encoding="utf-8")
+            allowed = root / "core" / "StructureAggregateCensus.cpp"
+            allowed.parent.mkdir(parents=True)
+            allowed.write_text("StructureAggregateCensus internal implementation\n", encoding="utf-8")
+
+            blockers: list[dict] = []
+            result = CHECKER.validate_source_isolation(root, blockers)
+
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["violations"], ["hooks/ProcessEventHook.cpp"])
+        self.assertIn(
+            "structure_census_runtime_wiring_detected",
+            {blocker["reason"] for blocker in blockers},
+        )
 
     def test_missing_consume_only_flag_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

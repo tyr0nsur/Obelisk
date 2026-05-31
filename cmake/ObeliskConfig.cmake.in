@@ -1,5 +1,9 @@
 @PACKAGE_INIT@
 
+set(Obelisk_VERSION "@PROJECT_VERSION@")
+set(Obelisk_VERSION_MAJOR @PROJECT_VERSION_MAJOR@)
+set(Obelisk_VERSION_MINOR @PROJECT_VERSION_MINOR@)
+set(Obelisk_VERSION_PATCH @PROJECT_VERSION_PATCH@)
 set(Obelisk_DEVELOPMENT_LINE "@OBELISK_DEVELOPMENT_LINE@")
 set(Obelisk_RELEASE_CHANNEL "@OBELISK_RELEASE_CHANNEL@")
 set(Obelisk_API_ABI_VERSION @OBELISK_API_ABI_VERSION@)
@@ -12,6 +16,10 @@ set(Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION @OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSI
 
 include("${CMAKE_CURRENT_LIST_DIR}/ObeliskTargets.cmake")
 
-set(Obelisk_SDK_FOUND TRUE)
+if(TARGET Obelisk::obelisk_sdk)
+    set(Obelisk_SDK_FOUND TRUE)
+else()
+    set(Obelisk_SDK_FOUND FALSE)
+endif()
 
 check_required_components(Obelisk)

@@ -42,6 +42,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["schema"], "obelisk.player-identity-first-evidence-readiness.v1")
         self.assertEqual(payload["status"], "blocked")
         self.assertFalse(payload["ready"])
+        self.assertFalse(payload["accepted_for_internal_planning"])
+        self.assertTrue(payload["not_artifact_gate"])
+        self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertEqual(payload["target_set"], "players-identity-lifecycle-intake")
@@ -306,6 +309,75 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertFalse(payload["static_orientation"]["pre_core_evidence_boundary"]["blocked"])
         self.assertEqual(payload["static_orientation"]["pre_core_evidence_boundary"]["blockers"], [])
+
+    def test_candidate_ready_remains_internal_planning_not_promotion(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, {
+                    "ready": True,
+                    "accepted_pack": {"manifest": "/tmp/inventory/manifest.json"},
+                    "reasons": [],
+                }
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": True,
+                        "session_end_accepted": True,
+                        "accepted_start_targets": ["ShooterGameMode.PostLogin"],
+                        "accepted_end_targets": ["ShooterGameMode.Logout"],
+                        "blockers": [],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={"ready_to_build_core_evidence_pack": False},
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["status"], "candidate_ready")
+        self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertTrue(payload["not_artifact_gate"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
 
     def test_accepted_inventory_still_fails_closed_on_wrong_first_evidence_schema(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")

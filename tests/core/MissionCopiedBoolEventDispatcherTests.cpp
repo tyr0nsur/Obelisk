@@ -505,6 +505,115 @@ namespace
                 "owner-cleaned mission callback ran after in-flight cleanup");
     }
 
+    struct DeferredDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool ReleaseCallback = false;
+        bool DestroyEntered = false;
+        bool ReleaseDestroy = false;
+    };
+
+    void BlockingDestroyCallback(const MissionCopiedBoolEventView&, void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void BlockingDestroy(void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->DestroyEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseDestroy; });
+    }
+
+    void TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch()
+    {
+        MissionCopiedBoolEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredDestroyState state;
+        std::atomic<bool> cleanupFinished{false};
+        std::atomic<bool> secondCleanupFinished{false};
+        size_t secondRemoved = 99;
+        const std::vector<MissionCopiedBoolValue> bools = MakeAddPlayerBools();
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingDestroyCallback, &state, BlockingDestroy});
+        Require(id != 0, "deferred destroy mission callback registration failed");
+
+        std::thread dispatchThread([&dispatcher, &bools]() {
+            Require(dispatcher.Dispatch(MakeEvent(bools)) == 1,
+                    "deferred destroy mission callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.CallbackEntered; }),
+                    "deferred destroy mission callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 1,
+                    "owner cleanup removed wrong deferred destroy mission callback count");
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup did not remove deferred destroy mission callback during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed before deferred destroy mission dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() { return state.DestroyEntered; }),
+                    "deferred destroy mission cleanup did not run");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed while deferred destroy mission cleanup was still running");
+
+        std::thread secondCleanupThread([&]() {
+            secondRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+            secondCleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup completed while deferred destroy mission cleanup was still running");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseDestroy = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+        secondCleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup did not complete after deferred destroy mission cleanup");
+        Require(secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup did not complete after deferred destroy mission cleanup");
+        Require(secondRemoved == 0, "no-op owner cleanup removed callbacks after deferred destroy");
+        Require(dispatcher.SubscriptionCount() == 0, "deferred destroy mission callback survived cleanup");
+    }
+
     void TestCallbackExceptionDoesNotStopDispatch()
     {
         MissionCopiedBoolEventDispatcher dispatcher;
@@ -542,6 +651,7 @@ int main()
         TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks();
         TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
         TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
+        TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
         TestCallbackExceptionDoesNotStopDispatch();
     }
     catch (const std::exception& e)
