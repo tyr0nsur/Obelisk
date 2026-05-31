@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from snapshot_evidence_pack import safe_component
@@ -13,14 +12,6 @@ SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 PLAN_SCHEMA = "obelisk.ufunction-focal-snapshot-plan.v1"
 PYTHON_COMMAND = "python3"
 INSPECTOR_SCRIPT = "scripts/inspect_core_ufunctions.py"
-
-
-def repo_commit(repo_root: Path) -> str:
-    return subprocess.check_output(
-        ["git", "rev-parse", "--short", "HEAD"],
-        cwd=repo_root,
-        text=True,
-    ).strip()
 
 
 def parse_exact_target(target: str) -> tuple[str, str, str]:
@@ -55,6 +46,7 @@ def focal_snapshot_plan(
     fname_root_ready: bool,
     fname_root_blockers: list[str],
     artifact_identity_source: str,
+    obelisk_commit: str,
     repo_root: Path,
 ) -> dict[str, object]:
     inventory_by_key: dict[str, list[dict[str, object]]] = {}
@@ -64,7 +56,6 @@ def focal_snapshot_plan(
         if isinstance(outer, str) and isinstance(name, str) and outer and name:
             inventory_by_key.setdefault(f"{outer}.{name}", []).append(item)
 
-    obelisk_commit = repo_commit(repo_root)
     command_cwd = str(repo_root)
     command_env = {"PYTHONDONTWRITEBYTECODE": "1"}
     records: list[dict[str, object]] = []

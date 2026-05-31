@@ -534,6 +534,13 @@ REQUIRED_PLAYERS_IDENTITY_EXPLICIT_EXCLUSIONS = {
     "gobjects_indices",
     "identity_value_logging",
 }
+REQUIRED_PLAYERS_IDENTITY_NON_CLAIMS = {
+    "candidate-only planning evidence for players-identity-lifecycle-intake",
+    "does not accept ServerListPlayers or ServerKickPlayer as login/logout lifecycle anchors",
+    "does not expose copied public player identity, process-local identity, persistent identity, sender identity, permissions, commands, economy, or moderation APIs",
+    "does not expose UE pointers, raw params, FName/GObjects indices, object identity, lookup, ResourceHandle, mutation, or return overrides",
+    "copied chat text remains unauthenticated and does not establish a principal",
+}
 REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS = {
     "weak_helper_reject_0x100",
     "strict_0x4000_behavior",
@@ -5159,8 +5166,66 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
                 blockers.append({"reason": "players_identity_first_evidence_input_snapshot_targets_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
 
     coverage = payload.get("target_set_coverage")
+    targets = payload.get("targets")
+    fields = payload.get("fields")
+    copied_candidates = payload.get("copied_candidates")
+    forced_redacted_fields = payload.get("forced_redacted_fields")
+    forbidden_fields = payload.get("forbidden_fields")
+    if not isinstance(targets, list):
+        blockers.append({"reason": "players_identity_first_evidence_targets_not_list", "label": f"{label}:$.targets"})
+        targets = []
+    if not isinstance(fields, list):
+        blockers.append({"reason": "players_identity_first_evidence_fields_not_list", "label": f"{label}:$.fields"})
+        fields = []
+    if not isinstance(copied_candidates, list):
+        blockers.append({"reason": "players_identity_first_evidence_copied_candidates_not_list", "label": f"{label}:$.copied_candidates"})
+        copied_candidates = []
+    if not isinstance(forced_redacted_fields, list):
+        blockers.append({"reason": "players_identity_first_evidence_forced_redacted_fields_not_list", "label": f"{label}:$.forced_redacted_fields"})
+        forced_redacted_fields = []
+    if not isinstance(forbidden_fields, list):
+        blockers.append({"reason": "players_identity_first_evidence_forbidden_fields_not_list", "label": f"{label}:$.forbidden_fields"})
+        forbidden_fields = []
+
+    target_names = [entry.get("target") for entry in targets if isinstance(entry, dict)]
+    if set(target_names) != REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS or len(target_names) != len(REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS):
+        blockers.append(
+            {
+                "reason": "players_identity_first_evidence_targets_mismatch",
+                "label": f"{label}:$.targets",
+                "expected": sorted(REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
+                "recorded": target_names,
+            }
+        )
+    if not fields:
+        blockers.append({"reason": "players_identity_first_evidence_field_count_mismatch", "label": f"{label}:$.fields", "expected": ">0", "recorded": 0})
+    if not forced_redacted_fields:
+        blockers.append({"reason": "players_identity_first_evidence_forced_redacted_count_mismatch", "label": f"{label}:$.forced_redacted_fields", "expected": ">0", "recorded": 0})
+    if not forbidden_fields:
+        blockers.append({"reason": "players_identity_first_evidence_forbidden_count_mismatch", "label": f"{label}:$.forbidden_fields", "expected": ">0", "recorded": 0})
+
+    expected_targets = known_ufunction_target_set_targets("players-identity-lifecycle-intake")
+    emitted_targets = target_names
     if not isinstance(coverage, dict) or coverage.get("status") != "complete":
         blockers.append({"reason": "players_identity_first_evidence_target_set_coverage_not_complete", "label": f"{label}:$.target_set_coverage.status"})
+    elif coverage.get("schema") != TARGET_SET_COVERAGE_SCHEMA:
+        blockers.append({"reason": "players_identity_first_evidence_target_set_coverage_schema_mismatch", "label": f"{label}:$.target_set_coverage.schema", "recorded_schema": coverage.get("schema")})
+    else:
+        declared = coverage.get("declared_target_sets")
+        if not isinstance(declared, list) or len(declared) != 1:
+            blockers.append({"reason": "players_identity_first_evidence_declared_target_set_count_mismatch", "label": f"{label}:$.target_set_coverage.declared_target_sets"})
+        else:
+            entry = declared[0]
+            if not isinstance(entry, dict) or entry.get("name") != "players-identity-lifecycle-intake":
+                blockers.append({"reason": "players_identity_first_evidence_declared_target_set_identity_mismatch", "label": f"{label}:$.target_set_coverage.declared_target_sets[0]"})
+        if coverage.get("expected_targets") != expected_targets:
+            blockers.append({"reason": "players_identity_first_evidence_target_set_expected_targets_mismatch", "label": f"{label}:$.target_set_coverage.expected_targets", "expected": expected_targets, "recorded": coverage.get("expected_targets")})
+        if coverage.get("emitted_targets") != emitted_targets:
+            blockers.append({"reason": "players_identity_first_evidence_target_set_emitted_targets_mismatch", "label": f"{label}:$.target_set_coverage.emitted_targets", "expected": emitted_targets, "recorded": coverage.get("emitted_targets")})
+        if coverage.get("missing_targets") != []:
+            blockers.append({"reason": "players_identity_first_evidence_target_set_missing_targets_mismatch", "label": f"{label}:$.target_set_coverage.missing_targets", "recorded": coverage.get("missing_targets")})
+        if coverage.get("unexpected_targets") != []:
+            blockers.append({"reason": "players_identity_first_evidence_target_set_unexpected_targets_mismatch", "label": f"{label}:$.target_set_coverage.unexpected_targets", "recorded": coverage.get("unexpected_targets")})
 
     lifecycle = payload.get("lifecycle_anchors")
     if not isinstance(lifecycle, dict):
@@ -5195,12 +5260,29 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
         if safety_summary.get(key) is not False:
             blockers.append({"reason": f"players_identity_first_evidence_summary_{key}_not_false", "label": f"{label}:$.safety_summary.{key}"})
+    for key, actual_count in {
+        "field_count": len(fields),
+        "copied_candidate_count": len(copied_candidates),
+        "forced_redacted_count": len(forced_redacted_fields),
+        "forbidden_count": len(forbidden_fields),
+    }.items():
+        if safety_summary.get(key) != actual_count:
+            blockers.append({"reason": f"players_identity_first_evidence_{key}_mismatch", "label": f"{label}:$.safety_summary.{key}", "expected": actual_count, "recorded": safety_summary.get(key)})
     explicitly_excluded = safety_summary.get("explicitly_excluded")
     if not isinstance(explicitly_excluded, list) or not REQUIRED_PLAYERS_IDENTITY_EXPLICIT_EXCLUSIONS.issubset(set(explicitly_excluded)):
         blockers.append({"reason": "players_identity_first_evidence_explicit_exclusions_missing_boundaries", "label": f"{label}:$.safety_summary.explicitly_excluded"})
+    if not isinstance(payload.get("non_claims"), list) or not REQUIRED_PLAYERS_IDENTITY_NON_CLAIMS.issubset(set(payload["non_claims"])):
+        blockers.append({"reason": "players_identity_first_evidence_non_claims_missing_required_boundaries", "label": f"{label}:$.non_claims"})
 
     if mode == "promote":
         blockers.append({"reason": "promote_mode_players_identity_first_evidence_candidate_only", "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "players_identity_first_evidence_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
+    ):
+        blockers.append({"reason": f"players_identity_first_evidence_public_overclaim_{reason}", "label": f"{label}:{trail}"})
     return blockers
 
 

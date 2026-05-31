@@ -12,6 +12,9 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from reflection_target_sets import TARGET_SETS  # noqa: E402
+
 BINARY_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 CORE_SHA = "8" * 64
 
@@ -38,6 +41,24 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 "parms_size": 40,
             },
         ]
+
+    def rows_for_target_set(self, target_set: str) -> list[dict[str, object]]:
+        rows: list[dict[str, object]] = []
+        for qualified in TARGET_SETS[target_set]:
+            _, _, target = qualified.partition(":")
+            outer, _, name = target.rpartition(".")
+            rows.append(
+                {
+                    "family": "TargetSet",
+                    "function_flags": "0x220cc0",
+                    "name": name,
+                    "num_parms": 0,
+                    "outer_class_name": outer,
+                    "outer_name": outer,
+                    "parms_size": 0,
+                }
+            )
+        return rows
 
     def write_pack(
         self,
@@ -100,7 +121,13 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
 
     def run_planner(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            [sys.executable, str(SCRIPT_DIR / "plan_ufunction_focal_snapshots.py"), *args],
+            [
+                sys.executable,
+                str(SCRIPT_DIR / "plan_ufunction_focal_snapshots.py"),
+                "--evidence-obelisk-commit",
+                "reviewed-commit",
+                *args,
+            ],
             check=check,
             capture_output=True,
             text=True,
@@ -142,6 +169,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertIn("--snapshot-json", command)
         self.assertIn("--max-object-scan", command)
         self.assertIn("1234", command)
+        self.assertIn("--evidence-obelisk-commit", command)
+        self.assertIn("reviewed-commit", command)
         self.assertNotIn("--target-set", command)
         self.assertIn("Does not reread a core", " ".join(payload["non_claims"]))
 
@@ -167,6 +196,59 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertEqual(result.stdout, "")
         self.assertEqual(payload["planned_command_count"], 1)
         self.assertEqual(payload["inventory_pack"]["manifest"], str(pack / "manifest.json"))
+
+    def test_target_set_expands_player_identity_without_reading_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            missing_core = root / "reviewed-core-does-not-exist"
+            self.write_pack(
+                pack,
+                core_path=missing_core,
+                functions=self.rows_for_target_set("players-identity-lifecycle-intake"),
+            )
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-set",
+                    "players-identity-lifecycle-intake",
+                ]
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["target_source"]["target_sets"], ["players-identity-lifecycle-intake"])
+        self.assertEqual(payload["target_source"]["loaded_target_count"], 12)
+        self.assertEqual(payload["requested_count"], 12)
+        self.assertEqual(payload["planned_command_count"], 12)
+        self.assertEqual(payload["blocked_count"], 0)
+        planned_targets = {entry["target"] for entry in payload["snapshot_commands"]}
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
+            planned_targets,
+        )
+        self.assertIn(
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerKickPlayer",
+            planned_targets,
+        )
+        first_command = payload["snapshot_commands"][0]["argv"]
+        self.assertIn("--snapshot-json", first_command)
+        self.assertEqual(str(missing_core), payload["core"])
+
+    def test_unknown_target_set_rejects_before_planning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(pack, core_path=root / "missing-core")
+
+            result = self.run_planner(
+                ["--inventory-pack", str(pack), "--target-set", "not-a-target-set"],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown --target-set: not-a-target-set", result.stderr)
 
     def test_missing_target_is_candidate_blocked_not_invented(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

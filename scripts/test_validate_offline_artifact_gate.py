@@ -1007,13 +1007,43 @@ def players_identity_first_evidence_manifest(
     public_sdk_ready: bool = False,
     runtime_ready: bool = False,
 ) -> dict:
+    targets = gate.known_ufunction_target_set_targets("players-identity-lifecycle-intake")
     input_snapshots = [
         {
             "id": f"snapshot-{index:04d}",
             "sha256": hashlib.sha256(target.encode("utf-8")).hexdigest(),
             "target": target,
         }
-        for index, target in enumerate(sorted(gate.REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS), start=1)
+        for index, target in enumerate(targets, start=1)
+    ]
+    target_entries = [
+        {
+            "target": target,
+            "source_snapshot": f"snapshot-{index:04d}",
+            "source_snapshot_sha256": hashlib.sha256(target.encode("utf-8")).hexdigest(),
+            "property_order": ["PlayerLikeField"],
+            "status": "candidate_only",
+            "lifecycle_anchor_role": "not_accepted",
+            "blockers": ["identity-like fields are force-redacted"],
+        }
+        for index, target in enumerate(targets, start=1)
+    ]
+    forced_redacted_fields = [
+        {
+            "target": target,
+            "field": f"{target}.PlayerLikeField",
+            "classification": "forced_redacted",
+            "blockers": ["identity-like field is not public identity"],
+        }
+        for target in targets
+    ]
+    forbidden_fields = [
+        {
+            "target": target,
+            "forbidden_field": f"{target}.PlayerLikeField",
+            "reason": "identity-like field",
+        }
+        for target in targets
     ]
     return {
         "schema": gate.PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
@@ -1025,13 +1055,31 @@ def players_identity_first_evidence_manifest(
         "snapshot_root": "redacted",
         "input_target_set": "players-identity-lifecycle-intake",
         "generated_from": {"snapshot_schema": SNAPSHOT_SCHEMA, "input_snapshots": input_snapshots},
-        "target_set_coverage": {"status": "complete"},
+        "target_set_coverage": {
+            "schema": gate.TARGET_SET_COVERAGE_SCHEMA,
+            "status": "complete",
+            "complete": True,
+            "declared_target_sets": [
+                {
+                    "name": "players-identity-lifecycle-intake",
+                    "source": "manifest",
+                    "expected_targets": targets,
+                    "covered_targets": targets,
+                    "missing_targets": [],
+                    "complete": True,
+                }
+            ],
+            "expected_targets": targets,
+            "emitted_targets": targets,
+            "missing_targets": [],
+            "unexpected_targets": [],
+        },
         "artifact_identity": {"path_redacted": True},
-        "targets": [],
-        "fields": [],
+        "targets": target_entries,
+        "fields": forced_redacted_fields,
         "copied_candidates": [],
-        "forced_redacted_fields": [],
-        "forbidden_fields": [],
+        "forced_redacted_fields": forced_redacted_fields,
+        "forbidden_fields": forbidden_fields,
         "lifecycle_anchors": {
             "session_start_accepted": False,
             "session_end_accepted": False,
@@ -1053,6 +1101,10 @@ def players_identity_first_evidence_manifest(
             "target_count": len(gate.REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
             "expected_target_count": len(gate.REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS),
             "missing_target_count": 0,
+            "field_count": len(forced_redacted_fields),
+            "copied_candidate_count": 0,
+            "forced_redacted_count": len(forced_redacted_fields),
+            "forbidden_count": len(forbidden_fields),
             "promotion_ready": promotion_ready,
             "public_sdk_ready": public_sdk_ready,
             "runtime_ready": runtime_ready,
@@ -1060,7 +1112,10 @@ def players_identity_first_evidence_manifest(
         },
         "non_claims": [
             "candidate-only planning evidence for players-identity-lifecycle-intake",
+            "does not accept ServerListPlayers or ServerKickPlayer as login/logout lifecycle anchors",
             "does not expose copied public player identity, process-local identity, persistent identity, sender identity, permissions, commands, economy, or moderation APIs",
+            "does not expose UE pointers, raw params, FName/GObjects indices, object identity, lookup, ResourceHandle, mutation, or return overrides",
+            "copied chat text remains unauthenticated and does not establish a principal",
         ],
     }
 
@@ -5435,6 +5490,51 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_first_evidence_target_count_mismatch", reasons)
         self.assertIn("players_identity_first_evidence_missing_target_count_mismatch", reasons)
         self.assertIn("players_identity_first_evidence_explicit_exclusions_missing_boundaries", reasons)
+
+    def test_blocks_players_identity_first_evidence_empty_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            payload["targets"] = []
+            payload["fields"] = []
+            payload["copied_candidates"] = []
+            payload["forced_redacted_fields"] = []
+            payload["forbidden_fields"] = []
+            payload["safety_summary"]["field_count"] = 0
+            payload["safety_summary"]["forced_redacted_count"] = 0
+            payload["safety_summary"]["forbidden_count"] = 0
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_targets_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_field_count_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_forced_redacted_count_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_forbidden_count_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_target_set_emitted_targets_mismatch", reasons)
+
+    def test_blocks_players_identity_first_evidence_status_only_coverage_and_nested_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            payload["target_set_coverage"] = {"status": "complete"}
+            payload["privacy_policy"]["lookup_ready"] = True
+            payload["promotion_gate"]["claim"] = "public SDK ready"
+            payload["non_claims"] = payload["non_claims"][:-1]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_target_set_coverage_schema_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_readiness_overclaim", reasons)
+        self.assertIn("players_identity_first_evidence_public_overclaim_public_sdk", reasons)
+        self.assertIn("players_identity_first_evidence_non_claims_missing_required_boundaries", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

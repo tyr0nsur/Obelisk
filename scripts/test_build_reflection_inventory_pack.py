@@ -344,6 +344,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "ServerChat=4",
                     "--plan-target",
                     "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(output_dir),
                 ]
@@ -410,6 +412,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "NoSuchName",
                     "--plan-target",
                     "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(output_dir),
                 ]
@@ -450,6 +454,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "fixture-pack",
                     "--plan-target",
                     "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(output_dir),
                 ]
@@ -490,6 +496,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "PrimalStructure.IsAllowedToBuild",
                     "--plan-target",
                     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(root / "out"),
                 ],
@@ -589,6 +597,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "fixture-pack",
                     "--plan-snapshot-target-set",
                     "chat-message-intake",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(output_dir),
                 ]
@@ -640,6 +650,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "NoSuchName",
                     "--plan-snapshot-target-set",
                     "chat-message-intake",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(output_dir),
                 ]
@@ -696,6 +708,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "ShooterPlayerController.ServerSendChatMessage",
                     "--plan-snapshot-target-set",
                     "chat-message-intake",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(root / "out"),
                 ],
@@ -730,6 +744,8 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
                     "fixture-pack",
                     "--plan-target",
                     "PrimalStructure.IsAllowedToBuild",
+                    "--evidence-obelisk-commit",
+                    "fixture-commit",
                     "--output-dir",
                     str(output_dir),
                 ]

@@ -8,12 +8,13 @@ The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfac
 promote each important modding category through copied ABI contracts and evidence, or
 explicitly exclude that category from the `v1.0` support statement.
 
-Plugin Hub V1 production support is lifecycle/config/logging, descriptor/catalog
-metadata, installed-SDK consumers, and owner-token process-local timers. Copied chat and
-gameplay-policy examples are experimental copied-data patterns only. Higher-level
-ArkApi-style categories remain planning or post-v1 until each has its own copied C ABI
-design, privacy/ownership rules, lifecycle cleanup, SDK consumer tests, and named
-second-source promotion gates.
+A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
+descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
+timers. That seed is useful for contributors, but it is not a `v1.0` complete SDK claim.
+Copied chat and gameplay-policy examples are experimental copied-data patterns only.
+Higher-level ArkApi-style categories remain outside the current promoted scope until each
+has its own copied C ABI design, privacy/ownership rules, lifecycle cleanup, SDK consumer
+tests, and named second-source promotion gates.
 
 ## Global Rules
 
@@ -72,13 +73,18 @@ sanitized logs, and global plugin config. Obelisk v1 does not promise a public c
 SDK/router, sender identity, permissions, replies, send-chat, moderation, blocking,
 mutation, return override, UE lookup, or raw UE/`FString`/params exposure.
 
-Player identity is planning-only. It remains blocked by missing sanitized
-`ServerListPlayers` and `ServerKickPlayer` snapshots, missing accepted lifecycle anchors,
-and missing privacy/invalidation semantics.
+Player identity is planning-only. `players-identity-lifecycle-intake` and
+`obelisk.players-identity-first-evidence.v1` are candidate-only,
+consume-only/promote-blocked evidence lanes, not public SDK or runtime readiness. The
+first-evidence gate force-redacts identity-like fields, treats `ServerKickPlayer` fields
+as admin-mutation-not-public-identity, and fails closed until missing sanitized
+`ServerListPlayers` and `ServerKickPlayer` snapshots, accepted lifecycle anchors,
+principal privacy/invalidation semantics, and independent second-source evidence exist.
 
 Inventory/items mutation, structure/dino/tribe/mission/transfer module SDKs, RCON,
 database/storage services, webhooks, economy, homes, teleport, and permissions remain
-post-v1 unless a later promotion gate explicitly moves them into the supported set.
+outside the current promoted scope. If they are included in the eventual `v1.0` support
+statement, they must be promoted before the release is called `v1.0`.
 
 ## v1.0 Release Bar
 

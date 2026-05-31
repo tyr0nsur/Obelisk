@@ -96,10 +96,27 @@ not by public SDK tooling. Minimal shape:
 
 Useful existing commands for a future approved offline pass:
 
+To plan exact focal snapshots from an already-reviewed redacted inventory pack without
+reading a core, expanding runtime scope, or touching a server, use the target-set planner
+with an explicit reviewed Obelisk id:
+
+```bash
+python3 scripts/plan_ufunction_focal_snapshots.py \
+  --inventory-pack <approved-reflection-inventory-pack>/manifest.json \
+  --target-set players-identity-lifecycle-intake \
+  --evidence-obelisk-commit <reviewed-obelisk-id> \
+  --json-out <ignored-non-protected-output>/players-identity-focal-plan.json
+```
+
+This emits candidate-only `inspect_core_ufunctions.py --snapshot-json` commands. It does
+not reread the core, execute commands, add fixtures, promote identity, or authorize server
+work.
+
 ```bash
 python3 scripts/build_reflection_inventory_pack.py \
   --evidence-pack-manifest <approved-offline-manifest> \
   --target-set players-identity-lifecycle-intake \
+  --evidence-obelisk-commit <reviewed-obelisk-id> \
   --plan-regeneration \
   --output-dir <ignored-non-protected-output>
 ```

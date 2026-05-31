@@ -11,6 +11,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import ufunction_focal_snapshot_plan as focal_planner  # noqa: E402
+from reflection_target_sets import TARGET_SETS  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     SHA256_RE,
     manifest_relative_path,
@@ -44,7 +45,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--inventory-pack", required=True, type=Path, help="Pack directory or manifest.json path.")
     parser.add_argument("--target", action="append", default=[], metavar="Outer.Name")
+    parser.add_argument("--target-set", action="append", default=[], help="Named reflection target set to expand.")
     parser.add_argument("--target-file", action="append", type=Path, default=[], help="Newline target list.")
+    parser.add_argument(
+        "--evidence-obelisk-commit",
+        required=True,
+        help="Reviewed Obelisk commit/id to embed in emitted snapshot commands.",
+    )
     parser.add_argument("--json-out", type=Path, help="Optional output JSON path. Defaults to stdout.")
     return parser.parse_args()
 
@@ -212,6 +219,12 @@ def load_functions(inventory_path: Path) -> list[dict[str, object]]:
 
 def load_targets(args: argparse.Namespace) -> tuple[list[str], dict[str, object]]:
     targets = list(args.target)
+    target_sets: list[str] = []
+    for target_set in args.target_set:
+        if target_set not in TARGET_SETS:
+            raise SystemExit(f"unknown --target-set: {target_set}")
+        target_sets.append(target_set)
+        targets.extend(TARGET_SETS[target_set])
     target_files: list[str] = []
     for path in args.target_file:
         reject_symlink_component(path, "--target-file")
@@ -226,6 +239,7 @@ def load_targets(args: argparse.Namespace) -> tuple[list[str], dict[str, object]
         raise SystemExit("at least one --target or --target-file entry is required")
     return targets, {
         "cli_target_count": len(args.target),
+        "target_sets": target_sets,
         "target_files": target_files,
         "loaded_target_count": len(targets),
     }
@@ -253,6 +267,7 @@ def build_plan(args: argparse.Namespace) -> dict[str, object]:
         fname_root_ready=True,
         fname_root_blockers=[],
         artifact_identity_source="reflection-inventory-pack",
+        obelisk_commit=args.evidence_obelisk_commit,
         repo_root=SCRIPT_DIR.parent,
     )
     payload["inventory_source"] = "accepted_redacted_inventory_pack"

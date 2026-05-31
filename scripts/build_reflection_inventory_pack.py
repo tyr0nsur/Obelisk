@@ -50,6 +50,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--artifact-kind", default="offline_core")
     parser.add_argument("--capture-id")
     parser.add_argument("--evidence-pack-id")
+    parser.add_argument(
+        "--evidence-obelisk-commit",
+        help="Reviewed Obelisk commit/id to embed in emitted focal snapshot commands.",
+    )
     parser.add_argument("--max-objects", type=int, default=DEFAULT_MAX_OBJECTS)
     parser.add_argument("--max-groups", type=int, default=DEFAULT_MAX_GROUPS)
     parser.add_argument("--outer-contains")
@@ -239,6 +243,8 @@ def main() -> int:
         evidence_pack_manifest = None
     if plan_snapshot_targets and artifact_kind != "offline_core":
         raise SystemExit("snapshot planning only supports offline_core artifact identity")
+    if plan_snapshot_targets and not args.evidence_obelisk_commit:
+        raise SystemExit("snapshot planning requires explicit --evidence-obelisk-commit")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -333,6 +339,7 @@ def main() -> int:
             fname_root_ready=root_readiness["ready"] is True,
             fname_root_blockers=[str(item) for item in root_readiness["blockers"]],
             artifact_identity_source="evidence-pack-manifest" if evidence_pack_manifest else "direct-core-explicit",
+            obelisk_commit=args.evidence_obelisk_commit,
             repo_root=SCRIPT_DIR.parent,
         )
 

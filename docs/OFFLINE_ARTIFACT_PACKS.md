@@ -135,6 +135,21 @@ paths.
 CLI `--root` and hidden protected-root inputs may be absolute or relative; the gate
 normalizes them before comparing direct path text and symlink-resolved paths.
 
+## Player Identity First Evidence
+
+`obelisk.players-identity-first-evidence.v1` is a consume-only, planning-only child
+manifest for `players-identity-lifecycle-intake`. It is useful for preserving redacted
+identity research, but it does not promote public player identity, commands, permissions,
+economy, lookup, `ResourceHandle`, runtime hooks, mutation, return override, or SDK
+readiness.
+
+The consume gate requires a complete 12-target pack, full target-set coverage metadata,
+per-target and per-field evidence rows, forced-redacted identity-like fields, forbidden
+field records, required non-claims, unaccepted login/logout lifecycle anchors, and
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`. Status-only
+coverage, empty evidence rows, nested readiness booleans, or public-SDK text claims fail
+closed.
+
 ## Consume Gate
 
 Run the offline gate against the container manifest, not an arbitrary file in the pack:

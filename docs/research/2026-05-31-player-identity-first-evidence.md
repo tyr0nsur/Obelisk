@@ -249,7 +249,10 @@ offline reuse only when it remains `candidate_only`, `planning_only`, redacts
 keeps lifecycle anchors unaccepted, keeps public principal policy unset, and carries the
 required explicit exclusions for commands, permissions, economy, lookup, `ResourceHandle`,
 mutation, return override, UE pointers, raw params, and FName/GObjects indices. Promote
-mode must stay blocked even for a complete 12-target pack.
+mode must stay blocked even for a complete 12-target pack. The gate also reconciles
+per-target rows, per-field rows, forced-redacted fields, forbidden fields, full target-set
+coverage metadata, required non-claims, and nested readiness/public-SDK overclaims; a
+status-only or empty evidence object must fail closed.
 
 The current fixture gap is exact: the committed snapshot manifest has 10/12
 `players-identity-lifecycle-intake` targets and lacks only
@@ -259,6 +262,9 @@ generate sanitized candidate snapshots for those two admin surfaces without a li
 but current live-ops policy still requires an explicit approved offline `/servidor/ark`
 workspace action before reading or writing that path. Those snapshots would close the
 admin-surface fixture gap only; they would not establish login/logout lifecycle anchors.
+For a reviewed inventory pack, `scripts/plan_ufunction_focal_snapshots.py --target-set
+players-identity-lifecycle-intake --evidence-obelisk-commit <reviewed-id>` now emits the
+exact candidate-only snapshot commands without rereading a core or relying on Git state.
 
 Demand review of local plugin source dictionaries reinforces priority rather than
 promotion: plugin authors expect player identity, tribe identity, command/RCON registries,
