@@ -3661,8 +3661,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         compact_inventory = normalized(inventory)
 
         for required in (
-            "Mission planning and mission demand",
-            "Demand/research notes only",
+            "Mission copied-bool planning and mission demand",
+            "Internal/test-only research notes",
             "Planning-only",
             "Production Plugin Hub mission module",
             "ArkApi mission compatibility",

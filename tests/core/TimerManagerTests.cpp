@@ -69,6 +69,27 @@ namespace
         state->Cv.notify_all();
     }
 
+    struct OwnerCleanupFromCallbackState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        void* Owner = nullptr;
+        int Count = 0;
+        size_t Removed = 0;
+    };
+
+    void OwnerCleanupFromCallback(uint64_t, void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupFromCallbackState*>(userData);
+        const size_t removed = TimerManager::Get().UnregisterCallbacksForOwner(state->Owner);
+        {
+            std::lock_guard<std::mutex> lock(state->Mutex);
+            ++state->Count;
+            state->Removed = removed;
+        }
+        state->Cv.notify_all();
+    }
+
     struct BlockingState
     {
         std::mutex Mutex;
@@ -197,6 +218,31 @@ namespace
         Require(state.UnregisterResult, "self-unregister returned false");
     }
 
+    void TestOwnerCleanupFromOwnCallbackDoesNotDeadlock()
+    {
+        int owner = 0;
+        OwnerCleanupFromCallbackState state;
+        state.Owner = &owner;
+        const uint64_t timerId =
+            TimerManager::Get().Register(&owner, 5, 5, true, OwnerCleanupFromCallback, &state);
+        Require(timerId != 0, "owner-cleanup timer registration failed");
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&]() { return state.Count == 1; }),
+                    "owner-cleanup callback did not run");
+            Require(state.Removed == 1, "owner cleanup from callback removed wrong timer count");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            Require(state.Count == 1, "owner-cleanup timer fired again after callback cleanup");
+        }
+        Require(!TimerManager::Get().Unregister(&owner, timerId),
+                "owner-cleanup timer remained active after callback cleanup");
+    }
+
     void TestCallbackExceptionDoesNotStopWorker()
     {
         int throwingOwner = 0;
@@ -308,6 +354,7 @@ int main()
     TestRepeatingTimerStopsAfterUnregister();
     TestWrongOwnerCannotUnregister();
     TestSelfUnregisterDoesNotDeadlock();
+    TestOwnerCleanupFromOwnCallbackDoesNotDeadlock();
     TestCallbackExceptionDoesNotStopWorker();
     TestUnknownCallbackExceptionDoesNotStopWorker();
     TestOwnerCleanupWaitsForInFlightCallback();

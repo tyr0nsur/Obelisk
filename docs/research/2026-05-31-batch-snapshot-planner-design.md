@@ -42,6 +42,26 @@ Current bridge: `scripts/build_reflection_inventory_pack.py` now supports
 inventory pack. The standalone planner below remains the preferred follow-up when we need
 to plan from an already reviewed inventory pack without rereading a core.
 
+## Bridge Audit
+
+The `--plan-snapshot-target-set` bridge matches this design's narrow bridge role: it
+expands named UFunction target sets into exact `Outer.Name` requests, keeps
+`manifest.inputs.target_sets=[]`, records the requested planning set separately under
+`manifest.inputs.plan_snapshot_target_sets`, and reuses `focal_snapshot_plan(...)` so the
+output remains candidate-only and emits `inspect_core_ufunctions.py --snapshot-json`
+commands rather than `--target-set` regeneration commands.
+
+The main test gap was bridge-specific success coverage. Existing tests covered ad hoc
+`--plan-target` success, target-set missing-target blocking, duplicate normalization, and
+offline-core identity gates, but not a named target set that actually plans a command from
+the unfiltered redacted inventory while the visible inventory output is filtered. Added
+coverage in `scripts/test_build_reflection_inventory_pack.py` now pins that behavior.
+
+Decision: do not keep expanding the bridge before the next implementation step. The bridge
+is adequate as a fresh-pack convenience path; the next useful implementation remains the
+standalone `scripts/plan_ufunction_focal_snapshots.py` that consumes an already reviewed
+reflection inventory pack without rereading a core.
+
 Preferred patch shape:
 
 1. Extract these helpers from `scripts/build_reflection_inventory_pack.py` into a new
@@ -103,6 +123,29 @@ Add consume-mode support for
 `obelisk.reflection-inventory-pack-comparison.v1` in
 `scripts/validate_offline_artifact_gate.py` after the planner lands. That is useful
 indexing/planning hygiene, but it is not required to emit focal snapshot commands.
+
+### 2026-05-31 Gate Readiness Check
+
+Decision: keep this follow-up documented; do not implement gate support yet. The
+producer schema exists in `scripts/compare_reflection_inventory_packs.py`, but the
+preferred standalone planner for consuming an already reviewed pack has not landed, so
+adding the comparison schema to the artifact gate now would create an accepted indexing
+surface before the consuming workflow is complete.
+
+Required guardrails before implementation:
+
+- consume mode accepts only `status=accepted` with empty `blockers`,
+  `promotion_status=not_promoted_candidate_only`, matching base/candidate binary SHA,
+  distinct `artifact_identity` fields, and no missing/new/changed function rows;
+- promote mode always blocks this schema as candidate-only planning hygiene;
+- `base.pack` and `candidate.pack` must be checked as offline workspace paths, not just
+  scanned as generic strings;
+- required non-claims must preserve the existing boundaries: no runtime-stable GObjects,
+  no UObject pointers/raw params/object identity/mutation/return override, and no
+  replacement for strict per-target snapshot readiness reports;
+- tests should cover accepted consume mode, blocked comparison status, promote-mode
+  rejection, protected-path pack references, identity reuse, binary mismatch, and
+  missing/new/changed rows.
 
 ## Risks And Non-Claims
 

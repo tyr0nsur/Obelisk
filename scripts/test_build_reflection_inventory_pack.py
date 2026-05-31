@@ -16,6 +16,18 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from test_enumerate_core_uobjects import build_core_fixture  # noqa: E402
 
 
+def patch_fixture_fname_entry(core: Path, addrs: dict[str, int], index: int, name: str) -> None:
+    data = bytearray(core.read_bytes())
+    entry_offset = 0x1000 + ((addrs["base"] + 0x4000 + index * 0x80) - addrs["base"])
+    text_offset = entry_offset + 0x10
+    encoded = name.encode("ascii") + b"\0"
+    if len(encoded) > 0x70:
+        raise ValueError(f"fixture FName entry is too long: {name}")
+    data[text_offset : text_offset + 0x70] = b"\0" * 0x70
+    data[text_offset : text_offset + len(encoded)] = encoded
+    core.write_bytes(data)
+
+
 class BuildReflectionInventoryPackTests(unittest.TestCase):
     def run_builder(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -598,6 +610,65 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertEqual(plan["targets"][0]["status"], "blocked")
         self.assertEqual(plan["targets"][0]["blocker"], "missing_inventory_target")
         self.assertEqual(plan["promotion_status"], "not_promoted_candidate_only")
+
+    def test_plan_snapshot_target_set_emits_exact_focal_command_from_unfiltered_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            patch_fixture_fname_entry(core, addrs, 3, "ShooterPlayerController")
+            patch_fixture_fname_entry(core, addrs, 4, "ServerSendChatMessage")
+            output_dir = root / "out"
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--capture-id",
+                    "fixture-core",
+                    "--evidence-pack-id",
+                    "fixture-pack",
+                    "--name-contains",
+                    "NoSuchName",
+                    "--plan-snapshot-target-set",
+                    "chat-message-intake",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+            stdout_manifest = json.loads(result.stdout)
+            inventory = json.loads((output_dir / "ufunction-inventory.json").read_text(encoding="utf-8"))
+            written_manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(stdout_manifest["summary"]["function_count"], 0)
+        self.assertEqual(written_manifest["inputs"]["target_sets"], [])
+        self.assertEqual(written_manifest["inputs"]["plan_targets"], [])
+        self.assertEqual(written_manifest["inputs"]["plan_snapshot_target_sets"], ["chat-message-intake"])
+        plan = inventory["focal_snapshot_plan"]
+        self.assertEqual(plan["requested_count"], 1)
+        self.assertEqual(plan["planned_command_count"], 1)
+        self.assertEqual(plan["blocked_count"], 0)
+        self.assertEqual(plan["inventory_source"], "unfiltered_redacted_functions")
+        self.assertEqual(plan["promotion_status"], "not_promoted_candidate_only")
+        self.assertEqual(plan["targets"][0]["target"], (
+            "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage"
+        ))
+        self.assertEqual(plan["targets"][0]["status"], "planned")
+        command = plan["snapshot_commands"][0]["argv"]
+        self.assertIn("--snapshot-json", command)
+        self.assertIn("--outer-exact", command)
+        self.assertIn("ShooterPlayerController", command)
+        self.assertIn("--name-exact", command)
+        self.assertIn("ServerSendChatMessage", command)
+        self.assertNotIn("--target-set", command)
 
     def test_plan_snapshot_target_set_rejects_duplicate_explicit_target(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

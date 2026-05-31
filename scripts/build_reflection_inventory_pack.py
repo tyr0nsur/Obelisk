@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -14,6 +13,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import scan_core_fname_tables as fname_scanner  # noqa: E402
 import reflection_target_sets  # noqa: E402
 import summarize_core_ufunction_inventory as ufunction_inventory  # noqa: E402
+import ufunction_focal_snapshot_plan as focal_planner  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     SHA256_RE,
     evidence_pack_defaults,
@@ -29,7 +29,6 @@ from snapshot_evidence_pack import (  # noqa: E402
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 DEFAULT_MAX_OBJECTS = ufunction_inventory.DEFAULT_MAX_OBJECTS
 DEFAULT_MAX_GROUPS = 20
-PYTHON_COMMAND = "python3"
 
 
 def parse_index(value: str) -> tuple[str, int]:
@@ -163,175 +162,6 @@ def load_evidence_defaults(args: argparse.Namespace) -> tuple[Path, int, int, st
 def reject_artifact_symlink(path: Path) -> None:
     if path.is_symlink():
         raise SystemExit(f"refusing to overwrite symlinked pack artifact: {path}")
-
-
-def repo_commit() -> str:
-    return subprocess.check_output(
-        ["git", "rev-parse", "--short", "HEAD"],
-        cwd=SCRIPT_DIR.parent,
-        text=True,
-    ).strip()
-
-
-def parse_exact_target(target: str) -> tuple[str, str, str]:
-    schema = "obelisk.ufunction-chain.snapshot.v1"
-    schema_part, separator, short_target = target.partition(":")
-    if separator:
-        if schema_part != schema:
-            raise SystemExit(f"--plan-target only supports {schema}: {target}")
-    else:
-        short_target = target
-    outer, dot, name = short_target.rpartition(".")
-    if not dot or not outer or not name:
-        raise SystemExit(f"--plan-target must be an exact Outer.Name target: {target}")
-    return schema, outer, name
-
-
-def plan_output_filename(outer: str, name: str) -> str:
-    return safe_component(f"{outer.replace('/', '_')}.{name}.snapshot.json", "plan-target-output")
-
-
-def focal_snapshot_plan(
-    functions: list[dict[str, object]],
-    *,
-    requested_targets: list[str],
-    core: Path,
-    gobjects: int,
-    fname_root_slot: int,
-    binary_sha: str,
-    core_sha: str,
-    capture_id: str,
-    evidence_pack_id: str,
-    max_object_scan: int,
-    fname_root_ready: bool,
-    fname_root_blockers: list[str],
-    artifact_identity_source: str,
-) -> dict[str, object]:
-    inventory_by_key: dict[str, list[dict[str, object]]] = {}
-    for item in functions:
-        outer = item.get("outer_name")
-        name = item.get("name")
-        if isinstance(outer, str) and isinstance(name, str) and outer and name:
-            inventory_by_key.setdefault(f"{outer}.{name}", []).append(item)
-
-    obelisk_commit = repo_commit()
-    command_cwd = str(SCRIPT_DIR.parent)
-    command_env = {"PYTHONDONTWRITEBYTECODE": "1"}
-    records: list[dict[str, object]] = []
-    commands: list[dict[str, object]] = []
-    blockers: list[dict[str, object]] = []
-    seen: set[str] = set()
-    for raw_target in requested_targets:
-        schema, outer, name = parse_exact_target(raw_target)
-        target = f"{outer}.{name}"
-        if target in seen:
-            raise SystemExit(f"duplicate --plan-target: {target}")
-        seen.add(target)
-        matches = inventory_by_key.get(target, [])
-        if not fname_root_ready:
-            status = "blocked"
-            blocker = "fname_root_not_ready"
-        elif not matches:
-            status = "blocked"
-            blocker = "missing_inventory_target"
-        elif len(matches) > 1:
-            status = "blocked"
-            blocker = "ambiguous_inventory_target"
-        else:
-            status = "planned"
-            blocker = None
-
-        record: dict[str, object] = {
-            "target": f"{schema}:{target}",
-            "short_target": target,
-            "inventory_status": "present" if len(matches) == 1 else "missing" if not matches else "ambiguous",
-            "inventory_match_count": len(matches),
-            "status": status,
-            "promotion_status": "not_promoted_candidate_only",
-            "snapshot_output_hint": f"<non-protected-review-output>/{plan_output_filename(outer, name)}",
-            "snapshot_command_cwd": command_cwd,
-            "snapshot_command_env": command_env,
-            "redaction_review": [
-                "review placement structs, location vectors, rotation values, player/controller context, object refs, arrays, and raw params before any copied payload",
-                "keep non-scalar or identity-bearing fields redacted or recognition-only unless separately promoted",
-            ],
-            "non_claims": [
-                "does not add a target set or fixture",
-                "does not promote StructureEvents, build-policy SDK, runtime hooks, mutation, or return override",
-            ],
-        }
-        if blocker is not None:
-            record["blocker"] = blocker
-            blocker_record: dict[str, object] = {"target": f"{schema}:{target}", "reason": blocker}
-            if blocker == "fname_root_not_ready":
-                blocker_record["fname_root_blockers"] = fname_root_blockers
-            blockers.append(blocker_record)
-        else:
-            command = [
-                PYTHON_COMMAND,
-                "scripts/inspect_core_ufunctions.py",
-                "--core",
-                str(core),
-                "--gobjects",
-                hex(gobjects),
-                "--fname-root-slot",
-                hex(fname_root_slot),
-                "--outer-exact",
-                outer,
-                "--name-exact",
-                name,
-                "--max-object-scan",
-                str(max_object_scan),
-                "--inspection-mode",
-                "ufunction",
-                "--snapshot-json",
-                "--evidence-ark-sha256",
-                binary_sha,
-                "--evidence-artifact-sha256",
-                core_sha,
-                "--evidence-artifact-kind",
-                "offline_core",
-                "--evidence-capture-id",
-                capture_id,
-                "--evidence-pack-id",
-                evidence_pack_id,
-                "--evidence-obelisk-commit",
-                obelisk_commit,
-            ]
-            record["snapshot_command"] = command
-            commands.append(
-                {
-                    "target": f"{schema}:{target}",
-                    "cwd": command_cwd,
-                    "env": command_env,
-                    "argv": command,
-                }
-            )
-        records.append(record)
-
-    return {
-        "schema": "obelisk.ufunction-focal-snapshot-plan.v1",
-        "requested_count": len(requested_targets),
-        "planned_command_count": len(commands),
-        "blocked_count": len(blockers),
-        "core": str(core),
-        "gobjects": hex(gobjects),
-        "fname_root_slot": hex(fname_root_slot),
-        "inventory_source": "unfiltered_redacted_functions",
-        "fname_root_readiness": {"ready": fname_root_ready, "blockers": fname_root_blockers},
-        "artifact_identity": {
-            "artifact_kind": "offline_core",
-            "artifact_sha256": core_sha,
-            "capture_id": capture_id,
-            "evidence_pack_id": evidence_pack_id,
-            "source": artifact_identity_source,
-        },
-        "binary": {"sha256": binary_sha},
-        "targets": records,
-        "snapshot_commands": commands,
-        "blockers": blockers,
-        "promotion_status": "not_promoted_candidate_only",
-    }
 
 
 def write_json(path: Path, payload: dict[str, object]) -> None:
@@ -489,7 +319,7 @@ def main() -> int:
     if plan_snapshot_targets:
         if plan_functions is None:
             raise SystemExit("snapshot planning requires redacted function inventory")
-        inventory_payload["focal_snapshot_plan"] = focal_snapshot_plan(
+        inventory_payload["focal_snapshot_plan"] = focal_planner.focal_snapshot_plan(
             plan_functions,
             requested_targets=plan_snapshot_targets,
             core=core,
@@ -503,6 +333,7 @@ def main() -> int:
             fname_root_ready=root_readiness["ready"] is True,
             fname_root_blockers=[str(item) for item in root_readiness["blockers"]],
             artifact_identity_source="evidence-pack-manifest" if evidence_pack_manifest else "direct-core-explicit",
+            repo_root=SCRIPT_DIR.parent,
         )
 
     fname_payload = {

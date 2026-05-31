@@ -236,6 +236,35 @@ namespace
                 "inventory_item.use_onto_item_check",
                 "Inventory Item Use Onto Item Check");
     }
+
+    bool ValidateRejectedDescriptorQueries(const ObeliskApi* api)
+    {
+        ObeliskResourceKindDescriptor resourceDescriptor{};
+        resourceDescriptor.struct_size = sizeof(ObeliskResourceKindDescriptor);
+        if (api->DescribeResourceKind(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_UNKNOWN, &resourceDescriptor))
+            return false;
+
+        resourceDescriptor = {};
+        resourceDescriptor.struct_size = sizeof(ObeliskResourceKindDescriptor) - 1;
+        if (api->DescribeResourceKind(OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE, &resourceDescriptor))
+            return false;
+
+        ObeliskGameplayPolicyEventDescriptor eventDescriptor{};
+        eventDescriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+        if (api->DescribeGameplayPolicyEventKind(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_UNKNOWN, &eventDescriptor))
+            return false;
+
+        eventDescriptor = {};
+        eventDescriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
+        if (api->DescribeGameplayPolicyEventKind(OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MAX + 1u, &eventDescriptor))
+            return false;
+
+        eventDescriptor = {};
+        eventDescriptor.struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor) - 1;
+        return !api->DescribeGameplayPolicyEventKind(
+            OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK,
+            &eventDescriptor);
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
@@ -282,7 +311,7 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
         if (!contextOk)
             return false;
 
-        g_DescriptorCatalogValidated = ValidateDescriptorCatalog(api);
+        g_DescriptorCatalogValidated = ValidateDescriptorCatalog(api) && ValidateRejectedDescriptorQueries(api);
         return g_DescriptorCatalogValidated;
     }
     catch (...)

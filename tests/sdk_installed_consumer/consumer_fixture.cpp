@@ -281,8 +281,8 @@ namespace
 
     bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
     {
-        Require(out != nullptr, "resource descriptor output was null");
-        Require(out->struct_size >= sizeof(ObeliskResourceKindDescriptor), "resource descriptor size mismatch");
+        if (!out || out->struct_size < sizeof(ObeliskResourceKindDescriptor))
+            return false;
 
         out->abi_version = OBELISK_RESOURCE_KIND_DESCRIPTOR_ABI_VERSION;
         out->struct_size = sizeof(ObeliskResourceKindDescriptor);
@@ -312,15 +312,13 @@ namespace
             std::strncpy(out->display_name, "Inventory Item", sizeof(out->display_name) - 1);
             return true;
         }
-        throw std::runtime_error("unexpected resource kind");
-        return true;
+        return false;
     }
 
     bool DescribeGameplayPolicyEventKind(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out)
     {
-        Require(out != nullptr, "event descriptor output was null");
-        Require(out->struct_size >= sizeof(ObeliskGameplayPolicyEventDescriptor),
-                "event descriptor size mismatch");
+        if (!out || out->struct_size < sizeof(ObeliskGameplayPolicyEventDescriptor))
+            return false;
 
         out->abi_version = OBELISK_GAMEPLAY_POLICY_EVENT_DESCRIPTOR_ABI_VERSION;
         out->struct_size = sizeof(ObeliskGameplayPolicyEventDescriptor);
@@ -431,8 +429,7 @@ namespace
             std::strncpy(out->display_name, "Inventory Item Use Onto Item Check", sizeof(out->display_name) - 1);
             return true;
         }
-        throw std::runtime_error("unexpected gameplay policy event kind");
-        return true;
+        return false;
     }
 
     template <typename T>

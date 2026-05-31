@@ -12,7 +12,7 @@ evidence trails. Treat them as examples of the common reflection and promotion-g
 not as the current product center. For contributor-facing release scope, use
 `docs/STATUS.md` and `docs/RELEASE.md` plus the RC evidence path below; broad UE4
 reflection, FName/GObjects expansion, and new module surface discovery are post-RC unless a
-new binary hash or contradictory evidence changes the active routing.
+new binary hash or contradictory evidence changes the current research priority.
 
 ## Start Here
 
@@ -117,8 +117,8 @@ v1 product center or SDK promise.
 Read the current v1 route through three gates:
 
 - Routing snapshot: the table below is a research index for next work, not live agent
-  routing, release authorization, or a public compatibility roadmap. Active turn routing
-  stays in the lead handoff brief.
+  routing, release authorization, or a public compatibility roadmap. Current task routing
+  belongs outside this research index.
 - Evidence gate: accepted target-set, consume-gate, or layout evidence can justify
   fixture/internal work only for the named slice. It does not promote adjacent identity,
   lookup, mutation, return override, runtime observer, or SDK surfaces.
@@ -142,11 +142,16 @@ internal/test-only copied-bool planning. Neither lane is a public Inventory SDK,
 Mission SDK, new capability family, identity/lookup contract, mutation path, return
 override, or server-observation approval.
 
-Next v1 research round: use
-[2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md) as the
-module prioritization checkpoint. The next useful pass is hub foundation first, then
-`GameplayPolicyEvent` backing evidence, then mission copied-bool internal planning only
-after item return-only evidence is preserved. Do not repeat broad discovery on the current
+Next v1 research round: keep hub foundation first, then
+`GameplayPolicyEvent` backing evidence, then mission copied-bool internal planning only.
+Use [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md) for the
+selected Mission copied-bool internal lane,
+[2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)
+and
+[2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md)
+for the still-blocked identity lane, and
+[2026-05-31-batch-snapshot-planner-design.md](2026-05-31-batch-snapshot-planner-design.md)
+for pre-target-set focal snapshot planning. Do not repeat broad discovery on the current
 binary, do not promote new SDK modules, and do not recenter the roadmap on chat.
 
 `GameplayPolicyEvent` backing currently means exactly three copied-data lanes:
@@ -173,8 +178,8 @@ Current v1 research lane snapshot from the current notes:
 | Inventory lane | Fact: current inventory evidence is promoted publicly only through copied/redacted `GameplayPolicyEvent` fields. | Preserve copied scalar observation and fixture gates without publishing a public Inventory SDK, item identity, lookup, mutation, return override, or `ResourceHandle`. |
 | Structures lane | Fact: structure access/demolish/variant/activation/PIN/seat policy slices back current copied gameplay policy. Build placement remains second-wave. | Keep structure target sets layout-only unless a strict readiness note promotes a named copied surface; do not publish StructureEvents, build-policy SDKs, return override, identity, lookup, or raw params. |
 | Items lane | Fact: item return-only evidence supports three copied `GameplayPolicyEvent` kinds; item detail remains internal/evidence-only. | Preserve item return-only evidence without publishing Items SDKs, Inventory SDKs, item identity, mutation, return override, or `ResourceHandle`. |
-| Players identity lifecycle | Hypothesis/planning: highest-value broad discovery family after current descriptor/smoke, transfer bool-tail, and item return-only work; the seed set is docs-only and candidate-only. | Build only a closed offline target-set review from known names; keep login/logout names, stable identity, lookup, privacy, and public SDK blocked until evidence exists. |
-| Mission lane | Fact: accepted compact layout evidence and copied-bool test planning make it the selected post-RC internal planning thread. | Use as internal/test-only copied-bool hardening; no runtime hooks, public Mission SDK, object/array/player identity, mutation, or return override. |
+| Players identity lifecycle | Hypothesis/planning: high-value blocker for future commands, permissions, economy, and moderation, but the current set is candidate-only, missing two snapshots, and has no accepted login/logout lifecycle anchors. | Build only a closed offline target-set review from known names; keep stable identity, lookup, privacy, permissions, commands, and public SDK blocked until exact lifecycle evidence exists. |
+| Mission lane | Fact: accepted compact layout evidence and copied-bool test planning make it the selected post-RC internal/test-only module planning thread. | Use as internal/test-only copied-bool hardening; no runtime hooks, public Mission SDK, object/array/player identity, mutation, or return override. |
 | Transfer lane | Fact: UFunction and ScriptStruct layouts have exact layout-only evidence, but payloads remain sensitive. | Keep transfer as offline/internal until copied payload ownership, privacy/redaction, lifecycle, second-source/static evidence, ABI tests, installed SDK consumer coverage, and approved runtime validation all pass. |
 | Buff lane | Fact: compact and breadth target sets provide internal layout evidence for bool/class/zero-param shapes. | Treat as copied-payload/redaction design only; no public Buff SDK, runtime hooks, class/object exposure, mutation, return override, or gameplay semantics. |
 | Dino lane | Fact: passenger/carry compact target sets have accepted layout evidence. | Use only for later recognizer design until identity, lifetime, privacy/redaction, resource-handle, mutation, return-override, and callback gates are resolved. |

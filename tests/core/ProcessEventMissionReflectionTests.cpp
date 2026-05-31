@@ -1487,6 +1487,22 @@ namespace
             MissionFixture fixture;
             BuildAddPlayerToMission(fixture);
             fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+
+            attempt.Invocation.ParameterSize = 0x09;
+
+            CopiedMissionObservation observation;
+            PoisonObservation(observation);
+            Require(!TryBuildCopiedMissionObservation(attempt.Invocation, observation),
+                    "copied mission bool range past params provenance was accepted");
+            RequireObservationCleared(observation,
+                                      "copied mission bool range past params provenance did not clear output");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
             Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
 
             attempt.Invocation.Fields[2].Range = {};

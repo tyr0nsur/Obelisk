@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Extracted focal UFunction snapshot planning into a reusable helper module, added
+  target-set bridge coverage for unfiltered redacted inventories, hardened timer owner
+  cleanup from inside callbacks, and made installed descriptor catalog consumers reject
+  unknown or undersized descriptor queries fail-closed.
 - Added candidate-only batch snapshot planning from closed UFunction target sets in the
   reflection inventory pack builder, hardened `oDescriptorCatalog` fail-closed init,
   strengthened Mission copied-bool stale-output rejection tests, and recorded the player
