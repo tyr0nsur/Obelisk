@@ -326,6 +326,42 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertIn("snapshot_root_not_redacted", report["blockers"])
         self.assertIn("path_or_coordinate_leakage", report["blockers"])
 
+    def test_rejects_manifest_under_protected_server_root_before_reading(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "/servidor/ark/obelisk/player-identity-lifecycle-anchor-candidates.json",
+                "--json",
+            ],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("manifest must not read from protected server root /servidor/ark", result.stderr)
+
+    def test_rejects_symlinked_manifest_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest()), encoding="utf-8")
+            link = root / "manifest-link.json"
+            link.symlink_to(manifest_path)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(link), "--json"],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("manifest must not be a symlink", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

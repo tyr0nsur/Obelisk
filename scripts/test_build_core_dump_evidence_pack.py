@@ -164,7 +164,7 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 2)
-        self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+        self.assertIn("--binary must not be a symlink", stderr)
 
     def test_rejects_approved_dump_symlink_to_protected_server_binary_input(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -183,7 +183,53 @@ class CoreDumpEvidencePackCommandTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 2)
-        self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+        self.assertIn("--binary must not be a symlink", stderr)
+
+    def test_rejects_non_protected_binary_symlink_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "ShooterGameServer.real"
+            target.write_bytes(b"binary")
+            link = root / "ShooterGameServer"
+            link.symlink_to(target)
+            result, stderr = self.run_main_raw(
+                [
+                    "build_core_dump_evidence_pack.py",
+                    "--binary",
+                    str(link),
+                    "--core",
+                    str(root / "core"),
+                    "--output-dir",
+                    str(root / "pack"),
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--binary must not be a symlink", stderr)
+
+    def test_rejects_non_protected_core_symlink_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            binary.write_bytes(b"binary")
+            target = root / "core.real"
+            target.write_bytes(b"core")
+            link = root / "core"
+            link.symlink_to(target)
+            result, stderr = self.run_main_raw(
+                [
+                    "build_core_dump_evidence_pack.py",
+                    "--binary",
+                    str(binary),
+                    "--core",
+                    str(link),
+                    "--output-dir",
+                    str(root / "pack"),
+                ]
+            )
+
+        self.assertEqual(result, 2)
+        self.assertIn("--core must not be a symlink", stderr)
 
     def test_rejects_protected_server_output_dir_before_file_checks(self) -> None:
         result, stderr = self.run_main_raw(

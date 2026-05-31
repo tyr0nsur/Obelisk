@@ -166,6 +166,38 @@ If only non-protected copied core and binary files are available, first stage th
 both `/servidor/ark` and the repository, then build the core evidence pack explicitly
 without relying on Git or default candidate scans:
 
+Operator preflight for this direct route:
+
+- Use a fresh, run-specific `ROOT` under a non-protected artifact location such as
+  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>`.
+- Confirm `ROOT/raw/ShooterGameServer` and `ROOT/raw/core` are copied files, not symlinks
+  or paths back into `/servidor/ark`, the repository, or a live-server tree.
+- Set `COMMIT` from the reviewed checkpoint metadata already in hand. This recipe does
+  not require `git status`, `git rev-parse`, network access, GitHub, Discord, or any
+  server interaction.
+- Treat the address values below as evidence-bound to the same offline binary/core pair.
+  If the binary hash differs from the reviewed evidence, stop and collect new evidence
+  instead of reusing the sample addresses.
+- Keep all outputs under `ROOT`; the expected pack manifests are
+  `${ROOT}/core-evidence-pack/manifest.json` and
+  `${ROOT}/reflection-inventory-pack/manifest.json`.
+
+Use the staging helper when the source binary/core already exist as explicit
+non-protected files. It verifies the reviewed `ShooterGameServer` SHA, rejects symlinks
+and protected paths, and prepares the exact raw sibling layout without creating or
+validating a core:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/prepare_player_identity_offline_raw_layout.py \
+  --binary <non-protected-ShooterGameServer> \
+  --core <non-protected-core> \
+  --artifact-root /home/flowcommunity-ark/obelisk-artifacts \
+  --run-id <run-id>
+```
+
+After the helper reports `ready_for_core_evidence_pack_command=true`, use its
+`next_command` or the equivalent explicit command below.
+
 ```bash
 ROOT=/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>
 BIN=${ROOT}/raw/ShooterGameServer
@@ -201,6 +233,17 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_inventory_pack_readiness.py \
   --root "${ROOT}/reflection-inventory-pack"
 ```
+
+Operator stop/continue rule:
+
+- Stop if any command fails, if the core evidence pack manifest is missing, or if the
+  reflection readiness checker does not report `ready=true`.
+- Continue to focal snapshot planning only after the readiness checker accepts the
+  reflection-inventory pack and the pack records the full
+  `players-identity-lifecycle-intake` target-set coverage.
+- Even on success, the result remains candidate-only. Re-run the combined preflight
+  against the artifact root and expect the broader player-identity lane to remain blocked
+  until second-source evidence and lifecycle anchors are accepted.
 
 This direct staged-input route requires a matching offline `ShooterGameServer` and ELF
 core file. `build_reflection_inventory_pack.py` derives `binary.sha256` from the complete

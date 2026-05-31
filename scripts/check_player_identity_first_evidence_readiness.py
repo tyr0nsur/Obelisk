@@ -1005,10 +1005,15 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         elif first_evidence_ready:
             next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
 
-    core_manifest_pattern = args.artifact_root / CORE_EVIDENCE_MANIFEST_PATTERN
-    reflection_inventory_pattern = args.artifact_root / REFLECTION_INVENTORY_MANIFEST_PATTERN
-    raw_binary_pattern = args.artifact_root / "player-identity-offline-<run-id>" / "raw" / "ShooterGameServer"
-    raw_core_pattern = args.artifact_root / "player-identity-offline-<run-id>" / "raw" / "core"
+    recipe_root_raw = offline_inputs.get("resolved_root")
+    if isinstance(recipe_root_raw, str) and offline_inputs.get("status") != "artifact_root_rejected":
+        recipe_root = Path(recipe_root_raw)
+    else:
+        recipe_root = Path("<non-protected-artifact-root>")
+    core_manifest_pattern = recipe_root / CORE_EVIDENCE_MANIFEST_PATTERN
+    reflection_inventory_pattern = recipe_root / REFLECTION_INVENTORY_MANIFEST_PATTERN
+    raw_binary_pattern = recipe_root / "player-identity-offline-<run-id>" / "raw" / "ShooterGameServer"
+    raw_core_pattern = recipe_root / "player-identity-offline-<run-id>" / "raw" / "core"
     next_operator_recipe = {
         "blocked_until": "accepted_reflection_inventory_pack",
         "build_core_evidence_pack": (

@@ -120,6 +120,18 @@ def _is_under(path: Path, root: Path) -> bool:
     return True
 
 
+def _first_symlink_component(path: Path) -> Path | None:
+    candidate = path.expanduser()
+    candidate = candidate if candidate.is_absolute() else candidate.absolute()
+    current = Path(candidate.anchor) if candidate.anchor else Path()
+    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            return current
+    return None
+
+
 def _load_json(
     artifact_root: Path,
     rel_path: Path,
@@ -128,6 +140,10 @@ def _load_json(
     enforce_allowed_root: bool,
 ) -> Any | None:
     path = artifact_root / rel_path
+    symlink_component = _first_symlink_component(path)
+    if symlink_component is not None:
+        blockers.append(_blocker("artifact_path_symlink", f"{rel_path}: {symlink_component}"))
+        return None
     if enforce_allowed_root and not _is_under(path, ALLOWED_ARTIFACT_ROOT):
         blockers.append(
             _blocker(
@@ -381,6 +397,15 @@ def validate_artifacts(
 ) -> dict[str, Any]:
     artifact_root = Path(artifact_root)
     blockers: list[dict[str, str]] = []
+
+    root_symlink = _first_symlink_component(artifact_root)
+    if root_symlink is not None:
+        blockers.append(_blocker("artifact_root_symlink", str(root_symlink)))
+        return {
+            "status": "blocked",
+            "artifact_root": str(artifact_root),
+            "blockers": blockers,
+        }
 
     if enforce_allowed_root and not _is_under(artifact_root, ALLOWED_ARTIFACT_ROOT):
         blockers.append(

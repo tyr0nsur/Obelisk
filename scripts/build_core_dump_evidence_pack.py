@@ -106,6 +106,25 @@ def reject_protected_output_path(path: Path, label: str) -> None:
         raise SystemExit(2)
 
 
+def first_symlink_component(path: Path) -> Path | None:
+    expanded = path.expanduser()
+    candidate = expanded if expanded.is_absolute() else expanded.absolute()
+    current = Path(candidate.anchor) if candidate.anchor else Path()
+    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            return current
+    return None
+
+
+def reject_symlink_component(path: Path, label: str) -> None:
+    symlink_component = first_symlink_component(path)
+    if symlink_component is not None:
+        print(f"{label} must not be a symlink: {symlink_component}", file=sys.stderr)
+        raise SystemExit(2)
+
+
 def reject_preexisting_symlink_outputs(path: Path, label: str) -> None:
     if path.is_symlink():
         print(f"{label} must not contain pre-existing symlink output: {path}", file=sys.stderr)
@@ -1036,6 +1055,8 @@ def main() -> int:
     args = parse_args()
 
     try:
+        reject_symlink_component(args.binary, "--binary")
+        reject_symlink_component(args.core, "--core")
         reject_protected_input_path(args.binary, "--binary")
         reject_protected_input_path(args.core, "--core")
         reject_protected_output_path(args.output_dir, "--output-dir")

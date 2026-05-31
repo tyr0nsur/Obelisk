@@ -280,6 +280,27 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
 
+    def test_rejected_artifact_root_does_not_emit_copy_paste_protected_recipe_paths(self) -> None:
+        result = self.run_checker(
+            ["--artifact-root", "/servidor/ark/obelisk/player-identity-offline", "--json"],
+            check=False,
+        )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["artifact_chain"]["offline_inputs"]["status"], "artifact_root_rejected")
+        recipe = payload["next_operator_recipe"]
+        recipe_commands = "\n".join(
+            [
+                recipe["build_core_evidence_pack"],
+                recipe["build_reflection_inventory_pack"],
+                recipe["check_reflection_inventory_pack"],
+                recipe["plan_admin_focal_snapshots"],
+            ]
+        )
+        self.assertIn("<non-protected-artifact-root>", recipe_commands)
+        self.assertNotIn("/servidor/ark/obelisk/player-identity-offline", recipe_commands)
+
     def test_candidate_root_reports_second_source_not_accepted_separately_from_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_checker(

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from reflection_target_sets import schema_target_list
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
 SCHEMA = "obelisk.players-identity-lifecycle-anchor-candidates.v1"
@@ -97,6 +98,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_json(path: Path) -> dict[str, Any]:
+    reject_symlink_component(path, "manifest")
+    path = reject_protected_input_path(path, "manifest")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:

@@ -247,6 +247,28 @@ class BoundaryCheckerTests(unittest.TestCase):
 
         self.assertIn("bool_tail_metadata_mismatch", _result_codes(result))
 
+    def test_rejects_artifact_root_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            real_root = _artifact_tree(Path(temp_dir) / "real")
+            link = Path(temp_dir) / "root-link"
+            link.symlink_to(real_root, target_is_directory=True)
+
+            result = CHECKER.validate_artifacts(link, enforce_allowed_root=False)
+
+        self.assertIn("artifact_root_symlink", _result_codes(result))
+
+    def test_rejects_symlinked_artifact_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = _artifact_tree(Path(temp_dir))
+            readiness = root / CHECKER.READINESS_REL
+            target = root / "readiness.real.json"
+            readiness.rename(target)
+            readiness.symlink_to(target)
+
+            result = CHECKER.validate_artifacts(root, enforce_allowed_root=False)
+
+        self.assertIn("artifact_path_symlink", _result_codes(result))
+
 
 if __name__ == "__main__":
     unittest.main()
