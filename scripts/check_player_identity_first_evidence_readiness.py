@@ -533,6 +533,147 @@ def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) ->
     }
 
 
+def first_matching_binary_path(offline_inputs: dict[str, Any]) -> str | None:
+    candidates = offline_inputs.get("shooter_game_server_candidates")
+    if not isinstance(candidates, list):
+        return None
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("matches_current_binary") is True and isinstance(candidate.get("path"), str):
+            return candidate["path"]
+    return None
+
+
+def next_actionable_blocker(
+    *,
+    inventory_ready: bool,
+    inventory_payload_ready: bool,
+    inventory_chain: dict[str, Any],
+    downstream_blockers: list[str],
+    offline_inputs: dict[str, Any],
+    raw_binary_pattern: Path,
+    raw_core_pattern: Path,
+    core_manifest_pattern: Path,
+    reflection_inventory_pattern: Path,
+    next_operator_recipe: dict[str, Any],
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "not_artifact_gate": True,
+    }
+    if inventory_payload_ready and not inventory_ready:
+        return {
+            **base,
+            "code": "accepted_reflection_inventory_chain_incomplete",
+            "blocked_until": "accepted_reflection_inventory_pack_chained_to_complete_core_evidence_pack",
+            "why": "a lower-level readiness payload reported ready, but the identity chain guard rejected it",
+            "chain_blockers": inventory_chain.get("blockers") if isinstance(inventory_chain.get("blockers"), list) else [],
+            "next_required_artifact": {
+                "schema": REFLECTION_INVENTORY_PACK_SCHEMA,
+                "path_pattern": str(reflection_inventory_pattern),
+            },
+        }
+    if not inventory_ready:
+        offline_status = offline_inputs.get("status")
+        matching_binary_path = first_matching_binary_path(offline_inputs)
+        if offline_status == "offline_binary_present_core_like_input_missing":
+            return {
+                **base,
+                "code": "non_protected_core_input_missing",
+                "blocked_until": "non_protected_core_dump_input",
+                "why": "the artifact root has a matching offline ShooterGameServer, but no core-like input to package",
+                "available_binary": matching_binary_path,
+                "missing_input_path_pattern": str(raw_core_pattern),
+                "next_required_artifact": {
+                    "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+                    "path_pattern": str(core_manifest_pattern),
+                },
+                "next_command_after_input": next_operator_recipe["build_core_evidence_pack"],
+            }
+        if offline_status == "core_like_input_present_offline_binary_missing":
+            return {
+                **base,
+                "code": "matching_offline_binary_missing",
+                "blocked_until": "matching_non_protected_shooter_game_server_input",
+                "why": "the artifact root has a core-like input, but no matching offline ShooterGameServer for this binary hash",
+                "missing_input_path_pattern": str(raw_binary_pattern),
+                "expected_shooter_game_server_sha256": EXPECTED_SHOOTERGAME_SHA256,
+                "next_required_artifact": {
+                    "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+                    "path_pattern": str(core_manifest_pattern),
+                },
+            }
+        if offline_status == "offline_binary_present_hash_mismatch":
+            return {
+                **base,
+                "code": "matching_offline_binary_hash_mismatch",
+                "blocked_until": "matching_non_protected_shooter_game_server_input",
+                "why": "ShooterGameServer candidates were found, but none match the current reviewed binary hash",
+                "missing_input_path_pattern": str(raw_binary_pattern),
+                "expected_shooter_game_server_sha256": EXPECTED_SHOOTERGAME_SHA256,
+                "next_required_artifact": {
+                    "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+                    "path_pattern": str(core_manifest_pattern),
+                },
+            }
+        if offline_status == "offline_binary_and_core_like_inputs_present":
+            return {
+                **base,
+                "code": "core_evidence_pack_not_built_or_not_accepted",
+                "blocked_until": "complete_core_evidence_pack",
+                "why": "binary and core-like files are present under the artifact root, but no complete core evidence pack is accepted",
+                "next_required_artifact": {
+                    "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+                    "path_pattern": str(core_manifest_pattern),
+                },
+                "exact_next_command": next_operator_recipe["build_core_evidence_pack"],
+            }
+        return {
+            **base,
+            "code": "offline_binary_and_core_input_missing",
+            "blocked_until": "non_protected_offline_binary_and_core_inputs",
+            "why": "no accepted reflection inventory exists and the artifact root does not yet contain enough offline inputs to package core evidence",
+            "missing_input_path_patterns": [str(raw_binary_pattern), str(raw_core_pattern)],
+            "expected_shooter_game_server_sha256": EXPECTED_SHOOTERGAME_SHA256,
+            "next_required_artifact": {
+                "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+                "path_pattern": str(core_manifest_pattern),
+            },
+        }
+
+    if "fixture_coverage_incomplete" in downstream_blockers:
+        return {
+            **base,
+            "code": "admin_focal_snapshots_pending",
+            "blocked_until": "sanitized_server_list_players_and_server_kick_player_snapshots",
+            "why": "the reflection inventory chain is accepted, but fixture coverage still lacks the two admin snapshots",
+            "exact_next_command": next_operator_recipe["plan_admin_focal_snapshots"],
+        }
+    if "second_source_evidence_missing" in downstream_blockers or "second_source_evidence_not_accepted" in downstream_blockers:
+        return {
+            **base,
+            "code": "distinct_second_source_evidence_missing_or_not_accepted",
+            "blocked_until": "accepted_distinct_second_source_snapshot_comparison",
+            "why": "first-source fixtures are present enough to continue, but second-source evidence is not accepted",
+        }
+    if "accepted_lifecycle_anchors_missing" in downstream_blockers:
+        return {
+            **base,
+            "code": "accepted_lifecycle_anchor_evidence_missing",
+            "blocked_until": "consume_only_lifecycle_anchor_candidate_artifact",
+            "why": "identity first evidence still lacks accepted candidate start/end lifecycle anchors",
+        }
+    return {
+        **base,
+        "code": "validate_first_evidence_consume_promote_blocked",
+        "blocked_until": "consume_accepted_promote_blocked_first_evidence_artifact",
+        "why": "candidate evidence is ready enough for internal planning only; validate it as consume-only and promote-blocked",
+    }
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     inventory_result, inventory_payload = run_json_command(
         [
@@ -685,6 +826,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "planned admin focal snapshots remain candidate-only and do not promote public identity, permissions, commands, runtime hooks, mutation, lookup, return override, or SDK surface",
         ],
     }
+    next_blocker = next_actionable_blocker(
+        inventory_ready=inventory_ready,
+        inventory_payload_ready=inventory_payload_ready,
+        inventory_chain=inventory_chain,
+        downstream_blockers=downstream_blockers,
+        offline_inputs=offline_inputs,
+        raw_binary_pattern=raw_binary_pattern,
+        raw_core_pattern=raw_core_pattern,
+        core_manifest_pattern=core_manifest_pattern,
+        reflection_inventory_pattern=reflection_inventory_pattern,
+        next_operator_recipe=next_operator_recipe,
+    )
 
     return {
         "schema": REPORT_SCHEMA,
@@ -711,6 +864,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 "purpose": "reviewed_target_inventory_for_player_identity_lifecycle_intake",
             },
         ],
+        "next_actionable_blocker": next_blocker,
         "next_operator_recipe": next_operator_recipe,
         "artifact_chain": {
             "core_evidence_pack_required": True,

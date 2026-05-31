@@ -1,246 +1,193 @@
 # Current Agent Handoff
+
 This file is an active routing table only. Durable evidence belongs in `docs/research/`,
 resume facts in `COMPACT_CONTEXT.md`, and old detail in `HISTORY-*.md`. Historical
 recovery context is not active routing; use `git log --oneline -1` for the checkpoint.
 
 ## Active Objective
 
-- `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime, ProcessEvent hook, plugin lifecycle, central install layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, descriptors, timers, and refreshed RC evidence.
-- Publication used a clean release gate and exact tag/ref verification. Do not reinterpret, retag, or expand the published RC for routine post-RC work; treat stale local tags as invalid until revalidated.
-- Post-RC work moves toward `v1.0`: UE4 reflection, copied-data module APIs, lifecycle-safe plugins, operator tooling, and Linux-native equivalents for familiar ARK plugin concepts.
-- `v1.0` stable means the complete public SDK contract for plugin authors, not just a stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and `docs/public_sdk_surfaces.json` as the v1 surface map until the release gate packages or supersedes them.
-- Foundation/Plugin Hub seed work can be a pre-v1 contributor milestone, but it is not a substitute for `v1.0` SDK completeness.
-- Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers, commands, permissions, timers, config/logging, economy/database, and admin tooling as module areas above the core. Promote each only through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
+- `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime,
+  ProcessEvent hook, plugin lifecycle, central install layout, `oBaseEvents`,
+  `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, descriptors, timers, and
+  refreshed RC evidence.
+- Post-RC work moves toward `v1.0`: a complete public SDK contract for plugin authors,
+  not just a stable runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
+  `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
+  them.
+- Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers,
+  commands, permissions, timers, config/logging, economy/database, and admin tooling as
+  module areas above the same core. Promote each only through copied-data ABI, privacy,
+  lifecycle, and second-source/static evidence gates.
 
 ## Hard Overrides
 
-- GitHub publication is lead-only. GitHub work may be delegated only for an evidenced, stable milestone; this handoff does not authorize push, tag, release-ref updates, rebase, or routine publication.
-- No tag or release-ref push is authorized without explicit release-manager/lead authorization for the current-turn. Stale local tags are recreated only after rerunning the release gate on the intended ref and are not reused or pushed.
-- No server target has standing approval. Server-backed debug/beta work requires a current approved live-ops brief naming target instance/map, feature gates, marker/env changes, start/restart/stop window, notice path when players are involved, evidence capture, and rollback. Do not restart/start/stop servers, edit `/servidor/ark`, change markers, run ReflectionScanner, attach ptrace/gcore, enable broad ProcessEvent tracing, or publish runtime observations outside an exact approved run. Technical progress is only a reason to request a scoped run, not approval by itself.
-- Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug controls, and observers unless the matching approved env+marker pair is enabled for a scoped debug window.
-- Discord sends require explicit current-turn approval for approved public milestones or beta-test windows. Use no Discord for internal rounds or agent status, routine validation, or speculative notes. Always dry-run before any approved send and send one public-safe embed. Webhook URLs stay only in ignored `local/discord-webhooks.env`; repo text may name only `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and `OBELISK_BETA_TEST_WEBHOOK_URL`. Publication approval does not imply Discord approval.
+- GitHub publication is lead-only. GitHub work may be delegated only for an evidenced, stable milestone; this handoff does not authorize push, tag, release-ref updates,
+  rebase, or routine publication.
+- No tag or release-ref push may occur without release-manager/lead authorization for
+  the current-turn release scope.
+- No server target has standing approval. Server-backed debug/beta work requires a
+  current approved live-ops brief naming target instance/map, feature gates,
+  marker/env changes, start/restart/stop window, notice path when players are involved,
+  evidence capture, and rollback. Technical progress is only a reason to request a scoped
+  run, not approval by itself.
+- no Discord for internal rounds or agent status. Discord sends require explicit
+  current-turn approval for approved public milestones or beta-test windows, must use
+  `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL`, and must
+  use embed shape through `scripts/send_discord_embed.py`. Always dry-run before any approved send.
+  Never send routine validation notes, speculative reversing notes, or
+  internal agent status.
+- Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
+  `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
+  controls, and observers unless the matching approved env+marker pair is enabled for a
+  scoped debug window.
+- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries
+  only, not a behavior map, not a porting target, and not a copying source.
+  Do not copy code, offsets, layouts, vtables, ABI assumptions. Do not copy wrappers, raw UE pointer
+  APIs, constants, schemas, control flow, command parsers, return constants, return
+  semantics, or implementations.
 
 ## Current Routing Facts
 
-- RC public scope remains limited to `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`. `v0.1.0-rc.2` additionally includes process-local owner-token timers as core runtime API without promoting gameplay/module timers. It is not a production-stable `v1.0` claim.
-- The current v1 SDK inventory checkpoint is the latest complete-SDK alignment work: it
-  keeps `docs/public_sdk_surfaces.json`, `docs/SDK_V1_COMPATIBILITY.md`, and guardrails
-  aligned around v1 as a complete public SDK contract. It is a planning contract with
-  `v1_completion_required=false`, not a v1 release claim. Installed creator-facing
-  examples now use `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`, and
-  `ObeliskConfig.cmake` declares the `SDK` component, but that only proves package
-  consumption; it does not promote blocked gameplay surfaces.
-- The v1 completion checker now fails closed on truncated surface manifests, missing
-  canonical v1 blocker IDs, fake or external promotion evidence paths, generic existing
-  directories or unrelated existing release/tooling files as evidence for v1 blockers,
-  candidate-only/planning `scripts/test_*` files as blocker-promotion evidence, missing
-  structured promotion evidence (`surface_id`, `promotion_status=promoted`,
-  `public_sdk_ready=true`, ABI tests, and SDK consumer tests) for any promoted v1 blocker,
-  unlisted `promoted-experimental-only` surfaces, newly added or top-level-listed
-  `planning` surfaces without a v1 outcome, attempts to promote debug-only surfaces,
-  non-promoted completion blockers without `v1_decision_contract.exclusion_requires`, a
-  missing release statement for any v1 completion claim, ambiguous or contradictory
-  release-statement outcome lines, required exclusion text outside the exact structured
-  surface record, missing release-statement outcomes for non-promoted blockers, and
-  missing release-statement outcomes for canonical experimental seed surfaces when they
-  are excluded/post-v1. A valid release statement record uses exact
-  `surface-id: excluded - ...` or `surface-id: post-v1 - ...` wording, and required
-  exclusion text must appear on that surface's own record.
-- `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim: player identity, permissions/admin, commands/replies, inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and operator ingress/storage. Foundation/Plugin Hub seed work remains pre-v1 unless those blockers are promoted or explicitly excluded in a v1 release statement.
-- Lifecycle ops recovery is now an explicit machine-readable v1 blocker:
-  `obelisk.lifecycle_ops_recovery.v1`. Foundation lifecycle/config/logging does not satisfy
-  plugin watchdog, crash recovery, hot reload, process restart orchestration, server
-  recovery, operator reload command, detached-worker ingress, or restart-state recovery
-  demand. A v1 release statement must promote or explicitly exclude/post-v1 that surface.
-- `permissions/admin` remains blocked until `player_identity` is promoted. The documented
-  minimum later shape is query-only, owner-scoped, capability-gated, copied POD,
-  process-local, and fail-closed; it does not include commands/replies, send-chat,
-  moderation, kick/ban, grant CRUD, storage, RCON/operator ingress, lookup, mutation, or
-  cross-instance authority. Research note:
-  `docs/research/2026-05-31-permissions-admin-minimum-post-identity.md`.
-- Surfaces marked `promoted-experimental-only` also block a complete `v1.0` SDK claim until each is promoted, downgraded to planning/post-v1, or explicitly excluded in the release statement. Do not treat copied chat or copied gameplay-policy seeds as v1-complete.
-- `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership, capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted second-source/static evidence.
-- Legacy `CallProcessEvent` remains ABI-present only as an init-window debug escape hatch:
-  it fails closed unless the current plugin owner is inside `ObeliskPlugin_Init`, that
-  owner captured `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and the live env+marker gate
-  is still active. Post-init calls through captured API tables must not be treated as a
-  supported callable path; a future callable path needs an owner-token ABI.
-- SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require explicit install layout/test updates and ABI review.
-- Installed `Obelisk_*` CMake variables are derived from public headers; installed SDK
-  consumers verify package/header parity, version metadata, `Obelisk::obelisk_sdk`, and
-  versioned/versionless `find_package(... COMPONENTS SDK)` consumption.
-- Core dump evidence-pack manifests must declare `obelisk.core-dump-evidence-pack.v1`; snapshot/regeneration consumers and offline artifact gates require binary/core SHA, safe `core.path`, complete status, and `gdb_core_failed=false`.
-- Promoted copied events are observational and non-authoritative: no UE pointers, raw params, identity, lookup, mutation, return override, pincode/player text publication, or broad module SDK claim.
-- Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be proven complete, retains the plugin for retry, does not repeat plugin shutdown, runs copied-event `DestroyUserData` inside the relevant gameplay callback scope to avoid reentrant cleanup deadlocks, and release readiness rejects production `libobelisk.so` builds exposing manager/dispatcher test-only symbols.
-- Plugin-facing copied event dispatcher families with owner cleanup must be covered by
-  `PluginManager::UnregisterPluginCallbacks`; the static guardrail discovers
-  `*EventDispatcher.h` owner-cleanup families and allows only explicitly documented
-  internal/test-only exceptions. Before identity or other copied dispatcher promotion,
-  remove it from the exception path and add init-failure/unload cleanup coverage.
-- `oProcessTimer` is the first process-local timer example. Timer ids are process-local, not cluster state, UE identity, gameplay/module timer abstractions, or persistent handles, or shared scheduler state; owner-token timers require explicit unregister. Timer allocation skips zero/live ids after wrap. Safe-disabled config prep works without optional timer capability; active config fails closed on missing timer capability, owner token, or appended timer slots.
-- `oPolicyAudit` now unregisters its `GameplayPolicyEvent` owner-token handle if init fails after callback registration. The SDK fixture covers injected post-registration log failure cleanup.
-- `oDescriptorCatalog` is the metadata-only descriptor example. It registers no callbacks, timers, chat handlers, identity, lookup, mutation, return override, or ABI expansion.
-- `oBaseEvents` has a disabled-by-default plugin-local chat command helper over copied `ChatMessageEvent` bytes; no command ABI/router, identity, replies, moderation, send-chat API, mutation, or extra exported plugin symbols.
-- `oChatLogger` and `oChatAudit` are experimental and excluded from default release scope; safe-disabled init needs only the base ABI prefix/owner token, while active config fails closed on missing capabilities, short `struct_size`, null registration slots, or null callback user data.
-- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries
-  only, not a behavior map, not a porting target, not a copying source, and not implementation guides. Do not copy code, offsets, layouts, vtables, ABI assumptions, wrappers, raw UE pointer APIs, `.lib` artifacts, constants, schemas, control flow, command parsers, return constants, return semantics, or implementations.
-
-## Evidence Routing
-
-- Minimal second-source intake supports only the copied `GameplayPolicyEvent` structure/inventory lane. Consume gates accept; promotion remains blocked for identity, lookup, mutation, return override, Inventory SDK, StructureEvents, GObjects, and `ResourceHandle`.
-- The accepted RC UFunction second-source root remains the publication baseline.
-- `v0.1.0-rc.2` was published from `1a7cd98` after refreshing the RC UFunction second-source root for the intended ref and passing the release gate with all public RC targets accepted. Future RC/stable candidates must regenerate evidence for their exact intended ref.
-- Item return-only policy has three append-only public `GameplayPolicyEvent` kinds: `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem`, copied `ReturnValue` only and `inventory_item` category only. Runtime validation, public Inventory SDK, Items SDK, identity, mutation, and return override remain blocked without a live-ops brief and separate promotion gates.
-- Mission copied-bool, Transfer `bAccept`, Structure return-only, Structure non-PIN copied-scalar, and Buff breadth packages remain evidence-only/internal. Mission's exact internal bridge lane is the focused `mission-copied-bool-policy-slice` consumed as offline evidence, then `MissionReflection`-only recognition for a future default-off post-original log observer; it is not runtime/API promotion. Mission bool-tail preserves `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`. The only copied bools are `AddPlayerToMission.bForceAdd`, `AddPlayerToMission.ReturnValue`, `BPAllowPlayerToLeaveMission.ReturnValue`, `BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent`, and `BPOnPlayerRemovedFromMission.bLastPhaseSuccess`. The redacted-only fields are `AddPlayerToMission.PlayerCharacter`, `BPAllowPlayerToLeaveMission.PlayerPawn`, `BPOnPlayerRemovedFromMission.Player`, `BPOnPlayerRemovedFromMission.Controller`, `GetPlayerUsableItems.Character`, and `GetPlayerUsableItems.OutItemIDs`; `GetPlayerUsableItems` stays recognition-only and outside copied-bool policy output. Consume mode accepts documented slices and promote mode blocks release/public/runtime promotion through local consume-only/planning-only denylists even if shared metadata drifts. Mission now has local coverage that evaluated disabled/missing profile/window/marker/SHA and unsupported-SHA hook gates do no metadata/parameter reads and reserve no observation budget; zero budget, zero copied-bool subscribers, non-target FName, metadata-only `GetPlayerUsableItems`, rejection clearing, and non-canonical bool fail-closed remain part of the same local hardening envelope. Mission also has a local test-only ProcessEvent-to-dispatcher proof: default-off, disabled, zero-budget, non-target, zero-subscriber, pre-original, and rejected attempts do not dispatch, while a matched copied-bool attempt dispatches only after original success. The dispatcher remains linked only into Mission test binaries; it is not part of `libobelisk`, plugin cleanup, runtime hook production, installed SDK, or public ABI. `transfer-baccept-only-policy-slice` is blocked from release/public SDK gates. This does not authorize Transfer runtime work, public Mission SDK, runtime Mission dispatchers/callbacks, ResourceHandle, identity, arrays, mutation, return override, or server observation.
-- ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary hash changes or evidence is contradicted. The semantic blockers remain: the post-callback rejection contract is preserved as candidate-only and fail-closed. The first strict serial reuse/wraparound policy artifact is preserved at `/home/flowcommunity-ark/obelisk-artifacts/resourcehandle-serial-policy-20260530T190642Z/serial-policy.json`; manifest consume mode accepts it and promote mode blocks it as candidate-only. This narrows the serial-policy design gap but does not unlock runtime negative samples, public lookup, object identity, mutation, return override, persistent handles, or public `ResourceHandle`. The next strict ResourceHandle blocker is rejected runtime object samples plus runtime serial reuse/wraparound semantics. Future runtime artifacts must use the candidate-only `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` and `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1` schemas, remain consume-only/promote-blocked, redact run identity and privacy-sensitive values, and still reject post-callback lookup. These schemas are not public SDK/runtime-readiness contracts, and offline or copied-core scans cannot satisfy them. The minimal planning note now lives in `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md#future-runtime-observation-plan`; execution is still blocked until an operator-approved live-ops brief names the exact debug target, gates, window, rollback, artifacts, and posture checks. Do not replace this with another broad offline FName/GObjects scan.
-- Transfer ScriptStruct/bAccept evidence has refreshed internal-layout roots; old 20260529 transfer roots are stale. Transfer scalar/bool fields are redacted metadata only; gates detect Transfer structs without labels and require transfer blockers on every field.
-- `validate_offline_artifact_gate.py` consumes `obelisk.artifact-pack.manifest.v1` containers with current-content checksums, symlink fail-closed checks, child-manifest blockers, container-only promote blocking, protected-root checks, and duplicate target guidance rejection.
-- UFunction target-set listing and release-gate option parsing are classified as `release_readiness`, `planning_only`, or `internal_layout_only`; listings expose module lanes, promotion accepts only explicit release-readiness sets, rejects explicit `--target` widening outside named target sets, reports target-set guidance/non-claims in readiness JSON, blocks duplicate/unknown/overlapping readiness coverage, and marks internal/layout-only gaps as `target_set_not_release_readiness`.
-- Release gate UFunction preflight compares all requested target sets together so cross-set overlaps fail before build/test with `ambiguous_target_set_coverage`.
-- Offline artifact JSON manifests, provenance sidecars, artifact checksum reads, and core inspector inputs use no-symlink regular-file opens after protected-path prechecks; relative manifest/provenance/resource-handle core paths resolve against their sidecar, and `--snapshot-json` verifies observed offline core SHA256 plus safe capture/evidence-pack IDs before emitting evidence.
-- `scripts/check_static_tooling.py` records optional radare2/rizin/Ghidra availability and runs smoke checks only on approved offline binaries/output roots.
-- `APrimalStructure.IsAllowedToBuild` is second-wave only: no committed snapshot, second-source comparison, target-set promotion, public StructureEvents/build-policy SDK, mutation, or return override. Guidance requires one exact sanitized candidate snapshot before any target set; `inspect_core_ufunctions.py --core` rejects evidence-pack manifests.
-- `players-identity-lifecycle-intake` is a guidance-only target set backed by `docs/research/2026-05-30-player-identity-lifecycle-plan.md`; it stays out of RC/public target sets, is release-gate rejected, and does not promote identity, lookup, runtime work, mutation, or return override.
+- RC public scope remains limited to `GameplayPolicyEvent`, minimal copied
+  `ChatMessageEvent`, `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and
+  process-local owner-token timers. It is not a production-stable `v1.0` claim.
+- Current post-RC focus: preserve the accepted RC UFunction second-source root as release
+  evidence while moving toward copied-data v1 SDK blockers.
+- Published RC state used a clean release gate and exact tag/ref verification. Treat stale
+  local tags as invalid until revalidated against the intended ref; stale local tags must
+  not be reused or pushed.
+- `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list
+  for a complete SDK claim. Player identity, permissions/admin, commands/replies,
+  inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe,
+  player services/economy/mobility, operator ingress/storage, and lifecycle ops recovery
+  remain unresolved unless promoted or explicitly excluded in a reviewed v1 release
+  statement.
+- `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the
+  current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`,
+  or `production SDK` in public sinks unless that gate allows the stable SDK claim.
+- `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership,
+  capability and `struct_size` gates, lifecycle cleanup, privacy rules, accepted evidence,
+  ABI tests, and installed SDK consumer tests.
+- `CallProcessEvent` remains ABI-present only as an init-window debug escape hatch: the
+  current plugin owner is inside `ObeliskPlugin_Init`, must have captured
+  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and the live gate must still be active.
+  Post-init calls through captured API tables are unsupported; a future replacement
+  owner-token ABI is required.
+- Process-local owner-token timers are core primitives with explicit unregister. They are
+  not gameplay/module timer APIs, shared scheduler state, UE identity, or persistent
+  handles.
+- Plugin unload/init-failure cleanup skips `dlclose` when callback cleanup cannot be
+  proven complete, retains the plugin for retry, and does not repeat plugin shutdown on
+  retry. Dispatcher families with owner cleanup must be covered by
+  `PluginManager::UnregisterPluginCallbacks`.
+- `oDescriptorCatalog` and Plugin Hub foundation work are metadata/contributor seeds only:
+  lifecycle/config/logging, descriptor/catalog, and process-local timers are
+  release-supported seed lanes; copied chat/policy stays experimental. Foundation work is
+  not a substitute for v1 blockers.
+- `docs/PLUGIN_HUB_CONTRIBUTOR_PATH.md` is the short contributor path. Guardrails cover it
+  as public SDK wording so it cannot imply ArkApi compatibility, production Plugin Hub
+  modules, identity, permissions, commands, inventory/structure SDKs, mutation, or v1
+  completion.
+- Chat/commands near-term value remains plugin-local parsing over copied
+  `ChatMessageEvent`. Do not promote a public command router, replies, send-chat,
+  moderation, or player permissions until copied player identity, permissions, and a safe
+  response path are separately promoted.
+- Future command/principal routing is a new copied C ABI lifecycle/callback-ownership
+  surface, not a parser-only extension. Current planning note:
+  `docs/research/2026-05-31-commands-principal-routing-contract.md`.
+- Player identity is the first v1 dependency for permissions, commands, economy,
+  moderation, and several ownership-sensitive module APIs. The target set is 12-target
+  `players-identity-lifecycle-intake`; it remains planning-only and candidate-only.
+- Current player-identity state: the artifact root has the matching offline
+  `ShooterGameServer` SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`,
+  but no non-protected copied core, no complete `obelisk.core-dump-evidence-pack.v1`, and
+  no accepted `obelisk.reflection-inventory-pack.v1`.
+- `scripts/check_player_identity_first_evidence_readiness.py --artifact-root
+  /home/flowcommunity-ark/obelisk-artifacts --json` currently reports
+  `next_actionable_blocker.code=non_protected_core_input_missing`; the expected copied
+  core path pattern is
+  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/core`.
+- Player identity focal snapshot planning must start from a complete non-protected
+  `obelisk.reflection-inventory-pack.v1` with target-set coverage for the full 12-target
+  `players-identity-lifecycle-intake` set and exact rows for
+  `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer`. After that pack is reviewed, plan exactly
+  those two targets; do not use `--target-set players-identity-lifecycle-intake` with
+  `scripts/plan_ufunction_focal_snapshots.py`.
+- Player identity next step is to produce or approve a non-protected UFunction
+  reflection-inventory pack with `target_set_coverage` for the full 12-target
+  `players-identity-lifecycle-intake` set. do not treat ScriptStruct inventory,
+  standalone snapshots, redacted signatures, static thunks, or a two-function-only
+  inventory as satisfying this lane. After acceptance, use
+  `scripts/plan_ufunction_focal_snapshots.py` for
+  `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer` only.
+- Static orientation for all 12 identity targets and bounded admin thunk byte checks are
+  valid navigation evidence only. They do not replace the missing core evidence pack,
+  reflection inventory, focal snapshots, second source, lifecycle anchors, or
+  privacy/invalidation policy.
+- `PrimalLocalProfile.ArkTributePlayerData` is metadata/layout evidence only. The
+  `scripts/check_arktribute_playerdata_identity_boundary.py` checker proves only that the
+  current transfer ScriptStruct artifacts remain layout-only, candidate-only,
+  promote-blocked, and non-public.
+- Static field-window evidence only cleared the field-window packaging blocker. It is not
+  a `v1.0` SDK blocker, route shortcut, or completion signal; CMake package target are
+  present, but package-shape evidence only, not a `v1.0` completion marker. The gate
+  supports `obelisk.fuobjectarray-field-window-redacted.v1` as a durable normalized
+  artifact-pack child manifest in consume mode only.
+- Item return-only policy has three public `GameplayPolicyEvent` `ReturnValue` kinds only;
+  no public Inventory SDK, Items SDK, identity, mutation, or return override is promoted.
+- Mission copied-bool evidence keeps exact bool-tail metadata:
+  `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and
+  `native_bool=false`. Consume mode accepts; promote mode blocks, with promotion ready:
+  `false`.
+- ResourceHandle/public GObjects remain blocked: old flag-policy artifact is obsolete,
+  durable rich-provenance refresh is preserved, Consume mode accepts it and promote mode
+  stays blocked, post-callback rejection contract is preserved as candidate-only, and the first strict serial reuse/wraparound policy artifact is
+  preserved. manifest consume mode accepts it and promote mode blocks it as candidate-only;
+  it does not unlock runtime negative samples, public lookup, object identity, persistent
+  handles, mutation, return override, or ResourceHandle semantic helper predicate work
+  beyond fail-closed planning.
+- The next strict ResourceHandle blocker is rejected runtime object samples plus runtime
+  serial reuse/wraparound semantics. Future work needs a future-runtime-observation-plan
+  and an operator-approved live-ops brief names the exact debug target. Do not rerun broad
+  FName, GObjects, or core scans for ResourceHandle; Do not replace this with another
+  broad offline FName/GObjects scan.
+- Structure, Inventory item-return, Mission, Transfer, Dino, Buff, Tribe, and
+  ResourceHandle lanes stay internal/candidate unless promoted through their own copied
+  ABI, privacy, lifecycle, and evidence gates. Structure census is a useful offline side
+  lane, but identity -> permissions/admin -> commands/replies is the highest-impact v1
+  unblock route.
 
 ## Priority Next Steps
 
-- Current post-RC focus: preserve RC scope, reduce debt, improve evidence tooling, and promote only copied module APIs through strict gates. v1 route order is player identity/principal first, then permissions/admin, then commands/replies. The critical identity blocker is not another broad scan: current artifacts have the matching offline binary and static orientation, but no non-protected complete core evidence pack, no `obelisk.reflection-inventory-pack.v1`, no `ServerListPlayers`/`ServerKickPlayer` sanitized snapshots, no accepted lifecycle anchors, and no principal privacy/invalidation policy. Structure, Mission, Item, Transfer, Dino, Buff, Tribe, and ResourceHandle lanes stay candidate/internal until that dependency chain is solved or explicitly excluded in a reviewed v1 statement. Do not treat chat, descriptors, timers, or `GameplayPolicyEvent` seeds as a complete SDK.
-- Static admin thunk orientation for `ServerListPlayers`/`ServerKickPlayer` now has objdump/radare/Ghidra-smoke notes in `docs/research/2026-05-31-player-identity-static-admin-thunks.md`; it is useful as a second static clue, but still does not replace the core evidence pack, reflection inventory pack, lifecycle anchors, or public identity policy. Static player-identity orientation checks now share an internal `obelisk.static-candidate-orientation-contract.v1` guardrail; it remains candidate-only, not an artifact gate, not promotion evidence, and not a shortcut around core evidence, reflection inventory, focal snapshots, second source, lifecycle anchors, or privacy/invalidation policy.
-- Mission test-only copied-bool dispatcher exists outside shared runtime/API targets for three copied-bool functions, with local post-original dispatch gating covered. Before any runtime/public promotion, Mission still needs full owner-token API design, plugin-manager cleanup, init-failure/unload/in-flight callback lifecycle tests, hot-path subscriber and budget prefilters, and a separately approved live-ops brief. This is not public API.
-- For v0.2 product value, prefer Structure aggregate/census planning over Transfer `bAccept`. Transfer `bAccept` remains useful as a fixture/internal bool-layout lane, but it is low product value without identity/payload/cross-map/privacy semantics. Do not build Transfer runtime/API work unless a later focused gate makes it necessary.
-- `structure-aggregate-census-planning` is planning-only, not release readiness, public SDK evidence, or a public StructureEvents surface; use it only to bound copied/redacted Structure aggregate/census design while evidence, ABI, privacy, and lifecycle policy are missing. Design note: `docs/research/2026-05-31-structure-aggregate-census-v0.md`. The 2026-05-31 refinement keeps the lane internal/default-off, limits v0 inputs to copied scalar event views, excludes `VerifyPinCode.ReturnValue` from aggregate output, and records consume-accepted/promote-blocked policy-slice gates. After this lane, Mission copied-bool is the next fastest internal copied-data bridge; Dino compact now has planning-only scalar policy notes in `docs/research/2026-05-31-dino-scalar-policy-planning.md` and a local/test-only pre-call copied-scalar builder for `AddPassenger` in `ProcessEventDinoReflection`. It copies only `PassengerSeatIndex`, `bForcePassenger`, `bAllowFlyersAndWaterDinos`, and `bSkipLineTrace`; `ACharacter`, `CanCarryPawn`, FName indices, and all `ReturnValue` fields stay out. Dino `ReturnValue` ranges are not exposed for the pre-call lane; a future return-value lane needs an explicit post-original policy. Dino remains internal: no hook wiring, dispatcher, public ABI, identity, mutation, return override, or runtime observation.
-- Materialized Structure aggregate/census policy pack: `/home/flowcommunity-ark/obelisk-artifacts/structure-aggregate-census-policy-slice-20260531T034715Z`. Normalize check is `ok`, consume gate is `accepted`, promote gate is `blocked`; report sha256 is `15bc87854cc85e1bd4ed9a8658a3b1d83b41a4b1f8f52f967d17ea25421180dd`. This remains consume-only/planning-only and does not promote public StructureEvents, Structure aggregate/census SDK, identity, mutation, return override, or runtime validation.
-- Offline Structure aggregate/census contract test `scripts/test_structure_aggregate_census_contract.py` proves bounded counters, capped `VariantIndex` histogram overflow, `VerifyPinCode` exclusion, no identity/correlation fields, and no mutation/return override behavior from copied `GameplayPolicyEvent` fixture data. The first internal C++ accumulator now exists as `core/StructureAggregateCensus.*` with `StructureAggregateCensusTests`: it is default-off, bounded after exact non-PIN copied-scalar prefiltering, copied-scalar only, excludes PIN, caps `VariantIndex`, bounds post-window rejection counting, and is compiled into `libobelisk.so`. It is not wired to hooks, runtime markers, plugin APIs, descriptors, installed SDK headers, or public `StructureEvents`/aggregate surfaces.
-- `scripts/check_structure_census_readiness.py --json` validates the materialized Structure
-  aggregate/census policy-slice pack for internal planning only. It requires consume gate
-  acceptance, promote gate blocking, exact copied/redacted/excluded field sets, and
-  `public_sdk_ready=false`/`runtime_ready=false`/`promotion_ready=false`; it is not an
-  artifact gate, public ABI, runtime validation, or Structure SDK promotion.
-- `scripts/check_mission_copied_bool_readiness.py --json` and
-  `scripts/check_item_return_only_readiness.py --json` validate current pinned internal
-  policy-slice packs only: consume accepted, promote blocked, exact copied/redacted or
-  excluded fields, and no public SDK/runtime/identity/mutation/return-override promotion.
-  The older Mission 20260530T072912Z pack is stale and must not be used.
-- Item return-only bridge hardening now keeps copied dispatch construction in `ProcessEventItemReflection` helpers, with unit coverage for the three supported event kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact `ReturnValue` scalar scope, attempt-budgeted runtime reads, and no identity/mutation/return-override leakage. Dispatcher hot-path allocation has a local benchmark gate for no-subscriber and <=4-subscriber snapshots; do not expand it unless profiling justifies a larger callback snapshot strategy.
-- Structure and Inventory dispatcher hot-path allocation now have local benchmark gates for invalid event, no-subscriber, four-subscriber stack snapshot, and five-subscriber heap fallback behavior. Keep these internal guardrails before adding more runtime copied-event producers; they do not promote public Inventory SDK, StructureEvents, identity, mutation, return override, or runtime validation. Structure census readiness also blocks accidental `StructureAggregateCensus` runtime/public wiring.
-- Structure second-wave remains offline-only. Use `scripts/build_reflection_inventory_pack.py --plan-target Outer.Name` to produce a candidate-only focal plan from a complete non-protected evidence-pack manifest; the planner now uses unfiltered redacted inventory for exact matches, blocks unsafe/incomplete FName-root inputs before command emission, requires explicit artifact identity for direct-core planning, and remains planning-only. Then generate one sanitized snapshot and a distinct second-source compare. Fixture/rootless reports remain negative guardrails; do not add these keys to release target sets, ABI enums, descriptors, dispatchers, public docs, or runtime gates.
-- For general reflected decoding, reuse current FName root `0x5956f30` and GObjects candidate `0x595b7e0` through closed target-set snapshots and second-source comparison; do not repeat broad FName/GObjects/core scans for this binary.
-- Strict offline static field-window refresh `/tmp/obelisk-static-global-field-window-strict-20260531T040157` accepted in consume mode with artifact identity sha256 `b2929c5061aefdf3cfd24c9a8c42b27490edb89b551dff1a3d544b4da42a9113` and manifest file sha256 `bcc44f2b0a007deb50f1605eb78c771834d6739bb7e6ced732e58e6cbe197edc`. The offline artifact gate now supports `obelisk.fuobjectarray-field-window-redacted.v1` as a durable normalized artifact-pack child manifest in consume mode only, while `obelisk.offline-artifact-gate-result.v1` and `obelisk.static-artifact-provenance.v1` remain unsupported as authoritative child manifests. This clears only the static coherent field-window packaging blocker for reviewed `gobjects=0x595b7e0` evidence; it is not a `v1.0` SDK blocker, route shortcut, or completion signal, and does not promote public GObjects, ResourceHandle, identity, lookup, mutation, return override, runtime hooks, or SDK surface.
-- The same static field-window evidence is now materialized under
-  `/home/flowcommunity-ark/obelisk-artifacts/static-global-field-window-strict-20260531T040157Z`;
-  consume gate status is `accepted`, blockers are empty, artifact identity sha256 remains
-  `b2929c5061aefdf3cfd24c9a8c42b27490edb89b551dff1a3d544b4da42a9113`, and
-  `promotion_gate.ready=false`. Keep this refresh as standalone accepted evidence unless a
-  curated wrapper is explicitly needed. Do not normalize the whole directory as an
-  artifact-pack: `static-global.consume-gate.json` and `*.provenance.json` are not
-  supported authoritative child manifests.
-- Plugin Hub planning starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`: release-supported seeds are lifecycle/config/logging, descriptor/catalog, and process-local timers; copied chat/policy stays experimental.
-- Chat/commands near-term value is plugin-local parsing over copied `ChatMessageEvent`. Do not promote a public command router, replies, send-chat, moderation, or player permissions until copied player identity and a response path are separately promoted.
-- Demand routing remains: foundation first, then chat command parsing, permissions/admin after identity, structures/ownership policy, and inventory/items/economy-adjacent work. Mission copied-bool is valuable technical hardening and formal v1 blocker evidence, but current Plugin Hub demand is weak; keep it as a sidecar/internal evidence lane unless a future release statement promotes or excludes `obelisk.mission_transfer_dino_tribe.v1`.
-- The next low-risk Plugin Hub implementation target is descriptor catalog expansion: make promoted resource/event kinds and blocked/experimental boundaries discoverable through existing descriptor helpers before adding structure or inventory sample plugins. Permissions/admin remains design-only until identity/principal exists; structure policy samples must stay experimental audit-only; inventory samples are riskier because they imply item identity/mutation.
-- Descriptor catalog hardening should keep using installed SDK consumers and guardrails:
-  exact promoted resource/event tables, `OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MIN/MAX/COUNT`,
-  aggregate mask checks, backing flags, and unknown-kind rejection. Descriptors are
-  metadata-only routing/config discovery, not Structure SDK, Inventory SDK, Items SDK,
-  identity, lookup, mutation, return override, `ResourceHandle`, or v1 completion evidence.
-- Future command/principal routing is a new copied C ABI lifecycle/callback-ownership surface, not a parser-only extension. It needs a named capability captured at plugin init, nonzero owner token, owner-token handle registration, owner-scoped unregister, plugin-owner cleanup, callback-scope copied payloads, principal privacy/invalidation, promoted identity, promoted permissions, and a safe response path. Current planning note: `docs/research/2026-05-31-commands-principal-routing-contract.md`.
-- Player identity remains the main blocker for permissions, commands, economy, and moderation. `players-identity-lifecycle-intake` is planning-only and currently lacks sanitized `ServerListPlayers` and `ServerKickPlayer` snapshots plus accepted login/logout lifecycle anchors, principal-copy policy, invalidation semantics, and an independent second source. `build_redacted_ufunction_signatures.py --players-identity-first-evidence` is candidate-only, force-redacts identity-like fields, marks `ServerKickPlayer` fields as admin-mutation-not-public-identity, keeps promotion/public/runtime readiness false, and fails closed until the missing `ServerListPlayers`/`ServerKickPlayer` snapshots exist. `validate_offline_artifact_gate.py` recognizes `obelisk.players-identity-first-evidence.v1` as consume-only/promote-blocked evidence for a complete 12-target candidate pack and reconciles non-empty per-target/per-field rows, full target-set coverage metadata, forced redaction, forbidden fields, required non-claims, and nested readiness/public overclaims; it does not promote public identity, lookup, commands, permissions, economy, runtime hooks, operator ingress/storage, or SDK surface. The current fixture gap is exactly the two admin snapshots.
-- Current safe artifact preflight found no `obelisk.reflection-inventory-pack.v1` or complete `obelisk.core-dump-evidence-pack.v1` under `/home/flowcommunity-ark/obelisk-artifacts`; only normalized artifact packs, standalone UFunction snapshots/signatures, static/GObjects/ResourceHandle roots, and a ScriptStruct inventory pack are present. Before planning the two missing player-identity admin snapshots, produce or approve a non-protected complete core evidence pack, then produce or approve a non-protected UFunction reflection-inventory pack tied to it through `inputs.evidence_pack_manifest`. That reflection inventory pack must record `target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set and include inventory rows for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`; do not treat ScriptStruct inventory, standalone snapshots, redacted signatures, static thunks, or a two-function-only inventory as satisfying this lane. Direct `--core` plus manual `--gobjects`/`--fname-root-slot` mode is intentionally blocked for `players-identity-lifecycle-intake`. Then use `scripts/plan_ufunction_focal_snapshots.py` for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer` only. Research notes: `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` and `docs/research/2026-05-31-player-identity-static-admin-thunks.md`.
-- `scripts/check_player_identity_first_evidence_readiness.py` separates the artifact-chain
-  blocker from downstream blockers. Without accepted reflection inventory, it keeps
-  `missing_reflection_inventory_pack_or_core_evidence_pack` active, defers later identity
-  blockers, points first to non-protected core evidence then reflection inventory, and
-  reports any success as candidate-only internal planning (`not_artifact_gate=true`,
-  `promotion_ready=false`, `public_sdk_ready=false`, `runtime_ready=false`).
-- The player-identity preflight now also records artifact-root-only offline input
-  diagnosis. The current durable artifact root has a matching offline `ShooterGameServer`
-  for SHA `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`, but no
-  core-like input, no complete `obelisk.core-dump-evidence-pack.v1`, and no accepted
-  `obelisk.reflection-inventory-pack.v1`. `build_reflection_inventory_pack.py` must only
-  build the full `players-identity-lifecycle-intake` inventory from a complete core
-  evidence pack; player-identity focal snapshot planning is reserved for
-  `scripts/plan_ufunction_focal_snapshots.py`, which now requires full matched target-set
-  coverage plus exact `ServerListPlayers` and `ServerKickPlayer` admin rows before command
-  emission.
-- Player identity readiness now also rejects summarized or stale `ready=true` inventory
-  payloads unless they contain an accepted candidate-only `obelisk.reflection-inventory-pack.v1`
-  chained to an `obelisk.core-dump-evidence-pack.v1` manifest, full 12-target coverage, and
-  exact `ServerListPlayers`/`ServerKickPlayer` rows. ScriptStruct inventory, standalone
-  snapshots, static orientation, direct `--core` mode, and two-function-only inventories
-  remain useful orientation at most, not accepted identity inventory.
-- `PrimalLocalProfile.ArkTributePlayerData` (`PlayerDataID`, `PlayerName`) is a useful
-  existing ScriptStruct layout candidate from the transfer pack, but it is metadata/layout
-  evidence only. It does not prove runtime player identity, controller/player-state
-  correlation, `ResourceHandle`, public identity API, permissions, commands, or SDK surface.
-  Durable boundary note:
-  `docs/research/2026-05-31-arktribute-playerdata-identity-boundary.md`.
-- `scripts/check_arktribute_playerdata_identity_boundary.py` is a focused offline
-  contract checker for the current ArkTributePlayerData layout-only candidate. Passing it
-  proves only that the existing transfer ScriptStruct artifacts still say layout-only,
-  candidate-only, promote-blocked, and non-public; it does not promote runtime identity,
-  Transfer SDK, `ResourceHandle`, public identity, commands, permissions, mutation, return
-  override, or any plugin ABI surface.
-- The player-identity preflight JSON recipe now starts with the complete
-  `scripts/build_core_dump_evidence_pack.py` command using reviewed `verified_fname_root_slot`
-  and `gobjects` labels. The recipe intentionally omits `--skip-core-sha256` and
-  `--allow-partial-gdb`; those remain forbidden for this lane.
-- Static orientation for all 12 `players-identity-lifecycle-intake` targets is recorded in
-  `docs/research/2026-05-31-player-identity-static-target-orientation.md`. It provides
-  string/xref/thunk candidates only. It does not replace the missing core evidence pack,
-  reflection inventory pack, second source, focal snapshots, lifecycle anchors, or public
-  SDK promotion evidence.
-- A machine-readable companion exists at
-  `docs/research/2026-05-31-player-identity-static-target-orientation.json` with
-  `status=candidate_blocked` and `promotion_ready=false`; it is an orientation index only,
-  not an offline artifact gate or promotion source.
-- `scripts/check_player_identity_static_orientation.py --json` validates that orientation
-  index as candidate-only navigation evidence and is now included in the player-identity
-  first-evidence readiness report. A valid result has `not_artifact_gate=true`,
-  `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`; it does not
-  change the blocker order or replace the missing core evidence pack, reflection
-  inventory pack, focal snapshots, second source, or lifecycle anchors.
-- Lifecycle-anchor candidate artifacts now fail closed if a candidate anchor target is
-  outside the closed `players-identity-lifecycle-intake` target set, or if principal
-  invalidation semantics are claimed as resolved before promotion.
-- The v1 completion checker rejects duplicate or mixed release-statement records per
-  surface and requires promoted canonical v1 blockers to provide valid surface-specific
-  ABI evidence and SDK-consumer evidence, not just one valid machine-evidence bucket.
-- The v1 completion checker also applies strict structured promotion evidence to canonical
-  experimental public ABI seeds before they can become stable v1 surfaces.
-- The v1 completion checker rejects release-statement shortcuts: wrong `post-v1` vs
-  `excluded` outcomes, vague experimental outcomes, contradictory/negated exclusion text,
-  duplicate `surfaces[].id`, and strict surfaces using core/internal tests as SDK-consumer
-  evidence.
-- The v1 completion checker also requires `post_v1_or_excluded_surfaces` to exactly match
-  manifest surfaces whose status is `post-v1` or `excluded`; it cannot classify promoted,
-  planning, experimental, or debug-only surfaces as release exclusions.
-- `obelisk.operator_ingress_storage.v1` is not unlocked by player identity/principal evidence; it remains a separate post-v1 blocker until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are proven or explicitly excluded.
-- `obelisk.player_services_economy_mobility.v1` is a v1 blocker umbrella only, not a future monolithic public API. Future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy after identity, permissions, storage/persistence, privacy, audit, rollback, and abuse controls are proven. Economy and mobility require promoted identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.
-- Player identity focal snapshot planning must start from a complete non-protected `obelisk.reflection-inventory-pack.v1` with `target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set and rows for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`. After that pack is reviewed, use `scripts/plan_ufunction_focal_snapshots.py` with exactly two `--target` arguments for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`; do not use `--target-set players-identity-lifecycle-intake` to emit plans.
-- Player identity also needs a candidate-only lifecycle-anchor artifact before login/logout semantics can be promoted. Closing the two admin snapshots is not enough; session-start/session-end candidates need their own schema, second-source/static corroboration, and invalidation semantics. Research note: `docs/research/2026-05-31-player-identity-lifecycle-anchor-schema-gap.md`.
-- `obelisk.players-identity-lifecycle-anchor-candidates.v1` is now a consume-only
-  supported offline artifact schema through `validate_offline_artifact_gate.py`, including
-  normalized artifact-pack child revalidation. It records candidate or
-  layout-accepted-non-public start/end anchors only, blocks promote mode, rejects public
-  principal overclaims, nested readiness/public SDK/runtime-ready overclaims,
-  identity-value copied/public fields, path/coordinate leakage, and accepted anchors
-  without exact layout plus second-source/static corroboration. It still does not promote
-  public identity, lookup, permissions, commands, runtime hooks, mutation, return override,
-  or SDK surface.
-- Before adding more runtime copied-event producers, preserve hot-path benchmark coverage for disabled lanes, closed gates, zero budget, no-subscriber dispatch, nonmatching FNames, <=4 subscriber stack snapshots, and 5-subscriber heap fallback. Structure/Inventory and Mission copied-bool now have local dispatcher perf guards for invalid/no-subscriber/4-subscriber stack/5-subscriber heap behavior; Mission remains test-only and unwired from runtime.
-- `scripts/check_mission_copied_bool_readiness.py` now reuses the strict offline artifact gate in consume mode and rejects stale/minimal policy fixtures, manifest hash mismatches, runtime/public/API readiness overclaims, `not_artifact_gate=false`, `consume_only=false`, non-redacted snapshot roots, missing targets, and noncanonical bool-tail metadata. The durable tail pack remains `candidate_ready` only: consume accepted, promote blocked, `public_sdk_ready=false`, `runtime_ready=false`, and `promotion_ready=false`.
-- Chat and ItemReturn dispatch snapshots now use registration generations like Structure/Inventory/Mission, and their unregister cleanup paths reserve before mutation and catch allocation failures, so same-dispatch removed-id reuse cannot reactivate stale callbacks and exceptional cleanup fails closed. This is dispatcher hardening only; it does not expand public chat, command, Inventory SDK, identity, mutation, return override, or runtime validation scope.
-- Mission copied-bool unregister cleanup now matches the other dispatcher families: even
-  no-match unregister/owner-cleanup calls wait for active dispatch/deferred
-  `DestroyUserData` cleanup when outside callback cleanup scopes. This prevents plugin
-  unload from racing deferred mission cleanup and does not add public Mission API.
-- Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the concise runbook. UFunction regeneration and RC root assembly require complete `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail metadata; `--snapshot-json` is exact/direct single-target candidate-only output. The release gate preflights the four public RC target sets before build work.
-- Installed SDK validation now builds `examples/sdk_minimal_plugin` and `examples/sdk_timer_plugin` against the installed SDK and loads them through `tests/sdk_installed_consumer/consumer_fixture.cpp`, proving minimal lifecycle/logging behavior plus owner-token timer registration, callback observation, explicit unregister, idempotent `Shutdown`, and no private-header source-tree dependency for creator-facing plugins.
-- Runtime/plugin lifecycle audit found no P1 blocker; `EventManager` granular unregister, snapshot validation, null-callback rejection, gated raw blocking, no-throw API rejection, and `CallProcessEvent` catch boundaries are covered.
-- Any future live/player validation requires a new approved live-ops brief. Beta-test notice through the configured local webhook variable still requires explicit current-turn operator approval and dry-run when players are involved.
+- Keep player identity as the primary route: obtain or approve a non-protected copied core
+  under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`,
+  then build `obelisk.core-dump-evidence-pack.v1`, then the full 12-target
+  `obelisk.reflection-inventory-pack.v1`, then plan only `ServerListPlayers` and
+  `ServerKickPlayer` focal snapshots.
+- If no copied core is available, keep progressing offline by tightening guardrails,
+  permission/admin minimum design, command/principal contract, and structure census
+  consume/promote-blocked checks without claiming SDK promotion. This does not authorize
+  Transfer runtime work.
+- Revalidate before any checkpoint: identity readiness stays blocked with
+  `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
+  docs stay non-promotional, and `git diff --check` passes.
+- Start every supervised round by verifying no stale stand-by sub-agent remains open.
+  Assign each sub-agent only the scoped objective, safety baseline, allowed paths,
+  required skills, expert role, expected decision, and whether edits are allowed. Pass
+  only the skills needed for that task. The lead retains server-safety decisions.
 
 ## Agent Protocol
 
-- Lead owns server-safety decisions, GitHub, Discord, and stale-agent cleanup.
-- Before each sub-agent round: close stale agents, assign expert role, declare allowed paths, pass only the skills required for the task, and record any still-active agent with a polling or integration plan.
-- Sub-agents receive scoped expert tasks, safety baseline, allowed paths, forbidden paths, required skills, validation expectations, and one concrete expected decision. Do not pass leader cadence, unrelated module history, or broad policy unless it changes the task.
+- The lead owns integration. Sub-agents must not commit, amend, rebase, tag, push, update
+  GitHub state, touch servers, send Discord updates, or broaden live-ops scope.
+- Use expert roles with disjoint ownership: ABI/API engineer, build/SDK engineer,
+  UE4 reflection engineer, static binary analysis engineer, live-ops engineer, release
+  auditor, or docs/skills worker.
+- Tell workers they are not alone in the codebase. They must not revert unrelated changes
+  and must leave changes unstaged/uncommitted with touched paths and tests run.
+- Read-only explorers should answer concrete questions with file/line evidence and no
+  edits.
+- Close old agents after integrating useful findings. Do not leave active agents without a
+  polling/integration plan.

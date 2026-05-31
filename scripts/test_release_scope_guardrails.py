@@ -866,6 +866,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         )
 
     def test_plugin_hub_seed_path_stays_classified_before_install_or_release_scope(self) -> None:
+        contributor_path = read("docs/PLUGIN_HUB_CONTRIBUTOR_PATH.md")
         install = read("docs/INSTALL.md")
         release = read("docs/RELEASE.md")
         status = read("docs/STATUS.md")
@@ -884,6 +885,19 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file=path, item="install does not promote public SDK"):
                 self.assertIn("plugin `.so`", compact)
                 self.assertRegex(compact, r"(?i)(does not|do not)[^.]*public SDK")
+
+        contributor_compact = normalized(contributor_path)
+        for item in (
+            "adding a Plugin Hub foundation example without widening the SDK",
+            "`release-supported seed`: lifecycle/config/logging, descriptor/catalog reads, or process-local timers",
+            "`experimental pattern`: passive copied `ChatMessageEvent` parsing or copied `GameplayPolicyEvent` auditing",
+            "`blocked backlog`: anything that needs commands, replies, send-chat, permissions, identity",
+            "Do not start from `plugins/` when writing the minimum external package",
+            "Plugin Hub foundation examples help contributors learn the current C ABI",
+            "They do not declare a complete v1 SDK",
+        ):
+            with self.subTest(file="docs/PLUGIN_HUB_CONTRIBUTOR_PATH.md", item=item):
+                self.assertIn(normalized(item), contributor_compact)
 
         self.assertNormalizedIn(
             "keep support-tier classification separate from installation",

@@ -209,6 +209,18 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             payload["next_step"],
             "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack",
         )
+        self.assertEqual(payload["next_actionable_blocker"]["code"], "offline_binary_and_core_input_missing")
+        self.assertEqual(
+            payload["next_actionable_blocker"]["blocked_until"],
+            "non_protected_offline_binary_and_core_inputs",
+        )
+        self.assertFalse(payload["next_actionable_blocker"]["promotion_ready"])
+        self.assertFalse(payload["next_actionable_blocker"]["public_sdk_ready"])
+        self.assertFalse(payload["next_actionable_blocker"]["runtime_ready"])
+        self.assertEqual(
+            payload["next_actionable_blocker"]["next_required_artifact"]["schema"],
+            "obelisk.core-dump-evidence-pack.v1",
+        )
         self.assertIn("does not touch servers", " ".join(payload["non_claims"]))
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
 
@@ -295,6 +307,41 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(len(offline_inputs["core_like_candidates"]), 1)
         self.assertFalse(offline_inputs["ready_to_build_core_evidence_pack"])
         self.assertIn("file presence only", " ".join(offline_inputs["non_claims"]))
+
+    def test_next_actionable_blocker_prioritizes_missing_core_input_when_binary_matches(self) -> None:
+        blocker = checker.next_actionable_blocker(
+            inventory_ready=False,
+            inventory_payload_ready=False,
+            inventory_chain={"ready": False, "blockers": [], "accepted_manifest": None},
+            downstream_blockers=["fixture_coverage_incomplete"],
+            offline_inputs={
+                "status": "offline_binary_present_core_like_input_missing",
+                "shooter_game_server_candidates": [
+                    {
+                        "path": "/tmp/artifacts/raw/ShooterGameServer",
+                        "matches_current_binary": True,
+                    }
+                ],
+            },
+            raw_binary_pattern=Path("/tmp/artifacts/raw/ShooterGameServer"),
+            raw_core_pattern=Path("/tmp/artifacts/raw/core"),
+            core_manifest_pattern=Path("/tmp/artifacts/core-evidence-pack/manifest.json"),
+            reflection_inventory_pattern=Path("/tmp/artifacts/reflection-inventory-pack/manifest.json"),
+            next_operator_recipe={
+                "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
+                "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
+            },
+        )
+
+        self.assertEqual(blocker["code"], "non_protected_core_input_missing")
+        self.assertEqual(blocker["blocked_until"], "non_protected_core_dump_input")
+        self.assertEqual(blocker["available_binary"], "/tmp/artifacts/raw/ShooterGameServer")
+        self.assertEqual(blocker["missing_input_path_pattern"], "/tmp/artifacts/raw/core")
+        self.assertEqual(blocker["next_required_artifact"]["schema"], "obelisk.core-dump-evidence-pack.v1")
+        self.assertIn("build_core_dump_evidence_pack.py", blocker["next_command_after_input"])
+        self.assertFalse(blocker["promotion_ready"])
+        self.assertFalse(blocker["public_sdk_ready"])
+        self.assertFalse(blocker["runtime_ready"])
 
     def test_accepted_inventory_still_fails_closed_on_malformed_coverage_payload(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")

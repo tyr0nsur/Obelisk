@@ -76,7 +76,10 @@ child manifest only when it uses
 gate. The validator requires redacted binary/candidate fields, both Ghidra and radare2
 source hashes, the same-base evidence set, `root/chunks/count/serial` field coverage,
 `promotion_gate_ready=false`, and no absolute path strings. This is internal static
-research evidence only; promote mode remains blocked.
+research evidence only; promote mode remains blocked. The gate supports
+`obelisk.fuobjectarray-field-window-redacted.v1` as a durable normalized artifact-pack
+child manifest in consume mode only and clears only the static coherent field-window
+packaging blocker.
 
 Do not copy a `/tmp` manifest tree into a durable root. Normalizing a directory also does not rewrite absolute paths inside
 child manifests; regenerate manifests with pack-relative paths instead of copying `/tmp`
@@ -86,8 +89,9 @@ scratch manifests into a durable root. Historical packs that embedded
 failed with `unsupported_manifest_schema`: that blocker is cleared only for the
 FUObjectArray redacted field-window schema. `obelisk.offline-artifact-gate-result.v1` and
 `obelisk.static-artifact-provenance.v1` are still not supported as authoritative child
-manifests; store them as non-authoritative payloads or add schema-specific validators
-before making them child manifests.
+manifests; gate-result and provenance child manifests remain blocked with
+`unsupported_manifest_schema`. Store them as non-authoritative payloads or add
+schema-specific validators before making them child manifests.
 
 ## Normalize And Check
 

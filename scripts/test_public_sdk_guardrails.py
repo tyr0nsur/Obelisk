@@ -32,6 +32,7 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "docs" / "INSTALL.md",
     REPO_ROOT / "docs" / "OPERATOR_CLI.md",
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -98,6 +99,7 @@ PLUGIN_HUB_V1_ROADMAP_BOUNDARY_FILES = [
 PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
     REPO_ROOT / "README.md",
     REPO_ROOT / "CONTRIBUTING.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
     REPO_ROOT / "plugins" / "README.md",
@@ -5904,6 +5906,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_plugin_hub_v1_contributor_intake_boundary_is_consistent(self) -> None:
         docs = {
+            "contributor_path": REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
             "foundation": REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
             "matrix": REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
             "roadmap": REPO_ROOT / "docs" / "research" / "2026-05-29-module-surface-roadmap.md",
@@ -5913,6 +5916,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         compacts = {name: normalized(text) for name, text in texts.items()}
 
         required = {
+            "contributor_path": (
+                "## 1. Decide The Tier",
+                "`release-supported seed`",
+                "`experimental pattern`",
+                "`blocked backlog`",
+                "Names from ArkApi, AseApi, or popular plugin families can justify demand notes",
+                "they do not change the tier and must not be copied as implementation patterns",
+            ),
             "foundation": (
                 "## Contributor Intake Checklist",
                 "Release-supported seed now",
@@ -5957,7 +5968,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ResourceHandle",
             "raw UE",
         )
-        for name in ("foundation", "matrix", "roadmap", "research_readme"):
+        for name in ("contributor_path", "foundation", "matrix", "roadmap", "research_readme"):
             compact = compacts[name]
             with self.subTest(file=name, item="blocked dependency vocabulary"):
                 for term in blocked_dependency_terms:
@@ -5999,6 +6010,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "Start Plugin Hub work from",
                 "ArkServerApi, AseApi, and NextGenPlugins are names and demand dictionaries only",
                 "not sources for code, offsets, control flow, parsers, schemas, or implementation behavior",
+            ),
+            REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md": (
+                "adding a Plugin Hub foundation example without widening the\nSDK",
+                "`release-supported seed`: lifecycle/config/logging, descriptor/catalog reads, or\n  process-local timers",
+                "`experimental pattern`: passive copied `ChatMessageEvent` parsing or copied\n  `GameplayPolicyEvent` auditing",
+                "`blocked backlog`: anything that needs commands, replies, send-chat, permissions,\n  identity",
+                "Do not start from `plugins/` when writing the minimum external package",
+                "Stop at experimental pattern when the example passively observes copied chat or policy\ndata",
+                "Plugin Hub foundation examples help contributors learn the current C ABI",
+                "They do not\ndeclare a complete v1 SDK",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md": (
                 "Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons",
