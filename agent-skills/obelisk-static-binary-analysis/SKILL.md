@@ -103,6 +103,51 @@ claims from a stripped Linux server binary.
   runtime hook, mutation, return override, or object identity promotion, and promote mode
   must stay blocked until a separate schema-specific promotion contract exists.
 
+## Repo-Local UFunction Fixture Commands
+
+Use these offline commands from the repo root when auditing named UFunction fixture
+coverage and redacted signatures. They read committed sanitized fixtures only, write
+scratch evidence under `/tmp`, and fail closed on unknown target sets, missing fixture
+coverage, malformed guidance filters, or gate blockers:
+
+```bash
+set -euo pipefail
+target_set=mission-copied-bool-policy-slice
+
+python3 scripts/compare_reflection_snapshots.py \
+  --list-target-sets \
+  --json > /tmp/obelisk-ufunction-target-sets.json
+
+python3 scripts/compare_reflection_snapshots.py \
+  --list-target-guidance \
+  --target-set "$target_set" \
+  --json > "/tmp/${target_set}.target-guidance.json"
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --target-set "$target_set" \
+  --readiness-report \
+  --fail-on-base-readiness-gaps \
+  --json > "/tmp/${target_set}.base-readiness.json"
+
+python3 scripts/build_redacted_ufunction_signatures.py \
+  --snapshot-root tests/fixtures/ufunction_snapshots \
+  --target-set "$target_set" \
+  --json > "/tmp/${target_set}.redacted-ufunction-signatures.json"
+
+python3 scripts/validate_offline_artifact_gate.py \
+  --root /tmp \
+  --manifest "/tmp/${target_set}.redacted-ufunction-signatures.json" \
+  --mode consume \
+  --strict-target-set-coverage \
+  --json > "/tmp/${target_set}.signature-gate.json"
+```
+
+For reviewed direct snapshot inputs instead of a fixture root, pair each `--snapshot`
+with `--source-target-set "$target_set"` and keep `--strict-target-set-coverage` on the
+gate. These outputs are candidate/layout evidence only; they do not promote runtime hooks,
+SDK scope, object identity, mutation, return override, or cross-binary portability.
+
 ## Baseline Evidence Pack
 
 For every candidate offset/global/function, capture:

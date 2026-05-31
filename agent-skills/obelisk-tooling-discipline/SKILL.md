@@ -16,6 +16,10 @@ Offline-safe:
 - copied Obelisk logs
 - `scripts/analyze_reflectionscanner_capture.py` with copied logs, copied objdump output,
   and `--binary` pointed at an offline copy of `ShooterGameServer`
+- `scripts/compare_reflection_snapshots.py --list-target-sets`, `--list-target-guidance`,
+  and fixture-root readiness reports against `tests/fixtures/ufunction_snapshots`
+- `scripts/build_redacted_ufunction_signatures.py` against committed sanitized fixtures,
+  followed by `scripts/validate_offline_artifact_gate.py --strict-target-set-coverage`
 - Ghidra/rizin/radare2 on copied binaries
 - CMake/CTest validation against copied or installed SDK artifacts
 
@@ -60,6 +64,11 @@ Forbidden on live/shared instances:
 - Prefer offline static analysis before runtime probes.
 - Prefer copied logs over live attach.
 - Prefer deterministic scripts over manual UI-only conclusions.
+- For UFunction redacted-signature fixture work, list target sets and guidance first, then
+  generate from `tests/fixtures/ufunction_snapshots` and validate with
+  `validate_offline_artifact_gate.py --root <scratch-root> --mode consume
+  --strict-target-set-coverage`. Treat non-zero exits as blockers; do not downgrade to
+  promote mode for layout/signature-only artifacts.
 - Do not rely on `check_obelisk_server_posture.sh` defaults in agent rounds. Use explicit
   `--map <map> --instance <instance-id>` for the approved target, and do not use protected
   production instances as validation targets without a specific operator-approved
