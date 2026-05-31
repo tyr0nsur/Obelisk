@@ -189,3 +189,29 @@ explicitly excluded fields. Promote mode blocks with
 
 Do not use live roots, restarts, ptrace, gcore, markers, `/servidor/ark`, or
 `ReflectionScanner` for this planning note.
+
+## Internal Accumulator Checkpoint
+
+The first internal C++ accumulator now exists as `core/StructureAggregateCensus.*`, with
+fixture-backed coverage in `tests/core/StructureAggregateCensusTests.cpp`. It is compiled
+into `libobelisk.so` but is not wired to a hook, plugin API, public descriptor, installed
+SDK header, or runtime marker.
+
+The accumulator consumes only copied `StructureEventView` scalar data, remains default-off
+through explicit options, enforces a bounded window, excludes `VerifyPinCode`, and caps the
+`VariantIndex` histogram. Its snapshot contains only counters and histogram buckets; it
+does not carry function indices, outer indices, timestamps, coordinates, player/tribe/base
+identity, object handles, raw params, mutation decisions, or return-override authority.
+
+Validated locally:
+
+```bash
+cmake --build build --target obelisk structure_aggregate_census_tests -j"$(nproc)"
+./build/structure_aggregate_census_tests
+ctest --test-dir build -R 'StructureAggregateCensusTests|StructureEventDispatcherTests|ProcessEventMissionReflectionTests|MissionCopiedBoolEventDispatcherTests' --output-on-failure
+```
+
+This remains an internal planning/product-value bridge only. The next promotion step would
+need separate lifecycle gates, runtime approval, no-read/no-budget hook tests, privacy
+review, and SDK consumer design before any public Structure aggregate/census surface is
+claimed.

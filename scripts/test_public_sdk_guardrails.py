@@ -990,6 +990,31 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(surface["status"], allowed_statuses)
 
         promoted = set(manifest["promoted_surfaces"])
+        experimental = set(manifest["experimental_surfaces"])
+        planning = set(manifest["planning_surfaces"])
+        post_or_excluded = set(manifest["post_v1_or_excluded_surfaces"])
+        debug_only = set(manifest["debug_only_surfaces"])
+
+        self.assertEqual(promoted, {
+            surface["id"] for surface in manifest["surfaces"] if surface["status"] == "promoted"
+        })
+        self.assertEqual(experimental, {
+            surface["id"]
+            for surface in manifest["surfaces"]
+            if surface["status"] == "promoted-experimental-only"
+        })
+        self.assertEqual(planning, {
+            surface["id"] for surface in manifest["surfaces"] if surface["status"] == "planning"
+        })
+        self.assertEqual(post_or_excluded, {
+            surface["id"]
+            for surface in manifest["surfaces"]
+            if surface["status"] in {"post-v1", "excluded"}
+        })
+        self.assertEqual(debug_only, {
+            surface["id"] for surface in manifest["surfaces"] if surface["status"] == "debug-only"
+        })
+
         for surface_id in promoted:
             self.assertEqual(surfaces[surface_id]["status"], "promoted")
 
@@ -1074,6 +1099,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "v1.0",
             "SDK contract",
             "process-local timers",
+            "Experimental Copied Event Patterns",
+            "promoted-experimental-only",
             "GameplayPolicyEvent",
             "ChatMessageEvent",
             "OBELISK_API_CAPABILITY_CHAT_EVENTS",
@@ -1088,6 +1115,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         for term in required_terms:
             self.assertIn(term, text)
+        self.assertNotIn("promoted-minimal", text)
 
     def test_public_gameplay_event_manifest_contains_no_server_paths(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))

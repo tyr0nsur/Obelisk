@@ -102,6 +102,7 @@ add_library(obelisk SHARED
     core/ChatEventDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
     core/ItemReturnEventDispatcher.cpp
+    core/StructureAggregateCensus.cpp
     core/StructureEventDispatcher.cpp
     core/TimerManager.cpp
     core/EventManager.cpp
@@ -191,6 +192,14 @@ target_include_directories(structure_event_dispatcher_tests PRIVATE ${CMAKE_CURR
 target_link_libraries(structure_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME StructureEventDispatcherTests COMMAND structure_event_dispatcher_tests)
+
+add_executable(structure_aggregate_census_tests
+    tests/core/StructureAggregateCensusTests.cpp
+    core/StructureAggregateCensus.cpp
+)
+target_include_directories(structure_aggregate_census_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME StructureAggregateCensusTests COMMAND structure_aggregate_census_tests)
 
 add_executable(inventory_policy_event_dispatcher_tests
     tests/core/InventoryPolicyEventDispatcherTests.cpp

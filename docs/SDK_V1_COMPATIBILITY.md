@@ -42,9 +42,11 @@ These are production seed surfaces. They do not imply hot reload of Obelisk itse
 background ingress without shutdown proof, cluster scheduler state, gameplay timers,
 resource identity, lookup, mutation, or return override.
 
-## Promoted Copied Events
+## Experimental Copied Event Patterns
 
-`GameplayPolicyEvent` is promoted as copied observational policy data for the named event
+`GameplayPolicyEvent` is a promoted v0.1 copied ABI surface, but it remains
+`promoted-experimental-only` in the v1 compatibility inventory until the full SDK
+completion bar is met. It carries copied observational policy data for the named event
 kinds in [`public_gameplay_events.json`](public_gameplay_events.json). It is not an
 Inventory SDK, Items SDK, StructureEvents SDK, identity API, lookup API, mutation API, or
 return-override API.
@@ -82,13 +84,16 @@ post-v1 unless a later promotion gate explicitly moves them into the supported s
 
 A `v1.0` candidate must pass the normal build/test/install gates and include a reviewed
 SDK compatibility statement based on `public_sdk_surfaces.json`. Any surface marked
-`promoted` or `promoted-minimal` must have:
+`promoted` must have:
 
 - ABI or installed-SDK consumer tests;
 - lifecycle cleanup and unregister behavior;
 - privacy and no-UE-internals guarantees;
 - explicit target-set or static/offline evidence where gameplay data is involved;
 - documentation that does not imply blocked categories are available.
+
+Surfaces marked `promoted-experimental-only` can be useful RC/plugin-hub seeds, but they
+do not satisfy a complete v1 SDK claim by themselves.
 
 If a high-demand category is not promoted, release notes must name it as excluded or
 post-v1 so plugin authors do not mistake foundation primitives for a complete ArkApi-style

@@ -48,7 +48,8 @@ Included:
   still waits for in-flight dispatch and deferred `DestroyUserData` cleanup.
 - `GameplayPolicyEvent` as the promoted v0.1 gameplay policy callback family, with copied
   POD scalar payloads and no identity, no lookup, no mutation, and no return override
-  authority.
+  authority. In the v1 compatibility inventory this remains `promoted-experimental-only`
+  and is not a v1 completion claim.
   Structure-backed claims point to the fresh
   [`structure-observer-intake` evidence](research/2026-05-29-structure-observer-intake-refresh.md).
 - `DescribeResourceKind` as metadata-only resource category descriptors, not
@@ -347,9 +348,12 @@ summary remains observational until the second-source and SDK ownership gates ar
 satisfied. Public `StructureEvents`, separate Inventory callback ABI/capability bits, SDK
 structs, or plugin-facing Inventory registrations are outside the first stable release
 scope unless a later release-prep pass promotes them through those gates.
-`GameplayPolicyEvent` is the promoted gameplay policy callback family in the v0.1 scope.
+`GameplayPolicyEvent` is the promoted gameplay policy callback family in the v0.1 scope;
+in the v1 compatibility inventory it remains `promoted-experimental-only`, not a v1
+completion claim.
 `ChatMessageEvent` is separately tracked as a minimal v0.1-rc copied-notification ABI for
-chat-text plugins. It is declared in `docs/public_gameplay_events.json` so public event
+chat-text plugins. In the v1 compatibility inventory it also remains
+`promoted-experimental-only`. It is declared in `docs/public_gameplay_events.json` so public event
 capabilities stay audited, but it does not promote a command SDK, sender/player identity,
 chat sending, moderation/blocking, raw `FString`, `UObject`, `UFunction`, FName/GObjects
 indices, raw params, mutation, or return overrides. SDK acceptance for this event is ABI
