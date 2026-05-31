@@ -12,6 +12,7 @@ from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+from reflection_target_sets import schema_target_list  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     SHA256_RE,
     manifest_relative_path,
@@ -23,6 +24,9 @@ from snapshot_evidence_pack import (  # noqa: E402
 REPORT_SCHEMA = "obelisk.reflection-inventory-pack-readiness-check.v1"
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
+PLAYER_IDENTITY_TARGETS = tuple(
+    schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelisk.ufunction-chain.snapshot.v1")
+)
 REQUIRED_TARGETS = (
     "ShooterPlayerController.ServerListPlayers",
     "ShooterPlayerController.ServerKickPlayer",
@@ -65,6 +69,14 @@ def bounded_list_fields(field: str, values: list[Any]) -> dict[str, object]:
         field: values[:MAX_REASON_ITEMS],
         f"{field}_count": len(values),
         f"omitted_{field}_count": len(values) - MAX_REASON_ITEMS,
+    }
+
+
+def player_identity_target_set_expectation_fields() -> dict[str, object]:
+    return {
+        "target_set": PLAYER_IDENTITY_TARGET_SET,
+        "expected_target_count": len(PLAYER_IDENTITY_TARGETS),
+        "expected_targets": list(PLAYER_IDENTITY_TARGETS),
     }
 
 
@@ -246,6 +258,7 @@ def player_identity_target_set_scope_blockers(
                 path=str(inventory_path),
                 field="target_set_coverage",
                 required=PLAYER_IDENTITY_TARGET_SET,
+                **player_identity_target_set_expectation_fields(),
             )
         )
         return blockers
@@ -259,6 +272,7 @@ def player_identity_target_set_scope_blockers(
                 field="target_set_coverage.target_sets",
                 required=PLAYER_IDENTITY_TARGET_SET,
                 recorded=coverage_target_sets,
+                **player_identity_target_set_expectation_fields(),
             )
         )
 
@@ -269,18 +283,22 @@ def player_identity_target_set_scope_blockers(
                 "wrong_target_scope",
                 path=str(inventory_path),
                 field="target_set_coverage.requested_targets",
-                required=list(REQUIRED_TARGETS),
+                required=list(PLAYER_IDENTITY_TARGETS),
+                **player_identity_target_set_expectation_fields(),
             )
         )
     else:
-        missing = sorted(target for target in REQUIRED_TARGETS if target not in requested_targets)
+        missing = [target for target in PLAYER_IDENTITY_TARGETS if target not in requested_targets]
         if missing:
             blockers.append(
                 reason(
                     "wrong_target_scope",
                     path=str(inventory_path),
                     field="target_set_coverage.requested_targets",
+                    requested_target_count=len(requested_targets),
+                    missing_count=len(missing),
                     missing_targets=missing,
+                    **player_identity_target_set_expectation_fields(),
                 )
             )
     return blockers
@@ -356,6 +374,7 @@ def evaluate_pack(manifest_path: Path, manifest: dict[str, Any]) -> dict[str, ob
         "ready": not pack_reasons,
         "reasons": pack_reasons,
         "matched_targets": sorted(target for target in REQUIRED_TARGETS if target in targets),
+        "required_target_set": player_identity_target_set_expectation_fields(),
     }
 
 
@@ -373,6 +392,7 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
             "accepted_pack": None,
             "reasons": [reason("wrong_target_scope", path=str(root), detail=str(exc))],
             "required_targets": list(REQUIRED_TARGETS),
+            "required_target_set": player_identity_target_set_expectation_fields(),
             "non_claims": non_claims(),
         }
 
@@ -412,6 +432,7 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
         "accepted_pack": accepted,
         "reasons": reasons,
         "required_targets": list(REQUIRED_TARGETS),
+        "required_target_set": player_identity_target_set_expectation_fields(),
         "non_claims": non_claims(),
     }
 

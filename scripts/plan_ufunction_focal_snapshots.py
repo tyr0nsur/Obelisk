@@ -11,7 +11,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import ufunction_focal_snapshot_plan as focal_planner  # noqa: E402
-from reflection_target_sets import TARGET_SETS  # noqa: E402
+from reflection_target_sets import TARGET_SETS, schema_target_list  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     SHA256_RE,
     manifest_relative_path,
@@ -25,6 +25,9 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
+PLAYER_IDENTITY_TARGETS = tuple(
+    schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelisk.ufunction-chain.snapshot.v1")
+)
 REDACTED_FUNCTION_KEYS = {
     "family",
     "function_flags",
@@ -249,11 +252,21 @@ def require_player_identity_target_set_scope(
             "before planning player identity snapshots"
         )
     requested_targets = coverage.get("requested_targets")
-    expected_targets = [qualified.partition(":")[2] for qualified in TARGET_SETS[PLAYER_IDENTITY_TARGET_SET]]
-    if not isinstance(requested_targets, list) or any(target not in requested_targets for target in expected_targets):
+    if not isinstance(requested_targets, list):
+        missing_targets = list(PLAYER_IDENTITY_TARGETS)
+        requested_target_count = 0
+    else:
+        missing_targets = [target for target in PLAYER_IDENTITY_TARGETS if target not in requested_targets]
+        requested_target_count = len(requested_targets)
+    if missing_targets:
         raise SystemExit(
             f"{inventory_path}: target_set_coverage.requested_targets must include the complete "
-            f"{PLAYER_IDENTITY_TARGET_SET} target list before planning player identity snapshots"
+            f"{PLAYER_IDENTITY_TARGET_SET} target list before planning player identity snapshots "
+            f"(expected_target_count={len(PLAYER_IDENTITY_TARGETS)} "
+            f"requested_target_count={requested_target_count} "
+            f"missing_count={len(missing_targets)} "
+            f"missing_targets={','.join(missing_targets)} "
+            f"expected_targets={','.join(PLAYER_IDENTITY_TARGETS)})"
         )
 
 

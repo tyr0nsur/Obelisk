@@ -72,6 +72,7 @@
     "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly excluded in the v1 release statement before v1_completion_required can become true.",
     "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
+    "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "No surface may be listed as promoted unless its status is promoted.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a public_contract.",
@@ -635,6 +636,7 @@
       "blockers": [
         "Umbrella blocker only; future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy.",
         "No promoted player/principal identity or permission model.",
+        "Economy and mobility require promoted player identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.",
         "No persistence, migration, or cross-instance consistency contract.",
         "No abuse, rate-limit, rollback, audit, or privacy policy for economy and mobility actions.",
         "No safe runtime action surface for teleport, homes, rewards, kits, stats, safe zones, or timed notices."
@@ -673,6 +675,7 @@
         "current_public_slice": "plugin-owned config files only; read-only operator CLI is experimental"
       },
       "blockers": [
+        "Player identity/principal evidence does not unlock operator ingress/storage.",
         "No secret-safe ingress contract.",
         "No storage schema/migration contract.",
         "No queue drain, audit, encoding, or lifecycle policy for sockets/RCON/webhooks."

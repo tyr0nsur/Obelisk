@@ -204,12 +204,19 @@ def target_set_target_overlaps(target_sets: list[str]) -> list[dict[str, object]
 
 
 def schema_targets(target_set: str, schema: str) -> set[str]:
+    return set(schema_target_list(target_set, schema))
+
+
+def schema_target_list(target_set: str, schema: str) -> list[str]:
     targets = set()
+    ordered_targets = []
     for target in TARGET_SETS[target_set]:
         target_schema, _, short_key = target.partition(":")
         if target_schema == schema:
-            targets.add(short_key)
-    return targets
+            if short_key not in targets:
+                targets.add(short_key)
+                ordered_targets.append(short_key)
+    return ordered_targets
 
 
 def expand_schema_target_sets(target_sets: list[str], schema: str) -> set[str]:

@@ -12,9 +12,13 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from reflection_target_sets import schema_target_list  # noqa: E402
+
 BINARY_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 CORE_SHA = "8" * 64
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
+PLAYER_IDENTITY_TARGETS = schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelisk.ufunction-chain.snapshot.v1")
 
 
 class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
@@ -79,10 +83,7 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
                 "functions": rows,
                 "target_set_coverage": {
                     "target_sets": target_sets,
-                    "requested_targets": [
-                        "ShooterPlayerController.ServerListPlayers",
-                        "ShooterPlayerController.ServerKickPlayer",
-                    ],
+                    "requested_targets": PLAYER_IDENTITY_TARGETS if PLAYER_IDENTITY_TARGET_SET in target_sets else [],
                 },
             }
             (path / "ufunction-inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
@@ -110,6 +111,8 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertTrue(payload["ready"])
         self.assertEqual(payload["status"], "ready")
         self.assertEqual(payload["reasons"], [])
+        self.assertEqual(payload["required_target_set"]["target_set"], PLAYER_IDENTITY_TARGET_SET)
+        self.assertEqual(payload["required_target_set"]["expected_target_count"], len(PLAYER_IDENTITY_TARGETS))
         self.assertIn("ServerListPlayers", " ".join(payload["accepted_pack"]["matched_targets"]))
         self.assertIn("does not read a core", " ".join(payload["non_claims"]))
 
@@ -184,6 +187,34 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         ]
         self.assertEqual(len(scope_reasons), 2)
         self.assertIsNone(payload["accepted_pack"])
+
+    def test_partial_player_identity_target_set_coverage_reports_expected_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(root / "pack")
+            inventory_path = root / "pack" / "ufunction-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["target_set_coverage"]["requested_targets"] = [
+                "ShooterPlayerController.ServerListPlayers",
+                "ShooterPlayerController.ServerKickPlayer",
+            ]
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        coverage_reasons = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "wrong_target_scope"
+            and reason.get("field") == "target_set_coverage.requested_targets"
+        ]
+        self.assertEqual(len(coverage_reasons), 1)
+        self.assertEqual(coverage_reasons[0]["target_set"], PLAYER_IDENTITY_TARGET_SET)
+        self.assertEqual(coverage_reasons[0]["expected_target_count"], len(PLAYER_IDENTITY_TARGETS))
+        self.assertEqual(coverage_reasons[0]["missing_count"], len(PLAYER_IDENTITY_TARGETS) - 2)
+        self.assertIn("MissionType.AddPlayerToMission", coverage_reasons[0]["missing_targets"])
+        self.assertEqual(payload["required_target_set"]["expected_targets"], PLAYER_IDENTITY_TARGETS)
 
     def test_inventory_row_errors_are_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

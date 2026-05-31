@@ -300,6 +300,10 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("target_set_coverage.requested_targets must include the complete", result.stderr)
+        self.assertIn("expected_target_count=12", result.stderr)
+        self.assertIn("missing_count=11", result.stderr)
+        self.assertIn("missing_targets=ShooterPlayerController.ServerKickPlayer", result.stderr)
+        self.assertIn("MissionType.AddPlayerToMission", result.stderr)
 
     def test_unknown_target_set_rejects_before_planning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

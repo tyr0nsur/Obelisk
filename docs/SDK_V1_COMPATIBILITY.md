@@ -111,6 +111,10 @@ first-evidence gate force-redacts identity-like fields, treats `ServerKickPlayer
 as admin-mutation-not-public-identity, and fails closed until missing sanitized
 `ServerListPlayers` and `ServerKickPlayer` snapshots, accepted lifecycle anchors,
 principal privacy/invalidation semantics, and independent second-source evidence exist.
+Player identity/principal evidence does not unlock `operator_ingress_storage`; operator
+ingress/storage remains a separate post-v1 blocker until secret-safe ingress,
+storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted
+or explicitly excluded.
 
 The shortest useful route toward a complete v1 SDK is:
 
@@ -133,8 +137,10 @@ machine-readable blocker entries keep those broad areas auditable as release-sta
 units: structure aggregate/census, ownership/access identity, placement/build-policy,
 no-collision and admin exceptions; buff redaction, lifecycle/stacking/invalidation, and
 aggregate/proximity/count/mutation exclusions; and player services, economy, mobility,
-area policy, and timed-notice services. If they are included in the eventual `v1.0`
-support statement, they must be promoted before the release is called `v1.0`.
+area policy, and timed-notice services. Economy and mobility require promoted
+identity/principal, permissions/admin, and storage/persistence; identity alone is
+insufficient. If they are included in the eventual `v1.0` support statement, they must be
+promoted before the release is called `v1.0`.
 
 ## v1.0 Release Bar
 

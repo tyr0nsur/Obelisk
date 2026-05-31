@@ -1374,6 +1374,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for blocker in (
             "Umbrella blocker only; future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy.",
             "No promoted player/principal identity or permission model.",
+            "Economy and mobility require promoted player identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.",
             "No persistence, migration, or cross-instance consistency contract.",
             "No abuse, rate-limit, rollback, audit, or privacy policy for economy and mobility actions.",
             "No safe runtime action surface for teleport, homes, rewards, kits, stats, safe zones, or timed notices.",
@@ -1408,6 +1409,42 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn(
             "Each audit unit must be promoted as its own copied C ABI surface or explicitly excluded in the v1 release statement.",
             services["release_bar"],
+        )
+
+    def test_public_sdk_surfaces_manifest_keeps_operator_ingress_storage_independent_from_identity(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        operator_storage = surfaces["obelisk.operator_ingress_storage.v1"]
+        release_guardrails = " ".join(manifest["release_guardrails"])
+
+        self.assertEqual(operator_storage["status"], "post-v1")
+        self.assertEqual(operator_storage["support_tier"], "blocked")
+        self.assertEqual(operator_storage["public_contract"], [])
+        self.assertNotIn("depends_on", operator_storage)
+        self.assertIn("obelisk.operator_ingress_storage.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.operator_ingress_storage.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertNotIn("obelisk.operator_ingress_storage.v1", manifest["promoted_surfaces"])
+
+        for blocker in (
+            "Player identity/principal evidence does not unlock operator ingress/storage.",
+            "No secret-safe ingress contract.",
+            "No storage schema/migration contract.",
+            "No queue drain, audit, encoding, or lifecycle policy for sockets/RCON/webhooks.",
+        ):
+            self.assertIn(blocker, operator_storage["blockers"])
+
+        for exclusion in (
+            "RCON service",
+            "database service",
+            "webhook client",
+            "secret manager",
+            "cross-instance storage API",
+        ):
+            self.assertIn(exclusion, operator_storage["exclusions"])
+
+        self.assertIn(
+            "Player identity/principal evidence does not unlock operator ingress/storage",
+            release_guardrails,
         )
 
     def test_public_sdk_surfaces_manifest_keeps_structure_and_buff_scope_blocked(self) -> None:
