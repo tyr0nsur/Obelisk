@@ -24,6 +24,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import protected_paths  # noqa: E402
 from check_command_chat_response_static_orientation import RESPONSE_PATH_TARGETS  # noqa: E402
 from check_player_identity_static_admin_thunks import ADMIN_THUNKS  # noqa: E402
+from check_player_identity_static_lifecycle_orientation import LIFECYCLE_ANCHORS  # noqa: E402
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component  # noqa: E402
 
 
@@ -329,6 +330,40 @@ def load_admin_windows(*, registration_instructions: int, thunk_instructions: in
     return windows
 
 
+def load_lifecycle_windows(*, registration_instructions: int, thunk_instructions: int) -> list[OrientationWindow]:
+    windows: list[OrientationWindow] = []
+    for anchor in LIFECYCLE_ANCHORS:
+        windows.extend(
+            [
+                OrientationWindow(
+                    group="lifecycle",
+                    target=anchor.target,
+                    role="registration-class-load",
+                    vma=anchor.registration_class_load_vma,
+                    instruction_count=registration_instructions,
+                    source="scripts/check_player_identity_static_lifecycle_orientation.py",
+                ),
+                OrientationWindow(
+                    group="lifecycle",
+                    target=anchor.target,
+                    role="registration",
+                    vma=anchor.registration_vma,
+                    instruction_count=registration_instructions,
+                    source="scripts/check_player_identity_static_lifecycle_orientation.py",
+                ),
+                OrientationWindow(
+                    group="lifecycle",
+                    target=anchor.target,
+                    role="thunk",
+                    vma=anchor.thunk_vma,
+                    instruction_count=thunk_instructions,
+                    source="scripts/check_player_identity_static_lifecycle_orientation.py",
+                ),
+            ]
+        )
+    return windows
+
+
 def load_chat_response_windows(*, registration_instructions: int, thunk_instructions: int) -> list[OrientationWindow]:
     windows: list[OrientationWindow] = []
     for target in RESPONSE_PATH_TARGETS:
@@ -369,6 +404,13 @@ def selected_windows(args: argparse.Namespace) -> list[OrientationWindow]:
     if "admin" in groups:
         windows.extend(
             load_admin_windows(
+                registration_instructions=args.registration_instructions,
+                thunk_instructions=args.thunk_instructions,
+            )
+        )
+    if "lifecycle" in groups:
+        windows.extend(
+            load_lifecycle_windows(
                 registration_instructions=args.registration_instructions,
                 thunk_instructions=args.thunk_instructions,
             )
@@ -587,7 +629,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--target-group",
-        choices=("player-identity", "admin", "chat-response"),
+        choices=("player-identity", "admin", "lifecycle", "chat-response"),
         action="append",
         default=[],
         help="Capture only a target group. Repeatable. Defaults to all groups.",
@@ -598,7 +640,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     args = parser.parse_args()
     if not args.target_group:
-        args.target_group = ["player-identity", "admin", "chat-response"]
+        args.target_group = ["player-identity", "admin", "lifecycle", "chat-response"]
     if args.registration_instructions < 1 or args.thunk_instructions < 1:
         raise SystemExit("instruction counts must be positive")
     if args.timeout_sec < 1:

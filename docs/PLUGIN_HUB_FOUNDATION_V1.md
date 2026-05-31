@@ -42,7 +42,11 @@ Creator-facing examples that build against an installed SDK package live under
 `examples/`; `examples/sdk_minimal_plugin` is the minimum seed for an installed SDK
 consumer, `examples/sdk_descriptor_catalog` demonstrates descriptor/catalog reads, and
 `examples/sdk_timer_plugin` demonstrates the promoted process-local timer surface using
-only the installed package. First-party runtime reference plugins live under
+only the installed package. `examples/sdk_inventory_policy_audit` demonstrates an
+experimental copied `GameplayPolicyEvent` audit pattern for inventory-backed event
+categories only; it is not release-supported and does not add inventory/item identity,
+lookup, mutation, return override, command, permission, send-chat, storage, or
+compatibility surface. First-party runtime reference plugins live under
 `plugins/` and may use repository-local build/test wiring, so they are reference plugins
 in-tree rather than the minimum installed-SDK consumer contract.
 

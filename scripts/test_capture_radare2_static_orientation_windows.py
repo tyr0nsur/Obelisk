@@ -96,6 +96,45 @@ class CaptureRadare2StaticOrientationWindowsTests(unittest.TestCase):
                 self.assertIn("candidate-only radare2 orientation window", output.read_text(encoding="utf-8"))
                 self.assertEqual(window["radare2_status"], "ok")
 
+    def test_captures_candidate_only_lifecycle_windows_under_output_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            binary = root / "ShooterGameServer"
+            binary.write_bytes(b"offline test binary")
+            digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+            fake_radare2 = root / "radare2"
+            self.write_fake_radare2(fake_radare2)
+            output_root = root / "out"
+
+            result = self.run_wrapper(
+                str(binary),
+                "--expected-binary-sha256",
+                digest,
+                "--radare2",
+                str(fake_radare2),
+                "--output-root",
+                str(output_root),
+                "--run-id",
+                "lifecycle-test-run",
+                "--target-group",
+                "lifecycle",
+                "--json",
+            )
+
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "candidate_only_orientation_captured")
+            self.assertEqual(payload["scope"]["target_groups"], ["lifecycle"])
+            self.assertEqual(len(payload["windows_captured"]), 6)
+            targets = {window["target"] for window in payload["windows_captured"]}
+            roles = {window["role"] for window in payload["windows_captured"]}
+            self.assertEqual(targets, {"ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"})
+            self.assertEqual(roles, {"registration-class-load", "registration", "thunk"})
+            for window in payload["windows_captured"]:
+                output = Path(window["output"])
+                self.assertTrue(output.exists())
+                self.assertIn("candidate-only radare2 orientation window", output.read_text(encoding="utf-8"))
+                self.assertEqual(window["radare2_status"], "ok")
+
     def test_sha_mismatch_writes_blocked_manifest_without_windows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

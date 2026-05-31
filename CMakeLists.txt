@@ -307,6 +307,12 @@ target_include_directories(process_event_call_guard_tests PRIVATE ${CMAKE_CURREN
 
 add_test(NAME ProcessEventCallGuardTests COMMAND process_event_call_guard_tests)
 
+add_executable(permissions_admin_decision_model_tests
+    tests/core/PermissionsAdminDecisionModelTests.cpp
+)
+
+add_test(NAME PermissionsAdminDecisionModelTests COMMAND permissions_admin_decision_model_tests)
+
 add_executable(chat_reflection_tests
     tests/core/ChatReflectionTests.cpp
     ue/ChatReflection.cpp

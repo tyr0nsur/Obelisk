@@ -140,6 +140,20 @@ it does not promise ArkApi plugin compatibility.
 | 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, permissions/admin where gated, command routing and response path where user-triggered, item grant/mutation APIs, rollback, and privacy policy |
 | 13 | Shared persistence, database-backed state, webhook services | blocked | Config files are available only for plugin config; no Obelisk storage service, database schema/migration contract, secret manager, webhook client, or cross-instance persistence API |
 
+### Top Demand Family Routing
+
+These demand families are visible enough to keep in contributor planning, but they do not
+create new Plugin Hub seed support. Route proposals to the blocker named below unless a
+future promotion gate changes the support tier.
+
+| Demand family | Route to current surface/blocker | Public wording boundary |
+| --- | --- | --- |
+| Economy/storage | `obelisk.player_services_economy_mobility.v1`, `obelisk.operator_ingress_storage.v1`, plus identity, permissions, command-response, and mutation dependencies | Backlog/design only; no economy, shop, reward, database, webhook, storage service, or cross-instance persistence API |
+| Inventory mutation | `obelisk.inventory_items_mutation.v1`; experimental copied signal evidence may use `obelisk.inventory_item_copied_signals.v1` only as observation | No Inventory SDK, Items SDK, item identity, lookup, give/remove, mutation, rollback, or return override |
+| Structure/build policy | `obelisk.structure_census.v1`; copied `GameplayPolicyEvent` policy observation remains experimental only | No StructureEvents SDK, structure identity, ownership lookup, placement denial, no-collision control, mutation, enforcement, or return override |
+| Player mobility | `obelisk.player_services_economy_mobility.v1` | No homes, teleport, safe-zone, area-policy, persistent mobility state, or gameplay timer API |
+| Dinos/tribes | `obelisk.mission_transfer_dino_tribe.v1` | No Dino SDK, Tribe SDK, dino mutation/cosmetics/carry rules, tribe MOTD/notices, ownership lookup, teleport/spawn API, or cross-map correlation |
+
 `release-supported seed available` means an Obelisk-native plugin can be written and documented
 as a supported Plugin Hub seed against the stated current public ABI slice. `experimental
 seed only` means the example can teach copied-data callback patterns, but it should not be
@@ -176,6 +190,7 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |
 | Inspect descriptor output safely | `oDescriptorCatalog` | First-party metadata example | Resource discovery, callback subscription, identity, lookup, mutation, or return override |
 | Build an installed-SDK consumer | `examples/sdk_minimal_plugin`, `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Minimum installed SDK seed, descriptor seed, and timer seed | Runtime reference-plugin wiring, gameplay authority, module SDK coverage, private runtime headers, or ArkApi plugin portability |
+| Study an installed-SDK copied policy audit pattern | `examples/sdk_inventory_policy_audit` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Experimental pattern only | Inventory SDK, Items SDK, identity, lookup, mutation, return override, commands, permissions, send-chat, storage, policy enforcement, or ArkApi compatibility |
 | Study in-tree reference plugins | `plugins/oBaseEvents`, `plugins/oProcessTimer`, descriptor examples | Reference plugins | Minimum installed-SDK consumer contract, gameplay authority, module SDK coverage, or ArkApi plugin portability |
 | Use raw `ProcessEvent` callbacks | Filtered callbacks behind explicit debug gates | Debug-gated runtime plumbing | Stable gameplay API, borrowed pointer lifetime, raw param API, or public Plugin Hub dependency |
 | Commands, permissions, economy, kits, shops, RCON | No public Obelisk SDK yet | Not ready | ArkApi compatibility, player identity, reply/send-chat, database service, or operator command lifecycle |
@@ -238,8 +253,10 @@ Experimental pattern examples only:
 
 The installed-SDK seed starts at `examples/sdk_minimal_plugin` and now includes
 `examples/sdk_descriptor_catalog` for descriptor reads and `examples/sdk_timer_plugin` for
-the promoted timer surface. The current in-tree reference plugins cover this safe seed
-set: `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` cover the release-scope
+the promoted timer surface. `examples/sdk_inventory_policy_audit` is separate from that
+release-supported seed set; it is an experimental copied policy audit pattern only. The
+current in-tree reference plugins cover this safe seed set: `oBaseEvents`,
+`oProcessTimer`, and `oDescriptorCatalog` cover the release-scope
 foundation under `plugins/`, while
 `oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the experimental copied policy and
 copied chat slices. Those three are seed examples only, not production Plugin Hub modules;

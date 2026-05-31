@@ -81,6 +81,12 @@ PROMOTION_EVIDENCE_REQUIRED_TERMS = {
         "ServerListPlayers",
         "ServerKickPlayer",
     ),
+    "obelisk.permissions_admin.v1": (
+        "query-only fail-closed permission checks over copied principals",
+        "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+        "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+        "promoted copied principal semantics",
+    ),
 }
 REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
     "obelisk.permissions_admin.v1": (

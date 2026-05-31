@@ -14,6 +14,10 @@ not ArkApi portability kits, module SDKs, or evidence that Obelisk SDK v1 is com
   checks.
 - `sdk_timer_plugin/`: external C plugin using the installed SDK timer capability with
   owner-token registration and explicit shutdown cleanup.
+- `sdk_inventory_policy_audit/`: external C plugin showing an experimental copied-data
+  audit pattern for inventory-backed `GameplayPolicyEvent` callbacks; it is not an
+  inventory, item, identity, lookup, mutation, return override, command, permission,
+  send-chat, storage, or compatibility surface.
 
 Examples must stay inside public `include/obelisk/ObeliskApi.h` contracts. Do not use
 private headers, raw UE pointers, `ProcessEvent` internals, identity, lookup, mutation,

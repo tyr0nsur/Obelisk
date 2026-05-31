@@ -71,6 +71,14 @@ SDK_DESCRIPTOR_CATALOG_EXAMPLE_FILES = [
     REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md",
     REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "descriptor_catalog_plugin.c",
 ]
+SDK_INVENTORY_POLICY_AUDIT_EXAMPLE_FILES = [
+    REPO_ROOT / "examples" / "sdk_inventory_policy_audit" / "CMakeLists.txt",
+    REPO_ROOT / "examples" / "sdk_inventory_policy_audit" / "README.md",
+    REPO_ROOT
+    / "examples"
+    / "sdk_inventory_policy_audit"
+    / "inventory_policy_audit_plugin.c",
+]
 PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -4944,11 +4952,171 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 with self.subTest(path=relative, forbidden=token):
                     self.assertNotIn(token, text)
 
+    def test_sdk_inventory_policy_audit_example_stays_experimental_installed_sdk_only(self) -> None:
+        examples_readme = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+        audit_readme = (
+            REPO_ROOT / "examples" / "sdk_inventory_policy_audit" / "README.md"
+        ).read_text(encoding="utf-8")
+        audit_cmake = (
+            REPO_ROOT / "examples" / "sdk_inventory_policy_audit" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+        audit_source = (
+            REPO_ROOT
+            / "examples"
+            / "sdk_inventory_policy_audit"
+            / "inventory_policy_audit_plugin.c"
+        ).read_text(encoding="utf-8")
+
+        for path in SDK_INVENTORY_POLICY_AUDIT_EXAMPLE_FILES:
+            with self.subTest(path=path.relative_to(REPO_ROOT), token="example file"):
+                self.assertTrue(path.exists())
+
+        for text, relative in (
+            (examples_readme, "examples/README.md"),
+            (audit_readme, "examples/sdk_inventory_policy_audit/README.md"),
+            (audit_cmake, "examples/sdk_inventory_policy_audit/CMakeLists.txt"),
+        ):
+            normalized_text = re.sub(r"\s+", " ", text)
+            with self.subTest(path=relative, token="find_package"):
+                self.assertIn(
+                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
+                    normalized_text,
+                )
+            with self.subTest(path=relative, token="sdk target"):
+                self.assertIn("Obelisk::obelisk_sdk", text)
+
+        self.assertIn("Support tier: experimental pattern.", audit_readme)
+        audit_readme_normalized = re.sub(r"\s+", " ", audit_readme)
+        for token in (
+            "experimental copied-data pattern",
+            "copied inventory-backed `GameplayPolicyEvent` categories",
+            "callback-scope scalar fields",
+            "process-local aggregate counts",
+            "does not provide an Inventory SDK, Items SDK, identity, lookup, mutation",
+            "return override, commands, permissions, chat replies/send-chat, storage, ArkApi",
+            "does not make policy decisions",
+            "does not retain callback payloads",
+        ):
+            with self.subTest(path="examples/sdk_inventory_policy_audit/README.md", token=token):
+                self.assertIn(token, audit_readme_normalized)
+
+        self.assertEqual(c_like_includes(audit_source)[0], "obelisk/ObeliskApi.h")
+        self.assertIn("#include <obelisk/ObeliskApi.h>", audit_source)
+        self.assertIn("C_VISIBILITY_PRESET hidden", audit_cmake)
+        self.assertIn("OBELISK_SDK_INVENTORY_POLICY_AUDIT_TEST_PROBES", audit_cmake)
+        self.assertIn("#ifdef OBELISK_SDK_INVENTORY_POLICY_AUDIT_TEST_PROBES", audit_source)
+        self.assertIn("InstallLayoutConsumer_InventoryPolicyAuditRegistered", audit_source)
+        self.assertIn("InstallLayoutConsumer_InventoryPolicyAuditEventCount", audit_source)
+
+        exported_functions = re.findall(
+            r"OBELISK_PLUGIN_EXPORT\s+bool\s+(ObeliskPlugin_[A-Za-z0-9_]+)\s*\(",
+            audit_source,
+        )
+        self.assertEqual(exported_functions, ["ObeliskPlugin_GetInfo", "ObeliskPlugin_Init"])
+        self.assertIn("OBELISK_PLUGIN_EXPORT\nvoid ObeliskPlugin_Shutdown(void)", audit_source)
+        self.assertNotIn("__attribute__((visibility(\"default\")))\nbool", audit_source)
+
+        for token in (
+            '\\"enabled\\": false',
+            '\\"allow_all_instances\\": false',
+            '\\"instance_allowlist\\": []',
+            'out->default_config_json = kDefaultConfig',
+        ):
+            with self.subTest(
+                path="examples/sdk_inventory_policy_audit/inventory_policy_audit_plugin.c",
+                token=token,
+            ):
+                self.assertIn(token, audit_source)
+
+        for token in (
+            "api->abi_version == OBELISK_API_ABI_VERSION",
+            "api->struct_size >= offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +",
+            "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
+            "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+            "api->RegisterGameplayPolicyEventWithOwnerTokenHandle != NULL",
+            "api->UnregisterGameplayPolicyEventWithOwnerToken != NULL",
+            "api->DescribeGameplayPolicyEventKind != NULL",
+            "context->struct_size >= offsetof(ObeliskPluginInitContext, plugin_owner_token) +",
+            "context->plugin_owner_token != 0",
+            "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
+            "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+            "UnregisterGameplayPolicyEventWithOwnerToken",
+            "atomic_exchange(&g_registration_id, 0)",
+        ):
+            with self.subTest(
+                path="examples/sdk_inventory_policy_audit/inventory_policy_audit_plugin.c",
+                token=token,
+            ):
+                self.assertIn(token, audit_source)
+
+        for text, relative in (
+            (audit_readme, "examples/sdk_inventory_policy_audit/README.md"),
+            (audit_cmake, "examples/sdk_inventory_policy_audit/CMakeLists.txt"),
+            (audit_source, "examples/sdk_inventory_policy_audit/inventory_policy_audit_plugin.c"),
+        ):
+            with self.subTest(path=relative, check="no-broad-v1-completion-claim"):
+                self.assertEqual(broad_v1_completion_claims(text, relative), [])
+
+        self.assertEqual(
+            plugin_hub_seed_forbidden_claims(
+                audit_readme,
+                "examples/sdk_inventory_policy_audit/README.md",
+                "experimental pattern",
+            ),
+            [],
+        )
+
+        release_layout_script = (
+            REPO_ROOT / "scripts" / "test_install_obelisk_layout.sh"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("SDK_INVENTORY_POLICY_AUDIT_EXAMPLE_PLUGIN_PATH", release_layout_script)
+        self.assertNotIn("examples/sdk_inventory_policy_audit", release_layout_script)
+
+        for text, relative in (
+            (audit_cmake, "examples/sdk_inventory_policy_audit/CMakeLists.txt"),
+            (audit_source, "examples/sdk_inventory_policy_audit/inventory_policy_audit_plugin.c"),
+        ):
+            for token in (
+                '#include "',
+                "#include <api/",
+                "#include <core/",
+                "#include <hooks/",
+                "#include <plugins/",
+                "#include <runtime/",
+                "#include <ue/",
+                "UObject",
+                "UFunction",
+                "FString",
+                "ProcessEvent",
+                "CallProcessEvent",
+                "RegisterPreProcessEvent",
+                "RegisterPostProcessEvent",
+                "RegisterChat",
+                "ChatMessageEvent",
+                "SendChat",
+                "Reply",
+                "ArkApi",
+                "AseApi",
+                "ResourceHandle",
+                "GetResource",
+                "ResolveResource",
+                "player identity",
+                "object identity",
+                "resource identity",
+                "return_override",
+            ):
+                with self.subTest(path=relative, forbidden=token):
+                    self.assertNotIn(token, text)
+
     def test_installed_sdk_examples_label_package_version_as_prerelease_floor(self) -> None:
         for path in (
             REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
             REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md",
             REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
+            REPO_ROOT / "examples" / "sdk_inventory_policy_audit" / "README.md",
         ):
             compact = normalized(path.read_text(encoding="utf-8"))
             with self.subTest(path=path.relative_to(REPO_ROOT)):

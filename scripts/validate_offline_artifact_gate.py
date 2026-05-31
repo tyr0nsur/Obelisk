@@ -9034,6 +9034,14 @@ def validate_manifest(
         return record, [{"reason": "manifest_not_file", "path": str(path), "detail": str(exc)}]
     resolved = Path(state["resolved"])
     if payload.get("schema") not in SUPPORTED_MANIFEST_SCHEMAS:
+        if payload.get("schema") in STATIC_ORIENTATION_REPORT_SCHEMAS:
+            blockers.append(
+                {
+                    "reason": "static_orientation_report_not_artifact_gate",
+                    "label": f"{resolved}:$.schema",
+                    "recorded_schema": payload.get("schema"),
+                }
+            )
         blockers.append(
             {
                 "reason": "unsupported_manifest_schema",

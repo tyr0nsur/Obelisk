@@ -114,6 +114,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   and command/chat response are explicitly not offline artifact-gate schemas. They must
   fail closed both as `--manifest` inputs and as `--artifact` inputs even with valid
   provenance sidecars; they are navigation clues only, not consume/promote evidence packs.
+  The radare2 static-orientation wrapper may capture `lifecycle` windows for
+  `HandleNewPlayer`/`OnLogout` as candidate-only reviewer navigation; those windows do
+  not prove lifecycle anchors or replace core/reflection evidence.
 - The current artifact-root audit is summarized in
   `docs/research/2026-05-31-offline-artifact-inventory-audit.md`: usable roots are
   layout-only, evidence-only, or consume-only, command/chat response remains
@@ -173,6 +176,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `descriptor_reconciliation.status=accepted`, preserving the public
   `ItemReturnEventDispatcher` three-event ReturnValue-only boundary separately from the
   existing two-event `InventoryPolicyEventDispatcher` field masks.
+  Do not open a broader inventory/action target from `AdditionalData`, object refs, item
+  ids, `InventoryCustomFilter`, or redacted action context without new copied-data,
+  privacy, lifecycle, and evidence gates.
 - v0.2 internal hardening lane: Mission copied-bool is selected only for internal
   default-off recognizer/helper hardening, not a product-facing Plugin Hub module or
   Mission SDK/identity/mutation/return-override/v1-completion claim. Detail:
@@ -204,6 +210,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   owner-scoped rate-limit/audit gates. Current public header symbols remain an explicit
   empty set. `v1_sequence_gate` entries keep identity -> permissions -> command response
   -> commands/replies ordered and keep downstream storage/admin/replies/ingress out.
+  Internal test-only decision-model coverage may encode the fail-closed matrix, but it
+  remains non-ABI and cannot promote permissions/admin without copied identity evidence
+  plus required semantic evidence terms in the v1 completion checker.
 - Plugin Hub seed review now mechanically requires exactly one `Support tier: <tier>`
   declaration in seed README/package/public docs and rejects unnegated claims for v1,
   ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies,
