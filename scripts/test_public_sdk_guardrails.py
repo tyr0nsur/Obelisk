@@ -18,6 +18,9 @@ PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SET
 RELEASE_READINESS_TARGET_SETS = REFLECTION_TARGET_SET_VARS["RELEASE_READINESS_TARGET_SETS"]
 PUBLIC_GAMEPLAY_EVENTS_MANIFEST = REPO_ROOT / "docs" / "public_gameplay_events.json"
 PUBLIC_SDK_SURFACES_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISIONS = (
+    REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
+)
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 PUBLIC_DOC_FILES = [
@@ -1128,6 +1131,58 @@ def evidence_target_set_values(value: object, path: str = "evidence") -> list[tu
 
 
 class PublicSdkGuardrailTests(unittest.TestCase):
+    def test_player_identity_public_contract_decisions_block_public_header_until_evidence_complete(self) -> None:
+        decisions = json.loads(PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISIONS.read_text(encoding="utf-8"))
+
+        self.assertEqual(decisions["schema"], "obelisk.player-identity-public-contract-decisions.v1")
+        self.assertEqual(decisions["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(decisions["status"], "blocked")
+        self.assertIs(decisions["public_header_allowed"], False)
+        self.assertEqual(decisions["public_header"], "include/obelisk/ObeliskApi.h")
+
+        forbidden_contract = set(decisions.get("forbidden_public_contract", []))
+        self.assertTrue(
+            {
+                "UE pointers",
+                "raw params",
+                "FName/GObjects indices",
+                "ResourceHandle",
+                "pointer-derived identity",
+                "lookup",
+                "mutation",
+                "return override",
+            }.issubset(forbidden_contract)
+        )
+
+        requirements = decisions.get("required_before_public_header")
+        self.assertIsInstance(requirements, list)
+        requirement_ids = {item.get("id") for item in requirements if isinstance(item, dict)}
+        self.assertTrue(
+            {
+                "evidence.complete_non_protected_pack",
+                "evidence.accepted_session_start_anchor",
+                "evidence.accepted_session_end_anchor",
+                "evidence.second_source_anchor_layout",
+                "privacy.public_identifier_form",
+                "privacy.redacted_identifier_fields",
+                "privacy.logging_and_storage_policy",
+                "lifetime.principal_scope",
+                "lifetime.invalidation_events",
+                "lifetime.reconnect_duplicate_stale_policy",
+                "abi.payload_shape",
+                "abi.capability_bits",
+                "abi.owner_token_registration",
+                "abi.append_only_layout_tests",
+                "separation.no_commands_permissions_persistence",
+            }.issubset(requirement_ids)
+        )
+        self.assertTrue(
+            all(
+                isinstance(item, dict) and item.get("status") == "unresolved"
+                for item in requirements
+            )
+        )
+
     def test_public_sdk_surfaces_manifest_defines_v1_contract_without_claiming_completion(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(manifest["schema"], "obelisk.public-sdk-surfaces.v1")

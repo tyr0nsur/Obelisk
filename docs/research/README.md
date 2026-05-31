@@ -75,6 +75,7 @@ Current post-RC research lane:
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)
+- [2026-05-31-v1-sdk-round-identity-static-demand-audit.md](2026-05-31-v1-sdk-round-identity-static-demand-audit.md)
 - [2026-05-31-aggregate-census-product-priority.md](2026-05-31-aggregate-census-product-priority.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
 - [2026-05-31-batch-snapshot-planner-design.md](2026-05-31-batch-snapshot-planner-design.md)
