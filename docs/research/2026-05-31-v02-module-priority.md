@@ -47,19 +47,34 @@ order: after hub foundation and gameplay-policy backing, it names Mission as the
 internal copied-bool planning thread, with Dino, Buff, Structure build-policy, Player
 identity, Tribe, Transfer, and Admin/permissions behind it.
 
+## Product vs Technical Priority
+
+The Mission copied-bool lane is the best **technical hardening** target because its copied
+payload is small, fixture-backed, and easy to keep non-identifying. It is not the best
+**Plugin Hub product** target. Without identity, mutation, rewards, transfers,
+progression state, commands, or runtime observation, Mission exposes too little for
+creator-facing modules beyond passive aggregate telemetry and QA/regression checks.
+
+For future Plugin Hub value, Structure aggregate/census, Dino aggregate/census, or Buff
+aggregate/census may become better product-facing directions if they can be kept
+aggregate, privacy-preserving, and copied-data only. They are not ready today: each still
+needs its own evidence, redaction policy, lifecycle tests, and promotion gate. This note
+therefore prioritizes Mission only as an internal v0.2 hardening lane, not as a public
+Plugin Hub module.
+
 ## Ranked Recommendation
 
 1. **Mission copied-bool internal bridge**
 
-   Best v0.2 evidence-to-value ratio after chat and gameplay policy. The lane has accepted
-   `mission-compact-intake` layout evidence, a frozen four-function surface, exact
-   one-byte bool-tail rules, a consume-accepted focused policy artifact, recognizer/helper
-   test coverage, and a narrow copied payload: five canonical bool fields. Object,
-   player/controller, mission, and item-array fields can stay recognition-only, which
-   makes the slice smaller than identity-heavy player, tribe, transfer, dino, or structure
-   build-policy work. The v0.2 deliverable should remain internal/test-only: preserve and
-   harden the default-off Mission copied-bool observer contract, not publish a Mission
-   SDK.
+   Best v0.2 technical hardening ratio after chat and gameplay policy. The lane has
+   accepted `mission-compact-intake` layout evidence, a frozen four-function surface,
+   exact one-byte bool-tail rules, a consume-accepted focused policy artifact,
+   recognizer/helper test coverage, and a narrow copied payload: five canonical bool
+   fields. Object, player/controller, mission, and item-array fields can stay
+   recognition-only, which makes the slice smaller than identity-heavy player, tribe,
+   transfer, dino, or structure build-policy work. The v0.2 deliverable should remain
+   internal/test-only: preserve and harden the default-off Mission copied-bool observer
+   contract, not publish a Mission SDK or production Plugin Hub mission module.
 
 2. **Dino compact recognizer**
 
@@ -104,7 +119,8 @@ identity, Tribe, Transfer, and Admin/permissions behind it.
 ## Selected v0.2 Surface
 
 Choose **Mission copied-bool internal bridge** as the one module surface to prioritize
-after copied chat and copied gameplay policy.
+after copied chat and copied gameplay policy for internal hardening. Do not present this
+as the leading product-facing Plugin Hub category.
 
 The immediate v0.2 scope should be:
 
@@ -119,6 +135,9 @@ The immediate v0.2 scope should be:
 
 This gives v0.2 a module-shaped slice with real evidence and low payload risk while
 avoiding the identity, mutation, and public SDK traps that block the higher-demand lanes.
+Its useful outputs are internal recognizer confidence, copied-data ABI practice,
+candidate aggregate telemetry, and QA/regression evidence, not a creator-facing Mission
+feature set.
 
 ## Blockers
 
@@ -138,6 +157,7 @@ avoiding the identity, mutation, and public SDK traps that block the higher-dema
 This recommendation does not claim:
 
 - public v0.2 Mission SDK readiness;
+- production Plugin Hub mission module readiness;
 - ArkApi/AseApi or NextGenPlugins compatibility;
 - runtime hook, observer, dispatcher, descriptor, or ABI promotion;
 - player identity, mission identity, item identity, object identity, lookup, or

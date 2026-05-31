@@ -217,6 +217,10 @@ lead workflow, GitHub ownership, supervised agents, publication, and handoff pol
   not promotable layouts; new observer families need per-function analyzer fixture coverage
   and/or approved sanitized observer capture/research-note coverage before captures are
   accepted for review, then second-source/static evidence before promotion.
+- Public docs, release notes, community updates, and Plugin Hub planning must not present
+  Mission, Dino, Buff, Structure, or adjacent planning/internal evidence as public SDK
+  availability unless the promoted surface names its target set and passes the required
+  promotion gate. Use internal/planning/candidate wording for research-only module lanes.
 
 ## Pre-Push Checklist
 
