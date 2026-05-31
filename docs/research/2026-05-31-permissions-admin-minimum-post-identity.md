@@ -33,7 +33,9 @@ player_identity -> permissions_admin -> command_chat_response_path -> commands_r
 
 The improvement captured here is the minimum safe shape after identity, so later work has
 a narrow target instead of widening permissions into command routers, admin actions, or
-operator ingress.
+operator ingress. The machine-readable decision contract also keeps permission checks
+blocked before any public header until authority provenance and owner-scoped rate-limit
+and audit gates are defined.
 
 ## Minimum Scope After Identity
 
@@ -46,6 +48,8 @@ The first acceptable permission/admin surface should be query-only:
 - Return a copied decision: `deny`, `allow`, or `unknown`.
 - Return copied diagnostic flags for fail-closed reasons that are safe to log, such as
   `missing_identity`, `unsupported_scope`, `policy_unavailable`, or `capability_disabled`.
+- Return `allow` only when the runtime can attach runtime-owned policy provenance for the
+  policy source, authority kind, authority generation, and `policy_epoch`.
 - Treat `unknown` as denial for all command, mutation, economy, mobility, and moderation
   callers.
 
@@ -97,6 +101,12 @@ typedef struct ObeliskPermissionDecision {
     uint32_t struct_size;
     uint32_t decision;
     uint32_t reason_flags;
+    uint64_t policy_source_id;
+    uint64_t policy_source_generation;
+    uint32_t authority_kind;
+    uint32_t reserved0;
+    uint64_t authority_generation;
+    uint64_t policy_epoch;
 } ObeliskPermissionDecision;
 
 typedef int32_t (*ObeliskCheckPermissionFn)(
@@ -124,6 +134,23 @@ Required ABI properties:
   `principal_scope_flags`, `resource_scope`, or `policy_epoch` fails closed; no public
   permission cache ABI is allowed until `policy_epoch` and full generation/scope keying
   semantics are promoted;
+- no `allow` decision is valid without `policy_source_id`, `policy_source_generation`,
+  `authority_kind`, `authority_generation`, and `policy_epoch` provenance or a reviewed
+  equivalent copied provenance contract;
+- missing policy source, unknown `authority_kind`, policy source generation mismatch,
+  authority generation mismatch, or plugin-supplied provenance fails closed;
+- the only plausible initial authority kinds are runtime-owned `operator-config` and
+  `runtime-local`; plugin-supplied, remote-service, and cross-process-shared authority
+  require separate promotion before they can authorize;
+- permission queries must pass owner-scoped abuse gates before any expensive or
+  policy-revealing work; rate-limit exhaustion, malformed query bursts, or namespace
+  probing returns failure or `deny/unknown`, never `allow`;
+- abuse counters and audit records are process-local and owner-scoped by
+  `plugin_owner_token`; audit data may include sanitized action/scope names and safe
+  reason/provenance labels, but not UE pointers, raw params, secret policy contents, raw
+  player identifiers, or raw chat text;
+- rate-limit state, audit counters, and denial telemetry are not a public permission cache
+  ABI and must not be exposed as mutable plugin state;
 - no callback registration is required for the first query-only surface. If a future
   policy-change callback is added, it must use owner-token handle registration,
   owner-scoped unregister, and plugin-owner cleanup before `dlclose`.
@@ -139,6 +166,10 @@ Permission checks must be owner-scoped even when they are synchronous queries:
   cross-plugin authority model exists.
 - Capabilities are captured at plugin init. Later marker/env changes must not widen an
   already-loaded plugin's permission authority.
+- Plugin-provided query fields can name the requested action and resource scope, but they
+  cannot self-attest policy source, authority kind, authority generation, or policy epoch.
+- Owner-token rate limits and malformed-query counters must be independent per plugin
+  owner token, so one plugin cannot spend or reset another plugin's permission budget.
 - The permission surface must be separate from passive identity, command routing,
   response/send-chat, storage, and operator ingress capabilities.
 
@@ -153,7 +184,12 @@ Default state is process-local and fail-closed:
 - Runtime handles, owner tokens, principal handles, callback handles, sequence values, and
   permission cache keys are process-local and must not be persisted.
 - A plugin may maintain plugin-owned config policy, but Obelisk should not describe that
-  as global, per-player, group, admin, or cluster authority.
+  as global, per-player, group, admin, or cluster authority, and it cannot be the
+  authority provenance for a public Obelisk `allow`.
+- Runtime-owned authority provenance must identify the copied policy source and
+  generation used for a decision. `operator-config` and `runtime-local` authority can be
+  considered only as local process authority; remote service, plugin-supplied, or
+  cross-process shared authority remains blocked until separately promoted.
 - Principal invalidation from disconnect, transfer, restart, duplicate identity, malformed
   evidence, stale controller/state, or failed validation invalidates permission decisions.
 - Cache entries must include principal generation or equivalent invalidation metadata from
@@ -176,8 +212,12 @@ The minimum design cannot move beyond this note until all of these are resolved:
   restart-local, cluster-stable, or persistent.
 - A permission policy source is chosen without implying unpromoted storage, secret
   ingress, database, RCON, webhooks, or operator reload behavior.
-- Abuse controls exist for expensive checks, repeated denials, malformed strings,
-  namespace probing, and command-driven callers.
+- Authority provenance is defined for every possible `allow`: `policy_source_id`,
+  `policy_source_generation`, `authority_kind`, `authority_generation`, and
+  `policy_epoch`, with plugin input forbidden from self-attesting those values.
+- Owner-scoped rate-limit and audit gates exist for expensive checks, repeated denials,
+  malformed strings, namespace probing, and command-driven callers; exhaustion or audit
+  failure is fail-closed and the gate state is not a public cache ABI.
 - ABI tests, SDK consumer tests, and negative tests prove capability, owner-token,
   `struct_size`, stale-principal, unsupported-scope, and disabled-policy failures are
   fail-closed.

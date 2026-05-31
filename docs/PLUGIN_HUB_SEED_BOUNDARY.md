@@ -16,6 +16,11 @@ Every proposal must use one label:
   `GameplayPolicyEvent` data as a labeled example, without production support.
 - `blocked backlog`: depends on a v1 blocker or unpromoted gameplay/module surface.
 
+Seed README, package metadata, and public seed docs must declare exactly one support tier
+with `Support tier: <tier>`. Review must fail if that text claims v1 readiness,
+ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies, mutation,
+storage, inventory, or structure support outside the declared tier.
+
 ## Production Seeds Today
 
 Release-supported seeds are limited to:

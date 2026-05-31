@@ -20,6 +20,8 @@ REQUIRED_IDS = {
     "identity.principal_scope_compatibility",
     "abi.permission_query_identity_fields",
     "cache.generation_scope_keying",
+    "policy.authority_provenance_required",
+    "abuse.query_rate_limit_and_audit_gate",
     "fail_closed.stale_or_scope_mismatch",
     "separation.no_commands_replies_or_admin_mutation",
 }
@@ -101,6 +103,52 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         )
         self.assertIn("cache disabled unless all key fields are defined", cache["required_behavior"])
 
+    def test_policy_authority_provenance_and_abuse_gates_are_explicit(self) -> None:
+        payload = self.load_decisions()
+        requirements = {
+            item["id"]: item
+            for item in payload["required_before_public_header"]
+        }
+
+        provenance = requirements["policy.authority_provenance_required"]
+        self.assertEqual(
+            set(provenance["required_fields_or_equivalent"]),
+            {
+                "policy_source_id",
+                "policy_source_generation",
+                "authority_kind",
+                "authority_generation",
+                "policy_epoch",
+            },
+        )
+        self.assertEqual(set(provenance["allowed_initial_authority_kinds"]), {"operator-config", "runtime-local"})
+        for authority in (
+            "plugin-supplied-authority",
+            "remote-service-authority",
+            "cross-process-shared-authority",
+        ):
+            self.assertIn(authority, provenance["forbidden_until_separate_promotion"])
+        for behavior in (
+            "missing policy source fails closed",
+            "unknown authority kind fails closed",
+            "policy source generation mismatch fails closed",
+            "authority generation mismatch fails closed",
+            "allow decisions must carry policy_epoch provenance",
+            "plugin input cannot self-attest authority provenance",
+        ):
+            self.assertIn(behavior, provenance["required_behavior"])
+
+        abuse = requirements["abuse.query_rate_limit_and_audit_gate"]
+        for behavior in (
+            "permission queries are rate-limited per plugin owner token",
+            "burst exhaustion returns deny or unknown, never allow",
+            "abuse counters are process-local and owner-scoped",
+            "repeated malformed queries are observable through runtime logs or counters",
+            "audit records must not expose UE pointers, raw params, or secret policy contents",
+            "rate-limit state is not a public cache ABI",
+        ):
+            self.assertIn(behavior, abuse["required_behavior"])
+
     def test_fail_closed_and_scope_separation_remain_explicit(self) -> None:
         payload = self.load_decisions()
         requirements = {
@@ -115,11 +163,17 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "unsupported principal_scope_flags",
             "stale principal",
             "process mismatch",
+            "unknown policy source",
+            "missing policy source provenance",
+            "policy source generation mismatch",
             "missing plugin owner token",
             "missing capability",
+            "rate limit exceeded",
         ):
             self.assertIn(condition, fail_closed["deny_or_unknown_conditions"])
         self.assertIn("unknown authority source", fail_closed["must_never_return_allow_for"])
+        self.assertIn("missing policy source provenance", fail_closed["must_never_return_allow_for"])
+        self.assertIn("rate limit exceeded", fail_closed["must_never_return_allow_for"])
 
         separation = requirements["separation.no_commands_replies_or_admin_mutation"]
         for exclusion in ("command router", "replies/send-chat", "ban/kick", "groups/grants", "operator ingress"):

@@ -188,6 +188,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertNotIn("--skip-core-sha256", recipe["build_core_evidence_pack"])
         self.assertNotIn("--allow-partial-gdb", recipe["build_core_evidence_pack"])
         self.assertIn("build_reflection_inventory_pack.py", recipe["build_reflection_inventory_pack"])
+        self.assertIn(
+            f"--ark-binary-sha256 {checker.EXPECTED_SHOOTERGAME_SHA256}",
+            recipe["build_reflection_inventory_pack"],
+        )
         self.assertIn("--target-set players-identity-lifecycle-intake", recipe["build_reflection_inventory_pack"])
         self.assertIn("check_reflection_inventory_pack_readiness.py", recipe["check_reflection_inventory_pack"])
         self.assertIn("plan_ufunction_focal_snapshots.py", recipe["plan_admin_focal_snapshots"])

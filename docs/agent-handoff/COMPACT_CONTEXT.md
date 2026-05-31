@@ -263,8 +263,10 @@ priorities, and do not use history files as the active source of truth.
   non-protected offline `ShooterGameServer` and core inputs into
   `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
   It does not create or approve cores, touch protected server paths, or authorize server
-  access or runtime/core changes. The detailed stop/continue recipe remains in
-  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+  access or runtime/core changes. Current artifact audit: the matching offline binary
+  exists in `/home/flowcommunity-ark/obelisk-artifacts`, but no core file or
+  `player-identity-offline-*` run directory exists there. The detailed stop/continue
+  recipe remains in `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - `scripts/validate_player_identity_raw_inputs.py` is the read-only dry-run validator for
   an existing `player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` pair. It
   rejects direct or symlink-resolved `/servidor/ark`, symlinks, wrong layout, empty files,
@@ -287,12 +289,23 @@ priorities, and do not use history files as the active source of truth.
 - Permissions/admin has no public header symbols and no public cache ABI now. Any future
   permission query must carry principal generation/scope semantics and public cache ABI
   remains blocked until `policy_epoch` plus full generation/scope keying is promoted.
+  No `allow` decision is valid without runtime-owned policy source/authority provenance,
+  and public permission queries need owner-scoped rate-limit/audit gates.
+- Plugin Hub seed review requires exactly one `Support tier: <tier>` declaration in seed
+  README/package/public docs and rejects unnegated claims for v1, ArkApi/AseApi
+  compatibility, commands, permissions, identity, send-chat/replies, mutation, storage,
+  inventory, or structure support outside that tier.
+- Public v1 completion evidence rejects strict blocker evidence paths or schema/status
+  fields that are candidate/planning/orientation/preflight/readiness/consume-only/
+  evidence-only. Do not let static orientation, planning docs, or candidate reports
+  masquerade as promoted ABI or SDK consumer evidence.
 - If no non-protected core is available, the next high-value static side task is bounded
   command/chat response-path orientation for `ClientChatMessage`,
   `ClientServerChatMessage`, and `ClientServerChatDirectMessage` on the reviewed offline
   binary. This is candidate-only planning for `obelisk.command_chat_response_path.v1` and
   must not imply replies/send-chat, command router, identity, permissions, raw UE/FString
-  exposure, mutation, or runtime readiness.
+  exposure, mutation, or runtime readiness. Portable unit coverage uses a synthetic ELF
+  fixture; the reviewed real-binary check is optional smoke/evidence only.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, with only a test-only internal dispatcher/helper and no hook/runtime

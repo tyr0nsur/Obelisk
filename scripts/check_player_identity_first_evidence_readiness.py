@@ -1171,6 +1171,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "build_reflection_inventory_pack": (
             "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py "
             f"--evidence-pack-manifest {core_manifest_pattern} "
+            f"--ark-binary-sha256 {EXPECTED_SHOOTERGAME_SHA256} "
             "--evidence-pack-fname-root-label verified_fname_root_slot "
             "--evidence-pack-gobjects-label gobjects "
             f"--target-set {PLAYER_IDENTITY_TARGET_SET} "

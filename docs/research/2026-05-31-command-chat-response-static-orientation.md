@@ -58,6 +58,11 @@ python3 scripts/check_command_chat_response_static_orientation.py --json
 python3 -m unittest scripts/test_check_command_chat_response_static_orientation.py
 ```
 
+Portable unit coverage uses a synthetic ELF fixture to prove checker behavior and the
+candidate-only JSON contract without requiring the reviewed binary to be present. The
+real offline `ShooterGameServer` test is an optional smoke/evidence check only. Neither
+path promotes runtime readiness, response delivery, or public SDK surface.
+
 ## Stop Conditions
 
 The checker fails closed if the binary hash changes, a protected or symlinked input path

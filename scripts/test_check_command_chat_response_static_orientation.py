@@ -181,8 +181,15 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def test_default_binary_is_valid_candidate_only_orientation(self) -> None:
-        result = self.run_checker("--json")
+    def test_synthetic_binary_is_valid_candidate_only_orientation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake = Path(temp_dir) / "ShooterGameServer"
+            fake_sha256 = self.write_synthetic_response_path_elf(fake)
+            result = self.run_checker(
+                str(fake),
+                "--expected-binary-sha256",
+                fake_sha256,
+            )
         payload = json.loads(result.stdout)
 
         self.assertEqual(payload["schema"], "obelisk.command-chat-response-static-orientation-check.v1")
@@ -237,13 +244,30 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
         ):
             self.assertIn(phrase, joined_non_claims)
 
+    @unittest.skipUnless(DEFAULT_BINARY.exists(), "offline ShooterGameServer binary not available")
+    def test_default_binary_smoke_candidate_only_orientation(self) -> None:
+        result = self.run_checker("--json")
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["schema"], "obelisk.command-chat-response-static-orientation-check.v1")
+        self.assertEqual(payload["status"], "valid")
+        self.assertTrue(payload["accepted_for_orientation"])
+        self.assertTrue(payload["not_artifact_gate"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertEqual(payload["planning_surface"], "obelisk.command_chat_response_path.v1")
+
     def test_wrong_hash_fails_closed_without_promoting_readiness(self) -> None:
-        result = self.run_checker(
-            str(DEFAULT_BINARY),
-            "--expected-binary-sha256",
-            "0" * 64,
-            check=False,
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake = Path(temp_dir) / "ShooterGameServer"
+            self.write_synthetic_response_path_elf(fake)
+            result = self.run_checker(
+                str(fake),
+                "--expected-binary-sha256",
+                "0" * 64,
+                check=False,
+            )
         payload = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 1)
@@ -261,8 +285,10 @@ class CheckCommandChatResponseStaticOrientationTests(unittest.TestCase):
         self.assertIn("binary_path_rejected", {blocker["reason"] for blocker in payload["blockers"]})
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            fake = Path(temp_dir) / "real-ShooterGameServer"
+            self.write_synthetic_response_path_elf(fake)
             link = Path(temp_dir) / "ShooterGameServer"
-            link.symlink_to(DEFAULT_BINARY)
+            link.symlink_to(fake)
             result = self.run_checker(str(link), check=False)
 
         payload = json.loads(result.stdout)

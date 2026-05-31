@@ -98,6 +98,27 @@ PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
     r"\b(?:blocked|candidate(?:-only)?|insufficient|missing|needs?|no|not|planning|requires?|todo|unresolved|without)\b",
     re.IGNORECASE,
 )
+STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
+    "candidate",
+    "planning",
+    "orientation",
+    "preflight",
+    "readiness",
+    "consume-only",
+    "consume_only",
+    "evidence-only",
+    "evidence_only",
+)
+STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
+    "contract_kind",
+    "schema",
+    "schemas",
+    "status",
+}
+STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
+    r"(?:candidate|planning|static[-_ ]?orientation|orientation|preflight|readiness|consume[-_ ]?only|evidence[-_ ]?only)",
+    re.IGNORECASE,
+)
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
     "obelisk.debug_raw_process_event.v1",
 }
@@ -376,6 +397,21 @@ def evidence_path_is_specific(raw_path: str, surface_id: str) -> bool:
     return any(token.lower() in lowered for token in surface_tokens)
 
 
+def evidence_path_has_non_promotional_marker(raw_path: str) -> bool:
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return False
+    normalized_parts = [
+        part.lower().replace("-", "_")
+        for part in relative.with_suffix("").parts
+    ]
+    for part in normalized_parts:
+        for marker in STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS:
+            if marker.replace("-", "_") in part:
+                return True
+    return False
+
+
 def evidence_path_exists(raw_path: str, *, allow_generic_dirs: bool) -> bool:
     relative = repo_relative_evidence_path(raw_path)
     if relative is None:
@@ -386,6 +422,32 @@ def evidence_path_exists(raw_path: str, *, allow_generic_dirs: bool) -> bool:
     if path.is_dir():
         return allow_generic_dirs and relative.as_posix() in ALLOWED_GENERIC_EVIDENCE_DIRS
     return path.is_file()
+
+
+def evidence_has_non_promotional_schema_marker(
+    value: Any,
+    *,
+    parent_key: str | None = None,
+) -> bool:
+    normalized_key = parent_key.lower().replace("-", "_") if isinstance(parent_key, str) else None
+    if normalized_key in STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS:
+        try:
+            text = json.dumps(value, sort_keys=True)
+        except TypeError:
+            text = str(value)
+        if STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS.search(text):
+            return True
+    if isinstance(value, dict):
+        for key, item in value.items():
+            next_key = key if isinstance(key, str) else None
+            if evidence_has_non_promotional_schema_marker(item, parent_key=next_key):
+                return True
+    if isinstance(value, list):
+        return any(
+            evidence_has_non_promotional_schema_marker(item, parent_key=parent_key)
+            for item in value
+        )
+    return False
 
 
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
@@ -402,6 +464,8 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         if evidence.get("promotion_status") != "promoted":
             return False
         if evidence.get("public_sdk_ready") is not True:
+            return False
+        if evidence_has_non_promotional_schema_marker(evidence):
             return False
         if not isinstance(evidence.get("abi_tests"), list) or not evidence["abi_tests"]:
             return False
@@ -424,6 +488,8 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
             if not allow_generic_dirs and evidence_key == "abi_tests":
                 if not (relative_text.startswith("tests/abi/") or relative_text.startswith("tests/core/")):
                     return False
+            if not allow_generic_dirs and evidence_path_has_non_promotional_marker(item):
+                return False
             return evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs) and (
                 allow_generic_dirs or evidence_path_is_specific(item, surface_id)
             )

@@ -3,6 +3,8 @@
 This creator-facing example builds outside the Obelisk source tree and uses only the
 installed SDK package:
 
+Support tier: release-supported seed.
+
 - `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`
 - `Obelisk::obelisk_sdk`
 - `OBELISK_API_CAPABILITY_TIMERS`

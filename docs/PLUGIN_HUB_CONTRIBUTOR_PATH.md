@@ -89,7 +89,8 @@ Before review, the package must state:
 - display name
 - plugin version
 - minimum Obelisk SDK line
-- support tier: release-supported seed, experimental pattern, or blocked backlog prototype
+- exactly one `Support tier: <tier>` declaration using release-supported seed,
+  experimental pattern, or blocked backlog
 - used capabilities
 - config path
 - exported ABI entry points
@@ -99,6 +100,10 @@ Treat the minimum Obelisk SDK line as the installed package floor the example wa
 and reviewed against. Do not present it as `v1` readiness, general Plugin Hub
 compatibility, ArkApi/AseApi compatibility, or support for surfaces outside the declared
 tier.
+
+Review must fail if README, package metadata, or public seed docs claim v1 readiness,
+ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies, mutation,
+storage, inventory, or structure support outside that one declared tier.
 
 Ship safe-disabled default config when config is present:
 

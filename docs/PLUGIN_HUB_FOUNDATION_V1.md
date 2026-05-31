@@ -60,9 +60,13 @@ schema, a compatibility promise, or v1 completion evidence.
 A candidate package should contain one Linux shared object, a README, license text, and a
 config example or schema when the plugin reads config. The package metadata must be
 explicit enough for review: `plugin_id`, display name, plugin version, minimum Obelisk SDK
-line, declared support tier, used capabilities, config path, exported ABI entry points,
-and whether the package is a release-supported seed, experimental pattern, or blocked backlog
-prototype.
+line, exactly one `Support tier: <tier>` declaration using release-supported seed,
+experimental pattern, or blocked backlog, used capabilities, config path, exported ABI
+entry points, and whether shutdown is exported and why.
+
+Review must fail if README, package metadata, or public seed docs claim v1 readiness,
+ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies, mutation,
+storage, inventory, or structure support outside that one declared tier.
 
 Acceptance for a release-supported seed requires building against an installed SDK with
 `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`, linking only

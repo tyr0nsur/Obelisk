@@ -107,6 +107,11 @@ PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_SEED_BOUNDARY.md",
     REPO_ROOT / "plugins" / "README.md",
 ]
+PLUGIN_HUB_PUBLIC_SEED_DOC_FILES = [
+    REPO_ROOT / "docs" / "oBaseEvents.md",
+    REPO_ROOT / "docs" / "oDescriptorCatalog.md",
+    REPO_ROOT / "docs" / "oProcessTimer.md",
+]
 RESEARCH_MODULE_BOUNDARY_README = REPO_ROOT / "docs" / "research" / "README.md"
 LATEST_V1_SDK_ROUND_RESEARCH_NOTE = (
     REPO_ROOT / "docs" / "research" / "2026-05-31-v1-sdk-round-identity-static-demand-audit.md"
@@ -466,6 +471,60 @@ GAMEPLAY_POLICY_SCOPE_NEGATORS_RE = re.compile(
     re.IGNORECASE,
 )
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*")
+PLUGIN_HUB_SUPPORT_TIERS = (
+    "release-supported seed",
+    "experimental pattern",
+    "blocked backlog",
+)
+PLUGIN_HUB_SUPPORT_TIER_DECLARATION_RE = re.compile(
+    r"\b(?:declared\s+)?support[_ -]tier\b\s*[:=]\s*[\"'`]*"
+    r"(release-supported seed|experimental pattern|blocked backlog)"
+    r"[\"'`]*\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_SEED_PACKAGE_METADATA_NAMES = {
+    "manifest.json",
+    "obelisk-plugin.json",
+    "package.json",
+    "package.toml",
+    "plugin.json",
+    "plugin.toml",
+}
+PLUGIN_HUB_SEED_CLAIM_SUPPORT_RE = (
+    r"(?:available|compatib(?:le|ility)|exposes?|implements?|production[- ]ready|"
+    r"production[- ]supported|promotes?|promoted|provides?|public|ready|released|"
+    r"ships?|shipped|stable|supported|supports?)"
+)
+PLUGIN_HUB_SEED_FORBIDDEN_TERM_RE = (
+    r"(?:"
+    r"v1(?:\.0)?(?:[- ]?(?:stable|SDK|complete))?|"
+    r"ArkApi|AseApi|"
+    r"commands?|command[- ]?(?:SDK|router|routing|surface)|"
+    r"permissions?|permissions?[- ]?(?:SDK|surface)|"
+    r"(?:player|sender|resource|object|inventory|item|structure)?[- ]?identity|"
+    r"send[- ]?chat|repl(?:y|ies)|"
+    r"mutation|mutations|mutate|"
+    r"storage|database|webhooks?|"
+    r"Inventory[- ]?SDK|inventory(?:/item)?|"
+    r"StructureEvents?|structures?"
+    r")"
+)
+PLUGIN_HUB_SEED_FORBIDDEN_CLAIM_RE = re.compile(
+    rf"\b{PLUGIN_HUB_SEED_FORBIDDEN_TERM_RE}\b.{{0,96}}\b{PLUGIN_HUB_SEED_CLAIM_SUPPORT_RE}\b|"
+    rf"\b{PLUGIN_HUB_SEED_CLAIM_SUPPORT_RE}\b.{{0,96}}\b{PLUGIN_HUB_SEED_FORBIDDEN_TERM_RE}\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_SEED_FORBIDDEN_NEGATED_RE = re.compile(
+    r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|excludes?|fail[- ]closed|"
+    r"future|not|no|never|only|outside|planning|planning-only|reject|rejected|"
+    r"remain|remains|until|without)\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_SEED_LOCAL_BOUNDARY_RE = re.compile(
+    r"\b(?:callback-scope|copied\s+metadata|diagnostic|plugin-local|process-local|"
+    r"safe-disabled)\b",
+    re.IGNORECASE,
+)
 MODULE_AGGREGATE_CENSUS_PUBLIC_CLAIM_FILES = [
     PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
     *PUBLIC_SDK_GUIDANCE_DOC_FILES,
@@ -1115,6 +1174,62 @@ def broad_v1_completion_claims(text: str, relative_path: str) -> list[str]:
 
         line = scan_text.count("\n", 0, segment_start) + 1
         offenders.append(f"{relative_path}:{line}: {normalized(segment)}")
+
+    return offenders
+
+
+def plugin_hub_seed_review_files() -> list[Path]:
+    paths = set(PLUGIN_HUB_PUBLIC_SEED_DOC_FILES)
+
+    for root_name in ("examples", "plugins"):
+        root = REPO_ROOT / root_name
+        if not root.exists():
+            continue
+        for child in root.iterdir():
+            if not child.is_dir():
+                continue
+            readme = child / "README.md"
+            if readme.is_file():
+                paths.add(readme)
+            for package_file in child.rglob("*"):
+                if package_file.is_file() and package_file.name in PLUGIN_HUB_SEED_PACKAGE_METADATA_NAMES:
+                    paths.add(package_file)
+
+    return sorted(paths)
+
+
+def plugin_hub_support_tier_declarations(text: str) -> list[str]:
+    return [
+        match.group(1).lower()
+        for match in PLUGIN_HUB_SUPPORT_TIER_DECLARATION_RE.finditer(text)
+    ]
+
+
+def plugin_hub_seed_forbidden_claims(
+    text: str,
+    relative_path: str,
+    support_tier: str,
+) -> list[str]:
+    offenders = broad_v1_completion_claims(text, relative_path)
+
+    for segment_start, segment in sentence_like_segments(text):
+        for match in PLUGIN_HUB_SEED_FORBIDDEN_CLAIM_RE.finditer(segment):
+            absolute_match_start = segment_start + match.start()
+            absolute_match_end = segment_start + match.end()
+            context = text[max(0, absolute_match_start - 160): absolute_match_end + 80]
+            if PLUGIN_HUB_SEED_FORBIDDEN_NEGATED_RE.search(context):
+                continue
+            if (
+                support_tier == "experimental pattern"
+                and PLUGIN_HUB_SEED_LOCAL_BOUNDARY_RE.search(context)
+            ):
+                continue
+
+            line = text.count("\n", 0, segment_start) + 1
+            offenders.append(
+                f"{relative_path}:{line}: {support_tier}: {normalized(segment)}"
+            )
+            break
 
     return offenders
 
@@ -3360,7 +3475,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "persistent or cross-cluster handles",
             "The pre-v1 Plugin Hub package contract is an intake boundary",
             "not a registry implementation, a machine-readable manifest\nschema, a compatibility promise, or v1 completion evidence",
-            "`plugin_id`, display name, plugin version, minimum Obelisk SDK\nline, declared support tier, used capabilities, config path, exported ABI entry points",
+            "`plugin_id`, display name, plugin version, minimum Obelisk SDK\nline, exactly one `Support tier: <tier>` declaration",
+            "Review must fail if README, package metadata, or public seed docs claim v1 readiness",
             "Acceptance for a release-supported seed requires building against an installed SDK",
             "`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`",
             "hidden default symbol visibility, no private Obelisk headers",
@@ -6781,6 +6897,60 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     )
 
         self.assertEqual(offenders, [])
+
+    def test_plugin_hub_seed_review_files_declare_one_tier_and_no_blocked_claims(self) -> None:
+        offenders: list[str] = []
+
+        for path in plugin_hub_seed_review_files():
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            declarations = plugin_hub_support_tier_declarations(text)
+            if len(declarations) != 1:
+                offenders.append(
+                    f"{relative}: expected exactly one Support tier declaration, got {declarations}"
+                )
+                continue
+            if declarations[0] not in PLUGIN_HUB_SUPPORT_TIERS:
+                offenders.append(f"{relative}: unsupported Plugin Hub support tier {declarations[0]}")
+                continue
+
+            offenders.extend(
+                plugin_hub_seed_forbidden_claims(
+                    text,
+                    relative,
+                    declarations[0],
+                )
+            )
+
+        self.assertEqual(offenders, [])
+
+    def test_plugin_hub_seed_review_guardrail_catches_bad_tiers_and_claims(self) -> None:
+        bad_tiers = """
+        Support tier: release-supported seed.
+        support_tier = "experimental pattern"
+        """
+        self.assertEqual(
+            plugin_hub_support_tier_declarations(bad_tiers),
+            ["release-supported seed", "experimental pattern"],
+        )
+
+        bad_claims = """
+        Support tier: release-supported seed.
+        This package supports v1 SDK compatibility for plugin authors.
+        It is ArkApi compatible and provides command routing with permissions.
+        It exposes sender identity, send-chat replies, mutation, storage, inventory,
+        and structure support.
+        """
+        offenders = plugin_hub_seed_forbidden_claims(
+            bad_claims,
+            "candidate/README.md",
+            "release-supported seed",
+        )
+
+        self.assertGreaterEqual(len(offenders), 3)
+        self.assertTrue(any("v1 SDK compatibility" in offender for offender in offenders))
+        self.assertTrue(any("ArkApi compatible" in offender for offender in offenders))
+        self.assertTrue(any("structure support" in offender for offender in offenders))
 
     def test_plugin_hub_descriptor_catalog_seed_wording_stays_scaffolded_not_prebuilt(self) -> None:
         contributor_path = (

@@ -105,6 +105,50 @@
       ]
     },
     {
+      "id": "policy.authority_provenance_required",
+      "category": "policy",
+      "status": "unresolved",
+      "decision_required": "Define policy source and authority provenance before any permission decision can return allow.",
+      "required_fields_or_equivalent": [
+        "policy_source_id",
+        "policy_source_generation",
+        "authority_kind",
+        "authority_generation",
+        "policy_epoch"
+      ],
+      "allowed_initial_authority_kinds": [
+        "operator-config",
+        "runtime-local"
+      ],
+      "forbidden_until_separate_promotion": [
+        "plugin-supplied-authority",
+        "remote-service-authority",
+        "cross-process-shared-authority"
+      ],
+      "required_behavior": [
+        "missing policy source fails closed",
+        "unknown authority kind fails closed",
+        "policy source generation mismatch fails closed",
+        "authority generation mismatch fails closed",
+        "allow decisions must carry policy_epoch provenance",
+        "plugin input cannot self-attest authority provenance"
+      ]
+    },
+    {
+      "id": "abuse.query_rate_limit_and_audit_gate",
+      "category": "abuse",
+      "status": "unresolved",
+      "decision_required": "Define owner-scoped query abuse controls before exposing permission checks as a public ABI.",
+      "required_behavior": [
+        "permission queries are rate-limited per plugin owner token",
+        "burst exhaustion returns deny or unknown, never allow",
+        "abuse counters are process-local and owner-scoped",
+        "repeated malformed queries are observable through runtime logs or counters",
+        "audit records must not expose UE pointers, raw params, or secret policy contents",
+        "rate-limit state is not a public cache ABI"
+      ]
+    },
+    {
       "id": "fail_closed.stale_or_scope_mismatch",
       "category": "fail_closed",
       "status": "unresolved",
@@ -115,14 +159,19 @@
         "stale principal",
         "process mismatch",
         "unknown policy source",
+        "missing policy source provenance",
+        "policy source generation mismatch",
         "missing plugin owner token",
-        "missing capability"
+        "missing capability",
+        "rate limit exceeded"
       ],
       "must_never_return_allow_for": [
         "stale principal",
         "scope mismatch",
         "missing identity",
-        "unknown authority source"
+        "unknown authority source",
+        "missing policy source provenance",
+        "rate limit exceeded"
       ]
     },
     {

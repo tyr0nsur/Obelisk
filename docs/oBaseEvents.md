@@ -3,6 +3,8 @@
 `oBaseEvents` is the first official Obelisk plugin example. It is intentionally small and
 safe by default.
 
+Support tier: release-supported seed.
+
 It demonstrates plugin lifecycle, config, and filtered `ProcessEvent` callback mechanics.
 The promoted v0.1 gameplay callback path is `GameplayPolicyEvent`; use
 `DescribeGameplayPolicyEventKind` and `DescribeResourceKind` for metadata-only descriptions

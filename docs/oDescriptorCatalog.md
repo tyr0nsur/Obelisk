@@ -4,6 +4,8 @@
 It demonstrates how a plugin can inspect promoted resource categories and gameplay policy
 event kinds before deciding what copied events it wants to handle.
 
+Support tier: release-supported seed.
+
 The plugin uses only:
 
 - `DescribeResourceKind`
