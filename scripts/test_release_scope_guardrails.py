@@ -1499,7 +1499,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/test_install_obelisk_layout.sh", release_gate)
         self.assertIn("LAYOUT_CHECK_ROOT", release_gate)
 
-    def test_installed_sdk_smoke_covers_repeating_timers_in_release_gate(self) -> None:
+    def test_installed_sdk_smoke_covers_release_examples_in_release_gate(self) -> None:
         release_gate = read("scripts/check_release_readiness.sh")
         layout_test = read("scripts/test_install_obelisk_layout.sh")
         installed_consumer_cmake = read("tests/sdk_installed_consumer/CMakeLists.txt")
@@ -1515,10 +1515,61 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("SDK install published unexpected public headers", layout_test)
         self.assertIn('OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT="${REPO_DIR}/plugins"', layout_test)
         self.assertIn('OBELISK_RELEASE_SCOPE_EXTERN_ROOT="${REPO_DIR}/extern"', layout_test)
-        self.assertIn('examples/sdk_minimal_plugin', layout_test)
-        self.assertIn('obelisk_sdk_minimal_plugin.so', layout_test)
-        self.assertIn('examples/sdk_descriptor_catalog', layout_test)
-        self.assertIn('obelisk_sdk_descriptor_catalog.so', layout_test)
+
+        external_examples = (
+            (
+                "minimal",
+                "SDK_MINIMAL_EXAMPLE_DIR",
+                "SDK_MINIMAL_EXAMPLE_PLUGIN_PATH",
+                "examples/sdk_minimal_plugin",
+                "obelisk_sdk_minimal_plugin.so",
+                '"obelisk_sdk_minimal_plugin"',
+            ),
+            (
+                "descriptor catalog",
+                "SDK_DESCRIPTOR_EXAMPLE_DIR",
+                "SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH",
+                "examples/sdk_descriptor_catalog",
+                "obelisk_sdk_descriptor_catalog.so",
+                '"obelisk_sdk_descriptor_catalog"',
+            ),
+            (
+                "timer",
+                "SDK_TIMER_EXAMPLE_DIR",
+                "SDK_TIMER_EXAMPLE_PLUGIN_PATH",
+                "examples/sdk_timer_plugin",
+                "obelisk_sdk_timer_plugin.so",
+                '"obelisk_sdk_timer_plugin"',
+            ),
+        )
+        for label, example_dir_var, plugin_path_var, source_dir, plugin_so, plugin_id in external_examples:
+            with self.subTest(example=label):
+                self.assertIn(f'cp -R "${{REPO_DIR}}/{source_dir}/."', layout_test)
+                cmake_match = re.search(
+                    rf'cmake -S "\$\{{{example_dir_var}\}}" -B "\$\{{{example_dir_var}\}}/build"'
+                    rf'(?P<body>.*?)\ncmake --build "\$\{{{example_dir_var}\}}/build"',
+                    layout_test,
+                    re.S,
+                )
+                self.assertIsNotNone(cmake_match)
+                cmake_body = cmake_match.group("body") if cmake_match else ""
+                self.assertIn('-DCMAKE_PREFIX_PATH="${INSTALL_ROOT}"', cmake_body)
+                self.assertIn("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON", cmake_body)
+                self.assertIn(
+                    f'{plugin_path_var}="${{{example_dir_var}}}/build/{plugin_so}"',
+                    layout_test,
+                )
+                self.assertIn(f'require_path "${{{plugin_path_var}}}"', layout_test)
+                self.assertIn(
+                    f'if ! grep -F "${{INSTALL_ROOT}}/include" "${{{example_dir_var}}}/build/compile_commands.json"',
+                    layout_test,
+                )
+                self.assertIn(
+                    f'if grep -F "${{REPO_DIR}}/include" "${{{example_dir_var}}}/build/compile_commands.json"',
+                    layout_test,
+                )
+                self.assertIn(f'"${{{plugin_path_var}}}"', layout_test)
+                self.assertIn(plugin_id, layout_test)
 
         for target in ("release_scope_oBaseEvents", "release_scope_oProcessTimer", "release_scope_oDescriptorCatalog"):
             with self.subTest(file="tests/sdk_installed_consumer/CMakeLists.txt", target=target):

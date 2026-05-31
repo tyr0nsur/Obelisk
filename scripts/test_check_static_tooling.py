@@ -38,6 +38,17 @@ class CheckStaticToolingTests(unittest.TestCase):
         self.assertEqual("obelisk.static-tooling-check.v1", payload["schema"])
         self.assertEqual("ok", payload["status"])
         self.assertIn("radare2", payload["tools"])
+        self.assertEqual({}, payload["baseline_tools"])
+
+    def test_can_report_baseline_offline_tools(self) -> None:
+        result = self.run_tool("--tool", "radare2", "--include-baseline-tools", "--json")
+
+        payload = json.loads(result.stdout)
+        self.assertEqual("ok", payload["status"])
+        for name in ("c++filt", "file", "nm", "objdump", "readelf", "sha256sum", "strings"):
+            with self.subTest(tool=name):
+                self.assertIn(name, payload["baseline_tools"])
+                self.assertIn("available", payload["baseline_tools"][name])
 
     def test_required_missing_tool_blocks(self) -> None:
         result = self.run_tool(

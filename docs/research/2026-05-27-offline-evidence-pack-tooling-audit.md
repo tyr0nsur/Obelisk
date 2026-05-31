@@ -105,8 +105,10 @@ from an offline ELF and copied log, and rejects an output directory under `/serv
 ## Risks
 
 - `objdump` artifacts can be large and must stay out of Git.
-- The script can read a binary under `/servidor/ark` if explicitly pointed there, but it
-  does not write there. Prefer a copied binary path when available.
+- Historical note: this audit predates the current protected-path rules. Current evidence
+  builders must reject protected server roots except for explicitly approved offline
+  workspaces; prefer `docs/OFFLINE_ARTIFACT_PACKS.md` and the current script help over
+  copying the old `/servidor/ark` examples from this note.
 - Analyzer output remains evidence only. It does not accept offsets or runtime code.
 
 ## Next Steps

@@ -164,9 +164,24 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:complete|full|production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
     r"\b(?:sdk|api|surface|capability|support)\s+"
     r"(?:is|are|remains?|stays?)\s+"
-    r"(?:complete|full|production|stable|available|supported|included|shipped)\b",
+    r"(?:complete|full|production|stable|available|ready|supported|included|shipped)\b",
     r"\b[a-z0-9_ /+-]{2,80}\s+(?:is|are)\s+"
-    r"(?:available|supported|included|shipped)\s+in\s+v1\b",
+    r"(?:available|ready|supported|included|shipped)\s+in\s+v1\b",
+)
+FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
+    r"\b(?:inventory\s+sdk|items\s+sdk)\b.{0,80}"
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b",
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b"
+    r".{0,80}\b(?:inventory\s+sdk|items\s+sdk)\b",
+    r"\b(?:plugin\s+hub|pluginhub)\b.{0,80}"
+    r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b",
+    r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b"
+    r".{0,80}\b(?:plugin\s+hub|pluginhub)\b",
+)
+FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
+    r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|limited|"
+    r"must\s+not|no|not|post-v1|post v1|without)\b",
+    re.IGNORECASE,
 )
 CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
 BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
@@ -655,6 +670,36 @@ def text_has_affirmative_release_claim(text: str) -> bool:
     return False
 
 
+def release_statement_forbidden_broad_claims(text: str) -> list[str]:
+    offenders: list[str] = []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        lowered = line.lower()
+        for pattern in FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS:
+            for match in re.finditer(pattern, lowered, flags=re.IGNORECASE):
+                prefix = lowered[: match.start()]
+                clause_start = 0
+                for boundary in CLAUSE_START_PATTERN.finditer(prefix):
+                    clause_start = boundary.end()
+                claim_prefix = lowered[clause_start : match.start()]
+                claim_clause = lowered[clause_start : match.end()]
+                if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix):
+                    continue
+                if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_clause):
+                    continue
+                if re.match(
+                    r"\s*(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|"
+                    r"limited|must\s+not|no|not|post-v1|post v1|without)\b",
+                    claim_clause,
+                ):
+                    continue
+                offenders.append(f"line {line_number}: {line.strip()}")
+                break
+            else:
+                continue
+            break
+    return offenders
+
+
 def release_statement_record_has_contradiction(record: str) -> bool:
     lowered = record.lower()
     if re.search(
@@ -1093,6 +1138,7 @@ def build_report(
     release_statement_missing_contracts: list[str] = []
     release_statement_missing_experimental_outcomes: list[str] = []
     release_statement_duplicate_records: list[str] = []
+    release_statement_forbidden_claims: list[str] = []
     missing_completion_blocker_exclusion_contracts: list[str] = []
     debug_only_promoted: list[str] = []
     promoted_dependency_failures: dict[str, list[str]] = {}
@@ -1272,6 +1318,11 @@ def build_report(
     if release_statement_duplicate_records:
         blockers.append("release_statement_duplicate_or_mixed_surface_records")
     if release_statement_text is not None:
+        release_statement_forbidden_claims = release_statement_forbidden_broad_claims(
+            release_statement_text
+        )
+        if release_statement_forbidden_claims:
+            blockers.append("release_statement_forbidden_broad_claims")
         if "docs/sdk_v1_compatibility.md" not in release_statement_text.lower():
             blockers.append("release_statement_missing_sdk_compatibility_reference")
         if "docs/public_sdk_surfaces.json" not in release_statement_text.lower():
@@ -1326,6 +1377,7 @@ def build_report(
         "release_statement_missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
         "release_statement_missing_experimental_outcomes": sorted(set(release_statement_missing_experimental_outcomes)),
         "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
+        "release_statement_forbidden_broad_claims": release_statement_forbidden_claims,
         "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
         "non_claims": [
             "core-first release readiness, install layout, and package-shape checks do not satisfy this v1 SDK completion gate",

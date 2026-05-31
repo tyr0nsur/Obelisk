@@ -6,14 +6,16 @@ restarts, Git operations, tags, pushes, or Discord actions were used.
 
 ## Decision
 
-debt
+mostly-resolved
 
 The current installed SDK path is not blocked for a core-first v0.1.0 RC: the package exports
 `Obelisk::obelisk_sdk`, installs only `include/obelisk/ObeliskApi.h`, publishes the expected
 CMake package files, and the installed consumer validation passes from a temporary install
 root without source-tree include leakage.
 
-The remaining gap is example packaging/usability, not the core SDK package itself.
+The original example packaging/usability gap is now mostly closed by installed-SDK
+examples under `examples/`. Remaining limitations are v1 surface blockers, not package
+shape.
 
 ## Evidence Checked
 
@@ -26,9 +28,11 @@ The remaining gap is example packaging/usability, not the core SDK package itsel
 - `scripts/install_obelisk.sh:245-258` preflights runtime plus SDK package artifacts and
   allowlists the installed SDK files.
 - `scripts/install_obelisk.sh:302-320` publishes staged SDK files with rollback snapshots.
-- `scripts/test_install_obelisk_layout.sh:306-443` validates installed runtime/SDK layout,
-  header allowlist, no source/build path leaks in package files, RUNPATH, reinstall backup,
-  and an external installed SDK consumer build.
+- `scripts/test_install_obelisk_layout.sh` validates installed runtime/SDK layout, header
+  allowlist, no source/build path leaks in package files, RUNPATH, reinstall backup,
+  external installed SDK consumer builds, and installed-SDK builds for
+  `examples/sdk_minimal_plugin`, `examples/sdk_descriptor_catalog`, and
+  `examples/sdk_timer_plugin`.
 - `tests/sdk_installed_consumer/CMakeLists.txt:11-93` builds C and C++ plugins using
   `find_package(Obelisk 0.1.0 CONFIG REQUIRED)` and `Obelisk::obelisk_sdk`.
 
@@ -44,11 +48,12 @@ passed`.
 
 ## Findings
 
-### 1. External example packaging is still source-tree-shaped
+### 1. External example packaging was source-tree-shaped
 
-Priority: debt
+Priority: mostly-resolved in later integration
 
-The official examples build only through the top-level source tree:
+At the time of this audit, the visible first-party examples were in-tree reference
+plugins:
 
 - `plugins/oBaseEvents/CMakeLists.txt:1-3`
 - `plugins/oProcessTimer/CMakeLists.txt:1-3`
@@ -62,16 +67,19 @@ Each links the in-tree target name `obelisk_sdk`, not the installed package targ
 - `plugins/oProcessTimer/oProcessTimer.cpp:1-2`
 - `plugins/oDescriptorCatalog/oDescriptorCatalog.cpp:1-2`
 
-This does not break the RC package because `tests/sdk_installed_consumer` already proves
-external consumers can build against the installed SDK. It does mean the named official
-examples are not directly copy/build usable as external SDK examples without either the
-Obelisk source tree or a consumer-supplied JSON dependency and CMake rewrite.
+This did not break the RC package because `tests/sdk_installed_consumer` already proved
+external consumers could build against the installed SDK.
 
-Recommended closure before claiming a polished creator-facing SDK: add a small
-`examples/` or packaged example bundle that uses only `find_package(Obelisk CONFIG
-REQUIRED)` plus documented third-party dependencies, or explicitly document that
-`plugins/*` are in-tree reference plugins while `tests/sdk_installed_consumer` is the
-installed-package validation fixture.
+Closure now exists as release-supported seed examples:
+
+- `examples/sdk_minimal_plugin`
+- `examples/sdk_descriptor_catalog`
+- `examples/sdk_timer_plugin`
+
+They use `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and
+`Obelisk::obelisk_sdk`, and the install-layout gate builds them from a temporary consumer
+root against the installed package. `plugins/*` remain in-tree runtime reference plugins,
+not external package scaffolds.
 
 ### 2. The README minimal plugin was stricter than the append-only ABI guidance
 

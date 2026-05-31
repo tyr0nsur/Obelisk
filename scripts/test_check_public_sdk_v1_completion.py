@@ -821,6 +821,68 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["release_statement_missing_exclusion_contracts"],
         )
 
+    def test_release_statement_rejects_ready_claims_for_inventory_items_and_plugin_hub(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Inventory SDK is ready in v1.\n"
+            "Items SDK is ready in v1.\n"
+            "Plugin Hub completion is ready for v1.\n"
+            "Plugin Hub is complete for v1 plugin authors.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "Inventory SDK is ready in v1.",
+            "Items SDK is ready in v1.",
+            "Plugin Hub completion is ready for v1.",
+            "Plugin Hub is complete for v1 plugin authors.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
+    def test_release_statement_allows_negated_inventory_items_and_plugin_hub_claims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Inventory SDK is not ready in v1.\n"
+            "Items SDK is not ready in v1.\n"
+            "Plugin Hub completion remains blocked for v1.\n"
+            "Plugin Hub is not complete for v1 plugin authors.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+
     def test_release_statement_rejects_blocked_claim_inside_other_surface_record(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement = release_statement.replace(

@@ -235,17 +235,15 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md` for exact target counts and
   blockers.
-- Structure non-PIN copied-scalar evidence is preserved at
+- Structure non-PIN copied-scalar evidence is historical legacy context at
   `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/`.
   It excludes `VerifyPinCode`, copies only `SetVariant.{VariantIndex,bForceSet,ReturnValue}`,
-  `AllowToggleActivation.ReturnValue`, and `CanSeat.{bForce,ReturnValue}`, accepts consume
-  mode, and blocks promote mode with
-  `promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only` plus non-claim
-  blockers. `artifact-pack.manifest.json` SHA256 is
-  `90a7e51f6cb491bd56ef4f7c0445b0e61265982dadc7f7316139a0ffd43189a3`; `SHA256SUMS` SHA256
-  is `9334831106ce31818a64ed762baf95aadc01eeec4470c77ea5d7f47759e67209`. This does not
-  promote public `StructureEvents`, SDK callbacks, identity, lookup, mutation, return
-  override, dispatcher/hook wiring, `ResourceHandle`, runtime observation, or probing.
+  `AllowToggleActivation.ReturnValue`, and `CanSeat.{bForce,ReturnValue}`, but its artifact
+  pack schema/gate sidecars are legacy and should not be cited as current normalized pack
+  evidence. Prefer the current structure aggregate/census pack for active consume-only
+  citations. This legacy root does not promote public `StructureEvents`, SDK callbacks,
+  identity, lookup, mutation, return override, dispatcher/hook wiring, `ResourceHandle`,
+  runtime observation, or probing.
 - `PrimalStructure.IsAllowedToBuild` / `APrimalStructure.IsAllowedToBuild` is a
   second-wave build-policy dictionary seed only. There is no committed candidate pack,
   second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
@@ -380,10 +378,10 @@ priorities, and do not use history files as the active source of truth.
   identity, mutation, return override, or `ResourceHandle`. Use the dated research notes
   such as `docs/research/2026-05-29-item-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-item-return-only-policy-bridge-plan.md`,
-  `docs/research/2026-05-30-item-return-only-policy-slice.md`,
-  `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md`, and
-  `/servidor/ark/workspace-offline/redacted-ufunction-signatures-rollup-20260529T101249Z`
-  instead of copying artifact detail into handoff.
+  `docs/research/2026-05-30-item-return-only-policy-slice.md`, and
+  `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md` instead of
+  copying artifact detail into handoff. Older rollups under `/servidor/ark/workspace-offline`
+  are historical context and should not be dereferenced as active handoff evidence.
   The durable Item return-only policy slice is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/`;
   consume mode is accepted and promote mode is blocked with evidence-only/non-claim

@@ -70,6 +70,11 @@ Static-global baseline artifacts:
 
 Build-policy and structure-related artifacts:
 
+Note: the `structure-nonpin-copied-scalar-policy-slice-20260530T100717Z` entries below are
+legacy artifact context. Their gate sidecars are not current normalized JSON evidence; use
+the later structure aggregate/census pack for active consume-only citations unless this
+legacy root is regenerated as a normalized pack.
+
 - `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.json`
 - `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.consume-gate.json`
 - `/home/flowcommunity-ark/obelisk-artifacts/structure-return-only-policy-slice-20260530T093002Z/structure-return-only-policy-slice.promote-gate.json`

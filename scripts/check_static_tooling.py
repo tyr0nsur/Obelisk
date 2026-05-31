@@ -40,6 +40,36 @@ TOOL_COMMANDS = {
         "version_args": ["-v"],
     },
 }
+BASELINE_TOOL_COMMANDS = {
+    "c++filt": {
+        "which": "c++filt",
+        "version_args": ["--version"],
+    },
+    "file": {
+        "which": "file",
+        "version_args": ["--version"],
+    },
+    "nm": {
+        "which": "nm",
+        "version_args": ["--version"],
+    },
+    "objdump": {
+        "which": "objdump",
+        "version_args": ["--version"],
+    },
+    "readelf": {
+        "which": "readelf",
+        "version_args": ["--version"],
+    },
+    "sha256sum": {
+        "which": "sha256sum",
+        "version_args": ["--version"],
+    },
+    "strings": {
+        "which": "strings",
+        "version_args": ["--version"],
+    },
+}
 SMOKE_TOOLS = {"analyzeHeadless", "radare2"}
 
 
@@ -104,7 +134,7 @@ def run_command(
 
 
 def tool_report(name: str, *, timeout_sec: int) -> dict[str, Any]:
-    spec = TOOL_COMMANDS[name]
+    spec = TOOL_COMMANDS.get(name) or BASELINE_TOOL_COMMANDS[name]
     executable = shutil.which(spec["which"])
     report: dict[str, Any] = {
         "name": name,
@@ -260,6 +290,11 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Exit non-zero if the named optional tool is not available.",
     )
+    parser.add_argument(
+        "--include-baseline-tools",
+        action="store_true",
+        help="Also report baseline offline ELF/binutils helpers such as readelf, objdump, strings, nm, file, sha256sum, and c++filt.",
+    )
     parser.add_argument("--run-smoke", action="store_true", help="Run bounded radare2/Ghidra smoke checks.")
     parser.add_argument("--timeout-sec", type=int, default=120, help="Per-command timeout.")
     parser.add_argument("--json", action="store_true", help="Emit JSON.")
@@ -279,12 +314,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         )
     )
     reports = {name: tool_report(name, timeout_sec=args.timeout_sec) for name in selected_tools}
+    baseline_reports = (
+        {name: tool_report(name, timeout_sec=args.timeout_sec) for name in sorted(BASELINE_TOOL_COMMANDS)}
+        if args.include_baseline_tools
+        else {}
+    )
     missing_required = [name for name in args.require_tool if not reports.get(name, {}).get("available")]
     report: dict[str, Any] = {
         "schema": "obelisk.static-tooling-check.v1",
         "generated_utc": utc_now(),
         "status": "blocked" if missing_required else "ok",
         "tools": reports,
+        "baseline_tools": baseline_reports,
         "missing_required_tools": missing_required,
     }
     if args.binary is not None:
@@ -330,6 +371,9 @@ def main() -> int:
     else:
         print(f"status={report['status']}")
         for name, item in report["tools"].items():
+            path = item["path"] or "missing"
+            print(f"{name}: {path}")
+        for name, item in report["baseline_tools"].items():
             path = item["path"] or "missing"
             print(f"{name}: {path}")
         if report["missing_required_tools"]:
