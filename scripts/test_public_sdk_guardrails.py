@@ -66,6 +66,9 @@ PUBLIC_RELEASE_SCOPE_DOC_FILES = [
 CHAT_COMMAND_HELPER_ROADMAP = (
     REPO_ROOT / "docs" / "research" / "2026-05-30-chat-command-helper-roadmap.md"
 )
+CHAT_COMMAND_READINESS_AUDIT = (
+    REPO_ROOT / "docs" / "research" / "2026-05-31-chat-command-readiness.md"
+)
 NEXTGEN_DEMAND_BOUNDARY_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
@@ -2354,6 +2357,56 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(doc="plugin_hub_matrix", term=term):
                 self.assertIn(normalized(term), matrix)
+
+    def test_chat_command_readiness_audit_keeps_local_parsing_narrow(self) -> None:
+        note = CHAT_COMMAND_READINESS_AUDIT.read_text(encoding="utf-8")
+        compact = normalized(note)
+
+        for term in (
+            "The current surface is enough for plugin-local command parsing tests.",
+            "principal=unknown",
+            "This is not enough for a public command SDK",
+            "It does not provide sender/player identity, permissions, replies, chat send",
+            "Runtime code should wait until a concrete test gap is identified",
+            "this note does not create that approval",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
+
+        for required_scope in (
+            "ABI version",
+            "minimum struct size",
+            "send mode",
+            "copied flag",
+            "sequence",
+            "message text",
+            "result type containing only `name`",
+        ):
+            with self.subTest(required_scope=required_scope):
+                self.assertIn(normalized(required_scope), compact)
+
+        for boundary in (
+            "sender/player identity",
+            "permissions",
+            "replies",
+            "chat send",
+            "moderation",
+            "blocking",
+            "mutation",
+            "return override",
+            "UE lookup",
+            "raw `FString`",
+            "`UObject`",
+            "`UFunction`",
+            "raw params",
+            "FName/GObjects indices",
+            "persistent identity",
+        ):
+            with self.subTest(boundary=boundary):
+                self.assertIn(normalized(boundary), compact)
+
+        self.assertIn("docs/tests, not runtime code", compact)
+        self.assertIn("not an approved live test", compact)
 
     def test_public_gameplay_event_manifest_contains_no_server_paths(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))

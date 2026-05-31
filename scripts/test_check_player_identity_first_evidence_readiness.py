@@ -33,6 +33,52 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             text=True,
         )
 
+    def accepted_inventory_payload(self) -> dict:
+        targets = [
+            "ShooterGameMode.PostLogin",
+            "ShooterGameMode.Logout",
+            "ShooterPlayerController.ServerSendChatMessage",
+            "ShooterPlayerController.ServerRequestTribeLog",
+            "ShooterPlayerController.AllowTribeGroupPermission",
+            "ShooterPlayerController.IsInTribe",
+            "ShooterPlayerController.ClientReceiveMyTribeOnlineList",
+            "ShooterPlayerController.ClientReceiveActiveMissionTags",
+            "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+            "MissionType.AddPlayerToMission",
+            "ShooterPlayerController.ServerKickPlayer",
+            "ShooterPlayerController.ServerListPlayers",
+        ]
+        return {
+            "ready": True,
+            "accepted_pack": {
+                "manifest": "/tmp/inventory/manifest.json",
+                "schema": "obelisk.reflection-inventory-pack.v1",
+                "status": "candidate-only",
+                "promotion_status": "not_promoted_candidate_only",
+                "inputs": {
+                    "evidence_pack_manifest": "/tmp/core-evidence-pack/manifest.json",
+                    "evidence_pack_schema": "obelisk.core-dump-evidence-pack.v1",
+                    "evidence_pack_status": "complete",
+                    "target_sets": ["players-identity-lifecycle-intake"],
+                },
+                "summary": {"fname_root_ready": True},
+                "blockers": [],
+                "matched_targets": targets,
+                "target_set_coverage": {
+                    "target_sets": [
+                        {
+                            "name": "players-identity-lifecycle-intake",
+                            "expected_targets": targets,
+                            "covered_targets": targets,
+                            "missing_targets": [],
+                            "complete": True,
+                        }
+                    ]
+                },
+            },
+            "reasons": [],
+        }
+
     def test_current_fixture_gap_reports_exact_next_step_without_promoting_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_checker(["--artifact-root", temp_dir], check=False)
@@ -256,11 +302,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         def fake_run_json_command(args: list[str], *, check: bool = False):
             command = " ".join(args)
             if "check_reflection_inventory_pack_readiness.py" in command:
-                return ok, {
-                    "ready": True,
-                    "accepted_pack": {"manifest": "/tmp/inventory/manifest.json"},
-                    "reasons": [],
-                }
+                return ok, self.accepted_inventory_payload()
             if "compare_reflection_snapshots.py" in command:
                 return ok, {"totals": {"targets": 12}}
             if "build_redacted_ufunction_signatures.py" in command:
@@ -311,6 +353,71 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["static_orientation"]["pre_core_evidence_boundary"]["blockers"], [])
 
     def test_candidate_ready_remains_internal_planning_not_promotion(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": True,
+                        "session_end_accepted": True,
+                        "accepted_start_targets": ["ShooterGameMode.PostLogin"],
+                        "accepted_end_targets": ["ShooterGameMode.Logout"],
+                        "blockers": [],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={"ready_to_build_core_evidence_pack": False},
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["status"], "candidate_ready")
+        self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertTrue(payload["not_artifact_gate"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
+
+    def test_ready_inventory_payload_without_core_evidence_chain_still_blocks(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
 
         def fake_run_json_command(args: list[str], *, check: bool = False):
@@ -370,14 +477,138 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         ):
             payload = checker.build_report(args)
 
-        self.assertTrue(payload["ready"])
-        self.assertEqual(payload["status"], "candidate_ready")
-        self.assertTrue(payload["accepted_for_internal_planning"])
-        self.assertTrue(payload["not_artifact_gate"])
-        self.assertFalse(payload["promotion_ready"])
-        self.assertFalse(payload["public_sdk_ready"])
-        self.assertFalse(payload["runtime_ready"])
-        self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
+        self.assertIn("accepted_reflection_inventory_chain_incomplete", payload["blockers"])
+        self.assertFalse(payload["reflection_inventory"]["chain_validation"]["ready"])
+        self.assertIn(
+            "accepted_reflection_inventory_core_evidence_pack_manifest_missing",
+            payload["reflection_inventory"]["chain_validation"]["blockers"],
+        )
+
+    def test_ready_inventory_substitutes_are_rejected_before_identity_planning(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        base_pack = self.accepted_inventory_payload()["accepted_pack"]
+        two_targets = [
+            "ShooterPlayerController.ServerKickPlayer",
+            "ShooterPlayerController.ServerListPlayers",
+        ]
+        cases = [
+            (
+                "scriptstruct_inventory",
+                {
+                    **base_pack,
+                    "schema": "obelisk.scriptstruct-inventory-pack.v1",
+                },
+                "accepted_pack_schema_not_reflection_inventory",
+            ),
+            (
+                "direct_core_manual_mode",
+                {
+                    **base_pack,
+                    "inputs": {
+                        "core": "/tmp/core",
+                        "ark_binary": "/tmp/ShooterGameServer",
+                        "target_sets": ["players-identity-lifecycle-intake"],
+                    },
+                },
+                "accepted_reflection_inventory_core_evidence_pack_manifest_missing",
+            ),
+            (
+                "standalone_snapshots",
+                {
+                    **base_pack,
+                    "inputs": {
+                        "snapshot_root": "/tmp/snapshots",
+                        "target_sets": ["players-identity-lifecycle-intake"],
+                    },
+                },
+                "accepted_reflection_inventory_core_evidence_pack_manifest_missing",
+            ),
+            (
+                "two_function_only_inventory",
+                {
+                    **base_pack,
+                    "matched_targets": two_targets,
+                    "target_set_coverage": {
+                        "target_sets": [
+                            {
+                                "name": "players-identity-lifecycle-intake",
+                                "expected_targets": two_targets,
+                                "covered_targets": two_targets,
+                                "missing_targets": [],
+                                "complete": True,
+                            }
+                        ]
+                    },
+                },
+                "accepted_reflection_inventory_not_full_player_identity_target_set",
+            ),
+        ]
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": True,
+                        "session_end_accepted": True,
+                        "accepted_start_targets": ["ShooterGameMode.PostLogin"],
+                        "accepted_end_targets": ["ShooterGameMode.Logout"],
+                        "blockers": [],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        for label, accepted_pack, expected_blocker in cases:
+            with self.subTest(label=label):
+                def fake_with_inventory(args: list[str], *, check: bool = False):
+                    command = " ".join(args)
+                    if "check_reflection_inventory_pack_readiness.py" in command:
+                        return ok, {"ready": True, "accepted_pack": accepted_pack, "reasons": []}
+                    return fake_run_json_command(args, check=check)
+
+                with (
+                    mock.patch.object(checker, "run_json_command", side_effect=fake_with_inventory),
+                    mock.patch.object(
+                        checker,
+                        "bounded_artifact_file_scan",
+                        return_value={"ready_to_build_core_evidence_pack": False},
+                    ),
+                ):
+                    payload = checker.build_report(args)
+
+                self.assertFalse(payload["ready"])
+                self.assertIn("accepted_reflection_inventory_chain_incomplete", payload["blockers"])
+                self.assertIn(expected_blocker, payload["reflection_inventory"]["chain_validation"]["blockers"])
 
     def test_accepted_inventory_still_fails_closed_on_wrong_first_evidence_schema(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
@@ -385,11 +616,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         def fake_run_json_command(args: list[str], *, check: bool = False):
             command = " ".join(args)
             if "check_reflection_inventory_pack_readiness.py" in command:
-                return ok, {
-                    "ready": True,
-                    "accepted_pack": {"manifest": "/tmp/inventory/manifest.json"},
-                    "reasons": [],
-                }
+                return ok, self.accepted_inventory_payload()
             if "compare_reflection_snapshots.py" in command:
                 return ok, {
                     "totals": {

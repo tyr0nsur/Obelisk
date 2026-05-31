@@ -19,9 +19,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 REPORT_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
 FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
+REFLECTION_INVENTORY_PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
+CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
+PLAYER_IDENTITY_TARGET_COUNT = 12
 EXPECTED_SHOOTERGAME_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 REQUIRED_ADMIN_TARGETS = [
     "ShooterPlayerController.ServerKickPlayer",
@@ -372,6 +375,126 @@ def coverage_payload_has_required_totals(coverage_payload: dict[str, Any] | None
     )
 
 
+def string_list(value: Any) -> list[str]:
+    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+
+def target_set_coverage_entries(coverage: Any) -> list[dict[str, Any]]:
+    if not isinstance(coverage, dict):
+        return []
+    entries: list[dict[str, Any]] = []
+    for key in ("target_sets", "declared_target_sets"):
+        raw_entries = coverage.get(key)
+        if isinstance(raw_entries, list):
+            entries.extend(entry for entry in raw_entries if isinstance(entry, dict))
+    if not entries and coverage.get("name") == PLAYER_IDENTITY_TARGET_SET:
+        entries.append(coverage)
+    return entries
+
+
+def reflection_inventory_chain_diagnosis(inventory_payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Require the complete core-evidence -> full reflection-inventory chain.
+
+    The lower-level inventory readiness checker is still authoritative for reading
+    manifests. This wrapper also fails closed if a mocked, stale, or summarized payload
+    tries to substitute ScriptStruct inventory, direct-core mode, standalone snapshots,
+    static orientation, or a two-function-only inventory for the full identity lane.
+    """
+
+    if not isinstance(inventory_payload, dict) or inventory_payload.get("ready") is not True:
+        return {"ready": False, "blockers": [], "accepted_manifest": None}
+
+    blockers: list[str] = []
+    accepted_pack = inventory_payload.get("accepted_pack")
+    if not isinstance(accepted_pack, dict):
+        return {
+            "ready": False,
+            "blockers": ["accepted_reflection_inventory_pack_missing"],
+            "accepted_manifest": None,
+        }
+
+    if accepted_pack.get("schema") != REFLECTION_INVENTORY_PACK_SCHEMA:
+        blockers.append("accepted_pack_schema_not_reflection_inventory")
+    if accepted_pack.get("status") != "candidate-only":
+        blockers.append("accepted_reflection_inventory_status_not_candidate_only")
+    if accepted_pack.get("promotion_status") != "not_promoted_candidate_only":
+        blockers.append("accepted_reflection_inventory_promotion_status_mismatch")
+
+    pack_blockers = accepted_pack.get("blockers")
+    if pack_blockers not in ([], None):
+        blockers.append("accepted_reflection_inventory_blockers_present")
+
+    inputs = accepted_pack.get("inputs")
+    if not isinstance(inputs, dict):
+        inputs = {}
+        blockers.append("accepted_reflection_inventory_inputs_missing")
+
+    evidence_pack_manifest = inputs.get("evidence_pack_manifest")
+    if not isinstance(evidence_pack_manifest, str) or not evidence_pack_manifest.endswith("manifest.json"):
+        blockers.append("accepted_reflection_inventory_core_evidence_pack_manifest_missing")
+    evidence_pack_schema = inputs.get("evidence_pack_schema")
+    if evidence_pack_schema is not None and evidence_pack_schema != CORE_DUMP_EVIDENCE_PACK_SCHEMA:
+        blockers.append("accepted_reflection_inventory_core_evidence_pack_schema_mismatch")
+    evidence_pack_status = inputs.get("evidence_pack_status")
+    if evidence_pack_status is not None and evidence_pack_status != "complete":
+        blockers.append("accepted_reflection_inventory_core_evidence_pack_not_complete")
+    if any(key in inputs for key in ("core", "core_path", "ark_binary", "ark_binary_path")) and not evidence_pack_manifest:
+        blockers.append("accepted_reflection_inventory_direct_core_mode_not_allowed")
+
+    target_sets = string_list(inputs.get("target_sets"))
+    if target_sets and target_sets != [PLAYER_IDENTITY_TARGET_SET]:
+        blockers.append("accepted_reflection_inventory_input_target_set_mismatch")
+
+    coverage = accepted_pack.get("target_set_coverage")
+    coverage_entries = target_set_coverage_entries(coverage)
+    coverage_entry = next(
+        (
+            entry
+            for entry in coverage_entries
+            if entry.get("name") == PLAYER_IDENTITY_TARGET_SET
+            or entry.get("target_set") == PLAYER_IDENTITY_TARGET_SET
+        ),
+        None,
+    )
+    if not isinstance(coverage_entry, dict):
+        blockers.append("accepted_reflection_inventory_target_set_coverage_missing")
+        expected_targets: list[str] = []
+        covered_targets: list[str] = []
+    else:
+        expected_targets = (
+            string_list(coverage_entry.get("expected_targets"))
+            or string_list(coverage_entry.get("targets"))
+        )
+        covered_targets = (
+            string_list(coverage_entry.get("covered_targets"))
+            or string_list(coverage_entry.get("matched_targets"))
+            or string_list(accepted_pack.get("matched_targets"))
+        )
+        missing_targets = coverage_entry.get("missing_targets")
+        if missing_targets not in ([], None):
+            blockers.append("accepted_reflection_inventory_target_set_coverage_incomplete")
+        if coverage_entry.get("complete") is False:
+            blockers.append("accepted_reflection_inventory_target_set_coverage_incomplete")
+
+    if len(expected_targets) != PLAYER_IDENTITY_TARGET_COUNT:
+        blockers.append("accepted_reflection_inventory_not_full_player_identity_target_set")
+    if len(set(covered_targets)) != PLAYER_IDENTITY_TARGET_COUNT:
+        blockers.append("accepted_reflection_inventory_covered_targets_incomplete")
+    for target in REQUIRED_ADMIN_TARGETS:
+        if target not in covered_targets:
+            blockers.append(f"accepted_reflection_inventory_missing_required_target:{target}")
+
+    summary = accepted_pack.get("summary")
+    if isinstance(summary, dict) and summary.get("fname_root_ready") is not True:
+        blockers.append("accepted_reflection_inventory_fname_root_not_ready")
+
+    return {
+        "ready": not blockers,
+        "blockers": sorted(set(blockers)),
+        "accepted_manifest": accepted_pack.get("manifest") if isinstance(accepted_pack.get("manifest"), str) else None,
+    }
+
+
 def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(first_evidence_payload, dict):
         return {
@@ -446,7 +569,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         ]
     )
 
-    inventory_ready = bool(inventory_payload and inventory_payload.get("ready") is True)
+    inventory_chain = reflection_inventory_chain_diagnosis(inventory_payload)
+    inventory_payload_ready = bool(inventory_payload and inventory_payload.get("ready") is True)
+    inventory_ready = inventory_chain["ready"] is True
     orientation_valid = (
         isinstance(orientation_payload, dict)
         and orientation_payload.get("valid") is True
@@ -476,6 +601,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     downstream_blockers: list[str] = []
     if not inventory_ready:
         blockers = ["missing_reflection_inventory_pack_or_core_evidence_pack"]
+        if inventory_payload_ready:
+            blockers.append("accepted_reflection_inventory_chain_incomplete")
     else:
         blockers = []
     if coverage_result.returncode != 0 or not coverage_payload_valid or coverage_blocked:
@@ -588,7 +715,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_chain": {
             "core_evidence_pack_required": True,
             "reflection_inventory_pack_required": True,
+            "core_evidence_pack_manifest_required": True,
             "accepted_reflection_inventory_pack": artifact_root_diagnosis(inventory_payload)["accepted_manifest"],
+            "accepted_reflection_inventory_chain": inventory_chain,
             "required_admin_targets": REQUIRED_ADMIN_TARGETS,
             "blocked_before_focal_planning": not inventory_ready,
             "ready_to_plan_admin_snapshots": inventory_ready,
@@ -658,6 +787,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 for reason in (inventory_payload.get("reasons", []) if inventory_payload else [])
                 if isinstance(reason, dict)
             ],
+            "chain_validation": inventory_chain,
             "artifact_root_diagnosis": artifact_root_diagnosis(inventory_payload),
         },
         "fixture_coverage": {
