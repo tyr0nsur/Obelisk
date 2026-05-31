@@ -26,6 +26,7 @@ MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
 PLAYER_IDENTITY_TARGET_COUNT = 12
 EXPECTED_SHOOTERGAME_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+PLAYER_IDENTITY_RAW_RUN_PREFIX = "player-identity-offline-"
 REQUIRED_ADMIN_TARGETS = [
     "ShooterPlayerController.ServerKickPlayer",
     "ShooterPlayerController.ServerListPlayers",
@@ -208,6 +209,7 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
     has_matching_binary = any(candidate.get("matches_current_binary") is True for candidate in shooter_candidates)
     has_core_like = bool(core_candidates)
     paired_raw_inputs: list[dict[str, Any]] = []
+    rejected_raw_input_pairs: list[dict[str, Any]] = []
     for candidate in shooter_candidates:
         candidate_path = candidate.get("path")
         if candidate.get("matches_current_binary") is not True or not isinstance(candidate_path, str):
@@ -215,12 +217,26 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
         binary_path = Path(candidate_path)
         if binary_path.parent.name != "raw":
             continue
+        run_root = binary_path.parent.parent
+        if (
+            not run_root.name.startswith(PLAYER_IDENTITY_RAW_RUN_PREFIX)
+            or len(run_root.name) == len(PLAYER_IDENTITY_RAW_RUN_PREFIX)
+        ):
+            if len(rejected_raw_input_pairs) < MAX_DIAGNOSIS_ITEMS:
+                rejected_raw_input_pairs.append(
+                    {
+                        "run_root": str(run_root),
+                        "binary": str(binary_path),
+                        "reason": "run_root_name_must_start_with_player_identity_offline",
+                    }
+                )
+            continue
         core_path = binary_path.parent / "core"
         try:
             if core_path.exists() and core_path.is_file() and not core_path.is_symlink():
                 paired_raw_inputs.append(
                     {
-                        "run_root": str(binary_path.parent.parent),
+                        "run_root": str(run_root),
                         "binary": str(binary_path),
                         "core": str(core_path),
                     }
@@ -253,6 +269,7 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
         "core_like_candidates": core_candidates,
         "omitted_core_like_candidates": omitted_core,
         "paired_raw_inputs": paired_raw_inputs,
+        "rejected_raw_input_pairs": rejected_raw_input_pairs,
         "ready_to_build_core_evidence_pack": has_paired_raw_inputs,
         "non_claims": [
             "file presence only; core-like filenames are not accepted core evidence packs",
@@ -859,6 +876,12 @@ def build_operator_next_commands(
                 "present": core_like_present,
             },
         },
+        "paired_raw_inputs": (
+            offline_inputs.get("paired_raw_inputs")
+            if isinstance(offline_inputs.get("paired_raw_inputs"), list)
+            else []
+        ),
+        "ready_to_build_core_evidence_pack": ready_to_build_core,
         "sequence": sequence,
         "non_claims": [
             "derived recipe only; does not execute commands, read cores, write artifacts, or touch servers",

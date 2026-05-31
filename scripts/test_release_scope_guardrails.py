@@ -1263,6 +1263,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "does not replace per-target readiness reports",
             "Do not claim that a passing pack promotes a public SDK",
             "object identity, lookup, mutation, return overrides, ResourceHandle",
+            "Local artifact directories are not current release or v1 identity/structure evidence by location",
+            "`obelisk.offline-artifact-gate-result.v1` JSON is gate output, not an authoritative child manifest",
+            "convert archival identity/structure packs into current evidence",
+            "Label local packs as current-reviewed or archival/rejected",
+            "current v1 player identity, structure aggregate/census, release readiness, or SDK completion",
         )
         for item in required:
             with self.subTest(item=item):

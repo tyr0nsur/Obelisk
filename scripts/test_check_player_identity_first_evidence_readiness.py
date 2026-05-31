@@ -364,6 +364,27 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             self.assertEqual(paired_inputs["paired_raw_inputs"][0]["binary"], str(binary))
             self.assertEqual(paired_inputs["paired_raw_inputs"][0]["core"], str(raw_dir / "core"))
 
+    def test_offline_input_diagnosis_rejects_non_identity_raw_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            raw_dir = root / "generic-offline-run" / "raw"
+            raw_dir.mkdir(parents=True)
+            binary = raw_dir / "ShooterGameServer"
+            binary.write_bytes(b"server")
+            (raw_dir / "core").write_bytes(b"core")
+
+            with mock.patch.object(checker, "sha256_file", return_value=checker.EXPECTED_SHOOTERGAME_SHA256):
+                offline_inputs = checker.bounded_artifact_file_scan(root)
+
+        self.assertEqual(offline_inputs["status"], "offline_binary_and_unpaired_core_like_inputs_present")
+        self.assertFalse(offline_inputs["ready_to_build_core_evidence_pack"])
+        self.assertEqual(offline_inputs["paired_raw_inputs"], [])
+        self.assertEqual(offline_inputs["rejected_raw_input_pairs"][0]["binary"], str(binary))
+        self.assertEqual(
+            offline_inputs["rejected_raw_input_pairs"][0]["reason"],
+            "run_root_name_must_start_with_player_identity_offline",
+        )
+
     def test_next_actionable_blocker_prioritizes_missing_core_input_when_binary_matches(self) -> None:
         blocker = checker.next_actionable_blocker(
             inventory_ready=False,
@@ -431,6 +452,8 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(operator_commands["runnable_now"], [])
         self.assertTrue(operator_commands["inputs"]["matching_non_protected_shooter_game_server"]["present"])
         self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
+        self.assertFalse(operator_commands["ready_to_build_core_evidence_pack"])
+        self.assertEqual(operator_commands["paired_raw_inputs"], [])
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
         self.assertEqual(
             operator_commands["sequence"][0]["blocked_until"],

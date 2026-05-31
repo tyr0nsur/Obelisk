@@ -6909,6 +6909,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Normalizing a directory also does not rewrite absolute paths inside\nchild manifests",
             "that blocker is cleared only for the\nFUObjectArray redacted field-window schema",
             "gate-result and\nprovenance child manifests remain blocked with `unsupported_manifest_schema`",
+            "Local artifact directories are not current release or v1 identity/structure evidence by\nlocation",
+            "`obelisk.offline-artifact-gate-result.v1` JSON is gate output, not an authoritative child\nmanifest",
+            "placing it inside a pack must not bypass child-manifest validation or convert\narchival identity/structure packs into current evidence",
+            "For archival local packs, do\nnot cite gate-result JSON, child-manifest filenames, or container presence as evidence of\ncurrent v1 player identity, structure aggregate/census",
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)

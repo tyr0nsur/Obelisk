@@ -23,6 +23,14 @@ the exact scope recorded by its child manifests. It does not promote public SDK 
 object identity, lookup, raw UE pointers, mutation, return overrides, runtime hooks, or
 cross-binary portability.
 
+Local artifact directories are not current release or v1 identity/structure evidence by
+location or by an old accepted gate result. Treat them as archival unless the citation
+names the intended commit/ref, the pack id, container SHA256s, supported child manifest
+schemas, and the gate command/status for the current review. A saved
+`obelisk.offline-artifact-gate-result.v1` JSON is gate output, not an authoritative child
+manifest; placing it inside a pack must not bypass child-manifest validation or convert
+archival identity/structure packs into current evidence.
+
 ## Required Pack Shape
 
 - The pack root must be a real directory, not a symlink.
@@ -351,6 +359,12 @@ When recording a pack in a PR, issue, or research note, include:
 - whether strict target-set coverage was run;
 - second-source comparison status when applicable;
 - exact non-claims copied from the relevant child report or comparison.
+
+Label local packs as current-reviewed or archival/rejected. For archival local packs, do
+not cite gate-result JSON, child-manifest filenames, or container presence as evidence of
+current v1 player identity, structure aggregate/census, release readiness, or SDK
+completion. Re-run normalizer check and the consume gate against the supported child
+manifest set before changing the label.
 
 Do not claim that a passing pack promotes a public SDK, raw UE access, object identity,
 lookup, mutation, return overrides, ResourceHandle, or cross-binary support. A passing
