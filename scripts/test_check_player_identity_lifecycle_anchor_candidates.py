@@ -228,6 +228,21 @@ def manifest() -> dict:
     }
 
 
+def accepted_lifecycle_anchor_manifest() -> dict:
+    payload = manifest()
+    payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+    payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
+    payload["lifecycle_acceptance"]["session_start_accepted"] = True
+    payload["lifecycle_acceptance"]["session_end_accepted"] = True
+    payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
+    payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
+    payload["lifecycle_acceptance"]["blockers"] = ["principal_invalidation_semantics_unresolved"]
+    payload["safety_summary"]["accepted_anchor_count"] = 2
+    payload["safety_summary"]["field_count"] = 6
+    payload["safety_summary"]["copied_candidate_count"] = 2
+    return payload
+
+
 class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
     def run_checker(self, payload: dict, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
@@ -322,17 +337,7 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
 
     def test_consumes_corroborated_gamemode_layout_anchors_candidate_only(self) -> None:
-        payload = manifest()
-        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
-        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
-        payload["lifecycle_acceptance"]["session_start_accepted"] = True
-        payload["lifecycle_acceptance"]["session_end_accepted"] = True
-        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
-        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
-        payload["lifecycle_acceptance"]["blockers"] = ["principal_invalidation_semantics_unresolved"]
-        payload["safety_summary"]["accepted_anchor_count"] = 2
-        payload["safety_summary"]["field_count"] = 6
-        payload["safety_summary"]["copied_candidate_count"] = 2
+        payload = accepted_lifecycle_anchor_manifest()
 
         result = self.run_checker(payload)
         report = json.loads(result.stdout)
@@ -347,14 +352,7 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
 
     def test_promote_blocks_layout_anchors_on_invalidation_semantics(self) -> None:
-        payload = manifest()
-        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
-        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
-        payload["lifecycle_acceptance"]["session_start_accepted"] = True
-        payload["lifecycle_acceptance"]["session_end_accepted"] = True
-        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
-        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
-        payload["safety_summary"]["accepted_anchor_count"] = 2
+        payload = accepted_lifecycle_anchor_manifest()
 
         result = self.run_checker(payload, "--promote", check=False)
         report = json.loads(result.stdout)
@@ -364,6 +362,7 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertIn("promote_mode_players_identity_lifecycle_anchor_candidates_candidate_only", report["blockers"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_rejects_lifecycle_layout_anchor_shape_drift(self) -> None:
         payload = manifest()

@@ -93,6 +93,10 @@ priorities, and do not use history files as the active source of truth.
   The candidate `obelisk.permissions-admin-query-failclosed-contract.v1` is now supported
   by the offline artifact gate in consume mode only; it is not public ABI, runtime
   readiness, public SDK readiness, or v1 completion evidence.
+  Permissions authority is split between recognized and allow-capable kinds:
+  `operator-config` is recognized but not allow-capable; only runtime-local/runtime-owned
+  provenance may allow. Nested readiness/promotion overclaims in the candidate contract
+  must be rejected by the schema checker and offline artifact gate.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.

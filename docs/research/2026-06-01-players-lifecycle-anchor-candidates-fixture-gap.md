@@ -130,3 +130,21 @@ public player identity, runtime lifecycle ordering, lookup, `ResourceHandle`, mu
 return override. If this route needs to be regenerated for a new ARK binary hash, reuse
 the exact offline recipe above and compare against a distinct second-source root before
 updating fixture metadata.
+
+## Checker Fixture Audit
+
+The lifecycle-anchor candidate checker now has an explicit accepted-manifest helper for
+the two reviewed lifecycle layout anchors:
+
+- `ShooterGameMode.HandleNewPlayer` as `session_start`
+- `ShooterGameMode.OnLogout` as `session_end`
+
+The helper keeps the artifact `candidate_only`, marks promotion, public SDK, and runtime
+readiness false, and leaves principal invalidation semantics unresolved. Object fields
+remain `recognition_only`; scalar bools remain copied-candidate planning fields only.
+
+Targeted checker coverage consumes this manifest successfully, reports the accepted start
+and end targets, and verifies that `--promote` blocks on unresolved principal invalidation
+semantics plus the candidate-only gate while keeping public/runtime readiness false. This
+does not promote public player identity, UE pointer exposure, lookup, `ResourceHandle`,
+mutation, return override, or any runtime ordering claim.

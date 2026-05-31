@@ -40,6 +40,16 @@ REQUIRED_PROVENANCE_FIELDS = frozenset(
         "policy_epoch",
     )
 )
+REQUIRED_RECOGNIZED_AUTHORITY_KINDS = frozenset(("operator-config", "runtime-local"))
+REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS = frozenset(("runtime-local",))
+FORBIDDEN_ALLOW_CAPABLE_AUTHORITY_KINDS = frozenset(
+    (
+        "operator-config",
+        "plugin-supplied-authority",
+        "remote-service-authority",
+        "cross-process-shared-authority",
+    )
+)
 REQUIRED_FAIL_CLOSED_CASES = frozenset(
     (
         "stale_principal",
@@ -49,6 +59,13 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
         "missing_capability",
         "rate_limit_exceeded",
         "unknown_authority",
+        "missing_policy_source",
+        "missing_policy_source_generation",
+        "policy_source_generation_mismatch",
+        "missing_policy_epoch",
+        "missing_authority_generation",
+        "authority_generation_mismatch",
+        "plugin_supplied_provenance",
     )
 )
 REQUIRED_EXCLUSIONS = frozenset(
@@ -121,6 +138,27 @@ FORBIDDEN_SURFACE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+READY_OVERCLAIM_KEYS = frozenset(
+    (
+        "promoted",
+        "promote_ready",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+    )
+)
+READY_OVERCLAIM_STRINGS = {
+    "promoted": "promoted",
+    "public sdk ready": "public_sdk_ready",
+    "runtime ready": "runtime_ready",
+    "promotion ready": "promotion_ready",
+    "promote ready": "promote_ready",
+}
+OVERCLAIM_NEGATIVE_PREFIXES = (
+    "$.negative_surface_exclusions",
+    "$.non_claims",
+    "$.promotion_gate.blockers",
+)
 
 
 @dataclass
@@ -130,6 +168,8 @@ class Validation:
     decisions: list[str]
     provenance_fields: list[str]
     fail_closed_cases: list[str]
+    recognized_authority_kinds: list[str]
+    allow_capable_authority_kinds: list[str]
 
 
 def parse_args() -> argparse.Namespace:
@@ -224,6 +264,27 @@ def find_forbidden_surface(value: Any, trail: str = "$") -> tuple[str, str] | No
     elif isinstance(value, str) and FORBIDDEN_SURFACE_RE.search(value):
         return value, trail
     return None
+
+
+def collect_overclaim_fields(value: Any, trail: str = "$") -> list[dict[str, str]]:
+    if any(trail.startswith(prefix) for prefix in OVERCLAIM_NEGATIVE_PREFIXES):
+        return []
+    found: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if key in READY_OVERCLAIM_KEYS and child is True:
+                found.append({"reason": f"{key}_overclaim", "label": child_trail})
+            found.extend(collect_overclaim_fields(child, child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found.extend(collect_overclaim_fields(child, f"{trail}[{index}]"))
+    elif isinstance(value, str):
+        text = value.casefold()
+        for needle, reason in READY_OVERCLAIM_STRINGS.items():
+            if needle in text:
+                found.append({"reason": f"{reason}_string_overclaim", "label": trail})
+    return found
 
 
 def validate_query_contract(contract: Any, blockers: list[dict[str, Any]]) -> list[str]:
@@ -329,13 +390,64 @@ def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) ->
     return sorted(result_names), sorted(provenance_names)
 
 
-def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+def validate_authority_kind_list(
+    value: Any,
+    *,
+    label: str,
+    required: frozenset[str],
+    blockers: list[dict[str, Any]],
+    missing_reason: str,
+    unexpected_reason: str,
+) -> list[str]:
+    if not isinstance(value, list):
+        add(blockers, missing_reason, label)
+        return []
+    names = [item for item in value if isinstance(item, str)]
+    if len(names) != len(value):
+        add(blockers, "authority_kind_invalid", label)
+    missing = required - set(names)
+    if missing:
+        add(blockers, missing_reason, label, missing=sorted(missing))
+    unexpected = set(names) - required
+    if unexpected:
+        add(blockers, unexpected_reason, label, authority_kinds=sorted(unexpected))
+    return sorted(names)
+
+
+def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
     if not isinstance(policy, dict):
         add(blockers, "authority_policy_missing", "$.authority_policy")
-        return
-    allowed = policy.get("allowed_authority_kinds")
-    if not isinstance(allowed, list) or not {"operator-config", "runtime-local"}.issubset(set(allowed)):
-        add(blockers, "authority_allowed_kinds_missing_required", "$.authority_policy.allowed_authority_kinds")
+        return [], []
+    recognized = validate_authority_kind_list(
+        policy.get("recognized_authority_kinds"),
+        label="$.authority_policy.recognized_authority_kinds",
+        required=REQUIRED_RECOGNIZED_AUTHORITY_KINDS,
+        blockers=blockers,
+        missing_reason="authority_recognized_kinds_missing_required",
+        unexpected_reason="authority_recognized_kinds_unexpected",
+    )
+    allow_capable = validate_authority_kind_list(
+        policy.get("allow_capable_authority_kinds"),
+        label="$.authority_policy.allow_capable_authority_kinds",
+        required=REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS,
+        blockers=blockers,
+        missing_reason="authority_allow_capable_kinds_missing_required",
+        unexpected_reason="authority_allow_capable_kinds_unexpected",
+    )
+    forbidden_allow_capable = set(allow_capable) & FORBIDDEN_ALLOW_CAPABLE_AUTHORITY_KINDS
+    if forbidden_allow_capable:
+        add(
+            blockers,
+            "authority_forbidden_allow_capable_kind",
+            "$.authority_policy.allow_capable_authority_kinds",
+            authority_kinds=sorted(forbidden_allow_capable),
+        )
+
+    legacy_allowed = policy.get("allowed_authority_kinds")
+    if legacy_allowed is not None:
+        legacy_names = [item for item in legacy_allowed if isinstance(item, str)] if isinstance(legacy_allowed, list) else []
+        if not isinstance(legacy_allowed, list) or set(legacy_names) != REQUIRED_RECOGNIZED_AUTHORITY_KINDS:
+            add(blockers, "authority_allowed_kinds_must_match_recognized_legacy_alias", "$.authority_policy.allowed_authority_kinds")
     for key in (
         "plugin_supplied_authority_allowed",
         "remote_authority_allowed",
@@ -345,6 +457,9 @@ def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> No
             add(blockers, f"authority_{key}_not_false", f"$.authority_policy.{key}")
     if policy.get("unknown_authority_fails_closed") is not True:
         add(blockers, "unknown_authority_not_fail_closed", "$.authority_policy.unknown_authority_fails_closed")
+    if policy.get("operator_config_allow_capable") is not False:
+        add(blockers, "operator_config_allow_capable_not_false", "$.authority_policy.operator_config_allow_capable")
+    return recognized, allow_capable
 
 
 def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:
@@ -405,7 +520,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
-        return Validation(blockers, [], [], [], [])
+        return Validation(blockers, [], [], [], [], [])
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -425,7 +540,9 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
 
     query_fields = validate_query_contract(payload.get("query_contract"), blockers)
     decisions, provenance_fields = validate_decision_contract(payload.get("decision_contract"), blockers)
-    validate_authority_policy(payload.get("authority_policy"), blockers)
+    recognized_authority_kinds, allow_capable_authority_kinds = validate_authority_policy(
+        payload.get("authority_policy"), blockers
+    )
     fail_closed_cases = validate_fail_closed_cases(payload.get("fail_closed_cases"), blockers)
     validate_negative_exclusions(payload.get("negative_surface_exclusions"), blockers)
     validate_promotion_gate(payload.get("promotion_gate"), blockers)
@@ -443,12 +560,22 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     if forbidden is not None:
         value, trail = forbidden
         add(blockers, "forbidden_surface_claim", trail, value=value)
+    for overclaim in collect_overclaim_fields(payload):
+        add(blockers, overclaim["reason"], overclaim["label"])
 
     if check_mode != "consume":
         add(blockers, f"{check_mode}_blocked_for_candidate_only_pre_abi_contract", "$")
         add(blockers, "candidate_only_permissions_admin_query_contract_not_readiness_evidence", "$")
 
-    return Validation(blockers, query_fields, decisions, provenance_fields, fail_closed_cases)
+    return Validation(
+        blockers,
+        query_fields,
+        decisions,
+        provenance_fields,
+        fail_closed_cases,
+        recognized_authority_kinds,
+        allow_capable_authority_kinds,
+    )
 
 
 def build_report(payload: dict[str, Any], validation: Validation, *, check_mode: str) -> dict[str, Any]:
@@ -468,6 +595,8 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "decisions": validation.decisions,
         "provenance_fields": validation.provenance_fields,
         "fail_closed_cases": validation.fail_closed_cases,
+        "recognized_authority_kinds": validation.recognized_authority_kinds,
+        "allow_capable_authority_kinds": validation.allow_capable_authority_kinds,
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,
     }

@@ -199,6 +199,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   the query fail-closed contract, but promote/readiness remains blocked as candidate-only;
   public symbols remain empty until copied identity/principal semantics, policy provenance,
   scope/generation, epoch, rate-limit/audit, and v1 sequence gates are resolved.
+  The authority model is deliberately conservative: `operator-config` is recognized for
+  planning/audit, but only runtime-local/runtime-owned provenance is allow-capable until a
+  separate promotion explicitly widens that rule. The checker and artifact gate reject
+  nested readiness/promotion overclaims in this candidate contract.
 - Plugin Hub seed review requires exactly one package `Support tier: <tier>` declaration
   and rejects unnegated v1/ArkApi/permissions/identity/replies/mutation/storage/module
   support claims outside that tier. Release-supported examples are

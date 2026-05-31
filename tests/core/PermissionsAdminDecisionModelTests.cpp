@@ -83,6 +83,16 @@ namespace
         return scope == PrincipalScope::CallbackLocal || scope == PrincipalScope::ProcessLocal;
     }
 
+    bool IsRecognizedAuthority(PolicyAuthority authority)
+    {
+        return authority == PolicyAuthority::RuntimeOwned || authority == PolicyAuthority::OperatorConfig;
+    }
+
+    bool IsAllowCapableAuthority(PolicyAuthority authority)
+    {
+        return authority == PolicyAuthority::RuntimeOwned;
+    }
+
     Decision EvaluatePermissionQuery(const PermissionQuery& query)
     {
         const Principal& principal = query.PrincipalValue;
@@ -111,7 +121,7 @@ namespace
         if (provenance.SuppliedByPlugin || provenance.Authority == PolicyAuthority::PluginSupplied)
             return Decision::Deny;
 
-        if (provenance.Authority != PolicyAuthority::RuntimeOwned)
+        if (!IsRecognizedAuthority(provenance.Authority) || !IsAllowCapableAuthority(provenance.Authority))
             return Decision::Unknown;
 
         if (!provenance.SourceGenerationMatches || !provenance.AuthorityGenerationMatches)
@@ -146,7 +156,13 @@ namespace
         operatorConfig.Provenance.Authority = PolicyAuthority::OperatorConfig;
         RequireDecision(EvaluatePermissionQuery(operatorConfig),
                         Decision::Unknown,
-                        "non-runtime-owned provenance returned allow");
+                        "operator-config provenance returned allow before allow-capable promotion");
+
+        PermissionQuery unknownAuthority = CompleteRuntimeOwnedQuery();
+        unknownAuthority.Provenance.Authority = PolicyAuthority::Unknown;
+        RequireDecision(EvaluatePermissionQuery(unknownAuthority),
+                        Decision::Unknown,
+                        "unknown provenance authority returned allow");
     }
 
     void TestPrincipalGenerationFailsClosed()
@@ -208,11 +224,23 @@ namespace
                         Decision::Unknown,
                         "missing policy source returned allow");
 
+        PermissionQuery missingSourceGeneration = CompleteRuntimeOwnedQuery();
+        missingSourceGeneration.Provenance.HasSourceGeneration = false;
+        RequireDecision(EvaluatePermissionQuery(missingSourceGeneration),
+                        Decision::Unknown,
+                        "missing policy source generation returned allow");
+
         PermissionQuery missingEpoch = CompleteRuntimeOwnedQuery();
         missingEpoch.Provenance.HasPolicyEpoch = false;
         RequireDecision(EvaluatePermissionQuery(missingEpoch),
                         Decision::Unknown,
                         "missing policy epoch returned allow");
+
+        PermissionQuery missingAuthorityGeneration = CompleteRuntimeOwnedQuery();
+        missingAuthorityGeneration.Provenance.HasAuthorityGeneration = false;
+        RequireDecision(EvaluatePermissionQuery(missingAuthorityGeneration),
+                        Decision::Unknown,
+                        "missing authority generation returned allow");
 
         PermissionQuery sourceMismatch = CompleteRuntimeOwnedQuery();
         sourceMismatch.Provenance.SourceGenerationMatches = false;

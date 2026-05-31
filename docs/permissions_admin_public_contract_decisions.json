@@ -138,6 +138,13 @@
         "authority_generation",
         "policy_epoch"
       ],
+      "recognized_authority_kinds": [
+        "operator-config",
+        "runtime-local"
+      ],
+      "allow_capable_authority_kinds": [
+        "runtime-local"
+      ],
       "allowed_initial_authority_kinds": [
         "operator-config",
         "runtime-local"
@@ -152,7 +159,10 @@
         "unknown authority kind fails closed",
         "missing policy_epoch provenance fails closed",
         "policy source generation mismatch fails closed",
+        "missing policy source generation fails closed",
+        "missing authority generation fails closed",
         "authority generation mismatch fails closed",
+        "operator-config authority is recognized but not allow-capable until separately promoted",
         "allow decisions must carry policy_epoch provenance",
         "allow without policy provenance is forbidden",
         "plugin input cannot self-attest authority provenance"
@@ -184,8 +194,12 @@
         "process mismatch",
         "unknown policy source",
         "missing policy source provenance",
+        "missing_policy_source_generation",
+        "policy_source_generation_mismatch",
         "missing policy_epoch provenance",
         "policy source generation mismatch",
+        "missing_authority_generation",
+        "authority_generation_mismatch",
         "missing plugin owner token",
         "missing capability",
         "rate limit exceeded"
@@ -197,6 +211,7 @@
         "unknown authority source",
         "missing policy source provenance",
         "allow without policy_epoch provenance",
+        "operator-config authority before separate allow-capable promotion",
         "plugin-supplied provenance",
         "rate limit exceeded"
       ]

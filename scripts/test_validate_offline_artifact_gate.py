@@ -6482,7 +6482,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             payload = players_identity_lifecycle_anchor_candidates_manifest()
             payload["principal_policy"]["public_principal_ready"] = True
             payload["candidate_anchors"][0]["notes"] = "public SDK ready and runtime ready"
-            payload["candidate_anchors"][0]["nested_claim"] = {"runtime_ready": True, "lookup_ready": True}
+            payload["candidate_anchors"][0]["nested_claim"] = {"runtime_ready": True, "lookup_ready": True, "promoted": True}
             payload["candidate_anchors"][0]["fields"][0]["name"] = "SteamID"
             payload["candidate_anchors"][0]["fields"][0]["copied_scalar_eligibility"] = "candidate_copied_public_identifier"
             write_json(manifest, payload)
@@ -6557,6 +6557,13 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             payload = permissions_admin_query_failclosed_manifest()
             payload["public_sdk_ready"] = True
             payload["runtime_ready"] = True
+            payload["nested_claim"] = {
+                "public_sdk_ready": True,
+                "runtime_ready": True,
+                "promotion_ready": True,
+                "promoted": True,
+            }
+            payload["claim_text"] = "public SDK ready runtime ready promoted"
             payload["future_public_surface"] = {
                 "permission_groups": ["admin"],
                 "command_router": "registered",
@@ -6569,7 +6576,33 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("public_sdk_ready_not_false", reasons)
         self.assertIn("runtime_ready_not_false", reasons)
+        self.assertIn("public_sdk_ready_overclaim", reasons)
+        self.assertIn("runtime_ready_overclaim", reasons)
+        self.assertIn("promotion_ready_overclaim", reasons)
+        self.assertIn("promoted_overclaim", reasons)
+        self.assertIn("promoted_string_overclaim", reasons)
         self.assertIn("forbidden_surface_claim", reasons)
+
+    def test_artifact_pack_revalidates_permissions_admin_query_nested_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "pack"
+            pack.mkdir(parents=True)
+            child = permissions_admin_query_failclosed_manifest()
+            child["nested_claim"] = {"public_sdk_ready": True, "runtime_ready": True, "promoted": True}
+            child["claim_text"] = "public SDK ready runtime ready promoted"
+            write_json(pack / "permissions-admin-query-failclosed.json", child)
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("public_sdk_ready_overclaim", reasons)
+        self.assertIn("runtime_ready_overclaim", reasons)
+        self.assertIn("promoted_overclaim", reasons)
+        self.assertIn("promoted_string_overclaim", reasons)
 
     def test_blocks_players_identity_principal_invalidation_policy_child_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

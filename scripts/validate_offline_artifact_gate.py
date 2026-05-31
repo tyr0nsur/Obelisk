@@ -197,6 +197,7 @@ READY_OVERCLAIM_KEYS = {
     "cross_binary_portability_ready",
     "lookup_ready",
     "mutation_ready",
+    "promoted",
     "promote_ready",
     "promotion_ready",
     "public_resource_handle_ready",

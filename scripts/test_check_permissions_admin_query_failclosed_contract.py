@@ -82,7 +82,10 @@ def manifest() -> dict:
             "unknown_authority_result": "unknown",
         },
         "authority_policy": {
+            "recognized_authority_kinds": ["operator-config", "runtime-local"],
+            "allow_capable_authority_kinds": ["runtime-local"],
             "allowed_authority_kinds": ["operator-config", "runtime-local"],
+            "operator_config_allow_capable": False,
             "plugin_supplied_authority_allowed": False,
             "remote_authority_allowed": False,
             "cross_process_authority_allowed": False,
@@ -96,6 +99,13 @@ def manifest() -> dict:
             fail_closed_case("missing_capability"),
             fail_closed_case("rate_limit_exceeded"),
             fail_closed_case("unknown_authority"),
+            fail_closed_case("missing_policy_source"),
+            fail_closed_case("missing_policy_source_generation"),
+            fail_closed_case("policy_source_generation_mismatch"),
+            fail_closed_case("missing_policy_epoch"),
+            fail_closed_case("missing_authority_generation"),
+            fail_closed_case("authority_generation_mismatch"),
+            fail_closed_case("plugin_supplied_provenance"),
         ],
         "negative_surface_exclusions": [
             "permission_groups",
@@ -187,6 +197,27 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "policy_source_id",
             ],
         )
+        self.assertEqual(report["recognized_authority_kinds"], ["operator-config", "runtime-local"])
+        self.assertEqual(report["allow_capable_authority_kinds"], ["runtime-local"])
+        self.assertEqual(
+            report["fail_closed_cases"],
+            [
+                "authority_generation_mismatch",
+                "missing_authority_generation",
+                "missing_capability",
+                "missing_plugin_owner_token",
+                "missing_policy_epoch",
+                "missing_policy_source",
+                "missing_policy_source_generation",
+                "missing_principal_generation",
+                "plugin_supplied_provenance",
+                "policy_source_generation_mismatch",
+                "rate_limit_exceeded",
+                "scope_mismatch",
+                "stale_principal",
+                "unknown_authority",
+            ],
+        )
 
     def test_promote_public_and_runtime_modes_fail_closed(self) -> None:
         for flag, expected in (
@@ -270,16 +301,27 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("allow_without_provenance_allowed_not_false", report["blockers"])
 
     def test_rejects_missing_fail_closed_blocker_cases(self) -> None:
-        payload = manifest()
-        payload["fail_closed_cases"] = [
-            case for case in payload["fail_closed_cases"] if case["case"] != "scope_mismatch"
-        ]
+        for case_name in (
+            "scope_mismatch",
+            "missing_policy_source",
+            "missing_policy_source_generation",
+            "policy_source_generation_mismatch",
+            "missing_policy_epoch",
+            "missing_authority_generation",
+            "authority_generation_mismatch",
+            "plugin_supplied_provenance",
+        ):
+            with self.subTest(case_name=case_name):
+                payload = manifest()
+                payload["fail_closed_cases"] = [
+                    case for case in payload["fail_closed_cases"] if case["case"] != case_name
+                ]
 
-        result = self.run_checker(payload, check=False)
-        report = json.loads(result.stdout)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
 
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("fail_closed_cases_missing_required", report["blockers"])
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("fail_closed_cases_missing_required", report["blockers"])
 
     def test_rejects_non_fail_closed_blocker_case(self) -> None:
         payload = manifest()
@@ -301,6 +343,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         payload["authority_policy"]["plugin_supplied_authority_allowed"] = True
         payload["authority_policy"]["remote_authority_allowed"] = True
         payload["authority_policy"]["cross_process_authority_allowed"] = True
+        payload["authority_policy"]["operator_config_allow_capable"] = True
 
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
@@ -310,6 +353,30 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("authority_plugin_supplied_authority_allowed_not_false", report["blockers"])
         self.assertIn("authority_remote_authority_allowed_not_false", report["blockers"])
         self.assertIn("authority_cross_process_authority_allowed_not_false", report["blockers"])
+        self.assertIn("operator_config_allow_capable_not_false", report["blockers"])
+
+    def test_operator_config_can_be_recognized_but_not_allow_capable(self) -> None:
+        payload = manifest()
+        payload["authority_policy"]["allow_capable_authority_kinds"] = ["runtime-local", "operator-config"]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("authority_allow_capable_kinds_unexpected", report["blockers"])
+        self.assertIn("authority_forbidden_allow_capable_kind", report["blockers"])
+
+    def test_rejects_missing_required_authority_kind_sets(self) -> None:
+        payload = manifest()
+        payload["authority_policy"]["recognized_authority_kinds"].remove("operator-config")
+        payload["authority_policy"]["allow_capable_authority_kinds"].remove("runtime-local")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("authority_recognized_kinds_missing_required", report["blockers"])
+        self.assertIn("authority_allow_capable_kinds_missing_required", report["blockers"])
 
     def test_rejects_forbidden_surface_claims_outside_negative_contexts(self) -> None:
         for key, value in (
@@ -337,6 +404,28 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("forbidden_surface_claim", report["blockers"])
+
+    def test_rejects_nested_readiness_and_promotion_overclaims(self) -> None:
+        payload = manifest()
+        payload["nested_claim"] = {
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "promotion_ready": True,
+            "promoted": True,
+        }
+        payload["claim_text"] = "public SDK ready runtime ready promoted"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_sdk_ready_overclaim", report["blockers"])
+        self.assertIn("runtime_ready_overclaim", report["blockers"])
+        self.assertIn("promotion_ready_overclaim", report["blockers"])
+        self.assertIn("promoted_overclaim", report["blockers"])
+        self.assertIn("public_sdk_ready_string_overclaim", report["blockers"])
+        self.assertIn("runtime_ready_string_overclaim", report["blockers"])
+        self.assertIn("promoted_string_overclaim", report["blockers"])
 
     def test_rejects_ue_pointer_or_raw_coordinate_leakage(self) -> None:
         for key in ("ue_pointer", "fname_index", "object_address"):
