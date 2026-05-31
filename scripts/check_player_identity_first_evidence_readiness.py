@@ -207,8 +207,32 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
 
     has_matching_binary = any(candidate.get("matches_current_binary") is True for candidate in shooter_candidates)
     has_core_like = bool(core_candidates)
-    if has_matching_binary and has_core_like:
+    paired_raw_inputs: list[dict[str, Any]] = []
+    for candidate in shooter_candidates:
+        candidate_path = candidate.get("path")
+        if candidate.get("matches_current_binary") is not True or not isinstance(candidate_path, str):
+            continue
+        binary_path = Path(candidate_path)
+        if binary_path.parent.name != "raw":
+            continue
+        core_path = binary_path.parent / "core"
+        try:
+            if core_path.exists() and core_path.is_file() and not core_path.is_symlink():
+                paired_raw_inputs.append(
+                    {
+                        "run_root": str(binary_path.parent.parent),
+                        "binary": str(binary_path),
+                        "core": str(core_path),
+                    }
+                )
+        except OSError:
+            continue
+
+    has_paired_raw_inputs = bool(paired_raw_inputs)
+    if has_paired_raw_inputs:
         status = "offline_binary_and_core_like_inputs_present"
+    elif has_matching_binary and has_core_like:
+        status = "offline_binary_and_unpaired_core_like_inputs_present"
     elif has_matching_binary:
         status = "offline_binary_present_core_like_input_missing"
     elif shooter_candidates:
@@ -228,9 +252,11 @@ def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, A
         "omitted_shooter_game_server_candidates": omitted_shooter,
         "core_like_candidates": core_candidates,
         "omitted_core_like_candidates": omitted_core,
-        "ready_to_build_core_evidence_pack": has_matching_binary and has_core_like,
+        "paired_raw_inputs": paired_raw_inputs,
+        "ready_to_build_core_evidence_pack": has_paired_raw_inputs,
         "non_claims": [
             "file presence only; core-like filenames are not accepted core evidence packs",
+            "core and ShooterGameServer must be paired under the same player-identity-offline run raw directory before the core evidence pack step is considered runnable",
             "does not read /servidor/ark, attach to processes, execute scanners, or validate runtime state",
         ],
     }
@@ -593,6 +619,18 @@ def next_actionable_blocker(
                 },
                 "next_command_after_input": next_operator_recipe["build_core_evidence_pack"],
             }
+        if offline_status == "offline_binary_and_unpaired_core_like_inputs_present":
+            return {
+                **base,
+                "code": "paired_non_protected_raw_inputs_missing",
+                "blocked_until": "paired_non_protected_shooter_game_server_and_core_dump_input",
+                "why": "the artifact root has a matching ShooterGameServer and a core-like input, but they are not paired under the same player-identity-offline run raw directory",
+                "missing_input_path_patterns": [str(raw_binary_pattern), str(raw_core_pattern)],
+                "next_required_artifact": {
+                    "schema": CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+                    "path_pattern": str(core_manifest_pattern),
+                },
+            }
         if offline_status == "core_like_input_present_offline_binary_missing":
             return {
                 **base,
@@ -671,6 +709,161 @@ def next_actionable_blocker(
         "code": "validate_first_evidence_consume_promote_blocked",
         "blocked_until": "consume_accepted_promote_blocked_first_evidence_artifact",
         "why": "candidate evidence is ready enough for internal planning only; validate it as consume-only and promote-blocked",
+    }
+
+
+def build_operator_next_commands(
+    *,
+    inventory_ready: bool,
+    offline_inputs: dict[str, Any],
+    next_blocker: dict[str, Any],
+    raw_binary_pattern: Path,
+    raw_core_pattern: Path,
+    core_manifest_pattern: Path,
+    reflection_inventory_pattern: Path,
+    next_operator_recipe: dict[str, Any],
+) -> dict[str, Any]:
+    """Compact machine-readable view of the operator recipe.
+
+    This is derived from existing gates only. It does not decide readiness.
+    """
+
+    offline_status = offline_inputs.get("status")
+    matching_binary_path = first_matching_binary_path(offline_inputs)
+    core_like_candidates = offline_inputs.get("core_like_candidates")
+    core_like_present = isinstance(core_like_candidates, list) and bool(core_like_candidates)
+    omitted_core_like = offline_inputs.get("omitted_core_like_candidates")
+    if isinstance(omitted_core_like, int) and omitted_core_like > 0:
+        core_like_present = True
+
+    missing_inputs: list[str] = []
+    if not inventory_ready:
+        if offline_status in (
+            "offline_binary_and_core_like_inputs_missing",
+            "artifact_root_rejected",
+            "artifact_root_missing",
+            "artifact_root_not_directory",
+        ):
+            missing_inputs = [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ]
+        elif offline_status == "offline_binary_present_core_like_input_missing":
+            missing_inputs = ["non_protected_core_dump_input"]
+        elif offline_status == "offline_binary_and_unpaired_core_like_inputs_present":
+            missing_inputs = ["paired_non_protected_raw_binary_and_core"]
+        elif offline_status in (
+            "core_like_input_present_offline_binary_missing",
+            "offline_binary_present_hash_mismatch",
+        ):
+            missing_inputs = ["matching_non_protected_shooter_game_server"]
+
+    ready_to_build_core = (
+        not inventory_ready
+        and offline_inputs.get("ready_to_build_core_evidence_pack") is True
+    )
+    ready_to_plan_admin = (
+        inventory_ready
+        and next_blocker.get("code") == "admin_focal_snapshots_pending"
+    )
+
+    def command_step(
+        *,
+        step_id: str,
+        command: str,
+        ready: bool,
+        blocked_until: str | None,
+        produces_schema: str | None = None,
+        produces_path_pattern: Path | None = None,
+        requires: list[str] | None = None,
+    ) -> dict[str, Any]:
+        if ready:
+            status = "ready"
+        elif blocked_until is None:
+            status = "satisfied"
+        else:
+            status = "blocked"
+        step: dict[str, Any] = {
+            "id": step_id,
+            "status": status,
+            "ready": ready,
+            "blocked_until": blocked_until,
+            "requires": requires or [],
+            "command": command,
+        }
+        if produces_schema and produces_path_pattern:
+            step["produces"] = {
+                "schema": produces_schema,
+                "path_pattern": str(produces_path_pattern),
+            }
+        return step
+
+    sequence = [
+        command_step(
+            step_id="build_core_evidence_pack",
+            ready=ready_to_build_core,
+            blocked_until=None if ready_to_build_core or inventory_ready else next_blocker.get("blocked_until"),
+            requires=[
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+            produces_schema=CORE_DUMP_EVIDENCE_PACK_SCHEMA,
+            produces_path_pattern=core_manifest_pattern,
+            command=next_operator_recipe["build_core_evidence_pack"],
+        ),
+        command_step(
+            step_id="build_reflection_inventory_pack",
+            ready=False,
+            blocked_until=None if inventory_ready else "complete_core_evidence_pack",
+            requires=["complete_core_evidence_pack"],
+            produces_schema=REFLECTION_INVENTORY_PACK_SCHEMA,
+            produces_path_pattern=reflection_inventory_pattern,
+            command=next_operator_recipe["build_reflection_inventory_pack"],
+        ),
+        command_step(
+            step_id="check_reflection_inventory_pack",
+            ready=False,
+            blocked_until=None if inventory_ready else "reflection_inventory_pack_built",
+            requires=["reflection_inventory_pack_built"],
+            command=next_operator_recipe["check_reflection_inventory_pack"],
+        ),
+        command_step(
+            step_id="plan_admin_focal_snapshots",
+            ready=ready_to_plan_admin,
+            blocked_until=None if ready_to_plan_admin else (
+                None if inventory_ready else "accepted_reflection_inventory_pack"
+            ),
+            requires=[
+                "accepted_reflection_inventory_pack",
+                "ShooterPlayerController.ServerListPlayers",
+                "ShooterPlayerController.ServerKickPlayer",
+            ],
+            command=next_operator_recipe["plan_admin_focal_snapshots"],
+        ),
+    ]
+
+    return {
+        "current_blocker": next_blocker.get("code"),
+        "blocked_until": next_blocker.get("blocked_until"),
+        "runnable_now": [step["id"] for step in sequence if step["ready"] is True],
+        "missing_inputs": missing_inputs,
+        "inputs": {
+            "matching_non_protected_shooter_game_server": {
+                "path_pattern": str(raw_binary_pattern),
+                "present": matching_binary_path is not None,
+                "accepted_sha256": EXPECTED_SHOOTERGAME_SHA256,
+                "matched_path": matching_binary_path,
+            },
+            "non_protected_core_dump_input": {
+                "path_pattern": str(raw_core_pattern),
+                "present": core_like_present,
+            },
+        },
+        "sequence": sequence,
+        "non_claims": [
+            "derived recipe only; does not execute commands, read cores, write artifacts, or touch servers",
+            "ready=true means the command is directly runnable under the current report; ready=false is blocked or already satisfied",
+        ],
     }
 
 
@@ -838,6 +1031,16 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         reflection_inventory_pattern=reflection_inventory_pattern,
         next_operator_recipe=next_operator_recipe,
     )
+    operator_next_commands = build_operator_next_commands(
+        inventory_ready=inventory_ready,
+        offline_inputs=offline_inputs,
+        next_blocker=next_blocker,
+        raw_binary_pattern=raw_binary_pattern,
+        raw_core_pattern=raw_core_pattern,
+        core_manifest_pattern=core_manifest_pattern,
+        reflection_inventory_pattern=reflection_inventory_pattern,
+        next_operator_recipe=next_operator_recipe,
+    )
 
     return {
         "schema": REPORT_SCHEMA,
@@ -865,6 +1068,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             },
         ],
         "next_actionable_blocker": next_blocker,
+        "operator_next_commands": operator_next_commands,
         "next_operator_recipe": next_operator_recipe,
         "artifact_chain": {
             "core_evidence_pack_required": True,

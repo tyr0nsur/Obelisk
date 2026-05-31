@@ -2854,7 +2854,6 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (foundation, "Add process-local timers"),
             (foundation, "Keep passive copied chat parsing experimental and plugin-local only"),
             (foundation, "Keep copied policy auditors experimental"),
-            (foundation, "Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are\nrelease-supported seeds after the RC"),
             (foundation, "Copied chat parsers and copied policy auditors\nmay demonstrate patterns, but they remain experimental"),
             (matrix, "## Post-v0.1 Creator Ladder"),
             (matrix, "Release-supported seed lanes"),
@@ -6087,6 +6086,55 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     )
 
         self.assertEqual(offenders, [])
+
+    def test_plugin_hub_descriptor_catalog_seed_wording_stays_scaffolded_not_prebuilt(self) -> None:
+        contributor_path = (
+            REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md"
+        ).read_text(encoding="utf-8")
+        foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(
+            encoding="utf-8"
+        )
+        minimal_readme = (
+            REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md"
+        ).read_text(encoding="utf-8")
+        timer_readme = (
+            REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md"
+        ).read_text(encoding="utf-8")
+
+        for text, required in (
+            (
+                contributor_path,
+                "copy `examples/sdk_minimal_plugin` for descriptor/catalog readers, then add only",
+            ),
+            (
+                contributor_path,
+                "Use `plugins/oDescriptorCatalog` as a behavior reference for descriptor validation and\nbounded logging, not as the external package scaffold",
+            ),
+            (
+                contributor_path,
+                "Do not start from `plugins/` when writing the minimum external package",
+            ),
+            (
+                foundation,
+                "First-party runtime reference plugins live under\n`plugins/` and may use repository-local build/test wiring",
+            ),
+            (
+                foundation,
+                "This list names ABI primitives, not Plugin Hub module tiers",
+            ),
+        ):
+            with self.subTest(required=required):
+                self.assertIn(normalized(required), normalized(text))
+
+        combined_examples = f"{minimal_readme}\n{timer_readme}"
+        for forbidden in (
+            "Descriptor Catalog SDK Plugin",
+            "DescribeResourceKind",
+            "DescribeGameplayPolicyEventKind",
+            "oDescriptorCatalog",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, combined_examples)
 
     def test_mission_plugin_hub_boundary_stays_planning_only(self) -> None:
         foundation = (REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md").read_text(

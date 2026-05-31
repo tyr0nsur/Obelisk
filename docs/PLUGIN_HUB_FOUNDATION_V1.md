@@ -178,7 +178,7 @@ explicit:
 Release-supported seeds:
 
 - lifecycle, config, and logging examples;
-- descriptor/catalog readers;
+- descriptor/catalog readers scaffolded from the minimal installed-SDK example;
 - process-local timer utilities.
 
 Experimental pattern examples only:
@@ -189,11 +189,12 @@ Experimental pattern examples only:
   a command SDK; any routing/parsing stays plugin-local only, without permissions,
   send-chat, replies, or a public command SDK/router.
 
-Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are
-release-supported seeds after the RC. Copied chat parsers and copied policy auditors
-may demonstrate patterns, but they remain experimental and are not promises for complete
-economy, permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission,
-transfer, storage/database, webhook, or structure modules.
+Only lifecycle/config/logging examples, descriptor/catalog readers scaffolded from the
+minimal installed-SDK example, and process-local timer examples are release-supported
+seeds after the RC. Copied chat parsers and copied policy auditors
+may demonstrate patterns, but they remain experimental and are not promises for complete economy,
+permissions, homes, kits, shops, RCON, inventory, item, dino, tribe, mission, transfer,
+storage/database, webhook, or structure modules.
 
 ## Fastest Honest Creator Path
 

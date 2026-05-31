@@ -221,6 +221,36 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             payload["next_actionable_blocker"]["next_required_artifact"]["schema"],
             "obelisk.core-dump-evidence-pack.v1",
         )
+        operator_commands = payload["operator_next_commands"]
+        self.assertEqual(operator_commands["current_blocker"], "offline_binary_and_core_input_missing")
+        self.assertEqual(operator_commands["blocked_until"], "non_protected_offline_binary_and_core_inputs")
+        self.assertEqual(operator_commands["runnable_now"], [])
+        self.assertEqual(
+            operator_commands["missing_inputs"],
+            [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+        )
+        self.assertFalse(operator_commands["inputs"]["matching_non_protected_shooter_game_server"]["present"])
+        self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
+        self.assertEqual(
+            [step["id"] for step in operator_commands["sequence"]],
+            [
+                "build_core_evidence_pack",
+                "build_reflection_inventory_pack",
+                "check_reflection_inventory_pack",
+                "plan_admin_focal_snapshots",
+            ],
+        )
+        self.assertFalse(operator_commands["sequence"][0]["ready"])
+        self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
+        self.assertEqual(
+            operator_commands["sequence"][0]["blocked_until"],
+            "non_protected_offline_binary_and_core_inputs",
+        )
+        self.assertIn("build_core_dump_evidence_pack.py", operator_commands["sequence"][0]["command"])
+        self.assertIn("does not execute commands", " ".join(operator_commands["non_claims"]))
         self.assertIn("does not touch servers", " ".join(payload["non_claims"]))
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
 
@@ -308,6 +338,32 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(offline_inputs["ready_to_build_core_evidence_pack"])
         self.assertIn("file presence only", " ".join(offline_inputs["non_claims"]))
 
+    def test_offline_input_diagnosis_requires_paired_raw_binary_and_core(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            raw_dir = root / "player-identity-offline-test" / "raw"
+            raw_dir.mkdir(parents=True)
+            binary = raw_dir / "ShooterGameServer"
+            binary.write_bytes(b"server")
+            (root / "other" / "raw").mkdir(parents=True)
+            (root / "other" / "raw" / "core").write_bytes(b"core")
+
+            with mock.patch.object(checker, "sha256_file", return_value=checker.EXPECTED_SHOOTERGAME_SHA256):
+                offline_inputs = checker.bounded_artifact_file_scan(root)
+
+            self.assertEqual(offline_inputs["status"], "offline_binary_and_unpaired_core_like_inputs_present")
+            self.assertFalse(offline_inputs["ready_to_build_core_evidence_pack"])
+            self.assertEqual(offline_inputs["paired_raw_inputs"], [])
+
+            (raw_dir / "core").write_bytes(b"paired-core")
+            with mock.patch.object(checker, "sha256_file", return_value=checker.EXPECTED_SHOOTERGAME_SHA256):
+                paired_inputs = checker.bounded_artifact_file_scan(root)
+
+            self.assertEqual(paired_inputs["status"], "offline_binary_and_core_like_inputs_present")
+            self.assertTrue(paired_inputs["ready_to_build_core_evidence_pack"])
+            self.assertEqual(paired_inputs["paired_raw_inputs"][0]["binary"], str(binary))
+            self.assertEqual(paired_inputs["paired_raw_inputs"][0]["core"], str(raw_dir / "core"))
+
     def test_next_actionable_blocker_prioritizes_missing_core_input_when_binary_matches(self) -> None:
         blocker = checker.next_actionable_blocker(
             inventory_ready=False,
@@ -329,6 +385,8 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             reflection_inventory_pattern=Path("/tmp/artifacts/reflection-inventory-pack/manifest.json"),
             next_operator_recipe={
                 "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
+                "build_reflection_inventory_pack": "python3 scripts/build_reflection_inventory_pack.py ...",
+                "check_reflection_inventory_pack": "python3 scripts/check_reflection_inventory_pack_readiness.py ...",
                 "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
             },
         )
@@ -342,6 +400,101 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(blocker["promotion_ready"])
         self.assertFalse(blocker["public_sdk_ready"])
         self.assertFalse(blocker["runtime_ready"])
+
+        operator_commands = checker.build_operator_next_commands(
+            inventory_ready=False,
+            offline_inputs={
+                "status": "offline_binary_present_core_like_input_missing",
+                "ready_to_build_core_evidence_pack": False,
+                "shooter_game_server_candidates": [
+                    {
+                        "path": "/tmp/artifacts/raw/ShooterGameServer",
+                        "matches_current_binary": True,
+                    }
+                ],
+                "core_like_candidates": [],
+            },
+            next_blocker=blocker,
+            raw_binary_pattern=Path("/tmp/artifacts/raw/ShooterGameServer"),
+            raw_core_pattern=Path("/tmp/artifacts/raw/core"),
+            core_manifest_pattern=Path("/tmp/artifacts/core-evidence-pack/manifest.json"),
+            reflection_inventory_pattern=Path("/tmp/artifacts/reflection-inventory-pack/manifest.json"),
+            next_operator_recipe={
+                "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
+                "build_reflection_inventory_pack": "python3 scripts/build_reflection_inventory_pack.py ...",
+                "check_reflection_inventory_pack": "python3 scripts/check_reflection_inventory_pack_readiness.py ...",
+                "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
+            },
+        )
+        self.assertEqual(operator_commands["current_blocker"], "non_protected_core_input_missing")
+        self.assertEqual(operator_commands["missing_inputs"], ["non_protected_core_dump_input"])
+        self.assertEqual(operator_commands["runnable_now"], [])
+        self.assertTrue(operator_commands["inputs"]["matching_non_protected_shooter_game_server"]["present"])
+        self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
+        self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
+        self.assertEqual(
+            operator_commands["sequence"][0]["blocked_until"],
+            "non_protected_core_dump_input",
+        )
+
+    def test_next_actionable_blocker_reports_unpaired_core_and_binary(self) -> None:
+        blocker = checker.next_actionable_blocker(
+            inventory_ready=False,
+            inventory_payload_ready=False,
+            inventory_chain={"ready": False, "blockers": [], "accepted_manifest": None},
+            downstream_blockers=[],
+            offline_inputs={
+                "status": "offline_binary_and_unpaired_core_like_inputs_present",
+                "ready_to_build_core_evidence_pack": False,
+                "shooter_game_server_candidates": [
+                    {
+                        "path": "/tmp/artifacts/player-identity-offline-a/raw/ShooterGameServer",
+                        "matches_current_binary": True,
+                    }
+                ],
+                "core_like_candidates": [{"path": "/tmp/artifacts/other/raw/core"}],
+            },
+            raw_binary_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/raw/ShooterGameServer"),
+            raw_core_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/raw/core"),
+            core_manifest_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/core-evidence-pack/manifest.json"),
+            reflection_inventory_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"),
+            next_operator_recipe={
+                "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
+                "build_reflection_inventory_pack": "python3 scripts/build_reflection_inventory_pack.py ...",
+                "check_reflection_inventory_pack": "python3 scripts/check_reflection_inventory_pack_readiness.py ...",
+                "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
+            },
+        )
+        self.assertEqual(blocker["code"], "paired_non_protected_raw_inputs_missing")
+        self.assertEqual(blocker["blocked_until"], "paired_non_protected_shooter_game_server_and_core_dump_input")
+
+        operator_commands = checker.build_operator_next_commands(
+            inventory_ready=False,
+            offline_inputs={
+                "status": "offline_binary_and_unpaired_core_like_inputs_present",
+                "ready_to_build_core_evidence_pack": False,
+                "shooter_game_server_candidates": [
+                    {
+                        "path": "/tmp/artifacts/player-identity-offline-a/raw/ShooterGameServer",
+                        "matches_current_binary": True,
+                    }
+                ],
+                "core_like_candidates": [{"path": "/tmp/artifacts/other/raw/core"}],
+            },
+            next_blocker=blocker,
+            raw_binary_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/raw/ShooterGameServer"),
+            raw_core_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/raw/core"),
+            core_manifest_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/core-evidence-pack/manifest.json"),
+            reflection_inventory_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"),
+            next_operator_recipe={
+                "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
+                "build_reflection_inventory_pack": "python3 scripts/build_reflection_inventory_pack.py ...",
+                "check_reflection_inventory_pack": "python3 scripts/check_reflection_inventory_pack_readiness.py ...",
+                "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
+            },
+        )
+        self.assertEqual(operator_commands["missing_inputs"], ["paired_non_protected_raw_binary_and_core"])
+        self.assertEqual(operator_commands["runnable_now"], [])
 
     def test_accepted_inventory_still_fails_closed_on_malformed_coverage_payload(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
