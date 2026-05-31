@@ -438,6 +438,22 @@
           "docs/research/2026-05-30-player-identity-lifecycle-plan.md"
         ]
       },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "accepted non-protected complete core evidence pack plus reviewed UFunction reflection-inventory pack",
+          "sanitized ServerListPlayers and ServerKickPlayer snapshots",
+          "login/logout lifecycle anchors",
+          "principal privacy, invalidation, and cross-instance semantics",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.player_identity.v1 as excluded",
+          "the v1 release statement states that no player identity, principal, player lookup, permission principal, economy identity, or send-chat identity API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
+      },
       "blockers": [
         "No reviewed non-protected complete core evidence pack plus UFunction reflection-inventory pack accepted for the missing admin snapshots.",
         "Missing sanitized ServerListPlayers snapshot.",
@@ -518,6 +534,21 @@
           "structure-nonpin-copied-scalar-policy-slice"
         ]
       },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "narrow copied C ABI surface for each promoted structure audit unit",
+          "promoted identity, ownership, placement/build-policy, and privacy semantics needed by that unit",
+          "runtime lifecycle and plugin-owner cleanup coverage",
+          "append-only POD ABI design with capability gates and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.structure_census.v1 as excluded",
+          "the v1 release statement states that no StructureEvents SDK, structure census, structure identity, structure lookup, build placement policy, no-collision policy, or ownership lookup API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
+      },
       "blockers": [
         "No public Structure SDK.",
         "No structure/player/base identity.",
@@ -557,6 +588,21 @@
           "transfer-baccept-only-policy-slice",
           "buff-compact-intake",
           "tribe-compact-intake"
+        ]
+      },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "each mission, transfer, dino, tribe, and buff/status audit unit promoted as its own narrow copied C ABI surface",
+          "reviewed evidence for exposed gameplay data and explicit privacy/redaction boundaries",
+          "no identity, lookup, mutation, return override, or raw UE internals unless separately promoted",
+          "append-only POD ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.mission_transfer_dino_tribe.v1 as excluded",
+          "the v1 release statement states that no Mission SDK, Transfer SDK, Dino SDK, Tribe SDK, Buff/status SDK, teleport/spawn API, ownership lookup, or cross-map correlation API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
       },
       "blockers": [
@@ -784,7 +830,13 @@
         "ArkApi vtables",
         "MSVC layouts",
         "Windows ABI compatibility",
-        "copied ArkServerApi/AseApi code"
+        "copied ArkServerApi/AseApi code",
+        "ArkApi behavior parity",
+        "ArkApi command parsers",
+        "ArkApi return semantics",
+        "ArkApi constants and schemas",
+        "ArkApi control flow",
+        "source-derived ArkApi implementations"
       ]
     },
     {

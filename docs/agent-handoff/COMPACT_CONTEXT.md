@@ -41,8 +41,9 @@ priorities, and do not use history files as the active source of truth.
 - `ArkServerApi/AseApi` may be used only as a names and demand dictionary for familiar
   ArkApi-style plugin concepts. Do not import offsets, vtables, layouts, `.lib`
   artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
-  wrappers, raw UE pointer APIs, or algorithmic implementations; all access must be
-  rebuilt through Obelisk reflection/ProcessEvent copied-data evidence.
+  wrappers, raw UE pointer APIs, constants, schemas, control flow, command parsers,
+  return semantics, or source-derived implementations; all access must be rebuilt through
+  Obelisk reflection/ProcessEvent copied-data evidence.
 - Local `NextGenPlugins` clones are names and demand dictionaries only, not porting or
   copying sources. Keep clones out of the repo and do not copy code, constants, schemas,
   control flow, command parsers, return constants, or implementations.
@@ -235,7 +236,11 @@ priorities, and do not use history files as the active source of truth.
   `scripts/plan_ufunction_focal_snapshots.py` consumes an already reviewed
   reflection-inventory pack plus exact targets/target files and emits candidate-only
   planned commands without rereading a core, executing commands, writing snapshots, or
-  promoting target sets/runtime/API scope.
+  promoting target sets/runtime/API scope. For player identity, first review a complete
+  reflection inventory pack with full 12-target `players-identity-lifecycle-intake`
+  coverage, then plan only the exact `ShooterPlayerController.ServerListPlayers` and
+  `ShooterPlayerController.ServerKickPlayer` targets; do not use the full target set to
+  emit focal plans.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, with only a test-only internal dispatcher/helper and no hook/runtime

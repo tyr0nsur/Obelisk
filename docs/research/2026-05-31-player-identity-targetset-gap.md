@@ -112,7 +112,6 @@ python3 scripts/build_reflection_inventory_pack.py \
   --evidence-pack-manifest <approved-complete-core-evidence-pack>/manifest.json \
   --include-functions \
   --target-set players-identity-lifecycle-intake \
-  --evidence-obelisk-commit <reviewed-obelisk-id> \
   --output-dir <ignored-non-protected-output>/players-identity-reflection-inventory
 ```
 

@@ -1227,6 +1227,39 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 with self.subTest(non_public_surface=surface["id"]):
                     self.assertEqual(surface.get("public_contract", []), [])
 
+    def test_v1_sdk_completion_blockers_have_explicit_contract_outcome(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        post_or_excluded = set(manifest["post_v1_or_excluded_surfaces"])
+
+        for surface_id in manifest["v1_sdk_completion_blockers"]:
+            surface = surfaces[surface_id]
+            status = surface["status"]
+            with self.subTest(surface=surface_id, status=status):
+                if status == "promoted":
+                    self.assertTrue(surface.get("public_contract"))
+                    self.assertTrue(surface.get("evidence"))
+                    continue
+
+                self.assertEqual(surface.get("public_contract", []), [])
+                if status in {"post-v1", "excluded"}:
+                    self.assertIn(surface_id, post_or_excluded)
+                    if status == "post-v1":
+                        self.assertTrue(surface.get("blockers"))
+                    self.assertTrue(surface.get("exclusions"))
+                    continue
+
+                self.assertEqual(surface.get("support_tier"), "blocked")
+                decision = surface.get("v1_decision_contract")
+                self.assertIsInstance(decision, dict)
+                self.assertEqual(
+                    decision.get("current_decision"),
+                    "blocked_until_promoted_or_explicitly_excluded",
+                )
+                self.assertTrue(decision.get("must_remain_without_public_contract_until_promotion"))
+                self.assertTrue(decision.get("promotion_requires"))
+                self.assertTrue(decision.get("exclusion_requires"))
+
     def test_public_sdk_lifecycle_surface_declares_init_scope_ownership(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -5977,7 +6010,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "--obelisk-commit \"${COMMIT}\"",
             "--fname-root-slot verified_fname_root_slot=0x5956f30",
             "--gobjects-candidate gobjects=0x595b7e0",
-            "--ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+            "`--ark-binary-sha256` is only an optional mismatch check in\nthis mode, not a required argument",
             "Do not use `--skip-core-sha256`",
             "do not use `--allow-partial-gdb`",
             "at least one real session-start anchor and one real\nsession-end anchor",

@@ -219,6 +219,21 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("rejected runtime object samples", reversing_skill)
         self.assertIn("runtime serial reuse/wraparound semantics", reversing_skill)
 
+    def test_player_identity_focal_plans_require_exact_targets(self) -> None:
+        current = normalized(CURRENT.read_text(encoding="utf-8"))
+        compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))
+        obsolete_plan = (
+            "scripts/plan_ufunction_focal_snapshots.py "
+            "--target-set players-identity-lifecycle-intake"
+        )
+
+        for text in (current, compact):
+            self.assertIn("12-target `players-identity-lifecycle-intake`", text)
+            self.assertIn("ShooterPlayerController.ServerListPlayers", text)
+            self.assertIn("ShooterPlayerController.ServerKickPlayer", text)
+            self.assertIn("exact", text)
+            self.assertNotIn(obsolete_plan, text)
+
     def test_learning_skill_keeps_adopted_knowledge_compact(self) -> None:
         skill = (REPO_ROOT / "agent-skills/obelisk-continuous-learning/SKILL.md").read_text(
             encoding="utf-8"

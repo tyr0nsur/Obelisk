@@ -38,6 +38,11 @@ def parse_args() -> argparse.Namespace:
         default=REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots",
         help="Sanitized UFunction snapshot root used for fixture coverage and first-evidence build.",
     )
+    parser.add_argument(
+        "--candidate-root",
+        type=Path,
+        help="Optional distinct sanitized second-source snapshot root for layout comparison.",
+    )
     return parser.parse_args()
 
 
@@ -192,6 +197,16 @@ def second_source_missing_count(coverage_payload: dict[str, Any] | None) -> int 
     return value if isinstance(value, int) else None
 
 
+def second_source_total(coverage_payload: dict[str, Any] | None, key: str) -> int | None:
+    if not isinstance(coverage_payload, dict):
+        return None
+    totals = coverage_payload.get("totals")
+    if not isinstance(totals, dict):
+        return None
+    value = totals.get(key)
+    return value if isinstance(value, int) else None
+
+
 def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(first_evidence_payload, dict):
         return {
@@ -238,17 +253,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             str(args.artifact_root),
         ]
     )
-    coverage_result, coverage_payload = run_json_command(
-        [
-            str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
-            "--base-root",
-            str(args.snapshot_root),
-            "--target-set",
-            PLAYER_IDENTITY_TARGET_SET,
-            "--readiness-report",
-            "--json",
-        ]
-    )
+    coverage_command = [
+        str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
+        "--base-root",
+        str(args.snapshot_root),
+        "--target-set",
+        PLAYER_IDENTITY_TARGET_SET,
+        "--readiness-report",
+        "--json",
+    ]
+    if args.candidate_root:
+        coverage_command.extend(["--candidate-root", str(args.candidate_root)])
+    coverage_result, coverage_payload = run_json_command(coverage_command)
     first_evidence_result, first_evidence_payload = run_json_command(
         [
             str(SCRIPT_DIR / "build_redacted_ufunction_signatures.py"),
@@ -265,6 +281,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     coverage_comparable = coverage_totals.get("comparable")
     coverage_blocked = coverage_totals.get("blocked")
     second_source_missing = second_source_missing_count(coverage_payload)
+    second_source_inconclusive = second_source_total(coverage_payload, "second_source_inconclusive")
+    second_source_rejected = second_source_total(coverage_payload, "second_source_rejected")
     first_evidence_ready = first_evidence_result.returncode == 0 and first_evidence_payload is not None
     missing_targets = parse_missing_required_targets(first_evidence_result.stderr)
     lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
@@ -280,6 +298,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append("fixture_coverage_incomplete")
     if second_source_missing:
         blockers.append("second_source_evidence_missing")
+    if second_source_inconclusive or second_source_rejected:
+        blockers.append("second_source_evidence_not_accepted")
     if not first_evidence_ready:
         blockers.append("players_identity_first_evidence_not_buildable")
     if not lifecycle_ready:
@@ -301,6 +321,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "ready": not blockers,
         "artifact_root": str(args.artifact_root),
         "snapshot_root": str(args.snapshot_root),
+        "candidate_root": str(args.candidate_root) if args.candidate_root else None,
         "target_set": PLAYER_IDENTITY_TARGET_SET,
         "blockers": blockers,
         "reflection_inventory": {
@@ -327,6 +348,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             ),
             "second_source_status": coverage_payload.get("second_source_status") if coverage_payload else None,
             "second_source_missing": second_source_missing,
+            "second_source_inconclusive": second_source_inconclusive,
+            "second_source_rejected": second_source_rejected,
         },
         "first_evidence": {
             "returncode": first_evidence_result.returncode,

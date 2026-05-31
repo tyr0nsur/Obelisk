@@ -262,9 +262,14 @@ generate sanitized candidate snapshots for those two admin surfaces without a li
 but current live-ops policy still requires an explicit approved offline `/servidor/ark`
 workspace action before reading or writing that path. Those snapshots would close the
 admin-surface fixture gap only; they would not establish login/logout lifecycle anchors.
-For a reviewed inventory pack, `scripts/plan_ufunction_focal_snapshots.py --target-set
-players-identity-lifecycle-intake --evidence-obelisk-commit <reviewed-id>` now emits the
-exact candidate-only snapshot commands without rereading a core or relying on Git state.
+For a reviewed inventory pack, `scripts/plan_ufunction_focal_snapshots.py` must be called
+with the two exact admin targets:
+`--target ShooterPlayerController.ServerListPlayers` and
+`--target ShooterPlayerController.ServerKickPlayer`. The planner intentionally rejects
+`--target-set players-identity-lifecycle-intake` for focal snapshot planning so the full
+12-target coverage stays in the reflection inventory pack and does not expand into
+unneeded snapshot commands. The emitted commands remain candidate-only and do not reread a
+core or rely on Git state.
 
 Demand review of local plugin source dictionaries reinforces priority rather than
 promotion: plugin authors expect player identity, tribe identity, command/RCON registries,

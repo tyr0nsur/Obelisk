@@ -53,6 +53,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["fixture_coverage"]["comparable"], 10)
         self.assertEqual(payload["fixture_coverage"]["blocked"], 2)
         self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 10)
+        self.assertEqual(payload["fixture_coverage"]["second_source_inconclusive"], 0)
+        self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)
+        self.assertIsNone(payload["candidate_root"])
         self.assertEqual(
             payload["first_evidence"]["missing_required_targets"],
             [
@@ -76,6 +79,31 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertIn("does not touch servers", " ".join(payload["non_claims"]))
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
+
+    def test_candidate_root_reports_second_source_not_accepted_separately_from_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_checker(
+                [
+                    "--artifact-root",
+                    temp_dir,
+                    "--candidate-root",
+                    str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
+                ],
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(
+            payload["candidate_root"],
+            str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"),
+        )
+        self.assertNotIn("second_source_evidence_missing", payload["blockers"])
+        self.assertIn("second_source_evidence_not_accepted", payload["blockers"])
+        self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 0)
+        self.assertEqual(payload["fixture_coverage"]["second_source_inconclusive"], 10)
+        self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)
+        self.assertEqual(payload["fixture_coverage"]["second_source_status"], "compared")
 
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

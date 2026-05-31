@@ -99,7 +99,8 @@ Own these areas:
 - ArkServerApi/AseApi is reference material only: use it as a names and demand
   dictionary for familiar Unreal/ARK plugin concepts, then verify every
   `UFunction`/`UProperty` through Obelisk reflection evidence. Never import its offsets,
-  vtables, struct layouts, `.lib` linkage, MSVC conventions, or direct
+  vtables, struct layouts, `.lib` linkage, MSVC conventions, constants, schemas, control
+  flow, command parsers, return semantics, source-derived implementations, or direct
   field/native-call wrappers into Obelisk.
 - Prefer reflection-backed decoding over raw memory scanning in plugins.
 - Do not scan arbitrary params on every `ProcessEvent` in live servers.

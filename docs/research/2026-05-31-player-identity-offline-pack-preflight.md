@@ -24,6 +24,17 @@ This wrapper combines reflection-inventory readiness, committed fixture coverage
 the fail-closed `obelisk.players-identity-first-evidence.v1` build attempt. It writes no
 artifacts, touches no servers, and must keep reporting candidate-only/planning-only
 non-claims even if the first evidence pack becomes buildable.
+When a distinct sanitized second-source root exists, pass it explicitly:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_first_evidence_readiness.py \
+  --artifact-root /home/flowcommunity-ark/obelisk-artifacts \
+  --candidate-root <distinct-sanitized-second-source-root>
+```
+
+The wrapper reports missing second-source evidence separately from compared-but-rejected
+or compared-but-inconclusive second-source evidence, so a present but unusable candidate
+root cannot be mistaken for accepted layout evidence.
 
 The checker is read-only and emits
 `schema=obelisk.reflection-inventory-pack-readiness-check.v1`. It fails closed with
@@ -183,7 +194,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
   --evidence-pack-manifest "${ROOT}/core-evidence-pack/manifest.json" \
   --evidence-pack-fname-root-label verified_fname_root_slot \
   --evidence-pack-gobjects-label gobjects \
-  --ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
   --target-set players-identity-lifecycle-intake \
   --include-functions \
   --output-dir "${ROOT}/reflection-inventory-pack"
@@ -193,8 +203,11 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_inventory_pack_readin
 ```
 
 This direct staged-input route requires a matching offline `ShooterGameServer` and ELF
-core file. Do not use `--skip-core-sha256`, do not use `--allow-partial-gdb`, and do not
-reuse `0x5956f30` or `0x595b7e0` for a different ARK binary hash without new evidence.
+core file. `build_reflection_inventory_pack.py` derives `binary.sha256` from the complete
+core evidence-pack manifest; `--ark-binary-sha256` is only an optional mismatch check in
+this mode, not a required argument. Do not use `--skip-core-sha256`, do not use
+`--allow-partial-gdb`, and do not reuse `0x5956f30` or `0x595b7e0` for a different ARK
+binary hash without new evidence.
 
 This command shape is still offline and candidate-only. It must not use direct or
 symlinked `/servidor/ark` paths without a current scoped approval.
@@ -202,8 +215,9 @@ symlinked `/servidor/ark` paths without a current scoped approval.
 Even after the two missing admin snapshots exist, the combined preflight must still stay
 blocked until a distinct second-source snapshot root is accepted and session-start plus
 session-end lifecycle anchors are accepted. The wrapper reports those as
-`second_source_evidence_missing` and `accepted_lifecycle_anchors_missing` so fixture
-coverage cannot be mistaken for player identity readiness.
+`second_source_evidence_missing`, `second_source_evidence_not_accepted`, and
+`accepted_lifecycle_anchors_missing` as appropriate, so fixture coverage cannot be
+mistaken for player identity readiness.
 
 ## Boundary
 
