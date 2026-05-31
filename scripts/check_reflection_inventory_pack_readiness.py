@@ -36,6 +36,8 @@ REDACTED_FUNCTION_KEYS = {
     "parms_size",
 }
 MANIFEST_FILENAMES = {"manifest.json", "artifact-pack.manifest.json"}
+MAX_REASON_ITEMS = 20
+MAX_INVENTORY_ROW_BLOCKERS = 20
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,6 +55,28 @@ def parse_args() -> argparse.Namespace:
 
 def reason(code: str, **fields: object) -> dict[str, object]:
     return {"reason": code, **fields}
+
+
+def bounded_list_fields(field: str, values: list[Any]) -> dict[str, object]:
+    if len(values) <= MAX_REASON_ITEMS:
+        return {field: values}
+    return {
+        field: values[:MAX_REASON_ITEMS],
+        f"{field}_count": len(values),
+        f"omitted_{field}_count": len(values) - MAX_REASON_ITEMS,
+    }
+
+
+def append_inventory_row_blocker(
+    blockers: list[dict[str, object]],
+    entry: dict[str, object],
+    emitted_count: int,
+    omitted_count: int,
+) -> tuple[int, int]:
+    if emitted_count < MAX_INVENTORY_ROW_BLOCKERS:
+        blockers.append(entry)
+        return emitted_count + 1, omitted_count
+    return emitted_count, omitted_count + 1
 
 
 def load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
@@ -133,33 +157,63 @@ def load_inventory_targets(path: Path) -> tuple[set[str], list[dict[str, object]
     targets: set[str] = set()
     seen: set[str] = set()
     duplicates: set[str] = set()
+    row_blockers_emitted = 0
+    row_blockers_omitted = 0
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
-            blockers.append(reason("missing_ufunction_inventory", path=str(path), detail=f"functions[{index}]_not_object"))
+            row_blockers_emitted, row_blockers_omitted = append_inventory_row_blocker(
+                blockers,
+                reason("missing_ufunction_inventory", path=str(path), detail=f"functions[{index}]_not_object"),
+                row_blockers_emitted,
+                row_blockers_omitted,
+            )
             continue
         extra = sorted(set(row) - REDACTED_FUNCTION_KEYS)
         missing = sorted(REDACTED_FUNCTION_KEYS - set(row))
         if extra or missing:
-            blockers.append(
+            row_blockers_emitted, row_blockers_omitted = append_inventory_row_blocker(
+                blockers,
                 reason(
                     "missing_ufunction_inventory",
                     path=str(path),
                     detail=f"functions[{index}]_redaction_schema_mismatch",
-                    extra_keys=extra,
-                    missing_keys=missing,
-                )
+                    **bounded_list_fields("extra_keys", extra),
+                    **bounded_list_fields("missing_keys", missing),
+                ),
+                row_blockers_emitted,
+                row_blockers_omitted,
             )
             continue
         target = target_from_row(row)
         if target is None:
-            blockers.append(reason("missing_ufunction_inventory", path=str(path), detail=f"functions[{index}]_missing_target_identity"))
+            row_blockers_emitted, row_blockers_omitted = append_inventory_row_blocker(
+                blockers,
+                reason("missing_ufunction_inventory", path=str(path), detail=f"functions[{index}]_missing_target_identity"),
+                row_blockers_emitted,
+                row_blockers_omitted,
+            )
             continue
         if target in seen:
             duplicates.add(target)
         seen.add(target)
         targets.add(target)
+    if row_blockers_omitted:
+        blockers.append(
+            reason(
+                "missing_ufunction_inventory",
+                path=str(path),
+                detail="inventory_row_errors_omitted",
+                omitted_count=row_blockers_omitted,
+            )
+        )
     if duplicates:
-        blockers.append(reason("wrong_target_scope", path=str(path), duplicate_targets=sorted(duplicates)))
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(path),
+                **bounded_list_fields("duplicate_targets", sorted(duplicates)),
+            )
+        )
     return targets, blockers
 
 
@@ -271,7 +325,7 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
     elif manifest_paths:
         reasons = [
             reason("missing_reflection_inventory_pack", root=str(root)),
-            reason("schema_mismatch", scanned_paths=schema_mismatch_paths),
+            reason("schema_mismatch", **bounded_list_fields("scanned_paths", schema_mismatch_paths)),
         ]
     else:
         reasons = [reason("missing_reflection_inventory_pack", root=str(root))]

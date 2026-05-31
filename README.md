@@ -19,7 +19,7 @@ adapters, not the core product surface.
 
 ## Status
 
-Stable baseline:
+Validated core baseline; not a production-stable v1.0 or complete SDK claim:
 
 - `LD_PRELOAD` bootstrap for the current debug harness.
 - Absolute x64 `UObject::ProcessEvent` hook with target validation.

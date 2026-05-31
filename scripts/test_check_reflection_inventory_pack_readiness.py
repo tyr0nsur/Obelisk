@@ -151,6 +151,32 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         missing = [reason for reason in payload["reasons"] if reason["reason"] == "missing_target"]
         self.assertEqual(missing[0]["targets"], ["ShooterPlayerController.ServerKickPlayer"])
 
+    def test_inventory_row_errors_are_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            row = {f"unexpected_{index:02d}": index for index in range(25)}
+            self.write_pack(root / "pack", functions=[row.copy() for _ in range(25)])
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        row_errors = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "missing_ufunction_inventory"
+            and str(reason.get("detail", "")).startswith("functions[")
+        ]
+        omitted = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "missing_ufunction_inventory"
+            and reason.get("detail") == "inventory_row_errors_omitted"
+        ]
+        self.assertEqual(len(row_errors), 20)
+        self.assertEqual(row_errors[0]["extra_keys_count"], 25)
+        self.assertEqual(row_errors[0]["omitted_extra_keys_count"], 5)
+        self.assertEqual(omitted[0]["omitted_count"], 5)
+
     def test_protected_root_is_rejected_without_scanning(self) -> None:
         result = self.run_checker(["--root", "/servidor/ark/live"], check=False)
 

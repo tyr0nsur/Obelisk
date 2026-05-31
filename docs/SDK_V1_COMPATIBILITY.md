@@ -109,6 +109,19 @@ as admin-mutation-not-public-identity, and fails closed until missing sanitized
 `ServerListPlayers` and `ServerKickPlayer` snapshots, accepted lifecycle anchors,
 principal privacy/invalidation semantics, and independent second-source evidence exist.
 
+The shortest useful route toward a complete v1 SDK is:
+
+1. Promote the smallest copied `player_identity`/principal lifecycle contract that can
+   support privacy, invalidation, and multi-instance semantics.
+2. Build a fail-closed permissions/admin query layer on that principal model.
+3. Promote commands/replies as a new owner-token copied callback/response surface, not as
+   a parser-only extension to `ChatMessageEvent`.
+4. Advance structure census and inventory/items through narrow copied APIs, or explicitly
+   exclude them from the first v1 support statement.
+
+This route keeps chat, gameplay-policy slices, descriptors, and timers as useful seed
+surfaces while preventing them from being mistaken for a complete ArkApi-style SDK.
+
 Inventory/items mutation, structure ownership/placement/build policy/no-collision,
 dino/tribe/mission/transfer/buff module SDKs, RCON, database/storage services, webhooks,
 economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy,

@@ -275,7 +275,7 @@
       "id": "obelisk.chat_message.v1",
       "category": "copied chat notification",
       "status": "promoted-experimental-only",
-      "support_tier": "minimal v0.1-rc SDK ABI surface",
+      "support_tier": "minimal v0.1-rc copied ABI; experimental for v1 completion",
       "public_name": "ChatMessageEvent",
       "capabilities": [
         "OBELISK_API_CAPABILITY_CHAT_EVENTS"
