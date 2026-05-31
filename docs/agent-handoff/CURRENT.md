@@ -161,6 +161,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/research/2026-05-31-player-identity-static-target-orientation.json` with
   `status=candidate_blocked` and `promotion_ready=false`; it is an orientation index only,
   not an offline artifact gate or promotion source.
+- `scripts/check_player_identity_static_orientation.py --json` validates that orientation
+  index as candidate-only navigation evidence and is now included in the player-identity
+  first-evidence readiness report. A valid result has `not_artifact_gate=true`,
+  `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`; it does not
+  change the blocker order or replace the missing core evidence pack, reflection
+  inventory pack, focal snapshots, second source, or lifecycle anchors.
 - Lifecycle-anchor candidate artifacts now fail closed if a candidate anchor target is
   outside the closed `players-identity-lifecycle-intake` target set, or if principal
   invalidation semantics are claimed as resolved before promotion.

@@ -48,6 +48,9 @@ tests, and named second-source promotion gates.
 - Raw UE pointers, raw `ProcessEvent` params, raw `FString`, FName/GObjects indices,
   ArkApi offsets, MSVC layouts, vtables, object lookup, `ResourceHandle`, mutation, and
   return override authority are not public SDK contracts.
+- Legacy raw `ProcessEvent` ABI slots remain header compatibility entries only. They are
+  inventoried as `obelisk.debug_raw_process_event.v1`, require explicit debug gates, and
+  cannot count as promoted v1 SDK surface or completion evidence.
 
 ## Promoted Foundation
 

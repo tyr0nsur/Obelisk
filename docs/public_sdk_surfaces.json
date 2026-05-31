@@ -1029,6 +1029,37 @@
       "status": "debug-only",
       "support_tier": "not public SDK",
       "public_contract": [],
+      "legacy_abi_slots": [
+        "RegisterPreProcessEvent",
+        "RegisterPostProcessEvent",
+        "RegisterPreProcessEventForNameIndex",
+        "RegisterPostProcessEventForNameIndex",
+        "CallProcessEvent",
+        "RegisterPreProcessEventWithOwnerToken",
+        "RegisterPostProcessEventWithOwnerToken",
+        "RegisterPreProcessEventForNameIndexWithOwnerToken",
+        "RegisterPostProcessEventForNameIndexWithOwnerToken",
+        "RegisterPreProcessEventWithOwnerTokenHandle",
+        "RegisterPostProcessEventWithOwnerTokenHandle",
+        "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
+        "RegisterPostProcessEventForNameIndexWithOwnerTokenHandle",
+        "UnregisterProcessEventCallbackWithOwnerToken"
+      ],
+      "capability_gates": [
+        "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
+        "OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS",
+        "OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS",
+        "OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES",
+        "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT",
+        "OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING"
+      ],
+      "guardrails": [
+        "legacy slots remain append-only ABI compatibility entries only",
+        "callbacks expose borrowed UE pointers and raw parameter buffers",
+        "global and filtered callbacks require explicit debug env plus per-instance marker gates",
+        "CallProcessEvent is limited to the plugin init debug window and must fail closed post-init",
+        "no raw ProcessEvent slot may be used as v1 SDK completion evidence"
+      ],
       "exclusions": [
         "raw ProcessEvent params",
         "UObject pointers",

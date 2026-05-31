@@ -58,6 +58,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional distinct sanitized second-source snapshot root for layout comparison.",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Compatibility flag; output is always JSON.",
+    )
     return parser.parse_args()
 
 
@@ -414,6 +419,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "--json",
         ]
     )
+    orientation_result, orientation_payload = run_json_command(
+        [
+            str(SCRIPT_DIR / "check_player_identity_static_orientation.py"),
+            "--json",
+        ]
+    )
 
     inventory_ready = bool(inventory_payload and inventory_payload.get("ready") is True)
     coverage_totals = coverage_payload.get("totals", {}) if isinstance(coverage_payload, dict) else {}
@@ -549,6 +560,37 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "blocked_before_focal_planning": not inventory_ready,
             "ready_to_plan_admin_snapshots": inventory_ready,
             "offline_inputs": offline_inputs,
+        },
+        "static_orientation": {
+            "returncode": orientation_result.returncode,
+            "valid": (
+                orientation_payload.get("valid")
+                if isinstance(orientation_payload, dict)
+                else False
+            ),
+            "accepted_for_orientation": (
+                orientation_payload.get("accepted_for_orientation")
+                if isinstance(orientation_payload, dict)
+                else False
+            ),
+            "not_artifact_gate": (
+                orientation_payload.get("not_artifact_gate")
+                if isinstance(orientation_payload, dict)
+                else True
+            ),
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": (
+                orientation_payload.get("blockers")
+                if isinstance(orientation_payload, dict)
+                else [{"reason": "static_orientation_check_output_missing_or_malformed"}]
+            ),
+            "non_claims": (
+                orientation_payload.get("non_claims")
+                if isinstance(orientation_payload, dict)
+                else ["static orientation is candidate-only navigation evidence"]
+            ),
         },
         "public_sdk_ready": False,
         "runtime_ready": False,

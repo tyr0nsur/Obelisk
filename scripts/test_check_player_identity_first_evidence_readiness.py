@@ -98,6 +98,17 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["artifact_chain"]["offline_inputs"]["ready_to_build_core_evidence_pack"])
         self.assertTrue(payload["artifact_chain"]["blocked_before_focal_planning"])
         self.assertFalse(payload["artifact_chain"]["ready_to_plan_admin_snapshots"])
+        self.assertTrue(payload["static_orientation"]["valid"])
+        self.assertTrue(payload["static_orientation"]["accepted_for_orientation"])
+        self.assertTrue(payload["static_orientation"]["not_artifact_gate"])
+        self.assertFalse(payload["static_orientation"]["promotion_ready"])
+        self.assertFalse(payload["static_orientation"]["public_sdk_ready"])
+        self.assertFalse(payload["static_orientation"]["runtime_ready"])
+        self.assertEqual(payload["static_orientation"]["blockers"], [])
+        self.assertIn(
+            "candidate-only navigation evidence",
+            " ".join(payload["static_orientation"]["non_claims"]),
+        )
         self.assertEqual(
             payload["reflection_inventory"]["artifact_root_diagnosis"]["status"],
             "no_manifest_files_found",
@@ -133,6 +144,19 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertIn("does not touch servers", " ".join(payload["non_claims"]))
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
+
+    def test_json_flag_is_accepted_for_handoff_and_release_gate_callers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = self.run_checker(["--artifact-root", temp_dir, "--json"], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["schema"], "obelisk.player-identity-first-evidence-readiness.v1")
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
+        self.assertTrue(payload["static_orientation"]["valid"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
 
     def test_candidate_root_reports_second_source_not_accepted_separately_from_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

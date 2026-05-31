@@ -33,7 +33,7 @@ target_link_libraries(obelisk_sdk_minimal_plugin PRIVATE Obelisk::obelisk_sdk)
 ```
 
 That package version is a compatibility floor for the current pre-release SDK line, not a
-claim that a stable `v0.1.0` release tag exists.
+complete SDK claim and not a claim that a stable `v0.1.0` release tag exists.
 
 ## Build
 

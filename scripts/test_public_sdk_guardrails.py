@@ -1354,6 +1354,65 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(normalized(term), compatibility)
 
+    def test_public_sdk_manifest_tracks_raw_process_event_slots_as_debug_only(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        debug_surface = surfaces["obelisk.debug_raw_process_event.v1"]
+        compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
+
+        self.assertEqual(debug_surface["status"], "debug-only")
+        self.assertEqual(debug_surface.get("public_contract", []), [])
+        self.assertNotIn("obelisk.debug_raw_process_event.v1", manifest["promoted_surfaces"])
+        self.assertIn("obelisk.debug_raw_process_event.v1", manifest["debug_only_surfaces"])
+
+        for slot in (
+            "RegisterPreProcessEvent",
+            "RegisterPostProcessEvent",
+            "RegisterPreProcessEventForNameIndex",
+            "RegisterPostProcessEventForNameIndex",
+            "CallProcessEvent",
+            "RegisterPreProcessEventWithOwnerToken",
+            "RegisterPostProcessEventWithOwnerToken",
+            "RegisterPreProcessEventForNameIndexWithOwnerToken",
+            "RegisterPostProcessEventForNameIndexWithOwnerToken",
+            "RegisterPreProcessEventWithOwnerTokenHandle",
+            "RegisterPostProcessEventWithOwnerTokenHandle",
+            "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
+            "RegisterPostProcessEventForNameIndexWithOwnerTokenHandle",
+            "UnregisterProcessEventCallbackWithOwnerToken",
+        ):
+            with self.subTest(slot=slot):
+                self.assertIn(slot, debug_surface["legacy_abi_slots"])
+                self.assertIn(slot, V010_CORE_OBELISK_API_FIELD_ALLOWLIST)
+
+        for capability in (
+            "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
+            "OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS",
+            "OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS",
+            "OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES",
+            "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT",
+            "OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING",
+        ):
+            with self.subTest(capability=capability):
+                self.assertIn(capability, debug_surface["capability_gates"])
+
+        for guardrail in (
+            "legacy slots remain append-only ABI compatibility entries only",
+            "callbacks expose borrowed UE pointers and raw parameter buffers",
+            "global and filtered callbacks require explicit debug env plus per-instance marker gates",
+            "CallProcessEvent is limited to the plugin init debug window and must fail closed post-init",
+            "no raw ProcessEvent slot may be used as v1 SDK completion evidence",
+        ):
+            with self.subTest(guardrail=guardrail):
+                self.assertIn(guardrail, debug_surface["guardrails"])
+
+        for doc_term in (
+            "Legacy raw `ProcessEvent` ABI slots remain header compatibility entries only",
+            "inventoried as `obelisk.debug_raw_process_event.v1`",
+            "cannot count as promoted v1 SDK surface or completion evidence",
+        ):
+            self.assertIn(normalized(doc_term), compatibility)
+
     def test_pre_identity_plugin_hub_production_seeds_stay_limited_to_core_primitives(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -3623,6 +3682,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(path="examples/sdk_timer_plugin/timer_plugin.c", forbidden=token):
                 self.assertNotIn(token, timer_source)
+
+    def test_installed_sdk_examples_label_package_version_as_prerelease_floor(self) -> None:
+        for path in (
+            REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
+            REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
+        ):
+            compact = normalized(path.read_text(encoding="utf-8"))
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                self.assertIn("compatibility floor for the current pre-release SDK line", compact)
+                self.assertIn("not a complete SDK claim", compact)
+                self.assertIn("not a claim that a stable `v0.1.0` release tag exists", compact)
 
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")
