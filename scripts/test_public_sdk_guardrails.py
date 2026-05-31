@@ -351,6 +351,35 @@ GAMEPLAY_POLICY_SCOPE_NEGATORS_RE = re.compile(
     re.IGNORECASE,
 )
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*")
+MODULE_AGGREGATE_CENSUS_PUBLIC_CLAIM_FILES = [
+    PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+    *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+    REPO_ROOT / "plugins" / "README.md",
+]
+MODULE_AGGREGATE_CENSUS_TERM_RE = re.compile(
+    r"\b(?:structures?|dinos?|buffs?)[- ](?:aggregates?|aggregation|census|counts?|proximity)\b|"
+    r"\b(?:aggregates?|aggregation|census|counts?|proximity)[- ](?:structures?|dinos?|buffs?)\b|"
+    r"\baggregate\s+(?:structures?|dinos?|buffs?)\s+counts?\b",
+    re.IGNORECASE,
+)
+MODULE_AGGREGATE_CENSUS_SURFACE_RE = re.compile(
+    r"\b(?:SDKs?|APIs?|surfaces?|queries?|snapshots?|modules?|callbacks?)\b",
+    re.IGNORECASE,
+)
+MODULE_AGGREGATE_CENSUS_POSITIVE_RE = re.compile(
+    r"\b(?:public|promoted|production[- ]ready|production[- ]supported|stable|supported|"
+    r"available|included|exposed|published|shipped)\b|"
+    r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|"
+    r"publish|publishes|published|support|supports|supported|include|includes|included|"
+    r"provide|provides|provided)\b",
+    re.IGNORECASE,
+)
+MODULE_AGGREGATE_CENSUS_NEGATED_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|must\s+not|not|no|never|without|blocked|"
+    r"candidate[- ]only|guidance[- ]only|internal[- ]only|planning[- ]only|"
+    r"research[- ]only|rejected|redacted)\b",
+    re.IGNORECASE,
+)
 UNPROMOTED_GAMEPLAY_SURFACES = (
     "Player",
     "Tribe",
@@ -863,6 +892,26 @@ def positive_chat_message_event_claims(text: str, relative_path: str) -> list[st
     return offenders
 
 
+def positive_module_aggregate_census_claims(text: str, relative_path: str) -> list[str]:
+    offenders: list[str] = []
+
+    for segment_start, segment in sentence_like_segments(text):
+        if not MODULE_AGGREGATE_CENSUS_TERM_RE.search(segment):
+            continue
+        if not (
+            MODULE_AGGREGATE_CENSUS_SURFACE_RE.search(segment)
+            and MODULE_AGGREGATE_CENSUS_POSITIVE_RE.search(segment)
+        ):
+            continue
+        if MODULE_AGGREGATE_CENSUS_NEGATED_RE.search(segment):
+            continue
+
+        line = text.count("\n", 0, segment_start) + 1
+        offenders.append(f"{relative_path}:{line}: {normalized(segment)}")
+
+    return offenders
+
+
 def json_string_values(value: object, path: str) -> list[tuple[str, str]]:
     if isinstance(value, dict):
         values: list[tuple[str, str]] = []
@@ -1049,6 +1098,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     continue
                 if not allowed_context.search(normalized(paragraph)):
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {normalized(paragraph)}")
+
+        self.assertEqual(offenders, [])
+
+    def test_module_aggregate_census_positive_claim_detector_covers_structure_dino_and_buff(self) -> None:
+        forbidden = [
+            "The future public structure-census API is available.",
+            "Obelisk ships public dino census snapshots.",
+            "Buff aggregate SDK is supported.",
+            "Aggregate dino counts API is promoted.",
+            "Buff aggregate SDK remains available.",
+        ]
+        allowed = [
+            "Structure aggregate census planning-only evidence stays internal.",
+            "No public buff aggregate API is promoted.",
+            "Dino census API requires a promotion gate before use.",
+            "Buff aggregate SDK remains blocked.",
+        ]
+
+        for text in forbidden:
+            with self.subTest(kind="forbidden", text=text):
+                self.assertNotEqual(
+                    positive_module_aggregate_census_claims(text, "synthetic.md"),
+                    [],
+                )
+        for text in allowed:
+            with self.subTest(kind="allowed", text=text):
+                self.assertEqual(
+                    positive_module_aggregate_census_claims(text, "synthetic.md"),
+                    [],
+                )
+
+    def test_public_material_does_not_claim_structure_dino_or_buff_aggregate_census_sdk_or_api(self) -> None:
+        offenders: list[str] = []
+
+        for path in MODULE_AGGREGATE_CENSUS_PUBLIC_CLAIM_FILES:
+            text = path.read_text(encoding="utf-8")
+            if path == PUBLIC_GAMEPLAY_EVENTS_MANIFEST:
+                text = json.dumps(json.loads(text), sort_keys=True, indent=2)
+            offenders.extend(
+                positive_module_aggregate_census_claims(
+                    text,
+                    str(path.relative_to(REPO_ROOT)),
+                )
+            )
 
         self.assertEqual(offenders, [])
 
