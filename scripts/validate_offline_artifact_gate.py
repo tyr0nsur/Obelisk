@@ -3665,6 +3665,7 @@ def validate_reflection_inventory_pack_comparison_manifest(
         blockers.append({"reason": "reflection_inventory_comparison_blockers_present", "label": f"{label}:$.blockers"})
 
     sides: dict[str, dict[str, Any]] = {}
+    pack_states: dict[str, dict[str, Any]] = {}
     for side in ("base", "candidate"):
         side_payload = payload.get(side)
         side_label = f"{label}:$.{side}"
@@ -3677,6 +3678,7 @@ def validate_reflection_inventory_pack_comparison_manifest(
         if pack_path is None:
             blockers.append({"reason": f"reflection_inventory_comparison_{side}_pack_path_invalid", "label": f"{side_label}.pack"})
         else:
+            pack_states[side] = path_state(pack_path, workspace_root=workspace_root, protected_root=protected_root)
             blockers.extend(
                 {
                     **blocker,
@@ -3710,12 +3712,36 @@ def validate_reflection_inventory_pack_comparison_manifest(
                 side=side,
             )
         )
+        summary = side_payload.get("summary")
+        if not isinstance(summary, dict):
+            blockers.append({"reason": f"reflection_inventory_comparison_{side}_summary_missing", "label": f"{side_label}.summary"})
+        else:
+            if summary.get("fname_root_ready") is not True:
+                blockers.append(
+                    {
+                        "reason": f"reflection_inventory_comparison_{side}_fname_root_not_ready",
+                        "label": f"{side_label}.summary.fname_root_ready",
+                    }
+                )
+            for key in ("target_missing_count", "target_ambiguous_count"):
+                count = summary.get(key, 0)
+                if not is_json_int(count) or count != 0:
+                    blockers.append(
+                        {
+                            "reason": f"reflection_inventory_comparison_{side}_{key}_nonzero",
+                            "label": f"{side_label}.summary.{key}",
+                        }
+                    )
 
     if set(sides) == {"base", "candidate"}:
         base_sha = sides["base"].get("binary_sha256")
         candidate_sha = sides["candidate"].get("binary_sha256")
         if base_sha != candidate_sha:
             blockers.append({"reason": "reflection_inventory_comparison_binary_sha_mismatch", "label": label})
+        base_pack_resolved = pack_states.get("base", {}).get("resolved")
+        candidate_pack_resolved = pack_states.get("candidate", {}).get("resolved")
+        if base_pack_resolved is not None and base_pack_resolved == candidate_pack_resolved:
+            blockers.append({"reason": "reflection_inventory_comparison_pack_path_not_distinct", "label": label})
         base_identity = sides["base"].get("artifact_identity")
         candidate_identity = sides["candidate"].get("artifact_identity")
         if isinstance(base_identity, dict) and isinstance(candidate_identity, dict):
@@ -3735,9 +3761,23 @@ def validate_reflection_inventory_pack_comparison_manifest(
         for key in ("missing_in_candidate", "new_in_candidate", "changed_functions"):
             if function_comparison.get(key) != []:
                 blockers.append({"reason": f"reflection_inventory_comparison_{key}_present", "label": f"{label}:$.function_comparison.{key}"})
+        counts: dict[str, int] = {}
         for key in ("base_function_count", "candidate_function_count", "shared_function_count"):
-            if not is_json_int(function_comparison.get(key)):
+            count = function_comparison.get(key)
+            if not is_json_int(count) or count < 0:
                 blockers.append({"reason": f"reflection_inventory_comparison_{key}_invalid", "label": f"{label}:$.function_comparison.{key}"})
+            else:
+                counts[key] = count
+        if set(counts) == {"base_function_count", "candidate_function_count", "shared_function_count"}:
+            count_values = set(counts.values())
+            if len(count_values) != 1:
+                blockers.append(
+                    {
+                        "reason": "reflection_inventory_comparison_function_count_mismatch",
+                        "label": f"{label}:$.function_comparison",
+                        "recorded": counts,
+                    }
+                )
 
     non_claims = payload.get("non_claims")
     if not isinstance(non_claims, list) or not REQUIRED_REFLECTION_INVENTORY_COMPARISON_NON_CLAIMS.issubset(set(non_claims)):

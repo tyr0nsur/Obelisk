@@ -177,6 +177,27 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
             {"missing_reflection_inventory_pack", "scriptstruct_pack_not_reflection_inventory"},
         )
 
+    def test_reflection_inventory_comparison_fails_closed_without_source_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "comparison"
+            pack.mkdir()
+            (pack / "manifest.json").write_text(
+                json.dumps({"schema": "obelisk.reflection-inventory-pack-comparison.v1", "status": "accepted"}),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            self.reason_codes(payload),
+            {
+                "missing_reflection_inventory_pack",
+                "reflection_inventory_comparison_not_reflection_inventory_pack",
+            },
+        )
+
     def test_artifact_pack_container_manifest_cannot_be_used_as_reflection_inventory_pack(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -153,11 +153,11 @@ core/bin planning alone is insufficient and must not be described as public SDK,
 runtime-readiness, or promotion evidence.
 Player identity/principal evidence does not unlock `operator_ingress_storage`; operator
 ingress/storage remains a separate post-v1 blocker until secret-safe ingress,
-storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted
-or explicitly excluded. The v1 release decision for
-`obelisk.operator_ingress_storage.v1` has only two valid outcomes: promote a reviewed
+storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted,
+explicitly excluded, or named post-v1. The v1 release decision for
+`obelisk.operator_ingress_storage.v1` has three valid outcomes: promote a reviewed
 append-only copied C ABI contract with the required ingress/storage evidence and tests, or
-name the surface as excluded in the v1 release statement. Until one of those decisions is
+name the surface as excluded or post-v1 in the v1 release statement. Until one of those decisions is
 recorded, `v1_completion_required` must stay false and no public header, plugin callback,
 storage service, RCON service, webhook client, secret manager, or cross-instance storage
 API is part of the SDK.
@@ -213,7 +213,7 @@ surface-id: excluded - ...
 surface-id: post-v1 - ...
 ```
 
-Duplicate records, mixed `excluded`/`post-v1` records for the same surface, or wording
+Duplicate records, mixed `promoted`/`excluded`/`post-v1` records for the same surface, or wording
 that contradicts the chosen outcome are release blockers. A promoted record is valid only
 when the manifest surface is also promoted and has surface-specific ABI evidence,
 SDK-consumer evidence, lifecycle cleanup coverage, privacy/no-internals guarantees, and

@@ -1,0 +1,94 @@
+{
+  "schema": "obelisk.player-identity-public-contract-decisions.v1",
+  "surface": "obelisk.player_identity.v1",
+  "status": "blocked",
+  "public_header_allowed": false,
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "forbidden_public_contract": [
+    "UE pointers",
+    "raw params",
+    "FName/GObjects indices",
+    "ResourceHandle",
+    "pointer-derived identity",
+    "lookup",
+    "mutation",
+    "return override"
+  ],
+  "required_before_public_header": [
+    {
+      "id": "evidence.complete_non_protected_pack",
+      "category": "evidence",
+      "status": "unresolved"
+    },
+    {
+      "id": "evidence.accepted_session_start_anchor",
+      "category": "evidence",
+      "status": "unresolved"
+    },
+    {
+      "id": "evidence.accepted_session_end_anchor",
+      "category": "evidence",
+      "status": "unresolved"
+    },
+    {
+      "id": "evidence.second_source_anchor_layout",
+      "category": "evidence",
+      "status": "unresolved"
+    },
+    {
+      "id": "privacy.public_identifier_form",
+      "category": "privacy",
+      "status": "unresolved"
+    },
+    {
+      "id": "privacy.redacted_identifier_fields",
+      "category": "privacy",
+      "status": "unresolved"
+    },
+    {
+      "id": "privacy.logging_and_storage_policy",
+      "category": "privacy",
+      "status": "unresolved"
+    },
+    {
+      "id": "lifetime.principal_scope",
+      "category": "lifetime",
+      "status": "unresolved"
+    },
+    {
+      "id": "lifetime.invalidation_events",
+      "category": "lifetime",
+      "status": "unresolved"
+    },
+    {
+      "id": "lifetime.reconnect_duplicate_stale_policy",
+      "category": "lifetime",
+      "status": "unresolved"
+    },
+    {
+      "id": "abi.payload_shape",
+      "category": "abi",
+      "status": "unresolved"
+    },
+    {
+      "id": "abi.capability_bits",
+      "category": "abi",
+      "status": "unresolved"
+    },
+    {
+      "id": "abi.owner_token_registration",
+      "category": "abi",
+      "status": "unresolved"
+    },
+    {
+      "id": "abi.append_only_layout_tests",
+      "category": "abi",
+      "status": "unresolved"
+    },
+    {
+      "id": "separation.no_commands_permissions_persistence",
+      "category": "scope",
+      "status": "unresolved"
+    }
+  ]
+}

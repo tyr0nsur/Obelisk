@@ -24,6 +24,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 REPORT_SCHEMA = "obelisk.reflection-inventory-pack-readiness-check.v1"
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
+REFLECTION_INVENTORY_COMPARISON_SCHEMA = "obelisk.reflection-inventory-pack-comparison.v1"
 SCRIPTSTRUCT_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 PLAYER_IDENTITY_TARGETS = tuple(
@@ -592,6 +593,7 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
 
     artifact_pack_container_paths: list[str] = []
     scriptstruct_pack_paths: list[str] = []
+    reflection_inventory_comparison_paths: list[str] = []
     schema_mismatch_paths: list[str] = []
     candidate_packs: list[dict[str, object]] = []
     for manifest_path in manifest_paths:
@@ -603,6 +605,9 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
             continue
         if payload.get("schema") == SCRIPTSTRUCT_PACK_SCHEMA:
             scriptstruct_pack_paths.append(str(manifest_path))
+            continue
+        if payload.get("schema") == REFLECTION_INVENTORY_COMPARISON_SCHEMA:
+            reflection_inventory_comparison_paths.append(str(manifest_path))
             continue
         if payload.get("schema") != PACK_SCHEMA:
             schema_mismatch_paths.append(str(manifest_path))
@@ -622,6 +627,13 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
             reason(
                 "scriptstruct_pack_not_reflection_inventory",
                 **bounded_list_fields("scanned_paths", scriptstruct_pack_paths),
+            )
+        )
+    if reflection_inventory_comparison_paths:
+        non_candidate_reasons.append(
+            reason(
+                "reflection_inventory_comparison_not_reflection_inventory_pack",
+                **bounded_list_fields("scanned_paths", reflection_inventory_comparison_paths),
             )
         )
     if schema_mismatch_paths:

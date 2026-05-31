@@ -873,6 +873,66 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_surfaces_without_evidence"], ["obelisk.chat_message.v1"])
 
+    def test_promoted_experimental_surface_still_requires_release_statement_record(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.chat_message.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterChatEventWithOwnerTokenHandle"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.chat_message.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/ChatEventDispatcherTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/CAbiPlugin.c"],
+                }
+                break
+        if "obelisk.chat_message.v1" not in manifest["promoted_surfaces"]:
+            manifest["promoted_surfaces"].append("obelisk.chat_message.v1")
+        manifest["post_v1_or_excluded_surfaces"] = [
+            surface_id
+            for surface_id in manifest["post_v1_or_excluded_surfaces"]
+            if surface_id != "obelisk.chat_message.v1"
+        ]
+        release_statement = "\n".join(
+            line for line in release_statement.splitlines() if "obelisk.chat_message.v1" not in line
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_experimental_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_experimental_outcomes"], ["obelisk.chat_message.v1"])
+
+    def test_release_statement_parser_accepts_promoted_surface_record(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        record = module.release_statement_surface_record(
+            "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.\n",
+            "obelisk.chat_message.v1",
+            "promoted",
+        )
+
+        self.assertEqual(record, "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.")
+
     def test_new_planning_surface_blocks_v1_claim_until_outcome_is_named(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["surfaces"].append(

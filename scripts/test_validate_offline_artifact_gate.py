@@ -2806,6 +2806,54 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("reflection_inventory_comparison_artifact_identity_not_distinct_capture_id", reasons)
         self.assertIn("reflection_inventory_comparison_artifact_identity_not_distinct_evidence_pack_id", reasons)
 
+    def test_blocks_reflection_inventory_comparison_reused_pack_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["candidate"]["pack"] = payload["base"]["pack"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "reflection_inventory_comparison_pack_path_not_distinct",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_reflection_inventory_comparison_unready_side_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["candidate"]["summary"] = {"fname_root_ready": False}
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "reflection_inventory_comparison_candidate_fname_root_not_ready",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_reflection_inventory_comparison_incoherent_function_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "reflection-comparison" / "manifest.json"
+            payload = reflection_inventory_comparison_manifest(workspace)
+            payload["function_comparison"]["candidate_function_count"] = 3
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "reflection_inventory_comparison_function_count_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_blocks_reflection_inventory_comparison_protected_pack_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

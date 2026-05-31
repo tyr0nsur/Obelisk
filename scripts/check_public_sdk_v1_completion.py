@@ -123,13 +123,12 @@ def load_release_statement(path: Path | None) -> tuple[str | None, list[str]]:
 
 
 def release_statement_names_outcome(text: str, surface_id: str, status: str) -> bool:
-    expected = "post-v1" if status == "post-v1" else "excluded"
-    return release_statement_surface_record(text, surface_id, expected) is not None
+    return release_statement_surface_record(text, surface_id, status) is not None
 
 
 def release_statement_surface_records(text: str, surface_id: str, status: str | None = None) -> list[tuple[str, str]]:
     pattern = re.compile(
-        rf"^\s*{re.escape(surface_id)}\s*:\s*(?P<status>excluded|post-v1)(?:\s+-\s*(?P<details>.+)|\s*)$",
+        rf"^\s*{re.escape(surface_id)}\s*:\s*(?P<status>promoted|excluded|post-v1)(?:\s+-\s*(?P<details>.+)|\s*)$",
         re.IGNORECASE,
     )
     records: list[tuple[str, str]] = []
@@ -236,10 +235,11 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
 
 
 def release_statement_satisfies_experimental_outcome(text: str, surface_id: str, status: str) -> bool:
-    expected = "post-v1" if status == "post-v1" else "excluded"
-    record = release_statement_surface_record(text, surface_id, expected)
+    record = release_statement_surface_record(text, surface_id, status)
     if record is None or release_statement_record_has_contradiction(record):
         return False
+    if status == "promoted":
+        return True
     required_terms = CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT.get(surface_id, ())
     lowered = record.lower()
     return all(term.lower() in lowered for term in required_terms)
@@ -465,6 +465,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             continue
         status = surface.get("status")
         if status == "promoted":
+            if release_statement_text is None:
+                release_statement_missing_experimental_outcomes.append(surface_id)
+            elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
+                release_statement_duplicate_records.append(surface_id)
+            elif not release_statement_satisfies_experimental_outcome(release_statement_text, surface_id, status):
+                release_statement_missing_experimental_outcomes.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
             if release_statement_text is None:
@@ -486,6 +492,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         if status == "promoted":
             if not surface_has_promotion_evidence(surface):
                 promoted_without_evidence.append(surface_id)
+            if release_statement_text is None:
+                release_statement_missing_blockers.append(surface_id)
+            elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
+                release_statement_duplicate_records.append(surface_id)
+            elif not release_statement_names_outcome(release_statement_text, surface_id, status):
+                release_statement_missing_blockers.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
             if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS:

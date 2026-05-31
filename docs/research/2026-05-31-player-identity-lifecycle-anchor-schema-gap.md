@@ -16,6 +16,18 @@ invalidation.
 - Fixture coverage remains blocked on missing sanitized snapshots for:
   - `ShooterPlayerController.ServerListPlayers`
   - `ShooterPlayerController.ServerKickPlayer`
+- Static offline string/registration orientation has identified two additional
+  lifecycle-shaped clues in the same ShooterGameServer binary hash:
+  - `ShooterGameMode.HandleNewPlayer`: ASCII name VMA `0x4170122`, registration VMA
+    `0x13cc20a`, native thunk `0x15d04c0`, class slot `0x58f2bd0`, class name UTF-32 VMA
+    `0x40e0b24`, probable FName-ish slot `0x58ed3d0`.
+  - `ShooterGameMode.OnLogout`: ASCII name VMA `0x417024f`, registration VMA
+    `0x13cc560`, native thunk `0x15d1500`, class slot `0x58f2bd0`, class name UTF-32 VMA
+    `0x40e0b24`, probable FName-ish slot `0x58ed3e0`.
+  These are navigation clues only. They are not in the committed target set, do not prove
+  login/logout order, and must not be treated as accepted lifecycle anchors without a
+  reviewed schema update, sanitized snapshots, property-chain evidence, second source, and
+  invalidation policy.
 - `build_redacted_ufunction_signatures.py --players-identity-first-evidence` intentionally
   reports `session_start_accepted=false`, `session_end_accepted=false`, and empty accepted
   target lists.
