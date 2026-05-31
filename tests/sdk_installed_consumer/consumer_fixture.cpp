@@ -29,6 +29,7 @@ namespace
     int g_TimerUnregisterCount = 0;
     int g_ResourceDescriptorCount = 0;
     int g_GameplayPolicyDescriptorCount = 0;
+    bool g_TimerRegistrationShouldFail = false;
     ObeliskGameplayPolicyEventCallback g_GameplayPolicyCallback = nullptr;
     void* g_GameplayPolicyUserData = nullptr;
     ObeliskChatMessageEventCallback g_ChatMessageCallback = nullptr;
@@ -140,6 +141,8 @@ namespace
         Require(callback != nullptr, "timer registration received null callback");
         Require(userData != nullptr, "timer registration received null user data");
         ++g_TimerRegisterCount;
+        if (g_TimerRegistrationShouldFail)
+            return 0;
         g_TimerCallback = callback;
         g_TimerUserData = userData;
         return 4004;
@@ -513,6 +516,7 @@ namespace
         g_TimerUnregisterCount = 0;
         g_ResourceDescriptorCount = 0;
         g_GameplayPolicyDescriptorCount = 0;
+        g_TimerRegistrationShouldFail = false;
         g_GameplayPolicyCallback = nullptr;
         g_GameplayPolicyUserData = nullptr;
         g_ChatMessageCallback = nullptr;
@@ -805,6 +809,297 @@ namespace
                 shutdown();
         }
     }
+
+    struct DescriptorTimerGuardrailCase
+    {
+        const char* name;
+        uint32_t apiStructSize;
+        uint32_t contextStructSize;
+        uint64_t disabledCapability;
+        bool nullResourceDescriptorSlot;
+        bool nullGameplayDescriptorSlot;
+        bool nullTimerRegisterSlot;
+        bool nullTimerUnregisterSlot;
+        bool zeroOwnerToken;
+        bool timerRegistrationFails;
+        int resourceDescriptorQueries;
+        int gameplayPolicyDescriptorQueries;
+        int timerRegistrations;
+    };
+
+    void RunDescriptorTimerGuardrails(InitFn init, ShutdownFn shutdown, ObeliskPluginInitContext context)
+    {
+        Require(shutdown != nullptr, "descriptor+timer guardrails require plugin shutdown cleanup");
+        const DescriptorTimerGuardrailCase cases[] = {
+            {
+                "descriptor-timer-short-api-before-capabilities",
+                static_cast<uint32_t>(offsetof(ObeliskApi, capabilities)),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-short-api-before-resource-descriptor",
+                static_cast<uint32_t>(offsetof(ObeliskApi, DescribeResourceKind)),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-short-api-before-gameplay-descriptor",
+                static_cast<uint32_t>(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind)),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-short-api-before-timer-register",
+                static_cast<uint32_t>(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle)),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-short-api-before-timer-unregister",
+                static_cast<uint32_t>(offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken))),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-short-context-before-owner-token",
+                sizeof(ObeliskApi),
+                static_cast<uint32_t>(offsetof(ObeliskPluginInitContext, plugin_owner_token)),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-missing-resource-descriptor-capability",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-missing-gameplay-descriptor-capability",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-missing-timer-capability",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                OBELISK_API_CAPABILITY_TIMERS,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-null-resource-descriptor-slot",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-null-gameplay-descriptor-slot",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-null-timer-register-slot",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-null-timer-unregister-slot",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-zero-owner-token",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                0,
+                0,
+                0,
+            },
+            {
+                "descriptor-timer-register-failure",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                4,
+                13,
+                1,
+            },
+        };
+
+        for (const DescriptorTimerGuardrailCase& testCase : cases)
+        {
+            ObeliskApi api{};
+            PopulateApi(api);
+            api.capabilities =
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS |
+                OBELISK_API_CAPABILITY_TIMERS;
+            api.struct_size = testCase.apiStructSize;
+            api.capabilities &= ~testCase.disabledCapability;
+            if (testCase.nullResourceDescriptorSlot)
+                api.DescribeResourceKind = nullptr;
+            if (testCase.nullGameplayDescriptorSlot)
+                api.DescribeGameplayPolicyEventKind = nullptr;
+            if (testCase.nullTimerRegisterSlot)
+                api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            if (testCase.nullTimerUnregisterSlot)
+                api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+
+            ObeliskPluginInitContext testContext = context;
+            testContext.struct_size = testCase.contextStructSize;
+            if (testCase.zeroOwnerToken)
+                testContext.plugin_owner_token = 0;
+
+            ResetFixtureObservations();
+            g_TimerRegistrationShouldFail = testCase.timerRegistrationFails;
+            Require(!init(&api, &testContext), testCase.name);
+            Require(g_RegisterCount == 0, "descriptor+timer fixture registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0, "descriptor+timer fixture registered gameplay callback");
+            Require(g_ChatMessageRegisterCount == 0, "descriptor+timer fixture registered chat callback");
+            Require(g_ResourceDescriptorCount == testCase.resourceDescriptorQueries,
+                    "unexpected resource descriptor query count in descriptor+timer guardrail");
+            Require(g_GameplayPolicyDescriptorCount == testCase.gameplayPolicyDescriptorQueries,
+                    "unexpected gameplay descriptor query count in descriptor+timer guardrail");
+            Require(g_TimerRegisterCount == testCase.timerRegistrations,
+                    "unexpected timer registration count in descriptor+timer guardrail");
+            Require(g_TimerCallback == nullptr, "descriptor+timer failed init left timer callback registered");
+            Require(g_TimerUserData == nullptr, "descriptor+timer failed init left timer user data registered");
+            shutdown();
+            Require(g_TimerUnregisterCount == 0, "descriptor+timer failed init unregistered failed timer handle");
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -856,9 +1151,37 @@ int main(int argc, char** argv)
             RunOptionalSlotGuardrails(init, shutdown, context);
         if (std::strcmp(argv[2], "install_layout_descriptor_catalog_consumer") == 0)
             RunDescriptorCatalogGuardrails(init, shutdown, context);
+        if (std::strcmp(argv[2], "install_layout_descriptor_timer_consumer") == 0)
+            RunDescriptorTimerGuardrails(init, shutdown, context);
 
         ResetFixtureObservations();
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
+        if (descriptorCatalogValidated && expectsTimer)
+        {
+            Require(descriptorCatalogValidated(), "expected plugin to validate descriptor catalog");
+            Require(g_RegisterCount == 0, "descriptor+timer consumer unexpectedly registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                    "descriptor+timer consumer unexpectedly registered gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                    "descriptor+timer consumer unexpectedly registered chat message callback");
+            Require(g_TimerRegisterCount == 1, "descriptor+timer consumer did not register one timer");
+            DispatchValidTimer();
+            Require(timerSeen(), "expected descriptor+timer plugin to observe timer callback");
+            shutdown();
+            Require(!descriptorCatalogValidated(), "descriptor+timer validation state survived shutdown");
+            Require(g_UnregisterCount == 0, "descriptor+timer consumer unexpectedly unregistered ProcessEvent callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                    "descriptor+timer consumer unexpectedly unregistered gameplay policy callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                    "descriptor+timer consumer unexpectedly unregistered chat message callback");
+            Require(g_TimerUnregisterCount == 1, "descriptor+timer consumer did not unregister timer exactly once");
+            Require(g_TimerCallback == nullptr, "descriptor+timer callback was not cleared");
+            Require(g_TimerUserData == nullptr, "descriptor+timer user data was not cleared");
+            shutdown();
+            Require(g_TimerUnregisterCount == 1, "descriptor+timer second shutdown repeated timer unregister");
+            dlclose(handle);
+            return 0;
+        }
         if (descriptorCatalogValidated)
         {
             Require(descriptorCatalogValidated(), "expected plugin to validate descriptor catalog");

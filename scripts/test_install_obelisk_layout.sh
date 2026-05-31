@@ -379,6 +379,7 @@ PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_consumer.so"
 C_ABI_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_c_abi_consumer.so"
 NO_SHUTDOWN_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_no_shutdown_consumer.so"
 DESCRIPTOR_CATALOG_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_descriptor_catalog_consumer.so"
+DESCRIPTOR_TIMER_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_descriptor_timer_consumer.so"
 RELEASE_BASE_EVENTS_PLUGIN_PATH="${INSTALL_ROOT}/plugins/oBaseEvents.so"
 RELEASE_TIMER_PLUGIN_PATH="${INSTALL_ROOT}/plugins/oProcessTimer.so"
 RELEASE_DESCRIPTOR_PLUGIN_PATH="${INSTALL_ROOT}/plugins/oDescriptorCatalog.so"
@@ -407,6 +408,7 @@ require_path "${PLUGIN_PATH}"
 require_path "${C_ABI_PLUGIN_PATH}"
 require_path "${NO_SHUTDOWN_PLUGIN_PATH}"
 require_path "${DESCRIPTOR_CATALOG_PLUGIN_PATH}"
+require_path "${DESCRIPTOR_TIMER_PLUGIN_PATH}"
 require_path "${RELEASE_BASE_EVENTS_PLUGIN_PATH}"
 require_path "${RELEASE_TIMER_PLUGIN_PATH}"
 require_path "${RELEASE_DESCRIPTOR_PLUGIN_PATH}"
@@ -444,6 +446,12 @@ fi
 "${WORK_DIR}/build/consumer_fixture" \
     "${DESCRIPTOR_CATALOG_PLUGIN_PATH}" \
     "install_layout_descriptor_catalog_consumer" \
+    "${CONFIG_DIR}" \
+    "${CONFIG_PATH}" \
+    "install-layout-test"
+"${WORK_DIR}/build/consumer_fixture" \
+    "${DESCRIPTOR_TIMER_PLUGIN_PATH}" \
+    "install_layout_descriptor_timer_consumer" \
     "${CONFIG_DIR}" \
     "${CONFIG_PATH}" \
     "install-layout-test"

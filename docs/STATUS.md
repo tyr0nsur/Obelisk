@@ -24,6 +24,14 @@ reference plugins such as `oDescriptorCatalog`, and ArkApi-demand-informed
 Obelisk-native plugin replacement capacity without copying or porting ArkApi/NextGen
 implementations or retroactively expanding the published RC tag.
 
+The intended `v1.0` stable milestone is a complete Obelisk SDK milestone, not just a
+stable loader/runtime milestone. `v1.0` should give plugin authors a coherent Linux-native
+SDK for common ARK server modding categories with documented ABI, examples, lifecycle
+rules, copied payload ownership, privacy boundaries, installed-SDK validation, and
+promotion evidence for each public surface. Until those gates are met, individual core
+primitives such as timers, descriptors, copied chat notifications, or copied policy events
+remain useful foundations rather than a complete SDK claim.
+
 Scope terms used here:
 
 - published RC baseline: the frozen `v0.1.0-rc.2` tag and its public contract;
@@ -96,6 +104,21 @@ define or protect runtime behavior.
 | UObject flag validity policy | Not ready | Static flag-policy reports, transition matrices, and strict serial-policy artifacts that pass the offline artifact gate in consume mode are candidate-only evidence. They do not prove lifecycle/validity or serial reuse semantics, do not satisfy promote-mode gates, and do not unlock `ResourceHandle`, object lookup, GObjects promotion, persistent handles, identity, mutation, or return overrides. |
 | General reflected UFunction parameter decoding | Not ready | Candidate-only module recognizers exist, but SDK-facing decoding remains unpromoted. |
 | Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` surface, the minimal `ChatMessageEvent` RC notification surface, and process-local core timers, Inventory, Items, players, richer chat, tribes, dinos, missions, transfers, permissions, gameplay/module timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. The three item return-only checks are public only as copied `GameplayPolicyEvent` `ReturnValue` kinds; remaining item producer/runtime validation, Mission copied-bool observer, and Transfer `bAccept` work stay internal. Transfer `bAccept` internal work is offline/test-only only: no runtime target source, `PluginManager` wiring, marker/env activation, installed plugin path, public manifest, docs, or examples. Public Inventory SDK, Items SDK, Mission SDK, and Transfer SDK surfaces remain absent. |
+
+## v1.0 SDK Completion Bar
+
+`v1.0` should not be used for a partial runtime-only release. A stable SDK release needs:
+
+- installed SDK package validation for every promoted public surface;
+- plugin lifecycle, config, logging, timers, descriptors, chat, policy, identity, command,
+  inventory/item, structure, dino, tribe/player, mission/transfer, and operator-facing
+  extension paths to be either promoted with evidence or explicitly excluded from the
+  `v1.0` compatibility statement;
+- copied C ABI payloads with ownership, unregister, shutdown, privacy, and multi-instance
+  behavior documented and tested;
+- no public dependency on UE4 internals, raw `ProcessEvent` params, borrowed `UObject`,
+  raw `FString`, raw FName/GObjects indices, ArkApi offsets, MSVC layouts, or vtable
+  assumptions.
 
 ## Current Game Interaction Boundary
 
