@@ -118,6 +118,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `next_actionable_blocker.code=non_protected_core_input_missing`; the expected copied
   core path pattern is
   `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/core`.
+- `scripts/prepare_player_identity_offline_raw_layout.py` may stage explicit
+  non-protected offline `ShooterGameServer` and core inputs into the raw sibling layout
+  under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/`.
+  It does not create or approve cores, touch protected server paths, or authorize server
+  access or runtime/core changes; follow the full recipe in
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - Player identity focal snapshot planning must start from a complete non-protected
   `obelisk.reflection-inventory-pack.v1` with target-set coverage for the full 12-target
   `players-identity-lifecycle-intake` set and exact rows for
@@ -173,8 +179,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 ## Priority Next Steps
 
 - Keep player identity as the primary route: obtain or approve a non-protected copied core
-  under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`,
-  then build `obelisk.core-dump-evidence-pack.v1`, then the full 12-target
+  under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
+  If starting from explicit non-protected binary/core files, use
+  `scripts/prepare_player_identity_offline_raw_layout.py` only to stage those existing
+  inputs, then build `obelisk.core-dump-evidence-pack.v1`, then the full 12-target
   `obelisk.reflection-inventory-pack.v1`, then plan only `ServerListPlayers` and
   `ServerKickPlayer` focal snapshots.
 - If no copied core is available, keep progressing offline by tightening guardrails,

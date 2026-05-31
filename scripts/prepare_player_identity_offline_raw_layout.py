@@ -7,7 +7,9 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -73,6 +75,21 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def detect_obelisk_commit() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
+
+
 def validate_input_file(path: Path, label: str) -> Path:
     reject_symlink_component(path, label)
     resolved = reject_protected_input_path(path, label)
@@ -86,8 +103,15 @@ def validate_input_file(path: Path, label: str) -> Path:
 def validate_artifact_root(path: Path) -> Path:
     reject_symlink_component(path, "--artifact-root")
     resolved = reject_protected_output_path(path, "--artifact-root")
+    if resolved.exists() and not resolved.is_dir():
+        fail(f"--artifact-root must be a directory: {resolved}")
     require_ignored_output_path(resolved, "--artifact-root")
     return resolved
+
+
+def ensure_directory_slot(path: Path, label: str) -> None:
+    if path.exists() and not path.is_dir():
+        fail(f"{label} exists but is not a directory: {path}")
 
 
 def ensure_output_slot(path: Path, label: str) -> None:
@@ -115,6 +139,7 @@ def build_report(args: argparse.Namespace) -> dict[str, object]:
             "--binary sha256 does not match the reviewed ShooterGameServer hash "
             f"{EXPECTED_SHOOTERGAME_SHA256}: {binary_sha}"
         )
+    core_sha = sha256_file(core)
 
     artifact_root = validate_artifact_root(args.artifact_root)
     run_root = artifact_root / f"{PLAYER_IDENTITY_RAW_RUN_PREFIX}{run_id}"
@@ -124,10 +149,18 @@ def build_report(args: argparse.Namespace) -> dict[str, object]:
 
     output_binary = raw_dir / "ShooterGameServer"
     output_core = raw_dir / "core"
+    core_evidence_pack_dir = run_root / "core-evidence-pack"
+    core_evidence_pack_manifest = core_evidence_pack_dir / "manifest.json"
+    ensure_directory_slot(run_root, "run directory")
+    ensure_directory_slot(raw_dir, "raw directory")
     ensure_output_slot(output_binary, "output ShooterGameServer")
     ensure_output_slot(output_core, "output core")
+    ensure_output_slot(core_evidence_pack_dir, "output core evidence pack directory")
 
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        raw_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        fail(f"failed to create raw directory {raw_dir}: {exc}")
     try:
         stage_file(binary, output_binary, args.mode)
         stage_file(core, output_core, args.mode)
@@ -140,34 +173,84 @@ def build_report(args: argparse.Namespace) -> dict[str, object]:
                 pass
         fail(f"failed to stage raw inputs with mode={args.mode}: {exc}")
 
+    obelisk_commit = detect_obelisk_commit()
+    next_command_argv = [
+        "python3",
+        "scripts/build_core_dump_evidence_pack.py",
+        "--binary",
+        str(output_binary),
+        "--core",
+        str(output_core),
+        "--output-dir",
+        str(core_evidence_pack_dir),
+        "--obelisk-commit",
+        obelisk_commit,
+        "--no-default-candidates",
+        "--no-default-fname-roots",
+        "--no-default-fname-indices",
+        "--fname-root-slot",
+        "verified_fname_root_slot=0x5956f30",
+        "--fname-index",
+        "None=0",
+        "--fname-index",
+        "ClientMessage=4884",
+        "--fname-index",
+        "ServerChat=9619",
+        "--fname-index",
+        "SetActiveMissionDebugFlags=9622",
+        "--gobjects-candidate",
+        "gobjects=0x595b7e0",
+        "--gobjects-sample-index",
+        "0",
+        "--gobjects-sample-index",
+        "1",
+        "--gobjects-sample-index",
+        "25447",
+    ]
+
     return {
         "schema": REPORT_SCHEMA,
         "ready_for_core_evidence_pack_command": True,
         "run_root": str(run_root),
         "raw_dir": str(raw_dir),
+        "core_evidence_pack": {
+            "output_dir": str(core_evidence_pack_dir),
+            "manifest": str(core_evidence_pack_manifest),
+        },
+        "obelisk": {
+            "commit": obelisk_commit,
+            "commit_source": "git rev-parse --short=12 HEAD",
+        },
+        "reviewed_seed_scope": {
+            "binary_sha256": EXPECTED_SHOOTERGAME_SHA256,
+            "fname_root_slot": "0x5956f30",
+            "fname_indices": {
+                "None": 0,
+                "ClientMessage": 4884,
+                "ServerChat": 9619,
+                "SetActiveMissionDebugFlags": 9622,
+            },
+            "gobjects_candidate": "0x595b7e0",
+            "gobjects_sample_indices": [0, 1, 25447],
+            "non_claim": "binary-hash-scoped reviewed seed only; not a stable offset or public SDK promotion",
+        },
         "binary": {
             "source": str(binary),
             "staged": str(output_binary),
             "sha256": binary_sha,
+            "size_bytes": binary.stat().st_size,
             "matches_reviewed_hash": True,
         },
         "core": {
             "source": str(core),
             "staged": str(output_core),
+            "sha256": core_sha,
+            "size_bytes": core.stat().st_size,
         },
         "mode": args.mode,
-        "next_command": (
-            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py "
-            f"--binary {output_binary} --core {output_core} "
-            f"--output-dir {run_root / 'core-evidence-pack'} "
-            "--obelisk-commit <reviewed-obelisk-id> "
-            "--no-default-candidates --no-default-fname-roots --no-default-fname-indices "
-            "--fname-root-slot verified_fname_root_slot=0x5956f30 "
-            "--fname-index None=0 --fname-index ClientMessage=4884 "
-            "--fname-index ServerChat=9619 --fname-index SetActiveMissionDebugFlags=9622 "
-            "--gobjects-candidate gobjects=0x595b7e0 "
-            "--gobjects-sample-index 0 --gobjects-sample-index 1 --gobjects-sample-index 25447"
-        ),
+        "next_command_env": {"PYTHONDONTWRITEBYTECODE": "1"},
+        "next_command_argv": next_command_argv,
+        "next_command": f"PYTHONDONTWRITEBYTECODE=1 {shlex.join(next_command_argv)}",
         "non_claims": [
             "does not create a core dump",
             "does not validate that the core is usable for player identity evidence",

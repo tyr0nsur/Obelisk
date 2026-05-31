@@ -16,6 +16,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_structure_census_readiness.py"
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 DEFAULT_ROOT = Path(
     "/home/flowcommunity-ark/obelisk-artifacts/structure-aggregate-census-policy-slice-20260531T034715Z"
 )

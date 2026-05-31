@@ -245,6 +245,13 @@ priorities, and do not use history files as the active source of truth.
   coverage, then plan only the exact `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` targets; do not use the full target set to
   emit focal plans.
+- Player identity offline staging has a helper for the raw sibling layout:
+  `scripts/prepare_player_identity_offline_raw_layout.py`. Use it only to stage explicit
+  non-protected offline `ShooterGameServer` and core inputs into
+  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
+  It does not create or approve cores, touch protected server paths, or authorize server
+  access or runtime/core changes. The detailed stop/continue recipe remains in
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - Player identity has a candidate-only privacy/invalidation contract in
   `docs/research/2026-05-31-player-identity-privacy-invalidation-contract.md`: future
   principals must be opaque copied POD values, generation-checked, process-local by
