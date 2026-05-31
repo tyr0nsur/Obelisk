@@ -122,18 +122,8 @@ def sha256_file(path: Path) -> str:
 
 
 def detect_obelisk_commit() -> str:
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short=12", "HEAD"],
-            check=True,
-            text=True,
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
-    return result.stdout.strip() or "unknown"
+    env_commit = os.environ.get("OBELISK_COMMIT", "").strip()
+    return env_commit or "unknown"
 
 
 def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, Any]:
@@ -947,6 +937,10 @@ def build_operator_next_commands(
             "status": staging_status,
             "ready": False,
             "blocked_until": staging_blocked_until,
+            "explicit_source_inputs_required": [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
             "requires": [
                 "matching_non_protected_shooter_game_server",
                 "non_protected_core_dump_input",
@@ -1148,7 +1142,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     next_operator_recipe = {
         "blocked_until": "accepted_reflection_inventory_pack",
         "obelisk_commit": obelisk_commit,
-        "obelisk_commit_source": "git rev-parse --short=12 HEAD",
+        "obelisk_commit_source": "OBELISK_COMMIT environment variable if set; otherwise unknown",
         "build_core_evidence_pack": (
             "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py "
             f"--binary {raw_binary_pattern} "

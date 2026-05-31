@@ -5,6 +5,10 @@ safe by default.
 
 Support tier: release-supported seed.
 
+The support tier applies to lifecycle, config, metadata, shutdown, and guarded callback
+registration mechanics. The optional chat command helper remains an experimental,
+plugin-local pattern and is not part of the release-supported seed tier.
+
 It demonstrates plugin lifecycle, config, and filtered `ProcessEvent` callback mechanics.
 The promoted v0.1 gameplay callback path is `GameplayPolicyEvent`; use
 `DescribeGameplayPolicyEventKind` and `DescribeResourceKind` for metadata-only descriptions

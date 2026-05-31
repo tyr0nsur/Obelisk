@@ -21,7 +21,7 @@ with `Support tier: <tier>`. Review must fail if that text claims v1 readiness,
 ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies, mutation,
 storage, inventory, or structure support outside the declared tier.
 
-## Production Seeds Today
+## Release-Supported Seeds Today
 
 Release-supported seeds are limited to:
 

@@ -11,8 +11,8 @@ Support tier: release-supported seed.
 - `RegisterTimerWithOwnerTokenHandle`
 - `UnregisterTimerWithOwnerToken`
 
-It demonstrates one production seed surface: process-local owner-token timers. Timer IDs
-are runtime handles only. They are not stable across process restarts, ARK server
+It demonstrates one release-supported seed surface: process-local owner-token timers.
+Timer IDs are runtime handles only. They are not stable across process restarts, ARK server
 instances, maps, plugin reloads, or cluster nodes, and must never be persisted in shared
 configuration or storage.
 

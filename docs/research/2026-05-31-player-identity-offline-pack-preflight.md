@@ -96,6 +96,10 @@ of existing gates:
 If a matching non-protected `ShooterGameServer` is present but the non-protected core
 input is absent, `progress_signal.primary_blocker` reports
 `non_protected_core_input_missing` and the top-level `status` remains `blocked`.
+In that state, `operator_next_commands.runnable_now=[]`,
+`operator_next_commands.ready_to_build_core_evidence_pack=false`, and
+`operator_next_commands.input_staging.status=blocked` until an explicit
+non-protected core input is supplied alongside the matching offline binary.
 The signal must not be read as progress beyond the underlying fail-closed checks.
 
 The durable root currently contains normalized artifact packs and a ScriptStruct inventory
@@ -246,6 +250,11 @@ Use the staging helper when the source binary/core already exist as explicit
 non-protected files. It verifies the reviewed `ShooterGameServer` SHA, rejects symlinks
 and protected paths, and prepares the exact raw sibling layout without creating or
 validating a core:
+
+The readiness report's first staging command intentionally requires both
+`matching_non_protected_shooter_game_server` and `non_protected_core_dump_input` as
+explicit source inputs. A matching binary already present under the artifact root does
+not make the command runnable while the core input is missing.
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/prepare_player_identity_offline_raw_layout.py \

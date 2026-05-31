@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import runpy
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -477,7 +478,7 @@ PLUGIN_HUB_SUPPORT_TIERS = (
     "blocked backlog",
 )
 PLUGIN_HUB_SUPPORT_TIER_DECLARATION_RE = re.compile(
-    r"\b(?:declared\s+)?support[_ -]tier\b\s*[:=]\s*[\"'`]*"
+    r"[\"'`]*\b(?:declared\s+)?support[_ -]tier\b[\"'`]*\s*[:=]\s*[\"'`]*"
     r"(release-supported seed|experimental pattern|blocked backlog)"
     r"[\"'`]*\b",
     re.IGNORECASE,
@@ -2123,6 +2124,75 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ResourceHandle",
         ):
             self.assertIn(exclusion, inventory["exclusions"])
+
+    def test_inventory_copied_signals_cannot_stand_in_for_inventory_sdk_or_identity_completion(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        copied_signals = surfaces["obelisk.inventory_item_copied_signals.v1"]
+        inventory_mutation = surfaces["obelisk.inventory_items_mutation.v1"]
+        player_identity = surfaces["obelisk.player_identity.v1"]
+        compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
+
+        self.assertFalse(manifest["v1_completion_required"])
+        self.assertEqual(copied_signals["status"], "promoted-experimental-only")
+        self.assertEqual(copied_signals["support_tier"], "experimental Plugin Hub seed")
+        self.assertIn(copied_signals["id"], manifest["experimental_surfaces"])
+        self.assertNotIn(copied_signals["id"], manifest["promoted_surfaces"])
+        self.assertNotIn(copied_signals["id"], manifest["v1_sdk_completion_blockers"])
+
+        copied_signal_contract = normalized(
+            json.dumps(
+                {
+                    "public_contract": copied_signals.get("public_contract", []),
+                    "payload_contract": copied_signals.get("payload_contract", []),
+                },
+                sort_keys=True,
+            )
+        )
+        for forbidden in (
+            "Inventory SDK",
+            "Items SDK",
+            "item identity",
+            "inventory identity",
+            "ItemNetID identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+            "grant/remove",
+        ):
+            with self.subTest(scope="copied signal contract", forbidden=forbidden):
+                self.assertNotIn(normalized(forbidden), copied_signal_contract)
+
+        for required_exclusion in (
+            "Inventory SDK",
+            "Items SDK",
+            "item identity",
+            "inventory identity",
+            "ItemNetID identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+        ):
+            with self.subTest(scope="copied signal exclusions", exclusion=required_exclusion):
+                self.assertIn(required_exclusion, copied_signals["exclusions"])
+
+        self.assertEqual(inventory_mutation["status"], "post-v1")
+        self.assertEqual(inventory_mutation["public_contract"], [])
+        self.assertIn(inventory_mutation["id"], manifest["v1_sdk_completion_blockers"])
+        self.assertIn(inventory_mutation["id"], manifest["post_v1_or_excluded_surfaces"])
+        self.assertNotIn(inventory_mutation["id"], manifest["promoted_surfaces"])
+        self.assertEqual(player_identity["status"], "planning")
+        self.assertIn(player_identity["id"], manifest["v1_sdk_completion_blockers"])
+        self.assertNotIn(player_identity["id"], manifest["promoted_surfaces"])
+
+        for doc_phrase in (
+            "It is not an\nInventory SDK, Items SDK, StructureEvents SDK, identity API, lookup API, mutation API, or\nreturn-override API",
+            "These remain post-original copied signals,\nnot item identity, inventory lookup, mutation, `ResourceHandle`, rollback, or grant/remove\nauthority",
+        ):
+            with self.subTest(scope="compatibility doc", phrase=doc_phrase):
+                self.assertIn(normalized(doc_phrase), compatibility)
 
     def test_public_sdk_surfaces_manifest_names_high_demand_umbrella_audit_units(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -6952,6 +7022,37 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertTrue(any("ArkApi compatible" in offender for offender in offenders))
         self.assertTrue(any("structure support" in offender for offender in offenders))
 
+    def test_plugin_hub_seed_review_discovers_package_metadata_without_readme(self) -> None:
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "examples",
+            prefix="plugin_hub_metadata_guardrail_",
+        ) as temp_dir:
+            metadata_path = Path(temp_dir) / "plugin.json"
+            metadata_path.write_text(
+                json.dumps(
+                    {
+                        "plugin_id": "example.metadata_only_seed",
+                        "support_tier": "release-supported seed",
+                        "description": "Supports ArkApi compatible command routing.",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            review_paths = {path.resolve() for path in plugin_hub_seed_review_files()}
+            self.assertIn(metadata_path.resolve(), review_paths)
+
+            text = metadata_path.read_text(encoding="utf-8")
+            declarations = plugin_hub_support_tier_declarations(text)
+            self.assertEqual(declarations, ["release-supported seed"])
+            offenders = plugin_hub_seed_forbidden_claims(
+                text,
+                metadata_path.relative_to(REPO_ROOT).as_posix(),
+                declarations[0],
+            )
+
+        self.assertTrue(any("ArkApi compatible command routing" in offender for offender in offenders))
+
     def test_plugin_hub_descriptor_catalog_seed_wording_stays_scaffolded_not_prebuilt(self) -> None:
         contributor_path = (
             REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md"
@@ -7409,6 +7510,100 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(blocker=blocker):
                 self.assertIn(blocker, payload["blockers"])
+
+    def test_static_orientation_and_command_chat_schemas_are_not_artifact_gate_or_v1_promotion_evidence(self) -> None:
+        scripts_dir = REPO_ROOT / "scripts"
+        original_sys_path = list(sys.path)
+        sys.path.insert(0, str(scripts_dir))
+        try:
+            gate = runpy.run_path(
+                str(scripts_dir / "validate_offline_artifact_gate.py"),
+                run_name="__not_main__",
+            )
+        finally:
+            sys.path[:] = original_sys_path
+        checker = runpy.run_path(
+            str(scripts_dir / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+
+        schemas = (
+            "obelisk.command-chat-response-static-orientation-check.v1",
+            "obelisk.player-identity-static-target-orientation.v1",
+            "obelisk.player-identity-static-orientation-check.v1",
+            "obelisk.player-identity-static-lifecycle-orientation-check.v1",
+            "obelisk.static-candidate-orientation-contract.v1",
+        )
+        for schema in schemas:
+            with self.subTest(schema=schema, gate="offline artifact"):
+                self.assertNotIn(schema, gate["SUPPORTED_MANIFEST_SCHEMAS"])
+            with self.subTest(schema=schema, gate="public sdk v1 promotion evidence"):
+                self.assertTrue(
+                    checker["evidence_has_non_promotional_schema_marker"](
+                        {
+                            "schemas": [schema],
+                            "promotion_status": "promoted",
+                            "public_sdk_ready": True,
+                        }
+                    )
+                )
+
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="CommandChatResponsePathPromotion",
+            ) as command_core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="command_chat_response_path_promotion",
+            ) as command_sdk_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PlayerIdentityPromotion",
+            ) as identity_core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="player_identity_promotion",
+            ) as identity_sdk_dir,
+        ):
+            command_core_test = Path(command_core_dir) / "CommandChatResponsePathPromotionTests.cpp"
+            command_sdk_test = Path(command_sdk_dir) / "command_chat_response_path_promotion_plugin.c"
+            identity_core_test = Path(identity_core_dir) / "PlayerIdentityPromotionTests.cpp"
+            identity_sdk_test = Path(identity_sdk_dir) / "player_identity_promotion_plugin.c"
+            for path in (command_core_test, command_sdk_test, identity_core_test, identity_sdk_test):
+                path.write_text("// synthetic promotion evidence fixture\n", encoding="utf-8")
+
+            base_evidence_by_surface = {
+                "obelisk.command_chat_response_path.v1": {
+                    "surface_id": "obelisk.command_chat_response_path.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(command_core_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(command_sdk_test.relative_to(REPO_ROOT))],
+                },
+                "obelisk.player_identity.v1": {
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(identity_core_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(identity_sdk_test.relative_to(REPO_ROOT))],
+                },
+            }
+            for surface_id, base_evidence in base_evidence_by_surface.items():
+                with self.subTest(surface=surface_id, schema="none"):
+                    self.assertTrue(
+                        checker["surface_has_promotion_evidence"](
+                            {"id": surface_id, "evidence": base_evidence}
+                        )
+                    )
+                for schema in schemas:
+                    evidence = {**base_evidence, "schemas": [schema]}
+                    with self.subTest(surface=surface_id, schema=schema):
+                        self.assertFalse(
+                            checker["surface_has_promotion_evidence"](
+                                {"id": surface_id, "evidence": evidence}
+                            )
+                        )
 
     def test_latest_v1_sdk_round_note_does_not_imply_public_or_runtime_promotion(self) -> None:
         note = LATEST_V1_SDK_ROUND_RESEARCH_NOTE.read_text(encoding="utf-8")

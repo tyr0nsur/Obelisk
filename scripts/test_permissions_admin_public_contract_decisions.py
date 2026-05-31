@@ -236,6 +236,52 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         ):
             self.assertIn(term, promotion_requires)
 
+    def test_unresolved_pre_header_decisions_are_reflected_in_public_surface_contract(self) -> None:
+        decisions = self.load_decisions()
+        surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+        by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
+        permissions = by_id["obelisk.permissions_admin.v1"]
+
+        unresolved_ids = {
+            item["id"]
+            for item in decisions["required_before_public_header"]
+            if item.get("status") != "resolved"
+        }
+        self.assertEqual(unresolved_ids, REQUIRED_IDS)
+        self.assertTrue(permissions["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"])
+        self.assertEqual(permissions["public_contract"], [])
+
+        surface_contract = " ".join(
+            json.dumps(
+                {
+                    "v1_decision_contract": permissions["v1_decision_contract"],
+                    "blockers": permissions["blockers"],
+                    "exclusions": permissions["exclusions"],
+                },
+                sort_keys=True,
+            ).split()
+        )
+        for term in (
+            "player identity",
+            "principal_generation",
+            "principal_scope_flags",
+            "stale principal",
+            "scope mismatch",
+            "unknown authority source",
+            "owner token",
+            "capability",
+            "policy",
+            "abuse controls",
+            "privacy boundaries",
+            "command router",
+            "replies/send-chat",
+            "ban/kick API",
+            "storage/persistence",
+            "operator ingress",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, surface_contract)
+
 
 if __name__ == "__main__":
     unittest.main()

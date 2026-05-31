@@ -99,6 +99,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   and command/chat response are explicitly not offline artifact-gate schemas. They must
   fail closed both as `--manifest` inputs and as `--artifact` inputs even with valid
   provenance sidecars; they are navigation clues only, not consume/promote evidence packs.
+- The current artifact-root audit is summarized in
+  `docs/research/2026-05-31-offline-artifact-inventory-audit.md`: usable roots are
+  layout-only, evidence-only, or consume-only, command/chat response remains
+  orientation-only, and player identity is still blocked on a non-protected core plus a
+  complete reflection inventory pack.
 - Inventory, structures, missions, transfers, dinos, buffs, tribes, ResourceHandle, and
   GObjects remain internal/candidate unless promoted through their own copied ABI, privacy,
   lifecycle, and evidence gates. While identity waits on copied core evidence, inventory

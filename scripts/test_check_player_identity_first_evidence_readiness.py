@@ -177,7 +177,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         recipe = payload["next_operator_recipe"]
         self.assertEqual(recipe["blocked_until"], "accepted_reflection_inventory_pack")
         self.assertNotIn("<reviewed-obelisk-id>", json.dumps(payload))
-        self.assertEqual(recipe["obelisk_commit_source"], "git rev-parse --short=12 HEAD")
+        self.assertEqual(
+            recipe["obelisk_commit_source"],
+            "OBELISK_COMMIT environment variable if set; otherwise unknown",
+        )
         self.assertIn("build_core_dump_evidence_pack.py", recipe["build_core_evidence_pack"])
         self.assertIn("--binary", recipe["build_core_evidence_pack"])
         self.assertIn("--core", recipe["build_core_evidence_pack"])
@@ -322,6 +325,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(input_staging["id"], "stage_offline_raw_layout")
         self.assertEqual(input_staging["status"], "blocked")
         self.assertFalse(input_staging["ready"])
+        self.assertEqual(
+            input_staging["explicit_source_inputs_required"],
+            [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+        )
         self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
         self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
         self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
@@ -570,6 +580,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(input_staging["status"], "blocked")
         self.assertFalse(input_staging["ready"])
         self.assertEqual(input_staging["blocked_until"], "non_protected_core_dump_input")
+        self.assertEqual(
+            input_staging["explicit_source_inputs_required"],
+            [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+        )
         self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
         self.assertIn("--binary /tmp/artifacts/raw/ShooterGameServer", input_staging["command"])
         self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
@@ -659,6 +676,30 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["progress_signal"]["primary_blocker"], "non_protected_core_input_missing")
         self.assertFalse(payload["progress_signal"]["coverage"]["reflection_inventory_accepted"])
         self.assertEqual(payload["progress_signal"]["missing"]["operator_inputs"], ["non_protected_core_dump_input"])
+        operator_commands = payload["operator_next_commands"]
+        self.assertEqual(operator_commands["runnable_now"], [])
+        self.assertFalse(operator_commands["ready_to_build_core_evidence_pack"])
+        self.assertTrue(operator_commands["inputs"]["matching_non_protected_shooter_game_server"]["present"])
+        self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
+        input_staging = operator_commands["input_staging"]
+        self.assertEqual(input_staging["status"], "blocked")
+        self.assertFalse(input_staging["ready"])
+        self.assertEqual(input_staging["blocked_until"], "non_protected_core_dump_input")
+        self.assertEqual(
+            input_staging["explicit_source_inputs_required"],
+            [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+        )
+        self.assertIn(
+            "--binary /tmp/player-identity-artifacts/player-identity-offline-a/raw/ShooterGameServer",
+            input_staging["command"],
+        )
+        self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
+        self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
+        self.assertFalse(operator_commands["sequence"][0]["ready"])
+        self.assertEqual(operator_commands["sequence"][0]["blocked_until"], "non_protected_core_dump_input")
 
     def test_next_actionable_blocker_reports_unpaired_core_and_binary(self) -> None:
         blocker = checker.next_actionable_blocker(
