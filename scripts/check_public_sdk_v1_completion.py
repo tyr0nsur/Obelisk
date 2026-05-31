@@ -51,6 +51,12 @@ CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.chat.local_routing.v1",
     "obelisk.inventory_item_copied_signals.v1",
 }
+CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT = {
+    "obelisk.gameplay_policy_event.v1": ("GameplayPolicyEvent", "not included in v1"),
+    "obelisk.chat_message.v1": ("ChatMessageEvent", "not included in v1"),
+    "obelisk.chat.local_routing.v1": ("chat routing", "not included in v1"),
+    "obelisk.inventory_item_copied_signals.v1": ("inventory copied signals", "not included in v1"),
+}
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
     "obelisk.debug_raw_process_event.v1",
@@ -163,6 +169,46 @@ def required_release_statement_text(requirement: str) -> str | None:
     return requirement
 
 
+def required_release_statement_outcomes(surface: dict[str, Any]) -> set[str]:
+    contract = surface.get("v1_decision_contract")
+    if not isinstance(contract, dict):
+        status = surface.get("status")
+        return {status} if status in {"excluded", "post-v1"} else set()
+    required = as_string_list(contract.get("exclusion_requires"))
+    outcomes: set[str] = set()
+    surface_id = surface.get("id")
+    if not isinstance(surface_id, str):
+        return outcomes
+    prefix = f"the v1 release statement names {surface_id} as "
+    for requirement in required:
+        lowered = requirement.lower()
+        if not lowered.startswith(prefix.lower()):
+            continue
+        suffix = lowered[len(prefix) :]
+        if "post-v1" in suffix:
+            outcomes.add("post-v1")
+        if "excluded" in suffix:
+            outcomes.add("excluded")
+    if outcomes:
+        return outcomes
+    status = surface.get("status")
+    return {status} if status in {"excluded", "post-v1"} else set()
+
+
+def release_statement_record_has_contradiction(record: str) -> bool:
+    lowered = record.lower()
+    if re.search(r"\b(?:not true that|false that|actually included|included despite|contradict)\b", lowered):
+        return True
+    return (
+        re.search(
+            r"\b(?:except|other than|unless|but|however)\b[^.;\n]*"
+            r"\b(?:included|available|supported|shipped)\b",
+            lowered,
+        )
+        is not None
+    )
+
+
 def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str, Any]) -> bool:
     contract = surface.get("v1_decision_contract")
     if not isinstance(contract, dict):
@@ -179,10 +225,20 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
     if record is None:
         return False
     lowered = record.lower()
-    if re.search(r"\b(?:not true that|false that|actually included|included despite|contradict)\b", lowered):
+    if release_statement_record_has_contradiction(record):
         return False
     required_text = [item for item in (required_release_statement_text(item) for item in required) if item]
     return all(item.lower() in lowered for item in required_text)
+
+
+def release_statement_satisfies_experimental_outcome(text: str, surface_id: str, status: str) -> bool:
+    expected = "post-v1" if status == "post-v1" else "excluded"
+    record = release_statement_surface_record(text, surface_id, expected)
+    if record is None or release_statement_record_has_contradiction(record):
+        return False
+    required_terms = CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT.get(surface_id, ())
+    lowered = record.lower()
+    return all(term.lower() in lowered for term in required_terms)
 
 
 def repo_relative_evidence_path(raw_path: str) -> Path | None:
@@ -391,7 +447,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 release_statement_missing_experimental_outcomes.append(surface_id)
             elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
                 release_statement_duplicate_records.append(surface_id)
-            elif not release_statement_names_outcome(release_statement_text, surface_id, status):
+            elif not release_statement_satisfies_experimental_outcome(release_statement_text, surface_id, status):
                 release_statement_missing_experimental_outcomes.append(surface_id)
             continue
         unresolved_experimental.append(surface_id)
@@ -412,6 +468,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 contract = surface.get("v1_decision_contract")
                 if not isinstance(contract, dict) or not as_string_list(contract.get("exclusion_requires")):
                     missing_completion_blocker_exclusion_contracts.append(surface_id)
+                    continue
+                allowed_outcomes = required_release_statement_outcomes(surface)
+                if status not in allowed_outcomes:
+                    release_statement_missing_contracts.append(surface_id)
                     continue
             if release_statement_text is None:
                 release_statement_missing_blockers.append(surface_id)

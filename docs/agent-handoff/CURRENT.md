@@ -114,6 +114,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   acceptance, promote gate blocking, exact copied/redacted/excluded field sets, and
   `public_sdk_ready=false`/`runtime_ready=false`/`promotion_ready=false`; it is not an
   artifact gate, public ABI, runtime validation, or Structure SDK promotion.
+- `scripts/check_mission_copied_bool_readiness.py --json` validates the current Mission
+  copied-bool tail policy-slice pack for internal planning only. It pins the direct
+  manifest SHA256, requires current consume gate acceptance, promote gate blocking, exact
+  five-field copied bool-tail metadata, exact six-field redaction, and
+  `public_sdk_ready=false`/`runtime_ready=false`/`promotion_ready=false`. The older
+  `mission-copied-bool-policy-slice-20260530T072912Z` pack is stale against current
+  bool-tail requirements and must not be used for this lane.
 - Item return-only bridge hardening now keeps copied dispatch construction in `ProcessEventItemReflection` helpers, with unit coverage for the three supported event kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact `ReturnValue` scalar scope, attempt-budgeted runtime reads, and no identity/mutation/return-override leakage. Dispatcher hot-path allocation has a local benchmark gate for no-subscriber and <=4-subscriber snapshots; do not expand it unless profiling justifies a larger callback snapshot strategy.
 - Structure and Inventory dispatcher hot-path allocation now have local benchmark gates for invalid event, no-subscriber, four-subscriber stack snapshot, and five-subscriber heap fallback behavior. Keep these internal guardrails before adding more runtime copied-event producers; they do not promote public Inventory SDK, StructureEvents, identity, mutation, return override, or runtime validation.
 - Structure second-wave remains offline-only. Use `scripts/build_reflection_inventory_pack.py --plan-target Outer.Name` to produce a candidate-only focal plan from a complete non-protected evidence-pack manifest; the planner now uses unfiltered redacted inventory for exact matches, blocks unsafe/incomplete FName-root inputs before command emission, requires explicit artifact identity for direct-core planning, and remains planning-only. Then generate one sanitized snapshot and a distinct second-source compare. Fixture/rootless reports remain negative guardrails; do not add these keys to release target sets, ABI enums, descriptors, dispatchers, public docs, or runtime gates.
@@ -180,6 +187,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   ABI evidence and SDK-consumer evidence, not just one valid machine-evidence bucket.
 - The v1 completion checker also applies strict structured promotion evidence to canonical
   experimental public ABI seeds before they can become stable v1 surfaces.
+- The v1 completion checker now also rejects release-statement shortcuts that try to mark
+  a completion blocker as `post-v1` when its `v1_decision_contract` requires `excluded`,
+  rejects vague canonical experimental-surface outcomes that omit the named surface and
+  `not included in v1` wording, and rejects contradictory exception clauses after required
+  exclusion text.
 - `obelisk.operator_ingress_storage.v1` is not unlocked by player identity/principal evidence; it remains a separate post-v1 blocker until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are proven or explicitly excluded.
 - `obelisk.player_services_economy_mobility.v1` is a v1 blocker umbrella only, not a future monolithic public API. Future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy after identity, permissions, storage/persistence, privacy, audit, rollback, and abuse controls are proven. Economy and mobility require promoted identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.
 - Player identity focal snapshot planning must start from a complete non-protected `obelisk.reflection-inventory-pack.v1` with `target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set and rows for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`. After that pack is reviewed, use `scripts/plan_ufunction_focal_snapshots.py` with exactly two `--target` arguments for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`; do not use `--target-set players-identity-lifecycle-intake` to emit plans.
