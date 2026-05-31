@@ -458,6 +458,38 @@ def second_source_total(coverage_payload: dict[str, Any] | None, key: str) -> in
     return value if isinstance(value, int) else None
 
 
+def second_source_layout_accepted(
+    *,
+    coverage_payload_valid: bool,
+    coverage_targets: Any,
+    coverage_comparable: Any,
+    coverage_blocked: Any,
+    second_source_accepted: int | None,
+    second_source_missing: int | None,
+    second_source_inconclusive: int | None,
+    second_source_rejected: int | None,
+) -> bool:
+    accepted_count = second_source_accepted
+    if (
+        accepted_count is None
+        and second_source_missing == 0
+        and second_source_inconclusive == 0
+        and second_source_rejected == 0
+        and coverage_comparable == coverage_targets
+    ):
+        accepted_count = coverage_comparable
+    return (
+        coverage_payload_valid
+        and coverage_targets == PLAYER_IDENTITY_TARGET_COUNT
+        and coverage_comparable == PLAYER_IDENTITY_TARGET_COUNT
+        and coverage_blocked == 0
+        and accepted_count == PLAYER_IDENTITY_TARGET_COUNT
+        and second_source_missing == 0
+        and second_source_inconclusive == 0
+        and second_source_rejected == 0
+    )
+
+
 def coverage_payload_has_required_totals(coverage_payload: dict[str, Any] | None) -> bool:
     if not isinstance(coverage_payload, dict):
         return False
@@ -475,6 +507,59 @@ def coverage_payload_has_required_totals(coverage_payload: dict[str, Any] | None
             "second_source_rejected",
         )
     )
+
+
+def build_layout_lifecycle_state(
+    *,
+    layout_accepted: bool,
+    second_source_accepted: int | None,
+    second_source_missing: int | None,
+    second_source_inconclusive: int | None,
+    second_source_rejected: int | None,
+    lifecycle_ready: bool,
+    lifecycle_diagnosis: dict[str, Any],
+) -> dict[str, Any]:
+    lifecycle_invalidation_remains = layout_accepted and not lifecycle_ready
+    if lifecycle_invalidation_remains:
+        status = "second_source_layout_accepted_lifecycle_invalidation_remains"
+        statement = "second-source layout accepted; lifecycle invalidation remains"
+        remaining_work = [
+            "accepted_lifecycle_anchor_evidence",
+            "principal_invalidation_semantics",
+        ]
+    elif layout_accepted:
+        status = "second_source_layout_accepted_candidate_only"
+        statement = "second-source layout accepted; candidate-only validation remains"
+        remaining_work = []
+    else:
+        status = "second_source_layout_not_accepted"
+        statement = "second-source layout not accepted"
+        remaining_work = ["accepted_distinct_second_source_layout"]
+
+    return {
+        "status": status,
+        "statement": statement,
+        "second_source_layout_accepted": layout_accepted,
+        "second_source_accepted": second_source_accepted,
+        "second_source_missing": second_source_missing,
+        "second_source_inconclusive": second_source_inconclusive,
+        "second_source_rejected": second_source_rejected,
+        "lifecycle_invalidation_remains": lifecycle_invalidation_remains,
+        "lifecycle_anchor_ready": lifecycle_ready,
+        "lifecycle_anchor_blockers": (
+            lifecycle_diagnosis.get("blockers")
+            if isinstance(lifecycle_diagnosis.get("blockers"), list)
+            else []
+        ),
+        "remaining_work": remaining_work,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "non_claims": [
+            "layout acceptance is planning-only evidence and does not promote public identity, permissions, commands, lookup, ResourceHandle, mutation, return override, runtime hooks, or SDK surface",
+            "lifecycle invalidation still requires a reviewed fail-closed identity/principal policy before public promotion",
+        ],
+    }
 
 
 def string_list(value: Any) -> list[str]:
@@ -1124,6 +1209,7 @@ def build_progress_signal(
     lifecycle_diagnosis: dict[str, Any],
     next_blocker: dict[str, Any],
     operator_next_commands: dict[str, Any],
+    layout_lifecycle_state: dict[str, Any],
 ) -> dict[str, Any]:
     """Small operator-facing summary derived from the report's existing gates."""
 
@@ -1144,6 +1230,7 @@ def build_progress_signal(
         "status": status,
         "ready": ready,
         "primary_blocker": primary_blocker,
+        "statement": layout_lifecycle_state.get("statement"),
         "coverage": {
             "target_set": PLAYER_IDENTITY_TARGET_SET,
             "reflection_inventory_accepted": inventory_ready,
@@ -1154,6 +1241,12 @@ def build_progress_signal(
                 "inconclusive": second_source_inconclusive,
                 "rejected": second_source_rejected,
             },
+        },
+        "layout_lifecycle_state": {
+            "status": layout_lifecycle_state.get("status"),
+            "second_source_layout_accepted": layout_lifecycle_state.get("second_source_layout_accepted"),
+            "lifecycle_invalidation_remains": layout_lifecycle_state.get("lifecycle_invalidation_remains"),
+            "remaining_work": layout_lifecycle_state.get("remaining_work"),
         },
         "missing": {
             "required_targets": missing_targets,
@@ -1237,6 +1330,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     coverage_targets = coverage_totals.get("targets")
     coverage_comparable = coverage_totals.get("comparable")
     coverage_blocked = coverage_totals.get("blocked")
+    second_source_accepted = second_source_total(coverage_payload, "second_source_accepted")
     second_source_missing = second_source_missing_count(coverage_payload)
     second_source_inconclusive = second_source_total(coverage_payload, "second_source_inconclusive")
     second_source_rejected = second_source_total(coverage_payload, "second_source_rejected")
@@ -1251,6 +1345,25 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
+    )
+    layout_accepted = second_source_layout_accepted(
+        coverage_payload_valid=coverage_payload_valid,
+        coverage_targets=coverage_targets,
+        coverage_comparable=coverage_comparable,
+        coverage_blocked=coverage_blocked,
+        second_source_accepted=second_source_accepted,
+        second_source_missing=second_source_missing,
+        second_source_inconclusive=second_source_inconclusive,
+        second_source_rejected=second_source_rejected,
+    )
+    layout_lifecycle_state = build_layout_lifecycle_state(
+        layout_accepted=layout_accepted,
+        second_source_accepted=second_source_accepted,
+        second_source_missing=second_source_missing,
+        second_source_inconclusive=second_source_inconclusive,
+        second_source_rejected=second_source_rejected,
+        lifecycle_ready=lifecycle_ready,
+        lifecycle_diagnosis=lifecycle_diagnosis,
     )
     offline_inputs = bounded_artifact_file_scan(args.artifact_root)
 
@@ -1280,8 +1393,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         else "plan_missing_server_list_players_and_server_kick_player_snapshots"
     )
     if inventory_ready:
-        if first_evidence_ready and (second_source_missing or not lifecycle_ready):
+        if first_evidence_ready and not layout_accepted and not lifecycle_ready:
             next_step = "produce_distinct_second_source_and_accepted_lifecycle_anchor_evidence"
+        elif first_evidence_ready and not layout_accepted:
+            next_step = "produce_distinct_second_source_layout_evidence"
+        elif first_evidence_ready and not lifecycle_ready:
+            next_step = "produce_accepted_lifecycle_anchor_and_principal_invalidation_evidence"
         elif first_evidence_ready:
             next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
 
@@ -1390,6 +1507,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         lifecycle_diagnosis=lifecycle_diagnosis,
         next_blocker=next_blocker,
         operator_next_commands=operator_next_commands,
+        layout_lifecycle_state=layout_lifecycle_state,
     )
 
     return {
@@ -1406,6 +1524,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "blockers": blockers,
         "deferred_until_reflection_inventory_ready": [] if inventory_ready else downstream_blockers,
         "primary_blocker": next_blocker.get("code"),
+        "readiness_statement": layout_lifecycle_state["statement"],
+        "layout_lifecycle_state": layout_lifecycle_state,
         "progress_signal": progress_signal,
         "next_required_artifacts": [] if inventory_ready else [
             {
@@ -1511,9 +1631,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 else None
             ),
             "second_source_status": coverage_payload.get("second_source_status") if coverage_payload else None,
+            "second_source_accepted": second_source_accepted,
             "second_source_missing": second_source_missing,
             "second_source_inconclusive": second_source_inconclusive,
             "second_source_rejected": second_source_rejected,
+            "second_source_layout_accepted": layout_accepted,
         },
         "first_evidence": {
             "returncode": first_evidence_result.returncode,

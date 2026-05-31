@@ -61,6 +61,91 @@ def base_anchor(role: str, target: str) -> dict:
     }
 
 
+def lifecycle_layout_anchor(role: str, target: str) -> dict:
+    anchor = base_anchor(role, target)
+    anchor["accepted"] = True
+    anchor["acceptance_status"] = "layout_accepted_candidate_only"
+    anchor["corroboration"]["status"] = "second_source_accepted"
+    anchor["blockers"] = []
+    if target == "ShooterGameMode.HandleNewPlayer":
+        anchor["num_parms"] = 5
+        anchor["parms_size"] = 26
+        anchor["property_order"] = ["NewPlayer", "PlayerData", "PlayerCharacter", "bIsFromLogin", "ReturnValue"]
+        anchor["fields"] = [
+            {
+                "name": "NewPlayer",
+                "source_property_class": "ObjectProperty",
+                "direction": "in",
+                "offset": "0x0",
+                "element_size": 8,
+                "array_dim": 1,
+                "classification": "recognition_only",
+                "copied_scalar_eligibility": "recognition_only_object",
+            },
+            {
+                "name": "PlayerData",
+                "source_property_class": "ObjectProperty",
+                "direction": "in",
+                "offset": "0x8",
+                "element_size": 8,
+                "array_dim": 1,
+                "classification": "recognition_only",
+                "copied_scalar_eligibility": "recognition_only_object",
+            },
+            {
+                "name": "PlayerCharacter",
+                "source_property_class": "ObjectProperty",
+                "direction": "in",
+                "offset": "0x10",
+                "element_size": 8,
+                "array_dim": 1,
+                "classification": "recognition_only",
+                "copied_scalar_eligibility": "recognition_only_object",
+            },
+            {
+                "name": "bIsFromLogin",
+                "source_property_class": "BoolProperty",
+                "direction": "in",
+                "offset": "0x18",
+                "element_size": 1,
+                "array_dim": 1,
+                "classification": "copied_candidate",
+                "copied_scalar_eligibility": "candidate_non_identity_scalar",
+                "bool_masks": {"byte_mask": "0x01", "field_mask": "0xff"},
+            },
+            {
+                "name": "ReturnValue",
+                "source_property_class": "BoolProperty",
+                "direction": "out",
+                "offset": "0x19",
+                "element_size": 1,
+                "array_dim": 1,
+                "classification": "copied_candidate",
+                "copied_scalar_eligibility": "candidate_non_identity_scalar",
+                "bool_masks": {"byte_mask": "0x01", "field_mask": "0xff"},
+            },
+        ]
+    elif target == "ShooterGameMode.OnLogout":
+        anchor["num_parms"] = 1
+        anchor["parms_size"] = 8
+        anchor["property_order"] = ["Exiting"]
+        anchor["fields"] = [
+            {
+                "name": "Exiting",
+                "source_property_class": "ObjectProperty",
+                "direction": "in",
+                "offset": "0x0",
+                "element_size": 8,
+                "array_dim": 1,
+                "classification": "recognition_only",
+                "copied_scalar_eligibility": "recognition_only_object",
+            }
+        ]
+    else:
+        raise AssertionError(f"unknown lifecycle target {target}")
+    return anchor
+
+
 def manifest() -> dict:
     return {
         "schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
@@ -236,31 +321,85 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
 
-    def test_distinguishes_known_lifecycle_orientation_targets_not_accepted(self) -> None:
+    def test_consumes_corroborated_gamemode_layout_anchors_candidate_only(self) -> None:
         payload = manifest()
-        payload["candidate_anchors"][0] = base_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
-        payload["candidate_anchors"][1] = base_anchor("session_end", "ShooterGameMode.OnLogout")
+        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["session_end_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
+        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
+        payload["lifecycle_acceptance"]["blockers"] = ["principal_invalidation_semantics_unresolved"]
+        payload["safety_summary"]["accepted_anchor_count"] = 2
+        payload["safety_summary"]["field_count"] = 6
+        payload["safety_summary"]["copied_candidate_count"] = 2
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["ready"])
+        self.assertNotIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
+        self.assertEqual(report["accepted_start_targets"], ["ShooterGameMode.HandleNewPlayer"])
+        self.assertEqual(report["accepted_end_targets"], ["ShooterGameMode.OnLogout"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_promote_blocks_layout_anchors_on_invalidation_semantics(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["session_end_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
+        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
+        payload["safety_summary"]["accepted_anchor_count"] = 2
+
+        result = self.run_checker(payload, "--promote", check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promote_mode_principal_invalidation_semantics_unresolved", report["blockers"])
+        self.assertIn("promote_mode_players_identity_lifecycle_anchor_candidates_candidate_only", report["blockers"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+
+    def test_rejects_lifecycle_layout_anchor_shape_drift(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
+        payload["candidate_anchors"][0]["parms_size"] = 24
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["session_end_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
+        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
+        payload["safety_summary"]["accepted_anchor_count"] = 2
 
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
-        orientation_blockers = [
-            blocker
-            for blocker in report["blocker_details"]
-            if blocker["reason"] == "candidate_anchor_known_lifecycle_orientation_not_accepted"
-        ]
 
         self.assertEqual(result.returncode, 1)
-        self.assertNotIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
-        self.assertEqual(
-            {blocker["target"] for blocker in orientation_blockers},
-            {"ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"},
-        )
-        self.assertEqual(
-            {blocker["orientation_status"] for blocker in orientation_blockers},
-            {"static_orientation_only_not_in_closed_target_set"},
-        )
-        self.assertEqual(report["accepted_start_targets"], [])
-        self.assertEqual(report["accepted_end_targets"], [])
+        self.assertIn("candidate_layout_anchor_shape_mismatch", report["blockers"])
+
+    def test_rejects_lifecycle_object_field_public_copy_overclaim(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
+        payload["candidate_anchors"][0]["fields"][0]["classification"] = "copied_candidate"
+        payload["candidate_anchors"][0]["fields"][0]["copied_scalar_eligibility"] = "candidate_copied_public_identifier"
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["session_end_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
+        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
+        payload["safety_summary"]["accepted_anchor_count"] = 2
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("candidate_layout_object_field_not_redacted", report["blockers"])
+        self.assertIn("candidate_layout_object_field_public_overclaim", report["blockers"])
 
     def test_rejects_admin_snapshots_as_accepted_lifecycle_anchors(self) -> None:
         payload = manifest()

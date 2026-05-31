@@ -266,8 +266,7 @@ priorities, and do not use history files as the active source of truth.
   `ShooterPlayerController.ServerKickPlayer`. A distinct vanilla-gdb candidate root at
   `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
   now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
-  lifecycle anchors plus principal invalidation semantics, not the old admin fixture gap or
-  second-source layout.
+  lifecycle anchors plus principal invalidation semantics.
 - Player identity offline staging has a helper for the raw sibling layout:
   `scripts/prepare_player_identity_offline_raw_layout.py`. Use it only to stage explicit
   offline `ShooterGameServer` and core inputs into a

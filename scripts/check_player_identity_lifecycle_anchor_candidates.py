@@ -27,6 +27,28 @@ KNOWN_LIFECYCLE_ORIENTATION_TARGETS = frozenset(
         "ShooterGameMode.OnLogout",
     )
 )
+LIFECYCLE_LAYOUT_CANDIDATE_TARGETS = {
+    "ShooterGameMode.HandleNewPlayer": {
+        "role": "session_start",
+        "num_parms": 5,
+        "parms_size": 26,
+        "fields": (
+            ("NewPlayer", "ObjectProperty", "0x0", 8),
+            ("PlayerData", "ObjectProperty", "0x8", 8),
+            ("PlayerCharacter", "ObjectProperty", "0x10", 8),
+            ("bIsFromLogin", "BoolProperty", "0x18", 1),
+            ("ReturnValue", "BoolProperty", "0x19", 1),
+        ),
+    },
+    "ShooterGameMode.OnLogout": {
+        "role": "session_end",
+        "num_parms": 1,
+        "parms_size": 8,
+        "fields": (
+            ("Exiting", "ObjectProperty", "0x0", 8),
+        ),
+    },
+}
 ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF = frozenset(
     (
         "ShooterPlayerController.ServerKickPlayer",
@@ -39,8 +61,20 @@ ROLE_TO_ACCEPTANCE_KEYS = {
     "session_start": ("session_start_accepted", "accepted_start_targets"),
     "session_end": ("session_end_accepted", "accepted_end_targets"),
 }
-ACCEPTED_STATUSES = {"layout_accepted_non_public"}
+ACCEPTED_STATUSES = {"layout_accepted_non_public", "layout_accepted_candidate_only"}
 CORROBORATED_STATUSES = {"second_source_accepted", "static_accepted"}
+NON_PUBLIC_OBJECT_FIELD_CLASSIFICATIONS = {"identity_redacted", "recognition_only", "forbidden"}
+NON_PUBLIC_OBJECT_FIELD_ELIGIBILITY = {
+    "identity_redacted",
+    "recognition_only",
+    "recognition_only_object",
+    "not_copied",
+    "not_copied_object",
+    "not_public",
+    "non_public_object",
+    "not_eligible_for_public_copy",
+    "forbidden",
+}
 REQUIRED_EXCLUSIONS = {
     "public_player_identity",
     "permissions",
@@ -212,6 +246,94 @@ def validate_field(field: Any, blockers: list[dict[str, Any]], label: str, *, ac
     return name if isinstance(name, str) and name else None
 
 
+def validate_lifecycle_layout_candidate(
+    anchor: dict[str, Any],
+    fields: list[Any],
+    blockers: list[dict[str, Any]],
+    label: str,
+    target: str,
+) -> None:
+    expected = LIFECYCLE_LAYOUT_CANDIDATE_TARGETS[target]
+    if anchor.get("role") != expected["role"]:
+        add(
+            blockers,
+            "candidate_layout_anchor_role_mismatch",
+            f"{label}.role",
+            target=target,
+            expected_role=expected["role"],
+        )
+    for key in ("num_parms", "parms_size"):
+        if anchor.get(key) != expected[key]:
+            add(
+                blockers,
+                "candidate_layout_anchor_shape_mismatch",
+                f"{label}.{key}",
+                target=target,
+                expected=expected[key],
+                actual=anchor.get(key),
+            )
+    expected_fields = expected["fields"]
+    expected_order = [field[0] for field in expected_fields]
+    if anchor.get("property_order") != expected_order:
+        add(
+            blockers,
+            "candidate_layout_anchor_shape_mismatch",
+            f"{label}.property_order",
+            target=target,
+            expected=expected_order,
+            actual=anchor.get("property_order"),
+        )
+    if len(fields) != len(expected_fields):
+        add(
+            blockers,
+            "candidate_layout_anchor_shape_mismatch",
+            f"{label}.fields",
+            target=target,
+            expected=len(expected_fields),
+            actual=len(fields),
+        )
+        return
+    for index, (field, expected_field) in enumerate(zip(fields, expected_fields)):
+        field_label = f"{label}.fields[{index}]"
+        if not isinstance(field, dict):
+            add(blockers, "candidate_layout_anchor_shape_mismatch", field_label, target=target)
+            continue
+        expected_name, expected_class, expected_offset, expected_element_size = expected_field
+        for key, expected_value in (
+            ("name", expected_name),
+            ("source_property_class", expected_class),
+            ("offset", expected_offset),
+            ("element_size", expected_element_size),
+            ("array_dim", 1),
+        ):
+            if field.get(key) != expected_value:
+                add(
+                    blockers,
+                    "candidate_layout_anchor_shape_mismatch",
+                    f"{field_label}.{key}",
+                    target=target,
+                    expected=expected_value,
+                    actual=field.get(key),
+                )
+        if expected_class == "ObjectProperty":
+            if field.get("classification") not in NON_PUBLIC_OBJECT_FIELD_CLASSIFICATIONS:
+                add(
+                    blockers,
+                    "candidate_layout_object_field_not_redacted",
+                    field_label,
+                    target=target,
+                    field=expected_name,
+                )
+            if field.get("copied_scalar_eligibility") not in NON_PUBLIC_OBJECT_FIELD_ELIGIBILITY:
+                add(
+                    blockers,
+                    "candidate_layout_object_field_public_overclaim",
+                    field_label,
+                    target=target,
+                    field=expected_name,
+                )
+
+
 def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> tuple[str | None, str | None, bool]:
     label = f"$.candidate_anchors[{index}]"
     if not isinstance(anchor, dict):
@@ -222,6 +344,7 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
     outer = anchor.get("outer")
     function = anchor.get("function")
     accepted = anchor.get("accepted") is True or anchor.get("acceptance_status") in ACCEPTED_STATUSES
+    target_acceptance_eligible = False
     if role not in ROLE_TO_ACCEPTANCE_KEYS:
         add(blockers, "candidate_anchor_role_invalid", f"{label}.role")
     if not all(isinstance(value, str) and value for value in (target, outer, function)):
@@ -230,15 +353,10 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
         add(blockers, "candidate_anchor_target_mismatch", label)
     elif target not in TARGET_SET_TARGETS:
         if target in KNOWN_LIFECYCLE_ORIENTATION_TARGETS:
-            add(
-                blockers,
-                "candidate_anchor_known_lifecycle_orientation_not_accepted",
-                label,
-                target=target,
-                orientation_status="static_orientation_only_not_in_closed_target_set",
-            )
+            target_acceptance_eligible = True
         else:
             add(blockers, "candidate_anchor_target_outside_closed_target_set", label, target=target)
+            accepted = False
     elif accepted and target in ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF:
         add(
             blockers,
@@ -248,6 +366,10 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
             snapshot_status="admin_surface_only_not_lifecycle_anchor",
         )
         accepted = False
+    else:
+        target_acceptance_eligible = True
+    if accepted and isinstance(target, str) and target in ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF:
+        target_acceptance_eligible = False
     if accepted:
         for key in ("num_parms", "parms_size", "property_order"):
             value = anchor.get(key)
@@ -277,7 +399,9 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
     field_names = [name for offset, field in enumerate(fields) if (name := validate_field(field, blockers, f"{label}.fields[{offset}]", accepted_anchor=accepted))]
     if accepted and anchor.get("property_order") != field_names:
         add(blockers, "accepted_anchor_property_order_mismatch", f"{label}.property_order")
-    return role if isinstance(role, str) else None, target if isinstance(target, str) else None, accepted
+    if accepted and isinstance(target, str) and target in LIFECYCLE_LAYOUT_CANDIDATE_TARGETS:
+        validate_lifecycle_layout_candidate(anchor, fields, blockers, label, target)
+    return role if isinstance(role, str) else None, target if isinstance(target, str) else None, accepted and target_acceptance_eligible
 
 
 def validate_manifest_details(payload: dict[str, Any], *, promote: bool = False) -> ManifestValidation:
@@ -362,6 +486,14 @@ def validate_manifest_details(payload: dict[str, Any], *, promote: bool = False)
         key, trail = forbidden
         add(blockers, "path_or_coordinate_leakage", trail, field=key)
     if promote:
+        accepted_targets = sorted(target for targets in accepted_by_role.values() for target in targets)
+        if accepted_targets:
+            add(
+                blockers,
+                "promote_mode_principal_invalidation_semantics_unresolved",
+                "$.principal_policy.invalidation_semantics",
+                accepted_targets=accepted_targets,
+            )
         add(blockers, "promote_mode_players_identity_lifecycle_anchor_candidates_candidate_only", "$")
     return ManifestValidation(blockers, {role: sorted(targets) for role, targets in accepted_by_role.items()})
 

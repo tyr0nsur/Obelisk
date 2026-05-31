@@ -4,10 +4,12 @@ Date: 2026-05-31
 
 ## Summary
 
-`players-identity-lifecycle-intake` can guide player identity research, but it does not
-yet contain accepted session-start or session-end anchors. The admin-surface fixture gap
-and the distinct second-source layout gap are now closed for planning evidence; the
-remaining gap is a reviewed lifecycle-anchor schema plus principal invalidation policy.
+`players-identity-lifecycle-intake` can guide player identity research, and the
+lifecycle-anchor candidate schema can now consume the corroborated
+`ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` snapshots as
+candidate-only layout anchors. The admin-surface fixture gap and the distinct
+second-source layout gap are closed for planning evidence; the remaining gap is principal
+privacy and invalidation policy before any public identity or promotion claim.
 
 ## Current Evidence Boundary
 
@@ -45,23 +47,26 @@ remaining gap is a reviewed lifecycle-anchor schema plus principal invalidation 
 - `validate_offline_artifact_gate.py` currently rejects lifecycle overclaims; true
   lifecycle anchors or non-empty accepted target lists are blockers for the existing
   candidate-only first-evidence artifact.
-- `check_player_identity_lifecycle_anchor_candidates.py` now distinguishes the known
-  static-orientation-only targets `ShooterGameMode.HandleNewPlayer` and
-  `ShooterGameMode.OnLogout` with
-  `candidate_anchor_known_lifecycle_orientation_not_accepted`. Unknown out-of-set targets
-  still fail with `candidate_anchor_target_outside_closed_target_set`. This preserves the
-  clues without accepting lifecycle semantics or adding them to the closed first-evidence
-  target set.
+- `check_player_identity_lifecycle_anchor_candidates.py` now treats
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` as an explicit
+  candidate-only layout-anchor allowlist outside the closed first-evidence target set.
+  It requires the corroborated `ParmsSize`, `NumParms`, property order, field classes,
+  offsets, and non-public object-field classifications before those targets can appear in
+  accepted start/end target lists. Unknown out-of-set targets still fail with
+  `candidate_anchor_target_outside_closed_target_set`.
+- The checker still emits `promotion_ready=false`, `public_sdk_ready=false`, and
+  `runtime_ready=false`; `--promote` always fails candidate-only artifacts and now adds
+  `promote_mode_principal_invalidation_semantics_unresolved` when layout anchors are
+  accepted but principal invalidation semantics are not promoted.
 
-## Missing Schema
+## Candidate Schema Boundary
 
-The next useful artifact format is a candidate-only lifecycle-anchor schema that can
-record possible session-start/session-end evidence without promoting public identity. A
-future `obelisk.players-identity-lifecycle-anchor-candidates.v1` shape should distinguish:
+The `obelisk.players-identity-lifecycle-anchor-candidates.v1` shape distinguishes:
 
 - candidate anchor recorded but not accepted;
-- accepted start/end anchor only when exact `Outer.Function`, `ParmsSize`, property order,
-  field classes, and second-source/static evidence are present;
+- accepted candidate-only start/end layout anchor only when exact `Outer.Function`,
+  `ParmsSize`, property order, field classes, and second-source/static evidence are
+  present;
 - principal privacy and invalidation questions that remain unresolved even after layout
   acceptance.
 
@@ -77,10 +82,8 @@ Required candidate fields should include:
 
 ## Next Step
 
-Before adding login/logout target names to release or public SDK gates, update the
-lifecycle-anchor candidate schema and tests so they can consume the two corroborated
-layout snapshots while still blocking promotion until explicit invalidation semantics are
-recorded. The test should prove that a candidate can be preserved as research evidence
-while accepted lifecycle anchors remain non-public and do not imply public identity,
-permissions, commands, lookup, mutation, return override, ResourceHandle, or runtime
-readiness.
+Before adding login/logout target names to release or public SDK gates, define and test
+the principal privacy/invalidation policy. The current schema/test coverage proves that
+corroborated layout evidence can be preserved as research evidence while accepted
+lifecycle anchors remain non-public and do not imply public identity, permissions,
+commands, lookup, mutation, return override, ResourceHandle, or runtime readiness.

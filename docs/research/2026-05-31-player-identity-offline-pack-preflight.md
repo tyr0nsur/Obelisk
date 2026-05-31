@@ -1,7 +1,9 @@
 # Player Identity Offline Pack Preflight
 
-This note records the current offline preflight for closing the two remaining
-`players-identity-lifecycle-intake` snapshot gaps without touching a live server.
+This note records the current offline preflight boundary for the 12-target
+`players-identity-lifecycle-intake` lane without touching a live server. The admin
+candidate fixtures and distinct planning-layout second source are present; the remaining
+blockers are lifecycle anchor acceptance and principal invalidation semantics.
 
 ## Result
 
@@ -24,12 +26,13 @@ This wrapper combines reflection-inventory readiness, committed fixture coverage
 the fail-closed `obelisk.players-identity-first-evidence.v1` build attempt. It writes no
 artifacts, touches no servers, and must keep reporting candidate-only/planning-only
 non-claims even if the first evidence pack becomes buildable.
-When a distinct sanitized second-source root exists, pass it explicitly:
+For the current accepted planning-layout second source, pass the vanilla-gdb root
+explicitly:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_first_evidence_readiness.py \
   --artifact-root /home/flowcommunity-ark/obelisk-artifacts \
-  --candidate-root <distinct-sanitized-second-source-root>
+  --candidate-root /servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots
 ```
 
 The wrapper reports missing second-source evidence separately from compared-but-rejected
@@ -61,7 +64,7 @@ candidate-only focal snapshot planning. It is not player identity promotion, Inv
 SDK promotion, public SDK promotion, runtime identity readiness, lookup readiness, or
 `ResourceHandle` readiness.
 
-Current result:
+Legacy durable-root-only result:
 
 - `status=blocked`;
 - `ready=false`;
@@ -82,11 +85,15 @@ The combined preflight currently reports:
 - `fixture_coverage.blocked=0`;
 - `first_evidence.ready=false`;
 - `first_evidence.missing_required_targets=[]`;
-- `next_step=produce_distinct_second_source_and_accepted_lifecycle_anchor_evidence`.
+- without a candidate root, the report emits a no-candidate diagnostic; that diagnostic is
+  not the current blocker because the vanilla-gdb candidate root below is accepted.
 
 When the vanilla-gdb candidate root is supplied, the combined preflight advances to:
 
+- `readiness_statement=second-source layout accepted; lifecycle invalidation remains`;
 - `fixture_coverage.second_source_missing=0`;
+- `fixture_coverage.second_source_accepted=12`;
+- `fixture_coverage.second_source_layout_accepted=true`;
 - `fixture_coverage.second_source_inconclusive=0`;
 - `fixture_coverage.second_source_rejected=0`;
 - `fixture_coverage.second_source_status=compared`;
@@ -102,6 +109,12 @@ of existing gates:
 - `progress_signal.accepted_anchors.session_start=false`;
 - `progress_signal.accepted_anchors.session_end=false`;
 - `progress_signal.primary_blocker=<next_actionable_blocker.code>`.
+
+The wrapper still uses the diagnostic vocabulary `second_source_evidence_missing`,
+`second_source_evidence_not_accepted`, and `accepted_lifecycle_anchors_missing` when the
+corresponding evidence is absent or rejected. With the vanilla-gdb candidate root, the
+second-source diagnostics are cleared and the remaining blocker is lifecycle/principal
+policy.
 
 If a matching non-protected `ShooterGameServer` is present but the non-protected core
 input is absent, `progress_signal.primary_blocker` reports
@@ -168,10 +181,10 @@ candidate planning:
 - committed candidate snapshots for `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`.
 
-That closes the admin-surface fixture gap only. The current blocker is
-`distinct_second_source_evidence_missing_or_not_accepted`, plus no accepted
-session-start/session-end lifecycle anchors. Do not rerun the completed admin focal
-planning route unless the snapshot fixtures or binary hash change.
+That closes the admin-surface fixture gap only. With the vanilla-gdb candidate root below,
+distinct second-source layout is accepted and the current blocker is accepted lifecycle
+anchor evidence plus principal invalidation semantics. Do not rerun the completed admin
+focal planning route unless the snapshot fixtures or binary hash change.
 
 A distinct vanilla-gdb workspace run has also been produced from
 `/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw`
@@ -258,7 +271,8 @@ reflection-inventory pack with:
 Do not treat ScriptStruct inventory, standalone snapshots, redacted signatures, static
 thunks, or a two-function-only inventory as satisfying this lane.
 
-Once that pack exists outside protected live-server paths, the safe planning command is:
+That pack now exists outside protected live-server paths. If it must be revalidated after
+a fixture or binary-hash change, the safe planning command shape is:
 
 ```bash
 python3 scripts/plan_ufunction_focal_snapshots.py \
@@ -282,7 +296,7 @@ python3 scripts/check_reflection_inventory_pack_readiness.py \
 
 Proceed only when the checker reports `ready=true`. A valid pack for this lane must
 record `target_set_coverage` for the full 12-target
-`players-identity-lifecycle-intake` set and contain inventory rows for both missing admin
+`players-identity-lifecycle-intake` set and contain inventory rows for the completed admin
 targets: `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer`. Do not build a two-function-only reflection
 inventory pack; only the later focal snapshot plan narrows to those admin
@@ -292,14 +306,15 @@ snapshots, not as identity, Inventory SDK, public SDK, runtime, lookup, or
 
 ## Safe Next Step
 
-The next useful action is to produce accepted lifecycle anchor evidence for at least one
-session-start/login/connect target and one session-end/logout/disconnect target in the
-same candidate-only identity lane, plus principal invalidation semantics. Current
-candidate anchors from static orientation are `ShooterGameMode.HandleNewPlayer`
-(`session_start`) and `ShooterGameMode.OnLogout` (`session_end`), but they are not
-accepted anchors yet. That work must preserve the same non-claims: no public identity,
+The next useful action is to finish the principal privacy and invalidation policy for the
+candidate-only identity lane. Current candidate anchors from static orientation are
+`ShooterGameMode.HandleNewPlayer` (`session_start`) and `ShooterGameMode.OnLogout`
+(`session_end`); offline snapshots now corroborate their layouts, and the
+lifecycle-anchor checker can consume them as accepted candidate-only layout anchors while
+promotion still fails closed. That work must preserve the same non-claims: no public identity,
 permissions, command routing, runtime lookup, mutation, return override, ResourceHandle,
-or complete v1 SDK claim is promoted by fixture coverage or second-source layout alone.
+or complete v1 SDK claim is promoted by fixture coverage, second-source layout, or
+lifecycle layout alone.
 
 The checker and planner also fail closed when the inventory
 `target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so
@@ -310,8 +325,8 @@ An offline `ShooterGameServer` binary, copied core, manual `--gobjects`, and man
 `--fname-root-slot` are not enough by themselves for this lane. The reflection inventory
 pack must be tied back to the complete core evidence-pack manifest before
 `players-identity-lifecycle-intake` planning is accepted.
-Likewise, orientation-only static admin thunks are not enough to build the reflection
-inventory pack or plan the missing admin focal snapshots.
+Likewise, orientation-only static admin thunks are not enough to rebuild the reflection
+inventory pack or replace the completed admin focal snapshots.
 
 If a complete non-protected core evidence pack is available, a safe inventory-build route
 is:
@@ -436,8 +451,9 @@ Operator stop/continue rule:
   reflection-inventory pack and the pack records the full
   `players-identity-lifecycle-intake` target-set coverage.
 - Even on success, the result remains candidate-only. Re-run the combined preflight
-  against the artifact root and expect the broader player-identity lane to remain blocked
-  until second-source evidence and lifecycle anchors are accepted.
+  against the artifact root and, for current player-identity state, the vanilla-gdb
+  candidate root. Expect the broader player-identity lane to remain blocked until
+  lifecycle anchors and principal invalidation semantics are accepted.
 
 This direct staged-input route requires a matching offline `ShooterGameServer` and ELF
 core file. Always pass the reviewed `--ark-binary-sha256` shown above so the inventory
@@ -448,12 +464,11 @@ reuse `0x5956f30` or `0x595b7e0` for a different ARK binary hash without new evi
 This command shape is still offline and candidate-only. It must not use direct or
 symlinked `/servidor/ark` paths without a current scoped approval.
 
-Even with the admin snapshots now present, the combined preflight must still stay
-blocked until a distinct second-source snapshot root is accepted and session-start plus
-session-end lifecycle anchors are accepted. The wrapper reports those as
-`second_source_evidence_missing`, `second_source_evidence_not_accepted`, and
-`accepted_lifecycle_anchors_missing` as appropriate, so fixture coverage cannot be
-mistaken for player identity readiness.
+Even with the admin snapshots now present, and with the vanilla-gdb second-source layout
+accepted when supplied, the combined preflight must still stay blocked until
+session-start/session-end lifecycle anchors and principal invalidation semantics are
+accepted. The wrapper reports second-source status separately from lifecycle blockers, so
+fixture coverage cannot be mistaken for player identity readiness.
 
 ## Boundary
 
@@ -462,12 +477,14 @@ login/logout lifecycle anchors, principal validity, identity privacy, permission
 authority, command routing, economy identity, runtime readiness, mutation, return
 override, `ResourceHandle`, or player lookup.
 
-With those admin snapshots present, the player identity lane still remains planning-only
-until a separate candidate pack proves at least one real session-start anchor and one real
-session-end anchor. That pack must record exact `Outer.Function`, `ParmsSize`, property
-order, offsets, sizes, property classes, and a distinct second-source/static comparison.
-It also needs a copied opaque-principal policy, forced redaction for names, IP-like
-values, tribe ids, object references, raw params, and UE pointers, plus fail-closed
-invalidation for disconnect, transfer, reconnect, stale controller, and restart cases.
+With those admin snapshots present, and with the vanilla-gdb second-source layout
+accepted, the player identity lane still remains planning-only until the candidate
+lifecycle pack and principal policy prove at least one real session-start anchor and one
+real session-end anchor without public object exposure. That pack must record exact
+`Outer.Function`, `ParmsSize`, property order, offsets, sizes, property classes, and a
+distinct second-source/static comparison. It also needs a copied opaque-principal policy,
+forced redaction for names, IP-like values, tribe ids, object references, raw params, and
+UE pointers, plus fail-closed invalidation for disconnect, transfer, reconnect, stale
+controller, and restart cases.
 `ChatMessageEvent` must continue to treat `principal=unknown` until that lifecycle and
 privacy work is promoted.

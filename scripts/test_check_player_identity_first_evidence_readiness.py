@@ -516,6 +516,112 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)
         self.assertEqual(payload["fixture_coverage"]["second_source_status"], "compared")
 
+    def test_accepted_second_source_layout_reports_lifecycle_invalidation_remaining(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        vanilla_candidate_root = Path(
+            "/servidor/ark/workspace-offline/"
+            "player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots"
+        )
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                self.assertIn(str(vanilla_candidate_root), command)
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {
+                        "ready": False,
+                        "ready_scope": "planning_only",
+                        "layout_ready": True,
+                        "promotion_ready": False,
+                        "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
+                    },
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": False,
+                        "session_end_accepted": False,
+                        "accepted_start_targets": [],
+                        "accepted_end_targets": [],
+                        "blockers": [
+                            "accepted_session_start_anchor_missing",
+                            "accepted_session_end_anchor_missing",
+                        ],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=vanilla_candidate_root,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={"ready_to_build_core_evidence_pack": False},
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertEqual(payload["candidate_root"], str(vanilla_candidate_root))
+        self.assertEqual(payload["primary_blocker"], "accepted_lifecycle_anchor_evidence_missing")
+        self.assertEqual(payload["next_actionable_blocker"]["code"], "accepted_lifecycle_anchor_evidence_missing")
+        self.assertEqual(
+            payload["readiness_statement"],
+            "second-source layout accepted; lifecycle invalidation remains",
+        )
+        self.assertEqual(
+            payload["layout_lifecycle_state"]["status"],
+            "second_source_layout_accepted_lifecycle_invalidation_remains",
+        )
+        self.assertTrue(payload["layout_lifecycle_state"]["second_source_layout_accepted"])
+        self.assertTrue(payload["layout_lifecycle_state"]["lifecycle_invalidation_remains"])
+        self.assertIn("principal_invalidation_semantics", payload["layout_lifecycle_state"]["remaining_work"])
+        self.assertFalse(payload["layout_lifecycle_state"]["promotion_ready"])
+        self.assertFalse(payload["layout_lifecycle_state"]["public_sdk_ready"])
+        self.assertFalse(payload["layout_lifecycle_state"]["runtime_ready"])
+        self.assertEqual(
+            payload["progress_signal"]["statement"],
+            "second-source layout accepted; lifecycle invalidation remains",
+        )
+        self.assertTrue(payload["progress_signal"]["layout_lifecycle_state"]["second_source_layout_accepted"])
+        self.assertTrue(payload["progress_signal"]["layout_lifecycle_state"]["lifecycle_invalidation_remains"])
+        self.assertEqual(payload["fixture_coverage"]["second_source_accepted"], 12)
+        self.assertTrue(payload["fixture_coverage"]["second_source_layout_accepted"])
+        self.assertEqual(
+            payload["next_step"],
+            "produce_accepted_lifecycle_anchor_and_principal_invalidation_evidence",
+        )
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
