@@ -116,6 +116,150 @@ Required shape:
    - Negative tests proving missing identity, disabled capability, unsupported artifact,
      stale lifecycle state, and malformed copied fields fail closed.
 
+## Minimal Candidate Builder Design
+
+Extend `scripts/build_redacted_ufunction_signatures.py` with a focused
+`--players-identity-first-evidence` mode rather than creating a public SDK generator. The
+mode should consume only sanitized UFunction snapshot roots for
+`players-identity-lifecycle-intake`, reuse the existing protected-path rejection and
+target-set manifest coverage helpers, and then apply a stricter player-identity classifier
+on top of the generic redacted UFunction report. If the implementation becomes large,
+split helpers into `scripts/build_players_identity_first_evidence.py`, but keep the CLI
+and tests identity-specific and candidate-only.
+
+Required output schema:
+
+```text
+schema = "obelisk.players-identity-first-evidence.v1"
+artifact_status = "candidate_only"
+readiness_classification = "planning_only"
+promotion_ready = false
+public_sdk_ready = false
+runtime_ready = false
+snapshot_root = "redacted"
+input_target_set = "players-identity-lifecycle-intake"
+generated_from.snapshot_schema
+generated_from.input_snapshots[] = {id, sha256}
+target_set_coverage = existing redacted UFunction target-set coverage object
+artifact_identity = {
+  ark_binary_sha256,
+  obelisk_commit,
+  build_type,
+  target_set_revision,
+  source_artifact_ids[],
+  path_redacted = true
+}
+targets[] = {
+  target,
+  source_snapshot,
+  source_snapshot_sha256,
+  function_flags,
+  num_parms,
+  parms_size,
+  return_value_offset,
+  property_order[],
+  status,
+  lifecycle_anchor_role,
+  blockers[]
+}
+fields[] = {
+  field,
+  target,
+  name,
+  source_property_class,
+  direction,
+  offset,
+  element_size,
+  array_dim,
+  property_flags,
+  bool_masks?,
+  classification,
+  redaction_reason,
+  evidence_status,
+  source_snapshot,
+  source_snapshot_sha256,
+  blockers[]
+}
+copied_candidates[] = only canonical non-identity bool/scalar candidates, if any
+forced_redacted_fields[] = every identity-like scalar/string/container/object/FName field
+forbidden_fields[] = pointer-derived identity, raw params, UE pointers, GObjects/FName indices
+lifecycle_anchors = {
+  session_start_accepted = false,
+  session_end_accepted = false,
+  accepted_start_targets[],
+  accepted_end_targets[],
+  blockers[]
+}
+privacy_policy = {
+  public_principal_ready = false,
+  copied_public_identifier = null,
+  persistent_identifier_ready = false,
+  process_local_identifier_ready = false,
+  storage_ready = false,
+  logging_policy = "identity_values_not_logged"
+}
+promotion_gate = {
+  ready = false,
+  ready_scope = "planning_only",
+  promotion_ready = false,
+  blockers[]
+}
+safety_summary = {
+  target_count,
+  missing_target_count,
+  field_count,
+  copied_candidate_count,
+  forced_redacted_count,
+  forbidden_count,
+  blocker_count,
+  promotion_ready = false,
+  public_sdk_ready = false
+}
+non_claims[]
+```
+
+The identity classifier must force-redact, even when the generic signature builder would
+otherwise mark them as copied scalars: player IDs, Steam/EOS/platform IDs, names, IPs,
+tribe IDs, transfer IDs, bed/spawn IDs, online-list values, mission tags, object refs,
+arrays, strings/text, `NameProperty`, `FName`/GObjects indices, raw params, UE pointers,
+and pointer-derived handles. Bool candidates remain candidates only and must preserve the
+canonical-byte rule.
+
+Minimum blockers to always record until independently cleared:
+
+```text
+planning_guidance_only
+target_set_not_release_readiness
+missing_accepted_session_start_anchor
+missing_accepted_session_end_anchor
+identity_privacy_policy_unproven
+principal_copy_policy_unproven
+lifecycle_invalidation_policy_unproven
+second_source_identity_layout_not_accepted
+resourcehandle_lookup_blocked
+runtime_observation_requires_separate_approval
+public_player_sdk_blocked
+```
+
+Required tests belong beside the existing script tests:
+
+- `scripts/test_build_redacted_ufunction_signatures.py`: focused builder/mode emits
+  `obelisk.players-identity-first-evidence.v1`, keeps `promotion_ready=false`, fails
+  closed on missing `ServerListPlayers` or `ServerKickPlayer`, redacts input paths, and
+  reports every required blocker.
+- Identity scalar negatives: `PlayerDataID`, online-player arrays, mission tags, chat
+  strings, object refs, and synthetic `SteamID`/`EOSID`/`PlatformID` fields never appear in
+  copied/public fields.
+- Bool canonicality: copied-candidate bool metadata is shape-only; any future runtime
+  copied bool path must accept only `0` or `1` and clear output on non-canonical bytes.
+- Target-set guardrails: `scripts/test_compare_reflection_snapshots.py` and
+  `scripts/test_release_scope_guardrails.py` continue asserting
+  `players-identity-lifecycle-intake` is `planning_only`, not release readiness, and
+  promote-mode second-source reports are blocked by `target_set_not_release_readiness`.
+- Second-source layout test: a complete 12-target comparison may set layout comparison
+  success, but `promotion_gate.ready=false` and `promotion_gate.promotion_ready=false`
+  remain mandatory.
+
 ## Minimal Ordering
 
 The first identity package should unlock only design discussion for a copied principal

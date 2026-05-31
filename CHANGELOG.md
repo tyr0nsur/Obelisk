@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Hardened copied-event dispatch snapshots across Structure, Inventory, Chat, and
+  ItemReturn with generation checks so a removed registration id cannot be reactivated by
+  same-dispatch id reuse; tightened internal Dino `AddPassenger` copied-scalar shape
+  validation; aligned plugin-local chat parser docs/tests with the shipped `oBaseEvents`
+  grammar; and recorded consume-only Structure/GObjects evidence without promoting public
+  StructureEvents, identity, mutation, return override, ResourceHandle, or GObjects SDK
+  surface.
 - Hardened minimal `ChatMessageEvent` lifecycle and installed-SDK release-example
   coverage: init-failure/post-registration failure and in-flight unload paths now have
   regression tests, and the install-layout test builds release-scope examples against the

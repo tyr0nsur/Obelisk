@@ -1,7 +1,7 @@
 # FName/GObjects Offline Route
 
 Date: 2026-05-31
-Obelisk commit reviewed: `9345e2511e5a6ae2627e1db378742a5b4dace2db`
+Obelisk commit reviewed: `81bd839`
 
 ## Scope
 
@@ -76,6 +76,35 @@ reflection:
 The accepted evidence is still candidate/internal unless a target-set-specific gate says
 otherwise. It does not promote public GObjects, object identity, ResourceHandle, lookup,
 mutation, return override, raw params, or UE pointer access.
+
+## 2026-05-31 Static Field-Window Refresh
+
+A bounded offline Ghidra/radare2 refresh was run against the non-protected offline binary
+copy under `/home/flowcommunity-ark/obelisk-artifacts/offline-binaries/`, with raw output
+kept under `/tmp`. No server, dump, `ReflectionScanner`, ptrace, `gcore`, Discord, GitHub,
+or `/servidor/ark` path was touched.
+
+Strict output root:
+
+```text
+/tmp/obelisk-static-global-field-window-strict-20260531T040157
+```
+
+Validation result:
+
+```text
+static-global consume gate: accepted
+static-global blockers: []
+manifest sha256: b2929c5061aefdf3cfd24c9a8c42b27490edb89b551dff1a3d544b4da42a9113
+field-window sha256: 86957b02e41445595c5082d192fe4988b12397913336d099d3f68b079fdafc1e
+fname_root fields: root_slot
+gobjects fields: chunks, count, root, serial
+```
+
+This clears the static coherent field-window blocker for the reviewed `gobjects`
+candidate in consume-mode static evidence only. It still does not promote public
+`GObjects`, `ResourceHandle`, object identity, lookup, mutation, return override, runtime
+hooks, or any SDK surface.
 
 ## Fastest Offline Route
 
@@ -197,4 +226,3 @@ The fastest offline-only unlock is not another FName/GObjects discovery pass. It
 strict, target-set-driven snapshot pipeline over the already evidenced `0x5956f30` /
 `0x595b7e0` pair, followed by redacted signature generation and decoder planning bounded
 by reflected `ParmsSize`.
-

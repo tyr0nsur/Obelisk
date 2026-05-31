@@ -36,8 +36,9 @@ and not an approved live test.
   fields needed by a local parser: ABI version, minimum struct size, send mode, copied
   flag, sequence, and message text.
 - `scripts/test_chat_command_parser_contract.py` covers copied-text parsing, non-command
-  no-match behavior, shell-like local quoting, malformed event rejection, malformed quote
-  rejection, and a result type containing only `name` and `argv`.
+  no-match behavior, malformed event rejection, prefix-at-byte-zero matching, command
+  name byte limits, ASCII safe command-name characters, no lowercasing, and a result type
+  containing only `name`.
 - `plugins/oBaseEvents/oBaseEvents.cpp` contains a disabled-by-default helper that validates
   `ChatMessageEvent`, bounds copied command input to 1024 bytes, recognizes only a local
   `help` command, logs sanitized metadata with `principal=unknown`, and does not reply,

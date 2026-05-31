@@ -17,6 +17,7 @@ namespace Obelisk::Core
         struct DispatchRegistration
         {
             uint64_t Id = 0;
+            uint64_t Generation = 0;
             ChatMessageSubscription Subscription;
         };
 
@@ -82,7 +83,10 @@ namespace Obelisk::Core
 
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_Registrations.push_back({id, owner, subscription});
+        const uint64_t generation = m_NextGeneration++;
+        if (m_NextGeneration == 0)
+            m_NextGeneration = 1;
+        m_Registrations.push_back({id, generation, owner, subscription});
         return id;
     }
 
@@ -106,10 +110,14 @@ namespace Obelisk::Core
         });
     }
 
-    bool ChatEventDispatcher::IsRegistrationActive(uint64_t registrationId) const
+    bool ChatEventDispatcher::IsRegistrationActive(uint64_t registrationId, uint64_t generation) const
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        return HasRegistrationId(registrationId);
+        return std::any_of(m_Registrations.begin(),
+                           m_Registrations.end(),
+                           [registrationId, generation](const Registration& item) {
+                               return item.Id == registrationId && item.Generation == generation;
+                           });
     }
 
     bool ChatEventDispatcher::Unregister(uint64_t registrationId)
@@ -262,12 +270,12 @@ namespace Obelisk::Core
                     m_PendingDestroy.reserve(m_PendingDestroy.size() + m_Registrations.size());
                     callbacks.reserve(m_Registrations.size());
                     for (const Registration& item : m_Registrations)
-                        callbacks.push_back({item.Id, item.Subscription});
+                        callbacks.push_back({item.Id, item.Generation, item.Subscription});
                 }
 
                 for (const DispatchRegistration& item : callbacks)
                 {
-                    if (!IsRegistrationActive(item.Id))
+                    if (!IsRegistrationActive(item.Id, item.Generation))
                         continue;
                     if (!item.Subscription.Callback)
                         continue;

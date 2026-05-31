@@ -102,9 +102,7 @@ namespace
                                               kReturnValueNameIndex,
                                               0x0f,
                                               sizeof(uint8_t),
-                                              true,
-                                              params.data() + 0x0f,
-                                              sizeof(uint8_t)));
+                                              false));
         return invocation;
     }
 
@@ -147,6 +145,27 @@ namespace
         Poison(observation);
         Require(!TryBuildCopiedDinoScalarObservation(invocation, observation), message);
         Require(observation.ScalarCount == 0, "rejected copied dino observation left scalar payload");
+    }
+
+    std::array<uint8_t, 0x10> MakeCanonicalAddPassengerParams()
+    {
+        std::array<uint8_t, 0x10> params{};
+        const int32_t seatIndex = 1;
+        std::memcpy(params.data() + 0x08, &seatIndex, sizeof(seatIndex));
+        params[0x0c] = 1;
+        params[0x0d] = 0;
+        params[0x0e] = 1;
+        params[0x0f] = 0;
+        return params;
+    }
+
+    template <typename Mutator>
+    void RequireRejectedAddPassengerMutation(Mutator mutator, const char* message)
+    {
+        std::array<uint8_t, 0x10> params = MakeCanonicalAddPassengerParams();
+        DinoInvocation invocation = MakeValidAddPassengerInvocation(params);
+        mutator(invocation);
+        RequireRejected(invocation, message);
     }
 
     void RequireScalar(const CopiedDinoScalarObservation& observation,
@@ -246,6 +265,73 @@ namespace
         }
     }
 
+    void TestRequiresExactAddPassengerInvocationShape()
+    {
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.FunctionNameIndex = kAddPassengerNameIndex + 1; },
+            "wrong AddPassenger FunctionNameIndex built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.OuterNameIndex = kPrimalDinoCharacterNameIndex + 1; },
+            "wrong AddPassenger OuterNameIndex built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) {
+                DinoFieldRange swapped = invocation.Fields[1];
+                invocation.Fields[1] = invocation.Fields[2];
+                invocation.Fields[2] = swapped;
+            },
+            "reordered AddPassenger fields built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields[1].PropertyNameIndex = kPassengerSeatIndexNameIndex + 1; },
+            "wrong PassengerSeatIndex name index built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields[1].Offset = 0x04; },
+            "wrong PassengerSeatIndex offset built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields[1].Size = sizeof(int16_t); },
+            "wrong PassengerSeatIndex size built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields[1].ExposesRange = false; },
+            "PassengerSeatIndex without exposed range built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields.Count = 5; },
+            "truncated AddPassenger field chain built copied scalars");
+    }
+
+    void TestRejectsExcludedDinoFieldsAsCopiedScalars()
+    {
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) {
+                invocation.Fields[1].Field = DinoField::ACharacter;
+                invocation.Fields[1].PropertyNameIndex = kACharacterNameIndex;
+            },
+            "ACharacter copied-scalar slot built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) {
+                invocation.Fields[1].Field = DinoField::ReturnValue;
+                invocation.Fields[1].PropertyNameIndex = kReturnValueNameIndex;
+            },
+            "ReturnValue copied-scalar slot built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) {
+                invocation.Fields[1].Field = DinoField::CanCarryPawn;
+                invocation.Fields[1].PropertyNameIndex = kCanCarryPawnNameIndex;
+            },
+            "CanCarryPawn copied-scalar slot built copied scalars");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) {
+                static const uint8_t returnValue = 0;
+                invocation.Fields.clear();
+                invocation.Fields.push_back(MakeField(DinoField::ReturnValue,
+                                                      kReturnValueNameIndex,
+                                                      0x0f,
+                                                      sizeof(uint8_t),
+                                                      true,
+                                                      &returnValue,
+                                                      sizeof(uint8_t)));
+            },
+            "ReturnValue-only AddPassenger shape built copied scalars");
+    }
+
     void TestRejectsBadCopiedScalarRanges()
     {
         {
@@ -258,6 +344,12 @@ namespace
             DinoInvocation invocation = MakeValidAddPassengerInvocation(params);
             RequireRejected(invocation, "non-canonical AddPassenger bool was copied");
         }
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields[3].Range.Data = nullptr; },
+            "null AddPassenger bool range was copied");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.Fields[4].Range.Size = 0; },
+            "zero-sized AddPassenger bool range was copied");
         {
             std::array<uint8_t, 0x10> params{};
             params[0x0c] = 1;
@@ -279,6 +371,12 @@ namespace
             invocation.Fields[0].Range = {params.data(), sizeof(uint64_t)};
             RequireRejected(invocation, "forged ACharacter copied range was accepted");
         }
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) {
+                static const uint8_t returnValue = 0;
+                invocation.Fields[5].Range = {&returnValue, sizeof(uint8_t)};
+            },
+            "malformed ReturnValue range was accepted");
     }
 
     void TestReturnValueStaysOutOfPreCallPayload()
@@ -326,6 +424,8 @@ int main()
         TestBuildsAddPassengerCopiedScalars();
         TestBuildDoesNotMutateParams();
         TestRejectsNonAddPassengerAndMetadataOnly();
+        TestRequiresExactAddPassengerInvocationShape();
+        TestRejectsExcludedDinoFieldsAsCopiedScalars();
         TestRejectsBadCopiedScalarRanges();
         TestReturnValueStaysOutOfPreCallPayload();
     }

@@ -682,7 +682,7 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             "This is not enough for a public command SDK, player-facing authority, or beta-player command behavior.",
             "plugin may subscribe to copied `ChatMessageEvent`, validate ABI/size/flags/send-mode, copy callback-scope message bytes into plugin-owned memory",
             "route to local handlers with `principal=unknown`",
-            "`scripts/test_chat_command_parser_contract.py` covers copied-text parsing",
+            "`scripts/test_chat_command_parser_contract.py` covers copied-text parsing, non-command no-match behavior, malformed event rejection, prefix-at-byte-zero matching, command name byte limits, ASCII safe command-name characters, no lowercasing, and a result type containing only `name`.",
             "`plugins/oBaseEvents/oBaseEvents.cpp` contains a disabled-by-default helper",
             "`plugins/oChatLogger` and `plugins/oChatAudit` remain experimental copied-data examples",
             "Not accepted for beta-player command behavior:",

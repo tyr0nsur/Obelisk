@@ -12,7 +12,8 @@ Validates the fixed RC layout-only target sets against a copied second-source
 candidate root. This is not a base-fixture smoke; it must compare a distinct
 candidate root and fail on readiness gaps. Final RC/stable gates need a
 second-source root freshly assembled for the intended HEAD, including current
-bool-tail metadata; do not reuse the historical v0.1.0-rc.1 root.
+bool-tail metadata; do not reuse a historical published-RC root such as
+v0.1.0-rc.1 or v0.1.0-rc.2.
 EOF
 }
 

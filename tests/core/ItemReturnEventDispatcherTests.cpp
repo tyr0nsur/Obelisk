@@ -310,6 +310,68 @@ namespace
                 "owner-cleaned item return callbacks changed after later dispatch");
     }
 
+    struct ReuseRegistrationDuringDispatchState
+    {
+        Obelisk::Core::ItemReturnEventDispatcher* Dispatcher = nullptr;
+        int* Owner = nullptr;
+        uint64_t RemovedRegistrationId = 0;
+        int FirstCalls = 0;
+        int RemovedCalls = 0;
+        int ReplacementCalls = 0;
+    };
+
+    void ReuseFirstCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<ReuseRegistrationDuringDispatchState*>(userData);
+        ++state->FirstCalls;
+        if (state->FirstCalls != 1)
+            return;
+
+        Require(state->Dispatcher->Unregister(state->RemovedRegistrationId),
+                "item return stale-snapshot setup could not unregister callback");
+        state->Dispatcher->SetNextRegistrationIdForTesting(state->RemovedRegistrationId);
+        const uint64_t replacementId = state->Dispatcher->Register(state->Owner, {
+            [](const Obelisk::Core::ItemReturnEventView&, void* replacementUserData) {
+                auto* replacementState =
+                    static_cast<ReuseRegistrationDuringDispatchState*>(replacementUserData);
+                ++replacementState->ReplacementCalls;
+            },
+            state,
+        });
+        Require(replacementId == state->RemovedRegistrationId,
+                "item return stale-snapshot setup did not reuse removed id");
+    }
+
+    void ReuseRemovedCallback(const Obelisk::Core::ItemReturnEventView&, void* userData)
+    {
+        auto* state = static_cast<ReuseRegistrationDuringDispatchState*>(userData);
+        ++state->RemovedCalls;
+    }
+
+    void TestReusedRegistrationIdDoesNotReactivateStaleSnapshot()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int owner = 0;
+        ReuseRegistrationDuringDispatchState state{&dispatcher, &owner, 0, 0, 0, 0};
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> scalars = MakeScalars();
+
+        Require(dispatcher.Register(&owner, {ReuseFirstCallback, &state}) != 0,
+                "item return stale-snapshot first registration failed");
+        state.RemovedRegistrationId = dispatcher.Register(&owner, {ReuseRemovedCallback, &state});
+        Require(state.RemovedRegistrationId != 0, "item return stale-snapshot removed registration failed");
+
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "item return stale snapshot reused id as active callback");
+        Require(state.FirstCalls == 1, "item return stale-snapshot first callback did not run");
+        Require(state.RemovedCalls == 0, "item return stale-snapshot removed callback ran");
+        Require(state.ReplacementCalls == 0, "item return replacement callback ran in stale snapshot");
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 2,
+                "item return replacement callback was not active for later dispatch");
+        Require(state.FirstCalls == 2, "item return stale-snapshot first callback did not run later");
+        Require(state.RemovedCalls == 0, "item return stale-snapshot removed callback ran later");
+        Require(state.ReplacementCalls == 1, "item return replacement callback did not run later");
+    }
+
     struct BlockingOwnerCleanupState
     {
         std::mutex Mutex;
@@ -593,6 +655,7 @@ int main()
         TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
         TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
         TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks();
+        TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
         TestOwnerCleanupWaitsForInFlightDispatchBeforeDestroy();
         TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
         TestOwnerCleanupWithoutDispatchDestroysImmediatelyAndSuppressesCallbacks();

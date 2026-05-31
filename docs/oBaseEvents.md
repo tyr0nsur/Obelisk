@@ -67,6 +67,8 @@ most 1024 callback-scope message bytes into plugin-owned memory, matches one con
 printable prefix, and recognizes only the local `help` command. The handler does not reply,
 send chat, mutate game state, block chat, resolve identity, or authorize a sender; it only
 logs sanitized command metadata with `principal=unknown`.
+It extracts only the first whitespace-delimited command token and does not parse `argv`,
+quoting, or shell-like syntax.
 
 ## Build
 

@@ -63,13 +63,14 @@ namespace Obelisk::Core
         struct Registration
         {
             uint64_t Id = 0;
+            uint64_t Generation = 0;
             void* Owner = nullptr;
             ItemReturnEventSubscription Subscription;
         };
 
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
-        bool IsRegistrationActive(uint64_t registrationId) const;
+        bool IsRegistrationActive(uint64_t registrationId, uint64_t generation) const;
         bool QueueOrDestroyRemovedSubscriptions(
             std::vector<ItemReturnEventSubscription>& removed,
             std::unique_lock<std::mutex>& lock);
@@ -80,6 +81,7 @@ namespace Obelisk::Core
         std::condition_variable m_DispatchCv;
         size_t m_DispatchDepth = 0;
         uint64_t m_NextRegistrationId = 1;
+        uint64_t m_NextGeneration = 1;
         std::vector<Registration> m_Registrations;
         std::atomic<size_t> m_SubscriptionCount{0};
         std::vector<ItemReturnEventSubscription> m_PendingDestroy;

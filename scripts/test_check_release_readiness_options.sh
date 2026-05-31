@@ -26,7 +26,8 @@ fi
 for expected in \
     "freshly assembled for the intended HEAD" \
     "bool-tail metadata" \
-    "do not reuse the historical v0.1.0-rc.1 root"; do
+    "do not reuse a historical published-RC root" \
+    "v0.1.0-rc.2"; do
     if ! grep -Fq -- "${expected}" <<<"${rc_smoke_help_output}"; then
         printf 'missing RC layout smoke stale-root help text: %s\n%s\n' \
             "${expected}" "${rc_smoke_help_output}" >&2

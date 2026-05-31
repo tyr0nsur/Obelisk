@@ -77,7 +77,7 @@ with the current snapshot schema, including these fields on every accepted BoolP
 The refreshed diagnostic root
 `/tmp/obelisk-head-rc-second-source-root-20260530Trefresh` was generated from the existing
 second-source offline core with `scripts/inspect_core_ufunctions.py --snapshot-json` and
-accepted all nine RC targets:
+accepted all nine pre-item-return RC targets:
 
 ```text
 readiness targets=9 comparable=9 blocked=0 second_source_status=compared gate_mode=second_source_promotion
@@ -88,6 +88,9 @@ ufunction:sdk_structures targets=6 comparable=6 blocked=0 second_source=accepted
 ```
 
 The published `v0.1.0-rc.2` tag used the same regeneration path for commit `1a7cd98`:
+
+The final published `v0.1.0-rc.2` gate added `item-return-only-policy-slice`, so the
+release-scope total is 12 snapshots across the four public RC target sets.
 
 ```text
 root=/tmp/obelisk-head-rc-ufunction-second-source-root-1a7cd98

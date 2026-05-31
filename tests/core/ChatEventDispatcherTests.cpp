@@ -269,6 +269,67 @@ namespace
         Require(dispatcher.SubscriptionCount() == 1, "wrong subscriptions remained after reentrant unregister");
     }
 
+    struct ReuseRegistrationDuringDispatchState
+    {
+        Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
+        int* owner = nullptr;
+        uint64_t removedRegistrationId = 0;
+        int firstCalls = 0;
+        int removedCalls = 0;
+        int replacementCalls = 0;
+    };
+
+    void ReuseFirstCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<ReuseRegistrationDuringDispatchState*>(userData);
+        ++state->firstCalls;
+        if (state->firstCalls != 1)
+            return;
+
+        Require(state->dispatcher->Unregister(state->removedRegistrationId),
+                "chat stale-snapshot setup could not unregister callback");
+        state->dispatcher->SetNextRegistrationIdForTesting(state->removedRegistrationId);
+        const uint64_t replacementId = state->dispatcher->Register(state->owner, {
+            [](const Obelisk::Core::ChatMessageView&, void* replacementUserData) {
+                auto* replacementState =
+                    static_cast<ReuseRegistrationDuringDispatchState*>(replacementUserData);
+                ++replacementState->replacementCalls;
+            },
+            state,
+        });
+        Require(replacementId == state->removedRegistrationId,
+                "chat stale-snapshot setup did not reuse removed id");
+    }
+
+    void ReuseRemovedCallback(const Obelisk::Core::ChatMessageView&, void* userData)
+    {
+        auto* state = static_cast<ReuseRegistrationDuringDispatchState*>(userData);
+        ++state->removedCalls;
+    }
+
+    void TestReusedRegistrationIdDoesNotReactivateStaleSnapshot()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        ReuseRegistrationDuringDispatchState state{&dispatcher, &owner, 0, 0, 0, 0};
+
+        Require(dispatcher.Register(&owner, {ReuseFirstCallback, &state}) != 0,
+                "chat stale-snapshot first registration failed");
+        state.removedRegistrationId = dispatcher.Register(&owner, {ReuseRemovedCallback, &state});
+        Require(state.removedRegistrationId != 0, "chat stale-snapshot removed registration failed");
+
+        Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                "chat stale snapshot reused id as active callback");
+        Require(state.firstCalls == 1, "chat stale-snapshot first callback did not run");
+        Require(state.removedCalls == 0, "chat stale-snapshot removed callback ran");
+        Require(state.replacementCalls == 0, "chat replacement callback ran in stale snapshot");
+        Require(dispatcher.Dispatch(MakeMessage()) == 2,
+                "chat replacement callback was not active for later dispatch");
+        Require(state.firstCalls == 2, "chat stale-snapshot first callback did not run later");
+        Require(state.removedCalls == 0, "chat stale-snapshot removed callback ran later");
+        Require(state.replacementCalls == 1, "chat replacement callback did not run later");
+    }
+
     struct BlockingCallbackState
     {
         std::mutex mutex;
@@ -743,6 +804,7 @@ int main()
     TestCallbackCanUnregisterItself();
     TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
+    TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
