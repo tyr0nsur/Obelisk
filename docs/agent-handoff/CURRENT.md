@@ -169,7 +169,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Descriptor-preflight hardening keeps internal descriptor candidates unassigned to
   public event kinds/masks. Describe it only as copied `ReturnValue` signal evidence; it
   does not promote public Inventory SDK, Items SDK, identity, lookup, mutation, return
-  override, runtime validation, or v1 completion.
+  override, runtime validation, or v1 completion. Its readiness report now includes
+  `descriptor_reconciliation.status=accepted`, preserving the public
+  `ItemReturnEventDispatcher` three-event ReturnValue-only boundary separately from the
+  existing two-event `InventoryPolicyEventDispatcher` field masks.
 - v0.2 internal hardening lane: Mission copied-bool is selected only for internal
   default-off recognizer/helper hardening, not a product-facing Plugin Hub module or
   Mission SDK/identity/mutation/return-override/v1-completion claim. Detail:

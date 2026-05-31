@@ -29,6 +29,8 @@ PUBLIC_GAMEPLAY_EVENTS_SCHEMA = "obelisk.public-gameplay-events.v1"
 GAMEPLAY_POLICY_EVENT_ID = "obelisk.gameplay_policy.v1"
 INVENTORY_ITEM_RESOURCE_KIND = "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
 RETURN_VALUE_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+REQUESTED_BY_PLAYER_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER"
+IGNORE_COOLDOWN_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
 EXPECTED_METADATA_SURFACE_IDS = {
     "obelisk.resource_kind_descriptors.v1",
     "obelisk.gameplay_policy_event_descriptors.v1",
@@ -161,6 +163,24 @@ EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KIND_MASKS = {
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK": (
         "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK"
     ),
+}
+EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+}
+EXPECTED_PUBLIC_INVENTORY_POLICY_STABLE_NAMES = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK": "inventory.remote_add_check",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK": "inventory.use_check",
+}
+EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK": [
+        RETURN_VALUE_FIELD_MASK,
+        REQUESTED_BY_PLAYER_FIELD_MASK,
+    ],
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK": [
+        RETURN_VALUE_FIELD_MASK,
+        IGNORE_COOLDOWN_FIELD_MASK,
+    ],
 }
 ITEM_RETURN_EVENT_KIND_ALLOWED_KEYS = {
     "kind",
@@ -524,6 +544,9 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
             "descriptor_surface_ids": descriptor_surface_ids,
             "item_return_event_kinds": [],
             "item_return_backing_target_set": None,
+            "item_return_event_descriptors": [],
+            "inventory_policy_event_kinds": [],
+            "inventory_policy_event_descriptors": [],
         }
 
     item_return_backing = event.get("item_return_backing_target_set")
@@ -592,15 +615,57 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
             "descriptor_surface_ids": descriptor_surface_ids,
             "item_return_event_kinds": [],
             "item_return_backing_target_set": item_return_backing,
+            "item_return_event_descriptors": [],
+            "inventory_policy_event_kinds": [],
+            "inventory_policy_event_descriptors": [],
         }
 
     item_return_kinds: list[str] = []
+    item_return_event_descriptors: list[dict[str, Any]] = []
+    inventory_policy_event_kinds: list[str] = []
+    inventory_policy_event_descriptors: list[dict[str, Any]] = []
     for index, event_kind in enumerate(event_kinds):
         if not isinstance(event_kind, dict):
             append_blocker(blockers, "public_gameplay_event_kind_not_object", index=index)
             continue
         kind = event_kind.get("kind")
         stable_name = event_kind.get("stable_name")
+        if kind in EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS:
+            inventory_policy_event_kinds.append(kind)
+            inventory_policy_event_descriptors.append(
+                {
+                    "kind": kind,
+                    "stable_name": stable_name,
+                    "field_mask": event_kind.get("field_mask"),
+                    "resource_kind": event_kind.get("resource_kind"),
+                }
+            )
+            if stable_name != EXPECTED_PUBLIC_INVENTORY_POLICY_STABLE_NAMES[kind]:
+                append_blocker(
+                    blockers,
+                    "public_inventory_policy_stable_name_mismatch",
+                    index=index,
+                    kind=kind,
+                    expected=EXPECTED_PUBLIC_INVENTORY_POLICY_STABLE_NAMES[kind],
+                    value=stable_name,
+                )
+            if event_kind.get("field_mask") != EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS[kind]:
+                append_blocker(
+                    blockers,
+                    "public_inventory_policy_field_mask_mismatch",
+                    index=index,
+                    kind=kind,
+                    expected=EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS[kind],
+                    value=event_kind.get("field_mask"),
+                )
+            if isinstance(stable_name, str) and stable_name.startswith("inventory_item."):
+                append_blocker(
+                    blockers,
+                    "public_inventory_policy_stable_name_crosses_item_return_boundary",
+                    index=index,
+                    kind=kind,
+                    value=stable_name,
+                )
         is_item_return_kind = kind in EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS or (
             isinstance(stable_name, str) and stable_name.startswith("inventory_item.")
         )
@@ -615,6 +680,14 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
         )
         if isinstance(kind, str):
             item_return_kinds.append(kind)
+            item_return_event_descriptors.append(
+                {
+                    "kind": kind,
+                    "stable_name": stable_name,
+                    "field_mask": event_kind.get("field_mask"),
+                    "resource_kind": event_kind.get("resource_kind"),
+                }
+            )
         else:
             append_blocker(blockers, "public_item_return_kind_missing", index=index, value=kind)
         if event_kind.get("stable_name") != EXPECTED_PUBLIC_ITEM_RETURN_STABLE_NAMES.get(kind):
@@ -653,8 +726,17 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
                 expected=[RETURN_VALUE_FIELD_MASK],
                 value=event_kind.get("field_mask"),
             )
+        if isinstance(stable_name, str) and not stable_name.startswith("inventory_item."):
+            append_blocker(
+                blockers,
+                "public_item_return_stable_name_crosses_inventory_policy_boundary",
+                index=index,
+                kind=kind,
+                value=stable_name,
+            )
 
     item_return_kind_set = set(item_return_kinds)
+    inventory_policy_kind_set = set(inventory_policy_event_kinds)
     if item_return_kind_set != EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS:
         append_blocker(
             blockers,
@@ -664,11 +746,30 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
         )
     if len(item_return_kinds) != 3:
         append_blocker(blockers, "public_item_return_event_kind_count_mismatch", expected=3, value=len(item_return_kinds))
+    if inventory_policy_kind_set != EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS:
+        append_blocker(
+            blockers,
+            "public_inventory_policy_event_kind_coverage_mismatch",
+            missing=sorted(EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS - inventory_policy_kind_set),
+            unexpected=sorted(inventory_policy_kind_set - EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS),
+        )
+    if item_return_kind_set & inventory_policy_kind_set:
+        append_blocker(
+            blockers,
+            "public_item_return_inventory_policy_event_kind_overlap",
+            overlap=sorted(item_return_kind_set & inventory_policy_kind_set),
+        )
 
     return {
         "descriptor_surface_ids": descriptor_surface_ids,
         "item_return_event_kinds": sorted(item_return_kind_set),
         "item_return_backing_target_set": item_return_backing,
+        "item_return_event_descriptors": sorted(item_return_event_descriptors, key=lambda item: str(item.get("kind"))),
+        "inventory_policy_event_kinds": sorted(inventory_policy_kind_set),
+        "inventory_policy_event_descriptors": sorted(
+            inventory_policy_event_descriptors,
+            key=lambda item: str(item.get("kind")),
+        ),
     }
 
 
@@ -946,6 +1047,187 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     }
 
 
+def build_descriptor_reconciliation(
+    policy: dict[str, Any],
+    public_gameplay_events_summary: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    local_blockers_before = len(blockers)
+    preflight = policy.get("descriptor_preflight")
+    preflight_summary: dict[str, Any] = {
+        "policy_status": policy.get("policy_status"),
+        "status": None,
+        "assigned_event_kind": None,
+        "assigned_event_kind_mask": None,
+        "return_value_only": None,
+        "public_surface": None,
+        "promotion_ready": None,
+        "descriptor_count": 0,
+        "copied_fields": [],
+        "explicitly_not_assigned": [],
+    }
+
+    if policy.get("policy_status") != "evidence-only":
+        append_blocker(
+            blockers,
+            "descriptor_reconciliation_policy_status_drift",
+            expected="evidence-only",
+            value=policy.get("policy_status"),
+        )
+
+    if not isinstance(preflight, dict):
+        append_blocker(blockers, "descriptor_reconciliation_preflight_missing")
+    else:
+        descriptors = preflight.get("descriptors")
+        copied_fields = (
+            sorted(
+                descriptor["copied_field"]
+                for descriptor in descriptors
+                if isinstance(descriptor, dict) and isinstance(descriptor.get("copied_field"), str)
+            )
+            if isinstance(descriptors, list)
+            else []
+        )
+        explicitly_not_assigned = preflight.get("explicitly_not_assigned")
+        preflight_summary = {
+            "policy_status": policy.get("policy_status"),
+            "status": preflight.get("status"),
+            "assigned_event_kind": preflight.get("assigned_event_kind"),
+            "assigned_event_kind_mask": preflight.get("assigned_event_kind_mask"),
+            "return_value_only": preflight.get("return_value_only"),
+            "public_surface": preflight.get("public_surface"),
+            "promotion_ready": preflight.get("promotion_ready"),
+            "descriptor_count": preflight.get("descriptor_count"),
+            "copied_fields": copied_fields,
+            "explicitly_not_assigned": explicitly_not_assigned
+            if isinstance(explicitly_not_assigned, list)
+            else [],
+        }
+        for key, expected in {
+            "status": "internal-evidence-only",
+            "assigned_event_kind": None,
+            "assigned_event_kind_mask": None,
+            "return_value_only": True,
+            "public_surface": False,
+            "promotion_ready": False,
+        }.items():
+            if preflight.get(key) != expected:
+                append_blocker(
+                    blockers,
+                    "descriptor_reconciliation_preflight_assignment_drift",
+                    field=key,
+                    expected=expected,
+                    value=preflight.get(key),
+                )
+        required_unassigned = {
+            "event_kind",
+            "event_kind_mask",
+            "public_metadata_json",
+            "runtime_dispatcher_tables",
+            "plugin_callbacks",
+        }
+        recorded_unassigned = set(explicitly_not_assigned) if isinstance(explicitly_not_assigned, list) else set()
+        if not required_unassigned.issubset(recorded_unassigned):
+            append_blocker(
+                blockers,
+                "descriptor_reconciliation_preflight_not_assigned_incomplete",
+                missing=sorted(required_unassigned - recorded_unassigned),
+            )
+
+    item_return_descriptors = public_gameplay_events_summary.get("item_return_event_descriptors")
+    if not isinstance(item_return_descriptors, list):
+        item_return_descriptors = []
+    inventory_policy_descriptors = public_gameplay_events_summary.get("inventory_policy_event_descriptors")
+    if not isinstance(inventory_policy_descriptors, list):
+        inventory_policy_descriptors = []
+
+    for descriptor in item_return_descriptors:
+        if not isinstance(descriptor, dict):
+            continue
+        if descriptor.get("field_mask") != [RETURN_VALUE_FIELD_MASK]:
+            append_blocker(
+                blockers,
+                "descriptor_reconciliation_public_item_return_not_return_value_only",
+                kind=descriptor.get("kind"),
+                value=descriptor.get("field_mask"),
+            )
+    if len(item_return_descriptors) != 3:
+        append_blocker(
+            blockers,
+            "descriptor_reconciliation_public_item_return_descriptor_count_mismatch",
+            expected=3,
+            value=len(item_return_descriptors),
+        )
+    for descriptor in inventory_policy_descriptors:
+        if not isinstance(descriptor, dict):
+            continue
+        kind = descriptor.get("kind")
+        if kind in EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS and (
+            descriptor.get("field_mask") != EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS[kind]
+        ):
+            append_blocker(
+                blockers,
+                "descriptor_reconciliation_inventory_policy_field_mask_drift",
+                kind=kind,
+                expected=EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS[kind],
+                value=descriptor.get("field_mask"),
+            )
+
+    item_return_kinds = set(public_gameplay_events_summary.get("item_return_event_kinds", []))
+    inventory_policy_kinds = set(public_gameplay_events_summary.get("inventory_policy_event_kinds", []))
+    if item_return_kinds & inventory_policy_kinds:
+        append_blocker(
+            blockers,
+            "descriptor_reconciliation_dispatcher_boundary_overlap",
+            overlap=sorted(item_return_kinds & inventory_policy_kinds),
+        )
+    item_return_field_masks = {
+        str(descriptor.get("kind")): descriptor.get("field_mask")
+        for descriptor in item_return_descriptors
+        if isinstance(descriptor, dict)
+    }
+    inventory_policy_field_masks = {
+        str(descriptor.get("kind")): descriptor.get("field_mask")
+        for descriptor in inventory_policy_descriptors
+        if isinstance(descriptor, dict)
+    }
+    item_return_masks_preserved = all(
+        item_return_field_masks.get(kind) == [RETURN_VALUE_FIELD_MASK]
+        for kind in EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS
+    )
+    inventory_policy_masks_preserved = all(
+        inventory_policy_field_masks.get(kind) == expected
+        for kind, expected in EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS.items()
+    )
+
+    return {
+        "status": "accepted" if len(blockers) == local_blockers_before else "blocked",
+        "item_return_only_preflight": preflight_summary,
+        "public_gameplay_policy_item_return_descriptors": item_return_descriptors,
+        "dispatcher_boundary": {
+            "InventoryPolicyEventDispatcher": {
+                "stable_name_prefix": "inventory.",
+                "event_kinds": sorted(inventory_policy_kinds),
+                "field_masks": inventory_policy_field_masks,
+            },
+            "ItemReturnEventDispatcher": {
+                "stable_name_prefix": "inventory_item.",
+                "event_kinds": sorted(item_return_kinds),
+                "field_masks": item_return_field_masks,
+            },
+            "preserved": not bool(item_return_kinds & inventory_policy_kinds)
+            and item_return_kinds == EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS
+            and inventory_policy_kinds == EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS
+            and item_return_masks_preserved
+            and inventory_policy_masks_preserved,
+        },
+        "non_claims": [
+            "reconciles descriptors only; does not promote Inventory SDK, Items SDK, ABI expansion, runtime readiness, identity, mutation, or return override",
+            "offline descriptor preflight remains unassigned while public GameplayPolicyEvent descriptors remain ReturnValue-only",
+        ],
+    }
+
+
 def build_report(
     root_arg: Path, manifest_arg: Path | None, expected_manifest_sha256: str, skip_artifact_gates: bool = False
 ) -> dict[str, Any]:
@@ -956,6 +1238,7 @@ def build_report(
 
     summary: dict[str, Any] = {}
     public_gameplay_events_summary: dict[str, Any] = {}
+    descriptor_reconciliation: dict[str, Any] = {}
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
     public_events_path = safe_path(PUBLIC_GAMEPLAY_EVENTS, "docs/public_gameplay_events.json", blockers)
@@ -967,6 +1250,7 @@ def build_report(
         policy = read_policy(manifest, blockers, expected_manifest_sha256)
         if policy is not None:
             summary = validate_policy(policy, blockers)
+            descriptor_reconciliation = build_descriptor_reconciliation(policy, public_gameplay_events_summary, blockers)
         if skip_artifact_gates:
             consume_gate = {"returncode": None, "status": "skipped"}
             promote_gate = {"returncode": None, "status": "skipped", "blocker_reasons": []}
@@ -1027,6 +1311,7 @@ def build_report(
         "promote_gate": promote_gate,
         "summary": summary,
         "public_gameplay_events": public_gameplay_events_summary,
+        "descriptor_reconciliation": descriptor_reconciliation,
         "blockers": blockers,
         "non_claims": [
             "candidate readiness is internal planning evidence only",

@@ -10,6 +10,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_MANAGER = REPO_ROOT / "core" / "PluginManager.cpp"
+PLUGIN_MANAGER_HEADER = REPO_ROOT / "core" / "PluginManager.h"
+OBELISK_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 CORE_DIR = REPO_ROOT / "core"
 
 COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
@@ -44,7 +46,66 @@ def extract_function_body(text: str, pattern: str) -> str:
     return extract_braced_body(text, match)
 
 
+def strip_c_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"//.*", "", text)
+
+
+def obelisk_api_field_names(header: str) -> list[str]:
+    match = re.search(
+        r"typedef\s+struct\s+ObeliskApi\s*\{(?P<body>.*?)\}\s*ObeliskApi\s*;",
+        strip_c_comments(header),
+        re.DOTALL,
+    )
+    if match is None:
+        raise AssertionError("typedef struct ObeliskApi block not found")
+
+    fields: list[str] = []
+    for declaration in match.group("body").split(";"):
+        declaration = " ".join(declaration.split())
+        if not declaration:
+            continue
+        function_pointer = re.search(r"\(\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", declaration)
+        if function_pointer:
+            fields.append(function_pointer.group(1))
+            continue
+        plain_field = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]+\])?$", declaration)
+        if plain_field:
+            fields.append(plain_field.group(1))
+    return fields
+
+
 class PluginManagerGuardrailTests(unittest.TestCase):
+    def test_obelisk_api_table_is_zero_initialized_and_fully_assigned(self) -> None:
+        plugin_manager_header = PLUGIN_MANAGER_HEADER.read_text(encoding="utf-8")
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            plugin_manager_header,
+            r"\bObeliskApi\s+m_Api\s*\{\s*\}\s*;",
+            "PluginManager must zero-initialize the public API table before assigning fields.",
+        )
+
+        constructor_body = extract_function_body(
+            plugin_manager_text,
+            r"PluginManager::PluginManager\(LibraryLoader& loader, ChatEventDispatcher& chatDispatcher\)"
+            r"\s*:\s*m_Loader\(&loader\)\s*,\s*m_ChatDispatcher\(&chatDispatcher\)",
+        )
+        assigned_fields = set(re.findall(r"\bm_Api\.([A-Za-z_][A-Za-z0-9_]*)\s*=", constructor_body))
+        declared_fields = set(obelisk_api_field_names(api_header))
+
+        self.assertEqual(
+            sorted(declared_fields - assigned_fields),
+            [],
+            "Every ObeliskApi field needs an explicit PluginManager constructor assignment.",
+        )
+        self.assertEqual(
+            sorted(assigned_fields - declared_fields),
+            [],
+            "PluginManager assigns a field that is not in the public ObeliskApi struct.",
+        )
+
     def test_scoped_cleanup_guard_is_noexcept_and_catches(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         match = re.search(

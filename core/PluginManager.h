@@ -46,7 +46,7 @@ namespace Obelisk::Core
         };
 
         std::vector<PluginInfo> m_LoadedPlugins;
-        ObeliskApi m_Api;
+        ObeliskApi m_Api{};
         LibraryLoader* m_Loader;
         ChatEventDispatcher* m_ChatDispatcher;
 

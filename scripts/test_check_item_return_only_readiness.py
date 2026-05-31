@@ -43,6 +43,26 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                 "type": "bool",
             }
 
+        def descriptor(target: str, name: str) -> dict:
+            return {
+                "assigned_event_kind": None,
+                "assigned_event_kind_mask": None,
+                "copied_field": f"{target}.ReturnValue",
+                "descriptor": name,
+                "direction": "return",
+                "evidence_status": "descriptor-preflight-only",
+                "field": "ReturnValue",
+                "payload_policy": "copied_return_value_only",
+                "promotion_ready": False,
+                "public_promotion": False,
+                "resource_backing": "inventory_backed",
+                "resource_kind": "INVENTORY_ITEM",
+                "source_snapshot": f"{target}.snapshot.json",
+                "source_snapshot_sha256": "a" * 64,
+                "target": target,
+                "type": "bool",
+            }
+
         return {
             "schema": "obelisk.item-return-only-policy-slice.v1",
             "input_target_set": "item-compact-intake",
@@ -89,9 +109,36 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
             "safety_summary": {
                 "artifact_status": "evidence_only",
                 "copied_bool_count": 3,
+                "descriptor_preflight_count": 3,
                 "excluded_field_count": 5,
                 "intended_use": "offline_review_only",
                 "promotion_ready": False,
+            },
+            "descriptor_preflight": {
+                "assigned_event_kind": None,
+                "assigned_event_kind_mask": None,
+                "descriptor_count": 3,
+                "descriptors": [
+                    descriptor("PrimalItem.AllowEquipItem", "inventory_item.allow_equip_check"),
+                    descriptor("PrimalItem.CanRepair", "inventory_item.can_repair_check"),
+                    descriptor("PrimalItem.UseItemOntoItem", "inventory_item.use_onto_item_check"),
+                ],
+                "explicitly_not_assigned": [
+                    "event_kind",
+                    "event_kind_mask",
+                    "public_metadata_json",
+                    "runtime_dispatcher_tables",
+                    "plugin_callbacks",
+                ],
+                "payload_policy": "copied_return_value_only",
+                "promotion_ready": False,
+                "public_promotion": False,
+                "public_surface": False,
+                "resource_backing": "inventory_backed",
+                "resource_kind": "INVENTORY_ITEM",
+                "return_value_only": True,
+                "scope": "item-return-only-policy-slice",
+                "status": "internal-evidence-only",
             },
             "non_claims": [
                 "does not promote public SDK callbacks or public metadata helpers",
@@ -108,6 +155,15 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                 "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
                 "event_kind_mask": readiness.EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KIND_MASKS[kind],
                 "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+            }
+
+        def inventory_policy_event(kind: str, stable_name: str, field_mask: list[str]) -> dict:
+            return {
+                "kind": kind,
+                "stable_name": stable_name,
+                "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                "event_kind_mask": kind.replace("_EVENT_KIND_", "_EVENT_MASK_"),
+                "field_mask": field_mask,
             }
 
         return {
@@ -168,6 +224,22 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                     "inventory_sdk": "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
                     "item_module_sdk": "not promoted; item-return-backed policy signals are exposed only through GameplayPolicyEvent",
                     "event_kinds": [
+                        inventory_policy_event(
+                            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+                            "inventory.remote_add_check",
+                            [
+                                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+                            ],
+                        ),
+                        inventory_policy_event(
+                            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+                            "inventory.use_check",
+                            [
+                                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+                            ],
+                        ),
                         item_return_event(
                             "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
                             "inventory_item.allow_equip_check",
@@ -220,6 +292,28 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         self.assertEqual(len(payload["summary"]["excluded_fields"]), 5)
         self.assertEqual(payload["public_gameplay_events"]["item_return_backing_target_set"], "item-return-only-policy-slice")
         self.assertEqual(len(payload["public_gameplay_events"]["item_return_event_kinds"]), 3)
+        reconciliation = payload["descriptor_reconciliation"]
+        self.assertEqual(reconciliation["status"], "accepted")
+        self.assertEqual(reconciliation["item_return_only_preflight"]["policy_status"], "evidence-only")
+        self.assertIsNone(reconciliation["item_return_only_preflight"]["assigned_event_kind"])
+        self.assertIsNone(reconciliation["item_return_only_preflight"]["assigned_event_kind_mask"])
+        self.assertFalse(reconciliation["item_return_only_preflight"]["public_surface"])
+        self.assertEqual(len(reconciliation["public_gameplay_policy_item_return_descriptors"]), 3)
+        self.assertTrue(
+            all(
+                descriptor["field_mask"] == ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"]
+                for descriptor in reconciliation["public_gameplay_policy_item_return_descriptors"]
+            )
+        )
+        self.assertTrue(reconciliation["dispatcher_boundary"]["preserved"])
+        self.assertEqual(
+            reconciliation["dispatcher_boundary"]["ItemReturnEventDispatcher"]["event_kinds"],
+            sorted(readiness.EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS),
+        )
+        self.assertEqual(
+            reconciliation["dispatcher_boundary"]["InventoryPolicyEventDispatcher"]["event_kinds"],
+            sorted(readiness.EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS),
+        )
 
     def test_public_gameplay_events_accepts_three_return_value_only_item_events(self) -> None:
         blockers: list[dict] = []
@@ -234,6 +328,10 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         self.assertEqual(
             summary["item_return_event_kinds"],
             sorted(readiness.EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS),
+        )
+        self.assertEqual(
+            summary["inventory_policy_event_kinds"],
+            sorted(readiness.EXPECTED_PUBLIC_INVENTORY_POLICY_EVENT_KINDS),
         )
 
     def test_public_gameplay_events_rejects_descriptor_surface_overclaims(self) -> None:
@@ -261,7 +359,7 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
     def test_public_gameplay_events_rejects_extra_item_kind_and_non_return_value_field(self) -> None:
         public_events = self.make_public_gameplay_events()
         event = public_events["promoted_events"][0]
-        event["event_kinds"][0]["field_mask"].append("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN")
+        event["event_kinds"][2]["field_mask"].append("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN")
         event["event_kinds"].append(
             {
                 "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CRAFT_BLUEPRINT_CHECK",
@@ -328,6 +426,19 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         self.assertIn("safety_summary_unexpected_field", reasons)
         self.assertIn("copied_return_bool_entry_unexpected_field", reasons)
         self.assertIn("excluded_field_entry_unexpected_field", reasons)
+
+    def test_descriptor_reconciliation_requires_unassigned_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            del payload["descriptor_preflight"]
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(report["descriptor_reconciliation"]["status"], "blocked")
+        self.assertIn("descriptor_reconciliation_preflight_missing", {b["reason"] for b in report["blockers"]})
 
     def test_craftblueprint_copied_field_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
