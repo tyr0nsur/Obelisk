@@ -16,6 +16,10 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import evaluate_resource_handle_revalidation as resourcehandle_evaluator  # noqa: E402
 
 
+def normalized(text: str) -> str:
+    return " ".join(text.split())
+
+
 class ResearchDocGuardrailTests(unittest.TestCase):
     def test_resourcehandle_research_and_handoff_do_not_claim_readiness(self) -> None:
         scanned_paths = [
@@ -325,6 +329,71 @@ class ResearchDocGuardrailTests(unittest.TestCase):
                     offenders.append(f"{note.relative_to(REPO_ROOT)}: {phrase}")
 
         self.assertEqual(offenders, [])
+
+    def test_module_route_keeps_general_lanes_and_layout_boundary(self) -> None:
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        roadmap = (
+            REPO_ROOT / "docs/research/2026-05-29-module-surface-roadmap.md"
+        ).read_text(encoding="utf-8")
+        readiness = (
+            REPO_ROOT / "docs/research/2026-05-27-module-readiness-matrix.md"
+        ).read_text(encoding="utf-8")
+        taxonomy = (
+            REPO_ROOT / "docs/research/2026-05-27-sdk-module-taxonomy.md"
+        ).read_text(encoding="utf-8")
+
+        lane_names = (
+            "Inventory lane",
+            "Structures lane",
+            "Items lane",
+            "Mission lane",
+            "Transfer lane",
+            "Buff lane",
+            "Dino lane",
+            "Tribe lane",
+            "Admin/permissions lane",
+        )
+        readme_compact = normalized(readme)
+        for lane in lane_names:
+            with self.subTest(file="docs/research/README.md", lane=lane):
+                self.assertIn(lane, readme_compact)
+
+        roadmap_compact = normalized(roadmap)
+        for phrase in (
+            "Recommended lane order",
+            "Promotion gate for every module lane",
+            "exact layout target set",
+            "do not turn target-set labels into public SDK names",
+            "structures lane",
+            "inventory lane",
+            "items lane",
+            "mission lane",
+            "transfer lane",
+            "buff lane",
+            "dino lane",
+            "tribe lane",
+            "admin/permissions lane",
+        ):
+            with self.subTest(file="docs/research/2026-05-29-module-surface-roadmap.md", phrase=phrase):
+                self.assertIn(phrase, roadmap_compact)
+
+        for path, text in (
+            ("docs/research/2026-05-27-module-readiness-matrix.md", readiness),
+            ("docs/research/2026-05-27-sdk-module-taxonomy.md", taxonomy),
+        ):
+            compact = normalized(text)
+            compact_lower = compact.lower()
+            for phrase in (
+                "not the product center",
+            ):
+                with self.subTest(file=path, phrase=phrase):
+                    self.assertIn(phrase, compact_lower)
+            for phrase in (
+                "Inventory, structures, items, mission, transfer, buff, dino, tribe, and admin/permissions",
+                "independent promotion gates",
+            ):
+                with self.subTest(file=path, phrase=phrase):
+                    self.assertIn(phrase, compact)
 
     def test_second_source_intake_runbook_keeps_planner_phases_explicit(self) -> None:
         runbook = REPO_ROOT / "docs/research/2026-05-28-second-source-core-intake-runbook.md"

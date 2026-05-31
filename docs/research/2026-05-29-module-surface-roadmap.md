@@ -75,12 +75,19 @@ evidence:
 
 ## Result
 
-Recommended order:
+Recommended lane order:
 
 RC stays centered on `GameplayPolicyEvent`, the minimal copied `ChatMessageEvent`,
 `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`. The module ranking below is
 post-RC/internal research direction unless a later focused gate explicitly changes release
 scope.
+
+Promotion gate for every module lane is: exact layout target set, fixture coverage,
+second-source/static evidence, copied-data ownership and redaction policy, approved
+runtime observation, internal dispatcher lifetime cleanup, then append-only public SDK ABI
+and installed consumer tests. `promotion_gate.ready=true`, accepted targets, target-set
+names, and labels such as `sdk.inventory` or `sdk.buffs` describe the layout/evidence rung
+only; they do not turn target-set labels into public SDK names.
 
 0. `resources / ResourceHandle`: do not run more broad FName/GObjects/UFunction scans for
    this track on the current binary. Existing offline evidence is strong enough for target
@@ -88,39 +95,40 @@ scope.
    Treat `0x100` as a hard-invalid internal candidate and `0x4000` as mode-dependent
    weak-delegate evidence only until rejected runtime samples or stronger static semantics
    prove a safe public policy.
-1. `sdk.structures`: keep `GameplayPolicyEvent` as the only promoted public gameplay
+1. `structures lane`: keep `GameplayPolicyEvent` as the only promoted public gameplay
    surface; next work should harden docs/evidence around copied scalar fields, not add raw
    StructureEvents.
-2. `sdk.inventory`: current best hardened backing inside existing `GameplayPolicyEvent`.
+2. `inventory lane`: current best hardened backing inside existing `GameplayPolicyEvent`.
    `CanUse` and `AllowRemoteAddToInventory` are copied-bool only, require exact full field
    sequences, and reject forged metadata-only ranges.
-3. `sdk.items`: best post-RC internal bridge candidate after inventory hardening, but only
+3. `items lane`: best post-RC internal bridge candidate after inventory hardening, but only
    for return-only observations that already fit the public `GameplayPolicyEvent`
    `RETURN_VALUE` field mask. Do not weaken `InventoryPolicyEventDispatcher::CanUse` by
    fabricating `BIgnoreCooldown` from item-only fields.
-4. `sdk.missions`: useful post-RC internal recognizer candidate after item return-only
+4. `mission lane`: useful post-RC internal recognizer candidate after item return-only
    evidence is preserved. Keep it as a reduced copied-bool observer with
    object/player/controller/array fields recognition-only.
-5. `sdk.items detail`: `ue/ItemReflection` now implements the first fixture-backed, SHA-gated
+5. `items detail lane`: `ue/ItemReflection` now implements the first fixture-backed, SHA-gated
    internal recognizer for `PrimalItem.AllowEquipItem`, `CanRepair`, `CraftBlueprint`, and
    `UseItemOntoItem`. It exposes only bool ranges; `toInventory`, `DestinationItem`,
    `AdditionalData`, `ItemNetID`, identity, mutation, return override, hooks,
    dispatchers, and SDK callbacks stay blocked.
-6. `sdk.dinos`: compact passenger/carry policy shapes now have accepted second-source
+6. `dino lane`: compact passenger/carry policy shapes now have accepted second-source
    layout evidence and are useful internal recognizer inputs after inventory. They remain
    blocked from public payloads because raw actor identity, object lifetime, resource
    handles, taming, attack, mutation, and return-override semantics are unresolved.
-7. `sdk.buffs`: good reflection coverage for bool-return, bool-input, class-ref, and
+7. `buff lane`: good reflection coverage for bool-return, bool-input, class-ref, and
    zero-param shapes after compact plus breadth second-source evidence; poorer product
    candidate until buff semantics, object/class redaction, and no-override policy are
    explicit.
-8. `sdk.tribes`: accepted permission and membership layout evidence is valuable, but public
+8. `tribe lane`: accepted permission and membership layout evidence is valuable, but public
    usefulness is identity-sensitive and array/string targets remain blocked.
-9. `sdk.transfers`: broad fixture coverage and layout-only second-source evidence exist,
+9. `transfer lane`: broad fixture coverage and layout-only second-source evidence exist,
    including tribute structs, but transfer payloads are sensitive and array/string/nested
    struct ownership is unresolved. The only clean post-RC first slice is
    `ServerTransferredPlayerConfirmationResult.bAccept` as an internal copied bool.
-10. `sdk.admin`: keep documentation-only until a permission model and abuse controls exist.
+10. `admin/permissions lane`: keep documentation-only until a permission model and abuse
+    controls exist.
 
 ## Copied-POD Candidates
 

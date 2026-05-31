@@ -56,9 +56,26 @@ produce design notes, evidence plans, or guardrail tests only; do not start firs
 examples, SDK wrappers, compatibility shims, or public docs that imply those backlog
 modules are supported.
 
+## Dictionary-To-Primitive Rule
+
+The matrix maps demand families to the first Obelisk primitive that can honestly teach a
+small pattern; it does not map a popular plugin family to a rebuildable Plugin Hub module.
+Names from ArkApi/AseApi or local `NextGenPlugins` can corroborate demand, but they do not
+widen a row's support tier.
+
+For example, lifecycle/crash/reload demand maps only to lifecycle, config, logging, and
+shutdown-cleanup skeletons. It does not promote plugin watchdogs, hot reload, process
+restart, server recovery, or operator reload commands. Timed notices map to
+process-local timers only when no chat send, broadcast, command, permission, persistence,
+or cross-process scheduling behavior is implied. Economy, shops, kits, rewards, homes,
+safe zones, RCON, tribe notices, and structure tools remain blocked even when a subset of
+their timing, logging, descriptor, or passive parsing needs could be demonstrated by a
+core primitive.
+
 ## NextGenPlugins Demand Snapshot
 
-The local dictionary currently points to these high-demand Plugin Hub categories. The
+The local dictionary currently points to these high-demand Plugin Hub categories.
+ArkApi/AseApi names corroborate the same broad families for demand analysis only. The
 status below describes only what Obelisk can expose safely today or after promotion gates;
 it does not promise ArkApi plugin compatibility.
 

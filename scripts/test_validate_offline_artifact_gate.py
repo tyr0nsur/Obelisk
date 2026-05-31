@@ -3225,6 +3225,32 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn("evidence_pack_missing_evidence_status", {blocker["reason"] for blocker in result["blockers"]})
 
+    def test_artifact_pack_core_child_blockers_are_not_duplicated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            child = core_dump_evidence_pack_manifest(
+                workspace,
+                binary_sha256="b" * 64,
+                evidence_status={"status": "partial-gdb-failed", "gdb_core_failed": True},
+                core_path=str(protected / "live" / "core"),
+            )
+            write_json(pack / "core-evidence.json", child)
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        reason_counts = {reason: 0 for reason in {blocker["reason"] for blocker in result["blockers"]}}
+        for blocker in result["blockers"]:
+            reason_counts[blocker["reason"]] += 1
+        self.assertEqual(1, reason_counts["evidence_pack_not_complete"])
+        self.assertEqual(1, reason_counts["evidence_pack_gdb_core_failed"])
+        self.assertEqual(1, reason_counts["evidence_pack_binary_sha256_mismatch"])
+        self.assertEqual(1, reason_counts["path_text_under_protected_root"])
+        self.assertEqual(1, reason_counts["path_resolves_under_protected_root"])
+
     def test_artifact_pack_blocks_zero_byte_normalizer_summary_child(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

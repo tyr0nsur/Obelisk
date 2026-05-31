@@ -23,8 +23,15 @@ namespace
 
     bool HasDescriptorApi(const ObeliskApi* api)
     {
-        return api &&
-            api->abi_version == OBELISK_API_ABI_VERSION &&
+        if (!api ||
+            api->abi_version != OBELISK_API_ABI_VERSION ||
+            api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities))
+        {
+            return false;
+        }
+
+        return api->struct_size >= offsetof(ObeliskApi, DescribeResourceKind) +
+                sizeof(api->DescribeResourceKind) &&
             api->struct_size >= offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
                 sizeof(api->DescribeGameplayPolicyEventKind) &&
             (api->capabilities & OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS) != 0 &&

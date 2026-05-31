@@ -39,6 +39,12 @@ memory alone, or metadata reads without ownership and lifetime design.
 
 ## Module Map
 
+Route breadth guardrail: `sdk.*` labels in this historical taxonomy are research track
+labels only. Chat is useful evidence for copied notifications, but it is not the product
+center. Inventory, structures, items, mission, transfer, buff, dino, tribe, and
+admin/permissions stay visible as separate lanes, each with independent promotion gates
+before any public SDK claim.
+
 | Module Area | Current Sources | Near-Term Purpose | Status |
 | --- | --- | --- | --- |
 | `sdk.chat` | `ServerSendChatMessage`, exact chat fallback recognizers | Internal observation and eventual copied-data event API | Experimental internal only |

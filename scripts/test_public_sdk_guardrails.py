@@ -489,6 +489,7 @@ PUBLIC_SDK_OPTIONAL_API_CONSUMERS = [
     REPO_ROOT / "tests" / "sdk_consumer" / "CAbiPlugin.c",
     REPO_ROOT / "tests" / "sdk_installed_consumer" / "consumer_plugin.cpp",
     REPO_ROOT / "tests" / "sdk_installed_consumer" / "c_abi_plugin.c",
+    REPO_ROOT / "tests" / "sdk_installed_consumer" / "descriptor_catalog_plugin.cpp",
 ]
 PUBLIC_SDK_OPTIONAL_API_SURFACES = [
     {
@@ -976,19 +977,40 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_research_index_defines_module_layout_terms_as_non_public_non_callable(self) -> None:
         readme = RESEARCH_MODULE_BOUNDARY_README.read_text(encoding="utf-8")
+        compact = normalized(readme)
 
         required = (
             "`promotion_gate.ready=true`, `accepted targets`, and `candidate` in\n"
             "module-specific notes mean offline evidence readiness for the named layout or artifact\n"
             "gate only",
             "They do not make the named UE functions callable or usable plugin functions",
-            "Dino, Buff, Tribe, Transfer, Structure build policy, permissions/admin/RCON/economy/storage",
-            "public surfaces are not promoted and named UE functions are not usable plugin APIs",
+            "they do not authorize public SDK surfaces",
+            "They are not public SDK module names, ABI commitments,\n"
+            "runtime hooks, callback families",
         )
 
         for text in required:
             with self.subTest(text=text):
-                self.assertIn(text, readme)
+                self.assertIn(normalized(text), compact)
+
+        for term in (
+            "Current v1 research lane snapshot from the current notes",
+            "Treat chat as one small copied notification lane, not the v1 module center.",
+            "Inventory lane",
+            "Structures lane",
+            "Items lane",
+            "Mission lane",
+            "Dino lane",
+            "Buff lane",
+            "Tribe lane",
+            "Transfer lane",
+            "Admin/permissions lane",
+            "Keep structure target sets layout-only unless a strict readiness note promotes a named copied surface",
+            "Keep transfer as offline/internal until copied payload ownership, privacy/redaction, lifecycle, second-source/static evidence, ABI tests, installed SDK consumer coverage, and approved runtime validation all pass.",
+            "admin, permissions, RCON, economy, storage",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, compact)
 
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
         texts = {
@@ -3328,6 +3350,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "`experimental seed only`: allowed for explicitly labeled pattern examples",
             "not supported as production Plugin Hub modules or as general chat, command, policy, structure, inventory, identity, mutation, or enforcement SDKs",
             "`blocked` and `blocked except experimental auditing`: backlog demand only",
+            "## Dictionary-To-Primitive Rule",
+            "does not map a popular plugin family to a rebuildable Plugin Hub module",
+            "Names from ArkApi/AseApi or local `NextGenPlugins` can corroborate demand",
+            "they do not widen a row's support tier",
+            "It does not promote plugin watchdogs, hot reload, process restart, server recovery, or operator reload commands",
+            "Timed notices map to process-local timers only when no chat send, broadcast, command, permission, persistence, or cross-process scheduling behavior is implied",
             "it does not promise ArkApi plugin compatibility",
             "Neither tier means the corresponding ArkApi plugin family can be ported",
             "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",

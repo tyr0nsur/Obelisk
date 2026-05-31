@@ -1,7 +1,7 @@
 # Structure Build-Policy Focal Snapshot Planner
 
 Date: 2026-05-31
-Obelisk commit reviewed: `416652d`
+Obelisk commit reviewed: `0b0bd4f`
 
 ## Scope
 
@@ -43,9 +43,13 @@ The new plan mode:
 - works with `--evidence-pack-manifest` after the existing protected-path, SHA, status,
   FName root, and GObjects validation;
 - emits `obelisk.ufunction-focal-snapshot-plan.v1` inside `ufunction-inventory.json`;
+- uses unfiltered redacted inventory for exact target planning, so broad inventory display
+  filters cannot create a false missing-target blocker;
 - emits an exact `scripts/inspect_core_ufunctions.py --snapshot-json` command using the
   resolved offline core path, GObjects, FName root slot, binary SHA, artifact SHA,
-  capture id, evidence-pack id, and current Obelisk commit;
+  capture id, evidence-pack id, current Obelisk commit, command cwd, and
+  `PYTHONDONTWRITEBYTECODE=1` environment;
+- blocks command generation when FName root validation is not ready;
 - blocks missing or ambiguous inventory matches instead of inventing fixture entries;
 - records redaction review reminders for placement structs, location/rotation values,
   player/controller context, object refs, arrays, and raw params;
@@ -72,9 +76,14 @@ candidate snapshot exists and the redaction policy is reviewed.
 
 ## Current Status
 
-The tooling is now sufficient to generate a focal snapshot plan from a complete
-evidence-pack manifest. It is not sufficient to extract the actual
-`IsAllowedToBuild` snapshot until an eligible input exists.
+Planner confidence is limited to offline command planning from a complete, non-protected
+evidence-pack manifest or direct copied/offline core. A `planned` target means only that
+the exact owner/name appears once in the redacted inventory and the FName root validation
+is ready enough to run the emitted snapshot command. It is not layout acceptance,
+second-source evidence, runtime readiness, target-set promotion, or SDK readiness.
+
+The tooling cannot extract the actual `IsAllowedToBuild` snapshot until an eligible input
+exists.
 
 Still missing for extraction:
 
@@ -86,7 +95,7 @@ Still missing for extraction:
 - exactly one inventory match for `PrimalStructure.IsAllowedToBuild` or, if observed,
   `APrimalStructure.IsAllowedToBuild`.
 
-Sufficient evidence for the next gate:
+Inputs required before the next offline review attempt:
 
 - one sanitized candidate snapshot for the exact observed owner/name only;
 - a redaction review marking placement structs, location/rotation context, player or

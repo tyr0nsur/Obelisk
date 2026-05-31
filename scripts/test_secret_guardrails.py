@@ -15,6 +15,20 @@ DISCORD_WEBHOOK_RE = re.compile(
     r"https://(?:canary\.|ptb\.)?" + WEBHOOK_HOST_PATTERN + r"/\d+/[A-Za-z0-9_\-]+"
 )
 DISCORD_WEBHOOK_LITERAL_RE = re.compile(r"discord(?:app)?\.com/" + "api/webhooks")
+OPERATOR_ABSOLUTE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:/home/[A-Za-z0-9._-]+|/Users/[A-Za-z0-9._-]+|/root(?:/|$)|[A-Za-z]:\\Users\\[A-Za-z0-9._-]+)"
+)
+PUBLISHABLE_TEXT_PATHS = [
+    ".github/ISSUE_TEMPLATE/bug_report.yml",
+    ".github/ISSUE_TEMPLATE/plugin_proposal.yml",
+    ".github/ISSUE_TEMPLATE/research_finding.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/ci.yml",
+    "docs/INSTALL.md",
+    "docs/OFFLINE_ARTIFACT_PACKS.md",
+    "docs/RELEASE.md",
+    "docs/STATUS.md",
+]
 
 
 def tracked_text_files() -> list[Path]:
@@ -52,6 +66,16 @@ class SecretGuardrailTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8", errors="replace")
             if DISCORD_WEBHOOK_LITERAL_RE.search(text):
                 offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(offenders, [])
+
+    def test_publishable_release_docs_do_not_expose_operator_absolute_paths(self) -> None:
+        offenders: list[str] = []
+        for relative_path in PUBLISHABLE_TEXT_PATHS:
+            path = REPO_ROOT / relative_path
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if OPERATOR_ABSOLUTE_PATH_RE.search(text):
+                offenders.append(relative_path)
 
         self.assertEqual(offenders, [])
 

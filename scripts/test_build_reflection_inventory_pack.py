@@ -272,6 +272,28 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertIn("do not pass overrides", result.stderr)
         self.assertNotIn("does not exist", result.stderr)
 
+    def test_evidence_pack_mode_rejects_manifest_symlink_before_reading(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "invalid.json"
+            target.write_text("not json", encoding="utf-8")
+            manifest = root / "manifest-link.json"
+            manifest.symlink_to(target)
+
+            result = self.run_builder(
+                [
+                    "--evidence-pack-manifest",
+                    str(manifest),
+                    "--output-dir",
+                    str(root / "out"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--evidence-pack-manifest must not be a symlink", result.stderr)
+        self.assertNotIn("JSONDecodeError", result.stderr)
+
     def test_evidence_pack_mode_plans_exact_focal_snapshot_without_target_set(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -327,11 +349,16 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertEqual(plan["schema"], "obelisk.ufunction-focal-snapshot-plan.v1")
         self.assertEqual(plan["planned_command_count"], 1)
         self.assertEqual(plan["blocked_count"], 0)
+        self.assertEqual(plan["inventory_source"], "unfiltered_redacted_functions")
+        self.assertEqual(plan["fname_root_readiness"], {"ready": True, "blockers": []})
         target = plan["targets"][0]
         self.assertEqual(target["status"], "planned")
         self.assertEqual(target["promotion_status"], "not_promoted_candidate_only")
+        self.assertEqual(target["snapshot_command_env"], {"PYTHONDONTWRITEBYTECODE": "1"})
         self.assertIn("redacted or recognition-only", " ".join(target["redaction_review"]))
+        self.assertEqual(plan["snapshot_commands"][0]["env"], {"PYTHONDONTWRITEBYTECODE": "1"})
         command = plan["snapshot_commands"][0]["argv"]
+        self.assertEqual(command[0], "python3")
         self.assertIn("--snapshot-json", command)
         self.assertIn("--outer-exact", command)
         self.assertIn("/Script/CoreUObject", command)
@@ -340,6 +367,143 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertIn("--evidence-artifact-sha256", command)
         self.assertIn(core_sha, command)
         self.assertNotIn("--target-set", command)
+
+    def test_plan_target_uses_unfiltered_inventory_for_exact_match(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "out"
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--fname-index",
+                    "ServerChat=4",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--name-contains",
+                    "NoSuchName",
+                    "--plan-target",
+                    "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+            stdout_manifest = json.loads(result.stdout)
+            inventory = json.loads((output_dir / "ufunction-inventory.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(stdout_manifest["summary"]["function_count"], 0)
+        plan = inventory["focal_snapshot_plan"]
+        self.assertEqual(plan["planned_command_count"], 1)
+        self.assertEqual(plan["blocked_count"], 0)
+        self.assertEqual(plan["targets"][0]["status"], "planned")
+
+    def test_plan_target_blocks_when_fname_root_validation_is_not_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+            output_dir = root / "out"
+
+            self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--fname-index",
+                    "ServerChat=999",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--plan-target",
+                    "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+            )
+            inventory = json.loads((output_dir / "ufunction-inventory.json").read_text(encoding="utf-8"))
+
+        plan = inventory["focal_snapshot_plan"]
+        self.assertEqual(plan["planned_command_count"], 0)
+        self.assertEqual(plan["blocked_count"], 1)
+        self.assertEqual(plan["fname_root_readiness"]["ready"], False)
+        self.assertEqual(plan["targets"][0]["status"], "blocked")
+        self.assertEqual(plan["targets"][0]["blocker"], "fname_root_not_ready")
+        self.assertIn("requested_index_mismatch", plan["blockers"][0]["fname_root_blockers"])
+
+    def test_plan_target_rejects_duplicates_after_schema_normalization(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--plan-target",
+                    "PrimalStructure.IsAllowedToBuild",
+                    "--plan-target",
+                    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+                    "--output-dir",
+                    str(root / "out"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate --plan-target: PrimalStructure.IsAllowedToBuild", result.stderr)
+
+    def test_plan_target_requires_offline_core_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            core = root / "core"
+            addrs = build_core_fixture(core)
+
+            result = self.run_builder(
+                [
+                    "--core",
+                    str(core),
+                    "--gobjects",
+                    hex(addrs["gobjects"]),
+                    "--fname-root-slot",
+                    hex(addrs["fname_root_slot"]),
+                    "--fname-index",
+                    "None=0",
+                    "--ark-binary-sha256",
+                    "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "--artifact-kind",
+                    "external_capture",
+                    "--plan-target",
+                    "PrimalStructure.IsAllowedToBuild",
+                    "--output-dir",
+                    str(root / "out"),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--plan-target only supports offline_core artifact identity", result.stderr)
 
     def test_plan_target_reports_missing_inventory_target_as_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Hardened post-RC planning and contributor guardrails so focal snapshot planning uses
+  unfiltered redacted inventory, refuses unsafe or incomplete FName/root inputs before
+  emitting commands, de-duplicates artifact-pack blockers, verifies installed descriptor
+  consumers against appended API slots, and keeps Plugin Hub demand dictionaries mapped to
+  Obelisk primitives instead of unsupported ArkApi-style module promises.
 - Added a candidate-only focal snapshot planner for exact second-wave structure
   build-policy UFunction targets, extended offline artifact gates to validate
   `obelisk.core-dump-evidence-pack.v1` manifests schema-specifically, clarified that

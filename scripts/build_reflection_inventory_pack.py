@@ -18,6 +18,7 @@ from snapshot_evidence_pack import (  # noqa: E402
     evidence_pack_defaults,
     reject_protected_input_path,
     reject_protected_output_path,
+    reject_symlink_component,
     require_ignored_output_path,
     safe_component,
     sha256_file,
@@ -27,6 +28,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 DEFAULT_MAX_OBJECTS = ufunction_inventory.DEFAULT_MAX_OBJECTS
 DEFAULT_MAX_GROUPS = 20
+PYTHON_COMMAND = "python3"
 
 
 def parse_index(value: str) -> tuple[str, int]:
@@ -117,6 +119,7 @@ def resolve_binary_sha(args: argparse.Namespace) -> str:
 def load_evidence_defaults(args: argparse.Namespace) -> tuple[Path, int, int, str | None, str, str, str, str]:
     if args.gobjects is not None or args.fname_root_slot is not None or args.binary is not None:
         raise SystemExit("--evidence-pack-manifest reads binary/core/gobjects/fname root from manifest; do not pass overrides")
+    reject_symlink_component(args.evidence_pack_manifest, "--evidence-pack-manifest")
     manifest = reject_protected_input_path(args.evidence_pack_manifest, "--evidence-pack-manifest")
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     binary = payload.get("binary")
@@ -188,6 +191,8 @@ def focal_snapshot_plan(
     capture_id: str,
     evidence_pack_id: str,
     max_object_scan: int,
+    fname_root_ready: bool,
+    fname_root_blockers: list[str],
 ) -> dict[str, object]:
     inventory_by_key: dict[str, list[dict[str, object]]] = {}
     for item in functions:
@@ -197,6 +202,8 @@ def focal_snapshot_plan(
             inventory_by_key.setdefault(f"{outer}.{name}", []).append(item)
 
     obelisk_commit = repo_commit()
+    command_cwd = str(SCRIPT_DIR.parent)
+    command_env = {"PYTHONDONTWRITEBYTECODE": "1"}
     records: list[dict[str, object]] = []
     commands: list[dict[str, object]] = []
     blockers: list[dict[str, object]] = []
@@ -208,7 +215,10 @@ def focal_snapshot_plan(
             raise SystemExit(f"duplicate --plan-target: {target}")
         seen.add(target)
         matches = inventory_by_key.get(target, [])
-        if not matches:
+        if not fname_root_ready:
+            status = "blocked"
+            blocker = "fname_root_not_ready"
+        elif not matches:
             status = "blocked"
             blocker = "missing_inventory_target"
         elif len(matches) > 1:
@@ -226,6 +236,8 @@ def focal_snapshot_plan(
             "status": status,
             "promotion_status": "not_promoted_candidate_only",
             "snapshot_output_hint": f"<non-protected-review-output>/{plan_output_filename(outer, name)}",
+            "snapshot_command_cwd": command_cwd,
+            "snapshot_command_env": command_env,
             "redaction_review": [
                 "review placement structs, location vectors, rotation values, player/controller context, object refs, arrays, and raw params before any copied payload",
                 "keep non-scalar or identity-bearing fields redacted or recognition-only unless separately promoted",
@@ -237,10 +249,13 @@ def focal_snapshot_plan(
         }
         if blocker is not None:
             record["blocker"] = blocker
-            blockers.append({"target": f"{schema}:{target}", "reason": blocker})
+            blocker_record: dict[str, object] = {"target": f"{schema}:{target}", "reason": blocker}
+            if blocker == "fname_root_not_ready":
+                blocker_record["fname_root_blockers"] = fname_root_blockers
+            blockers.append(blocker_record)
         else:
             command = [
-                sys.executable,
+                PYTHON_COMMAND,
                 "scripts/inspect_core_ufunctions.py",
                 "--core",
                 str(core),
@@ -271,7 +286,14 @@ def focal_snapshot_plan(
                 obelisk_commit,
             ]
             record["snapshot_command"] = command
-            commands.append({"target": f"{schema}:{target}", "argv": command})
+            commands.append(
+                {
+                    "target": f"{schema}:{target}",
+                    "cwd": command_cwd,
+                    "env": command_env,
+                    "argv": command,
+                }
+            )
         records.append(record)
 
     return {
@@ -282,6 +304,8 @@ def focal_snapshot_plan(
         "core": str(core),
         "gobjects": hex(gobjects),
         "fname_root_slot": hex(fname_root_slot),
+        "inventory_source": "unfiltered_redacted_functions",
+        "fname_root_readiness": {"ready": fname_root_ready, "blockers": fname_root_blockers},
         "artifact_identity": {
             "artifact_kind": "offline_core",
             "artifact_sha256": core_sha,
@@ -299,6 +323,13 @@ def focal_snapshot_plan(
 def write_json(path: Path, payload: dict[str, object]) -> None:
     reject_artifact_symlink(path)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def has_inventory_filters(args: argparse.Namespace) -> bool:
+    return any(
+        value is not None
+        for value in (args.outer_contains, args.name_contains, args.family, args.min_params, args.max_params)
+    )
 
 
 def main() -> int:
@@ -346,6 +377,8 @@ def main() -> int:
         evidence_pack_id = safe_component(args.evidence_pack_id or "direct-core", "evidence-pack-id")
         core_sha = sha256_file(core)
         evidence_pack_manifest = None
+    if args.plan_target and artifact_kind != "offline_core":
+        raise SystemExit("--plan-target only supports offline_core artifact identity")
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -357,6 +390,7 @@ def main() -> int:
 
     indices = args.fname_index if (args.fname_index or args.no_default_fname_indices) else fname_scanner.DEFAULT_INDICES
     memory = fname_scanner.CoreMemory(core)
+    plan_functions: list[dict[str, object]] | None = None
     try:
         root_validation = fname_scanner.validate_root_slot(memory, fname_root_slot, indices)
         root_readiness = fname_scanner.root_validation_readiness(root_validation, indices)
@@ -392,16 +426,41 @@ def main() -> int:
                 else None
             ),
         )
+        if args.plan_target:
+            if has_inventory_filters(args):
+                plan_payload = ufunction_inventory.build_ufunction_inventory_payload(
+                    memory,
+                    core=core,
+                    gobjects=gobjects,
+                    fname_root_slot=fname_root_slot,
+                    max_objects=args.max_objects,
+                    max_groups=args.max_groups,
+                    filters={
+                        "outer_contains": None,
+                        "name_contains": None,
+                        "family": None,
+                        "min_params": None,
+                        "max_params": None,
+                    },
+                    target_sets=[],
+                    include_functions=True,
+                    redact_pointers=True,
+                )
+                functions = plan_payload.get("functions")
+            else:
+                functions = inventory_payload.get("functions")
+            if not isinstance(functions, list):
+                raise SystemExit("--plan-target requires redacted function inventory")
+            plan_functions = [item for item in functions if isinstance(item, dict)]
         fname_table = memory.read_ptr(fname_root_slot)
     finally:
         memory.close()
 
     if args.plan_target:
-        functions = inventory_payload.get("functions")
-        if not isinstance(functions, list):
+        if plan_functions is None:
             raise SystemExit("--plan-target requires redacted function inventory")
         inventory_payload["focal_snapshot_plan"] = focal_snapshot_plan(
-            [item for item in functions if isinstance(item, dict)],
+            plan_functions,
             requested_targets=args.plan_target,
             core=core,
             gobjects=gobjects,
@@ -411,6 +470,8 @@ def main() -> int:
             capture_id=capture_id,
             evidence_pack_id=evidence_pack_id,
             max_object_scan=args.max_objects,
+            fname_root_ready=root_readiness["ready"] is True,
+            fname_root_blockers=[str(item) for item in root_readiness["blockers"]],
         )
 
     fname_payload = {

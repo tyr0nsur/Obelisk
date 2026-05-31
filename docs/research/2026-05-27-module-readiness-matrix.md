@@ -25,6 +25,14 @@ snapshot rounds, without implying public SDK or runtime readiness.
 
 ## Historical Readiness Snapshot
 
+General v1 lane guardrail: this historical table keeps chat as one small copied
+notification row, not the product center. Inventory, structures, items, mission, transfer,
+buff, dino, tribe, and admin/permissions remain separate module lanes with independent
+promotion gates before public work: exact layout evidence, fixtures,
+second-source/static support, copied-data ownership, privacy/redaction policy, callback
+lifetime cleanup, append-only ABI tests, installed SDK consumer coverage, and approved
+runtime validation when runtime evidence is required.
+
 | Research Track Label | Current Level | Real Snapshots | Evidence | Next Gate |
 | --- | --- | ---: | --- | --- |
 | `sdk.inventory` | `internal-marker-gated-observer` | 5 | Item/controller exact snapshots plus internal `InventoryReflection` and hook-side metadata observer for `CanUse` and `AllowRemoteAddToInventory`; arrays/structs/item contents stay blocked. | Offline/posture review before any approved debug/development activation under current operator direction; no SDK callbacks or gameplay mutation. |

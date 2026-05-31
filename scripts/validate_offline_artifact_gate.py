@@ -1378,6 +1378,18 @@ def load_json(path: Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     return payload, []
 
 
+def dedupe_blockers(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    unique: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for blocker in blockers:
+        marker = json.dumps(blocker, sort_keys=True, separators=(",", ":"), default=str)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        unique.append(blocker)
+    return unique
+
+
 def checked_sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with open_regular_file_no_symlink(path) as handle:
@@ -7596,7 +7608,7 @@ def validate_artifact_pack_manifest(
         blockers.extend(child_blockers)
     if mode == "promote":
         blockers.append({"reason": "promote_mode_artifact_pack_manifest_container_only", "label": label})
-    return blockers
+    return dedupe_blockers(blockers)
 
 
 def validate_manifest(
@@ -7791,7 +7803,7 @@ def validate_manifest(
         )
     )
     blockers.extend(validate_claims(payload, label=str(resolved), mode=mode))
-    return record, blockers
+    return record, dedupe_blockers(blockers)
 
 
 def validate_expected_sha(value: str | None) -> str | None:
