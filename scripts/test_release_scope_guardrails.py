@@ -893,7 +893,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("run the\nplugin installer with `--dry-run`", install)
         self.assertIn("adding a first-party example", release)
         self.assertIn("naming a popular plugin\n  family does not promote public SDK surface", release)
-        self.assertNormalizedIn("do not gain new support tier or public SDK scope", status)
+        self.assertNormalizedIn(
+            "do not gain new support tier, public SDK scope, or `v1.0` completion weight",
+            status,
+        )
         self.assertIn("names and demand dictionaries only", pr_template)
 
     def test_release_gate_rejects_incomplete_ufunction_metadata_before_build(self) -> None:
