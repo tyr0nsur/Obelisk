@@ -21,6 +21,9 @@ descriptor/catalog metadata, installed-SDK consumers, and owner-token process-lo
 timers. That seed is useful for contributors, but pre-identity production seeds are not
 enough for v1 completion and are not a `v1.0` complete SDK claim.
 Copied chat and gameplay-policy examples are experimental copied-data patterns only.
+`GameplayPolicyEvent` and `ChatMessageEvent`, separately or together, must not be
+described as a complete `v1.0` SDK, `v1.0 stable`, or sufficient to turn on
+`v1_completion_required`.
 Higher-level ArkApi-style categories remain outside the current promoted scope until each
 has its own copied C ABI design, privacy/ownership rules, lifecycle cleanup, SDK consumer
 tests, and named second-source promotion gates.

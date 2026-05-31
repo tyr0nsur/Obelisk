@@ -186,3 +186,38 @@ Until that gate exists in code/config, runtime observer runbooks for this target
 premature. The safe next work is gate design and tests, not server execution. This does
 not promote public Inventory/Items SDKs, item or inventory identity, actor identity,
 lookup, mutation, return override, raw params, public callbacks, or `ResourceHandle`.
+
+## 2026-05-31 Fixture-Only Mutation Blocker Check
+
+A local fixture-only refresh can preserve the mutation boundary without reading a core or
+touching `/servidor/ark`:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_redacted_ufunction_signatures.py \
+  --snapshot-root tests/fixtures/ufunction_snapshots \
+  --target-set inventory-action-compact-intake \
+  --json
+```
+
+Expected current result:
+
+- `signature_count=2`;
+- `target_set_coverage.status=complete`;
+- `safety_summary.artifact_status=candidate_only`;
+- `safety_summary.promotion_ready=false`;
+- `safety_summary.copied_scalar_by_kind.integer=1`;
+- `safety_summary.redacted_by_reason.struct=2`;
+- `safety_summary.redacted_by_reason.object_ref=3`.
+
+The public boundary stays unchanged:
+
+- `ShooterPlayerController.ServerRequestInventoryUseItem.ItemId` stays
+  `redacted_struct`;
+- `ShooterPlayerController.ServerRequestInventoryUseItemWithActor.ItemID1` stays
+  `redacted_struct`;
+- `ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData` stays
+  an `int32` copied scalar candidate only;
+- `InventoryComp` and `anActor` stay redacted UObject references;
+- no Inventory SDK, Items SDK, `ItemNetID` identity, item/inventory/actor identity,
+  lookup, mutation, return override, raw params, public callback, runtime hook, or
+  `ResourceHandle` is promoted by this report.

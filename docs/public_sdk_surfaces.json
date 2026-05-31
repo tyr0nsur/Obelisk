@@ -78,6 +78,7 @@
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
+    "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
     "No surface may be listed as promoted unless its status is promoted.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a public_contract.",
     "docs/public_gameplay_events.json remains the detailed evidence source for GameplayPolicyEvent and ChatMessageEvent backing target sets."

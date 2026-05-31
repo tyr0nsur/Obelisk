@@ -1410,13 +1410,23 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("ItemId", use_item["params"][1]["name"])
         self.assertEqual("redacted_struct", use_item["params"][1]["type"])
         self.assertEqual("StructProperty", use_item["params"][1]["source_property_class"])
+        self.assertEqual("StructProperty identity/payload redacted", use_item["params"][1]["redaction"])
+        self.assertEqual("candidate", use_item["params"][1]["status"])
 
         with_actor = report["signatures"][1]
         self.assertEqual("ItemID1", with_actor["params"][2]["name"])
         self.assertEqual("redacted_struct", with_actor["params"][2]["type"])
         self.assertEqual("StructProperty", with_actor["params"][2]["source_property_class"])
+        self.assertEqual("StructProperty identity/payload redacted", with_actor["params"][2]["redaction"])
+        self.assertEqual("candidate", with_actor["params"][2]["status"])
         self.assertEqual("AdditionalData", with_actor["params"][3]["name"])
         self.assertEqual("int32", with_actor["params"][3]["type"])
+        self.assertEqual("IntProperty", with_actor["params"][3]["source_property_class"])
+        self.assertEqual("copied scalar candidate", with_actor["params"][3]["redaction"])
+        self.assertEqual("candidate", with_actor["params"][3]["status"])
+        self.assertEqual("in", with_actor["params"][3]["direction"])
+        self.assertEqual(24, with_actor["params"][3]["offset"])
+        self.assertEqual(4, with_actor["params"][3]["element_size"])
         self.assertEqual(["AdditionalData"], [
             param["name"]
             for signature in report["signatures"]

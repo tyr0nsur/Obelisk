@@ -343,6 +343,37 @@ CHAT_MESSAGE_EVENT_RELATION_BREAKERS = {
     "whereas",
     "while",
 }
+EXPERIMENTAL_COPIED_EVENT_TOKENS = {
+    "chatmessageevent",
+    "gameplaypolicyevent",
+}
+EXPERIMENTAL_EVENT_V1_COMPLETION_NEGATORS = {
+    "blocked",
+    "blocks",
+    "downgraded",
+    "exclude",
+    "excluded",
+    "excludes",
+    "excluding",
+    "experimental",
+    "never",
+    "no",
+    "not",
+    "only",
+    "outside",
+    "post-v1",
+    "promoted-experimental-only",
+    "until",
+    "without",
+}
+EXPERIMENTAL_EVENT_V1_COMPLETION_BREAKERS = {
+    "but",
+    "unless",
+    "until",
+    "whereas",
+    "while",
+}
+EXPERIMENTAL_EVENT_V1_COMPLETION_WINDOW = 14
 GAMEPLAY_POLICY_SCOPE_FORBIDDEN_RE = re.compile(
     r"\bInventory\s+SDKs?\b|"
     r"\bStructureEvents?\s+SDKs?\b|"
@@ -911,6 +942,76 @@ def positive_chat_message_event_claims(text: str, relative_path: str) -> list[st
     return offenders
 
 
+def experimental_event_v1_completion_claims(text: str, relative_path: str) -> list[str]:
+    offenders: list[str] = []
+    scan_text = re.sub(r"\bv1\.0\b", "v1-0", text)
+
+    for segment_start, segment in sentence_like_segments(scan_text):
+        tokens = [match.group(0).lower() for match in TOKEN_RE.finditer(segment)]
+        event_indices = [
+            index
+            for index, token in enumerate(tokens)
+            if token in EXPERIMENTAL_COPIED_EVENT_TOKENS
+        ]
+        if not event_indices:
+            continue
+
+        v1_indices = [
+            index
+            for index, token in enumerate(tokens)
+            if token in {"v1", "v1-0", "v1-complete", "v1_completion_required"}
+        ]
+        completion_indices = [
+            index
+            for index, token in enumerate(tokens)
+            if token in {"complete", "completed", "completes", "completion", "complete-sdk"}
+        ]
+        stable_indices = [
+            index
+            for index, token in enumerate(tokens)
+            if token in {"stable", "v1-stable"}
+        ]
+
+        claim_indices = [
+            index
+            for index in sorted(set(completion_indices + stable_indices + v1_indices))
+            if (
+                tokens[index] in {"v1-complete", "v1-stable"}
+                or (
+                    v1_indices
+                    and (
+                        completion_indices
+                        or stable_indices
+                        or "v1_completion_required" in tokens
+                    )
+                )
+            )
+        ]
+        if not claim_indices:
+            continue
+
+        for event_index in event_indices:
+            for claim_index in claim_indices:
+                if abs(event_index - claim_index) > EXPERIMENTAL_EVENT_V1_COMPLETION_WINDOW:
+                    continue
+
+                start = min(event_index, claim_index)
+                end = max(event_index, claim_index)
+                relation_tokens = tokens[start : end + 1]
+                negation_tokens = tokens[max(0, start - 6) : end + 1]
+                if EXPERIMENTAL_EVENT_V1_COMPLETION_BREAKERS.intersection(relation_tokens):
+                    continue
+                if EXPERIMENTAL_EVENT_V1_COMPLETION_NEGATORS.intersection(negation_tokens):
+                    continue
+
+                line = scan_text.count("\n", 0, segment_start) + 1
+                compact_segment = " ".join(segment.split())
+                offenders.append(f"{relative_path}:{line}: {compact_segment}")
+                break
+
+    return offenders
+
+
 def positive_module_aggregate_census_claims(text: str, relative_path: str) -> list[str]:
     offenders: list[str] = []
 
@@ -1159,6 +1260,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers",
             "those pre-identity production seeds are not enough for v1 completion",
             "passive chat parsing and plugin-local routing remain promoted-experimental-only",
+            "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required",
         ):
             self.assertIn(normalized(term), release_guardrails)
 
@@ -1209,6 +1311,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         inventory_signals = surfaces["obelisk.inventory_item_copied_signals.v1"]
         self.assertEqual(inventory_signals["status"], "promoted-experimental-only")
         self.assertEqual(inventory_signals["depends_on"], ["obelisk.gameplay_policy_event.v1"])
+        inventory_serialized = json.dumps(inventory_signals)
         for token in (
             "inventory.remote_add_check",
             "inventory.use_check",
@@ -1217,7 +1320,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "inventory_item.use_onto_item_check",
             "item-return-only-policy-slice",
         ):
-            self.assertIn(token, json.dumps(inventory_signals))
+            self.assertIn(token, inventory_serialized)
+        for forbidden in (
+            "inventory-action-compact-intake",
+            "ServerRequestInventoryUseItem",
+            "ServerRequestInventoryUseItemWithActor",
+            "AdditionalData int32",
+            "ItemId redacted_struct",
+            "ItemID1 redacted_struct",
+        ):
+            self.assertNotIn(forbidden, inventory_serialized)
         for exclusion in (
             "Inventory SDK",
             "Items SDK",
@@ -1229,6 +1341,23 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ResourceHandle",
         ):
             self.assertIn(exclusion, inventory_signals["exclusions"])
+
+        action_note = (
+            REPO_ROOT / "docs" / "research" / "2026-05-29-inventory-action-redacted-signature-readiness.md"
+        ).read_text(encoding="utf-8")
+        for term in (
+            "Fixture-Only Mutation Blocker Check",
+            "--snapshot-root tests/fixtures/ufunction_snapshots",
+            "`safety_summary.artifact_status=candidate_only`",
+            "`safety_summary.promotion_ready=false`",
+            "ItemId` stays\n  `redacted_struct`",
+            "ItemID1` stays\n  `redacted_struct`",
+            "AdditionalData` stays\n  an `int32` copied scalar candidate only",
+            "no Inventory SDK, Items SDK, `ItemNetID` identity",
+            "lookup, mutation, return override, raw params, public callback, runtime hook, or\n  `ResourceHandle`",
+        ):
+            with self.subTest(note="inventory-action-boundary", term=term):
+                self.assertIn(term, action_note)
 
     def test_public_sdk_surfaces_manifest_keeps_player_identity_planning_only_blocked(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -2755,7 +2884,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "`ChatMessageEvent` is a minimal v0.1-rc SDK ABI surface.",
             "This PR does not promote chat beyond minimal `ChatMessageEvent`.",
             "Outside the promoted `GameplayPolicyEvent` surface and the minimal `ChatMessageEvent` RC notification surface, richer chat remains blocked.",
-            "`GameplayPolicyEvent` is stable, while `ChatMessageEvent` is minimal and RC.",
+            "`GameplayPolicyEvent` has v0.1 release-readiness evidence, while `ChatMessageEvent` is minimal and RC.",
         ]
 
         for text in forbidden:
@@ -2774,6 +2903,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 text = json.dumps(json.loads(text), sort_keys=True, indent=2)
             offenders.extend(
                 positive_chat_message_event_claims(
+                    text,
+                    str(path.relative_to(REPO_ROOT)),
+                )
+            )
+
+        self.assertEqual(offenders, [])
+
+    def test_experimental_copied_event_v1_completion_claim_detector_is_order_independent(self) -> None:
+        forbidden = [
+            "`GameplayPolicyEvent` is v1-complete.",
+            "`ChatMessageEvent` completes the v1 SDK.",
+            "`GameplayPolicyEvent` and `ChatMessageEvent` are sufficient for v1_completion_required.",
+            "The complete v1 SDK is available through `GameplayPolicyEvent`.",
+            "`ChatMessageEvent` makes Obelisk v1.0 stable.",
+        ]
+        allowed = [
+            "`GameplayPolicyEvent` remains promoted-experimental-only until the full SDK completion bar is met.",
+            "`ChatMessageEvent` is not a v1 completion claim.",
+            "`GameplayPolicyEvent` and `ChatMessageEvent` are copied-data seeds only, not v1-complete.",
+            "A complete v1 SDK requires promoted blockers; `GameplayPolicyEvent` remains a copied-data seed.",
+        ]
+
+        for text in forbidden:
+            with self.subTest(kind="forbidden", text=text):
+                self.assertNotEqual(
+                    experimental_event_v1_completion_claims(text, "synthetic.md"),
+                    [],
+                )
+        for text in allowed:
+            with self.subTest(kind="allowed", text=text):
+                self.assertEqual(
+                    experimental_event_v1_completion_claims(text, "synthetic.md"),
+                    [],
+                )
+
+    def test_public_material_does_not_claim_copied_events_complete_v1_sdk(self) -> None:
+        offenders: list[str] = []
+
+        for path in CHAT_MESSAGE_EVENT_PUBLIC_CLAIM_FILES + [PUBLIC_SDK_SURFACES_MANIFEST]:
+            text = path.read_text(encoding="utf-8")
+            if path in {PUBLIC_GAMEPLAY_EVENTS_MANIFEST, PUBLIC_SDK_SURFACES_MANIFEST}:
+                text = json.dumps(json.loads(text), sort_keys=True, indent=2)
+            offenders.extend(
+                experimental_event_v1_completion_claims(
                     text,
                     str(path.relative_to(REPO_ROOT)),
                 )
@@ -5510,6 +5683,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         public_target_sets = set(V010_GAMEPLAY_POLICY_TARGET_SETS + V010_CHAT_MESSAGE_TARGET_SETS)
 
         self.assertIn("mission-copied-bool-policy-slice", PLANNING_ONLY_TARGET_SETS)
+        self.assertIn("players-identity-lifecycle-intake", PLANNING_ONLY_TARGET_SETS)
         self.assertIn("structure-aggregate-census-planning", PLANNING_ONLY_TARGET_SETS)
         self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_manifest_sets), [])
         self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_target_sets), [])
@@ -5519,20 +5693,33 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             re.IGNORECASE,
         )
         offenders: list[str] = []
+        planning_only_target_sets = sorted(PLANNING_ONLY_TARGET_SETS)
         for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
             for paragraph in re.split(r"\n\s*\n", path.read_text(encoding="utf-8")):
-                if not any(
-                    target_set in paragraph
-                    for target_set in (
-                        "mission-copied-bool-policy-slice",
-                        "structure-aggregate-census-planning",
-                    )
-                ):
+                if not any(target_set in paragraph for target_set in planning_only_target_sets):
                     continue
                 if not mention_context_re.search(normalized(paragraph)):
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {normalized(paragraph)}")
 
         self.assertEqual(offenders, [])
+
+    def test_planning_only_artifact_packs_are_not_release_or_public_sdk_claims(self) -> None:
+        curation = (
+            REPO_ROOT / "docs" / "research" / "2026-05-31-offline-artifact-curation.md"
+        ).read_text(encoding="utf-8")
+        compact = normalized(curation)
+
+        required_boundary = normalized(
+            "Planning-only target-set artifact packs are consume-mode planning evidence only. "
+            "The planning-only target sets are `mission-copied-bool-policy-slice`, "
+            "`players-identity-lifecycle-intake`, and `structure-aggregate-census-planning`; "
+            "their packs, container manifests, and child evidence must not be cited as "
+            "release-readiness roots, public SDK promotion evidence, or `v1.0` completion signals."
+        )
+        self.assertIn(required_boundary, compact)
+        for target_set in sorted(PLANNING_ONLY_TARGET_SETS):
+            with self.subTest(target_set=target_set):
+                self.assertIn(target_set, curation)
 
     def test_scalar_candidate_tooling_is_not_public_sdk_promotion(self) -> None:
         fixture_readme = (REPO_ROOT / "tests/fixtures/ufunction_snapshots/README.md").read_text(
