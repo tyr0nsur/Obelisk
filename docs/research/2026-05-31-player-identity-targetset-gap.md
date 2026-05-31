@@ -119,7 +119,9 @@ python3 scripts/build_reflection_inventory_pack.py \
 Only after that inventory exists, plan exact focal snapshots for the two currently missing
 admin/session targets. Do not plan the whole target set at this step; the full 12-target
 coverage belongs to the inventory pack and later first-evidence validation, while snapshot
-generation is currently missing only these two targets:
+generation is currently missing only these two targets. The focal planner rejects broad
+player-identity snapshot plans; this first missing-target pass must use exact `--target`
+entries:
 
 ```bash
 python3 scripts/plan_ufunction_focal_snapshots.py \

@@ -37,8 +37,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 "function_flags": "0x4020400",
                 "name": "ServerSendChatMessage",
                 "num_parms": 2,
-                "outer_class_name": "ShooterPlayerController",
-                "outer_name": "ShooterPlayerController",
+                "outer_class_name": "TestController",
+                "outer_name": "TestController",
                 "parms_size": 40,
             },
         ]
@@ -175,7 +175,7 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                     [
                         "# reviewed exact focal list",
                         "obelisk.ufunction-chain.snapshot.v1:/Script/CoreUObject.ServerChat",
-                        "ShooterPlayerController.ServerSendChatMessage",
+                        "TestController.ServerSendChatMessage",
                         "",
                     ]
                 ),
@@ -227,7 +227,7 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertEqual(payload["planned_command_count"], 1)
         self.assertEqual(payload["inventory_pack"]["manifest"], str(pack / "manifest.json"))
 
-    def test_target_set_expands_player_identity_without_reading_core(self) -> None:
+    def test_player_identity_target_set_rejects_broad_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             pack = root / "pack"
@@ -245,16 +245,79 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                     str(pack),
                     "--target-set",
                     PLAYER_IDENTITY_TARGET_SET,
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expands the full 12-target planning set", result.stderr)
+        self.assertIn("--target ShooterPlayerController.ServerListPlayers", result.stderr)
+        self.assertIn("--target ShooterPlayerController.ServerKickPlayer", result.stderr)
+
+    def test_player_identity_full_target_file_rejects_broad_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+            targets = root / "targets.txt"
+            targets.write_text("\n".join(TARGET_SETS[PLAYER_IDENTITY_TARGET_SET]) + "\n", encoding="utf-8")
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-file",
+                    str(targets),
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("refusing to plan broad players-identity-lifecycle-intake", result.stderr)
+        self.assertIn("full_target_count=12", result.stderr)
+
+    def test_direct_player_identity_admin_targets_plan_without_full_target_set_expansion(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            missing_core = root / "reviewed-core-does-not-exist"
+            self.write_pack(
+                pack,
+                core_path=missing_core,
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
+                    "--target",
+                    "ShooterPlayerController.ServerKickPlayer",
                 ]
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["target_source"]["target_sets"], [PLAYER_IDENTITY_TARGET_SET])
-        self.assertEqual(payload["target_source"]["loaded_target_count"], 12)
-        self.assertEqual(payload["requested_count"], 12)
-        self.assertEqual(payload["planned_command_count"], 12)
+        self.assertEqual(payload["target_source"]["target_sets"], [])
+        self.assertEqual(payload["target_source"]["loaded_target_count"], 2)
+        self.assertEqual(payload["requested_count"], 2)
+        self.assertEqual(payload["planned_command_count"], 2)
         self.assertEqual(payload["blocked_count"], 0)
         planned_targets = {entry["target"] for entry in payload["snapshot_commands"]}
+        self.assertEqual(
+            planned_targets,
+            {
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
+                "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerKickPlayer",
+            },
+        )
         self.assertIn(
             "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerListPlayers",
             planned_targets,
@@ -281,8 +344,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 [
                     "--inventory-pack",
                     str(pack),
-                    "--target-set",
-                    PLAYER_IDENTITY_TARGET_SET,
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
                 ],
                 check=False,
             )
@@ -330,8 +393,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 [
                     "--inventory-pack",
                     str(pack),
-                    "--target-set",
-                    PLAYER_IDENTITY_TARGET_SET,
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
                 ],
                 check=False,
             )
@@ -359,8 +422,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 [
                     "--inventory-pack",
                     str(pack),
-                    "--target-set",
-                    PLAYER_IDENTITY_TARGET_SET,
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
                 ],
                 check=False,
             )
@@ -389,8 +452,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 [
                     "--inventory-pack",
                     str(pack),
-                    "--target-set",
-                    PLAYER_IDENTITY_TARGET_SET,
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
                 ],
                 check=False,
             )
@@ -424,8 +487,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 [
                     "--inventory-pack",
                     str(pack),
-                    "--target-set",
-                    PLAYER_IDENTITY_TARGET_SET,
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
                 ],
                 check=False,
             )
@@ -555,6 +618,39 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertIn("artifact_identity.evidence_pack_id must be a non-empty string", incomplete_result.stderr)
         self.assertNotEqual(invalid_sha_result.returncode, 0)
         self.assertIn("binary.sha256 must be a lowercase 64-character SHA256", invalid_sha_result.stderr)
+
+    def test_rejects_placeholder_or_non_strict_artifact_identity_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            placeholder = root / "placeholder"
+            non_strict = root / "non-strict"
+            self.write_pack(
+                placeholder,
+                core_path=root / "missing-core",
+                identity_updates={"capture_id": "unspecified-capture"},
+            )
+            self.write_pack(
+                non_strict,
+                core_path=root / "missing-core",
+                identity_updates={"evidence_pack_id": "-pack"},
+            )
+
+            placeholder_result = self.run_planner(
+                ["--inventory-pack", str(placeholder), "--target", "/Script/CoreUObject.ServerChat"],
+                check=False,
+            )
+            non_strict_result = self.run_planner(
+                ["--inventory-pack", str(non_strict), "--target", "/Script/CoreUObject.ServerChat"],
+                check=False,
+            )
+
+        self.assertNotEqual(placeholder_result.returncode, 0)
+        self.assertIn("artifact_identity.capture_id must be a safe artifact identity id", placeholder_result.stderr)
+        self.assertNotEqual(non_strict_result.returncode, 0)
+        self.assertIn(
+            "artifact_identity.evidence_pack_id must be a safe artifact identity id",
+            non_strict_result.stderr,
+        )
 
     def test_rejects_protected_core_path_before_planning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

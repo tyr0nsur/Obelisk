@@ -147,7 +147,13 @@ runtime-readiness, or promotion evidence.
 Player identity/principal evidence does not unlock `operator_ingress_storage`; operator
 ingress/storage remains a separate post-v1 blocker until secret-safe ingress,
 storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted
-or explicitly excluded.
+or explicitly excluded. The v1 release decision for
+`obelisk.operator_ingress_storage.v1` has only two valid outcomes: promote a reviewed
+append-only copied C ABI contract with the required ingress/storage evidence and tests, or
+name the surface as excluded in the v1 release statement. Until one of those decisions is
+recorded, `v1_completion_required` must stay false and no public header, plugin callback,
+storage service, RCON service, webhook client, secret manager, or cross-instance storage
+API is part of the SDK.
 
 The shortest useful route toward a complete v1 SDK is:
 

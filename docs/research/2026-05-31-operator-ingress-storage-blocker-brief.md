@@ -14,6 +14,21 @@ or server-facing implementation is exposed.
 This brief is intentionally minimal. It defines acceptance criteria and
 non-scope for a future design/API round; it does not implement an API.
 
+## Current v1 Decision
+
+Decision: `blocked_until_promoted_or_explicitly_excluded`.
+
+`player_identity` promotion does not unblock this surface. A v1 release must either:
+
+- promote a reviewed append-only POD C ABI contract with the acceptance criteria below
+  and SDK consumer or integration coverage; or
+- explicitly exclude `obelisk.operator_ingress_storage.v1` by name in the v1 release
+  statement and state that RCON, webhook, database/storage, secret manager, external
+  ingress, and cross-instance storage APIs are not included.
+
+Until one of those outcomes is recorded, `v1_completion_required` must remain false and
+this surface must not declare a public contract.
+
 ## Acceptance Criteria
 
 - The design names the ingress sources, trust boundaries, authorization model,

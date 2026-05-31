@@ -1896,6 +1896,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
         operator_storage = surfaces["obelisk.operator_ingress_storage.v1"]
+        decision_contract = operator_storage["v1_decision_contract"]
         release_guardrails = " ".join(manifest["release_guardrails"])
 
         self.assertEqual(operator_storage["status"], "post-v1")
@@ -1905,6 +1906,28 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("obelisk.operator_ingress_storage.v1", manifest["v1_sdk_completion_blockers"])
         self.assertIn("obelisk.operator_ingress_storage.v1", manifest["post_v1_or_excluded_surfaces"])
         self.assertNotIn("obelisk.operator_ingress_storage.v1", manifest["promoted_surfaces"])
+
+        self.assertEqual(
+            decision_contract["current_decision"],
+            "blocked_until_promoted_or_explicitly_excluded",
+        )
+        self.assertTrue(decision_contract["must_remain_without_public_contract_until_promotion"])
+        self.assertEqual(decision_contract["not_unlocked_by"], ["obelisk.player_identity.v1"])
+        for requirement in (
+            "secret-safe ingress transport, trust-boundary, authorization, rate-limit, and backpressure contract",
+            "storage schema/versioning, migration, rollback, retention, corruption-handling, and per-instance isolation contract",
+            "queue durability, retry, poison-message, shutdown drain, unload drain, restart recovery, and maximum drain-time contract",
+            "audit, redaction, UTF-8 validation/normalization, log escaping, and lifecycle policy",
+            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer or integration tests",
+        ):
+            self.assertIn(requirement, decision_contract["promotion_requires"])
+
+        for requirement in (
+            "the v1 release statement names obelisk.operator_ingress_storage.v1 as excluded",
+            "the v1 release statement states that no RCON, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1",
+            "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded",
+        ):
+            self.assertIn(requirement, decision_contract["exclusion_requires"])
 
         for blocker in (
             "Player identity/principal evidence does not unlock operator ingress/storage.",

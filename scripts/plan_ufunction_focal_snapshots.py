@@ -11,6 +11,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import ufunction_focal_snapshot_plan as focal_planner  # noqa: E402
+from artifact_identity import is_safe_artifact_id  # noqa: E402
 from reflection_target_sets import TARGET_SETS, schema_target_list  # noqa: E402
 from snapshot_evidence_pack import (  # noqa: E402
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
@@ -123,6 +124,8 @@ def require_sha(value: object, label: str) -> str:
 def require_safe_identity(value: object, label: str) -> str:
     if not isinstance(value, str) or not value:
         raise SystemExit(f"{label} must be a non-empty string")
+    if not is_safe_artifact_id(value):
+        raise SystemExit(f"{label} must be a safe artifact identity id")
     return safe_component(value, label)
 
 
@@ -236,9 +239,19 @@ def require_player_identity_target_set_scope(
     requested_target_sets: list[str],
     requested_targets: list[str],
 ) -> None:
-    requested_player_identity_targets = player_identity_targets_from_requests(requested_targets)
+    requested_player_identity_targets = player_identity_target_set_targets_from_requests(requested_targets)
     if PLAYER_IDENTITY_TARGET_SET not in requested_target_sets and not requested_player_identity_targets:
         return
+    broad_player_identity_targets = sorted(requested_player_identity_targets - DIRECT_PLAYER_IDENTITY_GATE_TARGETS)
+    if PLAYER_IDENTITY_TARGET_SET in requested_target_sets or broad_player_identity_targets:
+        raise SystemExit(
+            f"refusing to plan broad {PLAYER_IDENTITY_TARGET_SET} focal snapshots by default; "
+            "first player identity planning must "
+            "target only ShooterPlayerController.ServerListPlayers and "
+            "ShooterPlayerController.ServerKickPlayer after a complete reflection inventory pack. "
+            f"(full_target_count={len(PLAYER_IDENTITY_TARGETS)} "
+            f"unexpected_targets={','.join(broad_player_identity_targets)})"
+        )
 
     require_player_identity_core_evidence_pack(manifest_path, manifest)
 
@@ -292,14 +305,14 @@ def require_player_identity_target_set_scope(
         )
 
 
-def player_identity_targets_from_requests(requested_targets: list[str]) -> list[str]:
+def player_identity_target_set_targets_from_requests(requested_targets: list[str]) -> set[str]:
     matched: set[str] = set()
     for target in requested_targets:
         _, outer, name = focal_planner.parse_exact_target(target)
         short_target = f"{outer}.{name}"
-        if short_target in DIRECT_PLAYER_IDENTITY_GATE_TARGETS:
+        if short_target in PLAYER_IDENTITY_TARGETS:
             matched.add(short_target)
-    return sorted(matched)
+    return matched
 
 
 def require_player_identity_core_evidence_pack(manifest_path: Path, manifest: dict[str, object]) -> None:
@@ -371,6 +384,14 @@ def load_targets(args: argparse.Namespace) -> tuple[list[str], dict[str, object]
     for target_set in args.target_set:
         if target_set not in TARGET_SETS:
             raise SystemExit(f"unknown --target-set: {target_set}")
+        if target_set == PLAYER_IDENTITY_TARGET_SET:
+            raise SystemExit(
+                f"--target-set {PLAYER_IDENTITY_TARGET_SET} expands the full "
+                f"{len(PLAYER_IDENTITY_TARGETS)}-target planning set. The current player identity "
+                "gap route should plan exact focal snapshots with "
+                "--target ShooterPlayerController.ServerListPlayers and "
+                "--target ShooterPlayerController.ServerKickPlayer."
+            )
         target_sets.append(target_set)
         targets.extend(TARGET_SETS[target_set])
     target_files: list[str] = []
