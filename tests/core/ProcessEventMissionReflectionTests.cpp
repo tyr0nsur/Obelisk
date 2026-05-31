@@ -571,6 +571,48 @@ namespace
         }
     }
 
+    void TestEvaluatedHookLevelMissingGatesDoNotReadOrReserve()
+    {
+        const char* supportedSha = kSupportedShooterGameServerSha256.data();
+        const std::array<Gate, 6> gates{
+            EvaluateGate(nullptr, true, true, true, supportedSha),
+            EvaluateGate("1", false, true, true, supportedSha),
+            EvaluateGate("1", true, false, true, supportedSha),
+            EvaluateGate("1", true, true, false, supportedSha),
+            EvaluateGate("1", true, true, true, nullptr),
+            EvaluateGate("1", true, true, true, "unsupported-sha"),
+        };
+
+        for (const Gate& gate : gates)
+        {
+            Require(!gate.Enabled(), "evaluated missing/unsupported mission gate unexpectedly enabled");
+
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+
+            std::atomic<uint64_t> observationCounter{0};
+            uint64_t observationNumber = 99;
+            Attempt attempt = TryObserveInvocation(
+                gate,
+                kAddPlayerToMissionNameIndex,
+                fixture.Reader(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                1,
+                observationNumber);
+
+            Require(attempt.Status == AttemptStatus::Disabled,
+                    "evaluated missing/unsupported mission gate did not short-circuit hook-level observation");
+            Require(observationNumber == 0,
+                    "evaluated missing/unsupported mission gate kept an observation number");
+            Require(observationCounter.load() == 0,
+                    "evaluated missing/unsupported mission gate reserved observation budget");
+            Require(fixture.Context.Calls == 0,
+                    "evaluated missing/unsupported mission gate touched UFunction memory");
+        }
+    }
+
     void TestDisabledGatesDoNotRead()
     {
         for (GateStatus status : {
@@ -1723,6 +1765,7 @@ int main()
     TestHookLevelZeroObservationLimitDoesNotRead();
     TestHookLevelObservationBudgetIsReservedBeforeRead();
     TestHookLevelDisabledAndNonMissionDoNotReadOrReserve();
+    TestEvaluatedHookLevelMissingGatesDoNotReadOrReserve();
     TestDisabledGatesDoNotRead();
     TestNonMissionNameDoesNotRead();
     TestIdentifyContainsReaderExceptions();

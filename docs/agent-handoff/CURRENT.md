@@ -121,13 +121,16 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `GetPlayerUsableItems` stays recognition-only and outside copied-bool policy output.
   Consume mode accepts documented slices and promote mode blocks release/public/runtime
   promotion through local consume-only/planning-only denylists even if shared metadata
-  drifts. Next Mission validation is local lifecycle/gate proof: disabled/missing
-  profile/window/marker/SHA, unsupported SHA, zero budget, and non-target FName must do no
-  metadata/parameter reads and reserve no budget; rejection must clear copied output and
-  non-canonical bool bytes greater than `1` must fail closed. `transfer-baccept-only-policy-slice`
-  is blocked from release/public SDK gates. This does not authorize Transfer runtime work,
-  public Mission SDK, runtime Mission dispatchers/callbacks, ResourceHandle, identity,
-  arrays, mutation, return override, or server observation.
+  drifts. Mission now has local coverage that evaluated disabled/missing
+  profile/window/marker/SHA and unsupported-SHA hook gates do no metadata/parameter reads
+  and reserve no observation budget; zero budget and non-target FName no-read/no-budget,
+  rejection clearing, and non-canonical bool fail-closed remain part of the same local
+  hardening envelope. The next Mission proof is end-to-end local observer/dispatcher
+  lifecycle gating: default-off, disabled/zero/non-target no-dispatch, and copied-bool
+  dispatch only after original success. `transfer-baccept-only-policy-slice` is blocked
+  from release/public SDK gates. This does not authorize Transfer runtime work, public
+  Mission SDK, runtime Mission dispatchers/callbacks, ResourceHandle, identity, arrays,
+  mutation, return override, or server observation.
 - ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
   stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle
@@ -192,8 +195,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   The 2026-05-31 refinement keeps the lane internal/default-off, limits v0 inputs to
   copied scalar event views, excludes `VerifyPinCode.ReturnValue` from aggregate output,
   and records consume-accepted/promote-blocked policy-slice gates. After this lane,
-  Mission copied-bool is the next fastest internal copied-data bridge; Dino compact
-  remains behind it until scalar-only copied-event policy and lifecycle/redaction review
+  Mission copied-bool is the next fastest internal copied-data bridge; Dino compact now
+  has planning-only scalar policy notes in
+  `docs/research/2026-05-31-dino-scalar-policy-planning.md`, but remains behind Mission
+  until recognizer tests, copied-scalar ownership, lifecycle gates, and redaction review
   exist.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
