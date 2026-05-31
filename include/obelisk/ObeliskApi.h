@@ -214,7 +214,9 @@ typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* e
 
 // Process-local timer callback. Timer ids are runtime handles only: they are not stable
 // across process restarts, maps, cluster instances, or plugin reloads. Callback code must
-// return quickly and must not throw across the C ABI boundary.
+// return quickly and must not throw across the C ABI boundary. Timer user_data is plugin
+// owned; plugins must keep it valid until no timer callback using it can still be in
+// flight.
 typedef void (*ObeliskTimerCallback)(uint64_t timer_id, void* user_data);
 
 typedef struct ObeliskPluginMetadata {
@@ -348,8 +350,11 @@ typedef struct ObeliskApi {
     // processes. delayMs must be non-zero. One-shot timers require intervalMs=0 and
     // flags=0. Repeating timers require OBELISK_TIMER_FLAG_REPEATING and non-zero
     // intervalMs. Reserved flags are rejected. UnregisterTimerWithOwnerToken cancels
-    // future delivery for one handle; plugin unload/init-failure owner cleanup is the
-    // quiescence barrier before plugin code and owner state are released.
+    // future delivery for one handle, but it is not a callback quiescence barrier for
+    // heap or plugin-owned userData that might already be in flight. Plugins that free
+    // timer state during shutdown must provide their own synchronization or defer that
+    // release until owner cleanup has quiesced callbacks. Plugin unload/init-failure
+    // owner cleanup is the runtime barrier before plugin code is unmapped.
     uint64_t (*RegisterTimerWithOwnerTokenHandle)(
         uint64_t ownerToken,
         uint64_t delayMs,

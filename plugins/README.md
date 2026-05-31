@@ -21,9 +21,12 @@ Obelisk plugin, not to become a feature-heavy server plugin.
 
 `oProcessTimer` is part of the first-stable core plugin set for `v0.1.0`. It demonstrates
 only the process-local timer ABI: owner-token registration, zero-failure handles, and
-explicit unregister on shutdown. It is not a gameplay/module timer abstraction and does not
-use UE timers, gameplay timers, UE identity, lookup, permissions, commands, shared
-scheduler state, persistent handles, or cluster coordination.
+explicit unregister on shutdown. Timer unregister cancels future delivery, but it is not a
+callback quiescence proof for heap-owned `user_data`; examples must keep timer state valid
+until their own synchronization or Obelisk owner cleanup proves callbacks are no longer in
+flight. It is not a gameplay/module timer abstraction and does not use UE timers, gameplay
+timers, UE identity, lookup, permissions, commands, shared scheduler state, persistent
+handles, or cluster coordination.
 
 `oDescriptorCatalog` is the post-RC reference plugin for descriptor discovery and the next
 release-scope metadata example. It reads `DescribeResourceKind` and

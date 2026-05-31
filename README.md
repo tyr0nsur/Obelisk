@@ -244,6 +244,12 @@ static void ResetState()
     g_has_api = false;
 }
 
+static bool HasApiMetadataPrefix(const ObeliskApi* api)
+{
+    return api &&
+        api->struct_size >= offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities);
+}
+
 extern "C" __attribute__((visibility("default")))
 bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
@@ -271,8 +277,7 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
     try {
         if (!api || !context)
             return false;
-        if (api->abi_version != OBELISK_API_ABI_VERSION ||
-            api->struct_size < sizeof(ObeliskApi))
+        if (!HasApiMetadataPrefix(api) || api->abi_version != OBELISK_API_ABI_VERSION)
             return false;
         if (context->abi_version != OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION ||
             context->struct_size < sizeof(ObeliskPluginInitContext))
@@ -447,6 +452,12 @@ field, `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` is advertised, and the functi
 is non-null. If a pre-callback calls it, that callback should return `false`; if it returns
 `true`, the runtime skips the automatic original call and warns to avoid double execution.
 Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted.
+
+Owner-token timers are process-local runtime utilities. The timer unregister call cancels
+future delivery for a handle, but plugins must not treat it as proof that a timer callback
+already in flight has returned. Keep timer `user_data` valid until the plugin has its own
+quiescence proof or until Obelisk owner cleanup quiesces callbacks during
+unload/init-failure cleanup.
 
 The official reference plugin set includes [oBaseEvents](docs/oBaseEvents.md),
 `oProcessTimer`, and `oDescriptorCatalog`; each demonstrates a release-scope core/SDK
