@@ -75,6 +75,16 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Mission copied-bool policy-slice manifest. Defaults to --root/mission-copied-bool-policy-slice.json.",
     )
+    parser.add_argument(
+        "--expected-manifest-sha256",
+        default=EXPECTED_MANIFEST_SHA256,
+        help="Expected direct manifest SHA256. Defaults to the reviewed durable artifact.",
+    )
+    parser.add_argument(
+        "--skip-artifact-gates",
+        action="store_true",
+        help="Skip consume/promote gate subprocesses for hermetic policy-fixture tests.",
+    )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
 
@@ -121,7 +131,7 @@ def run_gate(root: Path, manifest: Path, mode: str) -> tuple[int, dict[str, Any]
     return result.returncode, payload, result.stderr.strip()
 
 
-def read_policy(manifest: Path, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
+def read_policy(manifest: Path, blockers: list[dict[str, Any]], expected_sha256: str) -> dict[str, Any] | None:
     try:
         content = manifest.read_bytes()
         manifest_sha256 = hashlib.sha256(content).hexdigest()
@@ -135,11 +145,11 @@ def read_policy(manifest: Path, blockers: list[dict[str, Any]]) -> dict[str, Any
     if not isinstance(parsed, dict):
         append_blocker(blockers, "manifest_not_object", path=str(manifest))
         return None
-    if manifest_sha256 != EXPECTED_MANIFEST_SHA256:
+    if manifest_sha256 != expected_sha256:
         append_blocker(
             blockers,
             "manifest_sha256_mismatch",
-            expected=EXPECTED_MANIFEST_SHA256,
+            expected=expected_sha256,
             value=manifest_sha256,
         )
     return parsed
@@ -297,7 +307,9 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     }
 
 
-def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
+def build_report(
+    root_arg: Path, manifest_arg: Path | None, expected_manifest_sha256: str, skip_artifact_gates: bool = False
+) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     root = safe_path(root_arg, "--root", blockers)
     manifest_path = manifest_arg if manifest_arg is not None else root_arg / DEFAULT_MANIFEST_NAME
@@ -307,46 +319,50 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
     if root is not None and manifest is not None:
-        policy = read_policy(manifest, blockers)
+        policy = read_policy(manifest, blockers, expected_manifest_sha256)
         if policy is not None:
             summary = validate_policy(policy, blockers)
-        consume_rc, consume_payload, consume_stderr = run_gate(root, manifest, "consume")
-        consume_gate = {
-            "returncode": consume_rc,
-            "status": consume_payload.get("status") if isinstance(consume_payload, dict) else None,
-            "stderr": consume_stderr,
-        }
-        if consume_rc != 0 or consume_gate["status"] != "accepted":
-            append_blocker(blockers, "consume_gate_not_accepted", returncode=consume_rc, status=consume_gate["status"])
-        promote_rc, promote_payload, promote_stderr = run_gate(root, manifest, "promote")
-        promote_blockers = (
-            promote_payload.get("blockers")
-            if isinstance(promote_payload, dict) and isinstance(promote_payload.get("blockers"), list)
-            else []
-        )
-        promote_reasons = sorted(
-            blocker.get("reason")
-            for blocker in promote_blockers
-            if isinstance(blocker, dict) and isinstance(blocker.get("reason"), str)
-        )
-        promote_gate = {
-            "returncode": promote_rc,
-            "status": promote_payload.get("status") if isinstance(promote_payload, dict) else None,
-            "blocker_reasons": promote_reasons,
-            "stderr": promote_stderr,
-        }
-        required_promote_reasons = {
-            "promote_mode_mission_copied_bool_policy_slice_evidence_only",
-            "promote_mode_manifest_has_non_claims",
-        }
-        if promote_rc == 0 or promote_gate["status"] != "blocked":
-            append_blocker(blockers, "promote_gate_not_blocked", returncode=promote_rc, status=promote_gate["status"])
-        if not required_promote_reasons.issubset(set(promote_reasons)):
-            append_blocker(
-                blockers,
-                "promote_gate_missing_required_blockers",
-                missing=sorted(required_promote_reasons - set(promote_reasons)),
+        if skip_artifact_gates:
+            consume_gate = {"returncode": None, "status": "skipped"}
+            promote_gate = {"returncode": None, "status": "skipped", "blocker_reasons": []}
+        else:
+            consume_rc, consume_payload, consume_stderr = run_gate(root, manifest, "consume")
+            consume_gate = {
+                "returncode": consume_rc,
+                "status": consume_payload.get("status") if isinstance(consume_payload, dict) else None,
+                "stderr": consume_stderr,
+            }
+            if consume_rc != 0 or consume_gate["status"] != "accepted":
+                append_blocker(blockers, "consume_gate_not_accepted", returncode=consume_rc, status=consume_gate["status"])
+            promote_rc, promote_payload, promote_stderr = run_gate(root, manifest, "promote")
+            promote_blockers = (
+                promote_payload.get("blockers")
+                if isinstance(promote_payload, dict) and isinstance(promote_payload.get("blockers"), list)
+                else []
             )
+            promote_reasons = sorted(
+                blocker.get("reason")
+                for blocker in promote_blockers
+                if isinstance(blocker, dict) and isinstance(blocker.get("reason"), str)
+            )
+            promote_gate = {
+                "returncode": promote_rc,
+                "status": promote_payload.get("status") if isinstance(promote_payload, dict) else None,
+                "blocker_reasons": promote_reasons,
+                "stderr": promote_stderr,
+            }
+            required_promote_reasons = {
+                "promote_mode_mission_copied_bool_policy_slice_evidence_only",
+                "promote_mode_manifest_has_non_claims",
+            }
+            if promote_rc == 0 or promote_gate["status"] != "blocked":
+                append_blocker(blockers, "promote_gate_not_blocked", returncode=promote_rc, status=promote_gate["status"])
+            if not required_promote_reasons.issubset(set(promote_reasons)):
+                append_blocker(
+                    blockers,
+                    "promote_gate_missing_required_blockers",
+                    missing=sorted(required_promote_reasons - set(promote_reasons)),
+                )
 
     ready = not blockers
     return {
@@ -360,7 +376,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         "promotion_ready": False,
         "root": str(root if root is not None else root_arg),
         "manifest": str(manifest if manifest is not None else manifest_path),
-        "expected_manifest_sha256": EXPECTED_MANIFEST_SHA256,
+        "expected_manifest_sha256": expected_manifest_sha256,
         "consume_gate": consume_gate,
         "promote_gate": promote_gate,
         "summary": summary,
@@ -375,7 +391,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.root, args.manifest)
+    report = build_report(args.root, args.manifest, args.expected_manifest_sha256, args.skip_artifact_gates)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["ready"] else 1
 

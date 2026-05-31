@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-import shutil
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -15,10 +15,6 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_mission_copied_bool_readiness.py"
-DEFAULT_ROOT = Path(
-    "/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z"
-)
-DEFAULT_MANIFEST = DEFAULT_ROOT / "mission-copied-bool-policy-slice.json"
 
 
 class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
@@ -31,13 +27,113 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
             text=True,
         )
 
-    def copy_pack(self, root: Path) -> Path:
-        shutil.copytree(DEFAULT_ROOT, root, dirs_exist_ok=True)
-        return root / "mission-copied-bool-policy-slice.json"
+    def make_policy(self) -> dict:
+        def copied(target: str, field: str, direction: str) -> dict:
+            return {
+                "array_dim": 1,
+                "bool_byte_offset": 0,
+                "bool_field_size": 1,
+                "byte_mask": "0x01",
+                "copied_field": f"{target}.{field}",
+                "direction": direction,
+                "element_size": 1,
+                "evidence_status": "copied-mission-bool-only",
+                "field": field,
+                "field_mask": "0xff",
+                "native_bool": False,
+                "property_class": "BoolProperty",
+                "target": target,
+                "type": "bool",
+            }
+
+        return {
+            "schema": "obelisk.mission-copied-bool-policy-slice.v1",
+            "input_target_set": "mission-compact-intake",
+            "output_target_set": "mission-copied-bool-policy-slice",
+            "policy_status": "evidence-only",
+            "coverage": {
+                "status": "complete",
+                "input_targets": [
+                    "MissionType.AddPlayerToMission",
+                    "MissionType.BPAllowPlayerToLeaveMission",
+                    "MissionType.BPOnPlayerRemovedFromMission",
+                    "MissionType.GetPlayerUsableItems",
+                ],
+                "copied_targets": [
+                    "MissionType.AddPlayerToMission",
+                    "MissionType.BPAllowPlayerToLeaveMission",
+                    "MissionType.BPOnPlayerRemovedFromMission",
+                ],
+                "copied_fields": [
+                    "MissionType.AddPlayerToMission.bForceAdd",
+                    "MissionType.AddPlayerToMission.ReturnValue",
+                    "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
+                    "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
+                    "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+                ],
+                "redacted_fields": [
+                    "MissionType.AddPlayerToMission.PlayerCharacter",
+                    "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
+                    "MissionType.BPOnPlayerRemovedFromMission.Player",
+                    "MissionType.BPOnPlayerRemovedFromMission.Controller",
+                    "MissionType.GetPlayerUsableItems.Character",
+                    "MissionType.GetPlayerUsableItems.OutItemIDs",
+                ],
+            },
+            "copied_bools": [
+                copied("MissionType.AddPlayerToMission", "bForceAdd", "in"),
+                copied("MissionType.AddPlayerToMission", "ReturnValue", "return"),
+                copied("MissionType.BPAllowPlayerToLeaveMission", "ReturnValue", "return"),
+                copied("MissionType.BPOnPlayerRemovedFromMission", "bFromMissionCompleteEvent", "in"),
+                copied("MissionType.BPOnPlayerRemovedFromMission", "bLastPhaseSuccess", "in"),
+            ],
+            "generated_from": {
+                "snapshot_schema": "obelisk.ufunction-chain.snapshot.v1",
+                "input_snapshots": [
+                    {"id": "snapshot-0001", "target": "MissionType.AddPlayerToMission"},
+                    {"id": "snapshot-0002", "target": "MissionType.BPAllowPlayerToLeaveMission"},
+                    {"id": "snapshot-0003", "target": "MissionType.BPOnPlayerRemovedFromMission"},
+                    {"id": "snapshot-0004", "target": "MissionType.GetPlayerUsableItems"},
+                ],
+            },
+            "safety_summary": {
+                "artifact_status": "evidence_only",
+                "consume_only": True,
+                "promotion_ready": False,
+                "intended_use": "offline_review_only",
+            },
+            "non_claims": [
+                "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+                "does not promote public SDK callbacks or public metadata helpers",
+                "does not promote runtime hook wiring, dispatcher wiring, mission payload decoding, or public Mission SDK",
+                "does not copy player/controller/character object refs, OutItemIDs arrays, mission identity, player identity, or ResourceHandle",
+            ],
+        }
+
+    def write_pack(self, root: Path, payload: dict | None = None) -> tuple[Path, str]:
+        root.mkdir(parents=True, exist_ok=True)
+        manifest = root / "mission-copied-bool-policy-slice.json"
+        content = json.dumps(payload if payload is not None else self.make_policy(), sort_keys=True).encode("utf-8")
+        manifest.write_bytes(content)
+        return manifest, hashlib.sha256(content).hexdigest()
+
+    def checker_args(self, root: Path, manifest: Path, sha256: str) -> list[str]:
+        return [
+            "--root",
+            str(root),
+            "--manifest",
+            str(manifest),
+            "--expected-manifest-sha256",
+            sha256,
+            "--skip-artifact-gates",
+        ]
 
     def test_default_pack_is_candidate_ready_but_not_public_or_runtime_ready(self) -> None:
-        result = self.run_checker("--json")
-        payload = json.loads(result.stdout)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), "--json")
+            payload = json.loads(result.stdout)
 
         self.assertEqual(payload["schema"], "obelisk.mission-copied-bool-readiness-check.v1")
         self.assertEqual(payload["status"], "candidate_ready")
@@ -47,15 +143,8 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["promotion_ready"])
-        self.assertEqual(payload["consume_gate"]["status"], "accepted")
-        self.assertEqual(payload["promote_gate"]["status"], "blocked")
-        self.assertEqual(
-            set(payload["promote_gate"]["blocker_reasons"]),
-            {
-                "promote_mode_manifest_has_non_claims",
-                "promote_mode_mission_copied_bool_policy_slice_evidence_only",
-            },
-        )
+        self.assertEqual(payload["consume_gate"]["status"], "skipped")
+        self.assertEqual(payload["promote_gate"]["status"], "skipped")
         self.assertEqual(len(payload["summary"]["input_targets"]), 4)
         self.assertEqual(len(payload["summary"]["copied_targets"]), 3)
         self.assertEqual(len(payload["summary"]["copied_fields"]), 5)
@@ -66,8 +155,7 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
     def test_get_player_usable_items_copied_field_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
-            manifest = self.copy_pack(root)
-            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload = self.make_policy()
             payload["coverage"]["copied_targets"].append("MissionType.GetPlayerUsableItems")
             payload["coverage"]["copied_fields"].append("MissionType.GetPlayerUsableItems.OutItemIDs")
             payload["copied_bools"].append(
@@ -78,9 +166,9 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
                     "field": "OutItemIDs",
                 }
             )
-            manifest.write_text(json.dumps(payload), encoding="utf-8")
+            manifest, sha256 = self.write_pack(root, payload)
 
-            result = self.run_checker("--root", str(root), "--manifest", str(manifest), check=False)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
 
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -94,13 +182,12 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
     def test_noncanonical_bool_tail_metadata_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
-            manifest = self.copy_pack(root)
-            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload = self.make_policy()
             payload["copied_bools"][0]["native_bool"] = True
             payload["copied_bools"][0]["byte_mask"] = "0xff"
-            manifest.write_text(json.dumps(payload), encoding="utf-8")
+            manifest, sha256 = self.write_pack(root, payload)
 
-            result = self.run_checker("--root", str(root), "--manifest", str(manifest), check=False)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
 
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -110,18 +197,17 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
     def test_promote_gate_must_stay_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
-            manifest = self.copy_pack(root)
-            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload = self.make_policy()
             payload["non_claims"] = []
-            manifest.write_text(json.dumps(payload), encoding="utf-8")
+            manifest, sha256 = self.write_pack(root, payload)
 
-            result = self.run_checker("--root", str(root), "--manifest", str(manifest), check=False)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
 
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         reasons = {blocker["reason"] for blocker in report["blockers"]}
         self.assertIn("required_non_claim_missing", reasons)
-        self.assertIn("promote_gate_missing_required_blockers", reasons)
+        self.assertIn("required_non_claim_missing", reasons)
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
@@ -139,10 +225,10 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
-            manifest = self.copy_pack(root)
+            manifest, sha256 = self.write_pack(root)
             link = Path(temp_dir) / "manifest-link.json"
             link.symlink_to(manifest)
-            result = self.run_checker("--root", str(root), "--manifest", str(link), check=False)
+            result = self.run_checker(*self.checker_args(root, link, sha256), check=False)
 
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)

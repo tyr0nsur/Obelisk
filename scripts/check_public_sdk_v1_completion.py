@@ -197,7 +197,11 @@ def required_release_statement_outcomes(surface: dict[str, Any]) -> set[str]:
 
 def release_statement_record_has_contradiction(record: str) -> bool:
     lowered = record.lower()
-    if re.search(r"\b(?:not true that|false that|actually included|included despite|contradict)\b", lowered):
+    if re.search(
+        r"\b(?:not true that|false that|it is not the case that|not the case that|"
+        r"actually included|included despite|contradict)\b",
+        lowered,
+    ):
         return True
     return (
         re.search(
@@ -307,23 +311,34 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
             return False
         if not isinstance(evidence.get("sdk_consumer_tests"), list) or not evidence["sdk_consumer_tests"]:
             return False
-    def evidence_value_valid(value: Any) -> bool:
-        if isinstance(value, list) and value:
-            return all(
-                isinstance(item, str)
-                and evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs)
-                and (allow_generic_dirs or evidence_path_is_specific(item, surface_id))
-                for item in value
+    def evidence_value_valid(value: Any, *, evidence_key: str | None = None) -> bool:
+        def item_valid(item: str) -> bool:
+            relative = repo_relative_evidence_path(item)
+            if relative is None:
+                return False
+            relative_text = relative.as_posix()
+            if not allow_generic_dirs and evidence_key in {"sdk_consumer_tests", "installed_sdk_consumer_tests"}:
+                if not (
+                    relative_text == "tests/sdk_consumer"
+                    or relative_text.startswith("tests/sdk_consumer/")
+                    or relative_text == "tests/sdk_installed_consumer"
+                    or relative_text.startswith("tests/sdk_installed_consumer/")
+                ):
+                    return False
+            if not allow_generic_dirs and evidence_key == "abi_tests":
+                if not (relative_text.startswith("tests/abi/") or relative_text.startswith("tests/core/")):
+                    return False
+            return evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs) and (
+                allow_generic_dirs or evidence_path_is_specific(item, surface_id)
             )
-        return (
-            isinstance(value, str)
-            and evidence_path_exists(value, allow_generic_dirs=allow_generic_dirs)
-            and (allow_generic_dirs or evidence_path_is_specific(value, surface_id))
-        )
+
+        if isinstance(value, list) and value:
+            return all(isinstance(item, str) and item_valid(item) for item in value)
+        return isinstance(value, str) and item_valid(value)
 
     if not allow_generic_dirs and not (
-        evidence_value_valid(evidence.get("abi_tests"))
-        and evidence_value_valid(evidence.get("sdk_consumer_tests"))
+        evidence_value_valid(evidence.get("abi_tests"), evidence_key="abi_tests")
+        and evidence_value_valid(evidence.get("sdk_consumer_tests"), evidence_key="sdk_consumer_tests")
     ):
         return False
 
@@ -335,7 +350,7 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         "install_gate",
     )
     for key in machine_keys:
-        if evidence_value_valid(evidence.get(key)):
+        if evidence_value_valid(evidence.get(key), evidence_key=key):
             return True
     return False
 
@@ -356,6 +371,15 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
 
     surfaces = manifest.get("surfaces")
     surface_rows = surfaces if isinstance(surfaces, list) else []
+    seen_surface_ids: set[str] = set()
+    duplicate_surface_ids: list[str] = []
+    for surface in surface_rows:
+        if not isinstance(surface, dict) or not isinstance(surface.get("id"), str):
+            continue
+        surface_id = surface["id"]
+        if surface_id in seen_surface_ids:
+            duplicate_surface_ids.append(surface_id)
+        seen_surface_ids.add(surface_id)
     surfaces_by_id = {
         surface.get("id"): surface
         for surface in surface_rows
@@ -515,6 +539,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
 
     if missing_surfaces:
         blockers.append("surface_id_missing")
+    if duplicate_surface_ids:
+        blockers.append("duplicate_surface_id")
     if missing_canonical_surfaces:
         blockers.append("canonical_surface_id_missing")
     if missing_canonical_completion_blockers:
@@ -577,6 +603,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             set(missing_completion_blocker_exclusion_contracts)
         ),
         "missing_surfaces": sorted(set(missing_surfaces)),
+        "duplicate_surface_ids": sorted(set(duplicate_surface_ids)),
         "promoted_without_public_contract": sorted(set(promoted_without_contract)),
         "missing_canonical_surfaces": missing_canonical_surfaces,
         "missing_canonical_completion_blockers": missing_canonical_completion_blockers,
