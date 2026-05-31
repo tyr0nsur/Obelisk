@@ -16,7 +16,9 @@ does not replace a core evidence pack or a UFunction reflection-inventory pack.
   - `/usr/bin/radare2`: 5.5.0
   - `/usr/bin/objdump`: GNU Binutils 2.42
   - `/usr/bin/readelf`: GNU Binutils 2.42
-  Ghidra headless is available, but no Ghidra import was used for this lightweight pass.
+  - `/usr/local/bin/analyzeHeadless`: Ghidra 12.1
+  Ghidra was smoke-tested with `-noanalysis` only, isolated under `/tmp`; no decompiler
+  or full auto-analysis result is part of this note.
 - Server impact: none. Offline binary only.
 
 ## ELF Ranges
@@ -75,6 +77,13 @@ Candidate native exec thunks for this binary hash:
 - `ServerKickPlayer`: `0x1547320`
 - `ServerListPlayers`: `0x1547450`
 
+`radare2` without global analysis gives the same local registration window quickly:
+
+```bash
+r2 -q -e io.cache=true -e scr.color=false \
+  -c 's 0x1368f60; pd 30; s 0x1547320; pd 45; s 0x1547450; pd 45; q' "${BIN}"
+```
+
 Focused disassembly suggests `ServerKickPlayer` decodes two script parameters before a
 virtual dispatch through `AShooterPlayerController` vtable offset `0x1528`.
 `ServerListPlayers` appears thinner and dispatches through vtable offset `0x1520`.
@@ -90,6 +99,12 @@ runtime-initialized FName globals:
 Because those are `.bss` runtime values, the ELF alone does not provide accepted FName
 indices.
 
+Adjacent lifecycle strings and registrations, including `OnLogout`, `GetPlayerState`,
+`GetUniqueIdString`, `GetPlayerIDForSteamID`, `GetSteamIDForPlayerID`,
+`OnRep_PlayerState`, and `OnRep_UniqueId`, are useful candidate names only. They do not
+prove session lifecycle order, principal validity, privacy boundaries, or a stable
+identity contract.
+
 ## Limitations
 
 - The `objdump` checks are bounded disassembly windows and immediate-value references,
@@ -103,6 +118,9 @@ indices.
   as orientation clues.
 - Vtable offsets `0x1520` and `0x1528` are stripped-binary orientation only. They are not
   a vtable definition, public ABI, or cross-build contract.
+- `radare2 -A` is not a good short smoke-test path for this binary; a local non-analysis
+  disassembly window is faster and less noisy. Full Ghidra/radare analysis should stay a
+  separate static-analysis task with `/tmp` output and bounded scripts.
 
 ## Decision
 

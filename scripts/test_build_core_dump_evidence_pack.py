@@ -17,6 +17,21 @@ import build_core_dump_evidence_pack as core_pack
 
 
 class CoreDumpEvidencePackCommandTests(unittest.TestCase):
+    def test_help_documents_approved_offline_workspace_exception(self) -> None:
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(sys, "argv", ["build_core_dump_evidence_pack.py", "--help"]),
+            contextlib.redirect_stdout(stdout),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            core_pack.parse_args()
+
+        self.assertEqual(raised.exception.code, 0)
+        help_text = stdout.getvalue()
+        self.assertIn("Paths under /servidor/ark are", help_text)
+        self.assertIn("rejected except approved offline workspaces", help_text)
+        self.assertIn("/servidor/ark/workspace-offline", help_text)
+
     def run_main_raw(self, argv: list[str]) -> tuple[int, str]:
         stderr = io.StringIO()
         with mock.patch.object(sys, "argv", argv), contextlib.redirect_stderr(stderr):

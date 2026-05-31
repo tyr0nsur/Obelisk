@@ -876,7 +876,8 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help=(
             "Offline artifact directory to create or reuse, such as /tmp/obelisk-core-pack. "
-            "Paths under /servidor/ark are rejected."
+            "Paths under /servidor/ark are rejected except approved offline workspaces "
+            "such as /servidor/ark/workspace-offline."
         ),
     )
     parser.add_argument(

@@ -8,11 +8,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
+
+import check_player_identity_first_evidence_readiness as checker
 
 
 class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
@@ -228,6 +232,125 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(len(offline_inputs["core_like_candidates"]), 1)
         self.assertFalse(offline_inputs["ready_to_build_core_evidence_pack"])
         self.assertIn("file presence only", " ".join(offline_inputs["non_claims"]))
+
+    def test_accepted_inventory_still_fails_closed_on_malformed_coverage_payload(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, {
+                    "ready": True,
+                    "accepted_pack": {"manifest": "/tmp/inventory/manifest.json"},
+                    "reasons": [],
+                }
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {"totals": {"targets": 12}}
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": True,
+                        "session_end_accepted": True,
+                        "accepted_start_targets": ["ShooterGameMode.PostLogin"],
+                        "accepted_end_targets": ["ShooterGameMode.Logout"],
+                        "blockers": [],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={"ready_to_build_core_evidence_pack": False},
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("fixture_coverage_incomplete", payload["blockers"])
+        self.assertEqual(payload["deferred_until_reflection_inventory_ready"], [])
+
+    def test_accepted_inventory_still_fails_closed_on_wrong_first_evidence_schema(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, {
+                    "ready": True,
+                    "accepted_pack": {"manifest": "/tmp/inventory/manifest.json"},
+                    "reasons": [],
+                }
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "unexpected.schema.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": True,
+                        "session_end_accepted": True,
+                        "accepted_start_targets": ["ShooterGameMode.PostLogin"],
+                        "accepted_end_targets": ["ShooterGameMode.Logout"],
+                        "blockers": [],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={"ready_to_build_core_evidence_pack": False},
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["status"], "blocked")
+        self.assertIn("players_identity_first_evidence_not_buildable", payload["blockers"])
+        self.assertNotIn("accepted_lifecycle_anchors_missing", payload["blockers"])
 
 
 if __name__ == "__main__":

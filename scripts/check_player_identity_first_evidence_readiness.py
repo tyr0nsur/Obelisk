@@ -18,6 +18,7 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_c
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 REPORT_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
+FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
@@ -352,6 +353,25 @@ def second_source_total(coverage_payload: dict[str, Any] | None, key: str) -> in
     return value if isinstance(value, int) else None
 
 
+def coverage_payload_has_required_totals(coverage_payload: dict[str, Any] | None) -> bool:
+    if not isinstance(coverage_payload, dict):
+        return False
+    totals = coverage_payload.get("totals")
+    if not isinstance(totals, dict):
+        return False
+    return all(
+        type(totals.get(key)) is int
+        for key in (
+            "targets",
+            "comparable",
+            "blocked",
+            "second_source_missing",
+            "second_source_inconclusive",
+            "second_source_rejected",
+        )
+    )
+
+
 def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(first_evidence_payload, dict):
         return {
@@ -434,7 +454,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     second_source_missing = second_source_missing_count(coverage_payload)
     second_source_inconclusive = second_source_total(coverage_payload, "second_source_inconclusive")
     second_source_rejected = second_source_total(coverage_payload, "second_source_rejected")
-    first_evidence_ready = first_evidence_result.returncode == 0 and first_evidence_payload is not None
+    coverage_payload_valid = coverage_payload_has_required_totals(coverage_payload)
+    first_evidence_payload_valid = (
+        isinstance(first_evidence_payload, dict)
+        and first_evidence_payload.get("schema") == FIRST_EVIDENCE_SCHEMA
+    )
+    first_evidence_ready = first_evidence_result.returncode == 0 and first_evidence_payload_valid
     missing_targets = parse_missing_required_targets(first_evidence_result.stderr)
     lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
     lifecycle_ready = (
@@ -448,7 +473,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         blockers = ["missing_reflection_inventory_pack_or_core_evidence_pack"]
     else:
         blockers = []
-    if coverage_result.returncode != 0 or coverage_blocked:
+    if coverage_result.returncode != 0 or not coverage_payload_valid or coverage_blocked:
         downstream_blockers.append("fixture_coverage_incomplete")
     if second_source_missing:
         downstream_blockers.append("second_source_evidence_missing")
