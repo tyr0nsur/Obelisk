@@ -130,12 +130,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   the matching offline binary exists under `/home/flowcommunity-ark/obelisk-artifacts`,
   but no core file or `player-identity-offline-*` run directory exists there; no command
   can advance the identity pack until a regular non-symlink non-protected core input is
-  available.
-- Player identity next step is to produce or approve a non-protected UFunction
+  available. Player identity next step is to produce or approve a non-protected UFunction
   reflection-inventory pack with `target_set_coverage` for the full 12-target
-  `players-identity-lifecycle-intake` set. do not treat ScriptStruct inventory,
-  standalone snapshots, redacted signatures, static thunks, or a two-function-only
-  inventory as satisfying this lane; use `scripts/plan_ufunction_focal_snapshots.py` for
+  `players-identity-lifecycle-intake` set. do not treat ScriptStruct inventory, standalone
+  snapshots, redacted signatures, static thunks, or a two-function-only inventory as
+  satisfying this lane; use `scripts/plan_ufunction_focal_snapshots.py` for
   `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` only.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0:
@@ -148,9 +147,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   copied-signal evidence hygiene, and structure census consume/promote-blocked checks
   without claiming SDK promotion. Prefer inventory copied-signal hygiene over structure
   census when choosing one side lane, because it has more near-term Plugin Hub value while
-  identity remains core-blocked. Treat inventory/item copied signals as the higher-value
-  side lane than structure census. Keep that work experimental and non-completion. This
+  identity remains core-blocked. Keep that work experimental and non-completion. This
   does not authorize Transfer runtime work.
+- Current no-core side-lane priority: `item-return-only-policy-slice` is the best
+  value/risk target set because it already has release-readiness classification,
+  fixture coverage, and second-source layout evidence behind existing
+  `GameplayPolicyEvent` event kinds. It still must be described only as copied
+  `ReturnValue` signal evidence; it does not promote an Inventory SDK, Items SDK,
+  identity, lookup, mutation, return override, runtime validation, or v1 completion.
 - Keep `obelisk.command_chat_response_path.v1` as orientation-only until identity and
   permissions/admin are promoted and a copied response contract exists. The current static
   checker is useful for later target matching, but it must not become public ABI or

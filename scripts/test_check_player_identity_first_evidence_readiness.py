@@ -344,6 +344,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "plan_admin_focal_snapshots",
             ],
         )
+        sequence_by_id = {step["id"]: step for step in operator_commands["sequence"]}
         self.assertFalse(operator_commands["sequence"][0]["ready"])
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
         self.assertEqual(
@@ -351,6 +352,26 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "non_protected_offline_binary_and_core_inputs",
         )
         self.assertIn("build_core_dump_evidence_pack.py", operator_commands["sequence"][0]["command"])
+        self.assertFalse(sequence_by_id["build_reflection_inventory_pack"]["ready"])
+        self.assertEqual(sequence_by_id["build_reflection_inventory_pack"]["status"], "blocked")
+        self.assertEqual(
+            sequence_by_id["build_reflection_inventory_pack"]["blocked_until"],
+            "complete_core_evidence_pack",
+        )
+        self.assertEqual(
+            sequence_by_id["build_reflection_inventory_pack"]["requires"],
+            ["complete_core_evidence_pack"],
+        )
+        self.assertFalse(sequence_by_id["plan_admin_focal_snapshots"]["ready"])
+        self.assertEqual(sequence_by_id["plan_admin_focal_snapshots"]["status"], "blocked")
+        self.assertEqual(
+            sequence_by_id["plan_admin_focal_snapshots"]["blocked_until"],
+            "accepted_reflection_inventory_pack",
+        )
+        self.assertIn(
+            "accepted_reflection_inventory_pack",
+            sequence_by_id["plan_admin_focal_snapshots"]["requires"],
+        )
         self.assertIn("does not execute commands", " ".join(operator_commands["non_claims"]))
         self.assertIn("does not touch servers", " ".join(payload["non_claims"]))
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
@@ -819,6 +840,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertFalse(payload["static_orientation"]["pre_core_evidence_boundary"]["blocked"])
         self.assertEqual(payload["static_orientation"]["pre_core_evidence_boundary"]["blockers"], [])
+        self.assertIn(
+            "static orientation does not replace core evidence, reflection inventory, focal snapshots",
+            " ".join(payload["static_orientation"]["pre_core_evidence_boundary"]["non_claims"]),
+        )
 
     def test_candidate_ready_remains_internal_planning_not_promotion(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")

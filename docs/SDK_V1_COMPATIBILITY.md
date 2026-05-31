@@ -105,6 +105,10 @@ The inventory/item value that can honestly fit v1 is a copied-signal lane over
 allow-equip, repair, and use-onto-item checks. These remain post-original copied signals,
 not item identity, inventory lookup, mutation, `ResourceHandle`, rollback, or grant/remove
 authority.
+Inventory-named `GameplayPolicyEvent` kinds are promoted only as copied event kinds inside
+the gameplay-policy surface; they are not an Inventory SDK or Items SDK and do not expose
+inventory/item identity, lookup, mutation, item handles, grant/remove, rollback, or
+`ResourceHandle`.
 
 `ChatMessageEvent` is a minimal v0.1-rc copied notification ABI. It exposes only
 `abi_version`, `struct_size`, `send_mode`, `reserved0`, `flags`, process-local

@@ -103,6 +103,44 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
 
+    def test_current_manifest_reports_exact_unresolved_v1_surface_groups(self) -> None:
+        result = self.run_checker("--json", check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(
+            payload["unresolved_completion_blockers"],
+            [
+                "obelisk.mission_transfer_dino_tribe.v1",
+                "obelisk.player_identity.v1",
+                "obelisk.structure_census.v1",
+            ],
+        )
+        self.assertEqual(
+            payload["unresolved_experimental_surfaces"],
+            [
+                "obelisk.chat.local_routing.v1",
+                "obelisk.chat_message.v1",
+                "obelisk.gameplay_policy_event.v1",
+                "obelisk.inventory_item_copied_signals.v1",
+            ],
+        )
+        self.assertEqual(
+            payload["release_statement_missing_blocker_outcomes"],
+            [
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+                "obelisk.gameplay_tick_callbacks.v1",
+                "obelisk.inventory_items_mutation.v1",
+                "obelisk.lifecycle_ops_recovery.v1",
+                "obelisk.operator_ingress_storage.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.player_services_economy_mobility.v1",
+            ],
+        )
+        self.assertEqual(payload["promoted_surfaces_with_unresolved_dependencies"], {})
+        self.assertEqual(payload["promoted_surfaces_without_evidence"], [])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], [])
+
     def test_complete_minimal_manifest_passes(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         with tempfile.TemporaryDirectory() as temp_dir:

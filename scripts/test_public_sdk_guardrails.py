@@ -7966,6 +7966,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             guardrails,
         )
 
+    def test_inventory_named_gameplay_policy_event_kinds_are_not_inventory_sdk(self) -> None:
+        compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
+
+        for term in (
+            "Inventory-named `GameplayPolicyEvent` kinds are promoted only as copied event kinds inside\nthe gameplay-policy surface",
+            "they are not an Inventory SDK or Items SDK",
+            "do not expose\ninventory/item identity, lookup, mutation, item handles, grant/remove, rollback, or\n`ResourceHandle`",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compatibility)
+
     def test_player_identity_preflight_keeps_admin_snapshots_separate_from_principal_promotion(self) -> None:
         note = (REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-offline-pack-preflight.md").read_text(
             encoding="utf-8"

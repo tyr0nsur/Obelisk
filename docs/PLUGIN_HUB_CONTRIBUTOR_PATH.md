@@ -83,6 +83,9 @@ should expose only the Obelisk plugin entry points.
 
 ## 4. Package Metadata
 
+Use `docs/PLUGIN_HUB_PACKAGE_TEMPLATE.md` as the package README/metadata checklist before
+review. Keep the final package scoped to one support tier and one supported surface.
+
 Before review, the package must state:
 
 - `plugin_id`

@@ -111,6 +111,13 @@ It also does not currently contain a non-protected
 `scripts/build_reflection_inventory_pack.py`; the current durable root by itself is
 therefore not enough to produce the missing UFunction inventory pack.
 
+Static orientation, including admin thunk navigation for `ServerListPlayers` or
+`ServerKickPlayer`, is not a substitute for the offline evidence chain. It can help
+operators understand where future focal matching will look, but it must not be used to
+start `build_reflection_inventory_pack.py` without a complete non-protected core evidence
+pack, and it must not be used to start `plan_ufunction_focal_snapshots.py` without an
+accepted full-target `players-identity-lifecycle-intake` reflection-inventory pack.
+
 ## V1 SDK Progress Signal
 
 Player identity is a complete-SDK v1 blocker because permissions, commands/replies,
@@ -189,6 +196,8 @@ An offline `ShooterGameServer` binary, copied core, manual `--gobjects`, and man
 `--fname-root-slot` are not enough by themselves for this lane. The reflection inventory
 pack must be tied back to the complete core evidence-pack manifest before
 `players-identity-lifecycle-intake` planning is accepted.
+Likewise, orientation-only static admin thunks are not enough to build the reflection
+inventory pack or plan the missing admin focal snapshots.
 
 If a complete non-protected core evidence pack is available, a safe inventory-build route
 is:
