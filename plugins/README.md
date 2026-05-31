@@ -5,6 +5,10 @@ This directory contains first-party Obelisk plugins.
 Read [../docs/PLUGIN_ARCHITECTURE.md](../docs/PLUGIN_ARCHITECTURE.md) before adding a new
 plugin.
 
+Creator-facing examples that build against an installed SDK package live in
+[`../examples`](../examples). The plugins in this directory are first-party in-tree
+reference plugins and may use repository-local test/build wiring.
+
 ## First-Party Plugins
 
 ```text

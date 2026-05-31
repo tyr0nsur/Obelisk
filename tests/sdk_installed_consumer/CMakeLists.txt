@@ -91,3 +91,50 @@ set_target_properties(install_layout_descriptor_catalog_consumer PROPERTIES
 
 add_executable(consumer_fixture consumer_fixture.cpp)
 target_link_libraries(consumer_fixture PRIVATE Obelisk::obelisk_sdk dl)
+
+set(OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT "" CACHE PATH
+    "Optional repo plugins/ root used by the install layout test to compile release-scope examples against the installed SDK")
+set(OBELISK_RELEASE_SCOPE_EXTERN_ROOT "" CACHE PATH
+    "Optional repo extern/ root used by release-scope examples that own third-party header-only dependencies")
+
+function(add_obelisk_release_scope_example target_name source_relative_path)
+    set(source_path "${OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT}/${source_relative_path}")
+    if(NOT EXISTS "${source_path}")
+        message(FATAL_ERROR "Missing release-scope example source: ${source_path}")
+    endif()
+
+    add_library(${target_name} SHARED "${source_path}")
+    target_include_directories(${target_name} PRIVATE "${OBELISK_RELEASE_SCOPE_EXTERN_ROOT}")
+    target_link_libraries(${target_name} PRIVATE Obelisk::obelisk_sdk)
+    set_target_properties(${target_name} PROPERTIES
+        PREFIX ""
+        LIBRARY_OUTPUT_DIRECTORY "${OBELISK_INSTALL_ROOT}/plugins"
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN 1
+    )
+endfunction()
+
+if(OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT)
+    if(NOT OBELISK_RELEASE_SCOPE_EXTERN_ROOT OR NOT EXISTS "${OBELISK_RELEASE_SCOPE_EXTERN_ROOT}/nlohmann/json.hpp")
+        message(FATAL_ERROR
+            "OBELISK_RELEASE_SCOPE_EXTERN_ROOT must point at the repo extern/ directory")
+    endif()
+
+    add_obelisk_release_scope_example(
+        release_scope_oBaseEvents
+        oBaseEvents/oBaseEvents.cpp
+    )
+    set_target_properties(release_scope_oBaseEvents PROPERTIES OUTPUT_NAME "oBaseEvents")
+
+    add_obelisk_release_scope_example(
+        release_scope_oProcessTimer
+        oProcessTimer/oProcessTimer.cpp
+    )
+    set_target_properties(release_scope_oProcessTimer PROPERTIES OUTPUT_NAME "oProcessTimer")
+
+    add_obelisk_release_scope_example(
+        release_scope_oDescriptorCatalog
+        oDescriptorCatalog/oDescriptorCatalog.cpp
+    )
+    set_target_properties(release_scope_oDescriptorCatalog PROPERTIES OUTPUT_NAME "oDescriptorCatalog")
+endif()

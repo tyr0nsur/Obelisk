@@ -379,6 +379,9 @@ PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_consumer.so"
 C_ABI_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_c_abi_consumer.so"
 NO_SHUTDOWN_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_no_shutdown_consumer.so"
 DESCRIPTOR_CATALOG_PLUGIN_PATH="${INSTALL_ROOT}/plugins/install_layout_descriptor_catalog_consumer.so"
+RELEASE_BASE_EVENTS_PLUGIN_PATH="${INSTALL_ROOT}/plugins/oBaseEvents.so"
+RELEASE_TIMER_PLUGIN_PATH="${INSTALL_ROOT}/plugins/oProcessTimer.so"
+RELEASE_DESCRIPTOR_PLUGIN_PATH="${INSTALL_ROOT}/plugins/oDescriptorCatalog.so"
 
 mkdir -p "${CONFIG_DIR}"
 cat > "${CONFIG_PATH}" <<'JSON'
@@ -395,6 +398,8 @@ cmake -S "${WORK_DIR}" -B "${WORK_DIR}/build" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
     -DOBELISK_INSTALL_ROOT="${INSTALL_ROOT}" \
+    -DOBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT="${REPO_DIR}/plugins" \
+    -DOBELISK_RELEASE_SCOPE_EXTERN_ROOT="${REPO_DIR}/extern" \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build "${WORK_DIR}/build" --parallel
 
@@ -402,6 +407,9 @@ require_path "${PLUGIN_PATH}"
 require_path "${C_ABI_PLUGIN_PATH}"
 require_path "${NO_SHUTDOWN_PLUGIN_PATH}"
 require_path "${DESCRIPTOR_CATALOG_PLUGIN_PATH}"
+require_path "${RELEASE_BASE_EVENTS_PLUGIN_PATH}"
+require_path "${RELEASE_TIMER_PLUGIN_PATH}"
+require_path "${RELEASE_DESCRIPTOR_PLUGIN_PATH}"
 
 if ! grep -F "${INSTALL_ROOT}/include" "${WORK_DIR}/build/compile_commands.json" >/dev/null; then
     echo "SDK consumer did not include headers from the installed SDK layout" >&2
@@ -439,5 +447,27 @@ fi
     "${CONFIG_DIR}" \
     "${CONFIG_PATH}" \
     "install-layout-test"
+
+SDK_MINIMAL_EXAMPLE_DIR="${WORK_DIR}/sdk_minimal_plugin"
+mkdir -p "${SDK_MINIMAL_EXAMPLE_DIR}"
+cp -R "${REPO_DIR}/examples/sdk_minimal_plugin/." "${SDK_MINIMAL_EXAMPLE_DIR}/"
+cmake -S "${SDK_MINIMAL_EXAMPLE_DIR}" -B "${SDK_MINIMAL_EXAMPLE_DIR}/build" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build "${SDK_MINIMAL_EXAMPLE_DIR}/build" --parallel
+require_path "${SDK_MINIMAL_EXAMPLE_DIR}/build/obelisk_sdk_minimal_plugin.so"
+
+if ! grep -F "${INSTALL_ROOT}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
+    echo "Minimal SDK example did not include headers from the installed SDK layout" >&2
+    cat "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >&2
+    exit 1
+fi
+
+if grep -F "${REPO_DIR}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
+    echo "Minimal SDK example accidentally included headers from the source tree" >&2
+    cat "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >&2
+    exit 1
+fi
 
 echo "Install layout and public SDK consumer validation passed for ${INSTALL_ROOT}"

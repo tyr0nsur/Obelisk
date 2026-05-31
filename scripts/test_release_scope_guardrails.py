@@ -1472,6 +1472,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_installed_sdk_smoke_covers_repeating_timers_in_release_gate(self) -> None:
         release_gate = read("scripts/check_release_readiness.sh")
         layout_test = read("scripts/test_install_obelisk_layout.sh")
+        installed_consumer_cmake = read("tests/sdk_installed_consumer/CMakeLists.txt")
         consumer = read("tests/sdk_installed_consumer/consumer_plugin.cpp")
         fixture = read("tests/sdk_installed_consumer/consumer_fixture.cpp")
 
@@ -1482,6 +1483,18 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn('installed_headers="$(find "${INSTALL_ROOT}/include" -type f', layout_test)
         self.assertIn('obelisk/ObeliskApi.h', layout_test)
         self.assertIn("SDK install published unexpected public headers", layout_test)
+        self.assertIn('OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT="${REPO_DIR}/plugins"', layout_test)
+        self.assertIn('OBELISK_RELEASE_SCOPE_EXTERN_ROOT="${REPO_DIR}/extern"', layout_test)
+        self.assertIn('examples/sdk_minimal_plugin', layout_test)
+        self.assertIn('obelisk_sdk_minimal_plugin.so', layout_test)
+
+        for target in ("release_scope_oBaseEvents", "release_scope_oProcessTimer", "release_scope_oDescriptorCatalog"):
+            with self.subTest(file="tests/sdk_installed_consumer/CMakeLists.txt", target=target):
+                self.assertIn(target, installed_consumer_cmake)
+        for plugin_path in ("oBaseEvents.so", "oProcessTimer.so", "oDescriptorCatalog.so"):
+            with self.subTest(file="scripts/test_install_obelisk_layout.sh", plugin_path=plugin_path):
+                self.assertIn(plugin_path, layout_test)
+        self.assertIn("Obelisk::obelisk_sdk", installed_consumer_cmake)
 
         self.assertRegex(
             consumer,

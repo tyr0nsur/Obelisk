@@ -142,16 +142,21 @@ be simulated through raw game access.
 
 ## Current Safe Route
 
-For plugin authors, the stable v0.1.x shape is descriptor-driven. In this section,
-`promoted` means a copied, capability-gated ABI entry can be discovered or subscribed to;
+For plugin authors, the stable v0.1.x production seed shape is lifecycle/config/logging,
+descriptor-driven discovery, and process-local timers. Stop there for production
+Foundation examples. In this section, `promoted` means a copied, capability-gated ABI
+entry can be discovered or subscribed to by explicitly experimental copied-data examples;
 it does not turn copied chat/policy examples into production Plugin Hub modules, command
 or policy SDKs, enforcement APIs, identity APIs, mutation APIs, or ArkApi compatibility.
 
 1. Check `abi_version`, `struct_size`, capability bits, and function pointers.
 2. Use `DescribeResourceKind` to discover promoted categories.
 3. Use `DescribeGameplayPolicyEventKind` to discover promoted copied policy kinds.
-4. Subscribe only to promoted copied events with owner-token handles.
-5. Route by copied `resource_kind`, `event_kind`, and `field_mask`.
+
+Experimental copied-data examples may then:
+
+1. Subscribe only to promoted copied events with owner-token handles.
+2. Route by copied `resource_kind`, `event_kind`, and `field_mask`.
 
 Plugins must copy any callback data they need after the callback returns. Runtime-owned
 event data is callback-scope only.

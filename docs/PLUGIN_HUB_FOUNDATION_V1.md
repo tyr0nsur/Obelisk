@@ -22,6 +22,10 @@ with fail-closed capability checks. Copied `ChatMessageEvent` parsing and copied
 production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of
 a new ABI.
 
+Creator-facing examples that build against an installed SDK package live under
+`examples/`. First-party runtime reference plugins live under `plugins/` and may use
+repository-local build/test wiring.
+
 ## Public Surface
 
 Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
@@ -33,8 +37,8 @@ Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
 - plugin metadata, config directory, and init context
 - metadata-only descriptors through `DescribeResourceKind`
 - metadata-only descriptors through `DescribeGameplayPolicyEventKind`
-- copied `GameplayPolicyEvent` observers
-- minimal copied `ChatMessageEvent` observers
+- copied `GameplayPolicyEvent` observers as experimental pattern examples only
+- minimal copied `ChatMessageEvent` observers as experimental pattern examples only
 - owner-token, process-local timers
 - raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API
 

@@ -33,6 +33,7 @@ hooks/                Runtime hook implementations and ProcessEvent observers
 loader/               LD_PRELOAD bootstrap
 runtime/              Logging, marker helpers, runtime services
 ue/                   UE4 memory/reflection helpers and recognizers
+examples/             Creator-facing examples that build against the installed SDK
 plugins/oBaseEvents/  First official example plugin
 tests/                C++ ABI/runtime/SDK tests and fixtures
 scripts/              Install, validation, and offline reversing tooling
@@ -95,6 +96,22 @@ That gate requires a clean worktree by default and runs the build, CTest,
 script tests, install-layout validation, operator CLI status check, install
 dry-runs, plugin install dry-run, and whitespace checks with one set of
 defaults.
+
+## SDK Foundation And Offline Evidence
+
+For SDK Foundation work, default to local-only validation: build, CTest, script tests, SDK
+consumer/install dry-runs, and documented offline artifact checks. Do not restart servers,
+edit live server roots, change markers, or run runtime observations unless the PR
+explicitly owns an operator-approved window.
+
+Use [docs/OFFLINE_ARTIFACT_PACKS.md](docs/OFFLINE_ARTIFACT_PACKS.md) for already captured
+evidence packs. Record the pack id, manifest and `SHA256SUMS` hashes, consume-gate status,
+strict target-set coverage when used, second-source comparison when applicable, and exact
+non-claims.
+
+A passing offline pack supports only the stated child-manifest scope. It does not promote
+public SDK APIs, raw UE access, identity, lookup, mutation, return override, runtime
+hooks, or cross-binary support.
 
 PRs that promote reflected gameplay or module surfaces must run the same gate
 with second-source readiness enabled and explicitly name every promoted target

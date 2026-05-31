@@ -98,6 +98,7 @@ hooks/                Runtime hooks, including ProcessEvent
 loader/               LD_PRELOAD bootstrap
 runtime/              Logging and runtime services
 ue/                   UE4 memory/reflection helpers
+examples/             Creator-facing examples for the installed SDK package
 plugins/oBaseEvents/  Official event/config/lifecycle reference plugin
 plugins/oProcessTimer/  Official process-local timer reference plugin
 plugins/oDescriptorCatalog/  Official descriptor-catalog reference plugin
