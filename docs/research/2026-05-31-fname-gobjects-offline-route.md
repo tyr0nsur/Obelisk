@@ -103,17 +103,22 @@ gobjects fields: chunks, count, root, serial
 ```
 
 This clears the static coherent field-window blocker for the reviewed `gobjects`
-candidate in consume-mode static evidence only. It remains tmp-only until a supported
-normalized artifact-pack shape exists for the redacted field-window input. It still does
-not promote public `GObjects`, `ResourceHandle`, object identity, lookup, mutation,
-return override, runtime hooks, or any SDK surface.
+candidate in consume-mode static evidence only. The gate now has a minimal durable
+artifact-pack shape for the redacted FUObjectArray field-window child manifest:
+`obelisk.fuobjectarray-field-window-redacted.v1` is accepted only with redacted
+binary/candidate fields, both static source hashes, same-base evidence, required
+`root/chunks/count/serial` field coverage, `promotion_gate_ready=false`, and no absolute
+path strings. It still does not promote public `GObjects`, `ResourceHandle`, object
+identity, lookup, mutation, return override, runtime hooks, or any SDK surface.
 
 Follow-up audit confirmed the blocker is the pack schema, not local tooling. `radare2`,
 `r2`, and Ghidra `analyzeHeadless` are available on the machine, while `rizin` remains
-optional. A durable pack must regenerate pack-relative child manifests or teach the
-offline artifact gate how to consume the field-window, gate-result, and provenance
-schemas. Copying the `/tmp` manifest tree into a normalized pack is not enough because
-unknown `obelisk.*` child schemas and absolute scratch paths remain fail-closed blockers.
+optional. A durable pack must regenerate pack-relative child manifests.
+Copying the `/tmp` manifest tree into a normalized pack is not enough because unknown `obelisk.*`
+child schemas and absolute scratch paths remain fail-closed blockers. This turn only
+teaches the offline artifact gate how to consume the field-window schema; gate-result and
+provenance child manifests remain blocked with `unsupported_manifest_schema` until they
+have their own schema-specific validators.
 
 ## Fastest Offline Route
 

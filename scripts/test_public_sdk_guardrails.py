@@ -2289,6 +2289,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             if forbidden in package_config:
                 offenders.append(f"cmake/ObeliskConfig.cmake.in: package dependency leak {forbidden}")
 
+        self.assertIn("set(Obelisk_SDK_FOUND TRUE)", package_config)
         self.assertEqual(offenders, [])
 
     def test_creator_facing_sdk_examples_do_not_depend_on_private_headers_or_repo_deps(self) -> None:
@@ -2333,9 +2334,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         offenders.append(f"{relative}: forbidden include {header}")
             if path.name == "CMakeLists.txt":
                 self.assertIn(
-                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED)",
+                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
                     re.sub(r"\s+", " ", text),
-                    f"{relative} must consume the installed Obelisk package",
+                    f"{relative} must consume the installed Obelisk SDK component",
                 )
                 self.assertIn("Obelisk::obelisk_sdk", text, f"{relative} must link the public SDK target")
                 for token in forbidden_cmake_tokens:
@@ -2802,7 +2803,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             normalized_text = re.sub(r"\s+", " ", text)
             with self.subTest(path=relative, token="find_package"):
-                self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", normalized_text)
+                self.assertIn(
+                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
+                    normalized_text,
+                )
             with self.subTest(path=relative, token="sdk target"):
                 self.assertIn("Obelisk::obelisk_sdk", text)
 
@@ -5441,7 +5445,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)
 
-    def test_offline_artifact_pack_docs_block_unsupported_static_field_window_children(self) -> None:
+    def test_offline_artifact_pack_docs_define_static_field_window_child_boundary(self) -> None:
         packs = (REPO_ROOT / "docs" / "OFFLINE_ARTIFACT_PACKS.md").read_text(encoding="utf-8")
         route = (REPO_ROOT / "docs" / "research" / "2026-05-31-fname-gobjects-offline-route.md").read_text(
             encoding="utf-8"
@@ -5450,13 +5454,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for term in (
             "unknown `obelisk.*` child schema\nis a blocker",
+            "Strict static FUObjectArray field-window evidence may now be stored as an authoritative\nchild manifest",
+            "`obelisk.fuobjectarray-field-window-redacted.v1` and passes that schema's consume-mode\ngate",
+            "`promotion_gate_ready=false`, and no absolute path strings",
+            "This is internal static\nresearch evidence only; promote mode remains blocked",
             "`obelisk.fuobjectarray-field-window-redacted.v1`",
             "`obelisk.offline-artifact-gate-result.v1`",
             "`obelisk.static-artifact-provenance.v1`",
             "`unsupported_manifest_schema`",
             "Normalizing a directory also does not rewrite absolute paths inside\nchild manifests",
-            "the blocker is the pack schema, not local tooling",
-            "Copying the `/tmp` manifest tree into a normalized pack is not enough",
+            "that blocker is cleared only for the\nFUObjectArray redacted field-window schema",
+            "gate-result and\nprovenance child manifests remain blocked with `unsupported_manifest_schema`",
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)

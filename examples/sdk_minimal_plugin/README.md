@@ -3,7 +3,7 @@
 This is the smallest creator-facing example for building an Obelisk plugin outside the
 Obelisk source tree. It uses only the installed CMake package and public C ABI:
 
-- `find_package(Obelisk 0.1.0 CONFIG REQUIRED)`
+- `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`
 - `Obelisk::obelisk_sdk`
 - `ObeliskPlugin_GetInfo`
 - `ObeliskPlugin_Init`
@@ -28,7 +28,7 @@ The example intentionally uses the installed SDK package and the current numeric
 compatibility floor:
 
 ```cmake
-find_package(Obelisk 0.1.0 CONFIG REQUIRED)
+find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(obelisk_sdk_minimal_plugin PRIVATE Obelisk::obelisk_sdk)
 ```
 

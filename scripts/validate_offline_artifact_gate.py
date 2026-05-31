@@ -95,6 +95,8 @@ RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA = "obelisk.rc-ufunction-second-source-roo
 RC_UFUNCTION_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 WEAK_HELPER_CALLER_MODE_SCHEMA = "obelisk.weak-helper-caller-mode-redacted.v1"
 STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA = "obelisk.static-global-promotion-evidence.v1"
+FUOBJECTARRAY_FIELD_WINDOW_REDACTED_SCHEMA = "obelisk.fuobjectarray-field-window-redacted.v1"
+STATIC_ARTIFACT_PROVENANCE_SCHEMA = "obelisk.static-artifact-provenance.v1"
 RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA = "obelisk.resource-handle-revalidation-evaluator.v1"
 INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA = "obelisk.internal-uobject-revalidation-post-callback-contract.v1"
 INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA = "obelisk.internal-uobject-revalidation-serial-policy.v1"
@@ -127,6 +129,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     RC_UFUNCTION_SECOND_SOURCE_ROOT_SCHEMA,
     WEAK_HELPER_CALLER_MODE_SCHEMA,
     STATIC_GLOBAL_PROMOTION_EVIDENCE_SCHEMA,
+    FUOBJECTARRAY_FIELD_WINDOW_REDACTED_SCHEMA,
     RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
     INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
     INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA,
@@ -656,6 +659,23 @@ REQUIRED_UOBJECT_FLAG_POLICY_CANDIDATES = {
 UOBJECT_FLAG_POLICY_ALLOWED_HEX_STRINGS = {"0x100", "0x4000"}
 STATIC_GLOBAL_CANDIDATE_KINDS = {"gobjects", "fname_root"}
 STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER = "missing_gobjects_coherent_field_window"
+FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_EVIDENCE = {
+    "candidate_passed_to_constructor_helper",
+    "same_candidate_registered_with_finalizer",
+    "constructor_writes_relative_fields",
+    "serial_accessors_use_same_field_family",
+}
+FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_WINDOWS = {
+    "static_init_caller",
+    "ctor_helper",
+    "serial_accessor",
+}
+FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_FIELDS = {
+    "root": {"present": True, "basis": "candidate_base"},
+    "chunks": {"present": True, "relative_offset": "base+0x10"},
+    "count": {"present": True, "relative_offset": "base+0x24"},
+    "serial": {"present": True, "relative_offset": "base+0x58"},
+}
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_KEY_RE = re.compile(r"(?:^|_)(address|index|indices|serial|pointer|ptr)(?:_|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_FORBIDDEN_VALUE_RE = re.compile(r"(?:^|[_\W])(address|index|indices|serial|pointer|ptr)(?:[_\W]|$)", re.IGNORECASE)
 UOBJECT_FLAG_POLICY_PUBLIC_ADDRESS_RE = re.compile(r"\b0x[0-9a-f]{5,}\b", re.IGNORECASE)
@@ -5523,6 +5543,149 @@ def validate_static_global_promotion_evidence_manifest(
     return blockers
 
 
+def validate_fuobjectarray_field_window_redacted_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != FUOBJECTARRAY_FIELD_WINDOW_REDACTED_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    unix_absolute_fragment = re.compile(r"(^|[\s='\":])/(?!/)")
+    windows_absolute_fragment = re.compile(r"(^|[\s='\":])[A-Za-z]:[\\/]")
+    for trail, raw_value in collect_string_fields(payload):
+        if unix_absolute_fragment.search(raw_value) is not None or windows_absolute_fragment.search(raw_value) is not None:
+            blockers.append({"reason": "fuobjectarray_field_window_absolute_path_string", "label": f"{label}:{trail}"})
+
+    if payload.get("status") != "accepted_internal_static_evidence":
+        blockers.append({"reason": "fuobjectarray_field_window_status_not_internal_static_evidence", "label": f"{label}:$.status"})
+
+    binary = payload.get("binary")
+    binary_sha = binary.get("sha256") if isinstance(binary, dict) else None
+    if not isinstance(binary_sha, str) or SHA256_RE.fullmatch(binary_sha) is None:
+        blockers.append({"reason": "fuobjectarray_field_window_binary_sha256_invalid", "label": f"{label}:$.binary.sha256"})
+    elif expected_binary_sha256 is not None and binary_sha != expected_binary_sha256:
+        blockers.append(
+            {
+                "reason": "fuobjectarray_field_window_binary_sha256_mismatch",
+                "label": f"{label}:$.binary.sha256",
+                "expected": expected_binary_sha256,
+                "recorded": binary_sha,
+            }
+        )
+    if not isinstance(binary, dict) or binary.get("path_redacted") is not True:
+        blockers.append({"reason": "fuobjectarray_field_window_binary_path_not_redacted", "label": f"{label}:$.binary.path_redacted"})
+
+    candidate = payload.get("candidate")
+    if not isinstance(candidate, dict):
+        blockers.append({"reason": "fuobjectarray_field_window_candidate_missing", "label": f"{label}:$.candidate"})
+    else:
+        if candidate.get("label") != "gobjects" or candidate.get("kind") != "gobjects":
+            blockers.append({"reason": "fuobjectarray_field_window_candidate_not_gobjects", "label": f"{label}:$.candidate"})
+        if "address" in candidate:
+            blockers.append({"reason": "fuobjectarray_field_window_candidate_address_present", "label": f"{label}:$.candidate.address"})
+        if candidate.get("address_redacted") is not True:
+            blockers.append({"reason": "fuobjectarray_field_window_candidate_address_not_redacted", "label": f"{label}:$.candidate.address_redacted"})
+        if not isinstance(candidate.get("address_sha256"), str) or SHA256_RE.fullmatch(candidate["address_sha256"]) is None:
+            blockers.append({"reason": "fuobjectarray_field_window_candidate_address_sha256_invalid", "label": f"{label}:$.candidate.address_sha256"})
+
+    redaction = payload.get("redaction")
+    if (
+        not isinstance(redaction, dict)
+        or redaction.get("absolute_addresses") != "omitted"
+        or redaction.get("raw_disassembly") != "omitted"
+        or redaction.get("raw_decompiler_text") != "omitted"
+        or redaction.get("absolute_paths") != "omitted"
+    ):
+        blockers.append({"reason": "fuobjectarray_field_window_redaction_contract_mismatch", "label": f"{label}:$.redaction"})
+
+    sources = payload.get("sources")
+    if not isinstance(sources, dict):
+        blockers.append({"reason": "fuobjectarray_field_window_sources_missing", "label": f"{label}:$.sources"})
+    else:
+        for source_name in ("ghidra_stdout", "r2_windows"):
+            source = sources.get(source_name)
+            if not isinstance(source, dict):
+                blockers.append({"reason": "fuobjectarray_field_window_source_missing", "label": f"{label}:$.sources.{source_name}"})
+                continue
+            if not isinstance(source.get("artifact_sha256"), str) or SHA256_RE.fullmatch(source["artifact_sha256"]) is None:
+                blockers.append({"reason": "fuobjectarray_field_window_source_sha256_invalid", "label": f"{label}:$.sources.{source_name}.artifact_sha256"})
+            expected_tool = "ghidra" if source_name == "ghidra_stdout" else "radare2"
+            if source.get("tool") != expected_tool:
+                blockers.append({"reason": "fuobjectarray_field_window_source_tool_mismatch", "label": f"{label}:$.sources.{source_name}.tool"})
+            if not isinstance(source.get("version"), str) or not source["version"]:
+                blockers.append({"reason": "fuobjectarray_field_window_source_version_invalid", "label": f"{label}:$.sources.{source_name}.version"})
+
+    window = payload.get("fuobjectarray_window")
+    if not isinstance(window, dict):
+        blockers.append({"reason": "fuobjectarray_field_window_missing_window", "label": f"{label}:$.fuobjectarray_window"})
+    else:
+        same_base = window.get("same_base_flow")
+        if not isinstance(same_base, dict) or same_base.get("proven") is not True:
+            blockers.append({"reason": "fuobjectarray_field_window_same_base_not_proven", "label": f"{label}:$.fuobjectarray_window.same_base_flow.proven"})
+        else:
+            evidence = same_base.get("evidence")
+            if (
+                not isinstance(evidence, list)
+                or any(not isinstance(item, str) for item in evidence)
+                or not FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_EVIDENCE.issubset(set(evidence))
+            ):
+                blockers.append(
+                    {
+                        "reason": "fuobjectarray_field_window_same_base_evidence_missing",
+                        "label": f"{label}:$.fuobjectarray_window.same_base_flow.evidence",
+                        "expected": sorted(FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_EVIDENCE),
+                    }
+                )
+        required_fields = window.get("required_fields")
+        if not isinstance(required_fields, dict):
+            blockers.append({"reason": "fuobjectarray_field_window_required_fields_missing", "label": f"{label}:$.fuobjectarray_window.required_fields"})
+        else:
+            for field_name, expected_record in FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_FIELDS.items():
+                field = required_fields.get(field_name)
+                if not isinstance(field, dict) or field.get("present") is not True:
+                    blockers.append({"reason": "fuobjectarray_field_window_required_field_missing", "label": f"{label}:$.fuobjectarray_window.required_fields.{field_name}"})
+                    continue
+                for expected_key, expected_value in expected_record.items():
+                    if field.get(expected_key) != expected_value:
+                        blockers.append(
+                            {
+                                "reason": "fuobjectarray_field_window_required_field_mismatch",
+                                "label": f"{label}:$.fuobjectarray_window.required_fields.{field_name}.{expected_key}",
+                                "expected": expected_value,
+                                "recorded": field.get(expected_key),
+                            }
+                        )
+        windows = window.get("windows")
+        window_ids = {entry.get("id") for entry in windows if isinstance(entry, dict)} if isinstance(windows, list) else set()
+        if not FUOBJECTARRAY_FIELD_WINDOW_REQUIRED_WINDOWS.issubset(window_ids):
+            blockers.append({"reason": "fuobjectarray_field_window_required_windows_missing", "label": f"{label}:$.fuobjectarray_window.windows"})
+
+    builder_contract = payload.get("builder_contract")
+    if not isinstance(builder_contract, dict):
+        blockers.append({"reason": "fuobjectarray_field_window_builder_contract_missing", "label": f"{label}:$.builder_contract"})
+    else:
+        if builder_contract.get("candidate_static_contract_blocker_to_clear") != STATIC_GLOBAL_GOBJECTS_FIELD_WINDOW_BLOCKER:
+            blockers.append({"reason": "fuobjectarray_field_window_blocker_contract_mismatch", "label": f"{label}:$.builder_contract.candidate_static_contract_blocker_to_clear"})
+        if builder_contract.get("promotion_gate_ready") is not False:
+            blockers.append({"reason": "fuobjectarray_field_window_promotion_gate_ready_not_false", "label": f"{label}:$.builder_contract.promotion_gate_ready"})
+        if builder_contract.get("consumption_scope") != "internal_static_research_only":
+            blockers.append({"reason": "fuobjectarray_field_window_consumption_scope_mismatch", "label": f"{label}:$.builder_contract.consumption_scope"})
+        remaining_blockers = builder_contract.get("remaining_blockers")
+        if not isinstance(remaining_blockers, list) or "static_only_evidence" not in remaining_blockers:
+            blockers.append({"reason": "fuobjectarray_field_window_remaining_blockers_missing", "label": f"{label}:$.builder_contract.remaining_blockers"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_fuobjectarray_field_window_static_only", "label": label})
+
+    for trail, _, reason in collect_candidate_public_overclaims(payload, allowed_prefixes=()):
+        blockers.append({"reason": f"fuobjectarray_field_window_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    return blockers
+
+
 def validate_resource_handle_revalidation_evaluator_manifest(
     payload: dict[str, Any],
     *,
@@ -8368,6 +8531,14 @@ def validate_manifest(
     blockers.extend(validate_players_identity_first_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(
+        validate_fuobjectarray_field_window_redacted_manifest(
+            payload,
+            label=str(resolved),
+            mode=mode,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+    )
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_internal_uobject_post_callback_contract_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_internal_uobject_serial_policy_manifest(payload, label=str(resolved), mode=mode))

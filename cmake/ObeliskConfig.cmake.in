@@ -12,4 +12,6 @@ set(Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION @OBELISK_CHAT_MESSAGE_EVENT_ABI_VERSI
 
 include("${CMAKE_CURRENT_LIST_DIR}/ObeliskTargets.cmake")
 
+set(Obelisk_SDK_FOUND TRUE)
+
 check_required_components(Obelisk)

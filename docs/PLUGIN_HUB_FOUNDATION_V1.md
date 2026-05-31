@@ -31,6 +31,10 @@ consumer. First-party runtime reference plugins live under `plugins/` and may us
 repository-local build/test wiring, so they are reference plugins in-tree rather than the
 minimum installed-SDK consumer contract.
 
+External Plugin Hub examples should request the installed SDK component explicitly with
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and link only
+`Obelisk::obelisk_sdk`.
+
 ## Public Surface
 
 Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:

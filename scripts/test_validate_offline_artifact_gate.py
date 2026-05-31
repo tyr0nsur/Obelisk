@@ -1224,6 +1224,69 @@ def static_global_promotion_evidence_manifest(*, ready: bool = False) -> dict:
     return payload
 
 
+def fuobjectarray_field_window_redacted_manifest() -> dict:
+    return {
+        "schema": gate.FUOBJECTARRAY_FIELD_WINDOW_REDACTED_SCHEMA,
+        "status": "accepted_internal_static_evidence",
+        "binary": {
+            "sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+            "path_redacted": True,
+        },
+        "candidate": {
+            "label": "gobjects",
+            "kind": "gobjects",
+            "address_redacted": True,
+            "address_sha256": "1" * 64,
+        },
+        "redaction": {
+            "absolute_addresses": "omitted",
+            "raw_disassembly": "omitted",
+            "raw_decompiler_text": "omitted",
+            "absolute_paths": "omitted",
+        },
+        "sources": {
+            "ghidra_stdout": {
+                "artifact_sha256": "2" * 64,
+                "tool": "ghidra",
+                "version": "12.1",
+            },
+            "r2_windows": {
+                "artifact_sha256": "3" * 64,
+                "tool": "radare2",
+                "version": "5.5.0",
+            },
+        },
+        "fuobjectarray_window": {
+            "same_base_flow": {
+                "proven": True,
+                "evidence": [
+                    "candidate_passed_to_constructor_helper",
+                    "same_candidate_registered_with_finalizer",
+                    "constructor_writes_relative_fields",
+                    "serial_accessors_use_same_field_family",
+                ],
+            },
+            "required_fields": {
+                "root": {"present": True, "basis": "candidate_base"},
+                "chunks": {"present": True, "relative_offset": "base+0x10"},
+                "count": {"present": True, "relative_offset": "base+0x24"},
+                "serial": {"present": True, "relative_offset": "base+0x58"},
+            },
+            "windows": [
+                {"id": "static_init_caller", "ghidra_seen": True, "r2_seen": True},
+                {"id": "ctor_helper", "ghidra_seen": True, "r2_seen": True},
+                {"id": "serial_accessor", "ghidra_seen": True, "r2_seen": True},
+            ],
+        },
+        "builder_contract": {
+            "candidate_static_contract_blocker_to_clear": "missing_gobjects_coherent_field_window",
+            "promotion_gate_ready": False,
+            "remaining_blockers": ["static_only_evidence"],
+            "consumption_scope": "internal_static_research_only",
+        },
+    }
+
+
 def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> dict:
     return {
         "schema": gate.RESOURCE_HANDLE_REVALIDATION_EVALUATOR_SCHEMA,
@@ -3414,7 +3477,14 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             (pack / "report.json").write_text('{"schema":"fixture"}\n', encoding="utf-8")
             artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
 
-            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[pack / artifact_pack.MANIFEST_NAME],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
 
         self.assertEqual("accepted", result["status"])
         self.assertEqual([], result["blockers"])
@@ -3436,7 +3506,14 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             )
             artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
 
-            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[pack / artifact_pack.MANIFEST_NAME],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promotion_ready_overclaim", reasons)
@@ -5790,6 +5867,157 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("promote_mode_static_global_has_blockers", reasons)
         self.assertIn("promote_mode_static_global_has_remaining_blockers", reasons)
         self.assertIn("promote_mode_static_global_static_only_evidence", reasons)
+
+    def test_accepts_fuobjectarray_field_window_redacted_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "field-window.json"
+            write_json(manifest, fuobjectarray_field_window_redacted_manifest())
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_fuobjectarray_field_window_redacted_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "field-window.json"
+            write_json(manifest, fuobjectarray_field_window_redacted_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn("promote_mode_fuobjectarray_field_window_static_only", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_blocks_fuobjectarray_field_window_redacted_shape_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "field-window.json"
+            payload = fuobjectarray_field_window_redacted_manifest()
+            payload["status"] = "accepted_public_gobjects"
+            payload["binary"]["sha256"] = "0" * 64
+            payload["binary"]["path_redacted"] = False
+            payload["candidate"]["kind"] = "fname_root"
+            payload["candidate"]["address_redacted"] = False
+            payload["redaction"]["raw_disassembly"] = "included"
+            payload["sources"]["ghidra_stdout"]["artifact_sha256"] = "not-a-sha"
+            payload["fuobjectarray_window"]["same_base_flow"]["proven"] = False
+            payload["fuobjectarray_window"]["required_fields"]["serial"]["relative_offset"] = "base+0x5c"
+            payload["fuobjectarray_window"]["windows"] = [{"id": "static_init_caller"}]
+            payload["builder_contract"]["candidate_static_contract_blocker_to_clear"] = "other"
+            payload["builder_contract"]["promotion_gate_ready"] = True
+            payload["builder_contract"]["consumption_scope"] = "public_sdk"
+            write_json(manifest, payload)
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("fuobjectarray_field_window_status_not_internal_static_evidence", reasons)
+        self.assertIn("fuobjectarray_field_window_binary_sha256_mismatch", reasons)
+        self.assertIn("fuobjectarray_field_window_binary_path_not_redacted", reasons)
+        self.assertIn("fuobjectarray_field_window_candidate_not_gobjects", reasons)
+        self.assertIn("fuobjectarray_field_window_candidate_address_not_redacted", reasons)
+        self.assertIn("fuobjectarray_field_window_redaction_contract_mismatch", reasons)
+        self.assertIn("fuobjectarray_field_window_source_sha256_invalid", reasons)
+        self.assertIn("fuobjectarray_field_window_same_base_not_proven", reasons)
+        self.assertIn("fuobjectarray_field_window_required_field_mismatch", reasons)
+        self.assertIn("fuobjectarray_field_window_required_windows_missing", reasons)
+        self.assertIn("fuobjectarray_field_window_blocker_contract_mismatch", reasons)
+        self.assertIn("fuobjectarray_field_window_promotion_gate_ready_not_false", reasons)
+        self.assertIn("fuobjectarray_field_window_consumption_scope_mismatch", reasons)
+
+    def test_blocks_fuobjectarray_field_window_absolute_path_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "field-window.json"
+            payload = fuobjectarray_field_window_redacted_manifest()
+            payload["note"] = "/tmp/copied-field-window.json"
+            write_json(manifest, payload)
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[manifest],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
+
+        self.assertIn("fuobjectarray_field_window_absolute_path_string", {blocker["reason"] for blocker in result["blockers"]})
+
+    def test_normalized_pack_accepts_static_field_window_child_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "static-field-window-pack-20260531T090000Z"
+            pack.mkdir(parents=True)
+            write_json(pack / "fuobjectarray-field-window.redacted.json", fuobjectarray_field_window_redacted_manifest())
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-31T09:00:00Z")
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[pack / artifact_pack.MANIFEST_NAME],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_normalized_pack_blocks_gate_result_and_static_provenance_children(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "static-field-window-pack-20260531T090000Z"
+            pack.mkdir(parents=True)
+            write_json(
+                pack / "static-global.consume-gate.json",
+                {
+                    "schema": gate.SCHEMA,
+                    "root": "<offline-workspace>",
+                    "protected_root": "<redacted>",
+                    "mode": "consume",
+                    "status": "accepted",
+                    "manifests": [],
+                    "artifacts": [],
+                    "blockers": [],
+                },
+            )
+            write_json(
+                pack / "ShooterGameServer.objdump.provenance.json",
+                {
+                    "schema": gate.STATIC_ARTIFACT_PROVENANCE_SCHEMA,
+                    "verified": True,
+                    "path_redacted": True,
+                    "binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                    "artifact_sha256": "4" * 64,
+                    "sidecar_sha256": "5" * 64,
+                },
+            )
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-31T09:00:00Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        reasons = [blocker["reason"] for blocker in result["blockers"]]
+        self.assertEqual(2, reasons.count("unsupported_manifest_schema"))
 
     def test_accepts_resource_handle_revalidation_evaluator_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
