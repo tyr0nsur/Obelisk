@@ -76,14 +76,18 @@ priorities, and do not use history files as the active source of truth.
   `obelisk.command_chat_response_path.v1` planning dependency. That response path adds no
   ABI today and keeps public `CallProcessEvent`, raw UE pointer/params/FString response
   APIs, replies, send-chat, broadcast/notices, and moderation blocked until promoted or
-  explicitly excluded.
+  explicitly excluded. `docs/command_chat_response_public_contract_decisions.json` is the
+  blocked pre-ABI checklist for that future response path; static thunk orientation,
+  passive copied chat parsing, candidate vtable slots, raw ProcessEvent callbacks, and
+  legacy `CallProcessEvent` are not sufficient response-path evidence.
   While identity waits on copied core evidence, inventory copied signals are the more
   valuable side lane than structure census because they already ride copied
   `GameplayPolicyEvent` evidence; structure census remains offline planning/consume-only.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
-  player identity.
+  player identity. Identity and permissions decision contracts carry `v1_sequence_gate`
+  entries preserving identity -> permissions -> command response -> commands/replies.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.

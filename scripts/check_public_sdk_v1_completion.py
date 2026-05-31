@@ -581,7 +581,7 @@ def unresolved_promoted_surface_dependencies(
     surface: dict[str, Any],
     surfaces_by_id: dict[str, dict[str, Any]],
 ) -> list[str]:
-    if surface.get("status") != "promoted":
+    if surface.get("status") != "promoted" and surface.get("public_abi") is not True:
         return []
     unresolved: list[str] = []
     dependency_ids = as_string_list(surface.get("depends_on"))
@@ -708,6 +708,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     debug_only_promoted: list[str] = []
     promoted_dependency_failures: dict[str, list[str]] = {}
     promoted_missing_required_evidence_terms: dict[str, list[str]] = {}
+    non_promoted_with_public_abi: list[str] = []
 
     if stable_claim_allowed and manifest.get("v1_completion_required") is True and release_statement_text is None:
         blockers.append("release_statement_required_for_v1_completion")
@@ -813,13 +814,15 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             missing_required_terms = surface_missing_required_promotion_evidence(surface)
             if missing_required_terms:
                 promoted_missing_required_evidence_terms[surface_id] = missing_required_terms
-            unresolved_dependencies = unresolved_promoted_surface_dependencies(surface, surfaces_by_id)
-            if unresolved_dependencies:
-                promoted_dependency_failures[surface_id] = unresolved_dependencies
         elif status == "planning":
             unresolved_planning_surfaces.append(surface_id)
         elif status != "promoted-experimental-only" and contract_items:
             non_promoted_with_contract.append(surface_id)
+        if status != "promoted" and surface.get("public_abi") is True:
+            non_promoted_with_public_abi.append(surface_id)
+        unresolved_dependencies = unresolved_promoted_surface_dependencies(surface, surfaces_by_id)
+        if unresolved_dependencies:
+            promoted_dependency_failures[surface_id] = unresolved_dependencies
 
     for surface_id in sorted(promoted_surfaces):
         surface = surfaces_by_id.get(surface_id)
@@ -861,6 +864,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("promoted_surface_dependency_unresolved")
     if non_promoted_with_contract:
         blockers.append("non_promoted_surface_has_public_contract")
+    if non_promoted_with_public_abi:
+        blockers.append("non_promoted_surface_has_public_abi")
     if promoted_list_mismatches:
         blockers.append("promoted_surface_list_mismatch")
     if experimental_list_mismatches:
@@ -921,6 +926,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         },
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
+        "non_promoted_with_public_abi": sorted(set(non_promoted_with_public_abi)),
         "promoted_list_mismatches": sorted(set(promoted_list_mismatches)),
         "experimental_list_mismatches": sorted(set(experimental_list_mismatches)),
         "release_statement_missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),

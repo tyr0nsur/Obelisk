@@ -707,6 +707,64 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("non_promoted_surface_has_public_contract", payload["blockers"])
         self.assertEqual(payload["non_promoted_with_public_contract"], ["obelisk.commands_replies.v1"])
 
+    def test_non_promoted_public_abi_blocks_claim_even_with_promoted_dependencies(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] in {
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+            }:
+                surface["status"] = "promoted"
+                surface["public_contract"] = [f"{surface['id']}.placeholder"]
+                surface["evidence"] = {
+                    "surface_id": surface["id"],
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/abi/player_identity_placeholder"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_placeholder"],
+                    "terms": [
+                        "obelisk.core-dump-evidence-pack.v1",
+                        "obelisk.reflection-inventory-pack.v1",
+                        "ServerListPlayers",
+                        "ServerKickPlayer",
+                    ],
+                }
+            if surface["id"] == "obelisk.command_chat_response_path.v1":
+                surface["public_abi"] = True
+        manifest["promoted_surfaces"].extend(
+            ["obelisk.player_identity.v1", "obelisk.permissions_admin.v1"]
+        )
+        manifest["post_v1_or_excluded_surfaces"] = [
+            surface_id
+            for surface_id in manifest["post_v1_or_excluded_surfaces"]
+            if surface_id
+            not in {
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("non_promoted_surface_has_public_abi", payload["blockers"])
+        self.assertEqual(
+            payload["non_promoted_with_public_abi"],
+            ["obelisk.command_chat_response_path.v1"],
+        )
+
     def test_status_experimental_surface_omitted_from_top_level_list_blocks_claim(self) -> None:
         manifest = {
             "schema": "obelisk.public-sdk-surfaces.v1",
@@ -1387,6 +1445,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("completion_blocker_exclusion_contract_missing", payload["blockers"])
         self.assertEqual(payload["missing_completion_blocker_exclusion_contracts"], ["obelisk.commands_replies.v1"])
+
+    def test_public_abi_dependency_chain_blocks_until_identity_dependencies_promoted(self) -> None:
+        cases = {
+            "obelisk.permissions_admin.v1": ["obelisk.player_identity.v1"],
+            "obelisk.command_chat_response_path.v1": [
+                "obelisk.permissions_admin.v1",
+                "obelisk.player_identity.v1",
+            ],
+            "obelisk.commands_replies.v1": [
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.player_identity.v1",
+            ],
+        }
+        for surface_id, expected_dependencies in cases.items():
+            with self.subTest(surface=surface_id):
+                manifest, release_statement = complete_excluded_manifest()
+                for surface in manifest["surfaces"]:
+                    if surface["id"] == surface_id:
+                        surface["public_abi"] = True
+                        break
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+                    statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    statement_path.write_text(release_statement, encoding="utf-8")
+                    result = self.run_checker(
+                        "--manifest",
+                        str(manifest_path),
+                        "--release-statement",
+                        str(statement_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("promoted_surface_dependency_unresolved", payload["blockers"])
+                self.assertEqual(
+                    payload["promoted_surfaces_with_unresolved_dependencies"],
+                    {surface_id: expected_dependencies},
+                )
 
     def test_planning_completion_blocker_requires_exclusion_contract(self) -> None:
         manifest, _ = complete_excluded_manifest()

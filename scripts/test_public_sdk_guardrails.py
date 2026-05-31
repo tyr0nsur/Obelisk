@@ -23,6 +23,9 @@ PUBLIC_SDK_SURFACES_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISIONS = (
     REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 )
+COMMAND_CHAT_RESPONSE_PUBLIC_CONTRACT_DECISIONS = (
+    REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+)
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PLUGIN_HUB_PACKAGE_TEMPLATE_DOC = REPO_ROOT / "docs" / "PLUGIN_HUB_PACKAGE_TEMPLATE.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
@@ -1350,6 +1353,65 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 for item in requirements
             )
         )
+
+    def test_command_chat_response_public_contract_decisions_block_public_header(self) -> None:
+        decisions = json.loads(COMMAND_CHAT_RESPONSE_PUBLIC_CONTRACT_DECISIONS.read_text(encoding="utf-8"))
+
+        self.assertEqual(decisions["schema"], "obelisk.command-chat-response-public-contract-decisions.v1")
+        self.assertEqual(decisions["surface"], "obelisk.command_chat_response_path.v1")
+        self.assertEqual(decisions["status"], "blocked")
+        self.assertIs(decisions["public_header_allowed"], False)
+        self.assertEqual(decisions["public_header_symbols_now"], [])
+        self.assertIs(decisions["legacy_call_process_event_public_response_allowed"], False)
+
+        forbidden_contract = set(decisions.get("forbidden_public_contract", []))
+        self.assertTrue(
+            {
+                "public CallProcessEvent response path",
+                "raw UE pointers",
+                "raw ProcessEvent params",
+                "raw FString storage",
+                "FName/GObjects indices",
+                "reply API",
+                "send-chat API",
+                "broadcast/notices API",
+                "moderation API",
+                "player lookup",
+                "mutation",
+                "return override",
+            }.issubset(forbidden_contract)
+        )
+
+        requirements = decisions.get("required_before_public_header")
+        self.assertIsInstance(requirements, list)
+        requirement_ids = {item.get("id") for item in requirements if isinstance(item, dict)}
+        self.assertTrue(
+            {
+                "dependency.promoted_player_identity",
+                "dependency.promoted_permissions_admin",
+                "abi.copied_response_payload",
+                "abi.capability_and_owner_token",
+                "lifecycle.owner_scoped_unregister_and_drain",
+                "privacy.redaction_and_targeting",
+                "abuse.rate_limit_and_audit",
+                "separation.no_commands_router_or_moderation",
+                "evidence.layout_runtime_sdk_coverage",
+            }.issubset(requirement_ids)
+        )
+
+        evidence = {
+            item["id"]: item
+            for item in requirements
+            if isinstance(item, dict)
+        }["evidence.layout_runtime_sdk_coverage"]
+        for insufficient in (
+            "static thunk orientation",
+            "candidate vtable slots",
+            "passive ChatMessageEvent parsing",
+            "legacy CallProcessEvent debug gate",
+            "raw ProcessEvent callbacks",
+        ):
+            self.assertIn(insufficient, evidence["not_sufficient"])
 
     def test_public_sdk_surfaces_manifest_defines_v1_contract_without_claiming_completion(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))

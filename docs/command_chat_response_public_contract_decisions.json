@@ -1,0 +1,157 @@
+{
+  "schema": "obelisk.command-chat-response-public-contract-decisions.v1",
+  "surface": "obelisk.command_chat_response_path.v1",
+  "status": "blocked",
+  "public_header_allowed": false,
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "public_header_symbols_now": [],
+  "legacy_call_process_event_public_response_allowed": false,
+  "forbidden_public_contract": [
+    "public CallProcessEvent response path",
+    "raw UE pointers",
+    "raw ProcessEvent params",
+    "raw FString storage",
+    "UObject pointers",
+    "UFunction pointers",
+    "FName/GObjects indices",
+    "direct native-call wrappers",
+    "reply API",
+    "send-chat API",
+    "broadcast/notices API",
+    "moderation API",
+    "player lookup",
+    "mutation",
+    "return override"
+  ],
+  "required_before_public_header": [
+    {
+      "id": "dependency.promoted_player_identity",
+      "category": "dependency",
+      "status": "unresolved",
+      "decision_required": "Promote obelisk.player_identity.v1 before directed command/chat responses are public."
+    },
+    {
+      "id": "dependency.promoted_permissions_admin",
+      "category": "dependency",
+      "status": "unresolved",
+      "decision_required": "Promote query-only fail-closed permissions/admin before command/chat responses can target principals."
+    },
+    {
+      "id": "abi.copied_response_payload",
+      "category": "abi",
+      "status": "unresolved",
+      "decision_required": "Define an append-only copied POD response payload before any reply or send-chat API is public.",
+      "required_fields_or_equivalent": [
+        "abi_version",
+        "struct_size",
+        "plugin_owner_token",
+        "response_handle",
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "response_kind",
+        "message_utf8",
+        "message_size",
+        "delivery_scope",
+        "delivery_flags"
+      ],
+      "required_properties": [
+        "POD C ABI",
+        "callback-scope copied input",
+        "runtime-owned delivery path",
+        "no raw UE pointers or raw params",
+        "no raw FString exposure",
+        "no public UFunction or vtable details"
+      ]
+    },
+    {
+      "id": "abi.capability_and_owner_token",
+      "category": "abi",
+      "status": "unresolved",
+      "decision_required": "Define a named capability bit and nonzero owner-token API before plugins can request responses.",
+      "required_behavior": [
+        "capability is advertised in the plugin init-time ObeliskApi table",
+        "missing capability fails closed",
+        "missing or zero plugin_owner_token fails closed",
+        "captured post-init debug CallProcessEvent tables do not authorize response delivery",
+        "all response handles are owner-scoped"
+      ]
+    },
+    {
+      "id": "lifecycle.owner_scoped_unregister_and_drain",
+      "category": "lifecycle",
+      "status": "unresolved",
+      "decision_required": "Define owner-scoped unregister, cleanup, and drain behavior before any response path is public.",
+      "required_behavior": [
+        "owner unregister cancels pending responses for that plugin owner",
+        "plugin init failure cleans up registered response handles before dlclose",
+        "plugin unload waits for in-flight response callbacks or fails closed without dlclose",
+        "response callbacks cannot outlive copied payload storage",
+        "server shutdown does not call into unmapped plugin code"
+      ]
+    },
+    {
+      "id": "privacy.redaction_and_targeting",
+      "category": "privacy",
+      "status": "unresolved",
+      "decision_required": "Define redaction and targeting semantics before directed responses are public.",
+      "required_behavior": [
+        "stale principal fails closed",
+        "principal generation mismatch fails closed",
+        "unsupported scope fails closed",
+        "private identity fields are not logged",
+        "raw player names and platform ids are not required for response delivery",
+        "cross-instance routing is forbidden until separately promoted"
+      ]
+    },
+    {
+      "id": "abuse.rate_limit_and_audit",
+      "category": "abuse",
+      "status": "unresolved",
+      "decision_required": "Define owner-scoped abuse controls before plugins can send text through Obelisk.",
+      "required_behavior": [
+        "response attempts are rate-limited per plugin owner token",
+        "burst exhaustion drops or rejects the response, never bypasses permission checks",
+        "malformed UTF-8 or oversize messages fail closed",
+        "audit records are sanitized and do not expose raw UE internals",
+        "operator controls can disable response delivery without disabling passive chat intake"
+      ]
+    },
+    {
+      "id": "separation.no_commands_router_or_moderation",
+      "category": "scope",
+      "status": "unresolved",
+      "required_exclusions": [
+        "command router",
+        "command registration API",
+        "console command API",
+        "RCON command API",
+        "moderation API",
+        "ban/kick API",
+        "broadcast scheduler",
+        "operator ingress",
+        "storage/persistence"
+      ]
+    },
+    {
+      "id": "evidence.layout_runtime_sdk_coverage",
+      "category": "evidence",
+      "status": "unresolved",
+      "required_evidence": [
+        "promoted player identity evidence",
+        "promoted permissions/admin evidence",
+        "copied response ABI layout tests",
+        "SDK consumer tests",
+        "isolated runtime delivery evidence",
+        "second-source or independently reviewed response target evidence"
+      ],
+      "not_sufficient": [
+        "static thunk orientation",
+        "candidate vtable slots",
+        "passive ChatMessageEvent parsing",
+        "legacy CallProcessEvent debug gate",
+        "raw ProcessEvent callbacks"
+      ]
+    }
+  ]
+}

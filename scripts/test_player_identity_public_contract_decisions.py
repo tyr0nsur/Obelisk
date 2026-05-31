@@ -106,6 +106,35 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         self.assertIn("stale handles never resolve to a different player", stale_policy["required_policy"])
         self.assertIn("lookup-by-public-handle remains unavailable unless separately promoted", stale_policy["required_policy"])
 
+    def test_sequence_gate_keeps_downstream_surfaces_out_of_identity(self) -> None:
+        payload = self.load_decisions()
+        requirements = {
+            item["id"]: item
+            for item in payload["required_before_public_header"]
+        }
+        separation = requirements["separation.no_commands_permissions_persistence"]
+
+        self.assertEqual(
+            separation["v1_sequence_gate"],
+            [
+                "identity principal contract first",
+                "permission query contract only after identity promotion",
+                "command response contract only after permission result provenance is promoted",
+                "commands/replies only after command response privacy, generation, and scope gates are promoted",
+            ],
+        )
+        for forbidden in (
+            "permission query API",
+            "permission cache API",
+            "command response API",
+            "command router",
+            "replies/send-chat",
+            "admin mutation",
+            "storage/persistence",
+            "operator ingress",
+        ):
+            self.assertIn(forbidden, separation["forbidden_in_identity_contract"])
+
     def test_public_header_stays_blocked_until_all_decisions_are_resolved(self) -> None:
         payload = self.load_decisions()
         unresolved = [

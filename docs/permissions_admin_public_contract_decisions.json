@@ -178,6 +178,13 @@
       "id": "separation.no_commands_replies_or_admin_mutation",
       "category": "scope",
       "status": "unresolved",
+      "decision_required": "Permissions/admin v1 may promote only query-only authorization results; command response, commands/replies, admin mutation, and persistence require later contracts after identity and permission provenance are public.",
+      "v1_sequence_gate": [
+        "promoted player identity is required before permission checks",
+        "query-only permission result provenance is required before command response",
+        "command response privacy, generation, and scope policy is required before commands/replies",
+        "commands/replies cannot imply permission groups, admin mutation, storage, or operator ingress"
+      ],
       "required_exclusions": [
         "command router",
         "replies/send-chat",

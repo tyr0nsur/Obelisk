@@ -148,6 +148,11 @@ raw `FString` response API, reply API, send-chat API, broadcast/notices API, or
 moderation API. A future response path must use a copied append-only C ABI with a named
 capability bit, nonzero owner token, owner-scoped lifecycle cleanup, privacy/redaction,
 abuse/rate-limit, audit, and SDK consumer evidence.
+The pre-ABI decision checklist for that future path is
+[`command_chat_response_public_contract_decisions.json`](command_chat_response_public_contract_decisions.json).
+It is a blocking checklist only: static thunk orientation, passive `ChatMessageEvent`
+parsing, candidate vtable slots, raw `ProcessEvent` callbacks, and the legacy
+`CallProcessEvent` debug gate are not sufficient response-path evidence.
 
 Future command/principal routing is a lifecycle and callback-ownership change, not a
 parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design

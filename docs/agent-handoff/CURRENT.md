@@ -76,6 +76,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   response APIs, replies, send-chat, broadcast/notices, and moderation blocked until a
   future copied owner-token/capability/lifecycle/privacy promotion gate accepts it or a v1
   statement explicitly excludes it.
+  Its blocked pre-ABI checklist is `docs/command_chat_response_public_contract_decisions.json`;
+  static thunk orientation, passive chat parsing, vtable slots, raw callbacks, and legacy
+  CallProcessEvent remain insufficient evidence.
 - Future command/principal routing is a new copied C ABI lifecycle/callback-ownership
   surface, not a parser-only extension. Current planning note:
   `docs/research/2026-05-31-commands-principal-routing-contract.md`.
@@ -179,7 +182,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   generation/scope keying semantics are promoted; no `allow` decision is valid without
   runtime-owned policy source/authority provenance, and permission queries need
   owner-scoped rate-limit/audit gates. Current public header symbols remain an explicit
-  empty set.
+  empty set. `v1_sequence_gate` entries keep identity -> permissions -> command response
+  -> commands/replies ordered and keep downstream storage/admin/replies/ingress out.
 - Plugin Hub seed review now mechanically requires exactly one `Support tier: <tier>`
   declaration in seed README/package/public docs and rejects unnegated claims for v1,
   ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies,

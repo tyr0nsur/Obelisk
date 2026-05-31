@@ -174,7 +174,24 @@
     {
       "id": "separation.no_commands_permissions_persistence",
       "category": "scope",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Player identity may promote only the copied opaque principal contract; permissions, command response routing, commands/replies, and persistence remain separate downstream contracts.",
+      "v1_sequence_gate": [
+        "identity principal contract first",
+        "permission query contract only after identity promotion",
+        "command response contract only after permission result provenance is promoted",
+        "commands/replies only after command response privacy, generation, and scope gates are promoted"
+      ],
+      "forbidden_in_identity_contract": [
+        "permission query API",
+        "permission cache API",
+        "command response API",
+        "command router",
+        "replies/send-chat",
+        "admin mutation",
+        "storage/persistence",
+        "operator ingress"
+      ]
     }
   ]
 }

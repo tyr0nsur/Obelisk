@@ -176,6 +176,15 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertIn("rate limit exceeded", fail_closed["must_never_return_allow_for"])
 
         separation = requirements["separation.no_commands_replies_or_admin_mutation"]
+        self.assertEqual(
+            separation["v1_sequence_gate"],
+            [
+                "promoted player identity is required before permission checks",
+                "query-only permission result provenance is required before command response",
+                "command response privacy, generation, and scope policy is required before commands/replies",
+                "commands/replies cannot imply permission groups, admin mutation, storage, or operator ingress",
+            ],
+        )
         for exclusion in ("command router", "replies/send-chat", "ban/kick", "groups/grants", "operator ingress"):
             self.assertIn(exclusion, separation["required_exclusions"])
 
