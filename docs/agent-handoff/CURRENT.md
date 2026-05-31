@@ -5,10 +5,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Active Objective
 
-- `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime, ProcessEvent hook
-  infrastructure, plugin lifecycle, central install layout, `oBaseEvents`,
-  `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, descriptor helpers,
-  process-local owner-token timers, and refreshed RC UFunction second-source evidence.
+- `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime, ProcessEvent
+  hook, plugin lifecycle, central install layout, `oBaseEvents`, `GameplayPolicyEvent`,
+  minimal copied `ChatMessageEvent`, descriptors, timers, and refreshed RC evidence.
 - Publication used a clean release gate and exact tag/ref verification. Do not reinterpret,
   retag, or expand the published RC for routine post-RC work; treat stale local tags as
   invalid until revalidated.
@@ -22,9 +21,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Hard Overrides
 
-- GitHub publication is lead-only and only for an evidenced, stable milestone.
-  GitHub work may be delegated only for an evidenced, stable milestone; this handoff does
-  not authorize push, tag, release-ref updates, rebase, or routine publication.
+- GitHub publication is lead-only. GitHub work may be delegated only for an evidenced, stable milestone; this handoff does not authorize push, tag, release-ref updates, rebase, or routine publication.
 - No tag or release-ref push is authorized without explicit release-manager/lead
   authorization for the current-turn. Stale local tags are recreated only after rerunning
   the release gate on the intended ref and are not reused or pushed.
@@ -40,11 +37,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   controls, and observers unless the matching approved env+marker pair is enabled for a
   scoped debug window.
 - Discord sends require explicit current-turn approval for approved public milestones or
-  approved beta-test windows. Use no Discord for internal rounds or agent status,
-  routine validation, or speculative notes. Prefer `scripts/send_discord_embed.py --dry-run` and
-  one public-safe embed. Webhook URLs stay only in ignored `local/discord-webhooks.env`;
-  repo text may name only `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and
-  `OBELISK_BETA_TEST_WEBHOOK_URL`. Publication approval does not imply Discord approval.
+  beta-test windows. Use no Discord for internal rounds or agent status, routine validation,
+  or speculative notes. Always dry-run before any approved send and send one public-safe
+  embed. Webhook URLs stay only in ignored `local/discord-webhooks.env`; repo text may
+  name only `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and `OBELISK_BETA_TEST_WEBHOOK_URL`.
+  Publication approval does not imply Discord approval.
 
 ## Current Routing Facts
 
@@ -81,8 +78,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `oBaseEvents` has a disabled-by-default plugin-local chat command helper over copied
   `ChatMessageEvent` bytes; no command ABI/router, identity, replies, moderation, send-chat
   API, mutation, or extra exported plugin symbols.
-- `oChatLogger` and `oChatAudit` are experimental and excluded from default release scope.
-  Safe-disabled init requires only the base ABI prefix/owner token; active config fails
+- `oChatLogger` and `oChatAudit` are experimental and excluded from default release scope;
+  safe-disabled init needs only the base ABI prefix/owner token, while active config fails
   closed on missing capabilities, short `struct_size`, null registration slots, or null
   callback user data.
 - ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries
@@ -138,8 +135,6 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   execution is still blocked until an operator-approved live-ops brief names the exact
   debug target, gates, window, rollback, artifacts, and posture checks. Do not replace
   this with another broad offline FName/GObjects scan.
-- Historical ResourceHandle roadmap/fullscan notes are no-repeat for the current binary
-  hash; the next useful evidence is runtime semantic only under an approved brief.
 - Transfer ScriptStruct/bAccept evidence has refreshed internal-layout roots; old 20260529
   transfer roots are stale. Transfer scalar/bool fields are redacted metadata only; gates
   detect Transfer structs without labels and require transfer blockers on every field.
@@ -174,6 +169,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `bAccept`. Transfer `bAccept` remains useful as a fixture/internal bool-layout lane, but
   it is low product value without identity/payload/cross-map/privacy semantics. Do not
   build Transfer runtime/API work unless a later focused gate makes it necessary.
+- `structure-aggregate-census-planning` is planning-only, not release readiness, public
+  SDK evidence, or a public StructureEvents surface; use it only to bound copied/redacted
+  Structure aggregate/census design while evidence, ABI, privacy, and lifecycle policy are
+  missing.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact
@@ -199,15 +198,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail
   metadata; `--snapshot-json` is exact/direct single-target candidate-only output. The
   release gate preflights the four public RC target sets before build work.
-- Runtime/plugin lifecycle audit found no P1 blocker. `EventManager` granular unregister
-  skips unrelated in-flight callbacks, validates snapshots by id/generation/pointer/
-  family, contains snapshot setup failures without invoking partial callback snapshots,
-  rejects null owned callbacks with handle `0`, and lets raw `ProcessEvent` pre-callbacks
-  block only when the owner snapshot had blocking capability and the live gate remains
-  enabled; plugin API rejection paths use no-throw warning logging and `CallProcessEvent`
-  gating stays inside its catch boundary.
-- Any future live/player validation requires a new approved live-ops brief and beta-test
-  notice through the configured local webhook variable when players are involved.
+- Runtime/plugin lifecycle audit found no P1 blocker; `EventManager` granular unregister,
+  snapshot validation, null-callback rejection, gated raw blocking, no-throw API rejection,
+  and `CallProcessEvent` catch boundaries are covered.
+- Any future live/player validation requires a new approved live-ops brief. Beta-test
+  notice through the configured local webhook variable still requires explicit
+  current-turn operator approval and dry-run when players are involved.
 
 ## Agent Protocol
 

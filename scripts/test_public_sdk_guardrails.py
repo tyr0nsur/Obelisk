@@ -384,12 +384,16 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "ObeliskCommandContext",
     "ObeliskAdminCommand",
     "ObeliskPlayerCommand",
+    "PlayerIdentity",
+    "PlayerLookup",
     "ObeliskPlayerId",
     "ObeliskPlayerHandle",
     "ObeliskPlayerIdentity",
+    "ObeliskPlayerLookup",
     "RegisterCommand",
     "RegisterAdminCommand",
     "RegisterPlayerCommand",
+    "RegisterPlayerLookup",
     "UnregisterCommand",
     "UnregisterAdminCommand",
     "UnregisterPlayerCommand",
@@ -403,6 +407,7 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "TeleportPlayer",
     "FindPlayer",
     "ResolvePlayer",
+    "ResolvePlayerIdentity",
 )
 ROADMAP_COMMAND_HELPER_PROMOTION_TOKENS = (
     "Command",
@@ -4112,6 +4117,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         public_target_sets = set(V010_GAMEPLAY_POLICY_TARGET_SETS + V010_CHAT_MESSAGE_TARGET_SETS)
 
         self.assertIn("mission-copied-bool-policy-slice", PLANNING_ONLY_TARGET_SETS)
+        self.assertIn("structure-aggregate-census-planning", PLANNING_ONLY_TARGET_SETS)
         self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_manifest_sets), [])
         self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_target_sets), [])
 
@@ -4122,7 +4128,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         offenders: list[str] = []
         for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
             for paragraph in re.split(r"\n\s*\n", path.read_text(encoding="utf-8")):
-                if "mission-copied-bool-policy-slice" not in paragraph:
+                if not any(
+                    target_set in paragraph
+                    for target_set in (
+                        "mission-copied-bool-policy-slice",
+                        "structure-aggregate-census-planning",
+                    )
+                ):
                     continue
                 if not mention_context_re.search(normalized(paragraph)):
                     offenders.append(f"{path.relative_to(REPO_ROOT)}: {normalized(paragraph)}")

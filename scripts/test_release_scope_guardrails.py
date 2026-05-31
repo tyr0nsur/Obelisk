@@ -744,6 +744,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         blocked_cases = [
             ("--ufunction-second-source-target-set", "players-identity-lifecycle-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
+            ("--ufunction-second-source-target-set", "structure-aggregate-census-planning", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
             ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
         ]

@@ -66,9 +66,10 @@ that context changes the agent's concrete task.
 
 ## Agent Coordination
 
-- After conversation compaction or a resumed Obelisk turn, first read
+- After conversation compaction or a resumed Obelisk lead/integration turn, first read
   `docs/agent-handoff/COMPACT_CONTEXT.md` and `docs/agent-handoff/CURRENT.md`, then check
-  `git status --short --ignored` before spawning or reusing agents.
+  `git status --short --ignored` before spawning or reusing agents unless the current
+  instruction explicitly prohibits Git.
 - Mandatory round preflight: at the start of every new supervised agent round, verify there
   are no stale stand-by agents from the previous round. Close completed or obsolete agents
   before spawning new ones, and record any still-active agent with a concrete

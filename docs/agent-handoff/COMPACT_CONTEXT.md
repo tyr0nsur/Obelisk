@@ -9,7 +9,8 @@ priorities, and do not use history files as the active source of truth.
 ## Resume Protocol
 
 1. Read this file, `docs/agent-handoff/CURRENT.md`, and the relevant subsystem skill.
-2. Check `git status --short --ignored`.
+2. In lead/integration turns where current instructions do not prohibit Git, check
+   `git status --short --ignored`.
 3. Close completed or obsolete internal agents before starting a new round.
 4. Continue direct supervised work with scoped sub-agent prompts when delegation is used.
 
@@ -315,10 +316,10 @@ priorities, and do not use history files as the active source of truth.
   `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/`;
   it accepts 3/3 copied return-bool targets at `layout_only` scope while promote mode
   remains blocked.
-  Chat command ergonomics should start as a plugin-local parser/helper over the existing
-  copied `ChatMessageEvent`, not as a new ABI. Keep output callback-scope only and keep
-  player identity, permissions, targeting, chat send/reply, moderation/blocking, mutation,
-  and return override blocked.
+  If explicitly tasked with chat command ergonomics, start as a plugin-local parser/helper
+  over the existing copied `ChatMessageEvent`, not as a new ABI. Keep output
+  callback-scope only and keep player identity, permissions, targeting, chat send/reply,
+  moderation/blocking, mutation, and return override blocked.
   The strict RC `minimal-second-source-intake` redacted signature pack with complete
   target-set coverage is preserved at
   `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;

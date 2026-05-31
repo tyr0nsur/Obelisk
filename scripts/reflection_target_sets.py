@@ -71,6 +71,17 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
     ),
+    # Planning/guidance only for a future aggregate/census design. This deliberately
+    # reuses the current copied Structure evidence lane as a bounded seed list; it is not
+    # a release/public Structure SDK target set.
+    "structure-aggregate-census-planning": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
+    ),
     "transfer-ufunction-intake": (
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerDownloadTransferredPlayer",
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
@@ -118,6 +129,7 @@ PLANNING_ONLY_TARGET_SETS = frozenset(
     (
         "mission-copied-bool-policy-slice",
         "players-identity-lifecycle-intake",
+        "structure-aggregate-census-planning",
     )
 )
 
@@ -147,6 +159,7 @@ TARGET_SET_MODULE_LANES = {
     "mission-compact-intake": "mission",
     "mission-copied-bool-policy-slice": "mission",
     "players-identity-lifecycle-intake": "players_identity",
+    "structure-aggregate-census-planning": "structures",
     "structure-nonpin-copied-scalar-policy-slice": "structures",
     "structure-observer-intake": "structures",
     "structure-return-only-policy-slice": "structures",

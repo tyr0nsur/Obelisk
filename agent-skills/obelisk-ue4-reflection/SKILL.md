@@ -14,9 +14,10 @@ metadata.
 - ArkServerApi/AseApi may be used only as a names and demand dictionary for familiar
   Unreal/ARK `Class.Function` and `Class.Property` concepts. Do not copy memory offsets,
   vtable definitions, struct layouts, MSVC calling conventions, Windows-only ABI choices,
-  or direct native call wrappers from it. Reimplement any property/function access through
-  Obelisk's Linux-native `ReflectionScanner`, `RuntimeReflection`, and
-  `ProcessEventHook` paths with binary-hash-scoped evidence.
+  direct native call wrappers, constants, schemas, control flow, command parsers, return
+  constants, return semantics, or algorithmic implementations from it. Reimplement any
+  property/function access through Obelisk's Linux-native `ReflectionScanner`,
+  `RuntimeReflection`, and `ProcessEventHook` paths with binary-hash-scoped evidence.
 - `UObject::ProcessEvent` is hookable and currently observed around `0x1d34e20` on the
   validated ARK Linux server binary hash.
 - `UObjectBase::NamePrivate.ComparisonIndex` has been observed at object offset `0x18`
@@ -89,7 +90,9 @@ metadata.
   sanitized exact-target snapshot, redaction policy for placement structs/location/player
   context, and distinct second-source evidence before any runtime observation or dispatcher.
   Do not infer allow/deny constants from ArkApi code. Mutation, return override, and
-  enforcing build-deny APIs require separate promotion beyond read-only observation.
+  enforcing build-deny APIs require separate promotion beyond read-only observation. Do
+  not add these targets to release target sets, ABI enums, descriptors, dispatchers,
+  public docs, or runtime gates before that promotion.
 
 ## Reflection Direction
 
@@ -149,13 +152,14 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   ownership, callback lifetime, ABI layout, installed SDK consumer coverage, and runtime
   safety gates are complete.
 - Internal copied-data dispatchers are the required bridge between candidate recognizers
-  and public SDK modules. `core/StructureEventDispatcher` feeds the promoted
+  and any future public SDK module. `core/StructureEventDispatcher` feeds the promoted
   `GameplayPolicyEvent` ABI by copying approved scalar values only through
   `ProcessEventStructureReflection` event building, dispatching only after the original
   `ProcessEvent` path reports that the original call ran, and hiding object/string/array/
   raw param storage. Public plugins must receive only `field_mask`, `bool_values`, and
   `int32_values`; `pinCode`, player identity, object identity, FName/GObjects indices, and
-  UE pointers stay redacted.
+  UE pointers stay redacted. This does not promote public `StructureEvents`, a Structure
+  SDK, identity, mutation, or return override.
 - Item return-only observations have three append-only `GameplayPolicyEvent` kinds:
   `AllowEquipItem`, `CanRepair`, and `UseItemOntoItem`. They remain copied
   `ReturnValue` bool only, with no public Items/Inventory SDK, identity, mutation, or
@@ -189,8 +193,8 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
 - Rejection paths must clear copied output, and recognition-only object/array fields must
   reject forged copied ranges.
 - Reserve runtime observation budgets only after cheap exact prefilters pass.
-- On live servers, keep plugin discovery off unless testing a known safe build inside an
-  approved feature-test window.
+- On live servers, keep plugin discovery off unless testing a known safe build inside the
+  currently approved live-ops brief's feature-test window.
 - Server-backed reflection work has no default target. Use only the currently approved
   live-ops brief, and require exact instance/map, feature gates, time window, privacy
   bounds, evidence path, and rollback before starts, restarts, marker edits, runtime

@@ -153,7 +153,7 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         normalized_workflow = normalized(workflow_skill)
         self.assertIn("Do not draft or send Discord updates unless explicitly approved", workflow_skill)
         self.assertIn("Do not draft or send community announcements unless explicitly delegated", workflow_skill)
-        self.assertIn("Prefer `scripts/send_discord_embed.py --dry-run`", current)
+        self.assertIn("Always dry-run before any approved send", current)
         self.assertIn("prefer the guarded helper instead of hand-written", workflow_skill)
         self.assertIn("python3 scripts/send_discord_embed.py --channel community", workflow_skill)
         self.assertRegex(normalized_workflow, r"run .*send_discord_embed\.py --dry-run.*first")
