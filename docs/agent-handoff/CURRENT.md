@@ -121,55 +121,52 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Priority Next Steps
 
-- Keep player identity as the primary route: obtain or approve a non-protected copied core
-  under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
-  If starting from explicit non-protected binary/core files, use
-  `scripts/prepare_player_identity_offline_raw_layout.py` only to stage those existing
-  inputs, then build `obelisk.core-dump-evidence-pack.v1`, then the full 12-target
-  `obelisk.reflection-inventory-pack.v1` with the reviewed ARK binary SHA, then plan only
-  `ServerListPlayers` and `ServerKickPlayer` focal snapshots. Current artifact audit:
-  the matching offline binary exists under `/home/flowcommunity-ark/obelisk-artifacts`,
-  but no core file or `player-identity-offline-*` run directory exists there; no command
-  can advance the identity pack until a regular non-symlink non-protected core input is
-  available. Player identity next step is to produce or approve a non-protected UFunction
-  reflection-inventory pack with `target_set_coverage` for the full 12-target
-  `players-identity-lifecycle-intake` set. do not treat ScriptStruct inventory, standalone
-  snapshots, redacted signatures, static thunks, or a two-function-only inventory as
-  satisfying this lane; use `scripts/plan_ufunction_focal_snapshots.py` for
+- Primary v1 route: player identity remains blocked on a regular non-symlink
+  non-protected copied core under
+  `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/raw/`.
+  The matching offline binary exists under `/home/flowcommunity-ark/obelisk-artifacts`,
+  but no core file or `player-identity-offline-*` run directory exists there. After an
+  approved binary/core pair exists, use
+  `scripts/prepare_player_identity_offline_raw_layout.py` only to stage those inputs,
+  then build `obelisk.core-dump-evidence-pack.v1`, then the full 12-target
+  `obelisk.reflection-inventory-pack.v1` for `players-identity-lifecycle-intake`.
+  Only after that pack is accepted, plan exact focal snapshots for
   `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer` only. The exact current command recipe lives
-  in `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`; older
-  2026-05-27 core/dump notes are historical evidence and are not runnable promotion
-  instructions.
-- Demand-map priority from local NextGenPlugins dictionary signals is P0:
-  player identity, commands/replies/response path, and permissions/admin. P1:
-  economy/storage/operator ingress, inventory/items mutation, and structure/build policy.
-  P2: dinos/tribes/missions/transfers unless stronger demand appears. This priority map
-  does not authorize copying ArkApi/NextGenPlugins implementation details.
-- Current post-RC focus: If no copied core is available, keep progressing offline by tightening guardrails,
-  permission/admin query-only minimum design, command/principal contract, inventory
-  copied-signal evidence hygiene, and structure census consume/promote-blocked checks
-  without claiming SDK promotion. Prefer inventory copied-signal hygiene over structure
-  census when choosing one side lane, because it has more near-term Plugin Hub value while
-  identity remains core-blocked. Keep that work experimental and non-completion. This
-  does not authorize Transfer runtime work. inventory copied signals are the higher-value side lane; structure census remains useful offline planning/consume-only work; Neither side lane displaces identity -> permissions/admin -> commands/replies. The accepted RC UFunction second-source root is guardrail evidence only, not a broad SDK completion signal.
+  `ShooterPlayerController.ServerKickPlayer`. Do not treat ScriptStruct inventory,
+  standalone snapshots, redacted signatures, static thunks, or a two-function-only
+  inventory as satisfying this lane. Current recipe:
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+- Demand-map priority from local NextGenPlugins dictionary signals is P0 identity,
+  commands/replies/response path, and permissions/admin; P1 economy/storage/operator
+  ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
+  missions/transfers. Do not copy ArkApi/NextGenPlugins implementation details.
+- No-core fallback: if no copied core is available for identity, keep progress offline by
+  tightening guardrails, permission/admin query-only minimum design, command/principal
+  contract, and inventory copied-signal evidence hygiene without claiming SDK promotion.
+  Inventory copied signals are the preferred no-core side lane because they already ride
+  copied `GameplayPolicyEvent` evidence and have near-term Plugin Hub value. This does
+  not authorize Transfer runtime work, and no side lane displaces identity ->
+  permissions/admin -> command response -> commands/replies.
 - Current no-core side-lane priority: `item-return-only-policy-slice` has three copied
-  `GameplayPolicyEvent` `ReturnValue` checks and is the best value/risk target set
-  because it already has release-readiness classification, fixture coverage, and
-  second-source layout evidence. Descriptor-preflight hardening now requires the
-  three internal descriptor candidates to stay unassigned to public event kinds/masks and
-  blocks drift toward Inventory SDK/Items SDK/identity/lookup/mutation/return override
-  metadata. The preserved artifact gates were regenerated against policy-slice JSON sha256
-  `242d7506703d0164cfd5c2722690d4d865ca4063f4db1c26be4374da133f3f42`. It still must be
-  described only as copied `ReturnValue` signal evidence; it does not promote a public
-  Inventory SDK, public Items SDK, identity, lookup, mutation, return override, runtime
-  validation, or v1 completion.
-- Mission copied-bool remains internal/candidate-only: exact bool-tail evidence is `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`; it does not promote Mission SDK, authority, identity, mutation, return override, or v1 completion.
-- Keep `obelisk.command_chat_response_path.v1` as orientation-only until identity and
-  permissions/admin are promoted and a copied response contract exists. The current static
-  checker is useful for later target matching, but it must not become public ABI or
-  runtime work by itself. Its portable unit coverage now uses a synthetic ELF fixture;
-  the reviewed real-binary check is optional smoke/evidence only.
+  `GameplayPolicyEvent` `ReturnValue` checks and is the best value/risk target set.
+  Descriptor-preflight hardening keeps internal descriptor candidates unassigned to
+  public event kinds/masks. Describe it only as copied `ReturnValue` signal evidence; it
+  does not promote Inventory/Items SDK, identity, lookup, mutation, return override,
+  runtime validation, or v1 completion.
+- v0.2 internal hardening lane: Mission copied-bool is selected only for internal
+  default-off recognizer/helper hardening, not a product-facing Plugin Hub module or
+  Mission SDK/identity/mutation/return-override/v1-completion claim. Detail:
+  `docs/research/2026-05-31-v02-module-priority.md`.
+- Product-planning lane: Structure aggregate/census is planning/consume-only, with no
+  runtime observer, callback ABI, descriptor, public StructureEvents SDK, identity,
+  mutation, enforcement, return override, or v1 completion claim. Detail:
+  `docs/research/2026-05-31-aggregate-census-product-priority.md`.
+- Command/chat response-path static orientation is complete for the current reviewed
+  binary and remains orientation-only until identity and permissions/admin are promoted
+  and a copied response contract exists. The checker is useful for later target matching,
+  but it must not become public ABI, runtime work, or a pending primary task by itself.
+  Its portable unit coverage uses a synthetic ELF fixture; the reviewed real-binary check
+  is optional smoke/evidence only.
   The companion thunk note
   `docs/research/2026-05-31-command-chat-response-thunk-orientation.md` records candidate
   vtable slots `0x19d0`, `0x1790`, and `0x1788` for the reviewed binary only; it is

@@ -347,6 +347,11 @@ namespace
 
         Require(TimerManager::Get().Unregister(&owner, timerId),
                 "explicit unregister failed for in-flight timer");
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            Require(!state.Returned,
+                    "explicit unregister waited for in-flight timer callback");
+        }
 
         std::atomic<bool> cleanupReturned{false};
         std::thread cleanupThread([&]() {

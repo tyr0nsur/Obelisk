@@ -1,5 +1,9 @@
 # Offline Artifact Curation Snapshot
 
+Current status: superseded for artifact-root inventory by
+`docs/research/2026-05-31-offline-artifact-inventory-audit.md`. This note remains the
+planning-only target-set boundary and curation snapshot.
+
 This note records the current non-protected artifact root triage for
 `/home/flowcommunity-ark/obelisk-artifacts`. It is a routing aid only. It does not
 promote public SDK APIs, runtime readiness, object identity, lookup, mutation, return

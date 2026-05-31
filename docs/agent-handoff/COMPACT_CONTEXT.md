@@ -306,139 +306,44 @@ priorities, and do not use history files as the active source of truth.
   fields that are candidate/planning/orientation/preflight/readiness/consume-only/
   evidence-only. Do not let static orientation, planning docs, or candidate reports
   masquerade as promoted ABI or SDK consumer evidence.
-- If no non-protected core is available, the next high-value static side task is bounded
-  command/chat response-path orientation for `ClientChatMessage`,
-  `ClientServerChatMessage`, and `ClientServerChatDirectMessage` on the reviewed offline
-  binary. This is candidate-only planning for `obelisk.command_chat_response_path.v1` and
-  must not imply replies/send-chat, command router, identity, permissions, raw UE/FString
-  exposure, mutation, or runtime readiness. Portable unit coverage uses a synthetic ELF
-  fixture; the reviewed real-binary check is optional smoke/evidence only.
-- `ue/MissionReflection.*` is an internal fixture-backed recognizer for
-  `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
-  recognition-only, with only a test-only internal dispatcher/helper and no hook/runtime
-  dispatcher/public Mission SDK. Tests reject copied
-  bool ranges that exceed `ParameterSize` and clear poisoned output on failure.
-  The internal readiness note is
-  `docs/research/2026-05-29-mission-reflection-internal-readiness.md`. A local
-  test-only `ProcessEventMissionReflection` helper scaffold exists, but it has no live
-  hook path, dispatcher, public ABI, server marker/env, or runtime logs. Any next Mission
-  slice needs a separate runtime-observation/lifecycle review.
-  The canonical offline Mission refresh input is
-  `/servidor/ark/workspace-offline/mission-compact-intake-bool-semantics-refresh-20260530T020021Z/pack/redacted-signatures.json`
-  with SHA256 `09074e71666f755801802e5d796361cf4f84d3e7d8c00663801d84f981a1cc13`.
-  The durable focused Mission policy slice is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/`
-  with exact bool-tail evidence (`bool_field_size=1`, `bool_byte_offset=0`,
-  `byte_mask=0x01`, `field_mask=0xff`, `native_bool=false`), `artifact-pack.manifest.json`
-  SHA256 `b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb`
-  and `SHA256SUMS` SHA256
-  `9dc277b8e3dddeed66d140a12654e4d5f7e7dc13b8b9aca75d96446c53069545`;
-  consume mode accepts it and promote mode remains blocked.
-- `ue/TransferReflection.*` is an internal/test-only recognizer for the
-  `ServerTransferredPlayerConfirmationResult.bAccept` copied bool. It validates exact
-  SHA-scoped function/property shape and bool mask metadata, but has no hook/runtime
-  dispatcher/public Transfer SDK. The durable focused Transfer policy slice is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/`
-  with `artifact-pack.manifest.json`
-  SHA256 `dc35acbf63c9f22ffa5281952f2b651e034288f56ab9dec093cbfcfd368d841d`
-  and `SHA256SUMS` SHA256
-  `715f7c2b048370a74dbacfadd13d06496cf7e56867bb571351c2653d4fd297f8`;
-  consume mode accepts it and promote mode remains blocked.
-- ResourceHandle remains post-RC/internal. The old flag-policy artifact is obsolete; the
-  durable rich-provenance refresh and strict serial policy are consume-accepted but
-  promote-blocked candidate evidence only. Do not rerun broad FName, GObjects, or core
-  scans for ResourceHandle unless the binary hash changes or evidence is contradicted.
-  The next strict blocker is rejected runtime object samples plus runtime serial
-  reuse/wraparound semantics under an operator-approved live-ops brief. A primary Ragnarok
-  copied-core scan produced 44 coherent `0x4000` rejected-object candidate samples and is
-  preserved under
-  `/home/flowcommunity-ark/obelisk-artifacts/resource-handle-serial-scan-primary-20260530T000000Z/`;
-  consume mode is accepted and promote mode remains blocked. A focused `GObjects`
-  reconciliation resolved all 44 as `ParticleSystemComponent0` under `Text_Actor` /
-  `Text_Actor_C` and is preserved under
-  `/home/flowcommunity-ark/obelisk-artifacts/resource-handle-flag4000-reconciliation-primary-20260530T000000Z/`.
-  This is internal lifecycle/blocker evidence only, not public `ResourceHandle`, lookup,
-  identity, mutation, return override, or lifetime promotion.
-  Current offline flag-policy tooling requires the internal label
-  `InternalUObjectRevalidationCandidate` with frame-local lifetime only, post-callback
-  lookup rejected, `0x100` rejected, `0x4000` rejected by default, and output limited to
-  copied bool/reason or Obelisk-owned copied data. The consume gate also validates the
-  exact `weak_helper_caller_mode` shape/flag rules, rejects candidate fields outside the
-  known contract, and blocks extra blocker/non-claim text that overclaims public
-  `ResourceHandle`, lookup, SDK, runtime, or callback readiness.
-- Static GObjects/FUObjectItem evidence is internal offline input only. `0x595b7e0`
-  supports target-set enumeration across current copied-core evidence, but not public
-  GObjects, identity, lookup, `ResourceHandle`, mutation, or return override. Evidence:
-  `docs/research/2026-05-29-gobjects-fuobjectarray-durable-pack.md`,
-  `docs/research/2026-05-29-gobjects-second-core-reconciliation.md`, and
-  `docs/research/2026-05-29-gobjects-cross-manifest-comparison.md`.
-- Redacted UFunction signatures, offline manifests, item compact intake, inventory-action
-  compact intake, and BoolProperty mask/native markers are candidate/layout hygiene only.
-  They are useful for planning and fixture comparison, not runtime safety, public SDKs,
-  identity, mutation, return override, or `ResourceHandle`. Use the dated research notes
-  such as `docs/research/2026-05-29-item-compact-second-source-readiness.md`,
-  `docs/research/2026-05-29-item-return-only-policy-bridge-plan.md`,
-  `docs/research/2026-05-30-item-return-only-policy-slice.md`, and
-  `docs/research/2026-05-29-inventory-action-redacted-signature-readiness.md` instead of
-  copying artifact detail into handoff. Older rollups under `/servidor/ark/workspace-offline`
-  are historical context and should not be dereferenced as active handoff evidence.
-  The durable Item return-only policy slice is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-policy-slice-20260530T072255Z/`;
-  consume mode is accepted and promote mode is blocked with evidence-only/non-claim
-  blockers. It copies only `AllowEquipItem.ReturnValue`, `CanRepair.ReturnValue`, and
-  `UseItemOntoItem.ReturnValue`. Its internal helper can build-and-reserve the copied
-  return observation in one operation and clears output on invalid attempts or exhausted
-  budget; it remains internal/test-only. The pack now includes relative `SHA256SUMS`
-  (`sha256=9984465350ea4b29413135466e93537138e9611a47e95e728704fab3ca8929e1`) and
-  `artifact-pack.manifest.json`
-  (`sha256=2b832a8f32e835e962ae6ab597e041d4b7d73c1a341c5c4cd2f94e393814a3b4`).
-  The public shape is now limited to three post-original copied bool observations through
-  `GameplayPolicyEvent`, not an Inventory SDK or return override; artifact promote mode
-  remains blocked.
-  A target-specific second-source pack is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/item-return-only-second-source-20260530T084918Z/`;
-  it accepts 3/3 copied return-bool targets at `layout_only` scope while promote mode
-  remains blocked.
-  If explicitly tasked with chat command ergonomics, start as a plugin-local parser/helper
+- Command/chat response-path static orientation for `ClientChatMessage`,
+  `ClientServerChatMessage`, and `ClientServerChatDirectMessage` is complete for the
+  current reviewed offline binary and remains candidate-only planning for
+  `obelisk.command_chat_response_path.v1`. It is not a pending primary task and must not
+  imply replies/send-chat, command router, identity, permissions, raw UE/FString
+  exposure, mutation, runtime readiness, or public SDK promotion. Details:
+  `docs/research/2026-05-31-command-chat-response-static-orientation.md` and
+  `docs/research/2026-05-31-command-chat-response-thunk-orientation.md`.
+- Mission copied-bool is the selected v0.2 internal hardening lane only. Keep it
+  internal/test-only and default-off; it does not promote a Mission SDK, runtime observer,
+  public callback ABI, authority, identity, mutation, return override, or v1 completion.
+  Details: `docs/research/2026-05-31-v02-module-priority.md`,
+  `docs/research/2026-05-29-mission-reflection-internal-readiness.md`, and
+  `docs/research/2026-05-30-mission-copied-bool-observer-plan.md`.
+- Structure aggregate/census is the leading product-facing planning direction only. Keep
+  it planning/consume-only with no runtime observer, callback ABI, descriptor, capability
+  bit, public StructureEvents SDK, identity, lookup, mutation, enforcement, return
+  override, or v1 completion claim. Details:
+  `docs/research/2026-05-31-aggregate-census-product-priority.md` and
+  `docs/research/2026-05-31-structure-aggregate-census-v0.md`.
+- Inventory item return-only copied signals are the preferred no-core side lane because
+  they already ride copied `GameplayPolicyEvent` evidence. They remain consume/evidence
+  only and do not promote public Inventory SDK, public Items SDK, identity, lookup,
+  mutation, return override, runtime validation, or v1 completion. Details:
+  `docs/research/2026-05-30-item-return-only-policy-slice.md`.
+- Transfer, Dino, Buff, Tribe, ResourceHandle, static GObjects/FUObjectItem, UObject flag,
+  weak-helper, redacted-signature, and offline manifest work remains internal or
+  candidate-only. Do not duplicate their artifact roots, hashes, or gate sidecars here;
+  use the dated `docs/research/` notes and gate output as the durable evidence catalog.
+  Do not rerun broad FName, GObjects, or core scans for ResourceHandle unless the binary
+  hash changes, evidence is contradicted, or an approved focused runtime lifecycle/reuse
+  plan changes scope. If the reviewed binary/artifact FName root slot is already known,
+  pass it explicitly to evidence-pack, GObjects sampling, or snapshot regeneration
+  tooling instead of running broad reverse FName scans.
+- If explicitly tasked with chat command ergonomics, start as a plugin-local parser/helper
   over the existing copied `ChatMessageEvent`, not as a new ABI. Keep output
   callback-scope only and keep player identity, permissions, targeting, chat send/reply,
   moderation/blocking, mutation, and return override blocked.
-  The strict RC `minimal-second-source-intake` redacted signature pack with complete
-  target-set coverage is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/rc-minimal-redacted-signatures-strict-20260530T000000Z/`;
-  consume mode is accepted and promote mode remains candidate-only blocked.
-- The historical static-negative UObject flag policy pack is obsolete and blocked by old
-  vocabulary/provenance. The durable rich-provenance refresh is preserved at
-  `/home/flowcommunity-ark/obelisk-artifacts/uobject-flag-policy-refresh-20260530T071436Z/`;
-  consume mode is accepted and promote mode is blocked with candidate-only/non-claim
-  blockers. The pack now includes `artifact-pack.manifest.json`
-  (`sha256=1f678c05461131055e4b18fd68862de431a27bbf49609297030ac62bf6f5478d`)
-  and `SHA256SUMS`
-  (`sha256=cf76ee33a8ea640233af7eff4de78171254a5ee5fa11de714259b27f2731a87a`).
-  This is internal static evidence only and does not promote public GObjects, lookup,
-  identity, lifecycle, `ResourceHandle`, mutation, return override, or SDK surfaces.
-- Post-RC offline tooling added candidate-only UObject flag, weak-helper, and GObjects
-  evidence builders. They are consume-mode internal/offline indexing tools only and do not
-  promote public GObjects, lookup, identity, lifecycle, `ResourceHandle`, mutation, return
-  override, or SDK surfaces.
-- `scripts/build_uobject_flag_sample_report.py` produces
-  `obelisk.uobject-flag-sample-report.v1` from the transition-matrix plus regenerated
-  policy artifacts. Each `--input` must be paired with a `--consume-gate` in the same
-  order, and the output embeds redacted consume-gate summaries for the source artifacts,
-  not raw gate JSON. The offline artifact gate accepts it only in consume mode and blocks
-  promote mode; use the script tests and gate output as the authoritative reference.
-- Weak-helper caller-mode artifacts are consume-mode research hygiene and promote-mode
-  blocked. They refine helper evidence while keeping `ResourceHandle`, UE lifecycle names,
-  post-callback lookup, mutation, and return override blocked; summarize durable policy in
-  `docs/research/2026-05-29-resource-handle-flag-policy-candidate.md` and
-  `docs/research/2026-05-29-uobject-flags-validity-blocker.md`.
-- `weak-helper-static-polarity-report.v1` has a candidate-only builder/gate contract for
-  provenance-gated consume-mode indexing. It narrows internal flag-policy research only;
-  promote mode remains blocked and it does not clear `ResourceHandle`, lifecycle-name,
-  lookup, mutation, or return-override blockers.
-- If the reviewed binary/artifact FName root slot is already known, do not run broad
-  reverse FName scans. Pass the root slot explicitly to evidence-pack, GObjects sampling,
-  or snapshot regeneration tooling.
 
 ## Tooling Baseline
 
