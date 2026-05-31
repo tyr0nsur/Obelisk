@@ -172,7 +172,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `structure-aggregate-census-planning` is planning-only, not release readiness, public
   SDK evidence, or a public StructureEvents surface; use it only to bound copied/redacted
   Structure aggregate/census design while evidence, ABI, privacy, and lifecycle policy are
-  missing.
+  missing. Design note: `docs/research/2026-05-31-structure-aggregate-census-v0.md`.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact

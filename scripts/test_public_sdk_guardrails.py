@@ -989,6 +989,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         forbidden_positive_claims = (
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?Inventory\s+SDKs?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?StructureEvents?(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
+            r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?structure\s+(?:aggregate|census|counts?|proximity)(?:\s+(?:SDKs?|APIs?|surfaces?|snapshots?|queries?))?\b",
+            r"\bstructure\s+(?:aggregate|census|counts?|proximity)(?:\s+(?:SDKs?|APIs?|surfaces?|snapshots?|queries?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
+            r"\baggregate\s+structure\s+counts?(?:\s+(?:SDKs?|APIs?|surfaces?|snapshots?|queries?))?\s+(?:is|are)\s+(?:public|promoted|supported|available|included)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?(?:structure\s+)?build[- ]policy\s+(?:SDKs?|APIs?|surfaces?)\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:a\s+)?(?:public\s+)?ResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
             r"\b(?:ship|ships|shipped|promote|promotes|promoted|expose|exposes|exposed|publish|publishes|published|support|supports|supported|include|includes|included|provide|provides|provided)\s+(?:public\s+)?(?:resource|object|player|sender|inventory|item|structure|tribe|UE|game\s+object)\s+identity(?:\s+(?:APIs?|surfaces?|authority))?\b",
@@ -1022,6 +1025,30 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     ):
                         offenders.append(f"{path.relative_to(REPO_ROOT)}:{line}: {normalized(segment)}")
                         break
+
+        self.assertEqual(offenders, [])
+
+    def test_structure_aggregate_census_public_docs_stay_planning_or_blocked(self) -> None:
+        guarded_terms = re.compile(
+            r"\b(?:structure[- ]aggregate|structure[- ]census|structure[- ]proximity|"
+            r"structure[- ]counts?|aggregate\s+structure\s+counts?)\b",
+            re.IGNORECASE,
+        )
+        allowed_context = re.compile(
+            r"\b(?:blocked|does\s+not|do\s+not|future|guidance\s+only|no\s+public|"
+            r"no\s+sdk|not\s+public|not\s+ready|planning[- ]only|redacted|remain|"
+            r"requires?|still\s+needs)\b",
+            re.IGNORECASE,
+        )
+        offenders: list[str] = []
+
+        for path in PUBLIC_SDK_GUIDANCE_DOC_FILES:
+            text = path.read_text(encoding="utf-8")
+            for paragraph in re.split(r"\n\s*\n", text):
+                if not guarded_terms.search(paragraph):
+                    continue
+                if not allowed_context.search(normalized(paragraph)):
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {normalized(paragraph)}")
 
         self.assertEqual(offenders, [])
 

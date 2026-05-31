@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import runpy
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +14,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REFLECTION_TARGET_SET_VARS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflection_target_sets.py"))
+TARGET_SETS = REFLECTION_TARGET_SET_VARS["TARGET_SETS"]
+PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SETS"]
+RELEASE_READINESS_TARGET_SETS = REFLECTION_TARGET_SET_VARS["RELEASE_READINESS_TARGET_SETS"]
 PUBLIC_RC_UFUNCTION_TARGET_SETS = [
     "minimal-second-source-intake",
     "structure-observer-intake",
@@ -746,6 +751,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
             ("--ufunction-second-source-target-set", "structure-aggregate-census-planning", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
+            ("--scriptstruct-second-source-target-set", "structure-aggregate-census-planning", "ScriptStruct"),
             ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
         ]
 
@@ -817,6 +823,25 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("NextGen-plugin-hub-guidance is planning/guidance-only", result.stderr)
         self.assertIn("Promote a separate release/public target set", result.stderr)
         self.assertNotIn("cmake -S", result.stdout)
+
+    def test_structure_census_aliases_cannot_be_release_readiness_target_sets(self) -> None:
+        reserved_aliases = {
+            "structure-aggregate",
+            "structure-aggregate-census",
+            "structure-census",
+            "structure-census-planning",
+            "structure-counts",
+            "structure-proximity",
+        }
+
+        self.assertIn("structure-aggregate-census-planning", TARGET_SETS)
+        self.assertIn("structure-aggregate-census-planning", PLANNING_ONLY_TARGET_SETS)
+        self.assertNotIn("structure-aggregate-census-planning", RELEASE_READINESS_TARGET_SETS)
+        for alias in reserved_aliases:
+            with self.subTest(alias=alias):
+                if alias in TARGET_SETS:
+                    self.assertIn(alias, PLANNING_ONLY_TARGET_SETS)
+                    self.assertNotIn(alias, RELEASE_READINESS_TARGET_SETS)
 
     def test_plugin_hub_matrix_keeps_player_identity_lifecycle_intake_planning_only(self) -> None:
         matrix = read("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md")

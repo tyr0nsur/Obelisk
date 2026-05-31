@@ -841,6 +841,44 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("not_release_readiness_target", text_result.stdout)
         self.assertIn("does not promote Player Identity/Lifecycle SDK", text_result.stdout)
 
+    def test_structure_aggregate_census_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "structure-aggregate-census-planning",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_sets"], ["structure-aggregate-census-planning"])
+        self.assertEqual(report["targets"], [])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "structure-aggregate-census-planning")
+        self.assertEqual(guidance["classification"], "structure_aggregate_census_guidance_only_candidate")
+        self.assertIn("planning_guidance_only", guidance["why_blocked"])
+        self.assertIn("not_release_readiness_target", guidance["why_blocked"])
+        self.assertIn("public_structureevents_sdk_blocked", guidance["why_blocked"])
+        self.assertIn("VerifyPinCode.ReturnValue", " ".join(guidance["snapshot_prep_checks"]))
+        self.assertIn("do not use this target set for release/readiness or public SDK promotion gates", guidance["snapshot_prep_checks"])
+        self.assertIn("Structure aggregate/census SDK", guidance["non_claim"])
+        self.assertIn("public StructureEvents", guidance["non_claim"])
+        self.assertIn("release readiness", guidance["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "structure-aggregate-census-planning",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=0 scope=offline_planning_only target_set_guidance=1", text_result.stdout)
+        self.assertIn("target_set=structure-aggregate-census-planning", text_result.stdout)
+        self.assertIn("structure_aggregate_census_guidance_only_candidate", text_result.stdout)
+        self.assertIn("does not promote Structure aggregate/census SDK", text_result.stdout)
+
     def test_target_set_guidance_rejects_duplicate_target_set_filter(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",

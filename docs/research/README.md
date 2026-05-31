@@ -86,6 +86,7 @@ Current post-RC research lane:
 - [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md)
 - [2026-05-30-structure-return-only-policy-slice.md](2026-05-30-structure-return-only-policy-slice.md)
 - [2026-05-30-structure-nonpin-copied-scalar-policy-slice.md](2026-05-30-structure-nonpin-copied-scalar-policy-slice.md)
+- [2026-05-31-structure-aggregate-census-v0.md](2026-05-31-structure-aggregate-census-v0.md)
 - [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md)
 - [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md)
 - [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)

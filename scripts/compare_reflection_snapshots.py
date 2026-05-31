@@ -233,6 +233,35 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "ResourceHandle, mutation, return override, runtime hooks, or release readiness"
         ),
     },
+    "structure-aggregate-census-planning": {
+        "classification": "structure_aggregate_census_guidance_only_candidate",
+        "why_blocked": [
+            "planning_guidance_only",
+            "not_release_readiness_target",
+            "public_structureevents_sdk_blocked",
+            "aggregate_privacy_policy_unproven",
+            "identity_lookup_resourcehandle_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "use the six structure-observer targets as a bounded design seed; compare "
+            "schema-qualified targets through --target-set structure-aggregate-census-planning "
+            "for coverage review only and keep runtime observations behind a separate "
+            "approved live-ops brief"
+        ),
+        "snapshot_prep_checks": [
+            "aggregate only by copied/redacted event kind, scalar field mask, accepted/rejected counts, and bounded non-identifying buckets",
+            "keep pin codes, VerifyPinCode.ReturnValue, player/controller/character refs, structure identity, object refs, FName/GObjects indices, raw params, locations, and exact timestamps redacted or absent",
+            "keep StructureEvents SDK, structure handles, lookup, mutation, placement denial, collision policy, return override, and ResourceHandle blocked",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote Structure aggregate/census SDK, public StructureEvents, "
+            "structure handles, identity, lookup, ResourceHandle, mutation, return override, "
+            "runtime hooks, or release readiness"
+        ),
+    },
     "mission-copied-bool-policy-slice": {
         "classification": "internal_mission_copied_bool_policy_candidate",
         "why_blocked": [
