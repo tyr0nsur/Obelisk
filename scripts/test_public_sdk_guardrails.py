@@ -2014,6 +2014,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "gameplay mutation, inventory mutation",
             "return override authority",
             "persistent or cross-cluster handles",
+            "The pre-v1 Plugin Hub package contract is an intake boundary",
+            "not a registry implementation, a machine-readable manifest\nschema, a compatibility promise, or v1 completion evidence",
+            "`plugin_id`, display name, plugin version, minimum Obelisk SDK\nline, declared support tier, used capabilities, config path, exported ABI entry points",
+            "Acceptance for a production seed requires building against an installed SDK",
+            "`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`",
+            "hidden default symbol visibility, no private Obelisk headers",
+            "fail-closed `struct_size` and\ncapability checks, safe-disabled config defaults, owner-token cleanup, and idempotent\nshutdown",
+            "Reject or keep in backlog any package that depends on unpromoted gameplay surfaces",
+            "send-chat/replies, permissions, identity, storage services, mutation, or\nreturn overrides",
         )
 
         for item in required:
@@ -2745,7 +2754,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         layout_script = (REPO_ROOT / "scripts/test_install_obelisk_layout.sh").read_text(encoding="utf-8")
 
-        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", consumer_cmake)
+        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)", consumer_cmake)
         self.assertIn("target_link_libraries(${target_name} PRIVATE Obelisk::obelisk_sdk)", consumer_cmake)
         self.assertIn("-DOBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT=\"${REPO_DIR}/plugins\"", layout_script)
         self.assertIn("-DOBELISK_RELEASE_SCOPE_EXTERN_ROOT=\"${REPO_DIR}/extern\"", layout_script)
@@ -5333,6 +5342,40 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(doc="handoff", term=term):
                 self.assertIn(normalized(term), docs["handoff"])
 
+    def test_mission_copied_bool_priority_records_offline_blockers_not_public_sdk(self) -> None:
+        note = (REPO_ROOT / "docs" / "research" / "2026-05-31-v02-module-priority.md").read_text(
+            encoding="utf-8"
+        )
+        compact = normalized(note)
+        docs = {
+            "research_readme": normalized(
+                (REPO_ROOT / "docs" / "research" / "README.md").read_text(encoding="utf-8")
+            ),
+            "preflight": normalized(
+                (
+                    REPO_ROOT
+                    / "docs"
+                    / "research"
+                    / "2026-05-31-player-identity-offline-pack-preflight.md"
+                ).read_text(encoding="utf-8")
+            ),
+        }
+
+        for term in (
+            "Offline Evidence Refresh",
+            "`targets=3`",
+            "`comparable=3`",
+            "`second_source_missing=3`",
+            "`promotion_gate.ready=false`",
+            "`signature_count=3`",
+            "`copied_scalar_count_total=5`",
+            "`redacted_count_total=4`",
+            "`redacted_by_reason.object_ref=4`",
+            "not ready\nfor release readiness, public Mission SDK, runtime observer wiring, or installed SDK\nconsumer exposure",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
+
         for term in (
             "First produce or approve a reviewed non-protected UFunction `obelisk.reflection-inventory-pack.v1`",
             "then plan only `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`",
@@ -5425,6 +5468,34 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertNotIn("v1.0` core-stability track", status)
 
+    def test_field_window_components_sdk_and_seeds_are_not_v1_completion_signals(self) -> None:
+        handoff = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(
+            encoding="utf-8"
+        )
+        status = (REPO_ROOT / "docs" / "STATUS.md").read_text(encoding="utf-8")
+        compatibility = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
+        surfaces = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        compact = normalized("\n".join([handoff, status, compatibility]))
+        guardrails = normalized("\n".join(surfaces.get("release_guardrails", [])))
+
+        for term in (
+            "field-window packaging blocker",
+            "not a `v1.0` SDK blocker, route shortcut, or completion signal",
+            "CMake package target are present",
+            "package-shape evidence only, not a `v1.0` completion marker",
+            "do not gain new support tier, public SDK scope, or `v1.0` completion weight",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
+
+        self.assertIn(
+            normalized(
+                "Installed SDK package/component validation, including CMake COMPONENTS SDK, "
+                "is package-shape evidence only and is not a v1.0 completion marker."
+            ),
+            guardrails,
+        )
+
     def test_player_identity_preflight_keeps_admin_snapshots_separate_from_principal_promotion(self) -> None:
         note = (REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-offline-pack-preflight.md").read_text(
             encoding="utf-8"
@@ -5450,7 +5521,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         route = (REPO_ROOT / "docs" / "research" / "2026-05-31-fname-gobjects-offline-route.md").read_text(
             encoding="utf-8"
         )
-        compact = normalized(packs + "\n" + route)
+        current = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(encoding="utf-8")
+        compact = normalized(packs + "\n" + route + "\n" + current)
 
         for term in (
             "unknown `obelisk.*` child schema\nis a blocker",
@@ -5462,12 +5534,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "`obelisk.offline-artifact-gate-result.v1`",
             "`obelisk.static-artifact-provenance.v1`",
             "`unsupported_manifest_schema`",
+            "supports `obelisk.fuobjectarray-field-window-redacted.v1` as a durable normalized\nartifact-pack child manifest in consume mode only",
+            "clears only the static coherent field-window packaging blocker",
             "Normalizing a directory also does not rewrite absolute paths inside\nchild manifests",
             "that blocker is cleared only for the\nFUObjectArray redacted field-window schema",
             "gate-result and\nprovenance child manifests remain blocked with `unsupported_manifest_schema`",
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)
+
+        self.assertNotIn("it remains tmp-only until a supported normalized artifact-pack shape exists", compact)
 
     def test_offline_snapshot_fixtures_remain_candidate_only_not_public_sdk(self) -> None:
         fixture_roots = {

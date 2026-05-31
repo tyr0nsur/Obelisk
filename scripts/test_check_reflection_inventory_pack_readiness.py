@@ -236,6 +236,32 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertIn("MissionType.AddPlayerToMission", coverage_reasons[0]["missing_targets"])
         self.assertEqual(payload["required_target_set"]["expected_targets"], PLAYER_IDENTITY_TARGETS)
 
+    def test_player_identity_coverage_target_sets_must_match_manifest_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(root / "pack")
+            inventory_path = root / "pack" / "ufunction-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["target_set_coverage"]["target_sets"] = [
+                PLAYER_IDENTITY_TARGET_SET,
+                "mission-compact-intake",
+            ]
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        scope_reasons = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "wrong_target_scope"
+            and reason.get("detail") == "does_not_match_manifest_inputs"
+        ]
+        self.assertEqual(len(scope_reasons), 1)
+        self.assertEqual(scope_reasons[0]["field"], "target_set_coverage.target_sets")
+        self.assertEqual(scope_reasons[0]["manifest_target_sets"], [PLAYER_IDENTITY_TARGET_SET])
+
     def test_inventory_row_errors_are_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

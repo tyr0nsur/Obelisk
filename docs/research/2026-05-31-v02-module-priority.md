@@ -139,6 +139,55 @@ Its useful outputs are internal recognizer confidence, copied-data ABI practice,
 candidate aggregate telemetry, and QA/regression evidence, not a creator-facing Mission
 feature set.
 
+## Offline Evidence Refresh
+
+A later local offline check preserved the same routing:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --target-set mission-copied-bool-policy-slice \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --readiness-report \
+  --fail-on-base-readiness-gaps \
+  --json
+```
+
+Result summary:
+
+- `targets=3`;
+- `comparable=3`;
+- `second_source_missing=3`;
+- `promotion_gate.ready=false`;
+- `ready_scope=not_ready`;
+- `why_blocked` still includes `policy_slice_evidence_only`,
+  `consume_mode_only`, `promote_mode_blocked`,
+  `not_release_readiness_target`, `public_mission_sdk_blocked`, and
+  `runtime_observation_requires_separate_approval`.
+
+The redacted signature check also remains bounded and candidate-only:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_redacted_ufunction_signatures.py \
+  --snapshot-root tests/fixtures/ufunction_snapshots \
+  --target-set mission-copied-bool-policy-slice \
+  --json
+```
+
+Result summary:
+
+- `signature_count=3`;
+- `copied_scalar_count_total=5`;
+- `copied_scalar_by_kind.bool=5`;
+- `redacted_count_total=4`;
+- `redacted_by_reason.object_ref=4`;
+- `promotion_ready=false`;
+- promotion blockers remain `function_flags_not_bound_to_exact_target_gate` and
+  `property_flags_unknown_bits`.
+
+This confirms Mission is a good internal copied-data hardening lane, but it is not ready
+for release readiness, public Mission SDK, runtime observer wiring, or installed SDK
+consumer exposure.
+
 ## Blockers
 
 - No runtime observation is approved for Mission.
@@ -173,3 +222,6 @@ This pass was read-only except for this research note. It compared the matrix an
 index plus the dated module-priority notes listed above. No server tools, protected server
 paths, scanners, ptrace, `gcore`, runtime probes, commits, tags, pushes, or Discord
 actions were used.
+
+The later offline refresh above wrote only temporary files under `/tmp` and did not touch
+servers, protected paths, runtime processes, GitHub, or Discord.

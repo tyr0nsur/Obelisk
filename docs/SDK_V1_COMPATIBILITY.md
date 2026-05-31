@@ -61,8 +61,9 @@ target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
 ```
 
 The `SDK` component means the installed public header and CMake package target are
-present. It does not imply private runtime headers, vendored runtime dependencies, or any
-blocked gameplay module surface.
+present. It is package-shape evidence only, not a `v1.0` completion marker, and does not
+imply private runtime headers, vendored runtime dependencies, or any blocked gameplay
+module surface.
 
 Lifecycle ownership is part of the promoted foundation contract: metadata string
 pointers must remain valid until the plugin shared object is closed; `ObeliskApi*` and

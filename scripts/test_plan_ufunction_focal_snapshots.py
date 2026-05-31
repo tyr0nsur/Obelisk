@@ -305,6 +305,39 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertIn("missing_targets=ShooterPlayerController.ServerKickPlayer", result.stderr)
         self.assertIn("MissionType.AddPlayerToMission", result.stderr)
 
+    def test_player_identity_target_set_rejects_coverage_scope_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+            inventory_path = pack / "ufunction-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["target_set_coverage"]["target_sets"] = [
+                PLAYER_IDENTITY_TARGET_SET,
+                "mission-compact-intake",
+            ]
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-set",
+                    PLAYER_IDENTITY_TARGET_SET,
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target_set_coverage.target_sets must exactly match", result.stderr)
+        self.assertIn("manifest_target_sets=players-identity-lifecycle-intake", result.stderr)
+        self.assertIn("coverage_target_sets=players-identity-lifecycle-intake,mission-compact-intake", result.stderr)
+
     def test_unknown_target_set_rejects_before_planning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

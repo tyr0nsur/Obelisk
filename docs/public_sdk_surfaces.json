@@ -72,6 +72,7 @@
     "A v1.0 stable claim must mean the complete public SDK contract for plugin authors, not runtime/core-first RC readiness or internal runtime stability alone.",
     "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly excluded in the v1 release statement before v1_completion_required can become true.",
+    "Installed SDK package/component validation, including CMake COMPONENTS SDK, is package-shape evidence only and is not a v1.0 completion marker.",
     "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity production seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",

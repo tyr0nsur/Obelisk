@@ -35,6 +35,33 @@ External Plugin Hub examples should request the installed SDK component explicit
 `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and link only
 `Obelisk::obelisk_sdk`.
 
+## Package Contract
+
+The pre-v1 Plugin Hub package contract is an intake boundary for examples and future
+publisher tooling. It is not a registry implementation, a machine-readable manifest
+schema, a compatibility promise, or v1 completion evidence.
+
+A candidate package should contain one Linux shared object, a README, license text, and a
+config example or schema when the plugin reads config. The package metadata must be
+explicit enough for review: `plugin_id`, display name, plugin version, minimum Obelisk SDK
+line, declared support tier, used capabilities, config path, exported ABI entry points,
+and whether the package is a production seed, experimental pattern, or blocked backlog
+prototype.
+
+Acceptance for a production seed requires building against an installed SDK with
+`find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)`, linking only
+`Obelisk::obelisk_sdk`, hidden default symbol visibility, no private Obelisk headers, no
+raw UE pointers or ArkApi implementation patterns, fail-closed `struct_size` and
+capability checks, safe-disabled config defaults, owner-token cleanup, and idempotent
+shutdown. Experimental pattern packages must meet the same package hygiene but must be
+clearly labeled as experimental and must not imply production command, chat, policy,
+inventory, structure, identity, mutation, or enforcement support.
+
+Reject or keep in backlog any package that depends on unpromoted gameplay surfaces,
+private runtime headers, raw `ProcessEvent` params, persistent handles, cross-instance
+runtime state, send-chat/replies, permissions, identity, storage services, mutation, or
+return overrides.
+
 ## Public Surface
 
 Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:

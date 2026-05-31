@@ -101,6 +101,11 @@ Proceed only when the checker reports `ready=true` and the accepted pack contain
 `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer`.
 
+The checker and planner also fail closed when the inventory
+`target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so
+a mixed or stale coverage block cannot be used to plan the player-identity admin
+snapshots.
+
 If a complete non-protected core evidence pack is available, a safe inventory-build route
 is:
 

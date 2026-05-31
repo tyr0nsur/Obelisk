@@ -40,7 +40,8 @@ Scope terms used here:
   publication;
 - Plugin Hub seed: narrow examples that consume only existing ABI surfaces, start from
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` plus `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`, and do
-  not gain new support tier or public SDK scope merely by being installed as a plugin `.so`;
+  not gain new support tier, public SDK scope, or `v1.0` completion weight merely by being
+  installed as a plugin `.so`;
 - planning-only lane: guidance/demand work that is not release evidence or public SDK
   surface.
 

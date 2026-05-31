@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Obelisk 0.1.0 CONFIG REQUIRED)
+find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 
 if(NOT Obelisk_DEVELOPMENT_LINE STREQUAL "0.1.0-dev")
     message(FATAL_ERROR "Unexpected Obelisk development line: ${Obelisk_DEVELOPMENT_LINE}")

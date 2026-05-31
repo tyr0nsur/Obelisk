@@ -238,6 +238,8 @@ def require_player_identity_target_set_scope(
             f"{manifest_path}: inputs.target_sets must include {PLAYER_IDENTITY_TARGET_SET} "
             "before planning player identity snapshots"
         )
+    if not all(isinstance(item, str) and item for item in manifest_target_sets):
+        raise SystemExit(f"{manifest_path}: inputs.target_sets must be a list of non-empty strings")
 
     coverage = inventory.get("target_set_coverage")
     if not isinstance(coverage, dict):
@@ -250,6 +252,15 @@ def require_player_identity_target_set_scope(
         raise SystemExit(
             f"{inventory_path}: target_set_coverage.target_sets must include {PLAYER_IDENTITY_TARGET_SET} "
             "before planning player identity snapshots"
+        )
+    if not all(isinstance(item, str) and item for item in coverage_target_sets):
+        raise SystemExit(f"{inventory_path}: target_set_coverage.target_sets must be a list of non-empty strings")
+    if sorted(manifest_target_sets) != sorted(coverage_target_sets):
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage.target_sets must exactly match "
+            f"{manifest_path}: inputs.target_sets before planning player identity snapshots "
+            f"(manifest_target_sets={','.join(manifest_target_sets)} "
+            f"coverage_target_sets={','.join(coverage_target_sets)})"
         )
     requested_targets = coverage.get("requested_targets")
     if not isinstance(requested_targets, list):

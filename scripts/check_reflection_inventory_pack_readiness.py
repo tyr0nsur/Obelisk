@@ -82,6 +82,12 @@ def player_identity_target_set_expectation_fields() -> dict[str, object]:
     }
 
 
+def string_list(value: object) -> list[str] | None:
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        return None
+    return value
+
+
 def append_inventory_row_blocker(
     blockers: list[dict[str, object]],
     entry: dict[str, object],
@@ -251,6 +257,17 @@ def player_identity_target_set_scope_blockers(
                 recorded=manifest_target_sets,
             )
         )
+    manifest_target_set_values = string_list(manifest_target_sets)
+    if isinstance(manifest_target_sets, list) and manifest_target_set_values is None:
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(manifest_path),
+                field="inputs.target_sets",
+                detail="must_be_non_empty_string_list",
+                recorded=manifest_target_sets,
+            )
+        )
 
     coverage = inventory.get("target_set_coverage") if isinstance(inventory, dict) else None
     if not isinstance(coverage, dict):
@@ -274,6 +291,34 @@ def player_identity_target_set_scope_blockers(
                 field="target_set_coverage.target_sets",
                 required=PLAYER_IDENTITY_TARGET_SET,
                 recorded=coverage_target_sets,
+                **player_identity_target_set_expectation_fields(),
+            )
+        )
+    coverage_target_set_values = string_list(coverage_target_sets)
+    if isinstance(coverage_target_sets, list) and coverage_target_set_values is None:
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(inventory_path),
+                field="target_set_coverage.target_sets",
+                detail="must_be_non_empty_string_list",
+                recorded=coverage_target_sets,
+                **player_identity_target_set_expectation_fields(),
+            )
+        )
+    if (
+        manifest_target_set_values is not None
+        and coverage_target_set_values is not None
+        and sorted(manifest_target_set_values) != sorted(coverage_target_set_values)
+    ):
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(inventory_path),
+                field="target_set_coverage.target_sets",
+                detail="does_not_match_manifest_inputs",
+                recorded=coverage_target_set_values,
+                manifest_target_sets=manifest_target_set_values,
                 **player_identity_target_set_expectation_fields(),
             )
         )
