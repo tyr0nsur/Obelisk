@@ -243,7 +243,7 @@ def run_ghidra_smoke(tool: dict[str, Any], binary: Path, output_root: Path, *, t
     smoke_root = output_root / "ghidra-smoke"
     project_root = smoke_root / "project"
     ensure_real_directory(smoke_root, "Ghidra smoke output")
-    reject_symlink(project_root, "Ghidra project root")
+    ensure_real_directory(project_root, "Ghidra project root")
     command = [
         tool["path"],
         str(project_root),

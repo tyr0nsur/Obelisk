@@ -423,6 +423,31 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertIn("mission_copied_bool_policy_public_overclaim_mission_identity", reasons)
         self.assertIn("mission_copied_bool_policy_public_overclaim_player_authority", reasons)
 
+    def test_candidate_surface_overclaims_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["public_abi_ready"] = True
+            payload["v1_completion"] = True
+            payload["surface_claims"] = {
+                "mutation": "mutation supported",
+                "return_override": "return override enabled",
+                "runtime_hooks": "runtime hooks enabled",
+                "public_abi": "public ABI ready",
+                "v1": "v1 complete",
+            }
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        claims = {blocker.get("claim") for blocker in report["blockers"]}
+        self.assertIn("runtime_public_readiness_overclaim", reasons)
+        self.assertIn("mission_candidate_claim_overclaim", reasons)
+        self.assertTrue({"mutation", "return_override", "runtime_hooks", "public_abi", "v1_completion"} <= claims)
+
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(
             "--root",

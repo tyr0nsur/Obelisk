@@ -67,12 +67,56 @@ FORBIDDEN_COPIED_RE = re.compile(
 FORBIDDEN_TRUE_READY_KEYS = {
     "dispatcher_ready",
     "mission_payload_decoding_ready",
+    "mission_sdk_ready",
+    "mutation_ready",
+    "public_abi_ready",
     "public_api_ready",
     "public_mission_sdk_ready",
     "public_sdk_ready",
+    "return_override_ready",
     "runtime_hook_ready",
+    "runtime_hooks_ready",
     "runtime_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_ready",
 } | offline_gate.MISSION_COPIED_BOOL_FORBIDDEN_TRUE_READY_KEYS
+ALLOWED_OVERCLAIM_TEXT_PREFIXES = ("$.non_claims", "$.safety_summary.explicitly_excluded")
+MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
+    "abi ready": "public_abi",
+    "allows mutation": "mutation",
+    "allows return override": "return_override",
+    "authority promoted": "authority",
+    "authority ready": "authority",
+    "authoritative identity": "authority_identity",
+    "c abi ready": "public_abi",
+    "hook wiring ready": "runtime_hooks",
+    "identity promoted": "identity",
+    "identity ready": "identity",
+    "mission authority": "authority",
+    "mission identity": "identity",
+    "mission sdk": "mission_sdk",
+    "mutation enabled": "mutation",
+    "mutation path": "mutation",
+    "mutation ready": "mutation",
+    "mutation supported": "mutation",
+    "object identity": "identity",
+    "player authority": "authority",
+    "player identity": "identity",
+    "public abi": "public_abi",
+    "return override enabled": "return_override",
+    "return override ready": "return_override",
+    "return override supported": "return_override",
+    "return overrides": "return_override",
+    "runtime hook ready": "runtime_hooks",
+    "runtime hooks enabled": "runtime_hooks",
+    "runtime hooks ready": "runtime_hooks",
+    "v1 complete": "v1_completion",
+    "v1 completion": "v1_completion",
+    "v1 done": "v1_completion",
+    "v1 ready": "v1_completion",
+    "version 1 complete": "v1_completion",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -263,9 +307,16 @@ def validate_internal_only_boundaries(policy: dict[str, Any], blockers: list[dic
             append_blocker(blockers, "runtime_public_readiness_overclaim", field=trail)
     for trail, _, reason in offline_gate.collect_candidate_public_overclaims(
         policy,
-        allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
+        allowed_prefixes=ALLOWED_OVERCLAIM_TEXT_PREFIXES,
     ):
         append_blocker(blockers, "runtime_public_claim_overclaim", field=trail, claim=reason)
+    for trail, raw_value in offline_gate.collect_string_fields(policy):
+        if any(trail.startswith(prefix) for prefix in ALLOWED_OVERCLAIM_TEXT_PREFIXES):
+            continue
+        text = raw_value.casefold()
+        for needle, reason in MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES.items():
+            if needle in text:
+                append_blocker(blockers, "mission_candidate_claim_overclaim", field=trail, claim=reason)
 
 
 def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
