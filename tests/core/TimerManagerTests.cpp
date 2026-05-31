@@ -243,6 +243,30 @@ namespace
                 "owner-cleanup timer remained active after callback cleanup");
     }
 
+    void TestOwnerCleanupFromCallbackCancelsPeerTimer()
+    {
+        int owner = 0;
+        OwnerCleanupFromCallbackState state;
+        state.Owner = &owner;
+        const uint64_t cleanupTimerId =
+            TimerManager::Get().Register(&owner, 5, 0, false, OwnerCleanupFromCallback, &state);
+        Require(cleanupTimerId != 0, "owner-cleanup peer cleanup timer registration failed");
+
+        CounterState peerState;
+        const uint64_t peerTimerId = TimerManager::Get().Register(&owner, 60000, 0, false, CountCallback, &peerState);
+        Require(peerTimerId != 0, "owner-cleanup peer timer registration failed");
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&]() { return state.Count == 1; }),
+                    "owner-cleanup peer callback did not run");
+            Require(state.Removed == 2, "owner cleanup from callback did not remove peer timer");
+        }
+
+        Require(!TimerManager::Get().Unregister(&owner, peerTimerId),
+                "owner-cleanup peer timer remained active after callback cleanup");
+    }
+
     void TestCallbackExceptionDoesNotStopWorker()
     {
         int throwingOwner = 0;
@@ -355,6 +379,7 @@ int main()
     TestWrongOwnerCannotUnregister();
     TestSelfUnregisterDoesNotDeadlock();
     TestOwnerCleanupFromOwnCallbackDoesNotDeadlock();
+    TestOwnerCleanupFromCallbackCancelsPeerTimer();
     TestCallbackExceptionDoesNotStopWorker();
     TestUnknownCallbackExceptionDoesNotStopWorker();
     TestOwnerCleanupWaitsForInFlightCallback();

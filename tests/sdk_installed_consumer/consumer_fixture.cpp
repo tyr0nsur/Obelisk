@@ -27,6 +27,8 @@ namespace
     int g_ChatMessageUnregisterCount = 0;
     int g_TimerRegisterCount = 0;
     int g_TimerUnregisterCount = 0;
+    int g_ResourceDescriptorCount = 0;
+    int g_GameplayPolicyDescriptorCount = 0;
     ObeliskGameplayPolicyEventCallback g_GameplayPolicyCallback = nullptr;
     void* g_GameplayPolicyUserData = nullptr;
     ObeliskChatMessageEventCallback g_ChatMessageCallback = nullptr;
@@ -281,6 +283,7 @@ namespace
 
     bool DescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out)
     {
+        ++g_ResourceDescriptorCount;
         if (!out || out->struct_size < sizeof(ObeliskResourceKindDescriptor))
             return false;
 
@@ -317,6 +320,7 @@ namespace
 
     bool DescribeGameplayPolicyEventKind(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out)
     {
+        ++g_GameplayPolicyDescriptorCount;
         if (!out || out->struct_size < sizeof(ObeliskGameplayPolicyEventDescriptor))
             return false;
 
@@ -453,6 +457,249 @@ namespace
             return nullptr;
         return reinterpret_cast<T>(pointer);
     }
+
+    uint64_t AllOptionalCapabilities()
+    {
+        return OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
+            OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
+            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
+            OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS |
+            OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
+            OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
+            OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS |
+            OBELISK_API_CAPABILITY_CHAT_EVENTS |
+            OBELISK_API_CAPABILITY_TIMERS;
+    }
+
+    void PopulateApi(ObeliskApi& api)
+    {
+        api = {};
+        api.LogInfo = NoOpLog;
+        api.LogWarn = NoOpLog;
+        api.LogError = NoOpLog;
+        api.RegisterPreProcessEvent = RegisterProcessEvent;
+        api.RegisterPostProcessEvent = RegisterProcessEvent;
+        api.RegisterPreProcessEventForNameIndex = RegisterNamedProcessEvent;
+        api.RegisterPostProcessEventForNameIndex = RegisterNamedProcessEvent;
+        api.CallProcessEvent = CallProcessEvent;
+        api.abi_version = OBELISK_API_ABI_VERSION;
+        api.struct_size = sizeof(ObeliskApi);
+        api.capabilities = AllOptionalCapabilities();
+        api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
+            RegisterNamedProcessEventWithOwnerTokenHandle;
+        api.UnregisterProcessEventCallbackWithOwnerToken =
+            UnregisterProcessEventCallbackWithOwnerToken;
+        api.RegisterGameplayPolicyEventWithOwnerTokenHandle =
+            RegisterGameplayPolicyEventWithOwnerTokenHandle;
+        api.UnregisterGameplayPolicyEventWithOwnerToken =
+            UnregisterGameplayPolicyEventWithOwnerToken;
+        api.DescribeResourceKind = DescribeResourceKind;
+        api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
+        api.RegisterChatMessageEventWithOwnerTokenHandle = RegisterChatMessageEventWithOwnerTokenHandle;
+        api.UnregisterChatMessageEventWithOwnerToken = UnregisterChatMessageEventWithOwnerToken;
+        api.RegisterTimerWithOwnerTokenHandle = RegisterTimerWithOwnerTokenHandle;
+        api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = RemoveScheduledWithOwnerToken;
+    }
+
+    void ResetFixtureObservations()
+    {
+        g_RegisterCount = 0;
+        g_UnregisterCount = 0;
+        g_GameplayPolicyRegisterCount = 0;
+        g_GameplayPolicyUnregisterCount = 0;
+        g_ChatMessageRegisterCount = 0;
+        g_ChatMessageUnregisterCount = 0;
+        g_TimerRegisterCount = 0;
+        g_TimerUnregisterCount = 0;
+        g_ResourceDescriptorCount = 0;
+        g_GameplayPolicyDescriptorCount = 0;
+        g_GameplayPolicyCallback = nullptr;
+        g_GameplayPolicyUserData = nullptr;
+        g_ChatMessageCallback = nullptr;
+        g_ChatMessageUserData = nullptr;
+        g_TimerCallback = nullptr;
+        g_TimerUserData = nullptr;
+    }
+
+    struct OptionalSlotGuardrailCase
+    {
+        const char* name;
+        uint32_t structSize;
+        uint64_t disabledCapability;
+        int processEventRegistrations;
+        int gameplayPolicyRegistrations;
+        int resourceDescriptorQueries;
+        int gameplayPolicyDescriptorQueries;
+        int chatMessageRegistrations;
+        int timerRegistrations;
+    };
+
+    void AssertOptionalSlotGuardrailCounts(const OptionalSlotGuardrailCase& testCase)
+    {
+        Require(g_RegisterCount == testCase.processEventRegistrations,
+                "unexpected ProcessEvent registration count in optional slot guardrail");
+        Require(g_GameplayPolicyRegisterCount == testCase.gameplayPolicyRegistrations,
+                "unexpected gameplay policy registration count in optional slot guardrail");
+        Require(g_ResourceDescriptorCount == testCase.resourceDescriptorQueries,
+                "unexpected resource descriptor query count in optional slot guardrail");
+        Require(g_GameplayPolicyDescriptorCount == testCase.gameplayPolicyDescriptorQueries,
+                "unexpected gameplay policy descriptor query count in optional slot guardrail");
+        Require(g_ChatMessageRegisterCount == testCase.chatMessageRegistrations,
+                "unexpected chat message registration count in optional slot guardrail");
+        Require(g_TimerRegisterCount == testCase.timerRegistrations,
+                "unexpected timer registration count in optional slot guardrail");
+    }
+
+    void AssertOptionalSlotGuardrailUnregisters(const OptionalSlotGuardrailCase& testCase)
+    {
+        Require(g_UnregisterCount == testCase.processEventRegistrations,
+                "unexpected ProcessEvent unregister count in optional slot guardrail");
+        Require(g_GameplayPolicyUnregisterCount == testCase.gameplayPolicyRegistrations,
+                "unexpected gameplay policy unregister count in optional slot guardrail");
+        Require(g_ChatMessageUnregisterCount == testCase.chatMessageRegistrations,
+                "unexpected chat message unregister count in optional slot guardrail");
+        Require(g_TimerUnregisterCount == testCase.timerRegistrations,
+                "unexpected timer unregister count in optional slot guardrail");
+    }
+
+    void RunOptionalSlotGuardrails(InitFn init, ShutdownFn shutdown, const ObeliskPluginInitContext& context)
+    {
+        Require(shutdown != nullptr, "optional slot guardrails require plugin shutdown cleanup");
+        const OptionalSlotGuardrailCase cases[] = {
+            {
+                "short-api-before-gameplay-policy-unregister",
+                static_cast<uint32_t>(offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken)),
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+            },
+            {
+                "short-api-before-resource-descriptor",
+                static_cast<uint32_t>(offsetof(ObeliskApi, DescribeResourceKind)),
+                0,
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+            },
+            {
+                "short-api-before-gameplay-descriptor",
+                static_cast<uint32_t>(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind)),
+                0,
+                1,
+                1,
+                2,
+                0,
+                0,
+                0,
+            },
+            {
+                "short-api-before-chat-unregister",
+                static_cast<uint32_t>(offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken)),
+                0,
+                1,
+                1,
+                2,
+                11,
+                0,
+                0,
+            },
+            {
+                "short-api-before-timer-unregister",
+                static_cast<uint32_t>(offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken))),
+                0,
+                1,
+                1,
+                2,
+                11,
+                1,
+                0,
+            },
+            {
+                "missing-gameplay-policy-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS,
+                1,
+                0,
+                2,
+                11,
+                1,
+                1,
+            },
+            {
+                "missing-resource-descriptor-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS,
+                1,
+                1,
+                0,
+                11,
+                1,
+                1,
+            },
+            {
+                "missing-gameplay-descriptor-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS,
+                1,
+                1,
+                2,
+                0,
+                1,
+                1,
+            },
+            {
+                "missing-chat-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_CHAT_EVENTS,
+                1,
+                1,
+                2,
+                11,
+                0,
+                1,
+            },
+            {
+                "missing-timer-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_TIMERS,
+                1,
+                1,
+                2,
+                11,
+                1,
+                0,
+            },
+        };
+
+        for (const OptionalSlotGuardrailCase& testCase : cases)
+        {
+            ObeliskApi api{};
+            PopulateApi(api);
+            api.struct_size = testCase.structSize;
+            api.capabilities &= ~testCase.disabledCapability;
+
+            ResetFixtureObservations();
+            try
+            {
+                Require(init(&api, &context), testCase.name);
+                AssertOptionalSlotGuardrailCounts(testCase);
+                shutdown();
+                AssertOptionalSlotGuardrailUnregisters(testCase);
+            }
+            catch (...)
+            {
+                shutdown();
+                throw;
+            }
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -490,39 +737,7 @@ int main(int argc, char** argv)
         Require(metadata.default_config_json != nullptr, "missing default config");
 
         ObeliskApi api{};
-        api.LogInfo = NoOpLog;
-        api.LogWarn = NoOpLog;
-        api.LogError = NoOpLog;
-        api.RegisterPreProcessEvent = RegisterProcessEvent;
-        api.RegisterPostProcessEvent = RegisterProcessEvent;
-        api.RegisterPreProcessEventForNameIndex = RegisterNamedProcessEvent;
-        api.RegisterPostProcessEventForNameIndex = RegisterNamedProcessEvent;
-        api.CallProcessEvent = CallProcessEvent;
-        api.abi_version = OBELISK_API_ABI_VERSION;
-        api.struct_size = sizeof(ObeliskApi);
-        api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
-            OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
-            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
-            OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS |
-            OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS |
-            OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS |
-            OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS |
-            OBELISK_API_CAPABILITY_CHAT_EVENTS |
-            OBELISK_API_CAPABILITY_TIMERS;
-        api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
-            RegisterNamedProcessEventWithOwnerTokenHandle;
-        api.UnregisterProcessEventCallbackWithOwnerToken =
-            UnregisterProcessEventCallbackWithOwnerToken;
-        api.RegisterGameplayPolicyEventWithOwnerTokenHandle =
-            RegisterGameplayPolicyEventWithOwnerTokenHandle;
-        api.UnregisterGameplayPolicyEventWithOwnerToken =
-            UnregisterGameplayPolicyEventWithOwnerToken;
-        api.DescribeResourceKind = DescribeResourceKind;
-        api.DescribeGameplayPolicyEventKind = DescribeGameplayPolicyEventKind;
-        api.RegisterChatMessageEventWithOwnerTokenHandle = RegisterChatMessageEventWithOwnerTokenHandle;
-        api.UnregisterChatMessageEventWithOwnerToken = UnregisterChatMessageEventWithOwnerToken;
-        api.RegisterTimerWithOwnerTokenHandle = RegisterTimerWithOwnerTokenHandle;
-        api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = RemoveScheduledWithOwnerToken;
+        PopulateApi(api);
 
         ObeliskPluginInitContext context{};
         context.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION;
@@ -532,20 +747,10 @@ int main(int argc, char** argv)
         context.instance_id = argv[5];
         context.plugin_owner_token = 0xC0FFEE;
 
-        g_RegisterCount = 0;
-        g_UnregisterCount = 0;
-        g_GameplayPolicyRegisterCount = 0;
-        g_GameplayPolicyUnregisterCount = 0;
-        g_ChatMessageRegisterCount = 0;
-        g_ChatMessageUnregisterCount = 0;
-        g_TimerRegisterCount = 0;
-        g_TimerUnregisterCount = 0;
-        g_GameplayPolicyCallback = nullptr;
-        g_GameplayPolicyUserData = nullptr;
-        g_ChatMessageCallback = nullptr;
-        g_ChatMessageUserData = nullptr;
-        g_TimerCallback = nullptr;
-        g_TimerUserData = nullptr;
+        if (std::strcmp(argv[2], "install_layout_consumer") == 0)
+            RunOptionalSlotGuardrails(init, shutdown, context);
+
+        ResetFixtureObservations();
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
         if (descriptorCatalogValidated)
         {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a standalone candidate-only UFunction focal snapshot planner for reviewed
+  reflection inventory packs, hardened installed SDK optional-slot guardrails across
+  gameplay policy, descriptors, chat, and timers, and extended timer cleanup regression
+  coverage for owner cleanup canceling peer timers from inside a callback.
 - Extracted focal UFunction snapshot planning into a reusable helper module, added
   target-set bridge coverage for unfiltered redacted inventories, hardened timer owner
   cleanup from inside callbacks, and made installed descriptor catalog consumers reject

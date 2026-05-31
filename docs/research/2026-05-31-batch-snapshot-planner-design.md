@@ -62,22 +62,19 @@ is adequate as a fresh-pack convenience path; the next useful implementation rem
 standalone `scripts/plan_ufunction_focal_snapshots.py` that consumes an already reviewed
 reflection inventory pack without rereading a core.
 
-Preferred patch shape:
+Implemented patch shape:
 
-1. Extract these helpers from `scripts/build_reflection_inventory_pack.py` into a new
-   `scripts/ufunction_focal_snapshot_plan.py` module:
-   - `parse_exact_target`
-   - `plan_output_filename`
-   - `focal_snapshot_plan`
-2. Update `scripts/build_reflection_inventory_pack.py` to import the shared helpers so
-   the existing `--plan-target` behavior and tests stay intact.
-3. Add `scripts/plan_ufunction_focal_snapshots.py` with:
+1. `scripts/ufunction_focal_snapshot_plan.py` remains the shared candidate-only helper
+   module used by fresh-pack planning and standalone planning.
+2. `scripts/build_reflection_inventory_pack.py` continues to import the shared helpers,
+   preserving existing `--plan-target` and `--plan-snapshot-target-set` behavior.
+3. Added `scripts/plan_ufunction_focal_snapshots.py` with:
    - `--inventory-pack <dir-or-manifest>` to read `manifest.json` and
      `ufunction-inventory.json`.
    - repeatable `--target Outer.Name` and `--target-file <newline-list>` inputs.
    - optional `--json-out <path>`; default stdout is enough for review.
    - no core reads, no snapshot writes, no server access, no command execution.
-4. Validate the pack before command emission:
+4. The standalone planner validates the pack before command emission:
    - manifest schema is `obelisk.reflection-inventory-pack.v1`;
    - status is `candidate-only`;
    - promotion status is `not_promoted_candidate_only`;
@@ -91,19 +88,26 @@ Preferred patch shape:
      into planned commands;
    - inventory function rows are redacted rows only, with the same field policy as
      `compare_reflection_inventory_packs.py`.
-5. Feed the validated rows and identity fields into the shared `focal_snapshot_plan(...)`.
-   Keep `inventory_source` as `accepted_redacted_inventory_pack` or add a wrapper field
-   identifying the pack path and target-list source.
+5. The validated rows and identity fields feed into shared `focal_snapshot_plan(...)`.
+   The emitted payload changes `inventory_source` to `accepted_redacted_inventory_pack`
+   and records the pack manifest, `ufunction-inventory.json`, target file paths, and
+   loaded target count for review traceability.
+
+The script intentionally does not hash, parse, mmap, or otherwise reread the core. It
+checks that the recorded core path is offline-safe and non-symlinked before placing that
+path into the planned command argv. Missing core files are not blockers at planning time;
+snapshot extraction remains a separate later step.
 
 This is safer and faster than adding another mode to
 `run_second_source_core_intake.py`: the wrapper is intentionally target-set and
 regeneration/comparison oriented, while the missing step is pre-target-set focal command
 planning from reviewed inventory.
 
-## Tests To Add
+## Tests Added
 
 - `scripts/test_plan_ufunction_focal_snapshots.py`
-  - accepts a minimal candidate-only pack and emits two planned commands from
+  - accepts a minimal candidate-only pack with a missing core path and emits two planned
+    commands from
     `--target-file`;
   - preserves complete artifact identity and does not emit `--target-set`;
   - blocks a missing target without inventing a fixture or manifest entry;
@@ -112,6 +116,7 @@ planning from reviewed inventory.
   - rejects `fname_root_ready=false` or non-empty pack blockers;
   - rejects incomplete artifact identity, invalid SHA fields, protected core paths, and
     symlinked pack/core path components.
+  - rejects non-redacted inventory rows with extra keys.
 - Existing coverage to keep green:
   - `scripts/test_build_reflection_inventory_pack.py`
   - `scripts/test_compare_reflection_inventory_packs.py`

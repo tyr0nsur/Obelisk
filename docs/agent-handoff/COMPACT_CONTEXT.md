@@ -152,8 +152,8 @@ priorities, and do not use history files as the active source of truth.
   ProcessEvent callback infrastructure and experimental target-specific gameplay/module
   observers.
 - Runtime timer owner cleanup has regression coverage for cleanup initiated from inside
-  that owner's timer callback: it must not deadlock, must remove the repeating timer, and
-  must prevent later delivery.
+  that owner's timer callback: it must not deadlock, must remove the repeating timer,
+  must cancel peer timers for the same owner, and must prevent later delivery.
 
 ## Evidence Baseline
 
@@ -225,6 +225,10 @@ priorities, and do not use history files as the active source of truth.
   them for candidate-only exact snapshot command plans. Target-set bridge coverage proves
   named planning sets can emit exact `--snapshot-json` commands from unfiltered redacted
   inventory without adding release target-set regeneration claims.
+  `scripts/plan_ufunction_focal_snapshots.py` consumes an already reviewed
+  reflection-inventory pack plus exact targets/target files and emits candidate-only
+  planned commands without rereading a core, executing commands, writing snapshots, or
+  promoting target sets/runtime/API scope.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, no hook/runtime dispatcher/public Mission SDK. Tests reject copied
