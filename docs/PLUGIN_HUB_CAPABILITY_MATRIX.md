@@ -38,11 +38,12 @@ needed, SDK consumer tests, and exact release-readiness second-source target set
 promoted. Planning-only, internal-layout, consume-only, or test-only evidence is not
 public SDK evidence.
 
-`v1.0` is the target for a complete public SDK, not just a stable core runtime. The
-foundation rows below are the starting layer; the full stable SDK requires the blocked
-high-demand categories to be either promoted through Obelisk-native copied ABI contracts
-and evidence, or explicitly left outside the `v1.0` support statement so plugin authors do
-not mistake a partial primitive for a complete Ark server modding framework.
+`v1.0` is the planned completion gate for a complete public SDK claim, not just a stable
+core runtime. The foundation rows below are the starting layer; the full stable SDK
+requires the blocked high-demand categories to be either promoted through
+Obelisk-native copied ABI contracts and evidence, or explicitly left outside the `v1.0`
+support statement so plugin authors do not mistake a partial primitive for a complete Ark
+server modding framework.
 
 ## Support Tier Legend
 

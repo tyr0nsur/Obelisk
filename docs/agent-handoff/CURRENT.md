@@ -174,6 +174,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   correlation, `ResourceHandle`, public identity API, permissions, commands, or SDK surface.
   Durable boundary note:
   `docs/research/2026-05-31-arktribute-playerdata-identity-boundary.md`.
+- `scripts/check_arktribute_playerdata_identity_boundary.py` is a focused offline
+  contract checker for the current ArkTributePlayerData layout-only candidate. Passing it
+  proves only that the existing transfer ScriptStruct artifacts still say layout-only,
+  candidate-only, promote-blocked, and non-public; it does not promote runtime identity,
+  Transfer SDK, `ResourceHandle`, public identity, commands, permissions, mutation, return
+  override, or any plugin ABI surface.
 - The player-identity preflight JSON recipe now starts with the complete
   `scripts/build_core_dump_evidence_pack.py` command using reviewed `verified_fname_root_slot`
   and `gobjects` labels. The recipe intentionally omits `--skip-core-sha256` and

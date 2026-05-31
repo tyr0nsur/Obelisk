@@ -16,7 +16,7 @@ patterns in creator-facing examples.
 
 ## Installed-SDK Author Validation
 
-Use this pass before publishing a copied example or production seed. It validates package
+Use this pass before publishing a copied example or release-supported seed. It validates package
 shape and ABI hygiene only; it does not promote gameplay/module readiness or prove a
 complete v1 SDK claim.
 
@@ -74,5 +74,5 @@ Before packaging, confirm the plugin:
   registrations during `ObeliskPlugin_Init` and releases them in `ObeliskPlugin_Shutdown`;
 - ships safe-disabled default config with `enabled=false`, `allow_all_instances=false`,
   and an empty `instance_allowlist`;
-- documents its support tier as production seed, experimental pattern, or blocked backlog
+- documents its support tier as release-supported seed, experimental pattern, or blocked backlog
   prototype.

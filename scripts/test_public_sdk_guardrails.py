@@ -6743,7 +6743,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         compact = normalized(status)
 
         for term in (
-            "`v1.0` complete-SDK track",
+            "`v1.0` SDK planning track",
             "This track is not a\nruntime-only stability track",
             "complete Obelisk SDK milestone, not just a\nstable loader/runtime milestone",
             "umbrella blockers such as gameplay modules, player services, and operator/storage",
@@ -6754,6 +6754,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(term), compact)
 
         self.assertNotIn("v1.0` core-stability track", status)
+        self.assertNotIn("`v1.0` complete-SDK track", status)
 
     def test_release_gate_docs_do_not_make_core_first_gate_a_v1_completion_gate(self) -> None:
         release = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")
