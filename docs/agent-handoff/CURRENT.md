@@ -186,9 +186,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `obelisk.reflection-inventory-pack.v1`, then plan only `ServerListPlayers` and
   `ServerKickPlayer` focal snapshots.
 - If no copied core is available, keep progressing offline by tightening guardrails,
-  permission/admin minimum design, command/principal contract, and structure census
-  consume/promote-blocked checks without claiming SDK promotion. This does not authorize
-  Transfer runtime work.
+  permission/admin query-only minimum design, command/principal contract, and structure
+  census side-lane consume/promote-blocked checks without claiming SDK promotion. This
+  does not authorize Transfer runtime work.
 - Revalidate before any checkpoint: identity readiness stays blocked with
   `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
   docs stay non-promotional, and `git diff --check` passes.

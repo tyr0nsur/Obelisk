@@ -129,8 +129,8 @@ commands/replies surface whose dependency rows are not already promoted, and pla
 identity promotion must name the reviewed core/reflection evidence before it can support
 public permissions or command claims.
 That ordering is a dependency guardrail, not a declaration that permissions/admin is the
-immediate next public slice; groups, grants, admin actions, and mutation authority remain
-excluded unless a future promotion gate explicitly says otherwise.
+immediate next public slice; the only post-identity candidate inside permissions/admin is
+query-only fail-closed permission checks, and groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.
 
 Future command/principal routing is a lifecycle and callback-ownership change, not a
 parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design
@@ -170,11 +170,12 @@ The shortest useful route toward a complete v1 SDK is:
 
 1. Promote the smallest copied `player_identity`/principal lifecycle contract that can
    support privacy, invalidation, and multi-instance semantics.
-2. Build a fail-closed permissions/admin query layer on that principal model.
+2. Build a fail-closed permissions/admin query layer on that principal model, initially
+   limited to query-only checks.
 3. Promote commands/replies as a new owner-token copied callback/response surface, not as
    a parser-only extension to `ChatMessageEvent`.
-4. Advance structure census and inventory/items through narrow copied APIs, or explicitly
-   exclude them from the first v1 support statement.
+4. Advance structure census as an offline side-lane candidate, and inventory/items through
+   narrow copied APIs, or explicitly exclude them from the first v1 support statement.
 5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID:
    mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas,
    operator ingress/storage, and gameplay/server tick callbacks.

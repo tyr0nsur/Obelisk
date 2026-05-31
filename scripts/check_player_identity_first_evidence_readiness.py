@@ -37,6 +37,7 @@ CORE_EVIDENCE_MANIFEST_PATTERN = (
 REFLECTION_INVENTORY_MANIFEST_PATTERN = (
     "player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"
 )
+RAW_LAYOUT_HELPER = "scripts/prepare_player_identity_offline_raw_layout.py"
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,6 +119,21 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def detect_obelisk_commit() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short=12", "HEAD"],
+            check=True,
+            text=True,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
 
 
 def bounded_artifact_file_scan(root: Path, *, max_depth: int = 6) -> dict[str, Any]:
@@ -747,6 +763,7 @@ def build_operator_next_commands(
 
     offline_status = offline_inputs.get("status")
     matching_binary_path = first_matching_binary_path(offline_inputs)
+    artifact_root_pattern = raw_binary_pattern.parent.parent.parent
     core_like_candidates = offline_inputs.get("core_like_candidates")
     core_like_present = isinstance(core_like_candidates, list) and bool(core_like_candidates)
     omitted_core_like = offline_inputs.get("omitted_core_like_candidates")
@@ -788,6 +805,24 @@ def build_operator_next_commands(
         inventory_ready
         and next_blocker.get("code") == "admin_focal_snapshots_pending"
     )
+    staging_binary_arg = matching_binary_path or "<matching-non-protected-ShooterGameServer>"
+    staging_command = (
+        f"PYTHONDONTWRITEBYTECODE=1 python3 {RAW_LAYOUT_HELPER} "
+        f"--binary {staging_binary_arg} "
+        "--core <non-protected-core-dump-input> "
+        f"--artifact-root {artifact_root_pattern} "
+        "--run-id <run-id-suffix> "
+        "--mode hardlink"
+    )
+    if inventory_ready or ready_to_build_core:
+        staging_status = "satisfied"
+        staging_blocked_until = None
+    elif matching_binary_path is not None and offline_status == "offline_binary_present_core_like_input_missing":
+        staging_status = "blocked"
+        staging_blocked_until = "non_protected_core_dump_input"
+    else:
+        staging_status = "blocked"
+        staging_blocked_until = next_blocker.get("blocked_until")
 
     def command_step(
         *,
@@ -893,6 +928,23 @@ def build_operator_next_commands(
             "non_claims": [
                 "layout readiness does not validate core contents",
                 "presence of core-like files outside the paired raw directory is not enough",
+            ],
+        },
+        "input_staging": {
+            "id": "stage_offline_raw_layout",
+            "status": staging_status,
+            "ready": False,
+            "blocked_until": staging_blocked_until,
+            "requires": [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+            "command": staging_command,
+            "helper": RAW_LAYOUT_HELPER,
+            "non_claims": [
+                "helper stages existing offline binary and core files only",
+                "helper does not create, validate, approve, or promote core dumps",
+                "helper does not build or approve core evidence packs",
             ],
         },
         "paired_raw_inputs": (
@@ -1014,14 +1066,17 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     reflection_inventory_pattern = recipe_root / REFLECTION_INVENTORY_MANIFEST_PATTERN
     raw_binary_pattern = recipe_root / "player-identity-offline-<run-id>" / "raw" / "ShooterGameServer"
     raw_core_pattern = recipe_root / "player-identity-offline-<run-id>" / "raw" / "core"
+    obelisk_commit = detect_obelisk_commit()
     next_operator_recipe = {
         "blocked_until": "accepted_reflection_inventory_pack",
+        "obelisk_commit": obelisk_commit,
+        "obelisk_commit_source": "git rev-parse --short=12 HEAD",
         "build_core_evidence_pack": (
             "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py "
             f"--binary {raw_binary_pattern} "
             f"--core {raw_core_pattern} "
             f"--output-dir {core_manifest_pattern.parent} "
-            "--obelisk-commit <reviewed-obelisk-id> "
+            f"--obelisk-commit {obelisk_commit} "
             "--no-default-candidates "
             "--no-default-fname-roots "
             "--no-default-fname-indices "
@@ -1052,7 +1107,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             f"--inventory-pack {reflection_inventory_pattern} "
             "--target ShooterPlayerController.ServerListPlayers "
             "--target ShooterPlayerController.ServerKickPlayer "
-            "--evidence-obelisk-commit <reviewed-obelisk-id> "
+            "--evidence-obelisk-commit <evidence-pack-obelisk-commit> "
             "--json-out <ignored-output-path>/player-identity-admin-focal-plan.json"
         ),
         "forbidden_next_commands": [

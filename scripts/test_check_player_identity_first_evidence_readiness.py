@@ -112,6 +112,8 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         recipe = payload["next_operator_recipe"]
         self.assertEqual(recipe["blocked_until"], "accepted_reflection_inventory_pack")
+        self.assertNotIn("<reviewed-obelisk-id>", json.dumps(payload))
+        self.assertEqual(recipe["obelisk_commit_source"], "git rev-parse --short=12 HEAD")
         self.assertIn("build_core_dump_evidence_pack.py", recipe["build_core_evidence_pack"])
         self.assertIn("--binary", recipe["build_core_evidence_pack"])
         self.assertIn("--core", recipe["build_core_evidence_pack"])
@@ -247,6 +249,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "stage_matching_binary_and_core_under_same_player_identity_raw_dir",
         )
         self.assertIn("does not validate core contents", " ".join(input_layout["non_claims"]))
+        input_staging = operator_commands["input_staging"]
+        self.assertEqual(input_staging["id"], "stage_offline_raw_layout")
+        self.assertEqual(input_staging["status"], "blocked")
+        self.assertFalse(input_staging["ready"])
+        self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
+        self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
+        self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
         self.assertEqual(
             [step["id"] for step in operator_commands["sequence"]],
             [
@@ -488,11 +497,23 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
         self.assertFalse(operator_commands["ready_to_build_core_evidence_pack"])
         self.assertEqual(operator_commands["paired_raw_inputs"], [])
+        input_staging = operator_commands["input_staging"]
+        self.assertEqual(input_staging["status"], "blocked")
+        self.assertFalse(input_staging["ready"])
+        self.assertEqual(input_staging["blocked_until"], "non_protected_core_dump_input")
+        self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
+        self.assertIn("--binary /tmp/artifacts/raw/ShooterGameServer", input_staging["command"])
+        self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
+        self.assertIn("--artifact-root /tmp", input_staging["command"])
+        self.assertIn("--run-id <run-id-suffix>", input_staging["command"])
+        self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
+        self.assertIn("does not build or approve core evidence packs", " ".join(input_staging["non_claims"]))
         self.assertEqual(
             operator_commands["input_layout_requirements"]["next_input_preparation_action"],
             "stage_core_next_to_matching_binary_under_same_player_identity_raw_dir",
         )
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
+        self.assertFalse(operator_commands["sequence"][0]["ready"])
         self.assertEqual(
             operator_commands["sequence"][0]["blocked_until"],
             "non_protected_core_dump_input",
