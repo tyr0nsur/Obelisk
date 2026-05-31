@@ -89,10 +89,11 @@ priorities, and do not use history files as the active source of truth.
   `OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS=1` plus
   `allow-filtered-process-event-callbacks`; copied `GameplayPolicyEvent` and
   `ChatMessageEvent` are the RC plugin paths.
-  `CallProcessEvent` remains an ABI v1 compatibility/debug escape hatch only: it is not
-  owner-scoped, so the live env+marker gate is enforceable but the caller plugin's
-  captured capability snapshot is not. Keep it out of the RC production path; a future
-  replacement must carry an owner token and test cross-manager capability snapshots.
+  `CallProcessEvent` remains an ABI v1 compatibility/init-window debug escape hatch only:
+  it now fails closed unless the current plugin owner is inside `ObeliskPlugin_Init`, that
+  owner captured `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and the live env+marker gate
+  is still active. Post-init calls through captured API tables are not a supported callable
+  path; a future replacement must carry an owner token.
 
 ## Product Baseline
 

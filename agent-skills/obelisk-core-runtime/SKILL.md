@@ -59,12 +59,12 @@ Own these areas:
   `allow-call-process-event`, and the runtime only advertises
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` when that gate is active.
 - `CallProcessEvent` is an ABI v1 compatibility/debug escape hatch only. It is not
-  owner-scoped in ABI v1 because the legacy function signature carries no owner token or
-  caller context, so it cannot prove the calling plugin's captured capability snapshot.
-  Treat `allow-call-process-event` as a controlled debug-window marker, never as a
-  production plugin API. A future owner-scoped replacement must require an owner token and
-  reject calls when the owner's init-time capability snapshot did not advertise
-  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`.
+  a production plugin API. ABI v1 has no owner-token call signature, so the only accepted
+  legacy call context is the current `ObeliskPlugin_Init` owner while that owner has a
+  captured `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` snapshot and the live env+marker
+  gate is still active. Post-init calls through a copied `ObeliskApi` table must fail
+  closed. A future callable path must use an owner-token ABI and reject calls when the
+  owner's init-time capability snapshot did not advertise the callable capability.
 - Pre-callback blocking of the original `ProcessEvent` is runtime default-deny. A
   callback return value of `false` is observational unless
   `OBELISK_ALLOW_PROCESS_EVENT_BLOCKING=1`, `allow-process-event-blocking`, and
@@ -78,6 +78,9 @@ Own these areas:
   observer/debug-window markers and observer env.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
   unregistered if init fails, before unload, and before `dlclose`.
+- Owner cleanup must fail visibly. Dispatcher `UnregisterCallbacksForOwner(owner)` methods
+  must propagate internal cleanup exceptions to `PluginManager`; a `0` return is reserved
+  for "nothing removed" and must not hide a cleanup failure before `dlclose`.
 - `TimerManager` is a process-lifetime runtime service for plugin-owned delayed/repeating
   callbacks. Keep it owner-token scoped through `PluginManager`, zero-failure handle
   based, process-local only, and independent of UE4/server state. Plugin unload/init

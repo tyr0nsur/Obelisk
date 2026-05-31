@@ -94,32 +94,45 @@ not by public SDK tooling. Minimal shape:
 - Second source: if supplied, compare layouts only and still report no promotion because
   the target set is planning-only.
 
-Useful existing commands for a future approved offline pass:
+Useful existing commands for a future approved offline pass, in the required order:
 
-To plan exact focal snapshots from an already-reviewed redacted inventory pack without
-reading a core, expanding runtime scope, or touching a server, use the target-set planner
-with an explicit reviewed Obelisk id:
+First produce or approve a complete `obelisk.core-dump-evidence-pack.v1` manifest from a
+non-protected offline core. This note intentionally does not prescribe a server, dump
+path, runtime action, or direct-core planning mode. Do not satisfy this lane from
+ScriptStruct inventory, standalone snapshots, redacted signatures, static thunks, direct
+`--core` plus manual `--gobjects`/`--fname-root-slot`, or a two-function-only inventory.
+
+Then build the complete UFunction reflection inventory pack from that evidence-pack
+manifest. The inventory must include function rows, stay tied to the complete core
+evidence pack through `inputs.evidence_pack_manifest`, and report coverage for the full
+12-target `players-identity-lifecycle-intake` set:
+
+```bash
+python3 scripts/build_reflection_inventory_pack.py \
+  --evidence-pack-manifest <approved-complete-core-evidence-pack>/manifest.json \
+  --include-functions \
+  --target-set players-identity-lifecycle-intake \
+  --evidence-obelisk-commit <reviewed-obelisk-id> \
+  --output-dir <ignored-non-protected-output>/players-identity-reflection-inventory
+```
+
+Only after that inventory exists, plan exact focal snapshots for the two currently missing
+admin/session targets. Do not plan the whole target set at this step; the full 12-target
+coverage belongs to the inventory pack and later first-evidence validation, while snapshot
+generation is currently missing only these two targets:
 
 ```bash
 python3 scripts/plan_ufunction_focal_snapshots.py \
   --inventory-pack <approved-reflection-inventory-pack>/manifest.json \
-  --target-set players-identity-lifecycle-intake \
+  --target ShooterPlayerController.ServerListPlayers \
+  --target ShooterPlayerController.ServerKickPlayer \
   --evidence-obelisk-commit <reviewed-obelisk-id> \
-  --json-out <ignored-non-protected-output>/players-identity-focal-plan.json
+  --json-out <ignored-non-protected-output>/players-identity-admin-focal-plan.json
 ```
 
-This emits candidate-only `inspect_core_ufunctions.py --snapshot-json` commands. It does
-not reread the core, execute commands, add fixtures, promote identity, or authorize server
-work.
-
-```bash
-python3 scripts/build_reflection_inventory_pack.py \
-  --evidence-pack-manifest <approved-offline-manifest> \
-  --target-set players-identity-lifecycle-intake \
-  --evidence-obelisk-commit <reviewed-obelisk-id> \
-  --plan-regeneration \
-  --output-dir <ignored-non-protected-output>
-```
+This emits candidate-only `inspect_core_ufunctions.py --snapshot-json` commands for those
+two targets. It does not reread the core, execute commands, add fixtures, promote
+identity, or authorize server work.
 
 ```bash
 python3 scripts/compare_reflection_snapshots.py \

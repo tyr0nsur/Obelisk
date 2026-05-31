@@ -190,6 +190,24 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("This plan is not approval to add or enable gates", mission_plan)
         self.assertNotIn("arkserver " + "ventana aprobada", send_discord_tests)
 
+    def test_call_process_event_handoff_stays_owner_scoped_init_window_only(self) -> None:
+        for path in (CURRENT, COMPACT_CONTEXT):
+            text = normalized(path.read_text(encoding="utf-8"))
+            with self.subTest(file=str(path.relative_to(REPO_ROOT))):
+                self.assertIn("CallProcessEvent", text)
+                self.assertIn("init-window debug escape hatch", text)
+                self.assertRegex(
+                    text,
+                    r"(current plugin owner is inside|calling plugin is currently inside) `?ObeliskPlugin_Init`?",
+                )
+                self.assertIn("OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT", text)
+                self.assertIn("Post-init calls through captured API tables", text)
+                self.assertRegex(text, r"future .* owner[- ]token ABI|future replacement must carry an owner token")
+                self.assertNotRegex(text, r"\bglobal CallProcessEvent\b")
+                self.assertNotRegex(text, r"\bCallProcessEvent (?:is |remains |stays )?(?:global|ownerless|unowned)\b")
+                self.assertNotRegex(text, r"\bCallProcessEvent\b.{0,80}\b(?:not owner[- ]scoped|no owner scope)\b")
+                self.assertNotRegex(text, r"\bpost-init CallProcessEvent\b.{0,80}\b(?:supported|allowed|callable)\b")
+
     def test_resourcehandle_followup_does_not_restart_broad_scans(self) -> None:
         current = normalized(CURRENT.read_text(encoding="utf-8"))
         compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))

@@ -131,6 +131,9 @@ Validation rules:
   removed before the library is closed.
 - Before `dlclose`, runtime must call optional plugin shutdown, remove plugin-owned
   callbacks, and stop dispatching into that address range.
+- Dispatcher owner-cleanup failures must propagate to `PluginManager`. Returning `0` from
+  `UnregisterCallbacksForOwner(owner)` means no callbacks were removed, not cleanup
+  failure; swallowed exceptions can let `PluginManager` incorrectly proceed to `dlclose`.
 - Shutdown exports must be idempotent, stop external ingress before releasing state, and
   catch all exceptions before returning across the C ABI boundary.
 - Prefer copied Obelisk-level events over raw ProcessEvent callbacks. Filtered and global

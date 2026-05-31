@@ -217,6 +217,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn("internal/test-only", reason)
                 self.assertNotIn(dispatcher, cleaned_dispatchers)
 
+    def test_event_dispatcher_owner_cleanup_failures_propagate_to_plugin_manager(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "UnregisterCallbacksForOwner" not in text:
+                continue
+            body = extract_function_body(
+                text,
+                r"size_t \w+EventDispatcher::UnregisterCallbacksForOwner\(void\* owner\)",
+            )
+            for catch_body in re.findall(r"catch\s*\([^)]*\)\s*\{(?P<body>.*?)\n\s*\}", body, re.S):
+                with self.subTest(source=source.name, catch_body=catch_body.strip()[:80]):
+                    self.assertIn("throw", catch_body)
+                    self.assertNotRegex(catch_body, r"\breturn\s+0\s*;")
+
     def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         for function_name in ("InvokeGameplayPolicyEventCallback", "InvokeChatMessageEventCallback"):

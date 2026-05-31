@@ -335,13 +335,13 @@ namespace Obelisk::Core
         {
             if (Obelisk::Logger::IsInitialized())
                 OBELISK_ERROR("Item return event owner cleanup failed: {}", e.what());
-            return 0;
+            throw;
         }
         catch (...)
         {
             if (Obelisk::Logger::IsInitialized())
                 OBELISK_ERROR("Item return event owner cleanup failed with an unknown exception.");
-            return 0;
+            throw;
         }
         for (const ItemReturnEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
