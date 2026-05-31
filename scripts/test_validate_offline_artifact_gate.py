@@ -1318,6 +1318,13 @@ def players_identity_principal_invalidation_policy_manifest() -> dict:
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "lifecycle_layout_source": {
+            "status": "candidate_layout_consumable",
+            "accepted_layout_only": True,
+            "start_anchor": "ShooterGameMode.HandleNewPlayer",
+            "end_anchor": "ShooterGameMode.OnLogout",
+            "principal_invalidation_evidence": "candidate_policy_only",
+        },
         "principal": {
             "kind": "copied_opaque_principal",
             "copied": True,
@@ -1343,8 +1350,12 @@ def players_identity_principal_invalidation_policy_manifest() -> dict:
             "zero_invalid": True,
             "increments_on": [
                 "session_start",
-                "logout_invalidation",
-                "principal_reuse_after_invalidation",
+                "logout_or_disconnect_invalidation",
+                "reconnect_after_invalidation",
+                "transfer_or_download_edge",
+                "duplicate_or_conflicting_identity",
+                "server_restart",
+                "plugin_reload",
             ],
         },
         "state": {
@@ -1368,6 +1379,7 @@ def players_identity_principal_invalidation_policy_manifest() -> dict:
                 "fail_closed": True,
                 "consumer_result": "deny",
                 "generation_action": "invalidate_or_increment_generation",
+                "trigger": f"{name}_trigger",
             }
             for name in sorted(gate.principal_invalidation_policy.REQUIRED_INVALIDATION_CASES)
         ],
@@ -1375,7 +1387,10 @@ def players_identity_principal_invalidation_policy_manifest() -> dict:
             {
                 "rule": name,
                 "fail_closed": True,
-                "forbids": rejected_sources,
+                "forbids": sorted(
+                    set(rejected_sources)
+                    | gate.principal_invalidation_policy.REQUIRED_FORBIDDEN_CAPABILITY_CLAIMS
+                ),
             }
             for name in sorted(gate.principal_invalidation_policy.REQUIRED_NEGATIVE_RULES)
         ],
@@ -1384,13 +1399,22 @@ def players_identity_principal_invalidation_policy_manifest() -> dict:
             "status": "missing",
             "required_for": ["promote", "public_readiness", "runtime_readiness"],
         },
+        "evidence_policy": {
+            "accepted_evidence_class": "candidate_policy_only",
+            "malformed_evidence_result": "deny",
+            "unsupported_evidence_result": "deny",
+            "fail_closed": True,
+        },
         "rejected_public_identity_sources": rejected_sources,
         "promotion_gate": {
             "ready": False,
             "promotion_ready": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
-            "blockers": ["approved_runtime_evidence_missing"],
+            "blockers": [
+                "approved_runtime_evidence_missing",
+                "principal_invalidation_semantics_unresolved",
+            ],
         },
         "safety_summary": {
             "promotion_ready": False,

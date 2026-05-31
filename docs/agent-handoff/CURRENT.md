@@ -126,6 +126,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   the lifecycle-anchor evidence precondition; the checker must then remain blocked on
   `principal_invalidation_semantics_unresolved` and must keep identity, runtime,
   promotion, and public SDK readiness false.
+  A consume-only offline policy/lifecycle bundle now exists at
+  `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`.
+  Its manifests are accepted by `scripts/validate_offline_artifact_gate.py` in consume
+  mode. When both manifests are passed to
+  `scripts/check_player_identity_first_evidence_readiness.py`, the current primary blocker
+  becomes `approved_runtime_evidence_missing`; this still does not promote identity,
+  permissions, commands, runtime readiness, or public SDK readiness.
 - Static orientation reports for identity/lifecycle/admin and command response are
   navigation clues only, not consume/promote evidence packs or artifact-gate schemas.
 - The current artifact-root audit is summarized in
@@ -158,9 +165,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   complete `obelisk.core-dump-evidence-pack.v1`, accepted
   `obelisk.reflection-inventory-pack.v1`, 12/12 candidate fixtures for the
   `players-identity-lifecycle-intake` set, and accepted distinct second-source layout
-  evidence from the vanilla-gdb core. The next work is a lifecycle-anchor candidate schema
-  gate that consumes the corroborated `HandleNewPlayer`/`OnLogout` layouts while still
-  blocking public identity until principal invalidation semantics are explicit. Do not
+  evidence from the vanilla-gdb core. The lifecycle-anchor and principal-invalidation
+  candidate manifests can now be consumed together; the next blocker is approved runtime
+  principal lifecycle evidence. Do not
   rerun the completed admin snapshot, second-source layout, or lifecycle layout routes or
   broad FName/GObjects/core discovery unless a new binary hash or rejected evidence
   requires it. Current recipe:
@@ -218,9 +225,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Plugin cleanup failure policy skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown after shutdown already ran.
 - Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
   stays blocked on lifecycle-anchor evidence unless an explicit lifecycle-anchor candidate
-  manifest is provided; with that manifest it stays blocked on principal invalidation
-  semantics. Public SDK v1 completion stays blocked, Plugin Hub docs stay non-promotional,
-  and `git diff --check` passes.
+  manifest is provided; with both lifecycle-anchor and principal-invalidation policy
+  manifests it stays blocked on approved runtime evidence. Public SDK v1 completion stays
+  blocked, Plugin Hub docs stay non-promotional, and `git diff --check` passes.
 - Start every supervised round by verifying no stale stand-by sub-agent remains open.
   Assign each sub-agent only the scoped objective, safety baseline, allowed paths,
   required skills, expert role, expected decision, and whether edits are allowed. Pass

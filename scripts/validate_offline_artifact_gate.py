@@ -6062,6 +6062,7 @@ def validate_players_identity_lifecycle_anchor_candidates_manifest(
 
 
 PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_ALLOWED_OVERCLAIM_PREFIXES = (
+    "$.invalidation_cases",
     "$.non_claims",
     "$.negative_consumer_rules",
     "$.promotion_gate.blockers",

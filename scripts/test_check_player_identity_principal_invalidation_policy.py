@@ -102,8 +102,12 @@ def manifest() -> dict:
             "zero_invalid": True,
             "increments_on": [
                 "session_start",
-                "logout_invalidation",
-                "principal_reuse_after_invalidation",
+                "logout_or_disconnect_invalidation",
+                "reconnect_after_invalidation",
+                "transfer_or_download_edge",
+                "duplicate_or_conflicting_identity",
+                "server_restart",
+                "plugin_reload",
             ],
         },
         "state": {
@@ -123,37 +127,58 @@ def manifest() -> dict:
         },
         "invalidation_cases": [
             {
-                "case": "logout",
+                "case": "logout_or_disconnect",
                 "trigger": "ShooterGameMode.OnLogout",
                 "generation_action": "increment_or_retire",
                 "consumer_result": "deny",
                 "fail_closed": True,
             },
             {
-                "case": "generation_mismatch",
-                "trigger": "consumer_generation_check",
-                "generation_action": "deny_without_refresh",
+                "case": "reconnect_after_invalidation",
+                "trigger": "new_session_after_invalidated_principal",
+                "generation_action": "allocate_new_generation",
                 "consumer_result": "deny",
                 "fail_closed": True,
             },
             {
-                "case": "stale_principal_reuse",
-                "trigger": "principal_seen_after_invalidation",
+                "case": "transfer_or_download_edge",
+                "trigger": "transfer_download_without_promoted_identity_continuity",
                 "generation_action": "retire_and_deny",
                 "consumer_result": "deny",
                 "fail_closed": True,
             },
             {
-                "case": "unknown_or_invalid_state",
-                "trigger": "state_not_active",
-                "generation_action": "no_use",
+                "case": "stale_controller_or_player_state",
+                "trigger": "controller_or_player_state_replaced",
+                "generation_action": "invalidate_and_deny",
                 "consumer_result": "deny",
                 "fail_closed": True,
             },
             {
-                "case": "scope_mismatch",
-                "trigger": "scope_flags_not_process_session_local",
-                "generation_action": "no_use",
+                "case": "duplicate_or_conflicting_identity",
+                "trigger": "conflicting_candidate_identity_evidence",
+                "generation_action": "invalidate_conflict_and_deny",
+                "consumer_result": "deny",
+                "fail_closed": True,
+            },
+            {
+                "case": "server_restart",
+                "trigger": "process_restart_boundary",
+                "generation_action": "invalidate_all_prior_generations",
+                "consumer_result": "deny",
+                "fail_closed": True,
+            },
+            {
+                "case": "plugin_reload",
+                "trigger": "plugin_owner_cleanup_or_reload",
+                "generation_action": "deny_cached_plugin_values",
+                "consumer_result": "deny",
+                "fail_closed": True,
+            },
+            {
+                "case": "malformed_or_unsupported_evidence",
+                "trigger": "unsupported_or_malformed_identity_input",
+                "generation_action": "clear_output_and_deny",
                 "consumer_result": "deny",
                 "fail_closed": True,
             },
@@ -184,12 +209,28 @@ def manifest() -> dict:
                 "fail_closed": True,
             },
             {
+                "rule": "no_return_override_or_mutation_authority",
+                "forbids": ["return_override", "mutation"],
+                "fail_closed": True,
+            },
+            {
+                "rule": "no_commands_or_permissions_claims",
+                "forbids": ["commands", "permissions"],
+                "fail_closed": True,
+            },
+            {
                 "rule": "fail_closed_on_invalid_or_stale",
                 "forbids": ["fallback_to_real_id", "best_effort_lookup"],
                 "fail_closed": True,
             },
         ],
         "rejected_public_identity_sources": rejected_sources,
+        "evidence_policy": {
+            "accepted_evidence_class": "candidate_policy_only",
+            "malformed_evidence_result": "deny",
+            "unsupported_evidence_result": "deny",
+            "fail_closed": True,
+        },
         "runtime_evidence": {
             "status": "not_approved",
             "approved": False,
@@ -200,7 +241,11 @@ def manifest() -> dict:
             "promotion_ready": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
-            "blockers": ["approved_runtime_evidence_missing", "candidate_only_policy"],
+            "blockers": [
+                "approved_runtime_evidence_missing",
+                "principal_invalidation_semantics_unresolved",
+                "candidate_only_policy",
+            ],
         },
         "safety_summary": {
             "promotion_ready": False,
@@ -219,6 +264,9 @@ def manifest() -> dict:
                 "FNames",
                 "lookup",
                 "mutation",
+                "return_override",
+                "commands",
+                "permissions",
                 "persistence",
                 "public_sdk",
                 "runtime_readiness",
@@ -228,6 +276,7 @@ def manifest() -> dict:
             "candidate-only principal invalidation policy",
             "does not expose real player identifiers, Steam/EOS, names, IPs, or tribe ids",
             "does not expose UE pointers, ResourceHandle, GObjects, FNames, lookup, mutation, or persistence",
+            "does not expose return override, commands, permissions, moderation, or admin authority",
             "promote, public SDK readiness, and runtime readiness require separately approved runtime evidence",
         ],
     }
@@ -263,6 +312,8 @@ class PlayerIdentityPrincipalInvalidationPolicyTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["principal_invalidation_ready"])
+        self.assertEqual(report["remaining_blockers"], ["principal_invalidation_semantics_unresolved"])
 
     def test_promote_public_and_runtime_modes_fail_closed(self) -> None:
         for flag, expected in (
@@ -276,6 +327,10 @@ class PlayerIdentityPrincipalInvalidationPolicyTests(unittest.TestCase):
 
                 self.assertEqual(result.returncode, 1)
                 self.assertIn(expected, report["blockers"])
+                self.assertIn(
+                    f"{flag.removeprefix('--').replace('-', '_')}_blocked_principal_invalidation_semantics_unresolved",
+                    report["blockers"],
+                )
                 self.assertIn(
                     "candidate_only_principal_invalidation_policy_not_readiness_evidence",
                     report["blockers"],
@@ -327,7 +382,7 @@ class PlayerIdentityPrincipalInvalidationPolicyTests(unittest.TestCase):
     def test_rejects_missing_minimal_invalidation_case(self) -> None:
         payload = manifest()
         payload["invalidation_cases"] = [
-            case for case in payload["invalidation_cases"] if case["case"] != "scope_mismatch"
+            case for case in payload["invalidation_cases"] if case["case"] != "malformed_or_unsupported_evidence"
         ]
 
         result = self.run_checker(payload, check=False)
@@ -385,6 +440,43 @@ class PlayerIdentityPrincipalInvalidationPolicyTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("ue_coordinate_or_pointer_leakage", report["blockers"])
+
+    def test_rejects_positive_commands_permissions_lookup_mutation_and_return_override_claims(self) -> None:
+        for claim in ("commands", "permissions", "lookup", "mutation", "return_override"):
+            with self.subTest(claim=claim):
+                payload = manifest()
+                payload["principal"][claim] = True
+
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("forbidden_public_capability_claim", report["blockers"])
+
+    def test_rejects_missing_fail_closed_evidence_policy(self) -> None:
+        payload = manifest()
+        payload["evidence_policy"]["malformed_evidence_result"] = "allow"
+        payload["evidence_policy"]["unsupported_evidence_result"] = "allow"
+        payload["evidence_policy"]["fail_closed"] = False
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("evidence_policy_malformed_not_denied", report["blockers"])
+        self.assertIn("evidence_policy_unsupported_not_denied", report["blockers"])
+        self.assertIn("evidence_policy_not_fail_closed", report["blockers"])
+
+    def test_rejects_unexpected_top_level_schema_fields(self) -> None:
+        payload = manifest()
+        payload["public_contract_claim"] = "permissions"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("top_level_fields_unexpected", report["blockers"])
+        self.assertIn("forbidden_public_capability_claim", report["blockers"])
 
     def test_rejects_manifest_under_protected_server_root_before_reading(self) -> None:
         result = subprocess.run(

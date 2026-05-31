@@ -1446,8 +1446,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 if surface_id != "obelisk.player_identity.v1"
             ]
             manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            header_path = Path(core_dir) / "ObeliskApi.h"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+                check=False,
+            )
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -1497,8 +1506,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 if surface_id != "obelisk.player_identity.v1"
             ]
             manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            header_path = Path(core_dir) / "ObeliskApi.h"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+                check=False,
+            )
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -1675,6 +1693,152 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
+
+    def test_principal_invalidation_policy_schema_does_not_promote_player_identity(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PlayerIdentityPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="player_identity_promotion",
+            ) as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI test placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity consumer placeholder\n", encoding="utf-8")
+            manifest, _ = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                        "schemas": ["obelisk.players-identity-principal-invalidation-policy.v1"],
+                        "terms": [
+                            "obelisk.core-dump-evidence-pack.v1",
+                            "obelisk.reflection-inventory-pack.v1",
+                            "ServerListPlayers",
+                            "ServerKickPlayer",
+                        ],
+                    }
+                    break
+            manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id != "obelisk.player_identity.v1"
+            ]
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            header_path = Path(core_dir) / "ObeliskApi.h"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
+
+    def test_principal_invalidation_policy_schema_does_not_promote_permissions_readiness(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PlayerIdentityPromotion",
+            ) as identity_core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="player_identity_promotion",
+            ) as identity_sdk_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PermissionsAdminPromotion",
+            ) as permissions_core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="permissions_admin_promotion",
+            ) as permissions_sdk_dir,
+        ):
+            identity_core_test = Path(identity_core_dir) / "PlayerIdentityPromotionTests.cpp"
+            identity_sdk_test = Path(identity_sdk_dir) / "player_identity_promotion_plugin.c"
+            permissions_core_test = Path(permissions_core_dir) / "PermissionsAdminPromotionTests.cpp"
+            permissions_sdk_test = Path(permissions_sdk_dir) / "permissions_admin_promotion_plugin.c"
+            for path in (identity_core_test, identity_sdk_test, permissions_core_test, permissions_sdk_test):
+                path.write_text("// synthetic promotion evidence fixture\n", encoding="utf-8")
+
+            manifest, _ = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(identity_core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(identity_sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "obelisk.core-dump-evidence-pack.v1",
+                            "obelisk.reflection-inventory-pack.v1",
+                            "ServerListPlayers",
+                            "ServerKickPlayer",
+                        ],
+                    }
+                if surface["id"] == "obelisk.permissions_admin.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPermissionsAdminQuery"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.permissions_admin.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(permissions_core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(permissions_sdk_test.relative_to(REPO_ROOT))],
+                        "schemas": ["obelisk.players-identity-principal-invalidation-policy.v1"],
+                        "terms": [
+                            "query-only fail-closed permission checks over copied principals",
+                            "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+                            "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+                            "promoted copied principal semantics",
+                        ],
+                    }
+            manifest["promoted_surfaces"].extend(
+                ["obelisk.player_identity.v1", "obelisk.permissions_admin.v1"]
+            )
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id not in {"obelisk.player_identity.v1", "obelisk.permissions_admin.v1"}
+            ]
+            manifest_path = Path(identity_core_dir) / "public_sdk_surfaces.json"
+            header_path = Path(identity_core_dir) / "ObeliskApi.h"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.permissions_admin.v1"])
 
     def test_promoted_completion_blocker_requires_valid_abi_and_sdk_consumer_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()

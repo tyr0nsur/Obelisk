@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates
+import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -81,6 +82,15 @@ def parse_args() -> argparse.Namespace:
             "Optional consume-only obelisk.players-identity-lifecycle-anchor-candidates.v1 "
             "manifest. It can satisfy lifecycle anchor evidence only; it cannot promote "
             "identity, runtime readiness, or public SDK readiness."
+        ),
+    )
+    parser.add_argument(
+        "--principal-invalidation-policy-manifest",
+        type=Path,
+        help=(
+            "Optional consume-only obelisk.players-identity-principal-invalidation-policy.v1 "
+            "manifest. It can satisfy the planning policy precondition only; it cannot "
+            "promote identity, runtime readiness, or public SDK readiness."
         ),
     )
     parser.add_argument(
@@ -863,6 +873,44 @@ def merge_lifecycle_diagnosis(
     return first_evidence_diagnosis
 
 
+def principal_invalidation_policy_diagnosis(path: Path | None) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "provided": path is not None,
+        "path": str(path) if path is not None else None,
+        "ready": False,
+        "policy_consume_ready": False,
+        "runtime_evidence_ready": False,
+        "principal_invalidation_ready": False,
+        "blockers": [],
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "non_claims": [
+            "consume-only principal invalidation policy; does not promote public identity, permissions, commands, lookup, ResourceHandle, mutation, return override, runtime hooks, or SDK surface",
+        ],
+    }
+    if path is None:
+        return base
+    try:
+        payload = principal_invalidation_policy.load_json(path)
+    except SystemExit as exc:
+        return {**base, "blockers": ["principal_invalidation_policy_manifest_unreadable"], "error": str(exc)}
+    validation = principal_invalidation_policy.validate_manifest(payload, check_mode="consume")
+    blockers = [blocker["reason"] for blocker in validation.blockers]
+    policy_consume_ready = not blockers
+    return {
+        **base,
+        "ready": policy_consume_ready,
+        "policy_consume_ready": policy_consume_ready,
+        "principal_invalidation_ready": policy_consume_ready,
+        "runtime_evidence_ready": False,
+        "blockers": blockers,
+        "principal_fields": validation.principal_fields,
+        "invalidation_cases": validation.invalidation_cases,
+        "negative_consumer_rules": validation.negative_rules,
+    }
+
+
 def first_matching_binary_path(offline_inputs: dict[str, Any]) -> str | None:
     candidates = offline_inputs.get("shooter_game_server_candidates")
     if not isinstance(candidates, list):
@@ -1026,6 +1074,13 @@ def next_actionable_blocker(
             "code": "principal_invalidation_semantics_unresolved",
             "blocked_until": "reviewed_fail_closed_principal_invalidation_policy",
             "why": "lifecycle anchor layout evidence is present, but public identity still lacks reviewed principal invalidation semantics",
+        }
+    if "approved_runtime_evidence_missing" in downstream_blockers:
+        return {
+            **base,
+            "code": "approved_runtime_evidence_missing",
+            "blocked_until": "approved_runtime_principal_lifecycle_evidence",
+            "why": "principal invalidation policy is consumable for planning, but public identity still lacks approved runtime evidence",
         }
     return {
         **base,
@@ -1468,11 +1523,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         first_evidence_lifecycle_diagnosis,
         lifecycle_candidate_diagnosis,
     )
+    principal_policy_diagnosis = principal_invalidation_policy_diagnosis(
+        getattr(args, "principal_invalidation_policy_manifest", None)
+    )
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
     )
-    principal_invalidation_ready = lifecycle_diagnosis.get("principal_invalidation_ready") is True
+    principal_policy_ready = principal_policy_diagnosis.get("policy_consume_ready") is True
+    principal_invalidation_ready = (
+        lifecycle_diagnosis.get("principal_invalidation_ready") is True
+        or principal_policy_ready
+    )
     layout_accepted = second_source_layout_accepted(
         coverage_payload_valid=coverage_payload_valid,
         coverage_targets=coverage_targets,
@@ -1514,6 +1576,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         downstream_blockers.append("accepted_lifecycle_anchors_missing")
     if lifecycle_ready and not principal_invalidation_ready:
         downstream_blockers.append("principal_invalidation_semantics_unresolved")
+    if lifecycle_ready and principal_invalidation_ready:
+        downstream_blockers.append("approved_runtime_evidence_missing")
     if inventory_ready:
         blockers.extend(downstream_blockers)
 
@@ -1532,7 +1596,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         elif first_evidence_ready and not principal_invalidation_ready:
             next_step = "produce_reviewed_principal_invalidation_semantics"
         elif first_evidence_ready:
-            next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
+            next_step = "produce_approved_runtime_principal_lifecycle_evidence"
 
     recipe_root_raw = offline_inputs.get("resolved_root")
     if isinstance(recipe_root_raw, str) and offline_inputs.get("status") != "artifact_root_rejected":
@@ -1655,6 +1719,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "lifecycle_anchor_candidates_manifest": (
             str(args.lifecycle_anchor_candidates_manifest)
             if getattr(args, "lifecycle_anchor_candidates_manifest", None)
+            else None
+        ),
+        "principal_invalidation_policy_manifest": (
+            str(args.principal_invalidation_policy_manifest)
+            if getattr(args, "principal_invalidation_policy_manifest", None)
             else None
         ),
         "target_set": PLAYER_IDENTITY_TARGET_SET,
@@ -1782,6 +1851,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "lifecycle_anchors": lifecycle_diagnosis,
             "generated_lifecycle_anchors": first_evidence_lifecycle_diagnosis,
             "lifecycle_anchor_candidates": lifecycle_candidate_diagnosis,
+            "principal_invalidation_policy": principal_policy_diagnosis,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,

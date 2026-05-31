@@ -21,6 +21,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import check_player_identity_first_evidence_readiness as checker
 from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
+from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
@@ -711,6 +712,84 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(anchors["accepted_end_targets"], ["ShooterGameMode.OnLogout"])
         self.assertFalse(anchors["principal_invalidation_ready"])
         self.assertEqual(payload["next_step"], "produce_reviewed_principal_invalidation_semantics")
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+
+    def test_consumes_principal_policy_but_keeps_runtime_evidence_blocked(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"layout_ready": True, "promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": False,
+                        "session_end_accepted": False,
+                        "accepted_start_targets": [],
+                        "accepted_end_targets": [],
+                        "blockers": [
+                            "accepted_session_start_anchor_missing",
+                            "accepted_session_end_anchor_missing",
+                        ],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            lifecycle_manifest = Path(tmp) / "lifecycle-candidates.json"
+            principal_manifest = Path(tmp) / "principal-policy.json"
+            lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            args = SimpleNamespace(
+                artifact_root=Path("/tmp/player-identity-artifacts"),
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=Path("/tmp/player-identity-second-source"),
+                lifecycle_anchor_candidates_manifest=lifecycle_manifest,
+                principal_invalidation_policy_manifest=principal_manifest,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn("approved_runtime_evidence_missing", payload["blockers"])
+        policy = payload["first_evidence"]["principal_invalidation_policy"]
+        self.assertTrue(policy["policy_consume_ready"])
+        self.assertFalse(policy["runtime_evidence_ready"])
+        self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])

@@ -8380,6 +8380,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         }
                     )
                 )
+        self.assertIn(
+            "obelisk.players-identity-principal-invalidation-policy.v1",
+            gate["SUPPORTED_MANIFEST_SCHEMAS"],
+        )
+        self.assertTrue(
+            checker["evidence_has_non_promotional_schema_marker"](
+                {
+                    "schemas": ["obelisk.players-identity-principal-invalidation-policy.v1"],
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                }
+            )
+        )
 
         with (
             tempfile.TemporaryDirectory(
@@ -8615,7 +8628,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(term), compact)
 
         for term in (
-            "lifecycle-anchor candidate schema\n  gate that consumes the corroborated `HandleNewPlayer`/`OnLogout` layouts",
+            "lifecycle-anchor and principal-invalidation candidate manifests can now be consumed together",
+            "the next blocker is approved runtime principal lifecycle evidence",
             "Do not\n  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
             "Current recipe:\n  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`",
         ):

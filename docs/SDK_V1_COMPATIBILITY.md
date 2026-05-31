@@ -193,6 +193,10 @@ Planning those missing admin snapshots must start from a reviewed non-protected 
 `ShooterGameServer` binary, copied core, manual FName/GObjects roots, or direct
 core/bin planning alone is insufficient and must not be described as public SDK,
 runtime-readiness, or promotion evidence.
+The future `obelisk.players-identity-principal-invalidation-policy.v1` artifact is a
+candidate-only policy input; it does not promote player identity/principal,
+permissions/admin, command response paths, commands/replies, runtime readiness, or v1 SDK
+completion.
 Player identity/principal evidence does not unlock `operator_ingress_storage`; operator
 ingress/storage remains a separate post-v1 blocker until secret-safe ingress,
 storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted,

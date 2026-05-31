@@ -87,10 +87,21 @@ This does not authorize copying ArkServerApi/AseApi or NextGenPlugins code, offs
 layouts, constants, parsers, ABI assumptions, or implementation behavior. They remain
 name and demand dictionaries only.
 
-## Next Technical Step
+## Current Offline Policy Artifact
 
-Add or consume a candidate-only `obelisk.players-identity-principal-invalidation-policy.v1`
-artifact checker. It should accept only non-public planning evidence and keep these flags
+A consume-only policy/lifecycle bundle now exists at:
+
+```text
+/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/
+```
+
+It contains:
+
+- `players-identity-lifecycle-anchor-candidates.json`
+- `players-identity-principal-invalidation-policy.json`
+
+Both manifests are accepted by `scripts/validate_offline_artifact_gate.py` in consume
+mode. The principal policy checker accepts the candidate-only policy and keeps these flags
 false:
 
 - `promotion_ready`;
@@ -102,7 +113,8 @@ claims, permissions/commands unlock claims, mutation, return override, raw UE ex
 unredacted identifiers, and cross-instance stability claims.
 
 The lifecycle-anchor checker should remain candidate-only and should not accept new
-values in `principal_policy.invalidation_semantics` as a shortcut to promotion. A future
-higher-level readiness gate can consume the lifecycle layout artifact and the principal
-policy artifact together, but that gate must still block public SDK promotion until
-runtime evidence and public ABI review exist.
+values in `principal_policy.invalidation_semantics` as a shortcut to promotion. The
+higher-level first-evidence readiness gate can now consume the lifecycle layout artifact
+and principal policy artifact together, but it still reports
+`approved_runtime_evidence_missing` and blocks public SDK promotion until runtime evidence
+and public ABI review exist.

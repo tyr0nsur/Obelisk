@@ -22,11 +22,14 @@ REQUIRED_PRINCIPAL_FIELD_NAMES = frozenset(
 )
 REQUIRED_INVALIDATION_CASES = frozenset(
     (
-        "logout",
-        "generation_mismatch",
-        "stale_principal_reuse",
-        "unknown_or_invalid_state",
-        "scope_mismatch",
+        "logout_or_disconnect",
+        "reconnect_after_invalidation",
+        "transfer_or_download_edge",
+        "stale_controller_or_player_state",
+        "duplicate_or_conflicting_identity",
+        "server_restart",
+        "plugin_reload",
+        "malformed_or_unsupported_evidence",
     )
 )
 REQUIRED_NEGATIVE_RULES = frozenset(
@@ -34,7 +37,33 @@ REQUIRED_NEGATIVE_RULES = frozenset(
         "no_real_identity_public",
         "no_ue_pointer_or_handle_identity",
         "no_lookup_or_persistence_from_principal",
+        "no_return_override_or_mutation_authority",
+        "no_commands_or_permissions_claims",
         "fail_closed_on_invalid_or_stale",
+    )
+)
+REQUIRED_TOP_LEVEL_KEYS = frozenset(
+    (
+        "schema",
+        "artifact_status",
+        "readiness_classification",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "lifecycle_layout_source",
+        "principal",
+        "generation",
+        "state",
+        "scope_flags",
+        "privacy_class",
+        "invalidation_cases",
+        "negative_consumer_rules",
+        "rejected_public_identity_sources",
+        "evidence_policy",
+        "runtime_evidence",
+        "promotion_gate",
+        "safety_summary",
+        "non_claims",
     )
 )
 REQUIRED_REJECTED_PUBLIC_IDENTITY_SOURCES = frozenset(
@@ -58,6 +87,7 @@ REQUIRED_NON_CLAIMS = frozenset(
         "candidate-only principal invalidation policy",
         "does not expose real player identifiers, Steam/EOS, names, IPs, or tribe ids",
         "does not expose UE pointers, ResourceHandle, GObjects, FNames, lookup, mutation, or persistence",
+        "does not expose return override, commands, permissions, moderation, or admin authority",
         "promote, public SDK readiness, and runtime readiness require separately approved runtime evidence",
     )
 )
@@ -75,9 +105,21 @@ REQUIRED_EXCLUSIONS = frozenset(
         "FNames",
         "lookup",
         "mutation",
+        "return_override",
+        "commands",
+        "permissions",
         "persistence",
         "public_sdk",
         "runtime_readiness",
+    )
+)
+REQUIRED_FORBIDDEN_CAPABILITY_CLAIMS = frozenset(
+    (
+        "lookup",
+        "mutation",
+        "return_override",
+        "commands",
+        "permissions",
     )
 )
 
@@ -123,15 +165,39 @@ FORBIDDEN_PUBLIC_IDENTITY_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+FORBIDDEN_CAPABILITY_CLAIM_RE = re.compile(
+    r"\b("
+    r"lookup|"
+    r"mutation|"
+    r"mutate|"
+    r"return[_ -]?override|"
+    r"override[_ -]?return|"
+    r"commands?|"
+    r"permissions?|"
+    r"admin(?:istration)?|"
+    r"moderation|"
+    r"kick|"
+    r"ban"
+    r")\b",
+    re.IGNORECASE,
+)
 
 NEGATIVE_CONTEXT_TOKENS = (
     "blocker",
+    "deny",
+    "excluded",
     "forbid",
     "forbidden",
+    "forbids",
     "negative",
     "non_claim",
     "reject",
     "rejected",
+    "safety",
+)
+PERMITTED_POSITIVE_TRAIL_TOKENS = (
+    "invalidation_cases",
+    "lifecycle_layout_source",
 )
 
 
@@ -199,6 +265,11 @@ def is_negative_context(trail: str) -> bool:
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
 
 
+def is_permitted_positive_context(trail: str) -> bool:
+    lowered = trail.casefold()
+    return any(token in lowered for token in PERMITTED_POSITIVE_TRAIL_TOKENS)
+
+
 def find_forbidden_coordinate(value: Any, trail: str = "$") -> tuple[str, str] | None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -235,6 +306,27 @@ def find_forbidden_public_identity(value: Any, trail: str = "$") -> tuple[str, s
             if found is not None:
                 return found
     elif isinstance(value, str) and FORBIDDEN_PUBLIC_IDENTITY_RE.search(value):
+        return value, trail
+    return None
+
+
+def find_forbidden_positive_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
+    if is_negative_context(trail) or is_permitted_positive_context(trail):
+        return None
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if FORBIDDEN_CAPABILITY_CLAIM_RE.search(str(key)):
+                return str(key), child_trail
+            found = find_forbidden_positive_claim(child, child_trail)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = find_forbidden_positive_claim(child, f"{trail}[{index}]")
+            if found is not None:
+                return found
+    elif isinstance(value, str) and FORBIDDEN_CAPABILITY_CLAIM_RE.search(value):
         return value, trail
     return None
 
@@ -309,7 +401,15 @@ def validate_generation(generation: Any, blockers: list[dict[str, Any]]) -> None
     if generation.get("zero_invalid") is not True:
         add(blockers, "generation_zero_invalid_missing", "$.generation.zero_invalid")
     increments = generation.get("increments_on")
-    required = {"session_start", "logout_invalidation", "principal_reuse_after_invalidation"}
+    required = {
+        "session_start",
+        "logout_or_disconnect_invalidation",
+        "reconnect_after_invalidation",
+        "transfer_or_download_edge",
+        "duplicate_or_conflicting_identity",
+        "server_restart",
+        "plugin_reload",
+    }
     if not isinstance(increments, list) or not required.issubset(set(increments)):
         add(blockers, "generation_increments_missing_required_cases", "$.generation.increments_on")
 
@@ -380,6 +480,8 @@ def validate_invalidation_cases(cases: Any, blockers: list[dict[str, Any]]) -> l
             add(blockers, "invalidation_case_consumer_result_not_denied", f"{label}.consumer_result", case=name)
         if not isinstance(case.get("generation_action"), str) or not case["generation_action"]:
             add(blockers, "invalidation_case_generation_action_missing", f"{label}.generation_action", case=name)
+        if not isinstance(case.get("trigger"), str) or not case["trigger"]:
+            add(blockers, "invalidation_case_trigger_missing", f"{label}.trigger", case=name)
     missing = REQUIRED_INVALIDATION_CASES - set(seen)
     if missing:
         add(blockers, "invalidation_cases_missing_required", "$.invalidation_cases", missing=sorted(missing))
@@ -422,7 +524,29 @@ def validate_negative_consumer_rules(rules: Any, blockers: list[dict[str, Any]])
             "$.negative_consumer_rules",
             missing=sorted(missing_forbidden),
         )
+    missing_capability_claims = REQUIRED_FORBIDDEN_CAPABILITY_CLAIMS - forbidden_terms
+    if missing_capability_claims:
+        add(
+            blockers,
+            "negative_consumer_rules_missing_forbidden_capability_claims",
+            "$.negative_consumer_rules",
+            missing=sorted(missing_capability_claims),
+        )
     return sorted(seen)
+
+
+def validate_evidence_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    if not isinstance(policy, dict):
+        add(blockers, "evidence_policy_missing", "$.evidence_policy")
+        return
+    if policy.get("accepted_evidence_class") != "candidate_policy_only":
+        add(blockers, "evidence_policy_not_candidate_policy_only", "$.evidence_policy.accepted_evidence_class")
+    if policy.get("malformed_evidence_result") != "deny":
+        add(blockers, "evidence_policy_malformed_not_denied", "$.evidence_policy.malformed_evidence_result")
+    if policy.get("unsupported_evidence_result") != "deny":
+        add(blockers, "evidence_policy_unsupported_not_denied", "$.evidence_policy.unsupported_evidence_result")
+    if policy.get("fail_closed") is not True:
+        add(blockers, "evidence_policy_not_fail_closed", "$.evidence_policy.fail_closed")
 
 
 def validate_runtime_evidence(evidence: Any, blockers: list[dict[str, Any]]) -> None:
@@ -439,11 +563,34 @@ def validate_runtime_evidence(evidence: Any, blockers: list[dict[str, Any]]) -> 
         add(blockers, "runtime_evidence_required_for_missing_readiness_modes", "$.runtime_evidence.required_for")
 
 
+def validate_lifecycle_layout_source(source: Any, blockers: list[dict[str, Any]]) -> None:
+    if not isinstance(source, dict):
+        add(blockers, "lifecycle_layout_source_missing", "$.lifecycle_layout_source")
+        return
+    if source.get("status") != "candidate_layout_consumable":
+        add(blockers, "lifecycle_layout_source_status_not_candidate", "$.lifecycle_layout_source.status")
+    if source.get("accepted_layout_only") is not True:
+        add(blockers, "lifecycle_layout_source_not_layout_only", "$.lifecycle_layout_source.accepted_layout_only")
+    if source.get("principal_invalidation_evidence") != "candidate_policy_only":
+        add(
+            blockers,
+            "lifecycle_layout_source_principal_invalidation_overclaim",
+            "$.lifecycle_layout_source.principal_invalidation_evidence",
+        )
+
+
 def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation:
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
         return Validation(blockers, [], [], [])
+    keys = set(payload)
+    missing_keys = REQUIRED_TOP_LEVEL_KEYS - keys
+    unexpected_keys = keys - REQUIRED_TOP_LEVEL_KEYS
+    if missing_keys:
+        add(blockers, "top_level_fields_missing_required", "$", missing=sorted(missing_keys))
+    if unexpected_keys:
+        add(blockers, "top_level_fields_unexpected", "$", unexpected=sorted(unexpected_keys))
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -452,6 +599,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         if payload.get(key) is not False:
             add(blockers, f"{key}_not_false", f"$.{key}")
 
+    validate_lifecycle_layout_source(payload.get("lifecycle_layout_source"), blockers)
     principal_fields = validate_principal(payload.get("principal"), blockers)
     validate_generation(payload.get("generation"), blockers)
     validate_state(payload.get("state"), blockers)
@@ -459,6 +607,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     validate_privacy_class(payload.get("privacy_class"), blockers)
     invalidation_cases = validate_invalidation_cases(payload.get("invalidation_cases"), blockers)
     negative_rules = validate_negative_consumer_rules(payload.get("negative_consumer_rules"), blockers)
+    validate_evidence_policy(payload.get("evidence_policy"), blockers)
     validate_runtime_evidence(payload.get("runtime_evidence"), blockers)
 
     rejected = payload.get("rejected_public_identity_sources")
@@ -473,7 +622,8 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
             if promotion_gate.get(key) is not False:
                 add(blockers, f"promotion_gate_{key}_not_false", f"$.promotion_gate.{key}")
         blockers_value = promotion_gate.get("blockers")
-        if not isinstance(blockers_value, list) or "approved_runtime_evidence_missing" not in blockers_value:
+        required_blockers = {"approved_runtime_evidence_missing", "principal_invalidation_semantics_unresolved"}
+        if not isinstance(blockers_value, list) or not required_blockers.issubset(set(blockers_value)):
             add(blockers, "promotion_gate_missing_runtime_evidence_blocker", "$.promotion_gate.blockers")
 
     safety = payload.get("safety_summary")
@@ -495,12 +645,21 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     if coordinate is not None:
         field, trail = coordinate
         add(blockers, "ue_coordinate_or_pointer_leakage", trail, field=field)
-    forbidden = find_forbidden_public_identity(payload.get("principal", {}), "$.principal")
+    forbidden = find_forbidden_public_identity(payload)
     if forbidden is not None:
         value, trail = forbidden
         add(blockers, "forbidden_public_identity_source", trail, value=value)
+    claim = find_forbidden_positive_claim(payload)
+    if claim is not None:
+        value, trail = claim
+        add(blockers, "forbidden_public_capability_claim", trail, value=value)
 
     if check_mode != "consume":
+        add(
+            blockers,
+            f"{check_mode}_blocked_principal_invalidation_semantics_unresolved",
+            "$.runtime_evidence",
+        )
         add(
             blockers,
             f"{check_mode}_blocked_without_approved_runtime_evidence",
@@ -525,6 +684,8 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "principal_invalidation_ready": False,
+        "remaining_blockers": ["principal_invalidation_semantics_unresolved"],
         "principal_fields": validation.principal_fields,
         "invalidation_cases": validation.invalidation_cases,
         "negative_consumer_rules": validation.negative_rules,

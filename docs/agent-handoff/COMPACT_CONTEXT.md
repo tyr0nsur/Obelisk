@@ -281,6 +281,12 @@ priorities, and do not use history files as the active source of truth.
   `scripts/check_player_identity_first_evidence_readiness.py`, it may clear only the
   lifecycle-anchor evidence precondition and must then remain blocked on
   `principal_invalidation_semantics_unresolved`.
+  A consume-only policy/lifecycle bundle at
+  `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
+  is accepted by the offline artifact gate. Passing both that lifecycle-anchor candidate
+  manifest and the principal-invalidation policy manifest to the first-evidence readiness
+  checker moves the primary blocker to `approved_runtime_evidence_missing`, still with
+  promotion/public/runtime readiness false.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as
