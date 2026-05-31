@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ TRANSFER_BACCEPT_ONLY_POLICY_SCHEMA = "obelisk.transfer-baccept-only-policy-slic
 MISSION_COPIED_BOOL_POLICY_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
 STRUCTURE_RETURN_ONLY_POLICY_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
+STRUCTURE_AGGREGATE_CENSUS_POLICY_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -54,6 +56,8 @@ STRUCTURE_RETURN_ONLY_INPUT_TARGET_SET = "structure-observer-intake"
 STRUCTURE_RETURN_ONLY_OUTPUT_TARGET_SET = "structure-return-only-policy-slice"
 STRUCTURE_NONPIN_COPIED_SCALAR_INPUT_TARGET_SET = "structure-nonpin-copied-scalar-policy-slice"
 STRUCTURE_NONPIN_COPIED_SCALAR_OUTPUT_TARGET_SET = "structure-nonpin-copied-scalar-policy-slice"
+STRUCTURE_AGGREGATE_CENSUS_INPUT_TARGET_SET = "structure-aggregate-census-planning"
+STRUCTURE_AGGREGATE_CENSUS_OUTPUT_TARGET_SET = "structure-aggregate-census-policy-slice"
 DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET = "dino-compact-intake"
 
 ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
@@ -358,6 +362,11 @@ STRUCTURE_NONPIN_REDACTED_FIELD_REASONS = {
     "PrimalStructureSeating.CanSeat.forCharacter": "character_ref_excluded",
 }
 
+STRUCTURE_AGGREGATE_EXCLUDED_PIN_FIELDS = (
+    "PrimalStructureItemContainer.VerifyPinCode.pinCode",
+    "PrimalStructureItemContainer.VerifyPinCode.ReturnValue",
+)
+
 SCALAR_TYPE_BY_CLASS = {
     "BoolProperty": "bool",
     "ByteProperty": "byte_or_enum",
@@ -532,6 +541,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Emit a focused evidence-only structure policy slice that validates "
             "non-PIN structure targets and copies only approved scalar fields."
+        ),
+    )
+    parser.add_argument(
+        "--structure-aggregate-census-policy-slice",
+        action="store_true",
+        help=(
+            "Emit a consume-only structure aggregate/census policy slice with "
+            "approved counters, histograms, copied fields, redactions, and PIN exclusions."
         ),
     )
     return parser.parse_args()
@@ -2793,6 +2810,252 @@ def build_structure_nonpin_copied_scalar_policy_slice(*, snapshot_root: Path = D
     }
 
 
+def require_structure_aggregate_pin_exclusions(
+    target_payload: dict[str, Any],
+    source_snapshot: dict[str, str],
+) -> list[dict[str, Any]]:
+    target_identity = target_payload.get("target")
+    property_chain = target_payload.get("property_chain")
+    if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+        raise SystemExit("structure aggregate policy snapshot missing target identity or property chain")
+    target = target_name(target_identity)
+    if target != "PrimalStructureItemContainer.VerifyPinCode":
+        return []
+
+    expected = STRUCTURE_RETURN_ONLY_EXPECTED_SHAPES[target]
+    return_value_offset = require_int_field(target_payload, "return_value_offset", target)
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list):
+        raise SystemExit(f"{target} property_chain.properties is not a list")
+
+    excluded: list[dict[str, Any]] = []
+    for prop, (expected_name, expected_class) in zip(properties, expected["properties"], strict=True):
+        if not isinstance(prop, dict):
+            raise SystemExit(f"{target} property entry is not an object")
+        name = prop.get("name")
+        class_name = prop.get("class_name")
+        if name != expected_name or class_name != expected_class:
+            raise SystemExit(f"{target} PIN property shape drifted: expected {expected_name}:{expected_class}")
+        field_key = f"{target}.{expected_name}"
+        if field_key not in STRUCTURE_AGGREGATE_EXCLUDED_PIN_FIELDS:
+            raise SystemExit(f"{field_key} has no structure aggregate PIN exclusion policy")
+        field = classify_property(prop, return_value_offset)
+        common = {
+            "target": target,
+            "field": expected_name,
+            "excluded_field": field_key,
+            "offset": format_hex(require_int_field(prop, "offset_internal", field_key)),
+            "offset_internal": require_int_field(prop, "offset_internal", field_key),
+            "element_size": require_int_field(prop, "element_size", field_key),
+            "array_dim": require_int_field(prop, "array_dim", field_key),
+            "property_flags": format_hex(property_flags(prop) or 0),
+            "property_class": expected_class,
+            "function_flags": format_hex(require_int_field(target_payload, "function_flags", target)),
+            "num_parms": require_int_field(target_payload, "num_parms", target),
+            "parms_size": require_int_field(target_payload, "parms_size", target),
+            "return_value_offset": format_hex(return_value_offset),
+            "source_snapshot": source_snapshot["id"],
+            "source_snapshot_sha256": source_snapshot["sha256"],
+            "evidence_status": "explicitly-excluded-pin-code-field",
+        }
+        if expected_name == "pinCode":
+            if expected_class != "IntProperty" or field["direction"] != "in" or common["element_size"] != 4:
+                raise SystemExit(f"{field_key} PIN scalar exclusion shape drifted")
+            excluded.append(
+                {
+                    **common,
+                    "direction": "in",
+                    "type": "int32",
+                    "reason": "pin_code_value_excluded",
+                }
+            )
+        else:
+            bool_field_size, bool_byte_offset = require_bool_tail(prop, field_key)
+            masks = field.get("bool_masks")
+            if (
+                field["type"] != "bool"
+                or field["direction"] != "return"
+                or bool_field_size != 1
+                or bool_byte_offset != 0
+                or not isinstance(masks, dict)
+                or masks.get("byte_mask") != "0x01"
+                or masks.get("field_mask") != "0xff"
+                or prop.get("native_bool") is not False
+            ):
+                raise SystemExit(f"{field_key} PIN return exclusion shape drifted")
+            excluded.append(
+                {
+                    **common,
+                    "direction": "return",
+                    "type": "bool",
+                    "bool_field_size": bool_field_size,
+                    "bool_byte_offset": bool_byte_offset,
+                    "byte_mask": masks["byte_mask"],
+                    "field_mask": masks["field_mask"],
+                    "native_bool": False,
+                    "reason": "pin_code_return_value_excluded",
+                }
+            )
+    return excluded
+
+
+def build_structure_aggregate_census_policy_slice(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
+    paths, missing_targets = snapshot_paths_from_target_sets(snapshot_root, [STRUCTURE_AGGREGATE_CENSUS_INPUT_TARGET_SET])
+    if missing_targets:
+        raise SystemExit("structure aggregate census policy manifest missing targets: " + ",".join(missing_targets))
+
+    input_snapshots: list[dict[str, str]] = []
+    copied: list[dict[str, Any]] = []
+    redacted: list[dict[str, Any]] = []
+    excluded_pin_fields: list[dict[str, Any]] = []
+    property_class_histogram: Counter[str] = Counter()
+    seen_targets: set[str] = set()
+    for index, path in enumerate(paths, start=1):
+        source_snapshot = {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
+        payload = load_json_file("snapshot", path)
+        targets = require_snapshot_payload(payload, path)
+        for target_payload in targets:
+            target_identity = target_payload.get("target")
+            property_chain = target_payload.get("property_chain")
+            if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+                raise SystemExit(f"snapshot missing structure aggregate target identity or property chain: {path}")
+            target = target_name(target_identity)
+            if target in seen_targets:
+                raise SystemExit(f"duplicate structure aggregate policy target: {target}")
+            seen_targets.add(target)
+            source_snapshot["target"] = target
+            input_snapshots.append(source_snapshot)
+
+            properties = property_chain.get("properties")
+            if not isinstance(properties, list):
+                raise SystemExit(f"{target} property_chain.properties is not a list")
+            property_class_histogram.update(
+                prop.get("class_name")
+                for prop in properties
+                if isinstance(prop, dict) and isinstance(prop.get("class_name"), str)
+            )
+
+            target_copied, target_redacted, _ = require_structure_return_only_shape(target_payload, source_snapshot)
+            copied.extend(target_copied)
+            redacted.extend(target_redacted)
+            if target in {
+                "PrimalStructure.SetVariant",
+                "PrimalStructureItemContainer.AllowToggleActivation",
+                "PrimalStructureSeating.CanSeat",
+            }:
+                target_copied, target_redacted = require_structure_nonpin_copied_scalar_shape(
+                    target_payload,
+                    source_snapshot,
+                )
+                copied.extend(target_copied)
+                redacted.extend(target_redacted)
+            excluded_pin_fields.extend(require_structure_aggregate_pin_exclusions(target_payload, source_snapshot))
+
+    expected_input_targets = expand_ufunction_targets([STRUCTURE_AGGREGATE_CENSUS_INPUT_TARGET_SET])
+    expected_copied_fields = (*STRUCTURE_RETURN_ONLY_COPIED_FIELDS, *STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS)
+    expected_redacted_fields = (
+        *STRUCTURE_RETURN_ONLY_REDACTED_FIELD_REASONS,
+        *STRUCTURE_NONPIN_REDACTED_FIELD_REASONS,
+    )
+    emitted_copied_fields = [entry["copied_field"] for entry in copied]
+    emitted_redacted_fields = [entry["redacted_field"] for entry in redacted]
+    emitted_excluded_pin_fields = [entry["excluded_field"] for entry in excluded_pin_fields]
+    blockers = [
+        *[f"missing_input_target:{target}" for target in expected_input_targets if target not in seen_targets],
+        *[f"unexpected_input_target:{target}" for target in seen_targets if target not in expected_input_targets],
+        *[f"missing_copied_field:{field}" for field in expected_copied_fields if field not in emitted_copied_fields],
+        *[f"unexpected_copied_field:{field}" for field in emitted_copied_fields if field not in expected_copied_fields],
+        *[f"missing_redacted_field:{field}" for field in expected_redacted_fields if field not in emitted_redacted_fields],
+        *[f"unexpected_redacted_field:{field}" for field in emitted_redacted_fields if field not in expected_redacted_fields],
+        *[
+            f"missing_excluded_pin_field:{field}"
+            for field in STRUCTURE_AGGREGATE_EXCLUDED_PIN_FIELDS
+            if field not in emitted_excluded_pin_fields
+        ],
+        *[
+            f"unexpected_excluded_pin_field:{field}"
+            for field in emitted_excluded_pin_fields
+            if field not in STRUCTURE_AGGREGATE_EXCLUDED_PIN_FIELDS
+        ],
+    ]
+    if blockers:
+        raise SystemExit("structure aggregate census policy slice failed closed: " + ",".join(blockers))
+
+    copied_direction_histogram = Counter(entry["direction"] for entry in copied)
+    copied_type_histogram = Counter(entry["type"] for entry in copied)
+    redaction_reason_histogram = Counter(entry["reason"] for entry in redacted)
+    excluded_reason_histogram = Counter(entry["reason"] for entry in excluded_pin_fields)
+    return {
+        "schema": STRUCTURE_AGGREGATE_CENSUS_POLICY_SCHEMA,
+        "generated_from": {
+            "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "snapshot_root": "redacted",
+        "input_target_set": STRUCTURE_AGGREGATE_CENSUS_INPUT_TARGET_SET,
+        "output_target_set": STRUCTURE_AGGREGATE_CENSUS_OUTPUT_TARGET_SET,
+        "policy_status": "evidence-only",
+        "consume_only": True,
+        "missing_targets": [],
+        "coverage": {
+            "status": "complete",
+            "input_targets": expected_input_targets,
+            "copied_fields_permitted": list(expected_copied_fields),
+            "redacted_fields": list(expected_redacted_fields),
+            "explicitly_excluded_fields": list(STRUCTURE_AGGREGATE_EXCLUDED_PIN_FIELDS),
+        },
+        "copied_fields_permitted": copied,
+        "redacted_structure_fields": redacted,
+        "explicitly_excluded_fields": excluded_pin_fields,
+        "approved_counters": {
+            "input_target_count": len(expected_input_targets),
+            "property_count": sum(property_class_histogram.values()),
+            "copied_field_count": len(copied),
+            "copied_bool_count": copied_type_histogram["bool"],
+            "copied_int32_count": copied_type_histogram["int32"],
+            "redacted_field_count": len(redacted),
+            "explicitly_excluded_field_count": len(excluded_pin_fields),
+        },
+        "approved_histograms": {
+            "property_class": dict(sorted(property_class_histogram.items())),
+            "copied_direction": dict(sorted(copied_direction_histogram.items())),
+            "copied_type": dict(sorted(copied_type_histogram.items())),
+            "redaction_reason": dict(sorted(redaction_reason_histogram.items())),
+            "explicit_exclusion_reason": dict(sorted(excluded_reason_histogram.items())),
+        },
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "promotion_ready": False,
+            "intended_use": "offline_review_only",
+            "consume_only": True,
+            "copied_field_count": len(copied),
+            "redacted_field_count": len(redacted),
+            "explicitly_excluded_field_count": len(excluded_pin_fields),
+            "explicitly_excluded": [
+                "ForPC",
+                "VerifyPinCode.pinCode",
+                "VerifyPinCode.ReturnValue",
+                "forCharacter",
+                "identity",
+                "lookup",
+                "mutation",
+                "object_refs",
+                "pinCode",
+                "public_sdk",
+                "resource_handle",
+                "return_override",
+                "runtime",
+            ],
+        },
+        "non_claims": [
+            "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+            "does not promote public SDK callbacks or public metadata helpers",
+            "does not promote runtime hook wiring, dispatcher wiring, StructureEvents, identity, lookup, ResourceHandle, mutation, or return override",
+            "does not copy VerifyPinCode.pinCode or VerifyPinCode.ReturnValue",
+        ],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
     for signature in report["signatures"]:
         print(
@@ -2828,6 +3091,7 @@ def main() -> int:
         args.mission_copied_bool_policy_slice,
         args.structure_return_only_policy_slice,
         args.structure_nonpin_copied_scalar_policy_slice,
+        args.structure_aggregate_census_policy_slice,
     ]
     if sum(1 for enabled in policy_modes if enabled) > 1:
         raise SystemExit("policy-slice modes cannot be combined")
@@ -2851,6 +3115,10 @@ def main() -> int:
         if args.target_set or args.source_target_set or args.snapshot:
             raise SystemExit("--structure-nonpin-copied-scalar-policy-slice cannot be combined with target-set or snapshot inputs")
         report = build_structure_nonpin_copied_scalar_policy_slice(snapshot_root=args.snapshot_root)
+    elif args.structure_aggregate_census_policy_slice:
+        if args.target_set or args.source_target_set or args.snapshot:
+            raise SystemExit("--structure-aggregate-census-policy-slice cannot be combined with target-set or snapshot inputs")
+        report = build_structure_aggregate_census_policy_slice(snapshot_root=args.snapshot_root)
     else:
         report = build_report(
             snapshot_root=args.snapshot_root,

@@ -877,6 +877,84 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         finally:
             sys.argv = original_argv
 
+    def test_structure_aggregate_census_policy_slice_is_consume_only(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        report = tool.build_structure_aggregate_census_policy_slice(snapshot_root=fixture_root)
+
+        self.assertEqual(tool.STRUCTURE_AGGREGATE_CENSUS_POLICY_SCHEMA, report["schema"])
+        self.assertEqual("structure-aggregate-census-planning", report["input_target_set"])
+        self.assertEqual("structure-aggregate-census-policy-slice", report["output_target_set"])
+        self.assertIs(True, report["consume_only"])
+        self.assertIs(False, report["safety_summary"]["promotion_ready"])
+        self.assertEqual(
+            {
+                "input_target_count": 6,
+                "property_count": 15,
+                "copied_field_count": 8,
+                "copied_bool_count": 7,
+                "copied_int32_count": 1,
+                "redacted_field_count": 5,
+                "explicitly_excluded_field_count": 2,
+            },
+            report["approved_counters"],
+        )
+        self.assertEqual(
+            {
+                "property_class": {"BoolProperty": 8, "IntProperty": 2, "ObjectProperty": 5},
+                "copied_direction": {"in": 3, "return": 5},
+                "copied_type": {"bool": 7, "int32": 1},
+                "redaction_reason": {"character_ref_excluded": 1, "player_controller_ref_excluded": 4},
+                "explicit_exclusion_reason": {
+                    "pin_code_return_value_excluded": 1,
+                    "pin_code_value_excluded": 1,
+                },
+            },
+            report["approved_histograms"],
+        )
+        copied_fields = [entry["copied_field"] for entry in report["copied_fields_permitted"]]
+        self.assertEqual(
+            [
+                "PrimalStructure.AllowStructureAccess.ReturnValue",
+                "PrimalStructure.IsAllowedToDemolish.ReturnValue",
+                "PrimalStructure.SetVariant.VariantIndex",
+                "PrimalStructure.SetVariant.bForceSet",
+                "PrimalStructure.SetVariant.ReturnValue",
+                "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue",
+                "PrimalStructureSeating.CanSeat.bForce",
+                "PrimalStructureSeating.CanSeat.ReturnValue",
+            ],
+            copied_fields,
+        )
+        self.assertEqual(
+            [
+                "PrimalStructureItemContainer.VerifyPinCode.pinCode",
+                "PrimalStructureItemContainer.VerifyPinCode.ReturnValue",
+            ],
+            [entry["excluded_field"] for entry in report["explicitly_excluded_fields"]],
+        )
+        self.assertNotIn("VerifyPinCode", json.dumps(report["copied_fields_permitted"]))
+        self.assertIn("VerifyPinCode.pinCode", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("VerifyPinCode.ReturnValue", report["safety_summary"]["explicitly_excluded"])
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+
+    def test_structure_aggregate_census_cli_mode_returns_success(self) -> None:
+        original_argv = sys.argv
+        try:
+            sys.argv = [
+                "build_redacted_ufunction_signatures.py",
+                "--structure-aggregate-census-policy-slice",
+                "--json",
+            ]
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(0, tool.main())
+            self.assertIn(tool.STRUCTURE_AGGREGATE_CENSUS_POLICY_SCHEMA, stdout.getvalue())
+        finally:
+            sys.argv = original_argv
+
     def test_dino_compact_descriptor_preflight_copies_exact_fixture_scalars(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

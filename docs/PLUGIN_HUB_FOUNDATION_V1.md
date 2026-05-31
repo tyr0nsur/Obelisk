@@ -4,11 +4,13 @@ Plugin Hub Foundation V1 is the minimum contributor-facing contract for Linux-na
 Obelisk plugins that consume `include/obelisk/ObeliskApi.h`.
 
 It is a boundary document, not a roadmap freeze. It does not add public symbols, structs,
-callbacks, capabilities, or gameplay modules. It does not promise ArkApi/AseApi
+callbacks, capabilities, or gameplay modules. More specifically, it does not add public
+contract structs/events/descriptors/API tables. It does not promise ArkApi/AseApi
 compatibility, Windows/MSVC portability, source parity, or behavior parity. ArkApi,
 AseApi, and local popular-plugin clones are names and demand dictionaries only, not
 porting or copying sources; every Obelisk surface must be rebuilt through Obelisk
-reflection, copied C ABI contracts, second-source fixtures, and runtime safety gates.
+reflection, copied C ABI contracts, explicitly named second-source target sets, and
+runtime safety gates.
 
 This foundation is a post-RC contributor seed for the current ABI, not a change to the
 published `v0.1.0-rc.2` tag. It explains what small native examples can honestly teach
@@ -20,11 +22,14 @@ descriptor/catalog consumers, and process-local timer utilities that use the cur
 with fail-closed capability checks. Copied `ChatMessageEvent` parsing and copied
 `GameplayPolicyEvent` auditing remain experimental seed patterns only; they are not
 production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of
-a new ABI.
+a new ABI. They are also not public command SDK/router surfaces, replies, permissions,
+identity, send-chat, or moderation.
 
 Creator-facing examples that build against an installed SDK package live under
-`examples/`. First-party runtime reference plugins live under `plugins/` and may use
-repository-local build/test wiring.
+`examples/`; `examples/sdk_minimal_plugin` is the minimum seed for an installed SDK
+consumer. First-party runtime reference plugins live under `plugins/` and may use
+repository-local build/test wiring, so they are reference plugins in-tree rather than the
+minimum installed-SDK consumer contract.
 
 ## Public Surface
 
@@ -37,7 +42,8 @@ Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
 - plugin metadata, config directory, and init context
 - metadata-only descriptors through `DescribeResourceKind`
 - metadata-only descriptors through `DescribeGameplayPolicyEventKind`
-- copied `GameplayPolicyEvent` observers as experimental pattern examples only
+- copied `GameplayPolicyEvent` observers as experimental pattern examples only for
+  target-set-promoted event kinds
 - minimal copied `ChatMessageEvent` observers as experimental pattern examples only
 - owner-token, process-local timers
 - raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API
@@ -58,7 +64,8 @@ Classify every Plugin Hub proposal before writing code:
    descriptor/catalog reads, or process-local timers from the current C ABI.
 2. Experimental pattern only: the proposal passively consumes copied
    `ChatMessageEvent` or `GameplayPolicyEvent` data and clearly avoids identity, lookup,
-   replies, moderation, enforcement, mutation, return overrides, and module SDK claims.
+   public command routing, replies, permissions, moderation, send-chat, enforcement,
+   mutation, return overrides, and module SDK claims.
 3. Blocked backlog: the proposal needs commands, permissions, persistence, operator
    ingress, send-chat/broadcast, player/tribe/dino/item/structure identity, inventory or
    item mutation, structure enforcement, `ResourceHandle`, raw UE pointers, raw params,
@@ -75,7 +82,8 @@ The ABI is C, append-only, and capability-gated:
 - cross-boundary data is POD with explicit integer widths;
 - strings are pointer-plus-size views and callback-scope unless documented otherwise;
 - callbacks use function pointers and opaque user data;
-- public structs are versioned by `abi_version` and bounded by `struct_size`;
+- public contract structs/events/descriptors/API tables are versioned by `abi_version`
+  and bounded by `struct_size`;
 - optional calls require the capability bit, sufficient `struct_size`, and a non-null
   function pointer;
 - fields may be appended, but existing field order and meaning must not change within ABI
@@ -136,9 +144,11 @@ Production-supported seeds:
 
 Experimental pattern examples only:
 
-- copied `GameplayPolicyEvent` auditors;
+- copied `GameplayPolicyEvent` auditors for target-set-promoted event kinds named in the
+  capability matrix;
 - copied `ChatMessageEvent` text parsers without sender identity, replies, moderation, or
-  a command SDK.
+  a command SDK; any routing/parsing stays plugin-local only, without permissions,
+  send-chat, replies, or a public command SDK/router.
 
 Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are
 production-supported seeds after the RC. Copied chat parsers and copied policy auditors
@@ -153,12 +163,13 @@ Obelisk-native examples in this order:
 
 1. Start from lifecycle, config, logging, and `struct_size`/capability checks.
 2. Add descriptor reads so plugins can explain which copied event categories are actually
-   promoted.
+   promoted by exact target set.
 3. Add process-local timers only for plugin-owned periodic work, never as gameplay timers,
    persistent ids, or cluster coordination.
-4. Keep passive copied chat parsing experimental and local-only, with no sender identity,
-   replies, moderation, blocking, or send-chat behavior.
-5. Keep copied policy auditors experimental; they may observe promoted
+4. Keep passive copied chat parsing experimental and plugin-local only, with no public
+   command SDK/router, sender identity, replies, permissions, moderation, blocking, or
+   send-chat behavior.
+5. Keep copied policy auditors experimental; they may observe target-set-promoted
    `GameplayPolicyEvent` data without identity, lookup, mutation, return override, or
    module SDK claims.
 
@@ -179,6 +190,8 @@ Foundation V1 does not provide or imply:
 - public Inventory SDK, Items SDK, StructureEvents SDK, command SDK, permissions,
   economy, kits, shops, homes, teleport, safe zones, RCON, replies, send-chat, or
   moderation;
+- no public Mission SDK, Mission module readiness, Mission identity/state mutation, or
+  reward/transfer authority from the internal/test-only Mission copied-bool lane;
 - public storage SDK, database service, schema/migration contract, secret manager, webhook
   client, or cross-instance persistence API;
 - gameplay mutation, inventory mutation, item grants/removal, dino spawn/mutation,
@@ -193,7 +206,9 @@ Foundation V1 does not provide or imply:
 Promoting any new Plugin Hub surface requires a separate design and evidence trail:
 
 - copied-data ABI shape with ownership and privacy rules;
-- second-source fixtures or accepted runtime evidence for the target;
+- explicitly named promoted second-source target sets for the exact gameplay/module
+  surface; planning-only, internal-layout, consume-only, or test-only evidence does not
+  become public SDK evidence;
 - fail-closed config and lifecycle tests;
 - SDK consumer tests for C and C++;
 - public docs that state both the safe use and the non-goals;

@@ -1,3 +1,4 @@
+#include "hooks/ProcessEventDinoReflection.h"
 #include "ue/DinoReflection.h"
 
 #include <array>
@@ -12,6 +13,7 @@ namespace
 {
     using namespace Obelisk::UE;
     using namespace Obelisk::UE::RuntimeReflection;
+    using namespace Obelisk::Hooks::ProcessEventDinoReflection;
 
     constexpr int32_t kAddPassengerNameIndex = 8267;
     constexpr int32_t kAllowCarryCharacterNameIndex = 8269;
@@ -72,6 +74,21 @@ namespace
     {
         if (!condition)
             throw std::runtime_error(message);
+    }
+
+    void RequireScalar(const CopiedDinoScalarObservation& observation,
+                       size_t index,
+                       DinoScalarField field,
+                       DinoScalarType type,
+                       bool boolValue,
+                       int32_t int32Value,
+                       const char* message)
+    {
+        Require(index < observation.ScalarCount, message);
+        Require(observation.ScalarStorage[index].Field == field, message);
+        Require(observation.ScalarStorage[index].Type == type, message);
+        Require(observation.ScalarStorage[index].BoolValue == boolValue, message);
+        Require(observation.ScalarStorage[index].Int32Value == int32Value, message);
     }
 
     template <typename T, size_t N>
@@ -375,6 +392,102 @@ namespace
         Require(!invocation.Fields[1].ExposesRange, "AllowCarryCharacter ReturnValue should stay post-call only");
         Require(invocation.Fields[1].Range.Data == nullptr,
                 "AllowCarryCharacter ReturnValue range should not be exposed pre-call");
+    }
+
+    void TestRecognizerFeedsBuilderWithoutIdentity()
+    {
+        {
+            DinoFixture fixture;
+            BuildAddPassenger(fixture);
+            const int32_t seatIndex = -3;
+            WriteAt(fixture.Params, 0x08, seatIndex);
+            fixture.Params[0x0c] = 1;
+            fixture.Params[0x0d] = 0;
+            fixture.Params[0x0e] = 1;
+            fixture.Params[0x0f] = 255;
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.FunctionNameIndex == kAddPassengerNameIndex,
+                    "recognizer did not observe AddPassenger function identity");
+            Require(invocation.OuterNameIndex == kPrimalDinoCharacterNameIndex,
+                    "recognizer did not observe PrimalDinoCharacter outer identity");
+            Require(!invocation.Fields[0].ExposesRange, "AddPassenger ACharacter range was exposed");
+            Require(invocation.Fields[0].Range.Data == nullptr, "AddPassenger ACharacter pointer leaked");
+            Require(!invocation.Fields[5].ExposesRange, "AddPassenger ReturnValue range was exposed pre-call");
+            Require(invocation.Fields[5].Range.Data == nullptr, "AddPassenger ReturnValue pointer leaked pre-call");
+
+            CopiedDinoScalarObservation observation;
+            Require(TryBuildCopiedDinoScalarObservation(invocation, observation),
+                    "recognized AddPassenger did not feed copied dino scalar builder");
+            Require(observation.Function == DinoReflection::DinoFunction::AddPassenger,
+                    "copied dino observation changed function kind");
+            Require(observation.ScalarCount == 4, "recognized AddPassenger copied wrong scalar count");
+            RequireScalar(observation,
+                          0,
+                          DinoScalarField::PassengerSeatIndex,
+                          DinoScalarType::Int32,
+                          false,
+                          seatIndex,
+                          "recognized PassengerSeatIndex scalar mismatch");
+            RequireScalar(observation,
+                          1,
+                          DinoScalarField::BForcePassenger,
+                          DinoScalarType::Bool,
+                          true,
+                          0,
+                          "recognized bForcePassenger scalar mismatch");
+            RequireScalar(observation,
+                          2,
+                          DinoScalarField::BAllowFlyersAndWaterDinos,
+                          DinoScalarType::Bool,
+                          false,
+                          0,
+                          "recognized bAllowFlyersAndWaterDinos scalar mismatch");
+            RequireScalar(observation,
+                          3,
+                          DinoScalarField::BSkipLineTrace,
+                          DinoScalarType::Bool,
+                          true,
+                          0,
+                          "recognized bSkipLineTrace scalar mismatch");
+        }
+        {
+            DinoFixture fixture;
+            BuildAllowCarryCharacter(fixture);
+            fixture.Params[0x08] = 1;
+
+            DinoReflection::DinoInvocation invocation;
+            ReadResult result = DinoReflection::TryIdentifyDinoInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function == DinoReflection::DinoFunction::AllowCarryCharacter,
+                    "AllowCarryCharacter recognizer kind mismatch");
+
+            CopiedDinoScalarObservation observation;
+            observation.ScalarCount = 1;
+            observation.ScalarStorage[0] = {
+                .Field = DinoScalarField::BSkipLineTrace,
+                .Type = DinoScalarType::Bool,
+                .BoolValue = true,
+                .Int32Value = 99,
+            };
+            Require(!TryBuildCopiedDinoScalarObservation(invocation, observation),
+                    "AllowCarryCharacter produced pre-call copied dino scalars");
+            Require(observation.ScalarCount == 0, "rejected AllowCarryCharacter left copied scalar payload");
+        }
     }
 
     void TestRecognitionOnlyDinoObjectFieldsDoNotReadParams()
@@ -994,6 +1107,7 @@ int main()
 {
     TestRecognizesAddPassengerWithoutObjectRange();
     TestRecognizesAllowCarryCharacterWithoutObjectRange();
+    TestRecognizerFeedsBuilderWithoutIdentity();
     TestRecognitionOnlyDinoObjectFieldsDoNotReadParams();
     TestAcceptsMetadataOnlyRecognition();
     TestRejectsPartialNameCollisions();

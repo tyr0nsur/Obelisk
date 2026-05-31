@@ -40,6 +40,11 @@ PUBLIC_SDK_GUIDANCE_DOC_FILES = [
     *PUBLIC_DOC_FILES,
     *PUBLIC_PLUGIN_EXAMPLE_DOC_FILES,
 ]
+SDK_MINIMAL_PLUGIN_EXAMPLE_FILES = [
+    REPO_ROOT / "examples" / "sdk_minimal_plugin" / "CMakeLists.txt",
+    REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
+    REPO_ROOT / "examples" / "sdk_minimal_plugin" / "minimal_plugin.c",
+]
 PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -1311,7 +1316,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (foundation, "## Fastest Honest Creator Path"),
             (foundation, "Add descriptor reads"),
             (foundation, "Add process-local timers"),
-            (foundation, "Keep passive copied chat parsing experimental and local-only"),
+            (foundation, "Keep passive copied chat parsing experimental and plugin-local only"),
             (foundation, "Keep copied policy auditors experimental"),
             (foundation, "Only lifecycle/config/logging, descriptor/catalog, and process-local timer examples are\nproduction-supported seeds after the RC"),
             (foundation, "Copied chat parsers and copied policy auditors\nmay demonstrate patterns, but they remain experimental"),
@@ -1910,6 +1915,67 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(source_path, consumer_cmake)
                 self.assertIn(output_variable, layout_script)
                 self.assertIn(output_path, layout_script)
+
+    def test_sdk_minimal_plugin_example_stays_installed_sdk_only(self) -> None:
+        examples_readme = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+        minimal_readme = (REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        minimal_cmake = (REPO_ROOT / "examples" / "sdk_minimal_plugin" / "CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        minimal_source = (REPO_ROOT / "examples" / "sdk_minimal_plugin" / "minimal_plugin.c").read_text(
+            encoding="utf-8"
+        )
+
+        for path in SDK_MINIMAL_PLUGIN_EXAMPLE_FILES:
+            with self.subTest(path=path.relative_to(REPO_ROOT), token="example file"):
+                self.assertTrue(path.exists())
+
+        for text, relative in (
+            (examples_readme, "examples/README.md"),
+            (minimal_readme, "examples/sdk_minimal_plugin/README.md"),
+            (minimal_cmake, "examples/sdk_minimal_plugin/CMakeLists.txt"),
+        ):
+            normalized_text = re.sub(r"\s+", " ", text)
+            with self.subTest(path=relative, token="find_package"):
+                self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", normalized_text)
+            with self.subTest(path=relative, token="sdk target"):
+                self.assertIn("Obelisk::obelisk_sdk", text)
+
+        for text, relative in (
+            (examples_readme, "examples/README.md"),
+            (minimal_readme, "examples/sdk_minimal_plugin/README.md"),
+        ):
+            for token in (
+                "private",
+                "UE pointers",
+                "new gameplay APIs",
+                "chat replies/send-chat",
+            ):
+                with self.subTest(path=relative, token=token):
+                    self.assertIn(token, text)
+
+        self.assertIn("#include <obelisk/ObeliskApi.h>", minimal_source)
+        for token in (
+            '#include "',
+            "#include <core/",
+            "#include <hooks/",
+            "#include <plugins/",
+            "UObject",
+            "UFunction",
+            "FString",
+            "ProcessEvent",
+            "CallProcessEvent",
+            "RegisterGameplay",
+            "RegisterChat",
+            "ChatMessageEvent",
+            "SendChat",
+            "Reply",
+            "ArkApi",
+        ):
+            with self.subTest(path="examples/sdk_minimal_plugin/minimal_plugin.c", forbidden=token):
+                self.assertNotIn(token, minimal_source)
 
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")
@@ -3918,7 +3984,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "This list names ABI primitives, not Plugin Hub module tiers",
                 "Experimental pattern examples only:",
                 "copied `GameplayPolicyEvent` auditors",
-                "Keep passive copied chat parsing experimental and local-only",
+                "Keep passive copied chat parsing experimental and plugin-local only",
                 "Keep copied policy auditors experimental",
                 "Foundation V1 does not provide or imply",
             ),

@@ -14,8 +14,9 @@ ArkApi implementation patterns.
 The local `NextGenPlugins` clones are a names and demand dictionary for future Plugin Hub
 categories only. Treat their plugin families as evidence of operator needs, not as
 portable behavior, source, ABI, constants, schemas, command parsers, or implementation
-patterns. Rebuild every promoted surface through Obelisk reflection, second-source
-fixtures, copied C ABI contracts, and runtime safety gates.
+patterns. They are also not sources for public contract structs/events/descriptors/API
+tables. Rebuild every promoted surface through Obelisk reflection, explicitly named
+second-source target sets, copied C ABI contracts, and runtime safety gates.
 The detailed local inventory lives in
 `docs/research/2026-05-30-nextgenplugins-reference-inventory.md` and records provenance for
 demand analysis only; it is not license clearance, runtime evidence, an ArkApi
@@ -27,12 +28,15 @@ Post-RC production-supported Plugin Hub seed work is limited to lifecycle/config
 skeletons, descriptor/catalog consumers, and process-local timer utilities that use the
 current C ABI with fail-closed capability checks. Copied `ChatMessageEvent` parsing and
 copied `GameplayPolicyEvent` auditing may remain useful experimental seed examples, but
-they are not production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or
-compatibility targets for ArkApi plugin families.
+they are not production Plugin Hub modules, public command SDK/router surfaces, replies,
+permissions, identity, send-chat, moderation, policy-enforcement SDKs, or compatibility
+targets for ArkApi plugin families.
 
 Every higher-level demand category below remains planning-only until its own copied-data
 payload, identity/privacy policy, lifecycle cleanup, persistence or ingress design where
-needed, SDK consumer tests, and second-source/runtime evidence gate are promoted.
+needed, SDK consumer tests, and exact release-readiness second-source target sets are
+promoted. Planning-only, internal-layout, consume-only, or test-only evidence is not
+public SDK evidence.
 
 ## Support Tier Legend
 
@@ -41,6 +45,9 @@ needed, SDK consumer tests, and second-source/runtime evidence gate are promoted
   process-local ownership.
 - `experimental seed only`: allowed for explicitly labeled pattern examples that teach
   copied-data callback handling, but not supported as production Plugin Hub modules or as
+  general chat, command/router, replies, permissions, send-chat, policy, structure,
+  inventory, identity, moderation, mutation, or enforcement SDKs.
+  In compact boundary wording: not supported as production Plugin Hub modules or as
   general chat, command, policy, structure, inventory, identity, mutation, or enforcement
   SDKs.
 - `blocked` and `blocked except experimental auditing`: backlog demand only. These lanes
@@ -63,14 +70,17 @@ For new contributors, the roadmap maps to this matrix in one direction only:
 - `hub foundation` means production seed work on lifecycle/config/logging,
   descriptor/catalog consumers, timers, packaging, and fail-closed capability checks.
 - `gameplay policy backing` means preserving evidence and tests for already promoted
-  copied/redacted `GameplayPolicyEvent` fields; it is not a new Inventory, Items,
-  StructureEvents, or enforcement SDK.
+  copied/redacted `GameplayPolicyEvent` fields from exact release-readiness target sets
+  such as `minimal-second-source-intake`, `item-return-only-policy-slice`, and
+  `structure-observer-intake`; it is not a new Inventory, Items, StructureEvents, or
+  enforcement SDK.
 - `internal recognizer planning` means docs, fixtures, and offline copied-bool planning
   for named targets; it is not runtime observation, public callbacks, public module
   capabilities, identity, lookup, mutation, or return override.
 
 Demand dictionaries can decide which blocked rows deserve clearer notes or evidence
-plans, but only a named promotion gate can move a row's support tier.
+plans, but only a named promotion gate can move a row's support tier. That gate must name
+the exact release-readiness target sets.
 
 ## Dictionary-To-Primitive Rule
 
@@ -98,8 +108,8 @@ it does not promise ArkApi plugin compatibility.
 | Priority | Category | Post-RC support tier | Safe interpretation |
 | --- | --- | --- | --- |
 | 1 | Lifecycle, descriptors, logging, config, local timers | production seed available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
-| 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for local parsing only; no command SDK, sender identity, replies, blocking, or moderation contract |
-| 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of promoted event kinds; no StructureEvents SDK, Inventory SDK, identity, mutation, enforcement, or return override |
+| 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for plugin-local parsing/routing only; no public command SDK/router, sender identity, replies, permissions, blocking, send-chat, or moderation contract |
+| 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of event kinds from `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake`; no StructureEvents SDK, Inventory SDK, identity, mutation, enforcement, or return override |
 | 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
 | 5 | Permissions/admin groups | blocked | Needs identity, persistence, privacy-safe grants/checks, and operator reload policy |
 | 6 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
@@ -114,10 +124,11 @@ it does not promise ArkApi plugin compatibility.
 `production seed available` means an Obelisk-native plugin can be written and documented
 as a supported Plugin Hub seed against the stated current public ABI slice. `experimental
 seed only` means the example can teach copied-data callback patterns, but it should not be
-marketed as a production Plugin Hub module or as general chat, command, policy, structure,
-or inventory SDK availability. Neither tier means the corresponding ArkApi plugin family
-can be ported, that command or identity semantics exist, or that blocked dependencies can
-be simulated through raw game access.
+marketed as a production Plugin Hub module or as general chat, command/router, replies,
+permissions, send-chat, moderation, policy, structure, or inventory SDK availability.
+Neither tier means the corresponding ArkApi plugin family can be ported, that command or
+identity semantics exist, or that blocked dependencies can be simulated through raw game
+access.
 
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |
@@ -125,18 +136,19 @@ be simulated through raw game access.
 | Log through Obelisk | `ObeliskApi::LogInfo`, `LogWarn`, and `LogError` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
 | Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
-| Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration | Promoted copied-data ABI surface; experimental Plugin Hub seed | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
-| Parse copied chat text locally | `ChatMessageEvent` with owner-token registration | Minimal v0.1-rc ABI surface | Command SDK, sender identity, replies, moderation, chat blocking, or send-chat API |
+| Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration for `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake` release-readiness target sets only | Promoted copied-data ABI surface; experimental Plugin Hub seed | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
+| Parse copied chat text locally | `ChatMessageEvent` with owner-token registration; `chat-message-intake` is the exact release-readiness target set | Minimal v0.1-rc ABI surface; experimental local parsing seed | Public command SDK/router, sender identity, replies, permissions, moderation, chat blocking, or send-chat API |
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |
 | Inspect descriptor output safely | `oDescriptorCatalog` | First-party metadata example | Resource discovery, callback subscription, identity, lookup, mutation, or return override |
-| Build simple lifecycle/config examples | `oBaseEvents`, `oProcessTimer`, descriptor examples | Reference plugins | Gameplay authority, module SDK coverage, or ArkApi plugin portability |
+| Build an installed-SDK consumer | `examples/sdk_minimal_plugin` | Minimum installed SDK seed | Runtime reference-plugin wiring, gameplay authority, module SDK coverage, or ArkApi plugin portability |
+| Study in-tree reference plugins | `plugins/oBaseEvents`, `plugins/oProcessTimer`, descriptor examples | Reference plugins | Minimum installed-SDK consumer contract, gameplay authority, module SDK coverage, or ArkApi plugin portability |
 | Use raw `ProcessEvent` callbacks | Filtered callbacks behind explicit debug gates | Debug-gated runtime plumbing | Stable gameplay API, borrowed pointer lifetime, raw param API, or public Plugin Hub dependency |
 | Commands, permissions, economy, kits, shops, RCON | No public Obelisk SDK yet | Not ready | ArkApi compatibility, player identity, reply/send-chat, database service, or operator command lifecycle |
 | Persistent storage, databases, webhooks | Plugin-owned config files only | Not ready | Public storage SDK, database service, schema/migration contract, secret management, webhook/RCON integration, or cross-instance state |
 | Inventory/item identity and mutation | No public Obelisk SDK yet | Not ready | `ResourceHandle`, `ItemNetID`, inventory lookup, item mutation, give/remove item, or return override |
 | Players, tribes, dinos, missions, transfers | No public Obelisk SDK yet | Not ready | Public identity, ownership lookup, mutation, teleport/spawn APIs, transfer payload decoding, or cross-map correlation |
 | Player identity lifecycle intake | `players-identity-lifecycle-intake` research guidance only | Planning-only | Stable player identity, lookup, permissions, send-chat, moderation, public SDK, runtime hooks, or release readiness |
-| Mission copied-bool planning and mission demand | Internal/test-only research notes | Planning-only | Production Plugin Hub mission module, ArkApi mission compatibility, command SDK dependency, mission identity, mission state mutation, runtime observation approval, or reward/transfer authority |
+| Mission copied-bool planning and mission demand | Internal/test-only research notes; `mission-copied-bool-policy-slice` internal/test-only v0.2 lane | Planning-only/test-only | Not a Production Plugin Hub mission module; no public Mission SDK, Mission module readiness, ArkApi mission compatibility, command SDK dependency, mission identity, mission state mutation, runtime observation approval, or reward/transfer authority |
 | Structure census/proximity | `structure-aggregate-census-planning` research guidance only | Planning-only | Public GObjects traversal, structure handles, exact coordinates, ownership lookup, linked-structure traversal, StructureEvents SDK, or mutation |
 | Structure build placement policy | No public Obelisk SDK yet | Not ready | `APrimalStructure.IsAllowedToBuild` compatibility, placement denial, no-collision behavior, structure identity, location disclosure, mutation, or return override |
 
@@ -145,9 +157,11 @@ be simulated through raw game access.
 For plugin authors, the stable v0.1.x production seed shape is lifecycle/config/logging,
 descriptor-driven discovery, and process-local timers. Stop there for production
 Foundation examples. In this section, `promoted` means a copied, capability-gated ABI
-entry can be discovered or subscribed to by explicitly experimental copied-data examples;
-it does not turn copied chat/policy examples into production Plugin Hub modules, command
-or policy SDKs, enforcement APIs, identity APIs, mutation APIs, or ArkApi compatibility.
+entry with an exact release-readiness second-source target set can be discovered or
+subscribed to by explicitly experimental copied-data examples; it does not turn copied
+chat/policy examples into production Plugin Hub modules, command/router or policy SDKs,
+replies, permissions, send-chat, enforcement APIs, identity APIs, moderation APIs,
+mutation APIs, or ArkApi compatibility.
 
 1. Check `abi_version`, `struct_size`, capability bits, and function pointers.
 2. Use `DescribeResourceKind` to discover promoted categories.
@@ -156,7 +170,7 @@ or policy SDKs, enforcement APIs, identity APIs, mutation APIs, or ArkApi compat
 Experimental copied-data examples may then:
 
 1. Subscribe only to promoted copied events with owner-token handles.
-2. Route by copied `resource_kind`, `event_kind`, and `field_mask`.
+2. Route plugin-local logic by copied `resource_kind`, `event_kind`, and `field_mask`.
 
 Plugins must copy any callback data they need after the callback returns. Runtime-owned
 event data is callback-scope only.
@@ -166,7 +180,12 @@ event data is callback-scope only.
 For the first Plugin Hub seeds after `v0.1`, prefer plugins that stay inside the current
 ABI and keep the support tier explicit:
 
-Production-supported seed lanes:
+Installed-SDK consumer seed:
+
+1. `examples/sdk_minimal_plugin` as the minimum package consumer that builds against the
+   installed SDK.
+
+Production-supported seed lanes under `plugins/`:
 
 1. Lifecycle/config/logging skeletons with safe-disabled config.
 2. Descriptor consumers that print sanitized promoted category/event metadata.
@@ -174,11 +193,13 @@ Production-supported seed lanes:
 
 Experimental pattern examples only:
 
-1. Passive chat text parsers that do local routing only.
-2. Copied policy auditors over promoted `GameplayPolicyEvent` kinds.
+1. Passive chat text parsers that do plugin-local routing/parsing only.
+2. Copied policy auditors over target-set-promoted `GameplayPolicyEvent` kinds named
+   above.
 
-The current first-party examples already cover this safe seed set: `oBaseEvents`,
-`oProcessTimer`, and `oDescriptorCatalog` cover the release-scope foundation, while
+The installed-SDK seed starts at `examples/sdk_minimal_plugin`. The current in-tree
+reference plugins cover this safe seed set: `oBaseEvents`, `oProcessTimer`, and
+`oDescriptorCatalog` cover the release-scope foundation under `plugins/`, while
 `oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the experimental copied policy and
 copied chat slices. Those three are seed examples only, not production Plugin Hub modules;
 specifically, they are experimental pattern examples and not promises that copied
@@ -190,16 +211,18 @@ auditing/parsing is a candidate for promotion review before copied policy auditi
 promised graduation path. If experimental examples are counted too, no additional public
 category is supported by the current ABI.
 
-Do not start public examples with permissions, economy, homes, RCON, storage/database
-services, webhooks, inventory, dinos, tribes, transfers, structure enforcement, or item
-grants. Those are valid demand signals, but they become Plugin Hub examples only after
-their own identity, privacy, persistence, operator-ingress, mutation/enforcement,
-lifecycle, and evidence gates are satisfied.
+Do not start public examples with permissions, command routers, replies, send-chat,
+economy, homes, RCON, storage/database services, webhooks, inventory, dinos, tribes,
+missions, transfers, structure enforcement, or item grants. Those are valid demand
+signals, but they become Plugin Hub examples only after their own identity, privacy,
+persistence, operator-ingress, mutation/enforcement, lifecycle, and exact target-set
+evidence gates are satisfied.
 
 ## Plugin Hub Direction
 
 The first useful Plugin Hub seed examples should be built from surfaces that already
-exist:
+exist. The minimum installed-SDK consumer is `examples/sdk_minimal_plugin`; `plugins/*`
+contains in-tree runtime reference plugins.
 
 - lifecycle/config/logging examples;
 - descriptor/catalog consumers;
@@ -209,11 +232,13 @@ Those are the production-supported seed lanes. Copied `GameplayPolicyEvent` audi
 copied `ChatMessageEvent` parsers may still be useful experimental pattern examples, but
 they must be labeled as experimental and must not claim policy enforcement, general chat,
 commands, identity, replies, moderation, send-chat, or production Plugin Hub availability.
+They also must not claim public routers or permissions.
 
 Higher-level ArkApi-style families such as permissions, economy, kits, homes, safe zones,
 RCON, storage/database services, webhooks, inventory tools, dino tools, tribe tools, and
 build-placement policy remain future work. Each requires its own copied-data evidence, ABI
-design, privacy policy, lifecycle tests, and promotion gate.
+design, privacy policy, lifecycle tests, and exact release-readiness target-set promotion
+gate.
 
 Planning should keep the full demand surface visible: players, tribes, dinos, items,
 structures, permissions, commands, admin, transfers, missions, timers, and storage.

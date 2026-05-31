@@ -115,6 +115,7 @@ TRANSFER_BACCEPT_ONLY_POLICY_SLICE_SCHEMA = "obelisk.transfer-baccept-only-polic
 MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
 STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
+STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
@@ -143,6 +144,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA,
     STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA,
     STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA,
+    STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -446,6 +448,54 @@ REQUIRED_STRUCTURE_NONPIN_EXPLICIT_EXCLUSIONS = {
     "public_sdk",
     "resource_handle",
     "return_override",
+}
+REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS = REQUIRED_STRUCTURE_RETURN_ONLY_INPUT_TARGETS
+REQUIRED_STRUCTURE_AGGREGATE_COPIED_FIELDS = (
+    REQUIRED_STRUCTURE_RETURN_ONLY_COPIED_FIELDS | REQUIRED_STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS
+)
+REQUIRED_STRUCTURE_AGGREGATE_REDACTED_FIELDS = (
+    REQUIRED_STRUCTURE_RETURN_ONLY_REDACTED_FIELDS | REQUIRED_STRUCTURE_NONPIN_REDACTED_FIELDS
+)
+REQUIRED_STRUCTURE_AGGREGATE_EXCLUDED_FIELDS = {
+    "PrimalStructureItemContainer.VerifyPinCode.pinCode",
+    "PrimalStructureItemContainer.VerifyPinCode.ReturnValue",
+}
+REQUIRED_STRUCTURE_AGGREGATE_COUNTERS = {
+    "input_target_count": 6,
+    "property_count": 15,
+    "copied_field_count": 8,
+    "copied_bool_count": 7,
+    "copied_int32_count": 1,
+    "redacted_field_count": 5,
+    "explicitly_excluded_field_count": 2,
+}
+REQUIRED_STRUCTURE_AGGREGATE_HISTOGRAMS = {
+    "property_class": {"BoolProperty": 8, "IntProperty": 2, "ObjectProperty": 5},
+    "copied_direction": {"in": 3, "return": 5},
+    "copied_type": {"bool": 7, "int32": 1},
+    "redaction_reason": {"character_ref_excluded": 1, "player_controller_ref_excluded": 4},
+    "explicit_exclusion_reason": {"pin_code_return_value_excluded": 1, "pin_code_value_excluded": 1},
+}
+REQUIRED_STRUCTURE_AGGREGATE_NON_CLAIMS = {
+    "does not expose UE pointers, object identity, class identity, raw params, mutation, or return overrides",
+    "does not promote public SDK callbacks or public metadata helpers",
+    "does not promote runtime hook wiring, dispatcher wiring, StructureEvents, identity, lookup, ResourceHandle, mutation, or return override",
+    "does not copy VerifyPinCode.pinCode or VerifyPinCode.ReturnValue",
+}
+REQUIRED_STRUCTURE_AGGREGATE_EXPLICIT_EXCLUSIONS = {
+    "ForPC",
+    "VerifyPinCode.pinCode",
+    "VerifyPinCode.ReturnValue",
+    "forCharacter",
+    "identity",
+    "lookup",
+    "mutation",
+    "object_refs",
+    "pinCode",
+    "public_sdk",
+    "resource_handle",
+    "return_override",
+    "runtime",
 }
 REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS = {
     "weak_helper_reject_0x100",
@@ -4819,6 +4869,203 @@ def validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload: dict[
     return blockers
 
 
+def validate_structure_aggregate_census_policy_slice_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    safety_summary = payload.get("safety_summary")
+    if not isinstance(safety_summary, dict):
+        blockers.append({"reason": "structure_aggregate_policy_safety_summary_missing", "label": f"{label}:$.safety_summary"})
+        return blockers
+
+    if payload.get("policy_status") != "evidence-only":
+        blockers.append({"reason": "structure_aggregate_policy_status_not_evidence_only", "label": f"{label}:$.policy_status"})
+    if payload.get("consume_only") is not True or safety_summary.get("consume_only") is not True:
+        blockers.append({"reason": "structure_aggregate_policy_not_consume_only", "label": label})
+    if payload.get("snapshot_root") != "redacted":
+        blockers.append({"reason": "structure_aggregate_policy_snapshot_root_not_redacted", "label": f"{label}:$.snapshot_root"})
+    if payload.get("input_target_set") != "structure-aggregate-census-planning":
+        blockers.append({"reason": "structure_aggregate_policy_input_target_set_mismatch", "label": f"{label}:$.input_target_set"})
+    if payload.get("output_target_set") != "structure-aggregate-census-policy-slice":
+        blockers.append({"reason": "structure_aggregate_policy_output_target_set_mismatch", "label": f"{label}:$.output_target_set"})
+    if payload.get("missing_targets") != []:
+        blockers.append({"reason": "structure_aggregate_policy_missing_targets_present", "label": f"{label}:$.missing_targets"})
+
+    input_snapshot_sources: dict[str, dict[str, str]] = {}
+    generated_from = payload.get("generated_from")
+    if not isinstance(generated_from, dict):
+        blockers.append({"reason": "structure_aggregate_policy_generated_from_missing", "label": f"{label}:$.generated_from"})
+    else:
+        if generated_from.get("snapshot_schema") != RC_UFUNCTION_SNAPSHOT_SCHEMA:
+            blockers.append({"reason": "structure_aggregate_policy_snapshot_schema_mismatch", "label": f"{label}:$.generated_from.snapshot_schema"})
+        input_snapshots = generated_from.get("input_snapshots")
+        if not isinstance(input_snapshots, list) or len(input_snapshots) != len(REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS):
+            blockers.append({"reason": "structure_aggregate_policy_input_snapshot_count_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+        else:
+            for index, snapshot in enumerate(input_snapshots):
+                snapshot_label = f"{label}:$.generated_from.input_snapshots[{index}]"
+                if not isinstance(snapshot, dict):
+                    blockers.append({"reason": "structure_aggregate_policy_input_snapshot_entry_invalid", "label": snapshot_label})
+                    continue
+                snapshot_id = snapshot.get("id")
+                snapshot_sha256 = snapshot.get("sha256")
+                snapshot_target = snapshot.get("target")
+                if not isinstance(snapshot_id, str) or not snapshot_id:
+                    blockers.append({"reason": "structure_aggregate_policy_input_snapshot_id_invalid", "label": f"{snapshot_label}.id"})
+                    continue
+                if snapshot_id in input_snapshot_sources:
+                    blockers.append({"reason": "structure_aggregate_policy_input_snapshot_id_duplicate", "label": f"{snapshot_label}.id"})
+                if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
+                    blockers.append({"reason": "structure_aggregate_policy_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+                    continue
+                if not isinstance(snapshot_target, str) or snapshot_target not in REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS:
+                    blockers.append({"reason": "structure_aggregate_policy_input_snapshot_target_invalid", "label": f"{snapshot_label}.target"})
+                    continue
+                input_snapshot_sources[snapshot_id] = {"sha256": snapshot_sha256, "target": snapshot_target}
+            if {entry["target"] for entry in input_snapshot_sources.values()} != REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS:
+                blockers.append({"reason": "structure_aggregate_policy_input_snapshot_targets_mismatch", "label": f"{label}:$.generated_from.input_snapshots"})
+
+    if safety_summary.get("artifact_status") != "evidence_only":
+        blockers.append({"reason": "structure_aggregate_policy_artifact_status_not_evidence_only", "label": f"{label}:$.safety_summary.artifact_status"})
+    if safety_summary.get("intended_use") != "offline_review_only":
+        blockers.append({"reason": "structure_aggregate_policy_intended_use_not_offline_review_only", "label": f"{label}:$.safety_summary.intended_use"})
+    if safety_summary.get("promotion_ready") is not False:
+        blockers.append({"reason": "structure_aggregate_policy_promotion_ready_not_false", "label": f"{label}:$.safety_summary.promotion_ready"})
+    for key, expected in {
+        "copied_field_count": len(REQUIRED_STRUCTURE_AGGREGATE_COPIED_FIELDS),
+        "redacted_field_count": len(REQUIRED_STRUCTURE_AGGREGATE_REDACTED_FIELDS),
+        "explicitly_excluded_field_count": len(REQUIRED_STRUCTURE_AGGREGATE_EXCLUDED_FIELDS),
+    }.items():
+        if safety_summary.get(key) != expected:
+            blockers.append({"reason": f"structure_aggregate_policy_{key}_mismatch", "label": f"{label}:$.safety_summary.{key}"})
+
+    if payload.get("approved_counters") != REQUIRED_STRUCTURE_AGGREGATE_COUNTERS:
+        blockers.append({"reason": "structure_aggregate_policy_counters_mismatch", "label": f"{label}:$.approved_counters", "expected": REQUIRED_STRUCTURE_AGGREGATE_COUNTERS, "recorded": payload.get("approved_counters")})
+    if payload.get("approved_histograms") != REQUIRED_STRUCTURE_AGGREGATE_HISTOGRAMS:
+        blockers.append({"reason": "structure_aggregate_policy_histograms_mismatch", "label": f"{label}:$.approved_histograms", "expected": REQUIRED_STRUCTURE_AGGREGATE_HISTOGRAMS, "recorded": payload.get("approved_histograms")})
+
+    coverage = payload.get("coverage")
+    if not isinstance(coverage, dict):
+        blockers.append({"reason": "structure_aggregate_policy_coverage_missing", "label": f"{label}:$.coverage"})
+    else:
+        if coverage.get("status") != "complete":
+            blockers.append({"reason": "structure_aggregate_policy_coverage_not_complete", "label": f"{label}:$.coverage.status"})
+        if set(coverage.get("input_targets") or []) != REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS:
+            blockers.append({"reason": "structure_aggregate_policy_coverage_input_targets_mismatch", "label": f"{label}:$.coverage.input_targets"})
+        if set(coverage.get("copied_fields_permitted") or []) != REQUIRED_STRUCTURE_AGGREGATE_COPIED_FIELDS:
+            blockers.append({"reason": "structure_aggregate_policy_coverage_copied_fields_mismatch", "label": f"{label}:$.coverage.copied_fields_permitted"})
+        if set(coverage.get("redacted_fields") or []) != REQUIRED_STRUCTURE_AGGREGATE_REDACTED_FIELDS:
+            blockers.append({"reason": "structure_aggregate_policy_coverage_redacted_fields_mismatch", "label": f"{label}:$.coverage.redacted_fields"})
+        if set(coverage.get("explicitly_excluded_fields") or []) != REQUIRED_STRUCTURE_AGGREGATE_EXCLUDED_FIELDS:
+            blockers.append({"reason": "structure_aggregate_policy_coverage_excluded_fields_mismatch", "label": f"{label}:$.coverage.explicitly_excluded_fields"})
+
+    copied_entries = payload.get("copied_fields_permitted")
+    if not isinstance(copied_entries, list) or len(copied_entries) != len(REQUIRED_STRUCTURE_AGGREGATE_COPIED_FIELDS):
+        blockers.append({"reason": "structure_aggregate_policy_copied_fields_count_mismatch", "label": f"{label}:$.copied_fields_permitted"})
+    else:
+        copied_fields = {entry.get("copied_field") for entry in copied_entries if isinstance(entry, dict)}
+        if copied_fields != REQUIRED_STRUCTURE_AGGREGATE_COPIED_FIELDS:
+            blockers.append({"reason": "structure_aggregate_policy_copied_fields_mismatch", "label": f"{label}:$.copied_fields_permitted"})
+        if any(isinstance(field, str) and "VerifyPinCode" in field for field in copied_fields):
+            blockers.append({"reason": "structure_aggregate_policy_contains_verify_pin_code_copied_field", "label": f"{label}:$.copied_fields_permitted"})
+        expected_copied_shapes = {
+            "PrimalStructure.AllowStructureAccess.ReturnValue": ("return", "bool", "0x8", 8),
+            "PrimalStructure.IsAllowedToDemolish.ReturnValue": ("return", "bool", "0x8", 8),
+            "PrimalStructure.SetVariant.VariantIndex": ("in", "int32", "0x0", 0),
+            "PrimalStructure.SetVariant.bForceSet": ("in", "bool", "0x4", 4),
+            "PrimalStructure.SetVariant.ReturnValue": ("return", "bool", "0x5", 5),
+            "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue": ("return", "bool", "0x8", 8),
+            "PrimalStructureSeating.CanSeat.bForce": ("in", "bool", "0x10", 16),
+            "PrimalStructureSeating.CanSeat.ReturnValue": ("return", "bool", "0x11", 17),
+        }
+        for index, entry in enumerate(copied_entries):
+            entry_label = f"{label}:$.copied_fields_permitted[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "structure_aggregate_policy_copied_field_entry_invalid", "label": entry_label})
+                continue
+            expected = expected_copied_shapes.get(entry.get("copied_field"))
+            if expected is None:
+                blockers.append({"reason": "structure_aggregate_policy_copied_field_shape_unknown", "label": entry_label})
+                continue
+            direction, type_name, offset, offset_internal = expected
+            for key, value in {"direction": direction, "type": type_name, "offset": offset, "offset_internal": offset_internal}.items():
+                if entry.get(key) != value:
+                    blockers.append({"reason": "structure_aggregate_policy_copied_field_shape_mismatch", "label": f"{entry_label}.{key}", "expected": value, "recorded": entry.get(key)})
+            source_snapshot = entry.get("source_snapshot")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "structure_aggregate_policy_copied_field_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif entry.get("source_snapshot_sha256") != input_snapshot_sources[source_snapshot]["sha256"]:
+                blockers.append({"reason": "structure_aggregate_policy_copied_field_source_snapshot_sha256_mismatch", "label": f"{entry_label}.source_snapshot_sha256"})
+            elif entry.get("target") != input_snapshot_sources[source_snapshot]["target"]:
+                blockers.append({"reason": "structure_aggregate_policy_copied_field_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
+
+    redacted_entries = payload.get("redacted_structure_fields")
+    if not isinstance(redacted_entries, list) or len(redacted_entries) != len(REQUIRED_STRUCTURE_AGGREGATE_REDACTED_FIELDS):
+        blockers.append({"reason": "structure_aggregate_policy_redacted_fields_count_mismatch", "label": f"{label}:$.redacted_structure_fields"})
+    else:
+        redacted_fields = {entry.get("redacted_field") for entry in redacted_entries if isinstance(entry, dict)}
+        if redacted_fields != REQUIRED_STRUCTURE_AGGREGATE_REDACTED_FIELDS:
+            blockers.append({"reason": "structure_aggregate_policy_redacted_fields_mismatch", "label": f"{label}:$.redacted_structure_fields"})
+
+    excluded_entries = payload.get("explicitly_excluded_fields")
+    if not isinstance(excluded_entries, list) or len(excluded_entries) != len(REQUIRED_STRUCTURE_AGGREGATE_EXCLUDED_FIELDS):
+        blockers.append({"reason": "structure_aggregate_policy_excluded_fields_count_mismatch", "label": f"{label}:$.explicitly_excluded_fields"})
+    else:
+        excluded_fields = {entry.get("excluded_field") for entry in excluded_entries if isinstance(entry, dict)}
+        if excluded_fields != REQUIRED_STRUCTURE_AGGREGATE_EXCLUDED_FIELDS:
+            blockers.append({"reason": "structure_aggregate_policy_excluded_fields_mismatch", "label": f"{label}:$.explicitly_excluded_fields"})
+        expected_excluded_shapes = {
+            "PrimalStructureItemContainer.VerifyPinCode.pinCode": ("in", "int32", "IntProperty", "0x0", 0, "pin_code_value_excluded"),
+            "PrimalStructureItemContainer.VerifyPinCode.ReturnValue": ("return", "bool", "BoolProperty", "0x4", 4, "pin_code_return_value_excluded"),
+        }
+        for index, entry in enumerate(excluded_entries):
+            entry_label = f"{label}:$.explicitly_excluded_fields[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "structure_aggregate_policy_excluded_field_entry_invalid", "label": entry_label})
+                continue
+            expected = expected_excluded_shapes.get(entry.get("excluded_field"))
+            if expected is None:
+                blockers.append({"reason": "structure_aggregate_policy_excluded_field_shape_unknown", "label": entry_label})
+                continue
+            direction, type_name, property_class, offset, offset_internal, reason = expected
+            expected_values = {
+                "target": "PrimalStructureItemContainer.VerifyPinCode",
+                "direction": direction,
+                "type": type_name,
+                "property_class": property_class,
+                "offset": offset,
+                "offset_internal": offset_internal,
+                "reason": reason,
+                "evidence_status": "explicitly-excluded-pin-code-field",
+            }
+            for key, value in expected_values.items():
+                if entry.get(key) != value:
+                    blockers.append({"reason": "structure_aggregate_policy_excluded_field_shape_mismatch", "label": f"{entry_label}.{key}", "expected": value, "recorded": entry.get(key)})
+
+    if not isinstance(payload.get("non_claims"), list) or not REQUIRED_STRUCTURE_AGGREGATE_NON_CLAIMS.issubset(set(payload["non_claims"])):
+        blockers.append({"reason": "structure_aggregate_policy_non_claims_missing_required_boundaries", "label": f"{label}:$.non_claims"})
+    if not isinstance(safety_summary.get("explicitly_excluded"), list) or not REQUIRED_STRUCTURE_AGGREGATE_EXPLICIT_EXCLUSIONS.issubset(set(safety_summary["explicitly_excluded"])):
+        blockers.append({"reason": "structure_aggregate_policy_explicit_exclusions_missing_internal_boundaries", "label": f"{label}:$.safety_summary.explicitly_excluded"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_structure_aggregate_census_policy_slice_consume_only", "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "structure_aggregate_policy_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
+    ):
+        blockers.append({"reason": f"structure_aggregate_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    for trail, raw_value in collect_string_fields(payload):
+        if trail.startswith("$.non_claims") or trail.startswith("$.safety_summary.explicitly_excluded"):
+            continue
+        text = raw_value.casefold()
+        if "structureevents" in text or "structure events" in text:
+            blockers.append({"reason": "structure_aggregate_policy_public_overclaim_public_structure_events", "label": f"{label}:{trail}"})
+    return blockers
+
+
 def validate_static_global_promotion_evidence_manifest(
     payload: dict[str, Any],
     *,
@@ -7798,6 +8045,7 @@ def validate_manifest(
     blockers.extend(validate_mission_copied_bool_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_return_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_structure_aggregate_census_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_resource_handle_revalidation_evaluator_manifest(payload, label=str(resolved), mode=mode))

@@ -318,6 +318,7 @@ add_test(NAME BuffReflectionTests COMMAND buff_reflection_tests)
 
 add_executable(dino_reflection_tests
     tests/core/DinoReflectionTests.cpp
+    hooks/ProcessEventDinoReflection.cpp
     ue/DinoReflection.cpp
     ue/RuntimeReflection.cpp
 )

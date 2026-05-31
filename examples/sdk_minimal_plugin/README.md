@@ -3,16 +3,16 @@
 This is the smallest creator-facing example for building an Obelisk plugin outside the
 Obelisk source tree. It uses only the installed CMake package and public C ABI:
 
-- `find_package(Obelisk CONFIG REQUIRED)`
+- `find_package(Obelisk 0.1.0 CONFIG REQUIRED)`
 - `Obelisk::obelisk_sdk`
 - `ObeliskPlugin_GetInfo`
 - `ObeliskPlugin_Init`
 - optional `ObeliskPlugin_Shutdown`
 - logging through the copied `ObeliskApi` table
 
-It does not use `ProcessEvent`, gameplay events, chat events, timers, UE pointers,
-identity, lookup, mutation, return overrides, ArkApi compatibility, or private Obelisk
-headers.
+It does not use `ProcessEvent`, gameplay events, new gameplay APIs, chat events, timers,
+UE pointers, identity, lookup, mutation, return overrides, chat replies/send-chat, ArkApi
+compatibility, or private Obelisk headers.
 
 The example intentionally uses the installed SDK package and the current numeric
 compatibility floor:

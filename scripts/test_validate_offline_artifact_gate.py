@@ -886,6 +886,120 @@ def structure_nonpin_copied_scalar_policy_slice_manifest(
     }
 
 
+def structure_aggregate_census_policy_slice_manifest(
+    *,
+    policy_status: str = "evidence-only",
+    promotion_ready: bool = False,
+    consume_only: bool = True,
+    counters: dict | None = None,
+    histograms: dict | None = None,
+    non_claims: list[str] | None = None,
+) -> dict:
+    copied_fields = [
+        "PrimalStructure.AllowStructureAccess.ReturnValue",
+        "PrimalStructure.IsAllowedToDemolish.ReturnValue",
+        "PrimalStructure.SetVariant.VariantIndex",
+        "PrimalStructure.SetVariant.bForceSet",
+        "PrimalStructure.SetVariant.ReturnValue",
+        "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue",
+        "PrimalStructureSeating.CanSeat.bForce",
+        "PrimalStructureSeating.CanSeat.ReturnValue",
+    ]
+    redacted_fields = [
+        "PrimalStructure.AllowStructureAccess.ForPC",
+        "PrimalStructure.IsAllowedToDemolish.ForPC",
+        "PrimalStructureItemContainer.AllowToggleActivation.ForPC",
+        "PrimalStructureSeating.CanSeat.ForPC",
+        "PrimalStructureSeating.CanSeat.forCharacter",
+    ]
+    excluded_fields = [
+        "PrimalStructureItemContainer.VerifyPinCode.pinCode",
+        "PrimalStructureItemContainer.VerifyPinCode.ReturnValue",
+    ]
+    if counters is None:
+        counters = dict(gate.REQUIRED_STRUCTURE_AGGREGATE_COUNTERS)
+    if histograms is None:
+        histograms = dict(gate.REQUIRED_STRUCTURE_AGGREGATE_HISTOGRAMS)
+    if non_claims is None:
+        non_claims = sorted(gate.REQUIRED_STRUCTURE_AGGREGATE_NON_CLAIMS)
+    input_snapshots = [
+        {"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64, "target": target}
+        for index, target in enumerate(sorted(gate.REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS), start=1)
+    ]
+    source_by_target = {snapshot["target"]: snapshot for snapshot in input_snapshots}
+    copied_shapes = {
+        "PrimalStructure.AllowStructureAccess.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "offset": "0x8", "offset_internal": 8},
+        "PrimalStructure.IsAllowedToDemolish.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "offset": "0x8", "offset_internal": 8},
+        "PrimalStructure.SetVariant.VariantIndex": {"field": "VariantIndex", "direction": "in", "type": "int32", "offset": "0x0", "offset_internal": 0},
+        "PrimalStructure.SetVariant.bForceSet": {"field": "bForceSet", "direction": "in", "type": "bool", "offset": "0x4", "offset_internal": 4},
+        "PrimalStructure.SetVariant.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "offset": "0x5", "offset_internal": 5},
+        "PrimalStructureItemContainer.AllowToggleActivation.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "offset": "0x8", "offset_internal": 8},
+        "PrimalStructureSeating.CanSeat.bForce": {"field": "bForce", "direction": "in", "type": "bool", "offset": "0x10", "offset_internal": 16},
+        "PrimalStructureSeating.CanSeat.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "offset": "0x11", "offset_internal": 17},
+    }
+    excluded_shapes = {
+        "PrimalStructureItemContainer.VerifyPinCode.pinCode": {"field": "pinCode", "direction": "in", "type": "int32", "property_class": "IntProperty", "offset": "0x0", "offset_internal": 0, "reason": "pin_code_value_excluded"},
+        "PrimalStructureItemContainer.VerifyPinCode.ReturnValue": {"field": "ReturnValue", "direction": "return", "type": "bool", "property_class": "BoolProperty", "offset": "0x4", "offset_internal": 4, "reason": "pin_code_return_value_excluded"},
+    }
+    return {
+        "schema": gate.STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA,
+        "snapshot_root": "redacted",
+        "input_target_set": "structure-aggregate-census-planning",
+        "output_target_set": "structure-aggregate-census-policy-slice",
+        "policy_status": policy_status,
+        "consume_only": consume_only,
+        "missing_targets": [],
+        "generated_from": {"snapshot_schema": SNAPSHOT_SCHEMA, "input_snapshots": input_snapshots},
+        "coverage": {
+            "status": "complete",
+            "input_targets": sorted(gate.REQUIRED_STRUCTURE_AGGREGATE_INPUT_TARGETS),
+            "copied_fields_permitted": copied_fields,
+            "redacted_fields": redacted_fields,
+            "explicitly_excluded_fields": excluded_fields,
+        },
+        "copied_fields_permitted": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "copied_field": field,
+                "source_snapshot": source_by_target[field.rsplit(".", 1)[0]]["id"],
+                "source_snapshot_sha256": source_by_target[field.rsplit(".", 1)[0]]["sha256"],
+                **copied_shapes[field],
+            }
+            for field in copied_fields
+        ],
+        "redacted_structure_fields": [
+            {
+                "target": field.rsplit(".", 1)[0],
+                "redacted_field": field,
+                "reason": "character_ref_excluded" if field.endswith("forCharacter") else "player_controller_ref_excluded",
+            }
+            for field in redacted_fields
+        ],
+        "explicitly_excluded_fields": [
+            {
+                "target": "PrimalStructureItemContainer.VerifyPinCode",
+                "excluded_field": field,
+                "evidence_status": "explicitly-excluded-pin-code-field",
+                **excluded_shapes[field],
+            }
+            for field in excluded_fields
+        ],
+        "approved_counters": counters,
+        "approved_histograms": histograms,
+        "non_claims": non_claims,
+        "safety_summary": {
+            "artifact_status": "evidence_only",
+            "intended_use": "offline_review_only",
+            "promotion_ready": promotion_ready,
+            "consume_only": consume_only,
+            "copied_field_count": len(copied_fields),
+            "redacted_field_count": len(redacted_fields),
+            "explicitly_excluded_field_count": len(excluded_fields),
+            "explicitly_excluded": sorted(gate.REQUIRED_STRUCTURE_AGGREGATE_EXPLICIT_EXCLUSIONS),
+        },
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -5107,6 +5221,85 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_nonpin_policy_contains_verify_pin_code_payload", reasons)
         self.assertIn("structure_nonpin_policy_readiness_overclaim", reasons)
         self.assertIn("structure_nonpin_policy_public_overclaim_public_structure_events", reasons)
+
+    def test_accepts_structure_aggregate_census_policy_slice_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-aggregate-policy.json"
+            write_json(manifest, structure_aggregate_census_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_aggregate_census_policy_slice_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-aggregate-policy.json"
+            write_json(manifest, structure_aggregate_census_policy_slice_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_structure_aggregate_census_policy_slice_consume_only", reasons)
+
+    def test_blocks_structure_aggregate_census_policy_slice_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-aggregate-policy.json"
+            payload = structure_aggregate_census_policy_slice_manifest(
+                policy_status="accepted",
+                promotion_ready=True,
+                consume_only=False,
+                non_claims=["does not copy VerifyPinCode"],
+            )
+            payload["approved_counters"]["copied_field_count"] = 7
+            payload["approved_histograms"]["copied_type"] = {"bool": 8}
+            payload["coverage"]["copied_fields_permitted"] = payload["coverage"]["copied_fields_permitted"][:-1]
+            payload["coverage"]["explicitly_excluded_fields"] = payload["coverage"]["explicitly_excluded_fields"][:-1]
+            payload["copied_fields_permitted"] = payload["copied_fields_permitted"][:-1]
+            payload["redacted_structure_fields"] = payload["redacted_structure_fields"][:-1]
+            payload["explicitly_excluded_fields"] = payload["explicitly_excluded_fields"][:-1]
+            payload["safety_summary"]["explicitly_excluded"] = ["pinCode"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_aggregate_policy_status_not_evidence_only", reasons)
+        self.assertIn("structure_aggregate_policy_not_consume_only", reasons)
+        self.assertIn("structure_aggregate_policy_promotion_ready_not_false", reasons)
+        self.assertIn("structure_aggregate_policy_counters_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_histograms_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_coverage_excluded_fields_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_copied_fields_count_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_redacted_fields_count_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_excluded_fields_count_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_non_claims_missing_required_boundaries", reasons)
+        self.assertIn("structure_aggregate_policy_explicit_exclusions_missing_internal_boundaries", reasons)
+
+    def test_blocks_structure_aggregate_census_policy_slice_verify_pin_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-aggregate-policy.json"
+            payload = structure_aggregate_census_policy_slice_manifest()
+            payload["copied_fields_permitted"][0]["copied_field"] = "PrimalStructureItemContainer.VerifyPinCode.ReturnValue"
+            payload["runtime_ready"] = True
+            payload["claim"] = "public StructureEvents ready"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_aggregate_policy_copied_fields_mismatch", reasons)
+        self.assertIn("structure_aggregate_policy_contains_verify_pin_code_copied_field", reasons)
+        self.assertIn("structure_aggregate_policy_readiness_overclaim", reasons)
+        self.assertIn("structure_aggregate_policy_public_overclaim_public_structure_events", reasons)
 
     def test_accepts_static_global_promotion_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
