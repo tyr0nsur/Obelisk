@@ -47,6 +47,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `surface-id: excluded - ...` or `surface-id: post-v1 - ...` wording, and required
   exclusion text must appear on that surface's own record.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim: player identity, permissions/admin, commands/replies, inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and operator ingress/storage. Foundation/Plugin Hub seed work remains pre-v1 unless those blockers are promoted or explicitly excluded in a v1 release statement.
+- Lifecycle ops recovery is now an explicit machine-readable v1 blocker:
+  `obelisk.lifecycle_ops_recovery.v1`. Foundation lifecycle/config/logging does not satisfy
+  plugin watchdog, crash recovery, hot reload, process restart orchestration, server
+  recovery, operator reload command, detached-worker ingress, or restart-state recovery
+  demand. A v1 release statement must promote or explicitly exclude/post-v1 that surface.
 - `permissions/admin` remains blocked until `player_identity` is promoted. The documented
   minimum later shape is query-only, owner-scoped, capability-gated, copied POD,
   process-local, and fail-closed; it does not include commands/replies, send-chat,
@@ -143,9 +148,18 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `scripts/plan_ufunction_focal_snapshots.py`, which now requires full matched target-set
   coverage plus exact `ServerListPlayers` and `ServerKickPlayer` admin rows before command
   emission.
+- The player-identity preflight JSON recipe now starts with the complete
+  `scripts/build_core_dump_evidence_pack.py` command using reviewed `verified_fname_root_slot`
+  and `gobjects` labels. The recipe intentionally omits `--skip-core-sha256` and
+  `--allow-partial-gdb`; those remain forbidden for this lane.
+- Lifecycle-anchor candidate artifacts now fail closed if a candidate anchor target is
+  outside the closed `players-identity-lifecycle-intake` target set, or if principal
+  invalidation semantics are claimed as resolved before promotion.
 - The v1 completion checker rejects duplicate or mixed release-statement records per
   surface and requires promoted canonical v1 blockers to provide valid surface-specific
   ABI evidence and SDK-consumer evidence, not just one valid machine-evidence bucket.
+- The v1 completion checker also applies strict structured promotion evidence to canonical
+  experimental public ABI seeds before they can become stable v1 surfaces.
 - `obelisk.operator_ingress_storage.v1` is not unlocked by player identity/principal evidence; it remains a separate post-v1 blocker until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are proven or explicitly excluded.
 - `obelisk.player_services_economy_mobility.v1` is a v1 blocker umbrella only, not a future monolithic public API. Future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy after identity, permissions, storage/persistence, privacy, audit, rollback, and abuse controls are proven. Economy and mobility require promoted identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.
 - Player identity focal snapshot planning must start from a complete non-protected `obelisk.reflection-inventory-pack.v1` with `target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set and rows for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`. After that pack is reviewed, use `scripts/plan_ufunction_focal_snapshots.py` with exactly two `--target` arguments for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`; do not use `--target-set players-identity-lifecycle-intake` to emit plans.

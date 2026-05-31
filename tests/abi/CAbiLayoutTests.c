@@ -3,6 +3,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(OBELISK_API_CAPABILITY_PLAYER_IDENTITY) || defined(OBELISK_API_CAPABILITY_PLAYER_PRINCIPALS) || \
+    defined(OBELISK_PLAYER_PRINCIPAL_ABI_VERSION) || defined(OBELISK_PLAYER_IDENTITY_EVENT_ABI_VERSION)
+#error "Public player identity/principal ABI must stay gated until promotion evidence is accepted."
+#endif
+
+#if defined(OBELISK_API_CAPABILITY_RESOURCE_HANDLE) || defined(OBELISK_API_CAPABILITY_RESOURCE_HANDLES) || \
+    defined(OBELISK_RESOURCE_HANDLE_ABI_VERSION)
+#error "Public ResourceHandle ABI must stay gated until ResourceHandle promotion requirements are complete."
+#endif
+
 #define ASSERT_SIZE(type, expected) _Static_assert(sizeof(type) == (expected), #type " size changed")
 #define ASSERT_ALIGN(type, expected) _Static_assert(_Alignof(type) == (expected), #type " alignment changed")
 #define ASSERT_OFFSET(type, field, expected) \

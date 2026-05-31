@@ -639,6 +639,25 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.structure_census.v1"])
 
+    def test_promoted_experimental_surface_requires_structured_surface_specific_evidence(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.chat_message.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterChatEventWithOwnerTokenHandle"]
+                surface["evidence"] = {"tests": ["tests/sdk_consumer"]}
+                break
+        manifest["promoted_surfaces"].append("obelisk.chat_message.v1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_surfaces_without_evidence"], ["obelisk.chat_message.v1"])
+
     def test_new_planning_surface_blocks_v1_claim_until_outcome_is_named(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["surfaces"].append(

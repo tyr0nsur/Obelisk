@@ -463,8 +463,29 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
     core_manifest_pattern = args.artifact_root / CORE_EVIDENCE_MANIFEST_PATTERN
     reflection_inventory_pattern = args.artifact_root / REFLECTION_INVENTORY_MANIFEST_PATTERN
+    raw_binary_pattern = args.artifact_root / "player-identity-offline-<run-id>" / "raw" / "ShooterGameServer"
+    raw_core_pattern = args.artifact_root / "player-identity-offline-<run-id>" / "raw" / "core"
     next_operator_recipe = {
         "blocked_until": "accepted_reflection_inventory_pack",
+        "build_core_evidence_pack": (
+            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py "
+            f"--binary {raw_binary_pattern} "
+            f"--core {raw_core_pattern} "
+            f"--output-dir {core_manifest_pattern.parent} "
+            "--obelisk-commit <reviewed-obelisk-id> "
+            "--no-default-candidates "
+            "--no-default-fname-roots "
+            "--no-default-fname-indices "
+            "--fname-root-slot verified_fname_root_slot=0x5956f30 "
+            "--fname-index None=0 "
+            "--fname-index ClientMessage=4884 "
+            "--fname-index ServerChat=9619 "
+            "--fname-index SetActiveMissionDebugFlags=9622 "
+            "--gobjects-candidate gobjects=0x595b7e0 "
+            "--gobjects-sample-index 0 "
+            "--gobjects-sample-index 1 "
+            "--gobjects-sample-index 25447"
+        ),
         "build_reflection_inventory_pack": (
             "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py "
             f"--evidence-pack-manifest {core_manifest_pattern} "

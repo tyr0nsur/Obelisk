@@ -18,11 +18,12 @@ SCRIPT = SCRIPT_DIR / "check_player_identity_lifecycle_anchor_candidates.py"
 SHA = "a" * 64
 
 
-def base_anchor(role: str, function: str) -> dict:
+def base_anchor(role: str, target: str) -> dict:
+    outer, _, function = target.rpartition(".")
     return {
         "role": role,
-        "target": f"ShooterPlayerController.{function}",
-        "outer": "ShooterPlayerController",
+        "target": target,
+        "outer": outer,
         "function": function,
         "acceptance_status": "candidate_recorded",
         "accepted": False,
@@ -83,8 +84,8 @@ def manifest() -> dict:
             "path_redacted": True,
         },
         "candidate_anchors": [
-            base_anchor("session_start", "ClientNotifyPlayerJoined"),
-            base_anchor("session_end", "ClientNotifyPlayerLeft"),
+            base_anchor("session_start", "MissionType.AddPlayerToMission"),
+            base_anchor("session_end", "MissionType.BPAllowPlayerToLeaveMission"),
         ],
         "lifecycle_acceptance": {
             "session_start_accepted": False,
@@ -224,6 +225,26 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("public_principal_overclaim", report["blockers"])
+
+    def test_rejects_lifecycle_anchor_target_outside_closed_target_set(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = base_anchor("session_start", "ShooterPlayerController.ClientNotifyPlayerJoined")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
+
+    def test_rejects_principal_invalidation_semantics_overclaim(self) -> None:
+        payload = manifest()
+        payload["principal_policy"]["invalidation_semantics"] = "stable_cross_instance_principal"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_invalidation_semantics_overclaim", report["blockers"])
 
     def test_rejects_identity_field_copied_public(self) -> None:
         payload = manifest()

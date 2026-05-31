@@ -18,7 +18,9 @@ The machine-readable `v1_sdk_completion_blockers` list records the high-demand c
 that currently prevent a complete SDK claim: player identity, permissions/admin,
 commands/replies, inventory/items mutation, structure census/build policy, gameplay
 modules including buffs, player services/economy/mobility/areas, and operator
-ingress/storage. Gameplay/server tick callbacks are also tracked as a separate
+ingress/storage. Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`
+so lifecycle/config/logging cannot be mistaken for watchdog, reload, restart, or server
+recovery APIs. Gameplay/server tick callbacks are also tracked as a separate
 post-v1 blocker so process-local timers are not mistaken for UE gameplay tick hooks.
 Those blockers must be promoted or deliberately excluded in the release statement before
 `v1_completion_required` can become true.
@@ -195,6 +197,38 @@ mobility require promoted
 identity/principal, permissions/admin, and storage/persistence; identity alone is
 insufficient. If they are included in the eventual `v1.0` support statement, they must be
 promoted before the release is called `v1.0`.
+
+## v1 Release Statement Checklist
+
+Before `stable_release_contract.claim_allowed=true`, the reviewed v1 release statement
+must have exactly one outcome record for every unresolved `.v1` blocker or experimental
+seed surface. Records use one of these exact forms:
+
+```text
+surface-id: promoted - ...
+surface-id: excluded - ...
+surface-id: post-v1 - ...
+```
+
+Duplicate records, mixed `excluded`/`post-v1` records for the same surface, or wording
+that contradicts the chosen outcome are release blockers. A promoted record is valid only
+when the manifest surface is also promoted and has surface-specific ABI evidence,
+SDK-consumer evidence, lifecycle cleanup coverage, privacy/no-internals guarantees, and
+the required gameplay evidence for that surface.
+
+| Surface or demand family | Required v1 outcome | Depends on | Release-statement detail |
+| --- | --- | --- | --- |
+| `obelisk.player_identity.v1` | `promoted` or `excluded` | accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source | Name player identity, principal, player lookup, permission principal, economy identity, and send-chat identity. |
+| `obelisk.permissions_admin.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal | Name permission groups, admin groups, grant/revoke, storage/persistence, operator ingress, command router, replies/send-chat, moderation, and ban/kick. |
+| `obelisk.commands_replies.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity and permissions/admin plus safe response path | Name command router, console/RCON commands, player/admin commands, chat replies, send-chat, broadcast/notices, and moderation. |
+| `obelisk.inventory_items_mutation.v1` | `promoted`, `excluded`, or `post-v1` | player/inventory/item identity plus rollback/privacy controls | Name Inventory SDK, Items SDK, give/remove item, kits/rewards, engrams/progression, lookup, item handles, mutation, return override, and `ResourceHandle`. |
+| `obelisk.structure_census.v1` | `promoted` or `excluded` | copied structure evidence, privacy/redaction, identity policy if exposed | Name StructureEvents SDK, structure census, structure identity, lookup, build placement policy, no-collision policy, and ownership lookup. |
+| `obelisk.mission_transfer_dino_tribe.v1` | `promoted` or `excluded` | each module promoted as a narrow copied ABI or explicitly left out | Name Mission SDK, Transfer SDK, Dino SDK, dino colors/cosmetics/carry rules, Tribe SDK, tribe MOTD/notices/policy, Buff/status SDK, teleport/spawn, ownership lookup, and cross-map correlation. |
+| `obelisk.player_services_economy_mobility.v1` | `promoted`, `excluded`, or `post-v1` | identity, permissions/admin, storage/persistence, audit/rollback/abuse controls | Name economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy, timed notices, and cross-instance persistence. |
+| `obelisk.operator_ingress_storage.v1` | `promoted`, `excluded`, or `post-v1` | secret-safe ingress, storage schema/migration, queue drain, audit, encoding, lifecycle policy | Name RCON, operator reload command API, Unicode/operator text encoding, webhooks, database/storage, secret manager, external ingress, and cross-instance storage. |
+| `obelisk.gameplay_tick_callbacks.v1` | `promoted`, `excluded`, or `post-v1` | cadence, budget, threading, hitch/backpressure, lifecycle, shutdown semantics | Name server tick callbacks, UE gameplay tick callbacks, module/per-frame hooks, and gameplay timers. |
+| Promoted-experimental copied seeds | `promoted`, `excluded`, or `post-v1` | full public SDK promotion evidence for each seed | Name `GameplayPolicyEvent`, `ChatMessageEvent`, plugin-local chat routing, and inventory copied signals if they remain outside v1. |
+| `obelisk.lifecycle_ops_recovery.v1` | `promoted`, `excluded`, or `post-v1` | current foundation plus operator ingress for command-triggered reloads | State that lifecycle/config/logging/descriptors/timers are included, but plugin watchdogs, hot plugin reload, Obelisk hot reload, process restart, server recovery API, operator reload commands, detached-worker ingress, and restart-state recovery are excluded or post-v1 unless separately promoted. |
 
 ## v1.0 Release Bar
 

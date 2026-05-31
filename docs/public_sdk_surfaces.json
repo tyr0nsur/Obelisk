@@ -59,6 +59,7 @@
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.structure_census.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
@@ -68,6 +69,7 @@
     "obelisk.permissions_admin.v1",
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
     "obelisk.gameplay_tick_callbacks.v1",
@@ -95,6 +97,7 @@
     "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "That dependency chain must not be documented as permissions/admin being the immediate next public slice; groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.",
     "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity production seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
+    "Lifecycle/config/logging foundation does not satisfy lifecycle ops recovery demand; plugin watchdogs, hot reload, process restart orchestration, server recovery, operator reload commands, and restart-state semantics must be promoted separately or explicitly excluded/post-v1.",
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Player identity/principal planning requires a non-protected complete core evidence pack plus a reviewed UFunction reflection-inventory pack; an offline ShooterGameServer binary, copied core, manual roots, or direct core/bin planning alone is not public SDK or promotion evidence.",
@@ -159,6 +162,68 @@
         "operator reload commands",
         "detached worker ingress without shutdown proof",
         "cross-process mutable state without plugin-owned locking"
+      ]
+    },
+    {
+      "id": "obelisk.lifecycle_ops_recovery.v1",
+      "category": "lifecycle/ops recovery",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_name": "Lifecycle ops recovery, reload, watchdog, and crash management",
+      "public_contract": [],
+      "depends_on": [
+        "obelisk.lifecycle_config_logging.v1",
+        "obelisk.operator_ingress_storage.v1"
+      ],
+      "evidence": {
+        "demand_sources": [
+          "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
+          "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
+        ],
+        "current_public_slice": "lifecycle/config/logging only; no recovery/reload/watchdog API"
+      },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "crash containment and watchdog policy that does not run plugin code after unsafe failure",
+          "hot reload or restart orchestration lifecycle with callback quiescence, unload drain, and dlclose safety",
+          "operator reload command ingress, authorization, audit, and rollback semantics",
+          "multi-instance restart-state and recovery semantics with explicit failure modes",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer or integration tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.lifecycle_ops_recovery.v1 as post-v1 or excluded",
+          "the v1 release statement states that no plugin watchdog API, plugin crash recovery API, hot plugin reload API, Obelisk hot reload API, process restart orchestration API, server recovery API, operator reload command API, detached-worker ingress API, or restart-state recovery API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
+      },
+      "blockers": [
+        "Foundation lifecycle/config/logging does not define crash containment, reload, watchdog, or restart orchestration.",
+        "No operator reload ingress, authorization, audit, rollback, or restart-state contract.",
+        "No callback quiescence, unload drain, dlclose safety, or multi-instance recovery semantics for hot reload/restart APIs.",
+        "No SDK consumer or integration coverage for recovery/reload behavior."
+      ],
+      "audit_units": [
+        "plugin watchdog/crash recovery",
+        "hot plugin reload",
+        "Obelisk hot reload",
+        "process restart orchestration",
+        "server recovery API",
+        "operator reload commands",
+        "detached-worker ingress",
+        "restart-state recovery"
+      ],
+      "exclusions": [
+        "plugin watchdog API",
+        "plugin crash recovery API",
+        "hot plugin reload API",
+        "Obelisk hot reload API",
+        "process restart orchestration API",
+        "server recovery API",
+        "operator reload command API",
+        "detached-worker ingress API",
+        "restart-state recovery API"
       ]
     },
     {

@@ -8,6 +8,16 @@
 #error "Public structure API must stay gated until StructureEvents promotion requirements are complete."
 #endif
 
+#if defined(OBELISK_API_CAPABILITY_PLAYER_IDENTITY) || defined(OBELISK_API_CAPABILITY_PLAYER_PRINCIPALS) || \
+    defined(OBELISK_PLAYER_PRINCIPAL_ABI_VERSION) || defined(OBELISK_PLAYER_IDENTITY_EVENT_ABI_VERSION)
+#error "Public player identity/principal ABI must stay gated until promotion evidence is accepted."
+#endif
+
+#if defined(OBELISK_API_CAPABILITY_RESOURCE_HANDLE) || defined(OBELISK_API_CAPABILITY_RESOURCE_HANDLES) || \
+    defined(OBELISK_RESOURCE_HANDLE_ABI_VERSION)
+#error "Public ResourceHandle ABI must stay gated until ResourceHandle promotion requirements are complete."
+#endif
+
 namespace
 {
     template <typename T>

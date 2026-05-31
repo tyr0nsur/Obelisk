@@ -24,6 +24,7 @@ CANONICAL_SURFACE_IDS = {
     "obelisk.inventory_item_copied_signals.v1",
     "obelisk.inventory_items_mutation.v1",
     "obelisk.lifecycle_config_logging.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
     "obelisk.operator_ingress_storage.v1",
     "obelisk.permissions_admin.v1",
@@ -37,6 +38,7 @@ CANONICAL_V1_COMPLETION_BLOCKERS = {
     "obelisk.permissions_admin.v1",
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.structure_census.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
     "obelisk.player_services_economy_mobility.v1",
@@ -49,6 +51,7 @@ CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.chat.local_routing.v1",
     "obelisk.inventory_item_copied_signals.v1",
 }
+STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
     "obelisk.debug_raw_process_event.v1",
 }
@@ -202,7 +205,7 @@ def evidence_path_is_specific(raw_path: str, surface_id: str) -> bool:
     if relative is None:
         return False
     relative_text = relative.as_posix()
-    if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS and relative_text.startswith("scripts/test_"):
+    if surface_id in STRICT_PROMOTION_EVIDENCE_SURFACE_IDS and relative_text.startswith("scripts/test_"):
         return False
     if relative_text in GENERIC_SCRIPT_EVIDENCE_DENYLIST:
         return False
@@ -236,7 +239,7 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     surface_id = surface.get("id")
     if not isinstance(surface_id, str):
         return False
-    allow_generic_dirs = surface_id not in CANONICAL_V1_COMPLETION_BLOCKERS
+    allow_generic_dirs = surface_id not in STRICT_PROMOTION_EVIDENCE_SURFACE_IDS
     if not allow_generic_dirs:
         if evidence.get("surface_id") != surface_id:
             return False

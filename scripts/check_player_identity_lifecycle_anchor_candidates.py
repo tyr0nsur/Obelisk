@@ -10,12 +10,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from reflection_target_sets import schema_target_list
+
 
 SCHEMA = "obelisk.players-identity-lifecycle-anchor-candidates.v1"
 REPORT_SCHEMA = "obelisk.players-identity-lifecycle-anchor-candidates-check.v1"
 TARGET_SET = "players-identity-lifecycle-intake"
 TARGET_SET_REVISION = "reflection_target_sets.py:players-identity-lifecycle-intake"
 SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
+TARGET_SET_TARGETS = set(schema_target_list(TARGET_SET, SNAPSHOT_SCHEMA))
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 ROLE_TO_ACCEPTANCE_KEYS = {
@@ -203,6 +206,8 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
         add(blockers, "candidate_anchor_exact_target_missing", label)
     elif target != f"{outer}.{function}":
         add(blockers, "candidate_anchor_target_mismatch", label)
+    elif target not in TARGET_SET_TARGETS:
+        add(blockers, "candidate_anchor_target_outside_closed_target_set", label, target=target)
     if accepted:
         for key in ("num_parms", "parms_size", "property_order"):
             value = anchor.get(key)
@@ -281,6 +286,8 @@ def validate_manifest(payload: dict[str, Any], *, promote: bool = False) -> list
     else:
         if principal.get("public_principal_ready") is not False or principal.get("copied_public_identifier") is not None:
             add(blockers, "public_principal_overclaim", "$.principal_policy")
+        if principal.get("invalidation_semantics") not in {"unresolved", "not_promoted"}:
+            add(blockers, "principal_invalidation_semantics_overclaim", "$.principal_policy.invalidation_semantics")
         if principal.get("logging_policy") != "identity_values_not_logged":
             add(blockers, "principal_logging_policy_mismatch", "$.principal_policy.logging_policy")
 

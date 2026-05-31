@@ -1134,9 +1134,9 @@ def players_identity_first_evidence_manifest(
 def players_identity_lifecycle_anchor_candidates_manifest() -> dict:
     anchor = {
         "role": "session_start",
-        "target": "ShooterPlayerController.ClientNotifyPlayerJoined",
-        "outer": "ShooterPlayerController",
-        "function": "ClientNotifyPlayerJoined",
+        "target": "MissionType.AddPlayerToMission",
+        "outer": "MissionType",
+        "function": "AddPlayerToMission",
         "acceptance_status": "candidate_recorded",
         "accepted": False,
         "function_flags": "0x00000000",

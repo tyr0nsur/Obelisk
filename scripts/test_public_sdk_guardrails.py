@@ -1144,6 +1144,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.player_identity.v1",
             "obelisk.inventory_item_copied_signals.v1",
             "obelisk.inventory_items_mutation.v1",
+            "obelisk.lifecycle_ops_recovery.v1",
             "obelisk.structure_census.v1",
             "obelisk.mission_transfer_dino_tribe.v1",
             "obelisk.player_services_economy_mobility.v1",
@@ -1198,6 +1199,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.commands_replies.v1",
                 "obelisk.permissions_admin.v1",
                 "obelisk.inventory_items_mutation.v1",
+                "obelisk.lifecycle_ops_recovery.v1",
                 "obelisk.structure_census.v1",
                 "obelisk.mission_transfer_dino_tribe.v1",
                 "obelisk.player_services_economy_mobility.v1",
@@ -1214,6 +1216,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIn(
             "stable_release_contract.claim_allowed must stay false while v1_completion_required is false.",
+            release_guardrails,
+        )
+        self.assertIn(
+            "Lifecycle/config/logging foundation does not satisfy lifecycle ops recovery demand; "
+            "plugin watchdogs, hot reload, process restart orchestration, server recovery, "
+            "operator reload commands, and restart-state semantics must be promoted separately "
+            "or explicitly excluded/post-v1.",
             release_guardrails,
         )
         self.assertIn(
@@ -1686,6 +1695,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Promote commands/replies as a new owner-token copied callback/response surface",
             "not as a parser-only extension to `ChatMessageEvent`",
             "preventing them from being mistaken for a complete Obelisk SDK",
+            "## v1 Release Statement Checklist",
+            "must have exactly one outcome record for every unresolved `.v1` blocker",
+            "surface-id: excluded -",
+            "surface-id: post-v1 -",
+            "Duplicate records, mixed `excluded`/`post-v1` records for the same surface",
+            "surface-specific ABI evidence",
+            "SDK-consumer evidence",
+            "`obelisk.player_identity.v1`",
+            "`obelisk.operator_ingress_storage.v1`",
+            "`obelisk.gameplay_tick_callbacks.v1`",
+            "`obelisk.lifecycle_ops_recovery.v1`",
+            "Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`",
+            "plugin watchdogs, hot plugin reload, Obelisk hot reload, process restart, server recovery API, operator reload commands, detached-worker ingress, and restart-state recovery are excluded or post-v1",
             "Passing runtime/core-first RC gates",
             "pre-identity production seed usefulness is insufficient for `v1.0 stable`",
             "blocker list is promoted or explicitly named as excluded/post-v1",
