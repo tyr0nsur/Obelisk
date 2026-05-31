@@ -157,8 +157,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `GameplayPolicyEvent` `ReturnValue` checks and is the best
   value/risk target set because it already has release-readiness classification,
   fixture coverage, and second-source layout evidence behind existing
-  `GameplayPolicyEvent` event kinds. It still must be described only as copied
-  `ReturnValue` signal evidence; it does not promote a public Inventory SDK, public Items SDK, identity, lookup, mutation, return override, runtime validation, or v1 completion.
+  `GameplayPolicyEvent` event kinds. Descriptor-preflight hardening now requires the
+  three internal descriptor candidates to stay unassigned to public event kinds/masks and
+  blocks drift toward Inventory SDK/Items SDK/identity/lookup/mutation/return override
+  metadata. The preserved artifact gates were regenerated against manifest sha256
+  `242d7506703d0164cfd5c2722690d4d865ca4063f4db1c26be4374da133f3f42`. It still must be
+  described only as copied `ReturnValue` signal evidence; it does not promote a public
+  Inventory SDK, public Items SDK, identity, lookup, mutation, return override, runtime
+  validation, or v1 completion.
 - Mission copied-bool remains internal/candidate-only: exact bool-tail evidence is `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`; it does not promote Mission SDK, authority, identity, mutation, return override, or v1 completion.
 - Keep `obelisk.command_chat_response_path.v1` as orientation-only until identity and
   permissions/admin are promoted and a copied response contract exists. The current static

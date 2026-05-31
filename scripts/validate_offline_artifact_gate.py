@@ -267,6 +267,45 @@ REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS = {
     "PrimalItem.CanRepair",
     "PrimalItem.UseItemOntoItem",
 }
+ITEM_RETURN_ONLY_DESCRIPTOR_BY_TARGET = {
+    "PrimalItem.AllowEquipItem": "inventory_item.allow_equip_check",
+    "PrimalItem.CanRepair": "inventory_item.can_repair_check",
+    "PrimalItem.UseItemOntoItem": "inventory_item.use_onto_item_check",
+}
+REQUIRED_ITEM_RETURN_ONLY_DESCRIPTORS = set(ITEM_RETURN_ONLY_DESCRIPTOR_BY_TARGET.values())
+REQUIRED_ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_NOT_ASSIGNED = {
+    "event_kind",
+    "event_kind_mask",
+    "public_metadata_json",
+    "runtime_dispatcher_tables",
+    "plugin_callbacks",
+}
+ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_FORBIDDEN_KEYS = REQUIRED_ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_NOT_ASSIGNED | {
+    "field_mask",
+    "identity",
+    "inventory_identity",
+    "inventory_sdk",
+    "item_identity",
+    "item_sdk",
+    "items_sdk",
+    "lookup",
+    "lookup_ready",
+    "mutation",
+    "mutation_ready",
+    "public_abi",
+    "public_abi_ready",
+    "public_sdk",
+    "public_sdk_ready",
+    "return_override",
+    "return_override_ready",
+}
+ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_FORBIDDEN_STRINGS = {
+    "INVENTORY_USE_CHECK",
+    "IGNORE_COOLDOWN",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+}
 REQUIRED_ITEM_RETURN_ONLY_INPUT_TARGETS = REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS | {
     "PrimalItem.CraftBlueprint",
 }
@@ -2401,6 +2440,13 @@ def validate_redacted_signature_manifest(
             strict=strict_target_set_coverage,
         )
     )
+    blockers.extend(
+        validate_item_return_descriptor_preflight(
+            payload,
+            label=source_label,
+            required=item_return_descriptor_preflight_required(payload),
+        )
+    )
     if isinstance(safety_summary, dict):
         actual_counts = {
             "blocked_count_total": sum(
@@ -3973,6 +4019,205 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
     return blockers
 
 
+def item_return_descriptor_preflight_required(payload: dict[str, Any]) -> bool:
+    if payload.get("schema") == ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA:
+        return True
+    if payload.get("schema") != REDACTED_UFUNCTION_SIGNATURE_SCHEMA:
+        return False
+    for key in ("target_sets", "source_target_sets"):
+        target_sets = payload.get(key)
+        if isinstance(target_sets, list) and "item-return-only-policy-slice" in target_sets:
+            return True
+    return False
+
+
+def validate_item_return_descriptor_preflight(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    required: bool,
+    copied_return_bools: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    preflight = payload.get("descriptor_preflight")
+    if preflight is None:
+        if required:
+            return [{"reason": "item_return_descriptor_preflight_missing", "label": f"{label}:$.descriptor_preflight"}]
+        return []
+    if not isinstance(preflight, dict):
+        return [{"reason": "item_return_descriptor_preflight_not_object", "label": f"{label}:$.descriptor_preflight"}]
+
+    blockers: list[dict[str, Any]] = []
+    expected_top_level = {
+        "status": "internal-evidence-only",
+        "scope": "item-return-only-policy-slice",
+        "descriptor_count": len(REQUIRED_ITEM_RETURN_ONLY_DESCRIPTORS),
+        "resource_kind": "INVENTORY_ITEM",
+        "resource_backing": "inventory_backed",
+        "payload_policy": "copied_return_value_only",
+        "return_value_only": True,
+        "assigned_event_kind": None,
+        "assigned_event_kind_mask": None,
+        "promotion_ready": False,
+        "public_promotion": False,
+        "public_surface": False,
+    }
+    for key, expected in expected_top_level.items():
+        if preflight.get(key) != expected:
+            blockers.append(
+                {
+                    "reason": "item_return_descriptor_preflight_shape_mismatch",
+                    "label": f"{label}:$.descriptor_preflight.{key}",
+                    "expected": expected,
+                    "recorded": preflight.get(key),
+                }
+            )
+
+    explicitly_not_assigned = preflight.get("explicitly_not_assigned")
+    if (
+        not isinstance(explicitly_not_assigned, list)
+        or any(not isinstance(item, str) for item in explicitly_not_assigned)
+        or not REQUIRED_ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_NOT_ASSIGNED.issubset(set(explicitly_not_assigned))
+    ):
+        blockers.append(
+            {
+                "reason": "item_return_descriptor_preflight_not_assigned_incomplete",
+                "label": f"{label}:$.descriptor_preflight.explicitly_not_assigned",
+                "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_NOT_ASSIGNED),
+            }
+        )
+
+    for trail, key in collect_key_names(preflight, trail="$.descriptor_preflight"):
+        if key in ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_FORBIDDEN_KEYS:
+            blockers.append(
+                {
+                    "reason": "item_return_descriptor_preflight_forbidden_assignment_key",
+                    "label": f"{label}:{trail}",
+                    "key": key,
+                }
+            )
+
+    copied_by_field: dict[str, dict[str, Any]] = {}
+    if copied_return_bools is not None:
+        copied_by_field = {
+            entry["copied_field"]: entry
+            for entry in copied_return_bools
+            if isinstance(entry, dict) and isinstance(entry.get("copied_field"), str)
+        }
+
+    descriptors = preflight.get("descriptors")
+    if not isinstance(descriptors, list) or len(descriptors) != len(REQUIRED_ITEM_RETURN_ONLY_DESCRIPTORS):
+        blockers.append({"reason": "item_return_descriptor_preflight_descriptor_count_mismatch", "label": f"{label}:$.descriptor_preflight.descriptors"})
+    else:
+        descriptor_names: set[str] = set()
+        descriptor_targets: set[str] = set()
+        for index, entry in enumerate(descriptors):
+            entry_label = f"{label}:$.descriptor_preflight.descriptors[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "item_return_descriptor_preflight_descriptor_not_object", "label": entry_label})
+                continue
+            descriptor = entry.get("descriptor")
+            target = entry.get("target")
+            copied_field = entry.get("copied_field")
+            if isinstance(descriptor, str):
+                descriptor_names.add(descriptor)
+            if isinstance(target, str):
+                descriptor_targets.add(target)
+            expected_descriptor = ITEM_RETURN_ONLY_DESCRIPTOR_BY_TARGET.get(target) if isinstance(target, str) else None
+            if descriptor != expected_descriptor:
+                blockers.append(
+                    {
+                        "reason": "item_return_descriptor_preflight_descriptor_identity_mismatch",
+                        "label": entry_label,
+                        "expected": expected_descriptor,
+                        "recorded": descriptor,
+                    }
+                )
+            expected_copied_field = f"{target}.ReturnValue" if isinstance(target, str) else None
+            expected_entry = {
+                "field": "ReturnValue",
+                "direction": "return",
+                "type": "bool",
+                "resource_kind": "INVENTORY_ITEM",
+                "resource_backing": "inventory_backed",
+                "payload_policy": "copied_return_value_only",
+                "assigned_event_kind": None,
+                "assigned_event_kind_mask": None,
+                "promotion_ready": False,
+                "public_promotion": False,
+                "evidence_status": "descriptor-preflight-only",
+            }
+            for key, expected in expected_entry.items():
+                if entry.get(key) != expected:
+                    blockers.append(
+                        {
+                            "reason": "item_return_descriptor_preflight_descriptor_shape_mismatch",
+                            "label": f"{entry_label}.{key}",
+                            "expected": expected,
+                            "recorded": entry.get(key),
+                        }
+                    )
+            if copied_field != expected_copied_field:
+                blockers.append(
+                    {
+                        "reason": "item_return_descriptor_preflight_copied_field_mismatch",
+                        "label": f"{entry_label}.copied_field",
+                        "expected": expected_copied_field,
+                        "recorded": copied_field,
+                    }
+                )
+            if copied_by_field and isinstance(copied_field, str):
+                copied_entry = copied_by_field.get(copied_field)
+                if copied_entry is None:
+                    blockers.append({"reason": "item_return_descriptor_preflight_copied_field_not_in_policy", "label": f"{entry_label}.copied_field"})
+                else:
+                    for key in ("source_snapshot", "source_snapshot_sha256"):
+                        if entry.get(key) != copied_entry.get(key):
+                            blockers.append(
+                                {
+                                    "reason": "item_return_descriptor_preflight_source_mismatch",
+                                    "label": f"{entry_label}.{key}",
+                                    "expected": copied_entry.get(key),
+                                    "recorded": entry.get(key),
+                                }
+                            )
+            source_snapshot = entry.get("source_snapshot")
+            if not isinstance(source_snapshot, str) or not source_snapshot:
+                blockers.append({"reason": "item_return_descriptor_preflight_source_snapshot_invalid", "label": f"{entry_label}.source_snapshot"})
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot_sha256, str) or SHA256_RE.fullmatch(source_snapshot_sha256) is None:
+                blockers.append({"reason": "item_return_descriptor_preflight_source_sha256_invalid", "label": f"{entry_label}.source_snapshot_sha256"})
+        if descriptor_names != REQUIRED_ITEM_RETURN_ONLY_DESCRIPTORS:
+            blockers.append(
+                {
+                    "reason": "item_return_descriptor_preflight_descriptors_mismatch",
+                    "label": f"{label}:$.descriptor_preflight.descriptors",
+                    "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_DESCRIPTORS),
+                    "recorded": sorted(descriptor_names),
+                }
+            )
+        if descriptor_targets != REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS:
+            blockers.append(
+                {
+                    "reason": "item_return_descriptor_preflight_targets_mismatch",
+                    "label": f"{label}:$.descriptor_preflight.descriptors",
+                    "expected": sorted(REQUIRED_ITEM_RETURN_ONLY_COPIED_TARGETS),
+                    "recorded": sorted(descriptor_targets),
+                }
+            )
+
+    for trail, raw_value in collect_string_fields(preflight, trail="$.descriptor_preflight"):
+        matched = sorted(needle for needle in ITEM_RETURN_ONLY_DESCRIPTOR_PREFLIGHT_FORBIDDEN_STRINGS if needle in raw_value)
+        if matched:
+            blockers.append(
+                {
+                    "reason": "item_return_descriptor_preflight_event_kind_drift",
+                    "label": f"{label}:{trail}",
+                    "forbidden": matched,
+                }
+            )
+    return blockers
+
+
 def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
     if payload.get("schema") != ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA:
         return []
@@ -4027,6 +4272,8 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
         blockers.append({"reason": "item_return_policy_promotion_ready_not_false", "label": f"{label}:$.safety_summary.promotion_ready"})
     if safety_summary.get("copied_bool_count") != 3:
         blockers.append({"reason": "item_return_policy_copied_bool_count_not_three", "label": f"{label}:$.safety_summary.copied_bool_count"})
+    if safety_summary.get("descriptor_preflight_count") != 3:
+        blockers.append({"reason": "item_return_policy_descriptor_preflight_count_not_three", "label": f"{label}:$.safety_summary.descriptor_preflight_count"})
     if safety_summary.get("excluded_field_count") != 5:
         blockers.append({"reason": "item_return_policy_excluded_field_count_not_five", "label": f"{label}:$.safety_summary.excluded_field_count"})
 
@@ -4058,6 +4305,15 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
                 blockers.append({"reason": "item_return_policy_copied_bool_not_return_bool", "label": entry_label})
             if entry.get("evidence_status") != "copied-return-bool-only":
                 blockers.append({"reason": "item_return_policy_copied_bool_evidence_status_mismatch", "label": entry_label})
+
+    blockers.extend(
+        validate_item_return_descriptor_preflight(
+            payload,
+            label=label,
+            required=True,
+            copied_return_bools=copied_bools if isinstance(copied_bools, list) else None,
+        )
+    )
 
     excluded_entries = payload.get("excluded_fields")
     if not isinstance(excluded_entries, list) or len(excluded_entries) != 5:
@@ -8868,6 +9124,14 @@ def validate_manifest(
             expected_binary_sha256=expected_binary_sha256,
         )
     )
+    if payload.get("schema") not in {REDACTED_UFUNCTION_SIGNATURE_SCHEMA, ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA}:
+        blockers.extend(
+            validate_item_return_descriptor_preflight(
+                payload,
+                label=str(resolved),
+                required=item_return_descriptor_preflight_required(payload),
+            )
+        )
     blockers.extend(validate_claims(payload, label=str(resolved), mode=mode))
     return record, dedupe_blockers(blockers)
 

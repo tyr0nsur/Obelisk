@@ -257,6 +257,53 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         )
         self.assertIn("obelisk.commands_replies.v1", surfaces["v1_sdk_completion_blockers"])
         self.assertTrue(commands["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"])
+        self.assertEqual(
+            commands["v1_decision_contract"]["decision_manifest"],
+            "docs/commands_replies_public_contract_decisions.json",
+        )
+        self.assertEqual(
+            commands["v1_decision_contract"]["not_sufficient_evidence"],
+            [
+                "passive ChatMessageEvent parsing",
+                "plugin-local command parser scaffold",
+                "static thunk orientation",
+                "candidate vtable slots",
+                "raw ProcessEvent callbacks",
+                "legacy CallProcessEvent debug access",
+                "command_chat_response_path planning status",
+            ],
+        )
+
+        response_path = by_id["obelisk.command_chat_response_path.v1"]
+        self.assertEqual(
+            response_path["v1_decision_contract"]["not_sufficient_evidence"],
+            [
+                "static thunk orientation",
+                "passive ChatMessageEvent parsing",
+                "candidate vtable slots",
+                "raw ProcessEvent callbacks",
+                "legacy CallProcessEvent debug access",
+            ],
+        )
+        self.assertIn(
+            "Static thunk orientation, passive ChatMessageEvent parsing, candidate vtable slots, raw ProcessEvent callbacks, and legacy CallProcessEvent debug access are not public response-path or command/reply promotion evidence.",
+            surfaces["release_guardrails"],
+        )
+
+    def test_sdk_v1_doc_links_commands_replies_decision_manifest(self) -> None:
+        compatibility = (REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "[`commands_replies_public_contract_decisions.json`](commands_replies_public_contract_decisions.json)",
+            compatibility,
+        )
+        self.assertIn(
+            "passive `ChatMessageEvent` parsing, plugin-local\n"
+            "command parser scaffolds, static thunk orientation, raw `ProcessEvent` callbacks,\n"
+            "legacy `CallProcessEvent` debug access, and ArkApi/AseApi compatibility names are not\n"
+            "sufficient command/reply evidence and cannot be cited as public response evidence",
+            compatibility,
+        )
 
 
 if __name__ == "__main__":

@@ -103,11 +103,15 @@ The policy slice artifact and gates were then preserved under:
 Preserved result:
 
 - `item-return-only-policy-slice.json`
-  (`sha256=53ac249aa107eb059ee420de8e939cc4117fb3590d651025a0bb6286625b1849`)
+  (`sha256=242d7506703d0164cfd5c2722690d4d865ca4063f4db1c26be4374da133f3f42`)
+- `consume-gate.json`
+  (`sha256=2df03579b90d77547da0ae5947a67ac6ab4a1d6d950561130363083d96f1a10d`)
+- `promote-gate.json`
+  (`sha256=ec1b30f534176b02b9689420abea2799dfd4321cff5cf08b11f2cd7fc8b94fba`)
 - `artifact-pack.manifest.json`
-  (`sha256=89e9b4af96472314055614824a2b2fce4a0b4343832ae38a2495d77411a5671a`)
+  (`sha256=2b832a8f32e835e962ae6ab597e041d4b7d73c1a341c5c4cd2f94e393814a3b4`)
 - `SHA256SUMS`
-  (`sha256=ccd33e42337fd5b1ae3c51333c73ec17aeadef29d3c203b6680bb3be49c7a046`)
+  (`sha256=9984465350ea4b29413135466e93537138e9611a47e95e728704fab3ca8929e1`)
 - `copied_return_bools=3`
 - `excluded_fields=5`
 - `coverage.status=complete`
@@ -115,8 +119,11 @@ Preserved result:
 - promote gate: `blocked` with `promote_mode_item_return_policy_slice_evidence_only`
   and `promote_mode_manifest_has_non_claims`
 
-The artifact root now has relative checksums plus a pack manifest. The historical gate
-JSON files still preserve their original absolute labels; do not rewrite them by hand.
+The artifact root now has relative checksums plus a pack manifest. The archived gate JSON
+files were regenerated after descriptor-preflight hardening so their manifest labels point
+at the current policy-slice hash. Do not edit those gate files by hand; regenerate them
+with `scripts/validate_offline_artifact_gate.py` and then rerun
+`scripts/normalize_artifact_pack.py`.
 
 The canonical item compact redacted-signature source remains
 `/servidor/ark/workspace-offline/item-compact-redacted-signatures-strict-20260530T013606Z/signatures.json`;

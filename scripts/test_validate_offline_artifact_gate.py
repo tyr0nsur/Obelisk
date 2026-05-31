@@ -282,9 +282,11 @@ def item_return_only_policy_slice_manifest(
     policy_status: str = "evidence-only",
     promotion_ready: bool = False,
     copied_bool_count: int = 3,
+    descriptor_preflight_count: int = 3,
     excluded_field_count: int = 5,
     missing_targets: list[str] | None = None,
     non_claims: list[str] | None = None,
+    include_descriptor_preflight: bool = True,
 ) -> dict:
     copied_fields = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_COPIED_FIELDS)
     excluded_fields = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_EXCLUDED_FIELDS)
@@ -294,7 +296,21 @@ def item_return_only_policy_slice_manifest(
         non_claims = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_NON_CLAIMS) + [
             "does not copy CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, or AdditionalData"
         ]
-    return {
+    copied_return_bools = [
+        {
+            "target": field.rsplit(".", 1)[0],
+            "field": "ReturnValue",
+            "copied_field": field,
+            "direction": "return",
+            "type": "bool",
+            "element_size": 1,
+            "evidence_status": "copied-return-bool-only",
+            "source_snapshot": f"snapshot-{index:04d}",
+            "source_snapshot_sha256": f"{index}" * 64,
+        }
+        for index, field in enumerate(copied_fields, start=1)
+    ]
+    payload = {
         "schema": gate.ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA,
         "snapshot_root": "redacted",
         "input_target_set": "item-compact-intake",
@@ -321,20 +337,7 @@ def item_return_only_policy_slice_manifest(
                 "PrimalItem.UseItemOntoItem",
             ],
         },
-        "copied_return_bools": [
-            {
-                "target": field.rsplit(".", 1)[0],
-                "field": "ReturnValue",
-                "copied_field": field,
-                "direction": "return",
-                "type": "bool",
-                "element_size": 1,
-                "evidence_status": "copied-return-bool-only",
-                "source_snapshot": f"snapshot-{index:04d}",
-                "source_snapshot_sha256": f"{index}" * 64,
-            }
-            for index, field in enumerate(copied_fields, start=1)
-        ],
+        "copied_return_bools": copied_return_bools,
         "excluded_fields": [
             {
                 "target": field.rsplit(".", 1)[0],
@@ -351,6 +354,7 @@ def item_return_only_policy_slice_manifest(
             "intended_use": "offline_review_only",
             "promotion_ready": promotion_ready,
             "copied_bool_count": copied_bool_count,
+            "descriptor_preflight_count": descriptor_preflight_count,
             "excluded_field_count": excluded_field_count,
             "explicitly_excluded": [
                 "CraftBlueprint",
@@ -366,6 +370,50 @@ def item_return_only_policy_slice_manifest(
             ],
         },
     }
+    if include_descriptor_preflight:
+        payload["descriptor_preflight"] = {
+            "status": "internal-evidence-only",
+            "scope": "item-return-only-policy-slice",
+            "descriptor_count": 3,
+            "resource_kind": "INVENTORY_ITEM",
+            "resource_backing": "inventory_backed",
+            "payload_policy": "copied_return_value_only",
+            "return_value_only": True,
+            "assigned_event_kind": None,
+            "assigned_event_kind_mask": None,
+            "promotion_ready": False,
+            "public_promotion": False,
+            "public_surface": False,
+            "descriptors": [
+                {
+                    "descriptor": gate.ITEM_RETURN_ONLY_DESCRIPTOR_BY_TARGET[entry["target"]],
+                    "target": entry["target"],
+                    "copied_field": entry["copied_field"],
+                    "field": entry["field"],
+                    "direction": "return",
+                    "type": "bool",
+                    "resource_kind": "INVENTORY_ITEM",
+                    "resource_backing": "inventory_backed",
+                    "payload_policy": "copied_return_value_only",
+                    "assigned_event_kind": None,
+                    "assigned_event_kind_mask": None,
+                    "promotion_ready": False,
+                    "public_promotion": False,
+                    "source_snapshot": entry["source_snapshot"],
+                    "source_snapshot_sha256": entry["source_snapshot_sha256"],
+                    "evidence_status": "descriptor-preflight-only",
+                }
+                for entry in copied_return_bools
+            ],
+            "explicitly_not_assigned": [
+                "event_kind",
+                "event_kind_mask",
+                "public_metadata_json",
+                "runtime_dispatcher_tables",
+                "plugin_callbacks",
+            ],
+        }
+    return payload
 
 
 def transfer_baccept_only_policy_slice_manifest(
@@ -4537,6 +4585,43 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("accepted", result["status"])
         self.assertEqual([], result["blockers"])
 
+    def test_consume_blocks_item_return_signature_manifest_missing_descriptor_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(
+                target_sets=["item-return-only-policy-slice"],
+                artifact_hygiene=historical_missing_coverage_marker(),
+                safety_overrides={"target_set_count": 1},
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "item_return_descriptor_preflight_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_consume_accepts_item_return_signature_manifest_descriptor_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest(
+                target_sets=["item-return-only-policy-slice"],
+                artifact_hygiene=historical_missing_coverage_marker(),
+                safety_overrides={"target_set_count": 1},
+            )
+            payload["descriptor_preflight"] = item_return_only_policy_slice_manifest()["descriptor_preflight"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
     def test_strict_blocks_historical_named_signature_manifest_missing_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -5290,6 +5375,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
                 policy_status="accepted",
                 promotion_ready=True,
                 copied_bool_count=4,
+                descriptor_preflight_count=4,
                 excluded_field_count=4,
                 missing_targets=["PrimalItem.CanRepair"],
                 non_claims=["does not copy the excluded fields"],
@@ -5308,6 +5394,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("item_return_policy_missing_targets_present", reasons)
         self.assertIn("item_return_policy_promotion_ready_not_false", reasons)
         self.assertIn("item_return_policy_copied_bool_count_not_three", reasons)
+        self.assertIn("item_return_policy_descriptor_preflight_count_not_three", reasons)
         self.assertIn("item_return_policy_excluded_field_count_not_five", reasons)
         self.assertIn("item_return_policy_copied_return_bools_count_mismatch", reasons)
         self.assertIn("item_return_policy_excluded_fields_count_mismatch", reasons)
@@ -5348,6 +5435,65 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("item_return_policy_coverage_input_targets_mismatch", reasons)
         self.assertIn("item_return_policy_input_snapshot_count_mismatch", reasons)
         self.assertIn("item_return_policy_copied_bool_target_mismatch", reasons)
+
+    def test_blocks_item_return_only_policy_slice_missing_descriptor_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            write_json(manifest, item_return_only_policy_slice_manifest(include_descriptor_preflight=False))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "item_return_descriptor_preflight_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_item_return_descriptor_preflight_inventory_use_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            payload = item_return_only_policy_slice_manifest()
+            payload["descriptor_preflight"]["assigned_event_kind"] = "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK"
+            payload["descriptor_preflight"]["descriptors"][0]["assigned_event_kind_mask"] = (
+                "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK"
+            )
+            payload["descriptor_preflight"]["descriptors"][0]["field_mask"] = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("item_return_descriptor_preflight_shape_mismatch", reasons)
+        self.assertIn("item_return_descriptor_preflight_descriptor_shape_mismatch", reasons)
+        self.assertIn("item_return_descriptor_preflight_event_kind_drift", reasons)
+
+    def test_blocks_item_return_descriptor_preflight_unassigned_structural_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            payload = item_return_only_policy_slice_manifest()
+            payload["descriptor_preflight"]["public_metadata_json"] = {}
+            payload["descriptor_preflight"]["descriptors"][0]["field_mask"] = [
+                "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+            ]
+            payload["descriptor_preflight"]["descriptors"][1]["public_abi_ready"] = False
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        blockers = [
+            blocker
+            for blocker in result["blockers"]
+            if blocker["reason"] == "item_return_descriptor_preflight_forbidden_assignment_key"
+        ]
+        self.assertEqual(
+            ["field_mask", "public_abi_ready", "public_metadata_json"],
+            sorted(blocker["key"] for blocker in blockers),
+        )
 
     def test_accepts_transfer_baccept_only_policy_slice_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

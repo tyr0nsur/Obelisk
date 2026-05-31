@@ -130,6 +130,12 @@ Commands/replies is post-v1 and blocked as a combined surface. It depends on a p
 player identity/principal contract, a promoted permission/authority model, and the
 post-v1 `obelisk.command_chat_response_path.v1` command/chat response path before any
 public command router or reply API can be claimed.
+The pre-ABI decision checklist for the future commands/replies surface is
+[`commands_replies_public_contract_decisions.json`](commands_replies_public_contract_decisions.json).
+It is a blocking checklist only: passive `ChatMessageEvent` parsing, plugin-local
+command parser scaffolds, static thunk orientation, raw `ProcessEvent` callbacks,
+legacy `CallProcessEvent` debug access, and ArkApi/AseApi compatibility names are not
+sufficient command/reply evidence and cannot be cited as public response evidence.
 Identity/principal, permissions/admin, command/chat response path, and commands/replies
 are an ordered v1 dependency chain: if any of those surfaces remains blocked, planning,
 or post-v1, no complete v1 SDK claim is valid.

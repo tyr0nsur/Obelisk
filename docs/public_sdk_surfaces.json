@@ -100,6 +100,7 @@
     "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "That dependency chain must not be documented as permissions/admin being the immediate next public slice; groups, grants, admin actions, and mutation authority remain excluded unless a future promotion gate explicitly says otherwise.",
     "Commands/replies also depend on obelisk.command_chat_response_path.v1; while that command/chat response path is post-v1, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted.",
+    "Static thunk orientation, passive ChatMessageEvent parsing, candidate vtable slots, raw ProcessEvent callbacks, and legacy CallProcessEvent debug access are not public response-path or command/reply promotion evidence.",
     "Before identity/principal is promoted, release-supported Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity release-supported seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
     "Lifecycle/config/logging foundation does not satisfy lifecycle ops recovery demand; plugin watchdogs, hot reload, process restart orchestration, server recovery, operator reload commands, and restart-state semantics must be promoted separately or explicitly excluded/post-v1.",
@@ -758,6 +759,13 @@
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,
+        "not_sufficient_evidence": [
+          "static thunk orientation",
+          "passive ChatMessageEvent parsing",
+          "candidate vtable slots",
+          "raw ProcessEvent callbacks",
+          "legacy CallProcessEvent debug access"
+        ],
         "promotion_requires": [
           "promoted player identity/principal semantics and promoted permission/authority checks for directed responses",
           "no public CallProcessEvent path; replies, send-chat, broadcast/notices, and moderation require their own copied response ABI instead of the legacy debug escape hatch",
@@ -814,7 +822,17 @@
       ],
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "decision_manifest": "docs/commands_replies_public_contract_decisions.json",
         "must_remain_without_public_contract_until_promotion": true,
+        "not_sufficient_evidence": [
+          "passive ChatMessageEvent parsing",
+          "plugin-local command parser scaffold",
+          "static thunk orientation",
+          "candidate vtable slots",
+          "raw ProcessEvent callbacks",
+          "legacy CallProcessEvent debug access",
+          "command_chat_response_path planning status"
+        ],
         "promotion_requires": [
           "promoted player identity/principal semantics",
           "promoted permission/authority model",
