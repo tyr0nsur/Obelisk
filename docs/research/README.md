@@ -71,6 +71,7 @@ Current post-RC research lane:
 - [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md)
 - [2026-05-31-commands-principal-routing-contract.md](2026-05-31-commands-principal-routing-contract.md)
 - [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md)
+- [2026-05-31-operator-ingress-storage-blocker-brief.md](2026-05-31-operator-ingress-storage-blocker-brief.md)
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)

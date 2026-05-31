@@ -34,7 +34,6 @@ namespace Obelisk::Core
     namespace
     {
         thread_local void* g_CurrentPluginOwner = nullptr;
-        std::atomic<uint64_t> g_ApiCapabilities{OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS};
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
@@ -330,6 +329,16 @@ namespace Obelisk::Core
             if (it == PluginOwnerApiStates().end())
                 return nullptr;
             return it->second.ChatDispatcher;
+        }
+
+        bool CurrentPluginOwnerHasCapability(uint64_t capability)
+        {
+            if (!g_CurrentPluginOwner)
+                return false;
+
+            std::lock_guard<std::mutex> lock(PluginOwnerLifecycleMutex());
+            return PluginOwnerHasCapabilityLocked(g_CurrentPluginOwner, capability) &&
+                   !IsUnloadingPluginOwnerLocked(g_CurrentPluginOwner);
         }
 
         void* ResolvePluginOwnerTokenLocked(uint64_t token)
@@ -2106,12 +2115,11 @@ namespace Obelisk::Core
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             try
             {
-                if ((g_ApiCapabilities.load(std::memory_order_acquire) &
-                     OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0 ||
+                if (!CurrentPluginOwnerHasCapability(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) ||
                     !IsCallProcessEventAllowed())
                 {
                     SafeLogWarnNoThrow(
-                        "CallProcessEvent rejected. Enable allow-call-process-event only for a controlled debug window.");
+                        "CallProcessEvent rejected. Enable allow-call-process-event only for a controlled plugin init debug window.");
                     return;
                 }
                 Hooks::ProcessEventHook::CallOriginalProcessEvent(caller, function, parms);
@@ -2198,7 +2206,6 @@ namespace Obelisk::Core
         m_Api.UnregisterChatMessageEventWithOwnerToken = PluginUnregisterChatMessageEventWithOwnerToken;
         m_Api.RegisterTimerWithOwnerTokenHandle = PluginRegisterTimerWithOwnerTokenHandle;
         m_Api.UnregisterTimerWithOwnerToken = PluginUnregisterTimerWithOwnerToken;
-        g_ApiCapabilities.store(m_Api.capabilities, std::memory_order_release);
         EventManager::SetProcessEventBlockingCapabilityAdvertised(
             (m_Api.capabilities & OBELISK_API_CAPABILITY_PROCESS_EVENT_BLOCKING) != 0);
     }

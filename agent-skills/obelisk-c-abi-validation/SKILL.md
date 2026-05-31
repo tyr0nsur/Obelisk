@@ -30,10 +30,14 @@ registration, and any SDK surface that a `.so` will consume.
 - Handle-returning owner-token ProcessEvent registrations are the preferred public path
   for long-lived callbacks. Public unregister must be owner-scoped with the same
   `plugin_owner_token`; never expose bare unregister-by-id across the plugin ABI.
-- `CallProcessEvent` remains in the ABI v1 function table for compatibility, but the
-  runtime must reject it unless `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` and the per-instance
-  marker `allow-call-process-event` are active. Plugins must check
-  `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` before treating it as available.
+- `CallProcessEvent` remains in the ABI v1 function table for compatibility, but it is an
+  init-window debug escape hatch only. The runtime must reject it unless the calling plugin
+  is currently inside `ObeliskPlugin_Init`, that plugin owner's captured capability
+  includes `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and both
+  `OBELISK_ALLOW_CALL_PROCESS_EVENT=1` plus the per-instance marker
+  `allow-call-process-event` are active. Post-init calls through a captured API table must
+  fail closed even when a later manager or marker enables the gate. A future callable path
+  needs an owner-token ABI instead of this legacy function pointer.
 - `GameplayPolicyEvent` is the first promoted gameplay callback family. Plugins must check
   `OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS`, `struct_size`, a non-zero
   `plugin_owner_token`, an event-kind mask, and non-null register/unregister function

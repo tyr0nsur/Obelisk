@@ -6,6 +6,11 @@ runtime is stable. It is a compatibility target, not a claim that the current po
 is already a complete `v1.0` SDK.
 
 The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfaces.json).
+That manifest's `stable_release_contract.claim_allowed` field is the explicit
+machine-readable release switch for the stable SDK claim. It must remain `false` while
+`v1_completion_required` is `false`; a runtime/core-first gate, internal runtime
+stability, installed SDK package shape, Foundation/Plugin Hub seed, or copied
+`GameplayPolicyEvent`/`ChatMessageEvent` seed cannot flip it.
 `v1.0` must not be used for a runtime-only release. A stable SDK release must either
 promote each important modding category through copied ABI contracts and evidence, or
 explicitly exclude that category from the `v1.0` support statement.

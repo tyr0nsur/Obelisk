@@ -1079,6 +1079,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         required_top_level = (
             "compatibility_statement",
+            "stable_release_contract",
             "promoted_surfaces",
             "experimental_surfaces",
             "planning_surfaces",
@@ -1096,6 +1097,32 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("v1.0 stable", manifest["compatibility_statement"])
         self.assertIn("complete public SDK contract", manifest["compatibility_statement"])
         self.assertIn("not a runtime/core-first RC", manifest["compatibility_statement"])
+
+        stable_contract = manifest["stable_release_contract"]
+        self.assertEqual(
+            stable_contract["meaning"],
+            "v1.0 stable is the complete public SDK contract for plugin authors.",
+        )
+        self.assertFalse(stable_contract["claim_allowed"])
+        self.assertIn(
+            "v1_completion_required is true in this manifest",
+            stable_contract["claim_requires"],
+        )
+        self.assertIn(
+            "every v1_sdk_completion_blocker is promoted or explicitly excluded by name in the v1 release statement",
+            stable_contract["claim_requires"],
+        )
+        self.assertIn(
+            "no promoted-experimental-only surface remains unresolved",
+            stable_contract["claim_requires"],
+        )
+        for non_signal in (
+            "runtime/core-first RC readiness",
+            "internal runtime stability",
+            "Foundation/Plugin Hub seed package shape",
+            "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
+        ):
+            self.assertIn(non_signal, stable_contract["not_sufficient"])
 
     def test_public_sdk_surfaces_manifest_classifies_expected_surfaces(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -1177,6 +1204,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn(
             "A v1.0 stable claim must mean the complete public SDK contract for plugin authors, "
             "not runtime/core-first RC readiness or internal runtime stability alone.",
+            release_guardrails,
+        )
+        self.assertIn(
+            "stable_release_contract.claim_allowed must stay false while v1_completion_required is false.",
             release_guardrails,
         )
         self.assertIn(
@@ -1534,6 +1565,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "v1.0",
             "SDK contract",
             "v1_sdk_completion_blockers",
+            "`stable_release_contract.claim_allowed` field",
+            "machine-readable release switch",
+            "must remain `false` while\n`v1_completion_required` is `false`",
+            "installed SDK package shape",
             "player identity, permissions/admin, commands/replies",
             "before `v1_completion_required` can become true",
             "pre-identity production seeds are not enough for v1 completion",

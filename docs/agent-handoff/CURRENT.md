@@ -39,6 +39,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/research/2026-05-31-permissions-admin-minimum-post-identity.md`.
 - Surfaces marked `promoted-experimental-only` also block a complete `v1.0` SDK claim until each is promoted, downgraded to planning/post-v1, or explicitly excluded in the release statement. Do not treat copied chat or copied gameplay-policy seeds as v1-complete.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership, capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted second-source/static evidence.
+- Legacy `CallProcessEvent` remains ABI-present only as an init-window debug escape hatch:
+  it fails closed unless the current plugin owner is inside `ObeliskPlugin_Init`, that
+  owner captured `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and the live env+marker gate
+  is still active. Post-init calls through captured API tables must not be treated as a
+  supported callable path; a future callable path needs an owner-token ABI.
 - SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require explicit install layout/test updates and ABI review.
 - Installed `Obelisk_*` CMake variables are derived from public C header `OBELISK_*` ABI macros at configure time; installed SDK consumers verify package/header parity.
 - Core dump evidence-pack manifests must declare `obelisk.core-dump-evidence-pack.v1`; snapshot/regeneration consumers and offline artifact gates require binary/core SHA, safe `core.path`, complete status, and `gdb_core_failed=false`.

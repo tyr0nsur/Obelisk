@@ -264,8 +264,11 @@ typedef struct ObeliskApi {
     // Call the original ProcessEvent trampoline for explicit UE function execution.
     //
     // Availability contract: this ABI slot is present for compatibility, but stable
-    // posture rejects calls unless OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT is advertised.
-    // Plugins must check struct_size, capabilities, and this function pointer before use.
+    // posture rejects calls unless OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT was advertised
+    // to the calling plugin and the call happens inside that plugin's init callback while
+    // the live debug env+marker gate is active. Post-init calls through a captured API table
+    // fail closed. Plugins must check struct_size, capabilities, and this function pointer
+    // before use.
     //
     // Reentrancy contract: a pre-callback that calls this should return false. If it
     // returns true, the runtime skips the automatic original call and warns to avoid

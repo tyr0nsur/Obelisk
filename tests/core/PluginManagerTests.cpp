@@ -4740,6 +4740,101 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestCallProcessEventRejectedOutsideInitEvenWhenGateAllowed()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_post_init");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ALLOW_CALL_PROCESS_EVENT", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-call-process-event");
+        Require(marker.is_open(), "failed to create CallProcessEvent marker");
+        marker.close();
+        Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
+
+        FakePlugin plugin{.filename = "call_process_event_post_init.so", .captureApi = true};
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        Require((manager.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) != 0,
+                "CallProcessEvent capability was not enabled with env and marker gate");
+
+        manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.initCalls == 1, "CallProcessEvent post-init plugin was not initialized");
+
+        plugin.capturedApi.CallProcessEvent(
+            reinterpret_cast<void*>(0x1),
+            reinterpret_cast<void*>(0x2),
+            reinterpret_cast<void*>(0x3));
+
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 0,
+                "CallProcessEvent reached original trampoline outside the plugin init owner scope");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
+        unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
+        fs::remove_all(root);
+    }
+
+    void TestCallProcessEventUsesCapturedPluginInitCapability()
+    {
+        const fs::path rootA = MakeTempRoot("obelisk_plugin_manager_call_process_event_snapshot_a");
+        ConfigureEnvironment(rootA);
+        Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
+
+        FakePlugin pluginA{.filename = "call_process_event_snapshot_a.so", .captureApi = true};
+        FakeLoader loaderA;
+        loaderA.Add(pluginA);
+        TouchPlugin(rootA, pluginA.filename);
+        WritePluginConfig(rootA, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager managerA(loaderA);
+        Require((managerA.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) == 0,
+                "first manager unexpectedly advertised CallProcessEvent");
+        managerA.LoadPlugins((rootA / "plugins").string());
+        Require(pluginA.initCalls == 1, "first CallProcessEvent snapshot plugin was not initialized");
+
+        const fs::path rootB = MakeTempRoot("obelisk_plugin_manager_call_process_event_snapshot_b");
+        ConfigureEnvironment(rootB);
+        setenv("OBELISK_ALLOW_CALL_PROCESS_EVENT", "1", 1);
+        fs::create_directories(rootB / "state" / "instances" / "arkserver");
+        std::ofstream marker(rootB / "state" / "instances" / "arkserver" / "allow-call-process-event");
+        Require(marker.is_open(), "failed to create second CallProcessEvent marker");
+        marker.close();
+
+        FakePlugin pluginB{.filename = "call_process_event_snapshot_b.so", .callProcessEventInInit = true};
+        FakeLoader loaderB;
+        loaderB.Add(pluginB);
+        TouchPlugin(rootB, pluginB.filename);
+        WritePluginConfig(rootB, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager managerB(loaderB);
+        Require((managerB.ApiCapabilitiesForTesting() & OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT) != 0,
+                "second manager did not advertise CallProcessEvent after enabling the gate");
+        managerB.LoadPlugins((rootB / "plugins").string());
+        Require(pluginB.initCalls == 1, "second CallProcessEvent snapshot plugin was not initialized");
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 1,
+                "second plugin did not reach original trampoline during its gated init window");
+
+        pluginA.capturedApi.CallProcessEvent(
+            reinterpret_cast<void*>(0x1),
+            reinterpret_cast<void*>(0x2),
+            reinterpret_cast<void*>(0x3));
+
+        Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 1,
+                "first plugin widened CallProcessEvent through a later manager capability");
+
+        managerB.UnloadAll();
+        managerA.UnloadAll();
+        CleanupPlugin(pluginB);
+        CleanupPlugin(pluginA);
+        unsetenv("OBELISK_ALLOW_CALL_PROCESS_EVENT");
+        fs::remove_all(rootB);
+        fs::remove_all(rootA);
+    }
+
     void TestCallProcessEventSuppressesOriginalException()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_call_process_event_exception");
@@ -4752,7 +4847,7 @@ namespace
         Obelisk::Hooks::ResetProcessEventCallOriginalCountForTesting();
         Obelisk::Hooks::SetProcessEventCallOriginalThrowForTesting(true);
 
-        FakePlugin plugin{.filename = "call_process_event_exception.so", .captureApi = true};
+        FakePlugin plugin{.filename = "call_process_event_exception.so", .callProcessEventInInit = true};
         FakeLoader loader;
         loader.Add(plugin);
         TouchPlugin(root, plugin.filename);
@@ -4764,18 +4859,6 @@ namespace
 
         manager.LoadPlugins((root / "plugins").string());
         Require(plugin.initCalls == 1, "CallProcessEvent-exception plugin was not initialized");
-
-        try
-        {
-            plugin.capturedApi.CallProcessEvent(
-                reinterpret_cast<void*>(0x1),
-                reinterpret_cast<void*>(0x2),
-                reinterpret_cast<void*>(0x3));
-        }
-        catch (...)
-        {
-            Require(false, "CallProcessEvent let a trampoline exception escape the C ABI boundary");
-        }
 
         Require(Obelisk::Hooks::ProcessEventCallOriginalCountForTesting() == 1,
                 "CallProcessEvent did not attempt original trampoline before suppressing exception");
@@ -5640,6 +5723,8 @@ int main()
     TestCallProcessEventRejectedByDefault();
     TestCallProcessEventAllowedWithGate();
     TestCallProcessEventRejectedAfterGateRevoked();
+    TestCallProcessEventRejectedOutsideInitEvenWhenGateAllowed();
+    TestCallProcessEventUsesCapturedPluginInitCapability();
     TestCallProcessEventSuppressesOriginalException();
     TestDisabledPluginPreparesConfigButDoesNotInit();
     TestInstanceDisallowedPluginDoesNotInit();
