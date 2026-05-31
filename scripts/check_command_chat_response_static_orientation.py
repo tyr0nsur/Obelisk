@@ -194,6 +194,9 @@ def parse_elf(data: bytes, blockers: list[dict[str, Any]]) -> tuple[list[LoadSeg
     if phentsize < 56:
         append_blocker(blockers, "elf_program_header_entry_too_small", value=phentsize)
         return [], {}
+    if phoff > len(data) or phnum > (len(data) - phoff) // phentsize:
+        append_blocker(blockers, "elf_program_header_table_truncated")
+        return [], {}
 
     segments: list[LoadSegment] = []
     for index in range(phnum):
@@ -205,6 +208,22 @@ def parse_elf(data: bytes, blockers: list[dict[str, Any]]) -> tuple[list[LoadSeg
             "<IIQQQQQQ", data, header_offset
         )
         if p_type == 1:
+            if p_filesz > p_memsz:
+                append_blocker(
+                    blockers,
+                    "elf_load_segment_filesz_exceeds_memsz",
+                    index=index,
+                    filesz=p_filesz,
+                    memsz=p_memsz,
+                )
+            if p_offset > len(data) or p_filesz > len(data) - p_offset:
+                append_blocker(
+                    blockers,
+                    "elf_load_segment_file_range_out_of_bounds",
+                    index=index,
+                    offset=p_offset,
+                    filesz=p_filesz,
+                )
             segments.append(
                 LoadSegment(
                     offset=p_offset,
@@ -220,6 +239,9 @@ def parse_elf(data: bytes, blockers: list[dict[str, Any]]) -> tuple[list[LoadSeg
     sections: dict[str, Section] = {}
     if shoff == 0 or shnum == 0 or shentsize < 64 or shstrndx >= shnum:
         append_blocker(blockers, "elf_section_headers_unusable")
+        return segments, sections
+    if shoff > len(data) or shnum > (len(data) - shoff) // shentsize:
+        append_blocker(blockers, "elf_section_header_table_truncated")
         return segments, sections
 
     shstr_header_offset = shoff + shstrndx * shentsize
@@ -250,6 +272,15 @@ def parse_elf(data: bytes, blockers: list[dict[str, Any]]) -> tuple[list[LoadSeg
             append_blocker(blockers, "elf_section_name_unterminated", index=index)
             continue
         name = shstrtab[name_offset:end].decode("ascii", errors="replace")
+        if section_type != 8 and (offset > len(data) or size > len(data) - offset):
+            append_blocker(
+                blockers,
+                "elf_section_file_range_out_of_bounds",
+                index=index,
+                section=name,
+                offset=offset,
+                size=size,
+            )
         sections[name] = Section(
             name=name,
             vaddr=addr,

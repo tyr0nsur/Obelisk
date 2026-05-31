@@ -569,6 +569,11 @@ priorities, and do not use history files as the active source of truth.
   `prepare_player_identity_offline_raw_layout.py` supports
   `--obelisk-commit <reviewed-obelisk-id>` so evidence commands can name the reviewed
   checkpoint explicitly instead of relying on Git HEAD.
+- The combined identity readiness wrapper now accepts the real lower-level flat
+  `target_set_coverage` shape from `check_reflection_inventory_pack_readiness.py`, with a
+  regression test preserving candidate-only/non-promotion semantics. The raw layout helper
+  rejects artifact roots under the repository to match
+  `validate_player_identity_raw_inputs.py` and the offline preflight note.
 
 ## Agent Coordination
 

@@ -27,6 +27,7 @@ from snapshot_evidence_pack import (
 
 REPORT_SCHEMA = "obelisk.player-identity-offline-raw-layout.v1"
 SAFE_RUN_ID_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def parse_args() -> argparse.Namespace:
@@ -83,10 +84,9 @@ def sha256_file(path: Path) -> str:
 
 
 def detect_obelisk_commit() -> str:
-    repo_root = Path(__file__).resolve().parents[1]
     try:
         result = subprocess.run(
-            ["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short=12", "HEAD"],
             check=True,
             text=True,
             stdout=subprocess.PIPE,
@@ -110,6 +110,12 @@ def validate_input_file(path: Path, label: str) -> Path:
 def validate_artifact_root(path: Path) -> Path:
     reject_symlink_component(path, "--artifact-root")
     resolved = reject_protected_output_path(path, "--artifact-root")
+    try:
+        resolved.relative_to(REPO_ROOT)
+    except ValueError:
+        pass
+    else:
+        fail(f"--artifact-root must not be under repository root {REPO_ROOT}: {resolved}")
     if resolved.exists() and not resolved.is_dir():
         fail(f"--artifact-root must be a directory: {resolved}")
     require_ignored_output_path(resolved, "--artifact-root")

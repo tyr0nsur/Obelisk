@@ -19,6 +19,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_first_evidence_readiness as checker
+from reflection_target_sets import schema_target_list  # noqa: E402
 
 
 class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
@@ -76,6 +77,41 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                             "complete": True,
                         }
                     ]
+                },
+            },
+            "reasons": [],
+        }
+
+    def lower_level_accepted_inventory_payload(self) -> dict:
+        targets = schema_target_list(
+            checker.PLAYER_IDENTITY_TARGET_SET,
+            "obelisk.ufunction-chain.snapshot.v1",
+        )
+        return {
+            "ready": True,
+            "accepted_pack": {
+                "manifest": "/tmp/player-identity-artifacts/reflection-inventory-pack/manifest.json",
+                "schema": "obelisk.reflection-inventory-pack.v1",
+                "status": "candidate-only",
+                "promotion_status": "not_promoted_candidate_only",
+                "inputs": {
+                    "evidence_pack_manifest": "/tmp/player-identity-artifacts/core-evidence-pack/manifest.json",
+                    "target_sets": [checker.PLAYER_IDENTITY_TARGET_SET],
+                },
+                "target_set_coverage": {
+                    "target_sets": [checker.PLAYER_IDENTITY_TARGET_SET],
+                    "requested_targets": targets,
+                },
+                "summary": {"fname_root_ready": True},
+                "blockers": [],
+                "inventory": "/tmp/player-identity-artifacts/reflection-inventory-pack/ufunction-inventory.json",
+                "ready": True,
+                "reasons": [],
+                "matched_targets": targets,
+                "required_target_set": {
+                    "target_set": checker.PLAYER_IDENTITY_TARGET_SET,
+                    "expected_target_count": len(targets),
+                    "expected_targets": targets,
                 },
             },
             "reasons": [],
@@ -808,6 +844,75 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["progress_signal"]["coverage"]["fixture_targets"], "12/12")
         self.assertTrue(payload["progress_signal"]["accepted_anchors"]["session_start"])
         self.assertTrue(payload["progress_signal"]["accepted_anchors"]["session_end"])
+        self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
+
+    def test_lower_level_accepted_pack_shape_passes_chain_validation_without_promotion(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.lower_level_accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, {
+                    "schema": "obelisk.players-identity-first-evidence.v1",
+                    "lifecycle_anchors": {
+                        "session_start_accepted": True,
+                        "session_end_accepted": True,
+                        "accepted_start_targets": ["ShooterGameMode.PostLogin"],
+                        "accepted_end_targets": ["ShooterGameMode.Logout"],
+                        "blockers": [],
+                    },
+                }
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        args = SimpleNamespace(
+            artifact_root=Path("/tmp/player-identity-artifacts"),
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(
+                checker,
+                "bounded_artifact_file_scan",
+                return_value={"ready_to_build_core_evidence_pack": False},
+            ),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertTrue(payload["reflection_inventory"]["chain_validation"]["ready"])
+        self.assertEqual(payload["reflection_inventory"]["chain_validation"]["blockers"], [])
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["status"], "candidate_ready")
+        self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertTrue(payload["not_artifact_gate"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertNotIn("accepted_reflection_inventory_chain_incomplete", payload["blockers"])
+        self.assertTrue(payload["progress_signal"]["coverage"]["reflection_inventory_accepted"])
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
 
     def test_ready_inventory_payload_without_core_evidence_chain_still_blocks(self) -> None:

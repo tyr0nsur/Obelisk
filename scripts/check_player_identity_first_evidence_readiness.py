@@ -446,6 +446,18 @@ def target_set_coverage_entries(coverage: Any) -> list[dict[str, Any]]:
         raw_entries = coverage.get(key)
         if isinstance(raw_entries, list):
             entries.extend(entry for entry in raw_entries if isinstance(entry, dict))
+            if PLAYER_IDENTITY_TARGET_SET in raw_entries:
+                entries.append(
+                    {
+                        "name": PLAYER_IDENTITY_TARGET_SET,
+                        "expected_targets": string_list(coverage.get("requested_targets")),
+                        "covered_targets": string_list(coverage.get("covered_targets"))
+                        or string_list(coverage.get("matched_targets"))
+                        or string_list(coverage.get("requested_targets")),
+                        "missing_targets": coverage.get("missing_targets", []),
+                        "complete": coverage.get("complete", True),
+                    }
+                )
     if not entries and coverage.get("name") == PLAYER_IDENTITY_TARGET_SET:
         entries.append(coverage)
     return entries

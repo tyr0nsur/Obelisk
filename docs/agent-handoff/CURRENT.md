@@ -139,9 +139,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   non-protected offline `ShooterGameServer` and core inputs into the raw sibling layout
   under `/home/flowcommunity-ark/obelisk-artifacts/player-identity-offline-<run-id>/`.
   Pass `--obelisk-commit <reviewed-obelisk-id>` when the reviewed checkpoint is known; the
-  helper falls back to current Git HEAD only when that option is omitted. It does not
-  create or approve cores, touch protected server paths, or authorize server access or
-  runtime/core changes; follow the full recipe in
+  helper falls back to current Git HEAD only when that option is omitted. The helper now
+  rejects artifact roots under the repository so its output stays aligned with
+  `validate_player_identity_raw_inputs.py`. It does not create or approve cores, touch
+  protected server paths, or authorize server access or runtime/core changes; follow the full recipe in
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - `scripts/validate_player_identity_raw_inputs.py` is the read-only dry-run check for an
   existing `player-identity-offline-<run-id>/raw/{ShooterGameServer,core}` pair. It
@@ -156,7 +157,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Inventory SDK, public SDK, runtime, lookup, or `ResourceHandle` promotion. For player
   identity it now requires both full 12-target `target_set_coverage.requested_targets`
   and inventory rows for all 12 `players-identity-lifecycle-intake` targets, not only the
-  two admin focal targets.
+  two admin focal targets. The combined identity readiness wrapper accepts the real
+  lower-level flat `target_set_coverage` shape and has a regression test for that
+  producer/consumer contract.
 - Player identity focal snapshot planning must start from a complete non-protected
   `obelisk.reflection-inventory-pack.v1` with target-set coverage for the full 12-target
   `players-identity-lifecycle-intake` set and exact rows for

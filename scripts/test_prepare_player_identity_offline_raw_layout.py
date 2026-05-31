@@ -308,6 +308,31 @@ class PreparePlayerIdentityOfflineRawLayoutTests(unittest.TestCase):
             self.assertEqual(result, 2)
             self.assertIn("--artifact-root must not write under protected server root /servidor/ark", stderr)
 
+    def test_rejects_artifact_root_under_repository_before_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            binary, core = self.write_inputs(root)
+            repo_artifact_root = prep.REPO_ROOT / "local" / "player-identity-test-artifacts"
+
+            result, _, stderr = self.run_main(
+                [
+                    "prepare_player_identity_offline_raw_layout.py",
+                    "--binary",
+                    str(binary),
+                    "--core",
+                    str(core),
+                    "--artifact-root",
+                    str(repo_artifact_root),
+                    "--run-id",
+                    "run-repo-root",
+                ],
+                binary_sha=prep.EXPECTED_SHOOTERGAME_SHA256,
+            )
+
+            self.assertEqual(result, 2)
+            self.assertIn("--artifact-root must not be under repository root", stderr)
+            self.assertFalse(repo_artifact_root.exists())
+
     def test_rejects_artifact_root_file_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
