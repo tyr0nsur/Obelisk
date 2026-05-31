@@ -41,7 +41,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["target_set"], "players-identity-lifecycle-intake")
         self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
         self.assertIn("fixture_coverage_incomplete", payload["blockers"])
+        self.assertIn("second_source_evidence_missing", payload["blockers"])
         self.assertIn("players_identity_first_evidence_not_buildable", payload["blockers"])
+        self.assertIn("accepted_lifecycle_anchors_missing", payload["blockers"])
         self.assertEqual(
             payload["reflection_inventory"]["artifact_root_diagnosis"]["status"],
             "no_manifest_files_found",
@@ -50,12 +52,23 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["fixture_coverage"]["targets"], 12)
         self.assertEqual(payload["fixture_coverage"]["comparable"], 10)
         self.assertEqual(payload["fixture_coverage"]["blocked"], 2)
+        self.assertEqual(payload["fixture_coverage"]["second_source_missing"], 10)
         self.assertEqual(
             payload["first_evidence"]["missing_required_targets"],
             [
                 "ShooterPlayerController.ServerKickPlayer",
                 "ShooterPlayerController.ServerListPlayers",
             ],
+        )
+        self.assertFalse(payload["first_evidence"]["lifecycle_anchors"]["session_start_accepted"])
+        self.assertFalse(payload["first_evidence"]["lifecycle_anchors"]["session_end_accepted"])
+        self.assertIn(
+            "accepted_session_start_anchor_missing",
+            payload["first_evidence"]["lifecycle_anchors"]["blockers"],
+        )
+        self.assertIn(
+            "accepted_session_end_anchor_missing",
+            payload["first_evidence"]["lifecycle_anchors"]["blockers"],
         )
         self.assertEqual(
             payload["next_step"],

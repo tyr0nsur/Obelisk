@@ -112,6 +112,9 @@ claimed.
 Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency
 chain: if any of those surfaces remains blocked, planning, or post-v1, no complete v1 SDK
 claim is valid.
+That ordering is a dependency guardrail, not a declaration that permissions/admin is the
+immediate next public slice; groups, grants, admin actions, and mutation authority remain
+excluded unless a future promotion gate explicitly says otherwise.
 
 Future command/principal routing is a lifecycle and callback-ownership change, not a
 parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design

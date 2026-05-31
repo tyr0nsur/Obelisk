@@ -117,7 +117,7 @@ it does not promise ArkApi plugin compatibility.
 | 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for plugin-local parsing/routing only; no public command SDK/router, sender identity, replies, permissions, blocking, send-chat, or moderation contract |
 | 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of event kinds from `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake`; no StructureEvents SDK, Inventory SDK, identity, mutation, enforcement, or return override |
 | 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public send-chat/broadcast policy is not promoted |
-| 5 | Permissions/admin query checks | blocked | First useful slice after identity is query-only authorization over a copied principal; groups, grants, admin actions, storage, RCON, and operator reload stay excluded |
+| 5 | Permissions/admin query checks | blocked | Dependency-order note only, not an immediate next public slice: query-only authorization requires copied principal identity first; groups, grants, admin actions, storage, RCON, and operator reload stay excluded |
 | 6 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
 | 7 | Economy, shops, kits, rewards, stats | blocked | Needs commands, identity, permissions, persistence, item mutation, and event evidence |
 | 8 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity, combat/enemy restrictions, and safe mutation/enforcement contracts |

@@ -288,6 +288,28 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         missing = [reason for reason in payload["reasons"] if reason["reason"] == "missing_target"]
         self.assertEqual(missing[0]["targets"], ["ShooterPlayerController.ServerKickPlayer"])
 
+    def test_promoted_inventory_pack_status_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(
+                root / "pack",
+                manifest_updates={"promotion_status": "promoted"},
+            )
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        self.assertIsNone(payload["accepted_pack"])
+        promotion_status_reasons = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "wrong_target_scope" and reason.get("field") == "promotion_status"
+        ]
+        self.assertEqual(len(promotion_status_reasons), 1)
+        self.assertEqual(promotion_status_reasons[0]["recorded"], "promoted")
+        self.assertIn("Does not promote player identity", " ".join(payload["non_claims"]))
+
     def test_wrong_player_identity_target_set_scope_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

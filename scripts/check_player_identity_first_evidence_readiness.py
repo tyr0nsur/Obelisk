@@ -182,6 +182,54 @@ def artifact_root_diagnosis(inventory_payload: dict[str, Any] | None) -> dict[st
     }
 
 
+def second_source_missing_count(coverage_payload: dict[str, Any] | None) -> int | None:
+    if not isinstance(coverage_payload, dict):
+        return None
+    totals = coverage_payload.get("totals")
+    if not isinstance(totals, dict):
+        return None
+    value = totals.get("second_source_missing")
+    return value if isinstance(value, int) else None
+
+
+def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(first_evidence_payload, dict):
+        return {
+            "session_start_accepted": False,
+            "session_end_accepted": False,
+            "accepted_start_targets": [],
+            "accepted_end_targets": [],
+            "blockers": [
+                "players_identity_first_evidence_not_buildable",
+                "accepted_session_start_anchor_missing",
+                "accepted_session_end_anchor_missing",
+            ],
+        }
+    anchors = first_evidence_payload.get("lifecycle_anchors")
+    if not isinstance(anchors, dict):
+        return {
+            "session_start_accepted": False,
+            "session_end_accepted": False,
+            "accepted_start_targets": [],
+            "accepted_end_targets": [],
+            "blockers": [
+                "lifecycle_anchors_missing_from_first_evidence",
+                "accepted_session_start_anchor_missing",
+                "accepted_session_end_anchor_missing",
+            ],
+        }
+    blockers = anchors.get("blockers")
+    accepted_start_targets = anchors.get("accepted_start_targets")
+    accepted_end_targets = anchors.get("accepted_end_targets")
+    return {
+        "session_start_accepted": anchors.get("session_start_accepted") is True,
+        "session_end_accepted": anchors.get("session_end_accepted") is True,
+        "accepted_start_targets": accepted_start_targets if isinstance(accepted_start_targets, list) else [],
+        "accepted_end_targets": accepted_end_targets if isinstance(accepted_end_targets, list) else [],
+        "blockers": blockers if isinstance(blockers, list) else [],
+    }
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     inventory_result, inventory_payload = run_json_command(
         [
@@ -216,23 +264,35 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     coverage_targets = coverage_totals.get("targets")
     coverage_comparable = coverage_totals.get("comparable")
     coverage_blocked = coverage_totals.get("blocked")
+    second_source_missing = second_source_missing_count(coverage_payload)
     first_evidence_ready = first_evidence_result.returncode == 0 and first_evidence_payload is not None
     missing_targets = parse_missing_required_targets(first_evidence_result.stderr)
+    lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
+    lifecycle_ready = (
+        lifecycle_diagnosis["session_start_accepted"] is True
+        and lifecycle_diagnosis["session_end_accepted"] is True
+    )
 
     blockers: list[str] = []
     if not inventory_ready:
         blockers.append("missing_reflection_inventory_pack_or_core_evidence_pack")
     if coverage_result.returncode != 0 or coverage_blocked:
         blockers.append("fixture_coverage_incomplete")
+    if second_source_missing:
+        blockers.append("second_source_evidence_missing")
     if not first_evidence_ready:
         blockers.append("players_identity_first_evidence_not_buildable")
+    if not lifecycle_ready:
+        blockers.append("accepted_lifecycle_anchors_missing")
 
     next_step = (
         "produce_or_approve_non_protected_core_evidence_pack_then_reflection_inventory_pack"
         if not inventory_ready
         else "plan_missing_server_list_players_and_server_kick_player_snapshots"
     )
-    if first_evidence_ready:
+    if first_evidence_ready and (second_source_missing or not lifecycle_ready):
+        next_step = "produce_distinct_second_source_and_accepted_lifecycle_anchor_evidence"
+    elif first_evidence_ready:
         next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
 
     return {
@@ -266,12 +326,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 else None
             ),
             "second_source_status": coverage_payload.get("second_source_status") if coverage_payload else None,
+            "second_source_missing": second_source_missing,
         },
         "first_evidence": {
             "returncode": first_evidence_result.returncode,
             "ready": first_evidence_ready,
             "schema": first_evidence_payload.get("schema") if first_evidence_payload else None,
             "missing_required_targets": missing_targets,
+            "lifecycle_anchors": lifecycle_diagnosis,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,

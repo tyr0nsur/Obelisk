@@ -199,6 +199,12 @@ reuse `0x5956f30` or `0x595b7e0` for a different ARK binary hash without new evi
 This command shape is still offline and candidate-only. It must not use direct or
 symlinked `/servidor/ark` paths without a current scoped approval.
 
+Even after the two missing admin snapshots exist, the combined preflight must still stay
+blocked until a distinct second-source snapshot root is accepted and session-start plus
+session-end lifecycle anchors are accepted. The wrapper reports those as
+`second_source_evidence_missing` and `accepted_lifecycle_anchors_missing` so fixture
+coverage cannot be mistaken for player identity readiness.
+
 ## Boundary
 
 The two missing snapshots close only the admin-surface fixture gap. They do not establish

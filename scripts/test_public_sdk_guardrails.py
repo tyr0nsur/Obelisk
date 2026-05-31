@@ -1681,6 +1681,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
             "if any of those surfaces remains blocked, planning, or post-v1",
             "v1_completion_required must stay false",
+            "must not be documented as permissions/admin being the immediate next public slice",
+            "groups, grants, admin actions, and mutation authority remain excluded",
         ):
             self.assertIn(term, release_guardrails)
 
@@ -1704,6 +1706,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
             "if any of those surfaces remains blocked, planning, or post-v1",
             "no complete v1 SDK claim is valid",
+            "not a declaration that permissions/admin is the immediate next public slice",
+            "groups, grants, admin actions, and mutation authority remain excluded",
         ):
             self.assertIn(normalized(term), compatibility)
 
@@ -5171,6 +5175,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
             "v0.1 copied-data ABI surface; experimental Plugin Hub seed, not v1-complete",
             "it does not turn copied chat/policy examples into production Plugin Hub modules",
+            "Dependency-order note only, not an immediate next public slice",
+            "groups, grants, admin actions, storage, RCON, and operator reload stay excluded",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, compact)
@@ -5766,6 +5772,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "safe inventory-build route",
             "full 12-target\n`players-identity-lifecycle-intake` set",
             "Do not build a two-function-only reflection\ninventory pack",
+            "`second_source_evidence_missing`",
+            "`accepted_lifecycle_anchors_missing`",
+            "fixture\ncoverage cannot be mistaken for player identity readiness",
             "check_player_identity_first_evidence_readiness.py",
             "fixture_coverage.comparable=10",
             "first_evidence.ready=false",
