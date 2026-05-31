@@ -125,6 +125,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOBaseEventsChatPostRegistrationFailureCleanup
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents throw-log-after-chat-message-registration
+)
+
+add_test(
     NAME SdkConsumerFixtureOBaseEventsCallbackNoThrow
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents callback-throw-log
 )

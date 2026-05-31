@@ -38,6 +38,7 @@ namespace
     bool g_FailGameplayPolicyRegistration = false;
     bool g_FailChatMessageRegistration = false;
     bool g_FailTimerRegistration = false;
+    bool g_ThrowLogAfterChatMessageRegistration = false;
     bool g_ThrowLogAfterTimerRegistration = false;
     bool g_ThrowLogAfterGameplayPolicyRegistration = false;
     bool g_BadGameplayPolicyDescriptor = false;
@@ -167,6 +168,8 @@ namespace
         g_RegisteredChatMessageCallback = callback;
         g_RegisteredChatMessageUserData = userData;
         ++g_ChatMessageRegisterCount;
+        if (g_ThrowLogAfterChatMessageRegistration)
+            g_ThrowLog = true;
         return 3003;
     }
 
@@ -767,7 +770,8 @@ int main(int argc, char** argv)
         if (mode == "active-process-event" || mode == "callback-throw-log")
             configJson = kActiveOBaseEventsConfig;
         else if (mode == "active-chat-command-helper" ||
-            mode == "active-chat-command-helper-no-chat-capability")
+            mode == "active-chat-command-helper-no-chat-capability" ||
+            mode == "throw-log-after-chat-message-registration")
             configJson = kActiveOBaseEventsChatCommandConfig;
         else if (mode == "active-timer" ||
             mode == "active-timer-double-shutdown" ||
@@ -945,6 +949,8 @@ int main(int argc, char** argv)
             g_FailChatMessageRegistration = true;
         if (mode == "fail-timer-registration")
             g_FailTimerRegistration = true;
+        if (mode == "throw-log-after-chat-message-registration")
+            g_ThrowLogAfterChatMessageRegistration = true;
         if (mode == "throw-log-after-timer-registration")
             g_ThrowLogAfterTimerRegistration = true;
         if (mode == "throw-log-after-gameplay-policy-registration")
@@ -1065,6 +1071,25 @@ int main(int argc, char** argv)
                 "gameplay policy user data survived post-registration init failure cleanup");
             g_ThrowLog = false;
             g_ThrowLogAfterGameplayPolicyRegistration = false;
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (mode == "throw-log-after-chat-message-registration")
+        {
+            Require(!initSucceeded, "plugin accepted log failure after chat message registration");
+            Require(g_ChatMessageRegisterCount == 1,
+                "plugin did not register chat message callback before injected log failure");
+            Require(g_ChatMessageUnregisterCount == 1,
+                "plugin did not unregister chat message callback after injected log failure");
+            Require(g_RegisteredChatMessageCallback == nullptr,
+                "chat message callback survived post-registration init failure cleanup");
+            Require(g_RegisteredChatMessageUserData == nullptr,
+                "chat message user data survived post-registration init failure cleanup");
+            Require(g_TimerRegisterCount == 0,
+                "plugin registered timer after chat message post-registration failure");
+            g_ThrowLog = false;
+            g_ThrowLogAfterChatMessageRegistration = false;
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -1271,6 +1296,8 @@ int main(int argc, char** argv)
                 "gameplay policy callback survived failed timer registration cleanup");
             Require(g_RegisteredChatMessageCallback == nullptr,
                 "chat message callback survived failed timer registration cleanup");
+            Require(g_RegisteredChatMessageUserData == nullptr,
+                "chat message user data survived failed timer registration cleanup");
             Require(g_TimerRegisterCount == 0,
                 "failed timer registration should not be counted as accepted");
             Require(g_TimerUnregisterCount == 0,

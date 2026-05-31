@@ -85,6 +85,7 @@ namespace
         bool registerItemReturnCallback = false;
         bool registerStructureCallback = false;
         bool registerGameplayPolicyCallback = false;
+        bool registerChatMessageCallback = false;
         bool registerTimerCallback = false;
         bool registerBlockingTimerCallback = false;
         bool callProcessEventInInit = false;
@@ -761,6 +762,19 @@ namespace
                     "fake gameplay policy callback registration failed");
         }
 
+        if (g_CurrentFakePlugin->registerChatMessageCallback)
+        {
+            Require(api->RegisterChatMessageEventWithOwnerTokenHandle != nullptr,
+                    "fake plugin requested chat message callback without registration API");
+            g_CurrentFakePlugin->chatMessageRegistrationId =
+                api->RegisterChatMessageEventWithOwnerTokenHandle(
+                    context->plugin_owner_token,
+                    FakeChatMessageEventCallback,
+                    g_CurrentFakePlugin);
+            Require(g_CurrentFakePlugin->chatMessageRegistrationId != 0,
+                    "fake chat message callback registration failed");
+        }
+
         if (g_CurrentFakePlugin->registerTimerCallback)
         {
             Require(api->RegisterTimerWithOwnerTokenHandle != nullptr,
@@ -1040,6 +1054,14 @@ namespace
         fs::create_directories(root / "state" / "instances" / "arkserver");
         std::ofstream marker(root / "state" / "instances" / "arkserver" / "allow-filtered-process-event-callbacks");
         Require(marker.is_open(), "failed to create filtered ProcessEvent callback marker");
+    }
+
+    void EnableChatMessageEvents(const fs::path& root)
+    {
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+        Require(marker.is_open(), "failed to create chat events marker");
     }
 
     void EnableProcessEventBlocking(const fs::path& root)
@@ -2912,6 +2934,60 @@ namespace
         manager.UnloadAll();
         CleanupPlugin(plugin);
         fs::remove_all(root);
+    }
+
+    void TestChatMessageCallbackCleansOnInitFailureAndException()
+    {
+        const auto runCase = [](const char* tempName,
+                                const char* filename,
+                                const char* pluginId,
+                                bool throwInInit) {
+            const fs::path root = MakeTempRoot(tempName);
+            ConfigureEnvironment(root);
+            EnableChatMessageEvents(root);
+
+            FakePlugin plugin{
+                .filename = filename,
+                .pluginId = pluginId,
+                .initResult = throwInInit,
+                .registerChatMessageCallback = true,
+                .throwInInitAfterCallbacks = throwInInit,
+            };
+            Obelisk::Core::ChatEventDispatcher chatDispatcher;
+            plugin.chatDispatcher = &chatDispatcher;
+            FakeLoader loader;
+            loader.Add(plugin);
+            TouchPlugin(root, plugin.filename);
+            WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+            Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+            manager.LoadPlugins((root / "plugins").string());
+
+            Require(plugin.initCalls == 1, "chat message failing plugin Init was not called");
+            Require(plugin.shutdownCalls == 1, "chat message failing plugin shutdown was not called");
+            Require(plugin.closeCalls == 1, "chat message failing plugin was not closed");
+            Require(plugin.initOwnerToken != 0, "chat message failing plugin did not receive an owner token");
+            Require(plugin.chatMessageRegistrationId != 0,
+                    "chat message callback was not registered before init failure");
+            Require(plugin.chatSubscriptionsAtShutdown == 1,
+                    "chat message callback was removed before failing-plugin shutdown");
+            Require(plugin.chatSubscriptionsAtClose == 0,
+                    "chat message callback survived until failing-plugin close");
+            Require(chatDispatcher.SubscriptionCount() == 0,
+                    "chat message callback survived plugin init failure or exception");
+
+            CleanupPlugin(plugin);
+            fs::remove_all(root);
+        };
+
+        runCase("obelisk_plugin_manager_chat_message_init_fail",
+                "chat_message_init_fail.so",
+                "chat_message_init_fail",
+                false);
+        runCase("obelisk_plugin_manager_chat_message_init_throw",
+                "chat_message_init_throw.so",
+                "chat_message_init_throw",
+                true);
     }
 
     void TestChatMessageCallbackExceptionDoesNotEscapeDispatch()
@@ -5403,6 +5479,7 @@ int main()
     TestOwnerTokenTimerUnregisterAllowedDuringShutdown();
     TestOwnerTokenTimerUnregisterAllowedDuringInitFailureShutdown();
     TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
+    TestChatMessageCallbackCleansOnInitFailureAndException();
     TestChatMessageCallbackExceptionDoesNotEscapeDispatch();
     TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();
     TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch();
