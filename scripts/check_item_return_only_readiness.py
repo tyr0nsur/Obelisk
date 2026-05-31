@@ -50,6 +50,114 @@ EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS = {
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
 }
+EXPECTED_PUBLIC_ITEM_RETURN_STABLE_NAMES = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK": "inventory_item.allow_equip_check",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK": "inventory_item.can_repair_check",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK": "inventory_item.use_onto_item_check",
+}
+EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KIND_MASKS = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK": (
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK"
+    ),
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK": (
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK"
+    ),
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK": (
+        "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK"
+    ),
+}
+ITEM_RETURN_EVENT_KIND_ALLOWED_KEYS = {
+    "kind",
+    "stable_name",
+    "resource_kind",
+    "event_kind_mask",
+    "field_mask",
+}
+POLICY_TOP_LEVEL_ALLOWED_KEYS = {
+    "schema",
+    "input_target_set",
+    "output_target_set",
+    "policy_status",
+    "coverage",
+    "copied_return_bools",
+    "excluded_fields",
+    "safety_summary",
+    "non_claims",
+    "descriptor_preflight",
+    "generated_from",
+    "missing_targets",
+    "snapshot_root",
+}
+COPIED_RETURN_BOOL_ALLOWED_KEYS = {
+    "bool_masks",
+    "copied_field",
+    "direction",
+    "element_size",
+    "evidence_status",
+    "field",
+    "offset",
+    "source_snapshot",
+    "source_snapshot_sha256",
+    "target",
+    "type",
+}
+EXCLUDED_FIELD_ALLOWED_KEYS = {
+    "excluded_field",
+    "field",
+    "reason",
+    "source_snapshot",
+    "target",
+}
+COVERAGE_ALLOWED_KEYS = {
+    "status",
+    "input_targets",
+    "copied_targets",
+    "copied_fields",
+    "excluded_fields",
+}
+SAFETY_SUMMARY_ALLOWED_KEYS = {
+    "artifact_status",
+    "copied_bool_count",
+    "descriptor_preflight_count",
+    "excluded_field_count",
+    "explicitly_excluded",
+    "intended_use",
+    "promotion_ready",
+}
+DESCRIPTOR_PREFLIGHT_ALLOWED_KEYS = {
+    "assigned_event_kind",
+    "assigned_event_kind_mask",
+    "descriptor_count",
+    "descriptors",
+    "explicitly_not_assigned",
+    "payload_policy",
+    "promotion_ready",
+    "public_promotion",
+    "public_surface",
+    "resource_backing",
+    "resource_kind",
+    "return_value_only",
+    "scope",
+    "status",
+}
+DESCRIPTOR_PREFLIGHT_DESCRIPTOR_ALLOWED_KEYS = {
+    "assigned_event_kind",
+    "assigned_event_kind_mask",
+    "copied_field",
+    "descriptor",
+    "direction",
+    "evidence_status",
+    "field",
+    "payload_policy",
+    "promotion_ready",
+    "public_promotion",
+    "resource_backing",
+    "resource_kind",
+    "source_snapshot",
+    "source_snapshot_sha256",
+    "target",
+    "type",
+}
 EXPECTED_EXCLUDED_FIELDS = {
     "PrimalItem.AllowEquipItem.toInventory",
     "PrimalItem.CanRepair.bIgnoreInventoryRequirement",
@@ -66,6 +174,12 @@ FORBIDDEN_COPIED_RE = re.compile(
     r"(?:CraftBlueprint|toInventory|DestinationItem|AdditionalData|bIgnoreInventoryRequirement|"
     r"bConsumeResources|identity|lookup|mutation|object_refs|public_sdk|resource_handle|return_override|"
     r"runtime|ue_pointer)",
+    re.IGNORECASE,
+)
+FORBIDDEN_CLAIM_FIELD_RE = re.compile(
+    r"(?:inventory_sdk|items_sdk|item_sdk|public_sdk|identity|lookup|mutation|resource_handle|"
+    r"return_overrides?|runtime_(?:ready|validated|validation)|v1(?:_completion|_complete|_stable)?|"
+    r"completion)",
     re.IGNORECASE,
 )
 
@@ -177,6 +291,21 @@ def require_set(blockers: list[dict[str, Any]], *, reason: str, actual: Any, exp
     return actual_set
 
 
+def reject_forbidden_claim_fields(
+    blockers: list[dict[str, Any]],
+    *,
+    reason: str,
+    mapping: dict[str, Any],
+    path: str,
+    allowed_keys: set[str] | None = None,
+) -> None:
+    for key in mapping:
+        if allowed_keys is not None and key not in allowed_keys:
+            append_blocker(blockers, reason, path=path, field=key, detail="unexpected_field")
+        elif FORBIDDEN_CLAIM_FIELD_RE.search(key):
+            append_blocker(blockers, reason, path=path, field=key, detail="forbidden_claim_field")
+
+
 def require_not_promoted_claim(
     blockers: list[dict[str, Any]], *, reason: str, value: Any, required_token: str = "GameplayPolicyEvent"
 ) -> None:
@@ -267,6 +396,11 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
         reason="public_item_module_sdk_non_claim_missing",
         value=event.get("item_module_sdk"),
     )
+    for key in event:
+        if key in {"inventory_sdk", "item_module_sdk"}:
+            continue
+        if key.startswith("item_return_") and FORBIDDEN_CLAIM_FIELD_RE.search(key):
+            append_blocker(blockers, "public_item_return_forbidden_claim_field", field=key)
 
     event_kinds = event.get("event_kinds")
     if not isinstance(event_kinds, list):
@@ -288,10 +422,35 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
         )
         if not is_item_return_kind:
             continue
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="public_item_return_unexpected_field",
+            mapping=event_kind,
+            path=f"event_kinds[{index}]",
+            allowed_keys=ITEM_RETURN_EVENT_KIND_ALLOWED_KEYS,
+        )
         if isinstance(kind, str):
             item_return_kinds.append(kind)
         else:
             append_blocker(blockers, "public_item_return_kind_missing", index=index, value=kind)
+        if event_kind.get("stable_name") != EXPECTED_PUBLIC_ITEM_RETURN_STABLE_NAMES.get(kind):
+            append_blocker(
+                blockers,
+                "public_item_return_stable_name_mismatch",
+                index=index,
+                kind=kind,
+                expected=EXPECTED_PUBLIC_ITEM_RETURN_STABLE_NAMES.get(kind),
+                value=event_kind.get("stable_name"),
+            )
+        if event_kind.get("event_kind_mask") != EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KIND_MASKS.get(kind):
+            append_blocker(
+                blockers,
+                "public_item_return_event_kind_mask_mismatch",
+                index=index,
+                kind=kind,
+                expected=EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KIND_MASKS.get(kind),
+                value=event_kind.get("event_kind_mask"),
+            )
         if event_kind.get("resource_kind") != INVENTORY_ITEM_RESOURCE_KIND:
             append_blocker(
                 blockers,
@@ -343,6 +502,13 @@ def validate_return_bool_entries(
         if not isinstance(entry, dict):
             append_blocker(blockers, "copied_return_bool_entry_not_object", index=index)
             continue
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="copied_return_bool_entry_unexpected_field",
+            mapping=entry,
+            path=f"copied_return_bools[{index}]",
+            allowed_keys=COPIED_RETURN_BOOL_ALLOWED_KEYS,
+        )
         copied_field = entry.get("copied_field")
         if isinstance(copied_field, str):
             entry_fields.add(copied_field)
@@ -385,7 +551,125 @@ def validate_return_bool_entries(
         )
 
 
+def validate_excluded_field_entries(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    entries = policy.get("excluded_fields")
+    if not isinstance(entries, list):
+        append_blocker(blockers, "excluded_fields_missing")
+        return
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            append_blocker(blockers, "excluded_field_entry_not_object", index=index)
+            continue
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="excluded_field_entry_unexpected_field",
+            mapping=entry,
+            path=f"excluded_fields[{index}]",
+            allowed_keys=EXCLUDED_FIELD_ALLOWED_KEYS,
+        )
+
+
+def validate_descriptor_preflight(policy: dict[str, Any], copied_fields: set[str], blockers: list[dict[str, Any]]) -> None:
+    preflight = policy.get("descriptor_preflight")
+    if preflight is None:
+        return
+    if not isinstance(preflight, dict):
+        append_blocker(blockers, "descriptor_preflight_not_object")
+        return
+    reject_forbidden_claim_fields(
+        blockers,
+        reason="descriptor_preflight_unexpected_field",
+        mapping=preflight,
+        path="descriptor_preflight",
+        allowed_keys=DESCRIPTOR_PREFLIGHT_ALLOWED_KEYS,
+    )
+    for key, expected in {
+        "assigned_event_kind": None,
+        "assigned_event_kind_mask": None,
+        "descriptor_count": 3,
+        "payload_policy": "copied_return_value_only",
+        "promotion_ready": False,
+        "public_promotion": False,
+        "public_surface": False,
+        "return_value_only": True,
+        "scope": OUTPUT_TARGET_SET,
+        "status": "internal-evidence-only",
+    }.items():
+        if preflight.get(key) != expected:
+            append_blocker(
+                blockers,
+                "descriptor_preflight_metadata_mismatch",
+                field=key,
+                expected=expected,
+                value=preflight.get(key),
+            )
+
+    descriptors = preflight.get("descriptors")
+    if not isinstance(descriptors, list):
+        append_blocker(blockers, "descriptor_preflight_descriptors_missing")
+        return
+    if len(descriptors) != 3:
+        append_blocker(blockers, "descriptor_preflight_descriptor_count_mismatch", expected=3, value=len(descriptors))
+
+    descriptor_fields: set[str] = set()
+    for index, descriptor in enumerate(descriptors):
+        if not isinstance(descriptor, dict):
+            append_blocker(blockers, "descriptor_preflight_descriptor_not_object", index=index)
+            continue
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="descriptor_preflight_descriptor_unexpected_field",
+            mapping=descriptor,
+            path=f"descriptor_preflight.descriptors[{index}]",
+            allowed_keys=DESCRIPTOR_PREFLIGHT_DESCRIPTOR_ALLOWED_KEYS,
+        )
+        copied_field = descriptor.get("copied_field")
+        if isinstance(copied_field, str):
+            descriptor_fields.add(copied_field)
+        if copied_field not in copied_fields:
+            append_blocker(
+                blockers,
+                "descriptor_preflight_descriptor_field_unexpected",
+                index=index,
+                copied_field=copied_field,
+            )
+        for key, expected in {
+            "assigned_event_kind": None,
+            "assigned_event_kind_mask": None,
+            "direction": "return",
+            "field": "ReturnValue",
+            "payload_policy": "copied_return_value_only",
+            "promotion_ready": False,
+            "public_promotion": False,
+            "type": "bool",
+        }.items():
+            if descriptor.get(key) != expected:
+                append_blocker(
+                    blockers,
+                    "descriptor_preflight_descriptor_metadata_mismatch",
+                    index=index,
+                    copied_field=copied_field,
+                    field=key,
+                    expected=expected,
+                    value=descriptor.get(key),
+                )
+    if descriptor_fields != copied_fields:
+        append_blocker(
+            blockers,
+            "descriptor_preflight_descriptor_coverage_mismatch",
+            missing=sorted(copied_fields - descriptor_fields),
+            unexpected=sorted(descriptor_fields - copied_fields),
+        )
+
+
 def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    reject_forbidden_claim_fields(
+        blockers,
+        reason="policy_unexpected_field",
+        mapping=policy,
+        path="policy",
+        allowed_keys=POLICY_TOP_LEVEL_ALLOWED_KEYS,
+    )
     if policy.get("schema") != POLICY_SCHEMA:
         append_blocker(blockers, "schema_mismatch", value=policy.get("schema"))
     if policy.get("input_target_set") != INPUT_TARGET_SET:
@@ -399,6 +683,14 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     if not isinstance(coverage, dict):
         append_blocker(blockers, "coverage_missing")
         coverage = {}
+    else:
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="coverage_unexpected_field",
+            mapping=coverage,
+            path="coverage",
+            allowed_keys=COVERAGE_ALLOWED_KEYS,
+        )
     input_targets = require_set(
         blockers, reason="input_target_coverage_mismatch", actual=coverage.get("input_targets"), expected=EXPECTED_INPUT_TARGETS
     )
@@ -422,11 +714,21 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
             append_blocker(blockers, "craftblueprint_copied_field_not_allowed")
 
     validate_return_bool_entries(policy, copied_fields, blockers)
+    validate_excluded_field_entries(policy, blockers)
+    validate_descriptor_preflight(policy, copied_fields, blockers)
 
     safety = policy.get("safety_summary")
     if not isinstance(safety, dict):
         append_blocker(blockers, "safety_summary_missing")
         safety = {}
+    else:
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="safety_summary_unexpected_field",
+            mapping=safety,
+            path="safety_summary",
+            allowed_keys=SAFETY_SUMMARY_ALLOWED_KEYS,
+        )
     if safety.get("artifact_status") != "evidence_only":
         append_blocker(blockers, "safety_artifact_status_invalid", value=safety.get("artifact_status"))
     if safety.get("promotion_ready") is not False:

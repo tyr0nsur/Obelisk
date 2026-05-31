@@ -539,6 +539,37 @@ fi
     "${CONFIG_PATH}" \
     "install-layout-test"
 
+SDK_DESCRIPTOR_EXAMPLE_DIR="${WORK_DIR}/sdk_descriptor_catalog"
+mkdir -p "${SDK_DESCRIPTOR_EXAMPLE_DIR}"
+cp -R "${REPO_DIR}/examples/sdk_descriptor_catalog/." "${SDK_DESCRIPTOR_EXAMPLE_DIR}/"
+cmake -S "${SDK_DESCRIPTOR_EXAMPLE_DIR}" -B "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
+    -DOBELISK_SDK_DESCRIPTOR_CATALOG_TEST_PROBES=ON \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build" --parallel
+SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH="${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/obelisk_sdk_descriptor_catalog.so"
+require_path "${SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH}"
+
+if ! grep -F "${INSTALL_ROOT}/include" "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
+    echo "Descriptor catalog SDK example did not include headers from the installed SDK layout" >&2
+    cat "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >&2
+    exit 1
+fi
+
+if grep -F "${REPO_DIR}/include" "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
+    echo "Descriptor catalog SDK example accidentally included headers from the source tree" >&2
+    cat "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >&2
+    exit 1
+fi
+
+"${WORK_DIR}/build/consumer_fixture" \
+    "${SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH}" \
+    "obelisk_sdk_descriptor_catalog" \
+    "${CONFIG_DIR}" \
+    "${CONFIG_PATH}" \
+    "install-layout-test"
+
 SDK_TIMER_EXAMPLE_DIR="${WORK_DIR}/sdk_timer_plugin"
 mkdir -p "${SDK_TIMER_EXAMPLE_DIR}"
 cp -R "${REPO_DIR}/examples/sdk_timer_plugin/." "${SDK_TIMER_EXAMPLE_DIR}/"

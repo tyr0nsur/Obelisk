@@ -14,6 +14,8 @@
 #define OBELISK_PLUGIN_EXPORT
 #endif
 
+static bool g_descriptor_catalog_validated = false;
+
 static const char kDefaultConfig[] =
     "{\n"
     "  \"enabled\": false,\n"
@@ -201,6 +203,14 @@ static bool validate_descriptor_catalog(const ObeliskApi* api)
     return true;
 }
 
+#ifdef OBELISK_SDK_DESCRIPTOR_CATALOG_TEST_PROBES
+OBELISK_PLUGIN_EXPORT
+bool InstallLayoutConsumer_DescriptorCatalogValidated(void)
+{
+    return g_descriptor_catalog_validated;
+}
+#endif
+
 OBELISK_PLUGIN_EXPORT
 bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
@@ -220,6 +230,7 @@ bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 OBELISK_PLUGIN_EXPORT
 bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
+    g_descriptor_catalog_validated = false;
     if (!has_init_context_prefix(context))
         return false;
     if (!has_descriptor_api(api))
@@ -228,5 +239,12 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
         return false;
     }
 
-    return validate_descriptor_catalog(api);
+    g_descriptor_catalog_validated = validate_descriptor_catalog(api);
+    return g_descriptor_catalog_validated;
+}
+
+OBELISK_PLUGIN_EXPORT
+void ObeliskPlugin_Shutdown(void)
+{
+    g_descriptor_catalog_validated = false;
 }

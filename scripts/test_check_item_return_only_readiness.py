@@ -106,7 +106,7 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                 "kind": kind,
                 "stable_name": stable_name,
                 "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
-                "event_kind_mask": f"{kind}_MASK",
+                "event_kind_mask": readiness.EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KIND_MASKS[kind],
                 "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
             }
 
@@ -228,6 +228,42 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in blockers}
         self.assertIn("public_inventory_sdk_non_claim_missing", reasons)
         self.assertIn("public_item_module_sdk_non_claim_missing", reasons)
+
+    def test_public_gameplay_events_rejects_item_return_claim_fields(self) -> None:
+        public_events = self.make_public_gameplay_events()
+        event = public_events["promoted_events"][0]
+        event["item_return_runtime_validated"] = True
+        event["event_kinds"][0]["identity"] = "item identity available"
+        event["event_kinds"][1]["return_override"] = True
+        event["event_kinds"][2]["v1_completion"] = "ready"
+        blockers: list[dict] = []
+
+        readiness.validate_public_gameplay_events(public_events, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn("public_item_return_forbidden_claim_field", reasons)
+        self.assertIn("public_item_return_unexpected_field", reasons)
+
+    def test_policy_rejects_sdk_runtime_and_v1_claim_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["v1_completion_ready"] = True
+            payload["coverage"]["runtime_validated"] = True
+            payload["safety_summary"]["items_sdk_ready"] = True
+            payload["copied_return_bools"][0]["identity"] = "item identity available"
+            payload["excluded_fields"][0]["return_override"] = False
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("policy_unexpected_field", reasons)
+        self.assertIn("coverage_unexpected_field", reasons)
+        self.assertIn("safety_summary_unexpected_field", reasons)
+        self.assertIn("copied_return_bool_entry_unexpected_field", reasons)
+        self.assertIn("excluded_field_entry_unexpected_field", reasons)
 
     def test_craftblueprint_copied_field_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1517,6 +1517,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn('OBELISK_RELEASE_SCOPE_EXTERN_ROOT="${REPO_DIR}/extern"', layout_test)
         self.assertIn('examples/sdk_minimal_plugin', layout_test)
         self.assertIn('obelisk_sdk_minimal_plugin.so', layout_test)
+        self.assertIn('examples/sdk_descriptor_catalog', layout_test)
+        self.assertIn('obelisk_sdk_descriptor_catalog.so', layout_test)
 
         for target in ("release_scope_oBaseEvents", "release_scope_oProcessTimer", "release_scope_oDescriptorCatalog"):
             with self.subTest(file="tests/sdk_installed_consumer/CMakeLists.txt", target=target):

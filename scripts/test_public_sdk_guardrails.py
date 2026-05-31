@@ -4795,13 +4795,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(c_like_includes(descriptor_source)[0], "obelisk/ObeliskApi.h")
         self.assertIn("#include <obelisk/ObeliskApi.h>", descriptor_source)
         self.assertIn("C_VISIBILITY_PRESET hidden", descriptor_cmake)
-        self.assertNotIn("OBELISK_SDK_DESCRIPTOR_CATALOG_TEST_PROBES", descriptor_source)
+        self.assertIn("OBELISK_SDK_DESCRIPTOR_CATALOG_TEST_PROBES", descriptor_cmake)
+        self.assertIn("#ifdef OBELISK_SDK_DESCRIPTOR_CATALOG_TEST_PROBES", descriptor_source)
+        self.assertIn("InstallLayoutConsumer_DescriptorCatalogValidated", descriptor_source)
 
         exported_functions = re.findall(
             r"OBELISK_PLUGIN_EXPORT\s+bool\s+(ObeliskPlugin_[A-Za-z0-9_]+)\s*\(",
             descriptor_source,
         )
         self.assertEqual(exported_functions, ["ObeliskPlugin_GetInfo", "ObeliskPlugin_Init"])
+        self.assertIn("OBELISK_PLUGIN_EXPORT\nvoid ObeliskPlugin_Shutdown(void)", descriptor_source)
         self.assertNotIn("__attribute__((visibility(\"default\")))\nbool", descriptor_source)
 
         for token in (
@@ -4856,6 +4859,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ),
             [],
         )
+        install_layout_script = (
+            REPO_ROOT / "scripts" / "test_install_obelisk_layout.sh"
+        ).read_text(encoding="utf-8")
+        for token in (
+            "SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH",
+            "examples/sdk_descriptor_catalog",
+            "obelisk_sdk_descriptor_catalog.so",
+            '"obelisk_sdk_descriptor_catalog"',
+        ):
+            with self.subTest(path="scripts/test_install_obelisk_layout.sh", token=token):
+                self.assertIn(token, install_layout_script)
 
         for text, relative in (
             (descriptor_cmake, "examples/sdk_descriptor_catalog/CMakeLists.txt"),
