@@ -71,8 +71,10 @@ priorities, and do not use history files as the active source of truth.
   `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub
   package shape, core-first readiness, and copied event seeds remain non-sufficient for a
   stable SDK claim.
-- After player identity, the permissions/admin candidate is query-only fail-closed checks;
-  commands/replies still require identity, permissions/admin, and the named post-v1
+- The active P0 dependency route is principal -> permissions/admin -> command response.
+  After player identity/principal, the permissions/admin candidate is query-only
+  fail-closed checks; commands/replies still require identity, permissions/admin, and
+  the named post-v1
   `obelisk.command_chat_response_path.v1` planning dependency. That response path adds no
   ABI today and keeps public `CallProcessEvent`, raw UE pointer/params/FString response
   APIs, replies, send-chat, broadcast/notices, and moderation blocked until promoted or
@@ -294,6 +296,9 @@ priorities, and do not use history files as the active source of truth.
   default, and invalidated fail-closed. This does not promote public identity, lookup,
   persistence, platform ids, player names, `ResourceHandle`, UE pointers, or runtime
   access.
+  The `obelisk.players-identity-principal-invalidation-policy.v1` schema is a
+  planning/candidate-only policy artifact only; it does not unlock `player_identity`,
+  permissions/admin, command response, commands/replies, or v1 SDK completion.
 - Static admin thunk orientation for `ServerListPlayers` and `ServerKickPlayer` is
   hash-pinned, bounded, and now checks exact vtable-dispatch byte sequences. It remains
   candidate-only navigation evidence and does not replace core evidence, reflection

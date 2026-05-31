@@ -77,9 +77,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   vtable slots, raw callbacks, and legacy `CallProcessEvent` are insufficient; see
   `docs/command_chat_response_public_contract_decisions.json` and
   `docs/research/2026-05-31-commands-principal-routing-contract.md`.
-- Player identity is the first v1 dependency for permissions, commands, economy,
-  moderation, and several ownership-sensitive module APIs. The target set is 12-target
-  `players-identity-lifecycle-intake`; it remains planning-only and candidate-only.
+- The active P0 dependency route is principal -> permissions/admin -> command response.
+  Player identity/principal is the first v1 dependency for permissions, commands,
+  economy, moderation, and several ownership-sensitive module APIs. The target set is
+  12-target `players-identity-lifecycle-intake`; it remains planning-only and
+  candidate-only.
 - Current player-identity state: `/servidor/ark/workspace-offline` now has the staged
   `player-identity-offline-identity-second-source-20260529T011227Z` hardlink layout, a
   complete `obelisk.core-dump-evidence-pack.v1`, an accepted
@@ -94,9 +96,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `targets=12`, `comparable=12`, `second_source_accepted=12`, rejected/inconclusive/missing
   all zero, and promotion remains false.
 - Current identity next step is accepted login/logout lifecycle anchor evidence and
-  principal invalidation semantics. The lane remains planning-only and candidate-only: no
-  public identity, permissions, commands, runtime lookup, ResourceHandle, mutation, return
-  override, or v1 SDK completion claim is promoted.
+  principal invalidation semantics. The
+  `obelisk.players-identity-principal-invalidation-policy.v1` schema is a
+  planning/candidate-only policy artifact and is not promoted. The lane remains
+  planning-only and candidate-only: no public identity, permissions, commands, runtime
+  lookup, ResourceHandle, mutation, return override, or v1 SDK completion claim is
+  promoted.
 - Candidate lifecycle layouts are now corroborated across the base and vanilla-gdb offline
   cores for `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`, but they are
   not accepted anchors because the lifecycle-anchor schema/target-set and principal
@@ -145,8 +150,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   broad FName/GObjects/core discovery unless a new binary hash or rejected evidence
   requires it. Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
-- Demand-map priority from local NextGenPlugins dictionary signals is P0 identity,
-  commands/replies/response path, and permissions/admin; P1 economy/storage/operator
+- Demand-map priority from local NextGenPlugins dictionary signals is P0 principal ->
+  permissions/admin -> command response; P1 economy/storage/operator
   ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
   missions/transfers. Do not copy ArkApi/NextGenPlugins implementation details.
 - No-core fallback: keep progress offline through guardrails, permission/admin query-only

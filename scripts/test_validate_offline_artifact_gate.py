@@ -1299,6 +1299,106 @@ def players_identity_lifecycle_anchor_candidates_manifest() -> dict:
     }
 
 
+def players_identity_principal_invalidation_policy_manifest() -> dict:
+    principal_fields = [
+        ("principal", "opaque_token"),
+        ("generation", "uint64"),
+        ("state", "enum"),
+        ("scope_flags", "uint64_flags"),
+        ("privacy_class", "enum"),
+    ]
+    rejected_sources = sorted(gate.principal_invalidation_policy.REQUIRED_REJECTED_PUBLIC_IDENTITY_SOURCES)
+    return {
+        "schema": gate.PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA,
+        "artifact_status": "candidate_only",
+        "readiness_classification": "planning_only",
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "principal": {
+            "kind": "copied_opaque_principal",
+            "copied": True,
+            "ownership": "obelisk_owned_copy",
+            "public_identity": "opaque_principal",
+            "reversible": False,
+            "stable_across_processes": False,
+            "real_identity_source": None,
+            "fields": [
+                {
+                    "name": name,
+                    "type": field_type,
+                    "copied": True,
+                    "source": "obelisk_owned_copy",
+                    "consumer_visible": True,
+                    "privacy_class": "opaque_principal",
+                }
+                for name, field_type in principal_fields
+            ],
+        },
+        "generation": {
+            "field": "generation",
+            "zero_invalid": True,
+            "increments_on": [
+                "session_start",
+                "logout_invalidation",
+                "principal_reuse_after_invalidation",
+            ],
+        },
+        "state": {
+            "field": "state",
+            "allowed": ["unknown", "active", "invalidated"],
+            "fail_closed_states": ["unknown", "invalidated"],
+        },
+        "scope_flags": {
+            "field": "scope_flags",
+            "allowed_flags": ["process_local", "session_local", "not_cross_cluster"],
+            "forbidden_flags": ["persistent", "cross_process", "cross_cluster"],
+        },
+        "privacy_class": {
+            "field": "privacy_class",
+            "allowed": ["opaque_principal"],
+            "public_value": "opaque_principal",
+        },
+        "invalidation_cases": [
+            {
+                "case": name,
+                "fail_closed": True,
+                "consumer_result": "deny",
+                "generation_action": "invalidate_or_increment_generation",
+            }
+            for name in sorted(gate.principal_invalidation_policy.REQUIRED_INVALIDATION_CASES)
+        ],
+        "negative_consumer_rules": [
+            {
+                "rule": name,
+                "fail_closed": True,
+                "forbids": rejected_sources,
+            }
+            for name in sorted(gate.principal_invalidation_policy.REQUIRED_NEGATIVE_RULES)
+        ],
+        "runtime_evidence": {
+            "approved": False,
+            "status": "missing",
+            "required_for": ["promote", "public_readiness", "runtime_readiness"],
+        },
+        "rejected_public_identity_sources": rejected_sources,
+        "promotion_gate": {
+            "ready": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": ["approved_runtime_evidence_missing"],
+        },
+        "safety_summary": {
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "explicitly_excluded": sorted(gate.principal_invalidation_policy.REQUIRED_EXCLUSIONS),
+        },
+        "non_claims": sorted(gate.principal_invalidation_policy.REQUIRED_NON_CLAIMS),
+    }
+
+
 def rc_ufunction_second_source_root_manifest(root: Path) -> dict:
     expected_sources = gate.expected_rc_ufunction_target_sources()
     assert expected_sources is not None
@@ -4137,6 +4237,52 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_public_sdk", reasons)
         self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_runtime_ready", reasons)
 
+    def test_artifact_pack_accepts_players_identity_principal_invalidation_child_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            write_json(
+                pack / "players-identity-principal-invalidation-policy.json",
+                players_identity_principal_invalidation_policy_manifest(),
+            )
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_artifact_pack_revalidates_players_identity_principal_invalidation_child(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "artifact-pack-20260530T072255Z"
+            pack.mkdir(parents=True)
+            child = players_identity_principal_invalidation_policy_manifest()
+            child["principal"]["kind"] = "public_player_identity"
+            child["principal"]["notes"] = "public SDK ready with ResourceHandle lookup permissions commands mutation return override promoted"
+            child["principal"]["nested_claim"] = {"runtime_ready": True, "lookup_ready": True, "promoted": True}
+            write_json(pack / "players-identity-principal-invalidation-policy.json", child)
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[pack / artifact_pack.MANIFEST_NAME]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertNotIn("unsupported_manifest_schema", reasons)
+        self.assertIn("principal_kind_not_copied_opaque", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_readiness_overclaim", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_promoted", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_lookup", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_resourcehandle", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_permissions", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_commands", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_mutation", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_return_override", reasons)
+
     def test_artifact_pack_revalidates_core_child_fail_closed_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -6348,6 +6494,80 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_lifecycle_anchor_candidates_public_overclaim_runtime_ready", reasons)
         self.assertIn("identity_field_not_redacted", reasons)
         self.assertIn("identity_field_copied_public_overclaim", reasons)
+
+    def test_accepts_players_identity_principal_invalidation_policy_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-principal-invalidation-policy.json"
+            write_json(manifest, players_identity_principal_invalidation_policy_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_players_identity_principal_invalidation_policy_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-principal-invalidation-policy.json"
+            write_json(manifest, players_identity_principal_invalidation_policy_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_players_identity_principal_invalidation_policy_candidate_only", reasons)
+
+    def test_blocks_players_identity_principal_invalidation_policy_child_rejection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-principal-invalidation-policy.json"
+            payload = players_identity_principal_invalidation_policy_manifest()
+            payload["principal"]["kind"] = "public_player_identity"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("principal_kind_not_copied_opaque", reasons)
+
+    def test_blocks_players_identity_principal_invalidation_policy_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-principal-invalidation-policy.json"
+            payload = players_identity_principal_invalidation_policy_manifest()
+            payload["claim"] = "public SDK ready with runtime ready ResourceHandle lookup permissions commands mutation return override promoted"
+            payload["nested_claim"] = {
+                "public_sdk_ready": True,
+                "runtime_ready": True,
+                "lookup_ready": True,
+                "promoted": True,
+                "permissions_ready": True,
+                "commands_ready": True,
+                "mutation_ready": True,
+                "return_override_ready": True,
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_principal_invalidation_policy_readiness_overclaim", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_public_sdk", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_runtime_ready", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_promoted", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_lookup", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_resourcehandle", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_permissions", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_commands", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_mutation", reasons)
+        self.assertIn("players_identity_principal_invalidation_policy_public_overclaim_return_override", reasons)
 
     def test_blocks_players_identity_first_evidence_weak_artifact_identity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
