@@ -362,12 +362,12 @@ supported LinuxGSM wrapper is used. The runtime itself disables plugin loading o
 `OBELISK_DISABLE_PLUGINS=1` is present; the `disable-plugins` marker is the wrapper input
 that sets that environment variable.
 
-Keep current instance names, maps, beta-test routing, community-update routing, and
+Keep current instance names, maps, validation windows, deployment communication, and
 debug-instance startup/shutdown rules in operator-owned deployment notes, not in public
-SDK install docs. For any approved exact server-side feature window, announce before
-activation through the approved notice path when applicable, enable only the required
-markers, avoid raw player text or identity logging, preserve copied logs, and remove
-experimental markers before returning to stable posture.
+SDK install docs. For any approved exact server-side feature window, use the approved
+operator notice path when applicable, enable only the required markers, avoid raw player
+text or identity logging, preserve copied logs, and remove experimental markers before
+returning to stable posture.
 
 Stable production posture also requires no forbidden experimental marker entries for the
 instance, including observer, scanner, debug-control, native-exec, ptrace, global callback,

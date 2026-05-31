@@ -1873,6 +1873,78 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(file="consumer_fixture.cpp", required_field_or_resource=token):
                 self.assertIn(token, fixture)
 
+    def test_installed_sdk_layout_keeps_release_scope_examples_on_installed_package(self) -> None:
+        consumer_cmake = (REPO_ROOT / "tests/sdk_installed_consumer/CMakeLists.txt").read_text(
+            encoding="utf-8"
+        )
+        layout_script = (REPO_ROOT / "scripts/test_install_obelisk_layout.sh").read_text(encoding="utf-8")
+
+        self.assertIn("find_package(Obelisk 0.1.0 CONFIG REQUIRED)", consumer_cmake)
+        self.assertIn("target_link_libraries(${target_name} PRIVATE Obelisk::obelisk_sdk)", consumer_cmake)
+        self.assertIn("-DOBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT=\"${REPO_DIR}/plugins\"", layout_script)
+        self.assertIn("-DOBELISK_RELEASE_SCOPE_EXTERN_ROOT=\"${REPO_DIR}/extern\"", layout_script)
+        self.assertIn("if grep -F \"${REPO_DIR}/include\"", layout_script)
+
+        for target_name, source_path, output_variable, output_path in (
+            (
+                "release_scope_oBaseEvents",
+                "oBaseEvents/oBaseEvents.cpp",
+                "RELEASE_BASE_EVENTS_PLUGIN_PATH",
+                "oBaseEvents.so",
+            ),
+            (
+                "release_scope_oProcessTimer",
+                "oProcessTimer/oProcessTimer.cpp",
+                "RELEASE_TIMER_PLUGIN_PATH",
+                "oProcessTimer.so",
+            ),
+            (
+                "release_scope_oDescriptorCatalog",
+                "oDescriptorCatalog/oDescriptorCatalog.cpp",
+                "RELEASE_DESCRIPTOR_PLUGIN_PATH",
+                "oDescriptorCatalog.so",
+            ),
+        ):
+            with self.subTest(target=target_name):
+                self.assertIn(target_name, consumer_cmake)
+                self.assertIn(source_path, consumer_cmake)
+                self.assertIn(output_variable, layout_script)
+                self.assertIn(output_path, layout_script)
+
+    def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
+        cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")
+        fixture = (REPO_ROOT / "tests/sdk_consumer/SdkConsumerFixture.cpp").read_text(encoding="utf-8")
+        obase = (REPO_ROOT / "plugins/oBaseEvents/oBaseEvents.cpp").read_text(encoding="utf-8")
+
+        for token in (
+            "SdkConsumerFixtureOBaseEventsChatCommandHelper",
+            "SdkConsumerFixtureOBaseEventsChatCommandHelperNoCapability",
+            "SdkConsumerFixtureOBaseEventsChatPostRegistrationFailureCleanup",
+            "SdkConsumerFixtureOBaseEventsRejectsInvalidChatCommandConfig",
+        ):
+            with self.subTest(file="tests/sdk_consumer/CMakeLists.txt", token=token):
+                self.assertIn(token, cmake)
+
+        for token in (
+            "throw-log-after-chat-message-registration",
+            "plugin did not unregister chat message callback after injected log failure",
+            "chat command helper callback survived shutdown unregister",
+            "chat command helper user data survived shutdown unregister",
+            "chat command helper registered without chat capability",
+        ):
+            with self.subTest(file="tests/sdk_consumer/SdkConsumerFixture.cpp", token=token):
+                self.assertIn(token, fixture)
+
+        for token in (
+            "UnregisterChatCommand();",
+            "UnregisterProcessEvent();",
+            "ResetState();",
+            "RegisterChatMessageEventWithOwnerTokenHandle",
+            "UnregisterChatMessageEventWithOwnerToken",
+        ):
+            with self.subTest(file="plugins/oBaseEvents/oBaseEvents.cpp", token=token):
+                self.assertIn(token, obase)
+
     def test_public_sdk_consumers_guard_append_only_api_slots(self) -> None:
         metadata_guard = "api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities)"
 

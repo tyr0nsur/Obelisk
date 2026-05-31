@@ -453,6 +453,18 @@ namespace
                 plugin->chatMessageRegistrationId);
     }
 
+    void BlockingChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
+    {
+        Require(event != nullptr, "blocking chat message callback received null event");
+        auto* state = static_cast<TimerFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->Calls;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->Release; });
+        ++state->Completed;
+        state->Cv.notify_all();
+    }
+
     std::vector<Obelisk::Core::StructureScalarValue> MakeStructureScalars()
     {
         return {
@@ -2373,6 +2385,125 @@ namespace
                 "owner-token chat unregister was rejected while plugin was unloading");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "shutdown-unregistered owner-token chat callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestUnloadAllWaitsForInFlightPublicChatMessageBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_unload_in_flight");
+        ConfigureEnvironment(root);
+        EnableChatMessageEvents(root);
+
+        TimerFenceState state;
+        FakePlugin plugin{
+            .filename = "chat_message_unload_in_flight.so",
+            .pluginId = "chat_message_unload_in_flight",
+            .captureApi = true,
+            .timerFence = &state,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "chat unload fence plugin was not initialized");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle != nullptr,
+                "chat message registration function was not exposed");
+
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                BlockingChatMessageEventCallback,
+                &state);
+        Require(registrationId != 0, "blocking public chat registration returned zero");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "blocking public chat callback was not bridged into chat dispatcher");
+
+        const Obelisk::Core::ChatMessageView message{
+            .Message = "hold",
+            .SenderName = "tester",
+            .SenderPlatformId = "local",
+            .SendMode = Obelisk::Core::ChatSendMode::Global,
+            .SenderNameIndex = 1,
+        };
+        std::atomic<size_t> dispatches{0};
+        std::thread dispatchThread([&]() {
+            dispatches.store(chatDispatcher.Dispatch(message), std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.Calls == 1;
+                    }),
+                    "blocking public chat callback did not enter");
+        }
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.UnloadReturned = true;
+            }
+            state.Cv.notify_all();
+        });
+
+        bool shutdownEntered = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            shutdownEntered = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.ShutdownEntered;
+            });
+        }
+
+        if (!shutdownEntered)
+        {
+            {
+                std::lock_guard<std::mutex> lock(state.Mutex);
+                state.Release = true;
+            }
+            state.Cv.notify_all();
+            dispatchThread.join();
+            unloadThread.join();
+            Require(false, "UnloadAll did not reach plugin shutdown while chat callback was in flight");
+        }
+
+        bool closedWhileCallbackInFlight = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            closedWhileCallbackInFlight =
+                state.Cv.wait_for(lock, std::chrono::milliseconds(100), [&state]() {
+                    return state.CloseEntered || state.UnloadReturned;
+                });
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        bool callbackCompleted = false;
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            callbackCompleted = state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                return state.Completed == 1;
+            });
+        }
+
+        dispatchThread.join();
+        unloadThread.join();
+
+        Require(!closedWhileCallbackInFlight,
+                "UnloadAll closed plugin while public chat callback was in flight");
+        Require(callbackCompleted, "public chat callback did not complete after release");
+        Require(dispatches.load(std::memory_order_acquire) == 1,
+                "public chat dispatch did not complete exactly one callback");
+        Require(plugin.closeCalls == 1, "chat unload fence plugin was not closed once");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "public chat callback survived unload after in-flight callback completed");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -5469,6 +5600,7 @@ int main()
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
     TestOwnerTokenChatMessageRegistrationRejectedDuringShutdown();
     TestOwnerTokenChatMessageUnregisterAllowedDuringShutdown();
+    TestUnloadAllWaitsForInFlightPublicChatMessageBeforeClose();
     TestOwnerTokenTimerRegistrationCanUnregisterAndUnload();
     TestPublicRepeatingTimerFiresAndStopsAfterUnregister();
     TestUnloadAllWaitsForInFlightPluginTimerBeforeClose();
