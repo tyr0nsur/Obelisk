@@ -612,7 +612,7 @@
         ],
         "exclusion_requires": [
           "the v1 release statement names obelisk.mission_transfer_dino_tribe.v1 as excluded",
-          "the v1 release statement states that no Mission SDK, Transfer SDK, Dino SDK, Tribe SDK, Buff/status SDK, teleport/spawn API, ownership lookup, or cross-map correlation API is included in v1",
+          "the v1 release statement states that no Mission SDK, Transfer SDK, Dino SDK, dino colors/cosmetics/carry rules API, Tribe SDK, tribe MOTD, tribe-facing notices, tribe policy API, Buff/status SDK, teleport/spawn API, ownership lookup, or cross-map correlation API is included in v1",
           "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
       },
@@ -877,7 +877,7 @@
         ],
         "exclusion_requires": [
           "the v1 release statement names obelisk.operator_ingress_storage.v1 as excluded",
-          "the v1 release statement states that no RCON, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1",
+          "the v1 release statement states that no RCON, operator reload command API, Unicode/operator text encoding API, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1",
           "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
       },

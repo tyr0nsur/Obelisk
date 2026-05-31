@@ -115,11 +115,19 @@ def load_release_statement(path: Path | None) -> tuple[str | None, list[str]]:
 
 def release_statement_names_outcome(text: str, surface_id: str, status: str) -> bool:
     expected = "post-v1" if status == "post-v1" else "excluded"
-    pattern = re.compile(rf"^\s*{re.escape(surface_id)}\s*(?::|-)\s*{re.escape(expected)}\b", re.IGNORECASE)
+    return release_statement_surface_record(text, surface_id, expected) is not None
+
+
+def release_statement_surface_record(text: str, surface_id: str, status: str) -> str | None:
+    pattern = re.compile(
+        rf"^\s*{re.escape(surface_id)}\s*:\s*{re.escape(status)}(?:\s+-\s*(?P<details>.+)|\s*)$",
+        re.IGNORECASE,
+    )
     for line in text.splitlines():
-        if pattern.search(line):
-            return True
-    return False
+        match = pattern.fullmatch(line)
+        if match:
+            return line.strip()
+    return None
 
 
 def required_release_statement_text(requirement: str) -> str | None:
@@ -137,11 +145,21 @@ def required_release_statement_text(requirement: str) -> str | None:
 def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str, Any]) -> bool:
     contract = surface.get("v1_decision_contract")
     if not isinstance(contract, dict):
-        return True
+        return False
     required = as_string_list(contract.get("exclusion_requires"))
     if not required:
-        return True
-    lowered = text.lower()
+        return False
+    surface_id = surface.get("id")
+    status = surface.get("status")
+    if not isinstance(surface_id, str) or status not in {"excluded", "post-v1"}:
+        return False
+    expected = "post-v1" if status == "post-v1" else "excluded"
+    record = release_statement_surface_record(text, surface_id, expected)
+    if record is None:
+        return False
+    lowered = record.lower()
+    if re.search(r"\b(?:not true that|false that|actually included|included despite|contradict)\b", lowered):
+        return False
     required_text = [item for item in (required_release_statement_text(item) for item in required) if item]
     return all(item.lower() in lowered for item in required_text)
 
@@ -166,6 +184,8 @@ def evidence_path_is_specific(raw_path: str, surface_id: str) -> bool:
     if relative is None:
         return False
     relative_text = relative.as_posix()
+    if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS and relative_text.startswith("scripts/test_"):
+        return False
     if relative_text in GENERIC_SCRIPT_EVIDENCE_DENYLIST:
         return False
     if not relative_text.startswith(PROMOTION_EVIDENCE_ALLOWED_PREFIXES):
@@ -199,6 +219,17 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     if not isinstance(surface_id, str):
         return False
     allow_generic_dirs = surface_id not in CANONICAL_V1_COMPLETION_BLOCKERS
+    if not allow_generic_dirs:
+        if evidence.get("surface_id") != surface_id:
+            return False
+        if evidence.get("promotion_status") != "promoted":
+            return False
+        if evidence.get("public_sdk_ready") is not True:
+            return False
+        if not isinstance(evidence.get("abi_tests"), list) or not evidence["abi_tests"]:
+            return False
+        if not isinstance(evidence.get("sdk_consumer_tests"), list) or not evidence["sdk_consumer_tests"]:
+            return False
     machine_keys = (
         "abi_tests",
         "sdk_consumer_tests",
@@ -345,11 +376,11 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 promoted_without_evidence.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
-            if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS and not isinstance(
-                surface.get("v1_decision_contract"), dict
-            ):
-                missing_completion_blocker_exclusion_contracts.append(surface_id)
-                continue
+            if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS:
+                contract = surface.get("v1_decision_contract")
+                if not isinstance(contract, dict) or not as_string_list(contract.get("exclusion_requires")):
+                    missing_completion_blocker_exclusion_contracts.append(surface_id)
+                    continue
             if release_statement_text is None:
                 release_statement_missing_blockers.append(surface_id)
             elif not release_statement_names_outcome(release_statement_text, surface_id, status):

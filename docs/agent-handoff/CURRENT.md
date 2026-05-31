@@ -33,15 +33,19 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - The v1 completion checker now fails closed on truncated surface manifests, missing
   canonical v1 blocker IDs, fake or external promotion evidence paths, generic existing
   directories or unrelated existing release/tooling files as evidence for v1 blockers,
+  candidate-only/planning `scripts/test_*` files as blocker-promotion evidence, missing
+  structured promotion evidence (`surface_id`, `promotion_status=promoted`,
+  `public_sdk_ready=true`, ABI tests, and SDK consumer tests) for any promoted v1 blocker,
   unlisted `promoted-experimental-only` surfaces, newly added or top-level-listed
   `planning` surfaces without a v1 outcome, attempts to promote debug-only surfaces,
   non-promoted completion blockers without `v1_decision_contract.exclusion_requires`, a
-  missing release statement for any v1 completion claim, missing release-statement
-  outcomes for non-promoted blockers, and missing release-statement outcomes for
-  canonical experimental seed surfaces when they are excluded/post-v1. A release
-  statement line may use
-  `surface-id: excluded - no ...` wording; the exact outcome is parsed from the line
-  prefix and explanatory `no ...` text does not make the outcome fail.
+  missing release statement for any v1 completion claim, ambiguous or contradictory
+  release-statement outcome lines, required exclusion text outside the exact structured
+  surface record, missing release-statement outcomes for non-promoted blockers, and
+  missing release-statement outcomes for canonical experimental seed surfaces when they
+  are excluded/post-v1. A valid release statement record uses exact
+  `surface-id: excluded - ...` or `surface-id: post-v1 - ...` wording, and required
+  exclusion text must appear on that surface's own record.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim: player identity, permissions/admin, commands/replies, inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and operator ingress/storage. Foundation/Plugin Hub seed work remains pre-v1 unless those blockers are promoted or explicitly excluded in a v1 release statement.
 - `permissions/admin` remains blocked until `player_identity` is promoted. The documented
   minimum later shape is query-only, owner-scoped, capability-gated, copied POD,
@@ -126,7 +130,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `artifact_chain` and `next_required_artifacts` fields point first to a non-protected
   `obelisk.core-dump-evidence-pack.v1`, then to an
   `obelisk.reflection-inventory-pack.v1`; `public_sdk_ready` and `runtime_ready` remain
-  false.
+  false. Its `next_operator_recipe.forbidden_next_commands` explicitly rejects
+  `/servidor/ark` IO for that recipe, broad player-identity target-set focal planning,
+  direct `--core` mode, `--skip-core-sha256`, and `--allow-partial-gdb`.
 - `obelisk.operator_ingress_storage.v1` is not unlocked by player identity/principal evidence; it remains a separate post-v1 blocker until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are proven or explicitly excluded.
 - `obelisk.player_services_economy_mobility.v1` is a v1 blocker umbrella only, not a future monolithic public API. Future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy after identity, permissions, storage/persistence, privacy, audit, rollback, and abuse controls are proven. Economy and mobility require promoted identity/principal, permissions/admin, and storage/persistence; identity alone is insufficient.
 - Player identity focal snapshot planning must start from a complete non-protected `obelisk.reflection-inventory-pack.v1` with `target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set and rows for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`. After that pack is reviewed, use `scripts/plan_ufunction_focal_snapshots.py` with exactly two `--target` arguments for `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`; do not use `--target-set players-identity-lifecycle-intake` to emit plans.

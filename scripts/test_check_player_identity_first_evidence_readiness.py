@@ -66,6 +66,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("--target ShooterPlayerController.ServerListPlayers", recipe["plan_admin_focal_snapshots"])
         self.assertIn("--target ShooterPlayerController.ServerKickPlayer", recipe["plan_admin_focal_snapshots"])
         self.assertNotIn("--target-set players-identity-lifecycle-intake", recipe["plan_admin_focal_snapshots"])
+        self.assertIn("do not read from or write to /servidor/ark", " ".join(recipe["forbidden_next_commands"]))
+        self.assertIn(
+            "do not use --target-set players-identity-lifecycle-intake",
+            " ".join(recipe["forbidden_next_commands"]),
+        )
+        self.assertIn("do not use direct --core mode", " ".join(recipe["forbidden_next_commands"]))
         self.assertIn("does not execute commands", " ".join(recipe["non_claims"]))
         self.assertEqual(
             payload["artifact_chain"]["required_admin_targets"],

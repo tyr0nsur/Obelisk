@@ -1990,7 +1990,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for requirement in (
             "the v1 release statement names obelisk.operator_ingress_storage.v1 as excluded",
-            "the v1 release statement states that no RCON, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1",
+            "the v1 release statement states that no RCON, operator reload command API, Unicode/operator text encoding API, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1",
             "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded",
         ):
             self.assertIn(requirement, decision_contract["exclusion_requires"])
@@ -3045,6 +3045,56 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(field=field):
                 for forbidden in forbidden_payload_fields:
                     self.assertNotIn(forbidden, lowered)
+
+    def test_player_identity_must_remain_a_separate_future_surface_not_event_extension(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        stripped_header = strip_c_comments(header)
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        player_identity = surfaces["obelisk.player_identity.v1"]
+
+        self.assertEqual(player_identity["status"], "planning")
+        self.assertEqual(player_identity["public_contract"], [])
+        self.assertIn("obelisk.player_identity.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertNotIn("obelisk.player_identity.v1", manifest["promoted_surfaces"])
+
+        forbidden_public_identity_tokens = (
+            "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+            "OBELISK_API_CAPABILITY_PRINCIPALS",
+            "OBELISK_API_CAPABILITY_IDENTITY",
+            "ObeliskPlayerIdentity",
+            "ObeliskPlayerPrincipal",
+            "ObeliskPrincipal",
+            "ObeliskPlayerId",
+            "ObeliskPlayerHandle",
+            "ObeliskPlayerLookup",
+            "ObeliskSteamId",
+            "ObeliskEOSId",
+            "ObeliskUniqueNetId",
+            "ObeliskIdentity",
+            "RegisterPlayerIdentity",
+            "RegisterPlayerPrincipal",
+            "RegisterIdentity",
+            "DescribePlayerIdentity",
+            "ResolvePlayerIdentity",
+            "ResolvePlayer",
+            "FindPlayer",
+            "LookupPlayer",
+            "player_id",
+            "principal_id",
+            "sender_identity",
+        )
+        for token in forbidden_public_identity_tokens:
+            with self.subTest(token=token):
+                self.assertNotIn(token, stripped_header)
+
+        for struct_name in ("ObeliskChatMessageEvent", "ObeliskGameplayPolicyEvent"):
+            for field in public_struct_field_names(header, struct_name):
+                lowered = field.lower()
+                with self.subTest(struct=struct_name, field=field):
+                    self.assertNotIn("principal", lowered)
+                    self.assertNotIn("identity", lowered)
+                    self.assertNotIn("player", lowered)
 
     def test_copied_event_callback_contracts_remain_void_observational_and_callback_scope(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")

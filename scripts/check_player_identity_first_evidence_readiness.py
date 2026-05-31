@@ -353,6 +353,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "--evidence-obelisk-commit <reviewed-obelisk-id> "
             "--json-out <ignored-output-path>/player-identity-admin-focal-plan.json"
         ),
+        "forbidden_next_commands": [
+            "do not read from or write to /servidor/ark for this preflight recipe",
+            "do not use --target-set players-identity-lifecycle-intake with plan_ufunction_focal_snapshots.py",
+            "do not use direct --core mode for players-identity-lifecycle-intake",
+            "do not use --skip-core-sha256 or --allow-partial-gdb for player identity evidence packs",
+        ],
         "non_claims": [
             "recipe only; this report does not execute commands, read cores, write artifacts, or touch servers",
             "planned admin focal snapshots remain candidate-only and do not promote public identity, permissions, commands, runtime hooks, mutation, lookup, return override, or SDK surface",

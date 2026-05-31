@@ -55,13 +55,14 @@ def complete_excluded_manifest() -> tuple[dict, str]:
                 }
             if surface["id"] not in manifest["post_v1_or_excluded_surfaces"]:
                 manifest["post_v1_or_excluded_surfaces"].append(surface["id"])
-            release_lines.append(f"{surface['id']}: excluded - no public API for this surface is included in v1.")
             contract = surface.get("v1_decision_contract")
+            detail_parts = ["no public API for this surface is included in v1"]
             if isinstance(contract, dict):
                 for requirement in contract.get("exclusion_requires", []):
                     marker = "the v1 release statement states that "
                     if isinstance(requirement, str) and requirement.lower().startswith(marker):
-                        release_lines.append(requirement[len(marker) :])
+                        detail_parts.append(requirement[len(marker) :])
+            release_lines.append(f"{surface['id']}: excluded - {'; '.join(detail_parts)}")
     return manifest, "\n".join(release_lines) + "\n"
 
 
@@ -231,6 +232,79 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], ["obelisk.player_identity.v1"])
+
+    def test_release_statement_rejects_ambiguous_outcome_punctuation(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement = release_statement.replace(
+            "obelisk.player_identity.v1: excluded -",
+            "obelisk.player_identity.v1: excluded? actually included -",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertIn("obelisk.player_identity.v1", payload["release_statement_missing_blocker_outcomes"])
+
+    def test_release_statement_rejects_negated_contract_substring_in_surface_record(self) -> None:
+        manifest = {
+            "schema": "obelisk.public-sdk-surfaces.v1",
+            "sdk_version": "v1.0",
+            "v1_completion_required": True,
+            "stable_release_contract": {"claim_allowed": True},
+            "promoted_surfaces": [],
+            "experimental_surfaces": [],
+            "planning_surfaces": [],
+            "v1_sdk_completion_blockers": ["obelisk.player_identity.v1"],
+            "post_v1_or_excluded_surfaces": ["obelisk.player_identity.v1"],
+            "surfaces": [
+                {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "excluded",
+                    "public_contract": [],
+                    "v1_decision_contract": {
+                        "exclusion_requires": [
+                            "the v1 release statement names obelisk.player_identity.v1 as excluded",
+                            "the v1 release statement states that no player identity API is included in v1",
+                        ]
+                    },
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(
+                "Reviewed against docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json.\n"
+                "obelisk.player_identity.v1: excluded - it is false that no player identity API is included in v1\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.player_identity.v1"])
 
     def test_release_statement_accepts_exact_outcome_with_no_explanatory_text(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
@@ -472,6 +546,31 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
                 surface["evidence"] = {"tests": ["scripts/check_release_readiness.sh"]}
                 break
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
+
+    def test_candidate_only_player_identity_preflight_test_does_not_promote_completion_blocker(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["scripts/test_check_player_identity_first_evidence_readiness.py"],
+                    "sdk_consumer_tests": ["scripts/test_check_player_identity_first_evidence_readiness.py"],
+                }
+                break
+        manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
