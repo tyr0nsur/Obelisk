@@ -159,6 +159,19 @@ and v1 blocker IDs are still planning or not promoted/excluded by release statem
 release-statement path is mandatory for the v1 gate and must name every non-promoted
 blocker as excluded or post-v1.
 
+To validate only the scoped wording of a draft statement while the full v1 gate remains
+intentionally blocked, use:
+
+```bash
+python3 scripts/check_public_sdk_v1_completion.py \
+  --release-statement release/v1/public-sdk/scoped-release-statement-template.md \
+  --validate-release-statement-scope
+```
+
+That scoped check accepts reviewed post-v1 outcome wording for already post-v1 blockers,
+but it still reports that no `v1.0 stable`, complete SDK, full SDK, or production SDK
+claim is allowed while top-level blockers remain planning.
+
 After assembling an RC second-source root, run the committed RC layout smoke. This checks
 that the copied second-source snapshots compare cleanly against the in-repo sanitized
 UFunction fixtures for the RC target sets without claiming runtime promotion,

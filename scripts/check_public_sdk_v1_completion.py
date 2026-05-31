@@ -73,6 +73,14 @@ CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT = (
     "Foundation/Plugin Hub seed package shape",
     "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
 )
+SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
+    "stable_release_contract_claim_not_allowed",
+    "v1_completion_required_false",
+    "promoted_experimental_surfaces_unresolved",
+    "v1_sdk_completion_blockers_unresolved",
+    "planning_surfaces_unresolved_for_v1_claim",
+    "top_level_planning_surfaces_unresolved_for_v1_claim",
+}
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
@@ -463,6 +471,14 @@ def parse_args() -> argparse.Namespace:
         help="Directory containing *_public_contract_decisions.json manifests.",
     )
     parser.add_argument("--json", action="store_true", help="Emit the full readiness report as JSON.")
+    parser.add_argument(
+        "--validate-release-statement-scope",
+        action="store_true",
+        help=(
+            "Validate the supplied release statement's scoped outcome wording without "
+            "allowing a complete v1 SDK claim while manifest blockers remain unresolved."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1462,6 +1478,30 @@ def build_report(
     }
 
 
+def add_scoped_release_statement_result(report: dict[str, Any]) -> dict[str, Any]:
+    blocking_report_blockers = [
+        blocker
+        for blocker in report.get("blockers", [])
+        if blocker not in SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS
+    ]
+    if report.get("release_statement") is None:
+        blocking_report_blockers.append("scoped_release_statement_path_required")
+    scoped_ready = not blocking_report_blockers
+    report["scoped_release_statement"] = {
+        "ready": scoped_ready,
+        "stable_v1_sdk_claim_allowed": False,
+        "blocking_report_blockers": sorted(set(blocking_report_blockers)),
+        "allowed_remaining_blockers": sorted(
+            set(report.get("blockers", [])) & SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS
+        ),
+        "non_claim": (
+            "A scoped release statement records reviewed exclusions/post-v1 outcomes only; "
+            "it does not authorize v1.0 stable, complete SDK, full SDK, or production SDK wording."
+        ),
+    }
+    return report
+
+
 def format_human_list(items: Any, *, limit: int = 12) -> str:
     if not isinstance(items, list) or not items:
         return "none"
@@ -1634,6 +1674,21 @@ def print_human_report(report: dict[str, Any]) -> None:
     print("Use --json for the full machine-readable report.")
 
 
+def print_scoped_release_statement_report(report: dict[str, Any]) -> None:
+    scoped = report["scoped_release_statement"]
+    if scoped["ready"]:
+        print("Scoped v1 SDK release statement check passed.")
+        print("This does not allow a v1.0 stable or complete-SDK claim.")
+        print(f"Remaining full-gate blockers: {format_human_list(scoped['allowed_remaining_blockers'])}.")
+        return
+    print("Scoped v1 SDK release statement check blocked.")
+    print("Blocking statement-scope issues:")
+    for blocker in scoped["blocking_report_blockers"]:
+        print(f"- {blocker}")
+        for detail in blocker_guidance(report, blocker):
+            print(f"  {detail}")
+
+
 def main() -> int:
     args = parse_args()
     report = build_report(
@@ -1642,6 +1697,13 @@ def main() -> int:
         args.public_header,
         args.contract_decisions_dir,
     )
+    if args.validate_release_statement_scope:
+        report = add_scoped_release_statement_result(report)
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print_scoped_release_statement_report(report)
+        return 0 if report["scoped_release_statement"]["ready"] else 1
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

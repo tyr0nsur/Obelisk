@@ -1204,6 +1204,131 @@ namespace
         Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
     }
 
+    void TestRejectsCrossKindScalarContamination()
+    {
+        uint64_t inventoryComponent = 0x1111111122222222ULL;
+        uint64_t byPc = 0x3333333344444444ULL;
+        uint8_t ignoreCooldown = 1;
+        uint8_t requestedByPlayer = 1;
+        uint8_t returnValue = 1;
+
+        auto makeBoolField = [](InventoryReflection::InventoryField field,
+                                int32_t propertyNameIndex,
+                                int32_t offset,
+                                const uint8_t* data) {
+            InventoryReflection::InventoryFieldRange value;
+            value.Field = field;
+            value.PropertyNameIndex = propertyNameIndex;
+            value.Offset = offset;
+            value.Size = sizeof(uint8_t);
+            value.ExposesRange = true;
+            value.Range = {data, sizeof(uint8_t)};
+            PopulateFieldMetadata(value);
+            return value;
+        };
+
+        auto makeObjectField = [](InventoryReflection::InventoryField field,
+                                  int32_t propertyNameIndex,
+                                  int32_t offset) {
+            InventoryReflection::InventoryFieldRange value;
+            value.Field = field;
+            value.PropertyNameIndex = propertyNameIndex;
+            value.Offset = offset;
+            value.Size = sizeof(uint64_t);
+            value.ExposesRange = false;
+            PopulateFieldMetadata(value);
+            return value;
+        };
+
+        InventoryReflection::InventoryInvocation contaminatedCanUse;
+        contaminatedCanUse.Function = InventoryReflection::InventoryFunction::CanUse;
+        contaminatedCanUse.FunctionNameIndex = kCanUseNameIndex;
+        contaminatedCanUse.OuterNameIndex = kPrimalItemNameIndex;
+        contaminatedCanUse.HasParameterRanges = true;
+        contaminatedCanUse.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::BRequestedByPlayer,
+                                                          kBRequestedByPlayerNameIndex,
+                                                          0x00,
+                                                          &requestedByPlayer));
+        contaminatedCanUse.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::ReturnValue,
+                                                          kReturnValueNameIndex,
+                                                          0x01,
+                                                          &returnValue));
+
+        InventoryReflection::InventoryInvocation contaminatedRemoteAdd;
+        contaminatedRemoteAdd.Function = InventoryReflection::InventoryFunction::AllowRemoteAddToInventory;
+        contaminatedRemoteAdd.FunctionNameIndex = kAllowRemoteAddToInventoryNameIndex;
+        contaminatedRemoteAdd.OuterNameIndex = kPrimalItemNameIndex;
+        contaminatedRemoteAdd.HasParameterRanges = true;
+        contaminatedRemoteAdd.Fields.push_back(makeObjectField(InventoryReflection::InventoryField::InventoryComponent,
+                                                               kInvCompNameIndex,
+                                                               0x00));
+        contaminatedRemoteAdd.Fields.push_back(makeObjectField(InventoryReflection::InventoryField::ByPC,
+                                                               kByPCNameIndex,
+                                                               0x08));
+        contaminatedRemoteAdd.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::BIgnoreCooldown,
+                                                            kBIgnoreCooldownNameIndex,
+                                                            0x10,
+                                                            &ignoreCooldown));
+        contaminatedRemoteAdd.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::ReturnValue,
+                                                            kReturnValueNameIndex,
+                                                            0x11,
+                                                            &returnValue));
+
+        int owner = 0;
+        std::vector<CapturedInventoryPolicyEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
+        Require(registrationId != 0,
+                "failed to register inventory policy event callback for scalar contamination test");
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        CopiedInventoryPolicyEvent event;
+
+        auto requireNoBudgetOrDispatch = [&](const InventoryReflection::InventoryInvocation& invocation,
+                                             const char* label) {
+            Require(!TryBuildCopiedInventoryPolicyEvent(invocation, event), label);
+            Require(event.View.Scalars.empty(),
+                    "cross-kind scalar contamination left stale copied event output");
+
+            event.ScalarStorage[0] = {
+                .Field = Obelisk::Core::InventoryPolicyScalarField::ReturnValue,
+                .BoolValue = true,
+            };
+            event.ScalarCount = 1;
+            event.RebindScalarSpan();
+
+            Attempt attempt;
+            attempt.Status = AttemptStatus::Matched;
+            attempt.Invocation = invocation;
+            observationNumber = 99;
+            Require(!TryBuildAndReserveDispatchBudgetForMatchedAttempt(attempt,
+                                                                       dispatchCounter,
+                                                                       1,
+                                                                       observationNumber,
+                                                                       event),
+                    label);
+            Require(observationNumber == 0,
+                    "cross-kind scalar contamination did not clear dispatch observation number");
+            Require(dispatchCounter.load() == 0,
+                    "cross-kind scalar contamination consumed dispatch budget");
+            Require(event.View.Scalars.empty(),
+                    "cross-kind scalar contamination left stale copied output after budget path");
+            Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, invocation) == 0,
+                    "cross-kind scalar contamination dispatched a copied policy event");
+            Require(captured.empty(), "cross-kind scalar contamination reached inventory policy callback");
+        };
+
+        requireNoBudgetOrDispatch(contaminatedCanUse,
+                                  "CanUse policy event accepted BRequestedByPlayer scalar contamination");
+        requireNoBudgetOrDispatch(
+            contaminatedRemoteAdd,
+            "AllowRemoteAddToInventory policy event accepted BIgnoreCooldown scalar contamination");
+
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+    }
+
     void TestDoesNotCopySensitiveInventoryRangesFromForgedInvocation()
     {
         uint64_t inventoryComponent = 0x1111111122222222ULL;
@@ -1576,6 +1701,7 @@ int main()
     TestRejectsDispatchWithoutParameterRanges();
     TestRejectsDispatchWhenExpectedScalarMetadataDiffers();
     TestRejectsDispatchWhenPolicyFieldSequenceDiffers();
+    TestRejectsCrossKindScalarContamination();
     TestDoesNotCopySensitiveInventoryRangesFromForgedInvocation();
     TestDispatchesCopiedInventoryPolicyEventsThroughInternalDispatcher();
     TestCopiedInventoryPolicyEventDispatchRequiresOwnedScalarSpan();

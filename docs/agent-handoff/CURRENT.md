@@ -116,9 +116,17 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `/servidor/ark/workspace-offline` player-identity run has passed the old artifact-root
   stage and is blocked only on approved runtime principal lifecycle evidence.
 - Inventory, structures, missions, transfers, dinos, buffs, tribes, ResourceHandle, and
-  GObjects remain internal/candidate. Do not rerun broad FName, GObjects, or core scans for
-  ResourceHandle; its next strict blockers are rejected runtime object samples plus runtime
-  serial reuse/wraparound semantics under an operator-approved live-ops brief.
+  GObjects remain internal/candidate. ResourceHandle/public GObjects remain blocked. The
+  old flag-policy artifact is obsolete; the durable rich-provenance refresh is preserved,
+  Consume mode accepts it and promote mode stays blocked, and the post-callback rejection
+  contract is preserved as candidate-only. The first strict serial reuse/wraparound policy
+  artifact is preserved; manifest consume mode accepts it and promote mode blocks it as
+  candidate-only. This does not unlock runtime negative samples, public lookup, object
+  identity, mutation, or fail-closed semantic helper promotion. Do not rerun broad FName,
+  GObjects, or core scans for ResourceHandle. Do not replace this with another broad offline
+  FName/GObjects scan. The next strict ResourceHandle blocker is rejected runtime object
+  samples plus runtime serial reuse/wraparound semantics, with a future-runtime-observation-plan
+  only after an operator-approved live-ops brief names the exact debug target.
 - Static field-window evidence clears only the field-window packaging blocker, is not a
   `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are
   present as package-shape evidence only, not a `v1.0` completion marker.
@@ -138,12 +146,16 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - No-core fallback: keep progress offline through guardrails, permission/admin query-only
   design, command/principal contract, and inventory copied-signal hygiene. Inventory copied
   signals are the higher-value side lane, but do not displace identity -> permissions/admin
-  -> commands/replies or authorize Transfer runtime work.
+  -> commands/replies and does not authorize Transfer runtime work.
 - Current no-core side-lane: `item-return-only-policy-slice` has three copied
   `GameplayPolicyEvent` `ReturnValue` checks and accepted descriptor reconciliation; it
-  does not promote Inventory/Items SDK, identity, mutation, return override, or v1.
+  does not promote public Inventory SDK, Items SDK, identity, mutation, return override,
+  or v1.
 - v0.2 internal hardening lane: Mission copied-bool is internal/default-off only, not a
-  Plugin Hub module or Mission SDK claim. Detail:
+  Plugin Hub module or Mission SDK claim. The preserved bool-tail evidence is
+  `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and
+  `native_bool=false`; consume mode accepts it and promote mode blocks it as candidate-only.
+  Detail:
   `docs/research/2026-05-31-v02-module-priority.md`.
 - Product-planning lane: Structure aggregate/census is planning/consume-only with no
   runtime observer, public StructureEvents SDK, enforcement, return override, or v1 claim.

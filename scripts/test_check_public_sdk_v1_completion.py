@@ -13,6 +13,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"
 PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+SCOPED_RELEASE_STATEMENT_TEMPLATE = (
+    REPO_ROOT / "release" / "v1" / "public-sdk" / "scoped-release-statement-template.md"
+)
 EXPERIMENTAL_EXCLUSION_DETAILS = {
     "obelisk.gameplay_policy_event.v1": "GameplayPolicyEvent is not included in v1.",
     "obelisk.chat_message.v1": "ChatMessageEvent is not included in v1.",
@@ -393,6 +396,59 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["promoted_surfaces_with_unresolved_dependencies"], {})
         self.assertEqual(payload["promoted_surfaces_without_evidence"], [])
         self.assertEqual(payload["promoted_blockers_without_evidence"], [])
+
+    def test_scoped_release_statement_template_passes_statement_scope_only(self) -> None:
+        result = self.run_checker(
+            "--release-statement",
+            str(SCOPED_RELEASE_STATEMENT_TEMPLATE),
+            "--validate-release-statement-scope",
+            "--json",
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertFalse(payload["ready"])
+        self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertFalse(payload["scoped_release_statement"]["stable_v1_sdk_claim_allowed"])
+        self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
+        self.assertIn("stable_release_contract_claim_not_allowed", payload["blockers"])
+        self.assertIn("top_level_planning_surfaces_unresolved_for_v1_claim", payload["blockers"])
+
+        full_gate = self.run_checker(
+            "--release-statement",
+            str(SCOPED_RELEASE_STATEMENT_TEMPLATE),
+            "--json",
+            check=False,
+        )
+        full_payload = json.loads(full_gate.stdout)
+        self.assertEqual(full_gate.returncode, 1)
+        self.assertFalse(full_payload["ready"])
+        self.assertIn("v1_completion_required_false", full_payload["blockers"])
+
+    def test_scoped_release_statement_scope_rejects_broad_v1_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "Inventory SDK is ready in v1.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
 
     def test_complete_minimal_manifest_passes(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
