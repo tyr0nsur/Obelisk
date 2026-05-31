@@ -15,6 +15,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_item_return_only_readiness.py"
+sys.path.insert(0, str(SCRIPT_DIR))
+import check_item_return_only_readiness as readiness  # noqa: E402
 
 
 class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
@@ -98,6 +100,53 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
             ],
         }
 
+    def make_public_gameplay_events(self) -> dict:
+        def item_return_event(kind: str, stable_name: str) -> dict:
+            return {
+                "kind": kind,
+                "stable_name": stable_name,
+                "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                "event_kind_mask": f"{kind}_MASK",
+                "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+            }
+
+        return {
+            "schema": "obelisk.public-gameplay-events.v1",
+            "promoted_events": [
+                {
+                    "event_id": "obelisk.gameplay_policy.v1",
+                    "item_return_backing_target_set": "item-return-only-policy-slice",
+                    "target_sets": [
+                        "structure-observer-intake",
+                        "minimal-second-source-intake",
+                        "item-return-only-policy-slice",
+                    ],
+                    "target_set_evidence": [
+                        {
+                            "target_set": "item-return-only-policy-slice",
+                            "scope": "second-source accepted copied ReturnValue-only item backing",
+                        }
+                    ],
+                    "inventory_sdk": "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
+                    "item_module_sdk": "not promoted; item-return-backed policy signals are exposed only through GameplayPolicyEvent",
+                    "event_kinds": [
+                        item_return_event(
+                            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+                            "inventory_item.allow_equip_check",
+                        ),
+                        item_return_event(
+                            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+                            "inventory_item.can_repair_check",
+                        ),
+                        item_return_event(
+                            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+                            "inventory_item.use_onto_item_check",
+                        ),
+                    ],
+                }
+            ],
+        }
+
     def write_pack(self, root: Path, payload: dict | None = None) -> tuple[Path, str]:
         root.mkdir(parents=True, exist_ok=True)
         manifest = root / "item-return-only-policy-slice.json"
@@ -131,6 +180,54 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         self.assertFalse(payload["promotion_ready"])
         self.assertEqual(payload["summary"]["copied_return_bool_count"], 3)
         self.assertEqual(len(payload["summary"]["excluded_fields"]), 5)
+        self.assertEqual(payload["public_gameplay_events"]["item_return_backing_target_set"], "item-return-only-policy-slice")
+        self.assertEqual(len(payload["public_gameplay_events"]["item_return_event_kinds"]), 3)
+
+    def test_public_gameplay_events_accepts_three_return_value_only_item_events(self) -> None:
+        blockers: list[dict] = []
+        summary = readiness.validate_public_gameplay_events(self.make_public_gameplay_events(), blockers)
+
+        self.assertEqual(blockers, [])
+        self.assertEqual(summary["item_return_backing_target_set"], "item-return-only-policy-slice")
+        self.assertEqual(
+            summary["item_return_event_kinds"],
+            sorted(readiness.EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS),
+        )
+
+    def test_public_gameplay_events_rejects_extra_item_kind_and_non_return_value_field(self) -> None:
+        public_events = self.make_public_gameplay_events()
+        event = public_events["promoted_events"][0]
+        event["event_kinds"][0]["field_mask"].append("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN")
+        event["event_kinds"].append(
+            {
+                "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CRAFT_BLUEPRINT_CHECK",
+                "stable_name": "inventory_item.craft_blueprint_check",
+                "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CRAFT_BLUEPRINT_CHECK",
+                "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+            }
+        )
+        blockers: list[dict] = []
+
+        readiness.validate_public_gameplay_events(public_events, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn("public_item_return_field_mask_not_return_value_only", reasons)
+        self.assertIn("public_item_return_event_kind_coverage_mismatch", reasons)
+        self.assertIn("public_item_return_event_kind_count_mismatch", reasons)
+
+    def test_public_gameplay_events_rejects_inventory_and_item_sdk_claims(self) -> None:
+        public_events = self.make_public_gameplay_events()
+        event = public_events["promoted_events"][0]
+        event["inventory_sdk"] = "promoted standalone Inventory SDK"
+        event["item_module_sdk"] = "promoted standalone item module SDK"
+        blockers: list[dict] = []
+
+        readiness.validate_public_gameplay_events(public_events, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn("public_inventory_sdk_non_claim_missing", reasons)
+        self.assertIn("public_item_module_sdk_non_claim_missing", reasons)
 
     def test_craftblueprint_copied_field_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

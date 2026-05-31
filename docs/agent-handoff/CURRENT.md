@@ -139,7 +139,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   snapshots, redacted signatures, static thunks, or a two-function-only inventory as
   satisfying this lane; use `scripts/plan_ufunction_focal_snapshots.py` for
   `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer` only.
+  `ShooterPlayerController.ServerKickPlayer` only. The exact current command recipe lives
+  in `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`; older
+  2026-05-27 core/dump notes are historical evidence and are not runnable promotion
+  instructions.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0:
   player identity, commands/replies/response path, and permissions/admin. P1:
   economy/storage/operator ingress, inventory/items mutation, and structure/build policy.

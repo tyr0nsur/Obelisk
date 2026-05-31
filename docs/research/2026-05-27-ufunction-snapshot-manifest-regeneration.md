@@ -1,5 +1,11 @@
 # UFunction Snapshot Manifest Regeneration
 
+> Historical regeneration note. The protected `/servidor/ark/obelisk/dumps` core path
+> below records prior validation provenance only. Do not use it as current promotion input;
+> use the non-protected raw-layout/core-pack workflow in
+> `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` for
+> player-identity evidence.
+
 ## Objective
 
 Replace manual one-off snapshot commands with a manifest-driven helper so real-core

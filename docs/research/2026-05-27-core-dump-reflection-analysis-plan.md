@@ -1,5 +1,12 @@
 # Core Dump Reflection Analysis Plan
 
+> Historical plan. Do not run the `/servidor/ark/obelisk/dumps` output examples below as
+> current promotion or player-identity instructions. Raw captures may be stored on that
+> disk for space, but current promotion tooling must consume non-protected offline layouts
+> from `/home/flowcommunity-ark/obelisk-artifacts` or another approved workspace. For the
+> current player-identity command chain, use
+> `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+
 ## Objective
 
 Define an offline workflow for analyzing a Linux `ShooterGameServer` core dump after an
@@ -17,7 +24,7 @@ runtime probe.
 
 ## Evidence Pack Command
 
-Preferred offline pack:
+Historical offline pack example:
 
 ```bash
 python3 scripts/build_core_dump_evidence_pack.py \
@@ -38,8 +45,8 @@ python3 scripts/build_core_dump_evidence_pack.py \
 ```
 
 The script records `file`, `readelf`, `objdump`, `strings`, GDB core inspection, hashes,
-candidate memory windows, and a manifest. Under `/servidor/ark`, it only writes to
-`/servidor/ark/obelisk/dumps`.
+candidate memory windows, and a manifest. Treat the `/servidor/ark/obelisk/dumps` paths in
+this note as historical storage examples, not direct inputs for current promotion tooling.
 
 ## Manual Commands
 
@@ -164,8 +171,8 @@ Reject or keep inconclusive when:
 
 ## Next Steps
 
-1. When a core exists, build an offline core evidence pack under
-   `/servidor/ark/obelisk/dumps` or another explicitly chosen artifact directory.
+1. When a core exists, stage it through the current non-protected raw-layout flow in
+   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 2. Compare the GDB memory windows for `0x5956f30` against the existing static-root notes.
 3. If a candidate table is readable, add a small offline decoder only after documenting the
    exact entry layout observed in the core.

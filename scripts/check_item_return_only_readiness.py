@@ -24,6 +24,11 @@ REPORT_SCHEMA = "obelisk.item-return-only-readiness-check.v1"
 POLICY_SCHEMA = "obelisk.item-return-only-policy-slice.v1"
 INPUT_TARGET_SET = "item-compact-intake"
 OUTPUT_TARGET_SET = "item-return-only-policy-slice"
+PUBLIC_GAMEPLAY_EVENTS = REPO_ROOT / "docs" / "public_gameplay_events.json"
+PUBLIC_GAMEPLAY_EVENTS_SCHEMA = "obelisk.public-gameplay-events.v1"
+GAMEPLAY_POLICY_EVENT_ID = "obelisk.gameplay_policy.v1"
+INVENTORY_ITEM_RESOURCE_KIND = "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
+RETURN_VALUE_FIELD_MASK = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
 EXPECTED_INPUT_TARGETS = {
     "PrimalItem.AllowEquipItem",
     "PrimalItem.CanRepair",
@@ -39,6 +44,11 @@ EXPECTED_COPIED_FIELDS = {
     "PrimalItem.AllowEquipItem.ReturnValue",
     "PrimalItem.CanRepair.ReturnValue",
     "PrimalItem.UseItemOntoItem.ReturnValue",
+}
+EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
 }
 EXPECTED_EXCLUDED_FIELDS = {
     "PrimalItem.AllowEquipItem.toInventory",
@@ -145,11 +155,177 @@ def read_policy(manifest: Path, blockers: list[dict[str, Any]], expected_sha256:
     return parsed
 
 
+def read_json_object(path: Path, blockers: list[dict[str, Any]], *, label: str) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        append_blocker(blockers, f"{label}_unreadable", path=str(path), detail=str(exc))
+        return None
+    except json.JSONDecodeError as exc:
+        append_blocker(blockers, f"{label}_malformed", path=str(path), detail=str(exc))
+        return None
+    if not isinstance(parsed, dict):
+        append_blocker(blockers, f"{label}_not_object", path=str(path))
+        return None
+    return parsed
+
+
 def require_set(blockers: list[dict[str, Any]], *, reason: str, actual: Any, expected: set[str]) -> set[str]:
     actual_set = set(actual) if isinstance(actual, list) and all(isinstance(item, str) for item in actual) else set()
     if actual_set != expected:
         append_blocker(blockers, reason, missing=sorted(expected - actual_set), unexpected=sorted(actual_set - expected))
     return actual_set
+
+
+def require_not_promoted_claim(
+    blockers: list[dict[str, Any]], *, reason: str, value: Any, required_token: str = "GameplayPolicyEvent"
+) -> None:
+    if not isinstance(value, str):
+        append_blocker(blockers, reason, value=value)
+        return
+    if "not promoted" not in value.lower() or required_token not in value:
+        append_blocker(blockers, reason, value=value)
+
+
+def find_gameplay_policy_event(public_events: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    promoted_events = public_events.get("promoted_events")
+    if not isinstance(promoted_events, list):
+        append_blocker(blockers, "public_gameplay_events_promoted_events_missing")
+        return {}
+    matches = [
+        event
+        for event in promoted_events
+        if isinstance(event, dict) and event.get("event_id") == GAMEPLAY_POLICY_EVENT_ID
+    ]
+    if len(matches) != 1:
+        append_blocker(blockers, "public_gameplay_policy_event_count_mismatch", expected=1, value=len(matches))
+        return matches[0] if matches else {}
+    return matches[0]
+
+
+def validate_public_gameplay_events(public_events: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    if public_events.get("schema") != PUBLIC_GAMEPLAY_EVENTS_SCHEMA:
+        append_blocker(blockers, "public_gameplay_events_schema_mismatch", value=public_events.get("schema"))
+
+    event = find_gameplay_policy_event(public_events, blockers)
+    if not event:
+        return {
+            "item_return_event_kinds": [],
+            "item_return_backing_target_set": None,
+        }
+
+    item_return_backing = event.get("item_return_backing_target_set")
+    if item_return_backing != OUTPUT_TARGET_SET:
+        append_blocker(
+            blockers,
+            "public_item_return_backing_target_set_mismatch",
+            expected=OUTPUT_TARGET_SET,
+            value=item_return_backing,
+        )
+
+    target_sets_raw = event.get("target_sets")
+    target_sets = (
+        set(target_sets_raw)
+        if isinstance(target_sets_raw, list) and all(isinstance(item, str) for item in target_sets_raw)
+        else set()
+    )
+    if not target_sets:
+        append_blocker(blockers, "public_target_sets_missing_or_invalid")
+    if OUTPUT_TARGET_SET not in target_sets:
+        append_blocker(blockers, "public_item_return_target_set_not_listed", expected=OUTPUT_TARGET_SET)
+
+    evidence = event.get("target_set_evidence")
+    if not isinstance(evidence, list):
+        append_blocker(blockers, "public_target_set_evidence_missing")
+    else:
+        evidence_matches = [
+            entry
+            for entry in evidence
+            if isinstance(entry, dict) and entry.get("target_set") == OUTPUT_TARGET_SET
+        ]
+        if len(evidence_matches) != 1:
+            append_blocker(
+                blockers,
+                "public_item_return_evidence_count_mismatch",
+                expected=1,
+                value=len(evidence_matches),
+            )
+        elif "copied ReturnValue-only item backing" not in str(evidence_matches[0].get("scope", "")):
+            append_blocker(
+                blockers,
+                "public_item_return_evidence_scope_not_return_value_only",
+                value=evidence_matches[0].get("scope"),
+            )
+
+    require_not_promoted_claim(
+        blockers,
+        reason="public_inventory_sdk_non_claim_missing",
+        value=event.get("inventory_sdk"),
+    )
+    require_not_promoted_claim(
+        blockers,
+        reason="public_item_module_sdk_non_claim_missing",
+        value=event.get("item_module_sdk"),
+    )
+
+    event_kinds = event.get("event_kinds")
+    if not isinstance(event_kinds, list):
+        append_blocker(blockers, "public_gameplay_event_kinds_missing")
+        return {
+            "item_return_event_kinds": [],
+            "item_return_backing_target_set": item_return_backing,
+        }
+
+    item_return_kinds: list[str] = []
+    for index, event_kind in enumerate(event_kinds):
+        if not isinstance(event_kind, dict):
+            append_blocker(blockers, "public_gameplay_event_kind_not_object", index=index)
+            continue
+        kind = event_kind.get("kind")
+        stable_name = event_kind.get("stable_name")
+        is_item_return_kind = kind in EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS or (
+            isinstance(stable_name, str) and stable_name.startswith("inventory_item.")
+        )
+        if not is_item_return_kind:
+            continue
+        if isinstance(kind, str):
+            item_return_kinds.append(kind)
+        else:
+            append_blocker(blockers, "public_item_return_kind_missing", index=index, value=kind)
+        if event_kind.get("resource_kind") != INVENTORY_ITEM_RESOURCE_KIND:
+            append_blocker(
+                blockers,
+                "public_item_return_resource_kind_mismatch",
+                index=index,
+                kind=kind,
+                expected=INVENTORY_ITEM_RESOURCE_KIND,
+                value=event_kind.get("resource_kind"),
+            )
+        if event_kind.get("field_mask") != [RETURN_VALUE_FIELD_MASK]:
+            append_blocker(
+                blockers,
+                "public_item_return_field_mask_not_return_value_only",
+                index=index,
+                kind=kind,
+                expected=[RETURN_VALUE_FIELD_MASK],
+                value=event_kind.get("field_mask"),
+            )
+
+    item_return_kind_set = set(item_return_kinds)
+    if item_return_kind_set != EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS:
+        append_blocker(
+            blockers,
+            "public_item_return_event_kind_coverage_mismatch",
+            missing=sorted(EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS - item_return_kind_set),
+            unexpected=sorted(item_return_kind_set - EXPECTED_PUBLIC_ITEM_RETURN_EVENT_KINDS),
+        )
+    if len(item_return_kinds) != 3:
+        append_blocker(blockers, "public_item_return_event_kind_count_mismatch", expected=3, value=len(item_return_kinds))
+
+    return {
+        "item_return_event_kinds": sorted(item_return_kind_set),
+        "item_return_backing_target_set": item_return_backing,
+    }
 
 
 def validate_return_bool_entries(
@@ -292,8 +468,14 @@ def build_report(
     manifest = safe_path(manifest_path, "--manifest", blockers)
 
     summary: dict[str, Any] = {}
+    public_gameplay_events_summary: dict[str, Any] = {}
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
+    public_events_path = safe_path(PUBLIC_GAMEPLAY_EVENTS, "docs/public_gameplay_events.json", blockers)
+    if public_events_path is not None:
+        public_events = read_json_object(public_events_path, blockers, label="public_gameplay_events")
+        if public_events is not None:
+            public_gameplay_events_summary = validate_public_gameplay_events(public_events, blockers)
     if root is not None and manifest is not None:
         policy = read_policy(manifest, blockers, expected_manifest_sha256)
         if policy is not None:
@@ -357,6 +539,7 @@ def build_report(
         "consume_gate": consume_gate,
         "promote_gate": promote_gate,
         "summary": summary,
+        "public_gameplay_events": public_gameplay_events_summary,
         "blockers": blockers,
         "non_claims": [
             "candidate readiness is internal planning evidence only",

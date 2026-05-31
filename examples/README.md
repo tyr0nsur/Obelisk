@@ -6,6 +6,9 @@ in-tree reference plugins used by Obelisk's own build and tests.
 
 - `sdk_minimal_plugin/`: smallest external C plugin using `find_package(Obelisk 0.1.0
   CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk`.
+- `sdk_descriptor_catalog/`: external C plugin that reads metadata-only resource and
+  gameplay policy event descriptors after capability, `struct_size`, and function-pointer
+  checks.
 - `sdk_timer_plugin/`: external C plugin using the installed SDK timer capability with
   owner-token registration and explicit shutdown cleanup.
 

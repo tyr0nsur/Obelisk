@@ -1,5 +1,11 @@
 # General UFunction Inventory
 
+> Historical inventory note. Commands below may reference protected
+> `/servidor/ark/obelisk/dumps` evidence packs from prior work. Treat them as provenance,
+> not current promotion instructions. Current player-identity work uses the non-protected
+> raw-layout/core-pack route in
+> `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+
 ## Objective
 
 Move Obelisk research from a single event family into a broad offline inventory of

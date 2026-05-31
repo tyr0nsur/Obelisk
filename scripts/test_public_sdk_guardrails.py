@@ -63,6 +63,11 @@ SDK_TIMER_PLUGIN_EXAMPLE_FILES = [
     REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
     REPO_ROOT / "examples" / "sdk_timer_plugin" / "timer_plugin.c",
 ]
+SDK_DESCRIPTOR_CATALOG_EXAMPLE_FILES = [
+    REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "CMakeLists.txt",
+    REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md",
+    REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "descriptor_catalog_plugin.c",
+]
 PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -4682,9 +4687,155 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(path="examples/sdk_timer_plugin/timer_plugin.c", forbidden=token):
                 self.assertNotIn(token, timer_source)
 
+    def test_sdk_descriptor_catalog_example_stays_installed_sdk_only(self) -> None:
+        examples_readme = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+        descriptor_readme = (
+            REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md"
+        ).read_text(encoding="utf-8")
+        descriptor_cmake = (
+            REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+        descriptor_source = (
+            REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "descriptor_catalog_plugin.c"
+        ).read_text(encoding="utf-8")
+
+        for path in SDK_DESCRIPTOR_CATALOG_EXAMPLE_FILES:
+            with self.subTest(path=path.relative_to(REPO_ROOT), token="example file"):
+                self.assertTrue(path.exists())
+
+        for text, relative in (
+            (examples_readme, "examples/README.md"),
+            (descriptor_readme, "examples/sdk_descriptor_catalog/README.md"),
+            (descriptor_cmake, "examples/sdk_descriptor_catalog/CMakeLists.txt"),
+        ):
+            normalized_text = re.sub(r"\s+", " ", text)
+            with self.subTest(path=relative, token="find_package"):
+                self.assertIn(
+                    "find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)",
+                    normalized_text,
+                )
+            with self.subTest(path=relative, token="sdk target"):
+                self.assertIn("Obelisk::obelisk_sdk", text)
+
+        self.assertIn("Support tier: release-supported seed.", descriptor_readme)
+        descriptor_readme_normalized = re.sub(r"\s+", " ", descriptor_readme)
+        for token in (
+            "metadata-only descriptor discovery",
+            "Resource descriptors are category data only",
+            "not identity, lookup handles, persistent IDs, mutable resources",
+            "do not expose raw UE state, return override authority, mutation, or object lookup",
+            "does not use private headers, raw UE pointers, `ProcessEvent`",
+            "identity, lookup, mutation, return overrides, chat replies/send-chat, ArkApi",
+        ):
+            with self.subTest(path="examples/sdk_descriptor_catalog/README.md", token=token):
+                self.assertIn(token, descriptor_readme_normalized)
+
+        self.assertEqual(c_like_includes(descriptor_source)[0], "obelisk/ObeliskApi.h")
+        self.assertIn("#include <obelisk/ObeliskApi.h>", descriptor_source)
+        self.assertIn("C_VISIBILITY_PRESET hidden", descriptor_cmake)
+        self.assertNotIn("OBELISK_SDK_DESCRIPTOR_CATALOG_TEST_PROBES", descriptor_source)
+
+        exported_functions = re.findall(
+            r"OBELISK_PLUGIN_EXPORT\s+bool\s+(ObeliskPlugin_[A-Za-z0-9_]+)\s*\(",
+            descriptor_source,
+        )
+        self.assertEqual(exported_functions, ["ObeliskPlugin_GetInfo", "ObeliskPlugin_Init"])
+        self.assertNotIn("__attribute__((visibility(\"default\")))\nbool", descriptor_source)
+
+        for token in (
+            '\\"enabled\\": false',
+            '\\"allow_all_instances\\": false',
+            '\\"instance_allowlist\\": []',
+            'out->default_config_json = kDefaultConfig',
+        ):
+            with self.subTest(path="examples/sdk_descriptor_catalog/descriptor_catalog_plugin.c", token=token):
+                self.assertIn(token, descriptor_source)
+
+        for token in (
+            "api->abi_version == OBELISK_API_ABI_VERSION",
+            "api->struct_size >= offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +",
+            "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
+            "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+            "api->DescribeResourceKind != NULL",
+            "api->DescribeGameplayPolicyEventKind != NULL",
+            "context->abi_version == OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION",
+            "context->struct_size >= offsetof(ObeliskPluginInitContext, instance_id) +",
+            "out->struct_size == sizeof(*out)",
+            "descriptor catalog did not cover all promoted event kinds",
+        ):
+            with self.subTest(path="examples/sdk_descriptor_catalog/descriptor_catalog_plugin.c", token=token):
+                self.assertIn(token, descriptor_source)
+
+        for token in (
+            "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
+            "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+            "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MIN",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MAX",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL",
+        ):
+            with self.subTest(path="examples/sdk_descriptor_catalog/descriptor_catalog_plugin.c", token=token):
+                self.assertIn(token, descriptor_source)
+
+        for text, relative in (
+            (descriptor_readme, "examples/sdk_descriptor_catalog/README.md"),
+            (descriptor_cmake, "examples/sdk_descriptor_catalog/CMakeLists.txt"),
+            (descriptor_source, "examples/sdk_descriptor_catalog/descriptor_catalog_plugin.c"),
+        ):
+            with self.subTest(path=relative, check="no-broad-v1-completion-claim"):
+                self.assertEqual(broad_v1_completion_claims(text, relative), [])
+
+        self.assertEqual(
+            plugin_hub_seed_forbidden_claims(
+                descriptor_readme,
+                "examples/sdk_descriptor_catalog/README.md",
+                "release-supported seed",
+            ),
+            [],
+        )
+
+        for text, relative in (
+            (descriptor_cmake, "examples/sdk_descriptor_catalog/CMakeLists.txt"),
+            (descriptor_source, "examples/sdk_descriptor_catalog/descriptor_catalog_plugin.c"),
+        ):
+            for token in (
+                '#include "',
+                "#include <api/",
+                "#include <core/",
+                "#include <hooks/",
+                "#include <plugins/",
+                "#include <runtime/",
+                "#include <ue/",
+                "UObject",
+                "UFunction",
+                "FString",
+                "ProcessEvent",
+                "CallProcessEvent",
+                "RegisterPreProcessEvent",
+                "RegisterPostProcessEvent",
+                "RegisterGameplayPolicyEvent",
+                "RegisterChat",
+                "ChatMessageEvent",
+                "SendChat",
+                "Reply",
+                "ArkApi",
+                "AseApi",
+                "ResourceHandle",
+                "GetResource",
+                "ResolveResource",
+                "player identity",
+                "object identity",
+                "resource identity",
+                "return_override",
+            ):
+                with self.subTest(path=relative, forbidden=token):
+                    self.assertNotIn(token, text)
+
     def test_installed_sdk_examples_label_package_version_as_prerelease_floor(self) -> None:
         for path in (
             REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
+            REPO_ROOT / "examples" / "sdk_descriptor_catalog" / "README.md",
             REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
         ):
             compact = normalized(path.read_text(encoding="utf-8"))

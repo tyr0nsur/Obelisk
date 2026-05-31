@@ -5,6 +5,10 @@
 > `arkserver` / Ragnarok while player performance testing is active. Future second-source
 > cores should use `docs/research/2026-05-27-isolated-second-core-runbook.md` with
 > `arkserver-obelisk-debug` preferred and TheIsland only as approved fallback.
+> The `/servidor/ark/obelisk/dumps` and `--skip-core-sha256` commands below are historical
+> provenance only. Current player-identity promotion work must use the non-protected
+> raw-layout/core-pack route in
+> `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 
 ## Objective
 

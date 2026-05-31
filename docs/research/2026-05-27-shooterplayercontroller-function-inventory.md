@@ -1,5 +1,10 @@
 # ShooterPlayerController Function Inventory
 
+> Historical inventory note. The protected `/servidor/ark/obelisk/dumps` paths below record
+> prior evidence provenance only; do not use them as current promotion inputs. For current
+> player-identity work, stage non-protected raw inputs and build packs with
+> `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+
 ## Objective
 
 Use the general offline `UFunction` inventory to move Obelisk roadmap work across the full
