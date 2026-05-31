@@ -468,6 +468,22 @@ add_executable(item_return_event_dispatcher_benchmark EXCLUDE_FROM_ALL
 target_include_directories(item_return_event_dispatcher_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(item_return_event_dispatcher_benchmark PRIVATE fmt::fmt spdlog::spdlog)
 
+add_executable(structure_event_dispatcher_benchmark EXCLUDE_FROM_ALL
+    tests/perf/StructureEventDispatcherBenchmark.cpp
+    core/StructureEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(structure_event_dispatcher_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(structure_event_dispatcher_benchmark PRIVATE fmt::fmt spdlog::spdlog)
+
+add_executable(inventory_policy_event_dispatcher_benchmark EXCLUDE_FROM_ALL
+    tests/perf/InventoryPolicyEventDispatcherBenchmark.cpp
+    core/InventoryPolicyEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(inventory_policy_event_dispatcher_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(inventory_policy_event_dispatcher_benchmark PRIVATE fmt::fmt spdlog::spdlog)
+
 add_executable(mission_copied_bool_event_dispatcher_benchmark EXCLUDE_FROM_ALL
     tests/perf/MissionCopiedBoolEventDispatcherBenchmark.cpp
     core/MissionCopiedBoolEventDispatcher.cpp

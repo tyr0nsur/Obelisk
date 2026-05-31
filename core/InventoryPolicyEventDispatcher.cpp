@@ -20,6 +20,9 @@ namespace Obelisk::Core
             InventoryPolicyEventSubscription Subscription;
         };
 
+        constexpr size_t kStackScalarCapacity = 2;
+        constexpr size_t kStackCallbackCapacity = 4;
+
         thread_local size_t g_DestroyUserDataDepth = 0;
 
         struct DestroyUserDataScope
@@ -183,6 +186,25 @@ namespace Obelisk::Core
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
+            const size_t matchingCount = static_cast<size_t>(
+                std::count_if(m_Registrations.begin(),
+                              m_Registrations.end(),
+                              [registrationId](const Registration& item) {
+                                  return item.Id == registrationId;
+                              }));
+            if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
+                return false;
+            }
+            removed.reserve(matchingCount);
+            if (m_DispatchDepth > 0)
+                m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
                                           [registrationId, &removed](const Registration& item) {
@@ -218,6 +240,25 @@ namespace Obelisk::Core
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
+            const size_t matchingCount = static_cast<size_t>(
+                std::count_if(m_Registrations.begin(),
+                              m_Registrations.end(),
+                              [owner, registrationId](const Registration& item) {
+                                  return item.Owner == owner && item.Id == registrationId;
+                              }));
+            if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
+                return false;
+            }
+            removed.reserve(matchingCount);
+            if (m_DispatchDepth > 0)
+                m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
                                           [owner, registrationId, &removed](const Registration& item) {
@@ -253,6 +294,25 @@ namespace Obelisk::Core
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
+            const size_t matchingCount = static_cast<size_t>(
+                std::count_if(m_Registrations.begin(),
+                              m_Registrations.end(),
+                              [owner](const Registration& item) {
+                                  return item.Owner == owner;
+                              }));
+            if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
+                return 0;
+            }
+            removed.reserve(matchingCount);
+            if (m_DispatchDepth > 0)
+                m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
                                           [owner, &removed](const Registration& item) {
@@ -340,26 +400,40 @@ namespace Obelisk::Core
         size_t dispatched = 0;
         try
         {
-            if (event.Scalars.size() > 3)
+            if (event.Scalars.size() > kStackScalarCapacity)
                 return 0;
-            std::array<InventoryPolicyScalarValue, 3> scalarCopies{};
+            std::array<InventoryPolicyScalarValue, kStackScalarCapacity> scalarCopies{};
             std::copy(event.Scalars.begin(), event.Scalars.end(), scalarCopies.begin());
             InventoryPolicyEventView copiedEvent{
                 .Kind = event.Kind,
                 .Scalars = std::span<const InventoryPolicyScalarValue>(scalarCopies.data(), event.Scalars.size()),
             };
 
-            std::vector<DispatchRegistration> callbacks;
+            std::array<DispatchRegistration, kStackCallbackCapacity> stackCallbacks{};
+            size_t stackCallbackCount = 0;
+            std::vector<DispatchRegistration> heapCallbacks;
             try
             {
                 {
                     std::lock_guard<std::mutex> lock(m_Mutex);
                     ++m_DispatchDepth;
-                    m_PendingDestroy.reserve(m_PendingDestroy.size() + m_Registrations.size());
-                    callbacks.reserve(m_Registrations.size());
-                    for (const Registration& item : m_Registrations)
-                        callbacks.push_back({item.Id, item.Subscription});
+                    if (m_Registrations.size() <= stackCallbacks.size())
+                    {
+                        for (const Registration& item : m_Registrations)
+                            stackCallbacks[stackCallbackCount++] = {item.Id, item.Subscription};
+                    }
+                    else
+                    {
+                        heapCallbacks.reserve(m_Registrations.size());
+                        for (const Registration& item : m_Registrations)
+                            heapCallbacks.push_back({item.Id, item.Subscription});
+                    }
                 }
+
+                const std::span<const DispatchRegistration> callbacks =
+                    heapCallbacks.empty()
+                        ? std::span<const DispatchRegistration>(stackCallbacks.data(), stackCallbackCount)
+                        : std::span<const DispatchRegistration>(heapCallbacks.data(), heapCallbacks.size());
 
                 for (const DispatchRegistration& item : callbacks)
                 {
