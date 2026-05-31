@@ -120,9 +120,10 @@ Required ABI properties:
   principal, unloaded policy, or invalid owner token returns failure or `deny/unknown`,
   never `allow`;
 - missing `principal_generation`, mismatched `principal_generation`, unsupported
-  `principal_scope_flags`, or any cache key that omits generation/scope fails closed; no
-  public permission cache ABI is allowed until `policy_epoch` and full
-  generation/scope keying semantics are promoted;
+  `principal_scope_flags`, or any cache key that omits `principal_generation`,
+  `principal_scope_flags`, `resource_scope`, or `policy_epoch` fails closed; no public
+  permission cache ABI is allowed until `policy_epoch` and full generation/scope keying
+  semantics are promoted;
 - no callback registration is required for the first query-only surface. If a future
   policy-change callback is added, it must use owner-token handle registration,
   owner-scoped unregister, and plugin-owner cleanup before `dlclose`.

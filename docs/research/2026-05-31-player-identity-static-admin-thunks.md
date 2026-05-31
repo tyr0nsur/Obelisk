@@ -90,6 +90,18 @@ virtual dispatch through `AShooterPlayerController` vtable offset `0x1528`.
 These offsets are static orientation clues only; they are not public ABI, vtable
 contracts, or reusable cross-build evidence.
 
+The checker now fails closed on exact bounded dispatch byte sequences instead of accepting
+the vtable-offset immediate anywhere in a local thunk window:
+
+- `ServerKickPlayer` at `0x15473c1`:
+  `49 8b 06 48 8b 80 28 15 00 00 48 8d 75 e0 48 8d 55 d0 4c 89 f7 ff d0`
+- `ServerListPlayers` at `0x1547464`:
+  `48 8b 07 ff a0 20 15 00 00`
+
+The `ServerKickPlayer` regression fixture mutates a non-immediate byte inside that
+sequence while leaving the `0x1528` immediate present; the checker blocks the artifact as
+`thunk_vtable_dispatch_sequence_mismatch`.
+
 UTF-32 name initialization around `0x78d740..0x78d7d0` also references probable
 runtime-initialized FName globals:
 
@@ -116,8 +128,9 @@ identity contract.
 - `objdump --start-address` can begin in the middle of an instruction if the window is
   cut poorly. Only coherent `mov`/`call` sequences inside the bounded window are treated
   as orientation clues.
-- Vtable offsets `0x1520` and `0x1528` are stripped-binary orientation only. They are not
-  a vtable definition, public ABI, or cross-build contract.
+- Exact vtable-dispatch byte sequences for offsets `0x1520` and `0x1528` are
+  stripped-binary orientation only. They are not a vtable definition, public ABI, or
+  cross-build contract.
 - `radare2 -A` is not a good short smoke-test path for this binary; a local non-analysis
   disassembly window is faster and less noisy. Full Ghidra/radare analysis should stay a
   separate static-analysis task with `/tmp` output and bounded scripts.

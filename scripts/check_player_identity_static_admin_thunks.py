@@ -76,6 +76,8 @@ class AdminThunk:
     fname_slot_vma: int
     vtable_offset: int
     expected_thunk_prefix: bytes
+    vtable_dispatch_vma: int
+    expected_vtable_dispatch: bytes
     decode_call_vmas: tuple[int, ...] = ()
 
 
@@ -92,6 +94,10 @@ ADMIN_THUNKS = (
         fname_slot_vma=0x58EAE60,
         vtable_offset=0x1528,
         expected_thunk_prefix=bytes.fromhex("554889e54156534883ec20"),
+        vtable_dispatch_vma=0x15473C1,
+        expected_vtable_dispatch=bytes.fromhex(
+            "498b06488b8028150000488d75e0488d55d04c89f7ffd0"
+        ),
         decode_call_vmas=(0x154734A, 0x154736A, 0x1547388, 0x15473A8),
     ),
     AdminThunk(
@@ -108,6 +114,8 @@ ADMIN_THUNKS = (
         expected_thunk_prefix=bytes.fromhex(
             "488b46204885c00f95c10fb6c94801c148894e20488b07ffa020150000"
         ),
+        vtable_dispatch_vma=0x1547464,
+        expected_vtable_dispatch=bytes.fromhex("488b07ffa020150000"),
     ),
 )
 ADMIN_TARGETS = tuple(thunk.target for thunk in ADMIN_THUNKS)
@@ -430,13 +438,18 @@ def check_thunk_shape(
             thunk_vma=hex(thunk.thunk_vma),
         )
 
-    window = read_vma(data, segments, thunk.thunk_vma, 0xD0)
-    expected_vtable = struct.pack("<I", thunk.vtable_offset)
-    if window is None or expected_vtable not in window:
+    dispatch = read_vma(
+        data,
+        segments,
+        thunk.vtable_dispatch_vma,
+        len(thunk.expected_vtable_dispatch),
+    )
+    if dispatch != thunk.expected_vtable_dispatch:
         append_blocker(
             blockers,
-            "thunk_vtable_offset_not_observed",
+            "thunk_vtable_dispatch_sequence_mismatch",
             target=thunk.target,
+            vma=hex(thunk.vtable_dispatch_vma),
             expected=hex(thunk.vtable_offset),
         )
 
@@ -517,6 +530,7 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
                         "thunk_vma": hex(thunk.thunk_vma),
                         "probable_fname_slot_vma": hex(thunk.fname_slot_vma),
                         "observed_vtable_offset": hex(thunk.vtable_offset),
+                        "vtable_dispatch_vma": hex(thunk.vtable_dispatch_vma),
                     }
                 )
 
@@ -547,6 +561,7 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
                 "thunk_vma": target.get("thunk_vma"),
                 "probable_fname_slot_vma": target.get("probable_fname_slot_vma"),
                 "observed_vtable_offset": target.get("observed_vtable_offset"),
+                "vtable_dispatch_vma": target.get("vtable_dispatch_vma"),
             }
             for target in checked_targets
         ],

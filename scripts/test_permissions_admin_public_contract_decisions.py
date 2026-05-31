@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DECISIONS = REPO_ROOT / "docs" / "permissions_admin_public_contract_decisions.json"
+NOTE = REPO_ROOT / "docs" / "research" / "2026-05-31-permissions-admin-minimum-post-identity.md"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
@@ -46,6 +47,8 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(payload["surface"], "obelisk.permissions_admin.v1")
         self.assertEqual(payload["status"], "blocked")
         self.assertFalse(payload["public_header_allowed"])
+        self.assertEqual(payload["public_header_symbols_now"], [])
+        self.assertFalse(payload["public_cache_abi_allowed"])
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
 
@@ -86,7 +89,16 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         cache = requirements["cache.generation_scope_keying"]
         self.assertIn("principal_generation", cache["required_cache_key_fields"])
         self.assertIn("principal_scope_flags", cache["required_cache_key_fields"])
+        self.assertIn("resource_scope", cache["required_cache_key_fields"])
         self.assertIn("policy_epoch", cache["required_cache_key_fields"])
+        self.assertEqual(
+            cache["public_cache_abi"],
+            "blocked_until_policy_epoch_generation_and_scope_semantics_are_promoted",
+        )
+        self.assertIn(
+            "no public permission cache ABI until policy_epoch and full generation/scope keying semantics are promoted",
+            cache["required_behavior"],
+        )
         self.assertIn("cache disabled unless all key fields are defined", cache["required_behavior"])
 
     def test_fail_closed_and_scope_separation_remain_explicit(self) -> None:
@@ -127,6 +139,30 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         for token in FORBIDDEN_HEADER_TOKENS:
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
+
+    def test_note_and_decision_manifest_share_minimum_query_field_names(self) -> None:
+        payload = self.load_decisions()
+        note = NOTE.read_text(encoding="utf-8")
+        normalized_note = " ".join(note.split())
+        requirements = {
+            item["id"]: item
+            for item in payload["required_before_public_header"]
+        }
+        query_fields = requirements["abi.permission_query_identity_fields"]["required_fields_or_equivalent"]
+        cache_fields = requirements["cache.generation_scope_keying"]["required_cache_key_fields"]
+
+        for field in query_fields:
+            with self.subTest(field=field):
+                self.assertIn(field, normalized_note)
+
+        for field in ("principal_generation", "principal_scope_flags", "resource_scope", "policy_epoch"):
+            with self.subTest(cache_field=field):
+                self.assertIn(field, cache_fields)
+                self.assertIn(field, normalized_note)
+
+        self.assertIn("no public permission cache ABI", normalized_note)
+        self.assertIn("does not add public headers", normalized_note)
+        self.assertIn("public ABI symbols, headers", normalized_note)
 
     def test_surface_manifest_requires_generation_scope_and_fail_closed_permissions(self) -> None:
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))

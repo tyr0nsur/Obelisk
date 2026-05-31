@@ -4,6 +4,8 @@
   "status": "blocked",
   "public_header_allowed": false,
   "public_header": "include/obelisk/ObeliskApi.h",
+  "public_header_symbols_now": [],
+  "public_cache_abi_allowed": false,
   "forbidden_public_contract": [
     "permission groups",
     "admin groups",
@@ -85,6 +87,7 @@
       "id": "cache.generation_scope_keying",
       "category": "cache",
       "status": "unresolved",
+      "public_cache_abi": "blocked_until_policy_epoch_generation_and_scope_semantics_are_promoted",
       "required_cache_key_fields": [
         "plugin_owner_token",
         "principal_handle",
@@ -95,6 +98,7 @@
         "policy_epoch"
       ],
       "required_behavior": [
+        "no public permission cache ABI until policy_epoch and full generation/scope keying semantics are promoted",
         "cache disabled unless all key fields are defined",
         "policy epoch mismatch fails closed",
         "cached allow decisions are invalidated on principal generation change"

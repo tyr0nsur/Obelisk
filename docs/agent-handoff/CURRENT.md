@@ -143,7 +143,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   compatibility flag and reports `accepted_for_candidate_planning`, `promotion_ready=false`,
   `public_sdk_ready=false`, `runtime_ready=false`, and `operator_next_step`. Accepted
   reflection inventory means candidate-only focal snapshot planning, not identity,
-  Inventory SDK, public SDK, runtime, lookup, or `ResourceHandle` promotion.
+  Inventory SDK, public SDK, runtime, lookup, or `ResourceHandle` promotion. For player
+  identity it now requires both full 12-target `target_set_coverage.requested_targets`
+  and inventory rows for all 12 `players-identity-lifecycle-intake` targets, not only the
+  two admin focal targets.
 - Player identity focal snapshot planning must start from a complete non-protected
   `obelisk.reflection-inventory-pack.v1` with target-set coverage for the full 12-target
   `players-identity-lifecycle-intake` set and exact rows for
@@ -162,7 +165,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Static orientation for all 12 identity targets and bounded admin thunk byte checks are
   valid navigation evidence only. They do not replace the missing core evidence pack,
   reflection inventory, focal snapshots, second source, lifecycle anchors, or
-  accepted privacy/invalidation implementation and tests.
+  accepted privacy/invalidation implementation and tests. Static admin thunk checking is
+  hash-pinned and now validates exact bounded vtable-dispatch byte sequences for
+  `ServerKickPlayer` and `ServerListPlayers`; this remains candidate-only navigation
+  evidence, not a vtable ABI or cross-build contract.
 - `PrimalLocalProfile.ArkTributePlayerData` is metadata/layout evidence only. The
   `scripts/check_arktribute_playerdata_identity_boundary.py` checker proves only that the
   current transfer ScriptStruct artifacts remain layout-only, candidate-only,
@@ -214,10 +220,21 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   without claiming SDK promotion. Prefer inventory copied-signal hygiene over structure
   census when choosing one side lane, because it has more near-term Plugin Hub value while
   identity remains core-blocked. This does not authorize Transfer runtime work.
+- A useful bounded static side task is command/chat response-path orientation for the
+  exact controller targets `ShooterPlayerController.ClientChatMessage`,
+  `ShooterPlayerController.ClientServerChatMessage`, and
+  `ShooterPlayerController.ClientServerChatDirectMessage` using local-window offline
+  inspection only. Treat any result as candidate-only planning evidence for
+  `obelisk.command_chat_response_path.v1`; it must not imply replies/send-chat,
+  command router, identity, permissions, raw UE/FString exposure, mutation, or runtime
+  readiness.
 - Permissions/admin now has a machine-readable pre-ABI decision contract in
   `docs/permissions_admin_public_contract_decisions.json`. Future permission checks must
   consume promoted copied principal semantics with generation/scope fail-closed behavior;
-  do not add public permission ABI symbols before that contract is resolved.
+  do not add public permission ABI symbols before that contract is resolved. Public
+  permission cache ABI is blocked until `policy_epoch` plus full principal
+  generation/scope keying semantics are promoted; current public header symbols remain
+  an explicit empty set.
 - Revalidate before any checkpoint: identity readiness stays blocked with
   `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
   docs stay non-promotional, and `git diff --check` passes.

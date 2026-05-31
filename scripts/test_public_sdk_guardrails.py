@@ -1796,7 +1796,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for blocker in (
             "Needs promoted player identity/principal semantics.",
             "Needs promoted permission/authority model.",
-            "Needs obelisk.command_chat_response_path.v1 promoted or explicitly excluded before replies/send-chat can be claimed.",
+            "Needs obelisk.command_chat_response_path.v1 promoted before replies/send-chat can be claimed; this blocker must be promoted or explicitly excluded/post-v1 before v1_completion_required can change.",
             "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
             "Needs command lifecycle and abuse boundaries.",
         ):
@@ -7373,7 +7373,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "--obelisk-commit \"${COMMIT}\"",
             "--fname-root-slot verified_fname_root_slot=0x5956f30",
             "--gobjects-candidate gobjects=0x595b7e0",
-            "`--ark-binary-sha256` is only an optional mismatch check in\nthis mode, not a required argument",
+            "Always pass the reviewed `--ark-binary-sha256` shown above so the inventory\nbuilder fails closed if the core evidence-pack manifest is paired with a different ARK\nbinary",
             "Do not use `--skip-core-sha256`",
             "do not use `--allow-partial-gdb`",
             "at least one real session-start anchor and one real\nsession-end anchor",

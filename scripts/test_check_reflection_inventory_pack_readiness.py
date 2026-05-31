@@ -22,27 +22,26 @@ PLAYER_IDENTITY_TARGETS = schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelis
 
 
 class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
+    def inventory_row_for_target(self, target: str) -> dict[str, object]:
+        outer, name = target.rsplit(".", 1)
+        family = "Server" if name.startswith("Server") else "Client" if name.startswith("Client") else "Native"
+        return {
+            "family": family,
+            "function_flags": "0x4020400",
+            "name": name,
+            "num_parms": 0,
+            "outer_class_name": outer,
+            "outer_name": outer,
+            "parms_size": 0,
+        }
+
     def default_functions(self) -> list[dict[str, object]]:
-        return [
-            {
-                "family": "Server",
-                "function_flags": "0x4020400",
-                "name": "ServerListPlayers",
-                "num_parms": 0,
-                "outer_class_name": "ShooterPlayerController",
-                "outer_name": "ShooterPlayerController",
-                "parms_size": 0,
-            },
-            {
-                "family": "Server",
-                "function_flags": "0x4020400",
-                "name": "ServerKickPlayer",
-                "num_parms": 2,
-                "outer_class_name": "ShooterPlayerController",
-                "outer_name": "ShooterPlayerController",
-                "parms_size": 32,
-            },
-        ]
+        rows = [self.inventory_row_for_target(target) for target in PLAYER_IDENTITY_TARGETS]
+        for row in rows:
+            if row["outer_name"] == "ShooterPlayerController" and row["name"] == "ServerKickPlayer":
+                row["num_parms"] = 2
+                row["parms_size"] = 32
+        return rows
 
     def write_pack(
         self,
@@ -323,7 +322,11 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
     def test_wrong_scope_and_missing_target_are_machine_readable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            rows = self.default_functions()[:1]
+            rows = [
+                row
+                for row in self.default_functions()
+                if f"{row['outer_name']}.{row['name']}" != "ShooterPlayerController.ServerKickPlayer"
+            ]
             self.write_pack(
                 root / "pack",
                 functions=rows,
@@ -338,6 +341,8 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertIn("missing_target", codes)
         missing = [reason for reason in payload["reasons"] if reason["reason"] == "missing_target"]
         self.assertEqual(missing[0]["targets"], ["ShooterPlayerController.ServerKickPlayer"])
+        self.assertEqual(missing[0]["required_target_count"], len(PLAYER_IDENTITY_TARGETS))
+        self.assertEqual(missing[0]["missing_count"], 1)
 
     def test_promoted_inventory_pack_status_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

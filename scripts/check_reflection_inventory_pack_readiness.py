@@ -565,15 +565,23 @@ def evaluate_pack(manifest_path: Path, manifest: dict[str, Any]) -> dict[str, ob
         pack_reasons.extend(
             player_identity_target_set_scope_blockers(manifest_path, manifest, inventory_path, inventory)
         )
-    missing = sorted(target for target in REQUIRED_TARGETS if target not in targets)
+    missing = sorted(target for target in PLAYER_IDENTITY_TARGETS if target not in targets)
     if missing:
-        pack_reasons.append(reason("missing_target", path=str(manifest_path), targets=missing))
+        pack_reasons.append(
+            reason(
+                "missing_target",
+                path=str(manifest_path),
+                targets=missing,
+                required_target_count=len(PLAYER_IDENTITY_TARGETS),
+                missing_count=len(missing),
+            )
+        )
     return {
         "manifest": str(manifest_path),
         "inventory": str(inventory_path) if inventory_path is not None else None,
         "ready": not pack_reasons,
         "reasons": pack_reasons,
-        "matched_targets": sorted(target for target in REQUIRED_TARGETS if target in targets),
+        "matched_targets": sorted(target for target in PLAYER_IDENTITY_TARGETS if target in targets),
         "required_target_set": player_identity_target_set_expectation_fields(),
     }
 

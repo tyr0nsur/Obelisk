@@ -192,6 +192,7 @@ is:
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
   --evidence-pack-manifest <non-protected-pack>/manifest.json \
+  --ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
   --target-set players-identity-lifecycle-intake \
   --include-functions \
   --output-dir /tmp/obelisk-reflection-inventory-identity-pack
@@ -283,6 +284,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py \
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \
   --evidence-pack-manifest "${ROOT}/core-evidence-pack/manifest.json" \
+  --ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
   --evidence-pack-fname-root-label verified_fname_root_slot \
   --evidence-pack-gobjects-label gobjects \
   --target-set players-identity-lifecycle-intake \
@@ -305,11 +307,10 @@ Operator stop/continue rule:
   until second-source evidence and lifecycle anchors are accepted.
 
 This direct staged-input route requires a matching offline `ShooterGameServer` and ELF
-core file. `build_reflection_inventory_pack.py` derives `binary.sha256` from the complete
-core evidence-pack manifest; `--ark-binary-sha256` is only an optional mismatch check in
-this mode, not a required argument. Do not use `--skip-core-sha256`, do not use
-`--allow-partial-gdb`, and do not reuse `0x5956f30` or `0x595b7e0` for a different ARK
-binary hash without new evidence.
+core file. Always pass the reviewed `--ark-binary-sha256` shown above so the inventory
+builder fails closed if the core evidence-pack manifest is paired with a different ARK
+binary. Do not use `--skip-core-sha256`, do not use `--allow-partial-gdb`, and do not
+reuse `0x5956f30` or `0x595b7e0` for a different ARK binary hash without new evidence.
 
 This command shape is still offline and candidate-only. It must not use direct or
 symlinked `/servidor/ark` paths without a current scoped approval.

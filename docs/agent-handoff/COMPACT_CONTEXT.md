@@ -271,13 +271,28 @@ priorities, and do not use history files as the active source of truth.
   and binary SHA mismatch; it hashes only the binary and treats the core as metadata-only.
 - `scripts/check_reflection_inventory_pack_readiness.py --json` reports candidate-only
   planning boundaries: accepted reflection inventory is not identity, Inventory SDK,
-  public SDK, runtime, lookup, or `ResourceHandle` promotion.
+  public SDK, runtime, lookup, or `ResourceHandle` promotion. Player-identity readiness
+  requires full 12-target coverage and inventory rows for all 12
+  `players-identity-lifecycle-intake` targets before focal planning can start.
 - Player identity has a candidate-only privacy/invalidation contract in
   `docs/research/2026-05-31-player-identity-privacy-invalidation-contract.md`: future
   principals must be opaque copied POD values, generation-checked, process-local by
   default, and invalidated fail-closed. This does not promote public identity, lookup,
   persistence, platform ids, player names, `ResourceHandle`, UE pointers, or runtime
   access.
+- Static admin thunk orientation for `ServerListPlayers` and `ServerKickPlayer` is
+  hash-pinned, bounded, and now checks exact vtable-dispatch byte sequences. It remains
+  candidate-only navigation evidence and does not replace core evidence, reflection
+  inventory, focal snapshots, lifecycle anchors, or privacy/invalidation implementation.
+- Permissions/admin has no public header symbols and no public cache ABI now. Any future
+  permission query must carry principal generation/scope semantics and public cache ABI
+  remains blocked until `policy_epoch` plus full generation/scope keying is promoted.
+- If no non-protected core is available, the next high-value static side task is bounded
+  command/chat response-path orientation for `ClientChatMessage`,
+  `ClientServerChatMessage`, and `ClientServerChatDirectMessage` on the reviewed offline
+  binary. This is candidate-only planning for `obelisk.command_chat_response_path.v1` and
+  must not imply replies/send-chat, command router, identity, permissions, raw UE/FString
+  exposure, mutation, or runtime readiness.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
   recognition-only, with only a test-only internal dispatcher/helper and no hook/runtime

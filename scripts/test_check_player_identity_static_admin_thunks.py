@@ -141,7 +141,11 @@ def make_fake_binary(path: Path, *, tamper_vma: int | None = None, tamper_byte: 
         (0x15473A8, 0x1D32CB0),
     ):
         write_vma(data, call_vma, call_bytes(call_vma, target_vma))
-    write_vma(data, 0x15473C1, bytes.fromhex("498b06488b8028150000"))
+    write_vma(
+        data,
+        0x15473C1,
+        bytes.fromhex("498b06488b8028150000488d75e0488d55d04c89f7ffd0"),
+    )
     write_vma(
         data,
         0x1547450,
@@ -208,6 +212,20 @@ class CheckPlayerIdentityStaticAdminThunksTests(unittest.TestCase):
         self.assertEqual(payload["status"], "blocked")
         reasons = {blocker["reason"] for blocker in payload["blockers"]}
         self.assertIn("registration_thunk_immediate_mismatch", reasons)
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+
+    def test_kick_vtable_dispatch_sequence_mutation_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            binary = Path(temp_dir) / "ShooterGameServer"
+            digest = make_fake_binary(binary, tamper_vma=0x15473CB, tamper_byte=b"\x49")
+
+            result = self.run_checker(str(binary), "--expected-binary-sha256", digest, check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("thunk_vtable_dispatch_sequence_mismatch", reasons)
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
 

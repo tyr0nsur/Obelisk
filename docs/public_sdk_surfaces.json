@@ -831,7 +831,7 @@
       "blockers": [
         "Needs promoted player identity/principal semantics.",
         "Needs promoted permission/authority model.",
-        "Needs obelisk.command_chat_response_path.v1 promoted or explicitly excluded before replies/send-chat can be claimed.",
+        "Needs obelisk.command_chat_response_path.v1 promoted before replies/send-chat can be claimed; this blocker must be promoted or explicitly excluded/post-v1 before v1_completion_required can change.",
         "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
         "Needs command lifecycle and abuse boundaries."
       ],
