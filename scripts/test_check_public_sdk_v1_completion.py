@@ -1600,6 +1600,90 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
                 self.assertIn(surface_id, payload["promoted_blockers_without_evidence"])
 
+    def test_item_return_only_readiness_does_not_promote_inventory_completion_blocker(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="InventoryItemMutationPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="inventory_item_mutation_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "InventoryItemMutationPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "inventory_item_mutation_plugin.c"
+            abi_test.write_text("// promoted inventory item mutation ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted inventory item mutation SDK placeholder\n", encoding="utf-8")
+            manifest, _ = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.inventory_items_mutation.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterInventoryItemMutationCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.inventory_items_mutation.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                        "schemas": ["obelisk.item-return-only-policy-slice.v1"],
+                        "release_readiness_target_sets": ["item-return-only-policy-slice"],
+                    }
+                    break
+            manifest["promoted_surfaces"].append("obelisk.inventory_items_mutation.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                item for item in manifest["post_v1_or_excluded_surfaces"] if item != "obelisk.inventory_items_mutation.v1"
+            ]
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertIn("obelisk.inventory_items_mutation.v1", payload["promoted_blockers_without_evidence"])
+
+    def test_descriptor_catalog_path_does_not_promote_inventory_completion_blocker(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="InventoryMutationPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="inventory_descriptor_catalog_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "InventoryMutationPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "inventory_descriptor_catalog_plugin.c"
+            abi_test.write_text("// promoted inventory mutation ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// inventory descriptor catalog SDK placeholder\n", encoding="utf-8")
+            manifest, _ = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.inventory_items_mutation.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterInventoryItemMutationCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.inventory_items_mutation.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                    }
+                    break
+            manifest["promoted_surfaces"].append("obelisk.inventory_items_mutation.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                item for item in manifest["post_v1_or_excluded_surfaces"] if item != "obelisk.inventory_items_mutation.v1"
+            ]
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertIn("obelisk.inventory_items_mutation.v1", payload["promoted_blockers_without_evidence"])
+
     def test_duplicate_surface_id_blocks_v1_claim(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         duplicate = {

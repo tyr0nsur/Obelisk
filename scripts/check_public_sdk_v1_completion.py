@@ -114,23 +114,37 @@ PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
 )
 STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "candidate",
+    "descriptor_catalog",
+    "descriptor_preflight",
+    "item_return",
     "planning",
     "orientation",
     "preflight",
     "readiness",
+    "return_only",
     "consume-only",
     "consume_only",
     "evidence-only",
     "evidence_only",
 )
 STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
+    "artifact_schema",
+    "descriptor_preflight",
+    "input_target_set",
+    "output_target_set",
+    "release_readiness_target_sets",
     "contract_kind",
     "schema",
     "schemas",
     "status",
+    "source_target_sets",
+    "target_set",
+    "target_sets",
 }
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
-    r"(?:candidate|planning|static[-_ ]?orientation|orientation|preflight|readiness|consume[-_ ]?only|evidence[-_ ]?only)",
+    r"(?:candidate|planning|static[-_ ]?orientation|orientation|preflight|readiness|"
+    r"item[-_ ]?return[-_ ]?only|return[-_ ]?only|descriptor[-_ ]?preflight|"
+    r"descriptor[-_ ]?catalog|consume[-_ ]?only|evidence[-_ ]?only)",
     re.IGNORECASE,
 )
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
