@@ -5132,6 +5132,55 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
     if payload.get("input_target_set") != "players-identity-lifecycle-intake":
         blockers.append({"reason": "players_identity_first_evidence_input_target_set_mismatch", "label": f"{label}:$.input_target_set"})
 
+    artifact_identity = payload.get("artifact_identity")
+    if not isinstance(artifact_identity, dict):
+        blockers.append({"reason": "players_identity_first_evidence_artifact_identity_missing", "label": f"{label}:$.artifact_identity"})
+    else:
+        if artifact_identity.get("path_redacted") is not True:
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_path_not_redacted", "label": f"{label}:$.artifact_identity.path_redacted"})
+        if not isinstance(artifact_identity.get("ark_binary_sha256"), str) or SHA256_RE.fullmatch(artifact_identity["ark_binary_sha256"]) is None:
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_ark_sha_invalid", "label": f"{label}:$.artifact_identity.ark_binary_sha256"})
+        if artifact_identity.get("build_type") != "offline_core":
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_build_type_mismatch", "label": f"{label}:$.artifact_identity.build_type"})
+        if artifact_identity.get("target_set_revision") != "reflection_target_sets.py:players-identity-lifecycle-intake":
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_target_set_revision_mismatch", "label": f"{label}:$.artifact_identity.target_set_revision"})
+        if not is_safe_artifact_id(artifact_identity.get("obelisk_commit")):
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_obelisk_commit_invalid", "label": f"{label}:$.artifact_identity.obelisk_commit"})
+
+        source_artifact_ids = artifact_identity.get("source_artifact_ids")
+        parsed_source_ids: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
+        if not isinstance(source_artifact_ids, list):
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_ids_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids"})
+        else:
+            for index, item in enumerate(source_artifact_ids):
+                item_label = f"{label}:$.artifact_identity.source_artifact_ids[{index}]"
+                if not isinstance(item, str) or ":" not in item:
+                    blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_id_invalid", "label": item_label})
+                    continue
+                key, _, value = item.partition(":")
+                if key not in parsed_source_ids:
+                    blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_id_key_unknown", "label": item_label})
+                    continue
+                parsed_source_ids[key].append(value)
+
+            for key, values in parsed_source_ids.items():
+                if len(values) != 1:
+                    blockers.append(
+                        {
+                            "reason": "players_identity_first_evidence_artifact_identity_source_id_count_mismatch",
+                            "label": f"{label}:$.artifact_identity.source_artifact_ids",
+                            "field": key,
+                            "recorded_count": len(values),
+                        }
+                    )
+                    continue
+                value = values[0]
+                if key == "artifact_sha256":
+                    if SHA256_RE.fullmatch(value) is None:
+                        blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_sha_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids"})
+                elif not is_safe_artifact_id(value):
+                    blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_id_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids", "field": key})
+
     generated_from = payload.get("generated_from")
     if not isinstance(generated_from, dict):
         blockers.append({"reason": "players_identity_first_evidence_generated_from_missing", "label": f"{label}:$.generated_from"})

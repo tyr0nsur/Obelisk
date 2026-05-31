@@ -23,6 +23,11 @@ stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
 `docs/public_sdk_surfaces.json` as the current surface map when planning promotion work,
 while remembering that those documents are a planning contract until a release gate
 packages or supersedes them.
+Treat `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` as the lead-owned list
+of high-demand blockers that prevent a complete v1 SDK claim. Foundation/Plugin Hub seed
+work can improve contributor readiness, but it must not be used to declare v1 complete
+while those blockers remain planning, post-v1, or excluded without an explicit v1 release
+statement.
 
 Compatibility research may consult ArkServerApi/AseApi as names and demand dictionaries
 for familiar ARK plugin concepts. Local NextGenPlugins clones are names and demand

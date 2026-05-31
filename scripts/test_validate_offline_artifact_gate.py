@@ -1074,7 +1074,18 @@ def players_identity_first_evidence_manifest(
             "missing_targets": [],
             "unexpected_targets": [],
         },
-        "artifact_identity": {"path_redacted": True},
+        "artifact_identity": {
+            "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+            "obelisk_commit": "5ad06ff",
+            "build_type": "offline_core",
+            "target_set_revision": "reflection_target_sets.py:players-identity-lifecycle-intake",
+            "source_artifact_ids": [
+                "artifact_sha256:1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e",
+                "capture_id:primary_core_20260527T031311Z",
+                "evidence_pack_id:primary_core_pack_20260527T031311Z",
+            ],
+            "path_redacted": True,
+        },
         "targets": target_entries,
         "fields": forced_redacted_fields,
         "copied_candidates": [],
@@ -5445,6 +5456,24 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_players_identity_first_evidence_candidate_only", reasons)
+
+    def test_blocks_players_identity_first_evidence_weak_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            payload["artifact_identity"] = {"path_redacted": True}
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_artifact_identity_ark_sha_invalid", reasons)
+        self.assertIn("players_identity_first_evidence_artifact_identity_obelisk_commit_invalid", reasons)
+        self.assertIn("players_identity_first_evidence_artifact_identity_build_type_mismatch", reasons)
+        self.assertIn("players_identity_first_evidence_artifact_identity_source_ids_invalid", reasons)
 
     def test_blocks_players_identity_first_evidence_overclaims_or_target_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

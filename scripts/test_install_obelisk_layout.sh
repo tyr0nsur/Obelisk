@@ -473,7 +473,8 @@ cmake -S "${SDK_MINIMAL_EXAMPLE_DIR}" -B "${SDK_MINIMAL_EXAMPLE_DIR}/build" \
     -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build "${SDK_MINIMAL_EXAMPLE_DIR}/build" --parallel
-require_path "${SDK_MINIMAL_EXAMPLE_DIR}/build/obelisk_sdk_minimal_plugin.so"
+SDK_MINIMAL_EXAMPLE_PLUGIN_PATH="${SDK_MINIMAL_EXAMPLE_DIR}/build/obelisk_sdk_minimal_plugin.so"
+require_path "${SDK_MINIMAL_EXAMPLE_PLUGIN_PATH}"
 
 if ! grep -F "${INSTALL_ROOT}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
     echo "Minimal SDK example did not include headers from the installed SDK layout" >&2
@@ -486,5 +487,12 @@ if grep -F "${REPO_DIR}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_comma
     cat "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >&2
     exit 1
 fi
+
+"${WORK_DIR}/build/consumer_fixture" \
+    "${SDK_MINIMAL_EXAMPLE_PLUGIN_PATH}" \
+    "obelisk_sdk_minimal_plugin" \
+    "${CONFIG_DIR}" \
+    "${CONFIG_PATH}" \
+    "install-layout-test"
 
 echo "Install layout and public SDK consumer validation passed for ${INSTALL_ROOT}"

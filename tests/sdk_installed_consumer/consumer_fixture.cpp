@@ -1160,18 +1160,19 @@ int main(int argc, char** argv)
         GetInfoFn getInfo = Resolve<GetInfoFn>(handle, "ObeliskPlugin_GetInfo");
         InitFn init = Resolve<InitFn>(handle, "ObeliskPlugin_Init");
         ShutdownFn shutdown = ResolveOptional<ShutdownFn>(handle, "ObeliskPlugin_Shutdown");
-    BoolProbeFn chatMessageEventSeen =
-        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ChatMessageEventSeen");
-    BoolProbeFn gameplayPolicyEventSeen =
-        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventSeen");
-    BoolProbeFn gameplayPolicyEventAccepted =
-        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventAccepted");
-    BoolProbeFn timerSeen =
-        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ScheduledCallbackSeen");
-    BoolProbeFn descriptorCatalogValidated =
-        ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_DescriptorCatalogValidated");
-    const bool expectsGameplayPolicy = gameplayPolicyEventSeen != nullptr && gameplayPolicyEventAccepted != nullptr;
-    const bool expectsTimer = timerSeen != nullptr;
+        BoolProbeFn chatMessageEventSeen =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ChatMessageEventSeen");
+        BoolProbeFn gameplayPolicyEventSeen =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventSeen");
+        BoolProbeFn gameplayPolicyEventAccepted =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_GameplayPolicyEventAccepted");
+        BoolProbeFn timerSeen =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_ScheduledCallbackSeen");
+        BoolProbeFn descriptorCatalogValidated =
+            ResolveOptional<BoolProbeFn>(handle, "InstallLayoutConsumer_DescriptorCatalogValidated");
+        const bool expectsGameplayPolicy = gameplayPolicyEventSeen != nullptr && gameplayPolicyEventAccepted != nullptr;
+        const bool expectsTimer = timerSeen != nullptr;
+        const bool lifecycleOnlyPlugin = std::strcmp(argv[2], "obelisk_sdk_minimal_plugin") == 0;
 
         ObeliskPluginMetadata metadata{};
         Require(getInfo(&metadata), "ObeliskPlugin_GetInfo failed");
@@ -1249,6 +1250,28 @@ int main(int argc, char** argv)
             Require(g_ChatMessageUnregisterCount == 0,
                     "descriptor catalog consumer unexpectedly unregistered chat message callback");
             Require(g_TimerUnregisterCount == 0, "descriptor catalog consumer unexpectedly unregistered timer");
+            dlclose(handle);
+            return 0;
+        }
+        if (lifecycleOnlyPlugin)
+        {
+            Require(shutdown != nullptr, "minimal installed SDK example must export shutdown");
+            Require(g_RegisterCount == 0, "minimal installed SDK example unexpectedly registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                    "minimal installed SDK example unexpectedly registered gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                    "minimal installed SDK example unexpectedly registered chat message callback");
+            Require(g_TimerRegisterCount == 0, "minimal installed SDK example unexpectedly registered timer");
+            api = {};
+            shutdown();
+            Require(g_UnregisterCount == 0, "minimal installed SDK example unexpectedly unregistered callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                    "minimal installed SDK example unexpectedly unregistered gameplay policy callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                    "minimal installed SDK example unexpectedly unregistered chat message callback");
+            Require(g_TimerUnregisterCount == 0, "minimal installed SDK example unexpectedly unregistered timer");
+            shutdown();
+            Require(g_UnregisterCount == 0, "minimal installed SDK example second shutdown unregistered callback");
             dlclose(handle);
             return 0;
         }

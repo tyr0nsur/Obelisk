@@ -949,6 +949,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "promoted_surfaces",
             "experimental_surfaces",
             "planning_surfaces",
+            "v1_sdk_completion_blockers",
             "post_v1_or_excluded_surfaces",
             "debug_only_surfaces",
             "promotion_requirements",
@@ -997,6 +998,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         planning = set(manifest["planning_surfaces"])
         post_or_excluded = set(manifest["post_v1_or_excluded_surfaces"])
         debug_only = set(manifest["debug_only_surfaces"])
+        v1_blockers = set(manifest["v1_sdk_completion_blockers"])
 
         self.assertEqual(promoted, {
             surface["id"] for surface in manifest["surfaces"] if surface["status"] == "promoted"
@@ -1021,11 +1023,53 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for surface_id in promoted:
             self.assertEqual(surfaces[surface_id]["status"], "promoted")
 
+        self.assertEqual(
+            v1_blockers,
+            {
+                "obelisk.player_identity.v1",
+                "obelisk.commands_replies.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.inventory_items_mutation.v1",
+                "obelisk.structure_census.v1",
+                "obelisk.mission_transfer_dino_tribe.v1",
+                "obelisk.operator_ingress_storage.v1",
+            },
+        )
+        self.assertTrue(v1_blockers.issubset(planning | post_or_excluded))
+        release_guardrails = " ".join(manifest["release_guardrails"])
+        self.assertIn("Every v1_sdk_completion_blocker", release_guardrails)
+        self.assertIn("before v1_completion_required can become true", release_guardrails)
+
         non_public_statuses = {"planning", "post-v1", "excluded", "debug-only"}
         for surface in manifest["surfaces"]:
             if surface["status"] in non_public_statuses:
                 with self.subTest(non_public_surface=surface["id"]):
                     self.assertEqual(surface.get("public_contract", []), [])
+
+    def test_public_sdk_lifecycle_surface_declares_init_scope_ownership(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        lifecycle = surfaces["obelisk.lifecycle_config_logging.v1"]
+        compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
+
+        self.assertEqual(lifecycle["status"], "promoted")
+        self.assertEqual(
+            lifecycle.get("ownership_contract"),
+            [
+                "ObeliskPluginMetadata string fields must remain valid until dlclose",
+                "ObeliskApi pointer is borrowed for ObeliskPlugin_Init only",
+                "ObeliskPluginInitContext string fields are borrowed for ObeliskPlugin_Init only",
+                "plugins must copy API slots and context values needed by shutdown, worker threads, or later callbacks",
+            ],
+        )
+
+        for term in (
+            "Lifecycle ownership is part of the promoted foundation contract",
+            "metadata string pointers must remain valid until the plugin shared object is closed",
+            "`ObeliskApi*` and `ObeliskPluginInitContext` borrowed strings are init-scope only",
+            "must copy those values into plugin-owned storage during init",
+        ):
+            self.assertIn(normalized(term), compatibility)
 
     def test_public_sdk_surfaces_manifest_keeps_chat_and_gameplay_experimental_bounds(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -1136,6 +1180,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "public_sdk_surfaces.json",
             "v1.0",
             "SDK contract",
+            "v1_sdk_completion_blockers",
+            "player identity, commands/replies",
+            "before `v1_completion_required` can become true",
             "process-local timers",
             "Experimental Copied Event Patterns",
             "promoted-experimental-only",
@@ -2158,6 +2205,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         minimal_source = (REPO_ROOT / "examples" / "sdk_minimal_plugin" / "minimal_plugin.c").read_text(
             encoding="utf-8"
         )
+        install_layout_script = (REPO_ROOT / "scripts" / "test_install_obelisk_layout.sh").read_text(
+            encoding="utf-8"
+        )
 
         for path in SDK_MINIMAL_PLUGIN_EXAMPLE_FILES:
             with self.subTest(path=path.relative_to(REPO_ROOT), token="example file"):
@@ -2207,6 +2257,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(path="examples/sdk_minimal_plugin/minimal_plugin.c", forbidden=token):
                 self.assertNotIn(token, minimal_source)
+
+        for token in (
+            "SDK_MINIMAL_EXAMPLE_PLUGIN_PATH",
+            '"${WORK_DIR}/build/consumer_fixture"',
+            '"obelisk_sdk_minimal_plugin"',
+        ):
+            with self.subTest(path="scripts/test_install_obelisk_layout.sh", token=token):
+                self.assertIn(token, install_layout_script)
 
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")

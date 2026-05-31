@@ -7,6 +7,11 @@ The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfac
 `v1.0` must not be used for a runtime-only release. A stable SDK release must either
 promote each important modding category through copied ABI contracts and evidence, or
 explicitly exclude that category from the `v1.0` support statement.
+The machine-readable `v1_sdk_completion_blockers` list records the high-demand categories
+that currently prevent a complete SDK claim: player identity, commands/replies,
+permissions/admin, inventory/items mutation, structure census, gameplay modules, and
+operator ingress/storage. Those blockers must be promoted or deliberately excluded in the
+release statement before `v1_completion_required` can become true.
 
 A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
@@ -42,6 +47,12 @@ owner-token callback lifetime, process-local timers, and descriptor metadata:
 These are production seed surfaces. They do not imply hot reload of Obelisk itself,
 background ingress without shutdown proof, cluster scheduler state, gameplay timers,
 resource identity, lookup, mutation, or return override.
+
+Lifecycle ownership is part of the promoted foundation contract: metadata string
+pointers must remain valid until the plugin shared object is closed; `ObeliskApi*` and
+`ObeliskPluginInitContext` borrowed strings are init-scope only. Plugins that need API
+slots, config paths, instance IDs, or owner tokens during shutdown, worker threads, or
+later callbacks must copy those values into plugin-owned storage during init.
 
 ## Experimental Copied Event Patterns
 
