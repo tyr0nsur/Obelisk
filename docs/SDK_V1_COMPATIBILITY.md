@@ -37,6 +37,9 @@ described as a complete `v1.0` SDK, `v1.0 stable`, or sufficient to turn on
 Higher-level ArkApi-style categories remain outside the current promoted scope until each
 has its own copied C ABI design, privacy/ownership rules, lifecycle cleanup, SDK consumer
 tests, and named second-source promotion gates.
+No Foundation/Plugin Hub seed, descriptor/timer example, installed SDK package shape, or
+copied event example is an ArkApi/AseApi/ArkServerApi compatibility layer, API parity
+claim, portable plugin path, or evidence that ArkApi plugin families can be ported.
 
 ## Global Rules
 

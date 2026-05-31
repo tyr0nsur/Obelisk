@@ -182,6 +182,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   hash-pinned and now validates exact bounded vtable-dispatch byte sequences for
   `ServerKickPlayer` and `ServerListPlayers`; this remains candidate-only navigation
   evidence, not a vtable ABI or cross-build contract.
+- Static orientation reports for player identity, player identity lifecycle/admin thunks,
+  and command/chat response are explicitly not offline artifact-gate schemas. They must
+  fail closed both as `--manifest` inputs and as `--artifact` inputs even with valid
+  provenance sidecars; they are navigation clues only, not consume/promote evidence packs.
 - `PrimalLocalProfile.ArkTributePlayerData` is metadata/layout evidence only. The
   `scripts/check_arktribute_playerdata_identity_boundary.py` checker proves only that the
   current transfer ScriptStruct artifacts remain layout-only, candidate-only,

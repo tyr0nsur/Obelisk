@@ -3778,6 +3778,66 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
                 reasons = {blocker["reason"] for blocker in result["blockers"]}
                 self.assertIn("unsupported_manifest_schema", reasons)
 
+    def test_static_orientation_reports_cannot_be_accepted_as_artifacts(self) -> None:
+        orientation_schemas = [
+            "obelisk.command-chat-response-static-orientation-check.v1",
+            "obelisk.player-identity-static-orientation-check.v1",
+            "obelisk.player-identity-static-lifecycle-orientation-check.v1",
+            "obelisk.player-identity-static-admin-thunks-check.v1",
+        ]
+        for schema in orientation_schemas:
+            self.assertNotIn(schema, gate.SUPPORTED_MANIFEST_SCHEMAS)
+
+        for schema in orientation_schemas:
+            for mode in ("intake", "consume", "promote"):
+                with self.subTest(schema=schema, mode=mode), tempfile.TemporaryDirectory() as tmp:
+                    protected = Path(tmp) / "server"
+                    workspace = protected / "workspace-offline"
+                    artifact = workspace / "static-orientation" / "report.json"
+                    write_json(
+                        artifact,
+                        {
+                            "schema": schema,
+                            "status": "valid",
+                            "accepted_for_orientation": True,
+                            "promotion_ready": False,
+                            "public_sdk_ready": False,
+                            "runtime_ready": False,
+                            "non_claims": [
+                                "valid static orientation is candidate-only planning evidence",
+                            ],
+                        },
+                    )
+                    artifact_sha = gate.sha256_file(artifact)
+                    write_json(
+                        Path(f"{artifact}.provenance.json"),
+                        {
+                            "schema": gate.PROVENANCE_SCHEMA,
+                            "verified": True,
+                            "artifact_kind": "static-orientation",
+                            "producer": "test",
+                            "tool": "fixture",
+                            "binary_sha256": BINARY_SHA,
+                            "artifact_sha256": artifact_sha,
+                            "source_provenance": {},
+                        },
+                    )
+
+                    result = gate.build_result(
+                        args(
+                            root=workspace,
+                            protected_root=protected,
+                            artifacts=[("static-orientation", artifact)],
+                            mode=mode,
+                        )
+                    )
+
+                    self.assertEqual("blocked", result["status"])
+                    self.assertIn(
+                        "static_orientation_report_not_artifact_gate",
+                        {blocker["reason"] for blocker in result["blockers"]},
+                    )
+
     def test_accepts_normalized_artifact_pack_manifest_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

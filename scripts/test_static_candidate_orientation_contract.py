@@ -70,6 +70,14 @@ class StaticCandidateOrientationContractTests(unittest.TestCase):
         self.assertIn("static_orientation_contract_subjects_missing", reasons)
         self.assertIn("static_orientation_contract_target_coverage_mismatch", reasons)
 
+    def test_candidate_contract_requires_explicit_blockers(self) -> None:
+        contract = self.valid_contract()
+        contract["blockers"] = []
+
+        reasons = {blocker["reason"] for blocker in validate_contract(contract)}
+
+        self.assertIn("static_orientation_contract_blockers_empty", reasons)
+
 
 if __name__ == "__main__":
     unittest.main()

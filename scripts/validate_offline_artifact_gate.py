@@ -122,6 +122,12 @@ STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA = "obelisk.structure-nonpin-c
 STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
+STATIC_ORIENTATION_REPORT_SCHEMAS = {
+    "obelisk.command-chat-response-static-orientation-check.v1",
+    "obelisk.player-identity-static-orientation-check.v1",
+    "obelisk.player-identity-static-lifecycle-orientation-check.v1",
+    "obelisk.player-identity-static-admin-thunks-check.v1",
+}
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
     GOBJECTS_TWO_CORE_MANIFEST_SCHEMA,
@@ -8518,6 +8524,20 @@ def validate_artifact(
         ]
     except OSError as exc:
         return record, [{"reason": "artifact_not_file", "label": label, "path": str(path), "detail": str(exc)}]
+    payload, payload_blockers = load_json(path)
+    artifact_blockers: list[dict[str, Any]] = []
+    if payload is not None:
+        schema = payload.get("schema")
+        if schema in STATIC_ORIENTATION_REPORT_SCHEMAS:
+            artifact_blockers.append(
+                {
+                    "reason": "static_orientation_report_not_artifact_gate",
+                    "label": label,
+                    "recorded_schema": schema,
+                }
+            )
+    elif path.suffix == ".json":
+        artifact_blockers.extend(payload_blockers)
     provenance, provenance_blockers = validate_provenance(
         artifact_path=path,
         artifact_sha256=artifact_sha256,
@@ -8526,7 +8546,7 @@ def validate_artifact(
         protected_root=protected_root,
     )
     record.update({"sha256": artifact_sha256, "provenance": provenance, "provenance_verified": not provenance_blockers})
-    return record, provenance_blockers
+    return record, artifact_blockers + provenance_blockers
 
 
 def artifact_pack_blocker_reason(detail: str) -> str:

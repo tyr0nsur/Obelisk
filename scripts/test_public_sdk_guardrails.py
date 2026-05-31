@@ -2088,6 +2088,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "player identity, permissions/admin,\ncommand/chat response path, commands/replies",
             "before `v1_completion_required` can become true",
             "pre-identity release-supported seeds are not enough for v1 completion",
+            "No Foundation/Plugin Hub seed, descriptor/timer example, installed SDK package shape, or\ncopied event example is an ArkApi/AseApi/ArkServerApi compatibility layer",
+            "API parity\nclaim, portable plugin path, or evidence that ArkApi plugin families can be ported",
             "structure census/build policy",
             "gameplay modules including buffs",
             "Gameplay/server tick callbacks",

@@ -157,5 +157,7 @@ def validate_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
     contract_blockers = contract.get("blockers")
     if not isinstance(contract_blockers, list) or not all(isinstance(item, str) for item in contract_blockers):
         add("static_orientation_contract_blockers_invalid")
+    elif not contract_blockers:
+        add("static_orientation_contract_blockers_empty")
 
     return blockers
