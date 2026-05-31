@@ -1,11 +1,14 @@
 # Obelisk
 
-Obelisk is a Linux-native modding runtime, C API, and SDK foundation for Unreal
-Engine dedicated server processes.
+Obelisk is a Linux-native runtime, C API, and SDK track for ARK: Survival
+Evolved server modders on Linux. It uses UE4 reflection and `ProcessEvent`
+evidence to promote copied, stable plugin-facing APIs without ArkApi/Windows ABI
+assumptions.
 
-It aims to bring familiar ARK plugin concepts to Linux without porting Windows
-assumptions: runtime injection, UE event hooks, a stable plugin ABI,
-reflection-driven research tooling, and eventually promoted gameplay APIs.
+It aims to bring familiar ARK plugin concepts to Linux as an Obelisk-native SDK:
+runtime injection, UE event hooks, a stable plugin ABI, reflection-driven
+research tooling, and promoted gameplay APIs with explicit ownership, privacy,
+and lifecycle gates.
 ArkServerApi/AseApi compatibility research is limited to a names and demand
 dictionary for familiar plugin concepts; it is not a behavior map, not a porting target,
 not a copying source, and not an implementation guide for offsets, layouts, ABI assumptions,
@@ -13,15 +16,15 @@ wrappers, raw UE pointer APIs, command parsers, return semantics, or implementat
 Local popular-plugin clones such as NextGenPlugins are held to the same demand-dictionary
 boundary.
 
-ARK: Survival Evolved is currently the debug harness used to validate Obelisk
-inside a real stripped UE4 Linux server. ARK/LinuxGSM details are validation
-adapters, not the core product surface.
+ARK: Survival Evolved dedicated servers are the current product target and
+validation environment. ARK/LinuxGSM details are operational adapters around the
+same Linux plugin runtime and SDK promotion path.
 
 ## Status
 
 Validated core baseline; not a production-stable v1.0 or complete SDK claim:
 
-- `LD_PRELOAD` bootstrap for the current debug harness.
+- `LD_PRELOAD` bootstrap for the current ARK/Linux validation target.
 - Absolute x64 `UObject::ProcessEvent` hook with target validation.
 - C ABI plugin loading through `ObeliskPlugin_GetInfo` and
   `ObeliskPlugin_Init(api, context)`.
@@ -33,6 +36,20 @@ Validated core baseline; not a production-stable v1.0 or complete SDK claim:
   checks before maintenance restarts.
 - Plugin-owned callback cleanup and optional `ObeliskPlugin_Shutdown`.
 - Public SDK header at `include/obelisk/ObeliskApi.h`.
+
+v1 SDK direction:
+
+- `v1.0` means a complete public SDK contract for ARK/Linux plugin authors, not
+  only a stable runtime.
+- Canonical blockers are tracked in
+  [`docs/SDK_V1_COMPATIBILITY.md`](docs/SDK_V1_COMPATIBILITY.md) and
+  [`docs/public_sdk_surfaces.json`](docs/public_sdk_surfaces.json): player
+  identity/principal, permissions/admin, command response and commands/replies,
+  inventory/items, structures/build policy, dinos/tribes/buffs/missions/
+  transfers, operator/storage ingress, and gameplay tick/module paths.
+- RC and post-RC surfaces improve plugin-author readiness, but they do not
+  replace the complete v1 SDK blocker track or authorize `v1.0 stable`,
+  complete, full, or production SDK wording.
 
 v0.1-rc public C ABI slices:
 
@@ -156,8 +173,9 @@ When promoting reflected gameplay/module surfaces, use the same gate with
 second-source readiness enabled and explicitly named target sets. See
 [docs/RELEASE.md](docs/RELEASE.md) for the full promotion policy.
 
-Changes on the `ProcessEvent` hot path, including chat/reflection observer work,
-should also run the local benchmark checker before review:
+Changes on the `ProcessEvent` hot path, including target-specific observer work,
+should also run the local benchmark checker before review. The current benchmark
+target is chat-specific because that observer exercises the hot path:
 
 ```bash
 cmake --build build --target chat_reflection_benchmark
@@ -538,11 +556,12 @@ Near-term engineering:
   plugin-facing gameplay events.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
-- Harden the small release-supported Plugin Hub seed set for contributors:
+- Harden the release-supported Plugin Hub seed boundary for contributors:
   installed package consumers, lifecycle/config examples, descriptors, and
-  process-local timers. Keep copied event examples explicitly experimental and inside
-  the Plugin Hub Foundation and Capability Matrix instead of relying on raw UE pointers
-  or compatibility-source behavior.
+  process-local timers. These seeds improve contributor readiness but do not
+  replace the complete v1 SDK blocker track. Keep copied event examples
+  explicitly experimental and inside the Plugin Hub Foundation and Capability
+  Matrix instead of relying on raw UE pointers or compatibility-source behavior.
 
 Later:
 

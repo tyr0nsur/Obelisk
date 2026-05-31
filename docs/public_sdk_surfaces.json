@@ -545,9 +545,8 @@
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,
         "promotion_requires": [
-          "accepted non-protected complete core evidence pack plus reviewed UFunction reflection-inventory pack",
-          "sanitized ServerListPlayers and ServerKickPlayer snapshots",
-          "login/logout lifecycle anchors",
+          "approved runtime principal lifecycle evidence for the candidate HandleNewPlayer/OnLogout route",
+          "accepted login/logout lifecycle ordering and principal invalidation semantics",
           "principal privacy, invalidation, and cross-instance semantics",
           "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
         ],
@@ -558,11 +557,11 @@
         ]
       },
       "blockers": [
-        "No reviewed non-protected complete core evidence pack plus UFunction reflection-inventory pack accepted for the missing admin snapshots.",
-        "Missing sanitized ServerListPlayers snapshot.",
-        "Missing sanitized ServerKickPlayer snapshot.",
-        "No accepted login/logout lifecycle anchors.",
-        "No principal privacy, invalidation, or cross-instance semantics."
+        "Candidate fixtures, reflection-inventory coverage, and distinct second-source layout evidence are consume-only and do not promote public identity.",
+        "No approved runtime principal lifecycle evidence.",
+        "No accepted login/logout lifecycle ordering or principal invalidation semantics.",
+        "No principal privacy, invalidation, or cross-instance scope contract.",
+        "No append-only public POD C ABI, capability policy, owner cleanup, or SDK consumer coverage."
       ],
       "exclusions": [
         "player lookup",

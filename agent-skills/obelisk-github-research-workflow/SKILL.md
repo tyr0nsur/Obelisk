@@ -204,7 +204,10 @@ Endpoints are operator secrets in ignored `local/discord-webhooks.env`; use only
 `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and `OBELISK_BETA_TEST_WEBHOOK_URL` variable names
 in repo files, handoff notes, commits, and prompts. Use `--channel community` for major
 public, modder-facing milestones only, and `--channel beta-test` only for
-operator-approved in-game test windows. Never use Discord for routine validations, internal
+operator-approved in-game test windows. Community embeds should frame Obelisk as progress
+toward a Linux SDK for ARK modders: name the modder-facing milestone, current public
+boundary, and next SDK blocker. Avoid narrow-base framing, routine validation, or internal
+agent progress as the main message. Never use Discord for routine validations, internal
 agent status, speculative reversing notes, private live-ops detail, raw player text, or
 secrets. Operators should prefer the guarded helper instead of hand-written webhook calls.
 Always run `scripts/send_discord_embed.py --dry-run` first and send one concise

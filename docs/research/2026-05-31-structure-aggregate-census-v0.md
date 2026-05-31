@@ -197,6 +197,32 @@ explicitly excluded fields. Promote mode blocks with
 Do not use live roots, restarts, ptrace, gcore, markers, `/servidor/ark`, or
 `ReflectionScanner` for this planning note.
 
+## Offline Readiness Report
+
+`scripts/check_structure_census_readiness.py --json` is the offline readiness report for
+this slice. It remains a report over fixture artifacts and source isolation only; it is
+not a public SDK gate, runtime gate, enforcement gate, or artifact promotion gate.
+
+The report now emits `target_readiness` with one entry for each fixture target. The
+allowed per-target states are:
+
+- `candidate`: target appears in the planning coverage but lacks fixture-backed field
+  records in the slice.
+- `fixture-backed`: target has fixture-backed evidence but no reported second-source
+  requirement failure in that entry.
+- `second-source-missing`: target has fixture-backed first-source evidence, but no
+  distinct sanitized second-source artifact identity or strict comparison is present.
+- `blocked`: target is missing from required coverage or the report encountered a
+  target-level blocker.
+
+For the current materialized aggregate/census slice, all six targets are expected to
+report `second-source-missing`: they are fixture-backed first-source evidence for
+internal planning, not promoted runtime or public SDK evidence.
+
+The same JSON includes machine-readable non-claims. These are intentional and must stay
+visible in future edits: no public `StructureEvents`, no public Structure SDK, no
+identity/lookup, no mutation, no return override, no enforcement, and no runtime claim.
+
 ## Internal Accumulator Checkpoint
 
 The first internal C++ accumulator now exists as `core/StructureAggregateCensus.*`, with

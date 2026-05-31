@@ -155,8 +155,9 @@ priorities, and do not use history files as the active source of truth.
 - Plugin Hub v1 seed work starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
   `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`. Release-supported installed-SDK scaffolds are
   `examples/sdk_minimal_plugin`, `examples/sdk_descriptor_catalog`, and
-  `examples/sdk_timer_plugin`; release-supported seed lanes are small Obelisk-native
-  lifecycle/config/logging examples, descriptor reads, and process-local timers. Passive
+  `examples/sdk_timer_plugin`; release-supported seed lanes are narrow pre-v1
+  lifecycle/config/logging examples, descriptor reads, and process-local timers. These
+  seeds improve contributor readiness but do not replace the complete v1 SDK blocker track. Passive
   copied chat parsing and copied policy auditing are experimental pattern examples only;
   demand-map or `NextGenPlugins` dictionary entries do not make a seed release-ready and
   do not promote permissions, RCON, economy, homes/safe zones, structure enforcement,

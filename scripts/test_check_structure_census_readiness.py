@@ -55,9 +55,27 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+        self.assertTrue(payload["offline_only"])
         self.assertEqual(payload["consume_gate"]["status"], "accepted")
         self.assertEqual(payload["promote_gate"]["status"], "blocked")
         self.assertEqual(payload["source_isolation"]["status"], "isolated")
+        self.assertEqual(payload["target_readiness"]["status"], "second-source-missing")
+        self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-missing": 6})
+        self.assertEqual(
+            payload["target_readiness"]["allowed_statuses"],
+            ["candidate", "fixture-backed", "second-source-missing", "blocked"],
+        )
+        self.assertEqual(payload["target_readiness"]["second_source"]["status"], "missing")
+        for target in payload["target_readiness"]["targets"]:
+            self.assertEqual(target["status"], "second-source-missing")
+            self.assertTrue(target["candidate"])
+            self.assertEqual(target["candidate_status"], "candidate")
+            self.assertTrue(target["fixture_backed"])
+            self.assertEqual(target["fixture_status"], "fixture-backed")
+            self.assertFalse(target["second_source_backed"])
+            self.assertEqual(target["second_source_status"], "second-source-missing")
+            self.assertEqual(target["blockers"], [])
         self.assertEqual(
             set(payload["promote_gate"]["blocker_reasons"]),
             {
@@ -70,6 +88,14 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertEqual(len(payload["summary"]["redacted_fields"]), 5)
         self.assertEqual(len(payload["summary"]["explicitly_excluded_fields"]), 2)
         self.assertIn("candidate readiness is internal planning evidence only", " ".join(payload["non_claims"]))
+        self.assertIn("no public StructureEvents", payload["non_claims"])
+        self.assertIn("no identity/lookup", payload["non_claims"])
+        self.assertIn("no mutation", payload["non_claims"])
+        self.assertIn("no return override", payload["non_claims"])
+        self.assertIn("no enforcement", payload["non_claims"])
+        self.assertEqual(payload["non_claim_matrix"]["public_structure_events"], "not_claimed")
+        self.assertEqual(payload["non_claim_matrix"]["identity_lookup"], "not_claimed")
+        self.assertEqual(payload["non_claim_matrix"]["enforcement"], "not_claimed")
 
     def test_source_isolation_blocks_runtime_or_public_wiring(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -167,11 +193,13 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
                 "build": "build placement and no-collision policy are ready",
                 "mutation": "mutation allowed and return override allowed",
                 "runtime": "runtime hooks and ProcessEvent hook wiring are active",
+                "enforcement": "enforcement ready",
             }
             payload["non_claims"].append("v1 complete")
             payload["ownership_ready"] = True
             payload["build_placement_policy_ready"] = True
             payload["runtime_hooks_ready"] = True
+            payload["enforcement_ready"] = True
             payload["v1_complete"] = True
             manifest.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -193,10 +221,12 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertIn("mutation", surfaces)
         self.assertIn("return_override", surfaces)
         self.assertIn("runtime_hooks", surfaces)
+        self.assertIn("enforcement", surfaces)
         self.assertIn("v1_completion", surfaces)
         self.assertIn("ownership_ready", surfaces)
         self.assertIn("build_placement_policy_ready", surfaces)
         self.assertIn("runtime_hooks_ready", surfaces)
+        self.assertIn("enforcement_ready", surfaces)
         self.assertIn("v1_complete", surfaces)
 
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:

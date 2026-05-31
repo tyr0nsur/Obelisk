@@ -39,17 +39,17 @@ class SendDiscordEmbedTests(unittest.TestCase):
             "--channel",
             "community",
             "--title",
-            "Obelisk v0.1.0-rc.1",
+            "Obelisk SDK progress: plugin-author RC surface",
             "--description",
-            "Public plugin authors can test the minimal copied event surface.",
+            "Obelisk is moving toward a Linux SDK for ARK modders with copied plugin APIs that do not expose UE internals.",
             "--status",
-            "Release candidate",
+            "Scoped release-candidate SDK milestone",
             "--scope",
-            "Public SDK surface",
+            "Plugin-author ABI slices; not a v1.0 stable, complete, full, or production SDK claim.",
             "--field",
-            "Incluye=ChatMessageEvent minimo",
+            "For modders=Build external plugins against the installed SDK package and promoted copied-data callbacks.",
             "--field",
-            "Validacion=Release gate completado",
+            "Next priority=Promote additional surfaces only after second-source evidence and SDK ownership gates pass.",
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -59,6 +59,24 @@ class SendDiscordEmbedTests(unittest.TestCase):
         self.assertEqual(embed["color"], 0x2ECC71)
         self.assertEqual(embed["fields"][0]["name"], "Estado")
         self.assertIn("major public", embed["footer"]["text"])
+        rendered = json.dumps(payload)
+        self.assertIn("ARK modders", rendered)
+        self.assertNotIn("minimal copied event " + "surface", rendered)
+        self.assertNotIn("Release gate " + "completado", rendered)
+
+    def test_community_fixture_stays_modder_facing_not_internal_validation(self) -> None:
+        text = Path(__file__).read_text(encoding="utf-8")
+        forbidden_fixture_phrases = (
+            "base " + "pequena",
+            "base " + "pequeña",
+            "minimal copied event " + "surface",
+            "release gate " + "completed",
+            "Release gate " + "completado",
+            "internal " + "validation",
+        )
+        for phrase in forbidden_fixture_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, text)
 
     def test_builds_beta_embed_with_beta_color(self) -> None:
         result = self.run_dry(

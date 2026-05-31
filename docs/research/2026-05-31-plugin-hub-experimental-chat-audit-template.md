@@ -7,7 +7,7 @@ command SDK, and not v1 completion evidence.
 
 ## Finding
 
-After the three release-supported installed-SDK foundation templates (`sdk_minimal_plugin`,
+After the three release-supported installed-SDK seed templates (`sdk_minimal_plugin`,
 `sdk_descriptor_catalog`, and `sdk_timer_plugin`), the next useful experimental template is
 a passive copied-chat audit digest.
 

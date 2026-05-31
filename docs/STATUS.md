@@ -107,15 +107,17 @@ define or protect runtime behavior.
 | General reflected UFunction parameter decoding | Not ready | Candidate-only module recognizers exist, but SDK-facing decoding remains unpromoted. |
 | Higher-level SDK APIs | Not ready | Outside the promoted `GameplayPolicyEvent` surface, the minimal `ChatMessageEvent` RC notification surface, and process-local core timers, Inventory, Items, players, richer chat, tribes, dinos, missions, transfers, permissions, gameplay/module timers, admin, commands, and public `StructureEvents` remain roadmap items until each has copied payloads, ABI tests, privacy policy, and accepted target-set evidence. The three item return-only checks are public only as copied `GameplayPolicyEvent` `ReturnValue` kinds; remaining item producer/runtime validation, Mission copied-bool observer, and Transfer `bAccept` work stay internal. Transfer `bAccept` internal work is offline/test-only only: no runtime target source, `PluginManager` wiring, marker/env activation, installed plugin path, public manifest, docs, or examples. Public Inventory SDK, Items SDK, Mission SDK, and Transfer SDK surfaces remain absent. |
 
-Player identity is the first v1 dependency, but it remains planning-only. The missing
-admin-surface snapshots require a reviewed non-protected complete
-`obelisk.core-dump-evidence-pack.v1` plus a reviewed UFunction
-`obelisk.reflection-inventory-pack.v1`; an offline `ShooterGameServer` binary, copied
-core, manual roots, or direct core/bin planning alone is not release-readiness, runtime,
-or public SDK evidence. Even after that fixture gap closes, permissions/admin,
+Player identity is the first v1 dependency, but it remains planning-only. The current
+player-identity lane has a reviewed non-protected core evidence pack, an accepted
+reflection-inventory pack for the 12-target `players-identity-lifecycle-intake`, committed
+candidate fixtures for `ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer`, and distinct second-source layout acceptance.
+Those results are still candidate/consume-only evidence: they do not promote public
+identity, lookup, permissions, command routing, runtime readiness, or v1 completion. The
+active blocker is approved runtime principal lifecycle evidence plus principal privacy,
+invalidation, and cross-instance semantics. Permissions/admin,
 `obelisk.command_chat_response_path.v1`, and then commands/replies remain separately
-blocked until identity privacy, invalidation, authority, and the named copied response
-path are promoted.
+blocked until identity authority and the named copied response path are promoted.
 
 ## v1.0 SDK Completion Bar
 

@@ -227,6 +227,10 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"(?:available|ready|supported|included|shipped)\s+in\s+v1\b",
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
+    r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
+    r"\b(?:this|statement|release)\s+"
+    r"(?:is|declares?|approves?|allows?|authorizes?)\s+"
+    r"(?:a\s+)?v1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim))?\b",
     r"\b(?:inventory\s+sdk|items\s+sdk)\b.{0,80}"
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b",
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b"
@@ -257,6 +261,12 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
     r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|limited|"
     r"must\s+not|no|not|post-v1|post v1|without)\b",
+    re.IGNORECASE,
+)
+FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER = re.compile(
+    r"^\s*(?:(?:is|are|remains?|stays?)\s+)?"
+    r"(?:blocked|cannot|disabled|forbidden|not\s+(?:allowed|approved|authorized|ready)|"
+    r"must\s+not)\b",
     re.IGNORECASE,
 )
 CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
@@ -764,11 +774,18 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                 clause_start = 0
                 for boundary in CLAUSE_START_PATTERN.finditer(prefix):
                     clause_start = boundary.end()
+                clause_end = len(lowered)
+                for boundary in CLAUSE_START_PATTERN.finditer(lowered, match.end()):
+                    clause_end = boundary.start()
+                    break
                 claim_prefix = lowered[clause_start : match.start()]
                 claim_clause = lowered[clause_start : match.end()]
+                claim_remainder = lowered[match.end() : clause_end]
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix):
                     continue
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_clause):
+                    continue
+                if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER.search(claim_remainder):
                     continue
                 if re.match(
                     r"\s*(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|"

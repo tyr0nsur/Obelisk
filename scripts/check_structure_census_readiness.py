@@ -24,6 +24,12 @@ REPORT_SCHEMA = "obelisk.structure-census-readiness-check.v1"
 POLICY_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 INPUT_TARGET_SET = "structure-aggregate-census-planning"
 OUTPUT_TARGET_SET = "structure-aggregate-census-policy-slice"
+TARGET_READINESS_STATUSES = (
+    "candidate",
+    "fixture-backed",
+    "second-source-missing",
+    "blocked",
+)
 EXPECTED_INPUT_TARGETS = {
     "PrimalStructure.AllowStructureAccess",
     "PrimalStructure.IsAllowedToDemolish",
@@ -59,6 +65,19 @@ REQUIRED_NON_CLAIM_TOKENS = (
     "does not promote runtime hook wiring",
     "does not copy VerifyPinCode.pinCode or VerifyPinCode.ReturnValue",
 )
+REPORT_NON_CLAIMS = [
+    "candidate readiness is internal planning evidence only",
+    "no public StructureEvents",
+    "no public Structure SDK or structure census public ABI",
+    "no identity/lookup",
+    "no mutation",
+    "no return override",
+    "no enforcement",
+    "does not promote StructureEvents, Structure SDK, structure census public ABI, identity, lookup, ownership, mutation, return override, runtime hooks, enforcement, or ResourceHandle",
+    "does not promote build placement, no-collision, or IsAllowedToBuild policy",
+    "does not claim v1 completion or production readiness",
+    "does not replace player identity, privacy, lifecycle, SDK consumer, public ABI, second-source, or live-ops promotion gates",
+]
 STRUCTURE_CENSUS_ALLOWED_BOUNDARY_PREFIXES = (
     "$.non_claims",
     "$.safety_summary.explicitly_excluded",
@@ -67,6 +86,8 @@ STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
     "build_placement_policy_ready",
     "build_policy_ready",
     "collision_policy_ready",
+    "enforcement_allowed",
+    "enforcement_ready",
     "mutation_allowed",
     "mutation_ready",
     "no_collision_policy_ready",
@@ -87,6 +108,8 @@ STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "build placement": "build_placement_policy",
     "build policy": "build_policy",
     "collision policy": "no_collision_policy",
+    "enforcement allowed": "enforcement",
+    "enforcement ready": "enforcement",
     "isallowedtobuild": "build_policy",
     "mutation allowed": "mutation",
     "mutation ready": "mutation",
@@ -118,7 +141,7 @@ def is_negative_boundary_statement(text: str) -> bool:
 
 
 FORBIDDEN_COPIED_RE = re.compile(
-    r"(?:ForPC|forCharacter|pinCode|VerifyPinCode|identity|lookup|mutation|"
+    r"(?:ForPC|forCharacter|pinCode|VerifyPinCode|enforcement|identity|lookup|mutation|"
     r"object_refs|public_sdk|resource_handle|return_override|runtime|ue_pointer)",
     re.IGNORECASE,
 )
@@ -226,6 +249,119 @@ def require_set(
             unexpected=sorted(actual_set - expected),
         )
     return actual_set
+
+
+def records_by_target(records: object, field_key: str) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    if not isinstance(records, list):
+        return grouped
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        target = record.get("target")
+        field_name = record.get(field_key)
+        source_snapshot = record.get("source_snapshot")
+        source_sha = record.get("source_snapshot_sha256")
+        if not all(isinstance(value, str) and value for value in (target, field_name, source_snapshot, source_sha)):
+            continue
+        grouped.setdefault(target, []).append(record)
+    return grouped
+
+
+def target_status(candidate: bool, fixture_backed: bool, blocked: bool) -> str:
+    if blocked:
+        return "blocked"
+    if not candidate:
+        return "blocked"
+    if not fixture_backed:
+        return "candidate"
+    return "second-source-missing"
+
+
+def build_target_readiness(
+    policy: dict[str, Any],
+    summary: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    input_targets = set(summary.get("input_targets", []))
+    copied_fields = set(summary.get("copied_fields", []))
+    redacted_fields = set(summary.get("redacted_fields", []))
+    excluded_fields = set(summary.get("explicitly_excluded_fields", []))
+    copied_records = records_by_target(policy.get("copied_fields_permitted"), "copied_field")
+    excluded_records = records_by_target(policy.get("explicitly_excluded_fields"), "excluded_field")
+    redacted_records = records_by_target(policy.get("redacted_structure_fields"), "redacted_field")
+
+    report_blocked = any(blocker.get("reason") in {"input_target_coverage_mismatch"} for blocker in blockers)
+    targets: list[dict[str, Any]] = []
+    status_counts = {status: 0 for status in TARGET_READINESS_STATUSES}
+    for target in sorted(EXPECTED_INPUT_TARGETS):
+        target_copied_fields = sorted(field for field in copied_fields if field.startswith(f"{target}."))
+        target_redacted_fields = sorted(field for field in redacted_fields if field.startswith(f"{target}."))
+        target_excluded_fields = sorted(field for field in excluded_fields if field.startswith(f"{target}."))
+        target_records = copied_records.get(target, []) + excluded_records.get(target, [])
+        candidate = target in input_targets
+        fixture_backed = bool(candidate and target_records)
+        target_blockers: list[str] = []
+        if not candidate:
+            target_blockers.append("target_not_in_input_coverage")
+        if report_blocked:
+            target_blockers.append("input_target_coverage_blocked")
+
+        status = target_status(candidate, fixture_backed, bool(target_blockers))
+        status_counts[status] += 1
+        targets.append(
+            {
+                "target": target,
+                "status": status,
+                "candidate": candidate,
+                "candidate_status": "candidate" if candidate else "blocked",
+                "fixture_status": "fixture-backed" if fixture_backed else "missing",
+                "fixture_backed": fixture_backed,
+                "second_source_status": "second-source-missing",
+                "second_source_backed": False,
+                "copied_fields": target_copied_fields,
+                "redacted_fields": target_redacted_fields,
+                "explicitly_excluded_fields": target_excluded_fields,
+                "fixture_sources": sorted(
+                    {
+                        f"{record['source_snapshot']}:{record['source_snapshot_sha256']}"
+                        for record in target_records
+                    }
+                ),
+                "redaction_fixture_sources": sorted(
+                    {
+                        f"{record['source_snapshot']}:{record['source_snapshot_sha256']}"
+                        for record in redacted_records.get(target, [])
+                    }
+                ),
+                "blockers": target_blockers,
+            }
+        )
+
+    readiness_status = "second-source-missing"
+    if status_counts["blocked"]:
+        readiness_status = "blocked"
+    elif status_counts["candidate"]:
+        readiness_status = "candidate"
+    elif status_counts["fixture-backed"]:
+        readiness_status = "fixture-backed"
+
+    return {
+        "status": readiness_status,
+        "allowed_statuses": list(TARGET_READINESS_STATUSES),
+        "status_counts": {key: value for key, value in status_counts.items() if value},
+        "second_source": {
+            "status": "missing",
+            "required_before": [
+                "runtime_observation",
+                "internal_event_promotion",
+                "public_sdk",
+                "enforcement",
+            ],
+            "reason": "this policy slice contains first-source fixture evidence only; no distinct sanitized artifact identity or strict second-source comparison is present",
+        },
+        "targets": targets,
+    }
 
 
 def iter_policy_values(value: object, *, trail: str = "$") -> list[tuple[str, object]]:
@@ -414,6 +550,13 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
     manifest = safe_path(manifest_path, "--manifest", blockers)
 
     summary: dict[str, Any] = {}
+    target_readiness: dict[str, Any] = {
+        "status": "blocked",
+        "allowed_statuses": list(TARGET_READINESS_STATUSES),
+        "status_counts": {"blocked": len(EXPECTED_INPUT_TARGETS)},
+        "second_source": {"status": "missing"},
+        "targets": [],
+    }
     source_isolation = validate_source_isolation(REPO_ROOT, blockers)
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
@@ -421,6 +564,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         policy = read_policy(manifest, blockers)
         if policy is not None:
             summary = validate_policy(policy, blockers)
+            target_readiness = build_target_readiness(policy, summary, blockers)
         consume_rc, consume_payload, consume_stderr = run_gate(root, manifest, "consume")
         consume_gate = {
             "returncode": consume_rc,
@@ -469,20 +613,26 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         "public_sdk_ready": False,
         "runtime_ready": False,
         "promotion_ready": False,
+        "enforcement_ready": False,
+        "offline_only": True,
         "root": str(root if root is not None else root_arg),
         "manifest": str(manifest if manifest is not None else manifest_path),
         "consume_gate": consume_gate,
         "promote_gate": promote_gate,
         "source_isolation": source_isolation,
+        "target_readiness": target_readiness,
         "summary": summary,
         "blockers": blockers,
-        "non_claims": [
-            "candidate readiness is internal planning evidence only",
-            "does not promote StructureEvents, Structure SDK, structure census public ABI, identity, lookup, ownership, mutation, return override, runtime hooks, or ResourceHandle",
-            "does not promote build placement, no-collision, or IsAllowedToBuild policy",
-            "does not claim v1 completion or production readiness",
-            "does not replace player identity, privacy, lifecycle, SDK consumer, public ABI, or live-ops promotion gates",
-        ],
+        "non_claim_matrix": {
+            "public_structure_events": "not_claimed",
+            "public_structure_sdk": "not_claimed",
+            "identity_lookup": "not_claimed",
+            "mutation": "not_claimed",
+            "return_override": "not_claimed",
+            "enforcement": "not_claimed",
+            "runtime": "not_claimed",
+        },
+        "non_claims": REPORT_NON_CLAIMS,
     }
 
 

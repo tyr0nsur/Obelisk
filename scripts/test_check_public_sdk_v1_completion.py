@@ -450,6 +450,56 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["scoped_release_statement"]["blocking_report_blockers"],
         )
 
+    def test_scoped_release_statement_scope_rejects_v1_stable_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "This is a v1.0 stable release.\n"
+                + "This statement authorizes v1 stable wording.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        self.assertIn("This is a v1.0 stable release.", forbidden_claims)
+        self.assertIn("This statement authorizes v1 stable wording.", forbidden_claims)
+
+    def test_scoped_release_statement_scope_allows_negated_v1_stable_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "v1 stable remains blocked until the full gate passes.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+        self.assertIn("v1_completion_required_false", payload["blockers"])
+
     def test_complete_minimal_manifest_passes(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         with tempfile.TemporaryDirectory() as temp_dir:

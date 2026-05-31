@@ -1,7 +1,7 @@
 # Obelisk Documentation
 
 Use this index to enter the project from the right angle. Obelisk is a Linux runtime and
-C SDK foundation for ARK: Survival Evolved server modding; public docs should stay focused
+C SDK track for ARK: Survival Evolved server modding; public docs should stay focused
 on contributors, plugin authors, operators, and reproducible research.
 
 ## Contributor
