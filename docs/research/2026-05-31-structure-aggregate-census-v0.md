@@ -198,10 +198,13 @@ into `libobelisk.so` but is not wired to a hook, plugin API, public descriptor, 
 SDK header, or runtime marker.
 
 The accumulator consumes only copied `StructureEventView` scalar data, remains default-off
-through explicit options, enforces a bounded window, excludes `VerifyPinCode`, and caps the
-`VariantIndex` histogram. Its snapshot contains only counters and histogram buckets; it
-does not carry function indices, outer indices, timestamps, coordinates, player/tribe/base
-identity, object handles, raw params, mutation decisions, or return-override authority.
+through explicit options, enforces a bounded window after the exact non-PIN copied-scalar
+prefilter, excludes `VerifyPinCode`, and caps the `VariantIndex` histogram. Rejected
+sensitive/non-structure and unexpected-shape events do not consume the accepted-event
+window; post-window overflow is counted as a bounded rejection signal. Its snapshot
+contains only counters and histogram buckets; it does not carry function indices, outer
+indices, timestamps, coordinates, player/tribe/base identity, object handles, raw params,
+mutation decisions, or return-override authority.
 
 Validated locally:
 

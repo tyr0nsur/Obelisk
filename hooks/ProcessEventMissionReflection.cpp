@@ -43,6 +43,13 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
                nameIndex == 1582;
     }
 
+    bool IsReflectedMissionCopiedBoolNameIndex(int32_t nameIndex)
+    {
+        return nameIndex == 7649 ||
+               nameIndex == 1211 ||
+               nameIndex == 1582;
+    }
+
     bool ShouldAttemptObservation(uint64_t observationLimit)
     {
         return observationLimit != 0;
@@ -63,6 +70,17 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
     {
         return ShouldAttemptRuntimeObservation(observationLimit) &&
                IsReflectedMissionNameIndex(nameIndex);
+    }
+
+    bool ShouldAttemptMissionCopiedBoolBridgeObservation(const Gate& gate,
+                                                         int32_t nameIndex,
+                                                         uint64_t observationLimit,
+                                                         size_t subscriberCount)
+    {
+        return gate.Enabled() &&
+               subscriberCount != 0 &&
+               ShouldAttemptRuntimeObservation(observationLimit) &&
+               IsReflectedMissionCopiedBoolNameIndex(nameIndex);
     }
 
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t observationLimit)

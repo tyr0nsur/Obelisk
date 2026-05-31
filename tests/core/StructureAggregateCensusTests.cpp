@@ -69,7 +69,7 @@ namespace
     {
         StructureAggregateCensus census({
             .Enabled = true,
-            .WindowEventLimit = 9,
+            .WindowEventLimit = 8,
             .VariantBucketLimit = 2,
         });
 
@@ -119,7 +119,7 @@ namespace
                 "post-original-blocked variant structure event was rejected");
 
         const auto snapshot = census.Snapshot();
-        Require(snapshot.WindowEventsSeen == 9, "structure census window count mismatch");
+        Require(snapshot.WindowEventsSeen == 8, "structure census window count mismatch");
         Require(snapshot.MatchedTotal == 8, "structure census match count mismatch");
         Require(snapshot.OriginalCalledTotal == 7, "structure census original-called count mismatch");
         Require(snapshot.OriginalBlockedTotal == 1, "structure census original-blocked count mismatch");
@@ -169,14 +169,18 @@ namespace
                 "structure census accepted unexpected copied field shape");
         Require(census.Accumulate(Event(StructureEventKind::AllowStructureAccess, returnTrue), true),
                 "structure census rejected valid event after invalid shape");
+        Require(census.Accumulate(Event(StructureEventKind::AllowStructureAccess, returnTrue), true),
+                "structure census rejected second valid event after invalid shape");
         Require(!census.Accumulate(Event(StructureEventKind::AllowStructureAccess, returnTrue), true),
                 "structure census accepted event past window limit");
+        Require(!census.Accumulate(Event(StructureEventKind::AllowStructureAccess, returnTrue), true),
+                "structure census accepted repeated event past window limit");
 
         const auto snapshot = census.Snapshot();
         Require(snapshot.WindowEventsSeen == 2, "structure census window consumed past limit");
-        Require(snapshot.MatchedTotal == 1, "structure census matched invalid shape");
+        Require(snapshot.MatchedTotal == 2, "structure census matched invalid shape");
         Require(snapshot.RejectedUnexpectedField == 1, "structure census did not count invalid shape rejection");
-        Require(snapshot.RejectedWindowFull == 1, "structure census did not count window overflow");
+        Require(snapshot.RejectedWindowFull == 1, "structure census did not bound window overflow counting");
     }
 }
 

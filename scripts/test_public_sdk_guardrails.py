@@ -976,9 +976,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.player_identity.v1",
             "obelisk.inventory_item_copied_signals.v1",
             "obelisk.inventory_items_mutation.v1",
+            "obelisk.structure_census.v1",
+            "obelisk.mission_transfer_dino_tribe.v1",
             "obelisk.commands_replies.v1",
             "obelisk.permissions_admin.v1",
             "obelisk.arkapi_compatibility.v1",
+            "obelisk.operator_ingress_storage.v1",
             "obelisk.debug_raw_process_event.v1",
         }
         self.assertTrue(required_ids.issubset(surfaces))

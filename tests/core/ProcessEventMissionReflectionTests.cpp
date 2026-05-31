@@ -474,6 +474,35 @@ namespace
         return MissionCopiedBoolEventDispatcher::Get().Dispatch(event);
     }
 
+    Attempt TryObserveMissionCopiedBoolBridgeInvocation(
+        const Gate& gate,
+        int32_t nameIndex,
+        const MemoryReader& reader,
+        void* function,
+        void* params,
+        std::atomic<uint64_t>& observationCounter,
+        uint64_t observationLimit,
+        uint64_t& observationNumber,
+        size_t subscriberCount)
+    {
+        observationNumber = 0;
+        if (!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                gate, nameIndex, observationLimit, subscriberCount))
+        {
+            return {};
+        }
+
+        return TryObserveInvocation(
+            gate,
+            nameIndex,
+            reader,
+            function,
+            params,
+            observationCounter,
+            observationLimit,
+            observationNumber);
+    }
+
     void TestGateEvaluation()
     {
         const char* supportedSha = kSupportedShooterGameServerSha256.data();
@@ -516,6 +545,24 @@ namespace
         Require(!ShouldAttemptNameObservation(42, 1), "non-mission FName should not pass observation filter");
         Require(!ShouldAttemptNameObservation(kAddPlayerToMissionNameIndex, 0),
                 "zero budget should skip matching mission FName");
+        Require(!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                    Gate{}, kAddPlayerToMissionNameIndex, 1, 1),
+                "disabled mission copied-bool bridge gate should skip observation");
+        Require(!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                    EnabledGate(), kAddPlayerToMissionNameIndex, 1, 0),
+                "zero subscribers should skip mission copied-bool bridge observation");
+        Require(!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                    EnabledGate(), kAddPlayerToMissionNameIndex, 0, 1),
+                "zero budget should skip mission copied-bool bridge observation");
+        Require(!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                    EnabledGate(), 42, 1, 1),
+                "non-mission FName should skip mission copied-bool bridge observation");
+        Require(!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                    EnabledGate(), kGetPlayerUsableItemsNameIndex, 1, 1),
+                "metadata-only mission FName should skip copied-bool bridge observation");
+        Require(ShouldAttemptMissionCopiedBoolBridgeObservation(
+                    EnabledGate(), kAddPlayerToMissionNameIndex, 1, 1),
+                "bool-producing mission FName should pass copied-bool bridge observation filter");
         Require(ShouldAttemptRuntimeObservation(1),
                 "single non-zero mission observation/log budget should activate runtime observation");
         Require(!ShouldAttemptRuntimeObservation(0),
@@ -1498,6 +1545,39 @@ namespace
             Require(captured.empty(), "gated mission observer reached dispatcher callback");
         };
 
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+
+            std::atomic<uint64_t> observationCounter{0};
+            uint64_t observationNumber = 99;
+            MemoryReader reader = fixture.Reader();
+            Attempt attempt = TryObserveMissionCopiedBoolBridgeInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                reader,
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                1,
+                observationNumber,
+                0);
+
+            Require(attempt.Status == AttemptStatus::Disabled,
+                    "zero-subscriber mission bridge did not skip observation");
+            Require(!ShouldAttemptMissionCopiedBoolBridgeObservation(
+                        EnabledGate(), kAddPlayerToMissionNameIndex, 1, 0),
+                    "zero-subscriber mission bridge prefilter allowed observation");
+            Require(observationCounter.load() == 0, "zero-subscriber mission bridge reserved budget");
+            Require(observationNumber == 0, "zero-subscriber mission bridge kept an observation number");
+            Require(fixture.Context.Calls == 0, "zero-subscriber mission bridge read metadata or params");
+            Require(MaybeDispatchObservedMissionCopiedBoolAfterOriginal(true, attempt) == 0,
+                    "zero-subscriber mission bridge dispatched copied bools");
+            Require(captured.empty(), "zero-subscriber mission bridge reached dispatcher callback");
+        }
+
         requireNoReadBudgetOrDispatch(
             Gate{},
             kAddPlayerToMissionNameIndex,
@@ -1536,7 +1616,7 @@ namespace
             std::atomic<uint64_t> observationCounter{0};
             uint64_t observationNumber = 99;
             MemoryReader reader = fixture.Reader();
-            Attempt attempt = TryObserveInvocation(
+            Attempt attempt = TryObserveMissionCopiedBoolBridgeInvocation(
                 EnabledGate(),
                 kAddPlayerToMissionNameIndex,
                 reader,
@@ -1544,10 +1624,14 @@ namespace
                 fixture.Params.data(),
                 observationCounter,
                 1,
-                observationNumber);
+                observationNumber,
+                dispatcher.SubscriptionCount());
 
             Require(attempt.Status == AttemptStatus::Matched,
                     "enabled mission observer did not match AddPlayerToMission");
+            Require(ShouldAttemptMissionCopiedBoolBridgeObservation(
+                        EnabledGate(), kAddPlayerToMissionNameIndex, 1, dispatcher.SubscriptionCount()),
+                    "mission bridge prefilter rejected active subscribers");
             Require(observationCounter.load() == 1, "matched mission observer did not reserve dispatch budget");
             Require(observationNumber == 1, "matched mission observer observation number mismatch");
             Require(fixture.Context.Calls > 0, "matched mission observer did not read reflected metadata");

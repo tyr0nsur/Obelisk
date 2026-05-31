@@ -77,6 +77,10 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
     bool ShouldAttemptRuntimeObservation(const std::atomic<uint64_t>& observationCounter,
                                          uint64_t observationLimit);
     bool ShouldAttemptNameObservation(int32_t nameIndex, uint64_t observationLimit);
+    bool ShouldAttemptMissionCopiedBoolBridgeObservation(const Gate& gate,
+                                                         int32_t nameIndex,
+                                                         uint64_t observationLimit,
+                                                         size_t subscriberCount);
     bool ShouldLogObservation(uint64_t observationNumber, uint64_t observationLimit);
     bool HasObservationBudgetRemaining(const std::atomic<uint64_t>& counter, uint64_t observationLimit);
     bool TryReserveObservationBudget(std::atomic<uint64_t>& counter,

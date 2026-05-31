@@ -8,6 +8,8 @@ namespace Obelisk::Core
     namespace
     {
         constexpr size_t kMaxVariantBuckets = 8;
+        static_assert(static_cast<size_t>(StructureScalarField::ReturnValue) + 1 == 4,
+                      "StructureAggregateCensus field counter cardinality must match StructureScalarField");
 
         size_t FieldIndex(StructureScalarField field)
         {
@@ -136,13 +138,6 @@ namespace Obelisk::Core
             return false;
         }
 
-        if (m_Snapshot.WindowEventsSeen >= m_Options.WindowEventLimit)
-        {
-            ++m_Snapshot.RejectedWindowFull;
-            return false;
-        }
-        ++m_Snapshot.WindowEventsSeen;
-
         if (!IsKnownEventKind(event.Kind) || event.Kind == StructureEventKind::VerifyPinCode)
         {
             ++m_Snapshot.RejectedSensitiveOrNonStructure;
@@ -154,6 +149,14 @@ namespace Obelisk::Core
             ++m_Snapshot.RejectedUnexpectedField;
             return false;
         }
+
+        if (m_Snapshot.WindowEventsSeen >= m_Options.WindowEventLimit)
+        {
+            if (m_Snapshot.RejectedWindowFull == 0)
+                ++m_Snapshot.RejectedWindowFull;
+            return false;
+        }
+        ++m_Snapshot.WindowEventsSeen;
 
         ++m_Snapshot.MatchedTotal;
         if (!originalCalled)
