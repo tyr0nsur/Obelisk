@@ -6,14 +6,68 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
+
+namespace
+{
+    std::atomic<bool> g_FailNextAllocation{false};
+
+    void FailNextAllocation()
+    {
+        g_FailNextAllocation.store(true, std::memory_order_release);
+    }
+}
+
+void* operator new(std::size_t size)
+{
+    if (g_FailNextAllocation.exchange(false, std::memory_order_acq_rel))
+        throw std::bad_alloc();
+
+    if (void* pointer = std::malloc(size == 0 ? 1 : size))
+        return pointer;
+
+    throw std::bad_alloc();
+}
+
+void* operator new[](std::size_t size)
+{
+    if (g_FailNextAllocation.exchange(false, std::memory_order_acq_rel))
+        throw std::bad_alloc();
+
+    if (void* pointer = std::malloc(size == 0 ? 1 : size))
+        return pointer;
+
+    throw std::bad_alloc();
+}
+
+void operator delete(void* pointer) noexcept
+{
+    std::free(pointer);
+}
+
+void operator delete(void* pointer, std::size_t) noexcept
+{
+    std::free(pointer);
+}
+
+void operator delete[](void* pointer) noexcept
+{
+    std::free(pointer);
+}
+
+void operator delete[](void* pointer, std::size_t) noexcept
+{
+    std::free(pointer);
+}
 
 namespace
 {
@@ -113,6 +167,31 @@ namespace
         Require(dispatcher.Register(&owner, {nullptr, &capture}) == 0,
                 "registration without callback was accepted");
         Require(dispatcher.SubscriptionCount() == 0, "invalid registrations were stored");
+    }
+
+    void TestRegisterHandlesAllocationFailureWithoutCountDrift()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        Capture capture;
+
+        FailNextAllocation();
+        Require(dispatcher.Register(&owner, {NoopCallback, nullptr}) == 0,
+                "registration allocation failure did not return zero");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "failed registration changed subscription count");
+
+        const uint64_t id = dispatcher.Register(&owner, {CaptureCallback, &capture});
+        Require(id != 0, "valid registration failed after allocation failure");
+        Require(dispatcher.SubscriptionCount() == 1,
+                "successful registration after failure did not update subscription count");
+        Require(dispatcher.Dispatch(MakeMessage()) == 1,
+                "callback registered after allocation failure did not dispatch");
+        Require(capture.calls == 1, "registered callback after allocation failure did not run");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 1,
+                "owner cleanup after allocation failure removed wrong count");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup after allocation failure left subscription count non-zero");
     }
 
     void TestUnregisterIsIdempotent()
@@ -810,6 +889,7 @@ int main()
     TestDispatchCopiesInputForCallbackDuration();
     TestNoSubscriberDispatchReturnsBeforeCallbackSnapshot();
     TestRegisterRejectsInvalidInput();
+    TestRegisterHandlesAllocationFailureWithoutCountDrift();
     TestUnregisterIsIdempotent();
     TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
     TestCallbackCanUnregisterItself();

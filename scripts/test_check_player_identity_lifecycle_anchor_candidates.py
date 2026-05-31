@@ -262,6 +262,32 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertEqual(report["accepted_start_targets"], [])
         self.assertEqual(report["accepted_end_targets"], [])
 
+    def test_rejects_admin_snapshots_as_accepted_lifecycle_anchors(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = base_anchor("session_start", "ShooterPlayerController.ServerListPlayers")
+        payload["candidate_anchors"][1] = base_anchor("session_end", "ShooterPlayerController.ServerKickPlayer")
+        for anchor in payload["candidate_anchors"]:
+            anchor["accepted"] = True
+            anchor["acceptance_status"] = "layout_accepted_non_public"
+            anchor["corroboration"]["status"] = "static_accepted"
+            anchor["blockers"] = []
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["session_end_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterPlayerController.ServerListPlayers"]
+        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterPlayerController.ServerKickPlayer"]
+        payload["safety_summary"]["accepted_anchor_count"] = 2
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("candidate_anchor_admin_snapshot_not_lifecycle_proof", report["blockers"])
+        self.assertIn("lifecycle_acceptance_summary_mismatch", report["blockers"])
+        self.assertIn("lifecycle_acceptance_targets_mismatch", report["blockers"])
+        self.assertIn("safety_accepted_anchor_count_mismatch", report["blockers"])
+        self.assertEqual(report["accepted_start_targets"], ["ShooterPlayerController.ServerListPlayers"])
+        self.assertEqual(report["accepted_end_targets"], ["ShooterPlayerController.ServerKickPlayer"])
+
     def test_rejects_principal_invalidation_semantics_overclaim(self) -> None:
         payload = manifest()
         payload["principal_policy"]["invalidation_semantics"] = "stable_cross_instance_principal"

@@ -4264,6 +4264,32 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_public_sdk_headers_have_no_raw_ue_public_abi_types(self) -> None:
+        forbidden = (
+            "UObject",
+            "UClass",
+            "UFunction",
+            "UProperty",
+            "FProperty",
+            "FName",
+            "FString",
+            "GNames",
+            "GObjects",
+            "GUObjectArray",
+            "FUObjectArray",
+        )
+        offenders: list[str] = []
+
+        for path in (REPO_ROOT / "include" / "obelisk").rglob("*"):
+            if not path.is_file() or path.suffix not in {".h", ".hpp"}:
+                continue
+            text = strip_c_comments(path.read_text(encoding="utf-8"))
+            for token in forbidden:
+                if re.search(rf"\b{re.escape(token)}\b", text):
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+
+        self.assertEqual(offenders, [])
+
     def test_public_gameplay_event_manifest_has_no_undeclared_public_event_capabilities(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
         header = (REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h").read_text(encoding="utf-8")
@@ -5835,7 +5861,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "v0.1-rc public C ABI slices",
                 "Plugin Hub work starts with",
                 "define the current supported seed boundary before any new public SDK surface is proposed",
-                "Harden the small production-supported Plugin Hub seed set",
+                "Harden the small release-supported Plugin Hub seed set",
                 "Keep copied event examples explicitly experimental",
             ),
             REPO_ROOT / "CONTRIBUTING.md": (

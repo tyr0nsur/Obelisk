@@ -1,6 +1,7 @@
 {
   "schema": "obelisk.public-sdk-surfaces.v1",
   "sdk_version": "v1.0",
+  "sdk_version_scope": "target-v1-planning-inventory-not-current-release",
   "abi_version": "0.1",
   "status": "planning-contract",
   "v1_completion_required": false,

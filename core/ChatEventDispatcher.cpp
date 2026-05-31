@@ -81,13 +81,29 @@ namespace Obelisk::Core
         if (!owner || !subscription.Callback)
             return 0;
 
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        const uint64_t id = AllocateRegistrationId();
-        const uint64_t generation = m_NextGeneration++;
-        if (m_NextGeneration == 0)
-            m_NextGeneration = 1;
-        m_Registrations.push_back({id, generation, owner, subscription});
-        return id;
+        try
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            const uint64_t id = AllocateRegistrationId();
+            const uint64_t generation = m_NextGeneration++;
+            if (m_NextGeneration == 0)
+                m_NextGeneration = 1;
+            m_Registrations.push_back({id, generation, owner, subscription});
+            m_SubscriptionCount.fetch_add(1, std::memory_order_release);
+            return id;
+        }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event registration failed: {}", e.what());
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event registration failed with an unknown exception.");
+        }
+
+        return 0;
     }
 
     uint64_t ChatEventDispatcher::AllocateRegistrationId()
@@ -161,6 +177,8 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
             else if (!IsInsideAnyGameplayCallback() &&
@@ -226,6 +244,8 @@ namespace Obelisk::Core
                                           });
             m_Registrations.erase(keepEnd, m_Registrations.end());
             after = m_Registrations.size();
+            if (before > after)
+                m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
             if (QueueOrDestroyRemovedSubscriptions(removed, lock))
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
             else if (!IsInsideAnyGameplayCallback() &&
@@ -313,11 +333,8 @@ namespace Obelisk::Core
         size_t dispatched = 0;
         try
         {
-            {
-                std::lock_guard<std::mutex> lock(m_Mutex);
-                if (m_Registrations.empty())
-                    return 0;
-            }
+            if (m_SubscriptionCount.load(std::memory_order_acquire) == 0)
+                return 0;
 
             std::string messageCopy(message.Message);
             std::string senderNameCopy(message.SenderName);
@@ -402,7 +419,6 @@ namespace Obelisk::Core
 
     size_t ChatEventDispatcher::SubscriptionCount() const
     {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        return m_Registrations.size();
+        return m_SubscriptionCount.load(std::memory_order_acquire);
     }
 }

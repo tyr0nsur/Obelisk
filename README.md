@@ -99,9 +99,9 @@ loader/               LD_PRELOAD bootstrap
 runtime/              Logging and runtime services
 ue/                   UE4 memory/reflection helpers
 examples/             Creator-facing examples for the installed SDK package
-plugins/oBaseEvents/  Official event/config/lifecycle reference plugin
-plugins/oProcessTimer/  Official process-local timer reference plugin
-plugins/oDescriptorCatalog/  Official descriptor-catalog reference plugin
+plugins/oBaseEvents/  Release-scope event/config/lifecycle reference plugin
+plugins/oProcessTimer/  Release-scope process-local timer reference plugin
+plugins/oDescriptorCatalog/  Release-scope descriptor-catalog reference plugin
 tests/                Offline C++/SDK/ABI tests
 docs/                 Architecture, install, research, release notes
 scripts/              Install and offline analyzer helpers
@@ -537,7 +537,7 @@ Near-term engineering:
   plugin-facing gameplay events.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
-- Harden the small production-supported Plugin Hub seed set for contributors:
+- Harden the small release-supported Plugin Hub seed set for contributors:
   installed package consumers, lifecycle/config examples, descriptors, and
   process-local timers. Keep copied event examples explicitly experimental and inside
   the Plugin Hub Foundation and Capability Matrix instead of relying on raw UE pointers

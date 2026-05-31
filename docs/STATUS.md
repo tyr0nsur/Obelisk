@@ -18,10 +18,10 @@ for the refreshed RC evidence root and gate result. RC public scope remains limi
 `ResourceHandle`, identity, lookup, mutation, return override, or live-server claim.
 `v0.1.0-rc.2` also includes process-local owner-token timers as core runtime API without
 promoting gameplay/module timers.
-Post-RC development continues toward the broader `v1.0` complete-SDK track: general
+Post-RC planning/evidence work continues toward the broader `v1.0` complete-SDK track: general
 reflection evidence, copied-data module APIs, operator lifecycle safety, metadata-only
 reference plugins such as `oDescriptorCatalog`, and ArkApi-demand-informed
-Obelisk-native plugin replacement capacity without copying or porting ArkApi/NextGen
+future Obelisk-native plugin capability planning without copying or porting ArkApi/NextGen
 implementations or retroactively expanding the published RC tag. This track is not a
 runtime-only stability track.
 

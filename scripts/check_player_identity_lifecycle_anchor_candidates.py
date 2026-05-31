@@ -25,6 +25,12 @@ KNOWN_LIFECYCLE_ORIENTATION_TARGETS = frozenset(
         "ShooterGameMode.OnLogout",
     )
 )
+ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF = frozenset(
+    (
+        "ShooterPlayerController.ServerKickPlayer",
+        "ShooterPlayerController.ServerListPlayers",
+    )
+)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 ROLE_TO_ACCEPTANCE_KEYS = {
@@ -223,6 +229,15 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
             )
         else:
             add(blockers, "candidate_anchor_target_outside_closed_target_set", label, target=target)
+    elif accepted and target in ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF:
+        add(
+            blockers,
+            "candidate_anchor_admin_snapshot_not_lifecycle_proof",
+            label,
+            target=target,
+            snapshot_status="admin_surface_only_not_lifecycle_anchor",
+        )
+        accepted = False
     if accepted:
         for key in ("num_parms", "parms_size", "property_order"):
             value = anchor.get(key)

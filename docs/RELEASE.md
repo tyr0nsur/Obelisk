@@ -34,7 +34,7 @@ Included:
 - C plugin ABI, after an explicit first-stable ABI freeze decision.
 - Central install script and LinuxGSM wrappers.
 - `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` as the built-by-default
-  first-party reference plugin set published by the release gate for the current post-RC
+  first-party reference plugin set included by the release gate for the current post-RC
   candidate; this does not retroactively add `oDescriptorCatalog` to the frozen
   `v0.1.0-rc.2` tag.
 - `OBELISK_INSTANCE_ID` logs and state markers.
@@ -70,12 +70,12 @@ Included:
   zero-failure handles, explicit unregister, exception containment, and owner cleanup on
   plugin init failure/unload. They are not UE/gameplay timers, gameplay/module timer APIs,
   shared scheduler state, persistent handles, identity, lookup, permissions, commands, or
-  cluster coordination. `oProcessTimer` is the first-party timer example and is published
+  cluster coordination. `oProcessTimer` is the first-party timer example and is included
   by the release gate.
 - `oDescriptorCatalog` as a metadata-only descriptor reference plugin. It validates
   `DescribeResourceKind` and `DescribeGameplayPolicyEventKind` consumption without
   callbacks, timers, chat, identity, lookup, mutation, return override, or ABI expansion,
-  and is published by the release gate.
+  and is included by the release gate.
 
 RC public scope remains limited to `GameplayPolicyEvent`, the minimal copied
 `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`.
@@ -93,7 +93,7 @@ Excluded:
   player/tribe/dino/buff/mission/transfer APIs.
 - Experimental first-party plugins such as `oPolicyAudit`, `oChatLogger`, and
   `oChatAudit`, which require `OBELISK_BUILD_EXPERIMENTAL_PLUGINS=ON` and are not
-  published by the release gate.
+  included by the release gate.
 - Gameplay mutation, return overrides, arbitrary UE4 function calls, and public
   `CallProcessEvent`-based plugin behavior.
 - Plugin callback blocking of the original `ProcessEvent` outside an explicit

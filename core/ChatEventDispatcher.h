@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
 #include <condition_variable>
@@ -74,6 +75,7 @@ namespace Obelisk::Core
         uint64_t m_NextRegistrationId = 1;
         uint64_t m_NextGeneration = 1;
         std::vector<Registration> m_Registrations;
+        std::atomic<size_t> m_SubscriptionCount{0};
         std::vector<ChatMessageSubscription> m_PendingDestroy;
         size_t m_PendingDestroyInProgress = 0;
     };

@@ -10,7 +10,7 @@ import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Program;
 
 public class DumpWeakHelperCallerModes extends GhidraScript {
-    private static final String SCRIPT_VERSION = "2026-05-29.1";
+    private static final String SCRIPT_VERSION = "2026-05-31.1";
 
     private static final class Window {
         final String label;
@@ -54,7 +54,9 @@ public class DumpWeakHelperCallerModes extends GhidraScript {
             println("program=" + program.getName());
             println("language=" + program.getLanguageID());
             println("image_base=" + program.getImageBase());
+            println("executable_sha256=" + program.getExecutableSHA256());
             println("window_count=" + windows.length);
+            validatePreflight(program);
             for (Window window : windows) {
                 println("window_spec=" + window.label + " start=0x" + Long.toHexString(window.start)
                     + " end=0x" + Long.toHexString(window.end));
@@ -65,6 +67,66 @@ public class DumpWeakHelperCallerModes extends GhidraScript {
             }
         } finally {
             decompiler.dispose();
+        }
+    }
+
+    private void validatePreflight(Program program) {
+        for (String rawArg : getScriptArgs()) {
+            String[] parts = rawArg.split("=", 2);
+            if (parts.length != 2) {
+                throw new IllegalArgumentException("preflight_failed: invalid_arg=" + rawArg);
+            }
+            String key = parts[0].trim();
+            String expected = parts[1].trim();
+            if (key.equals("expected_sha256")) {
+                String actualSha256 = program.getExecutableSHA256();
+                if (actualSha256 == null) {
+                    throw new IllegalStateException("preflight_failed: expected_sha256 actual=<missing>");
+                }
+                requireEquals(key, expected.toLowerCase(), actualSha256.toLowerCase());
+            } else if (key.equals("expected_language")) {
+                requireEquals(key, expected, program.getLanguageID().toString());
+            } else if (key.equals("expected_image_base")) {
+                long expectedImageBase = parseExpectedLong(expected);
+                if (expectedImageBase == 0) {
+                    throw new IllegalStateException("preflight_failed: expected_image_base must_not_be_zero");
+                }
+                requireEquals(key, expectedImageBase, program.getImageBase().getOffset());
+            } else if (key.equals("expected_window_count")) {
+                requireEquals(key, Integer.parseInt(expected), windows.length);
+            } else {
+                throw new IllegalArgumentException("preflight_failed: unknown_arg=" + key);
+            }
+        }
+        println("preflight=ok");
+    }
+
+    private static long parseExpectedLong(String value) {
+        if (value.startsWith("0x") || value.startsWith("0X")) {
+            return Long.parseUnsignedLong(value.substring(2), 16);
+        }
+        return Long.parseLong(value);
+    }
+
+    private static void requireEquals(String key, String expected, String actual) {
+        if (!expected.equals(actual)) {
+            throw new IllegalStateException(
+                "preflight_failed: " + key + " expected=" + expected + " actual=" + actual);
+        }
+    }
+
+    private static void requireEquals(String key, long expected, long actual) {
+        if (expected != actual) {
+            throw new IllegalStateException(
+                "preflight_failed: " + key + " expected=0x" + Long.toHexString(expected)
+                    + " actual=0x" + Long.toHexString(actual));
+        }
+    }
+
+    private static void requireEquals(String key, int expected, int actual) {
+        if (expected != actual) {
+            throw new IllegalStateException(
+                "preflight_failed: " + key + " expected=" + expected + " actual=" + actual);
         }
     }
 
