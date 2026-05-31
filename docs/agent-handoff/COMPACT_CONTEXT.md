@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-05-30
+Updated: 2026-05-31
 
 Use this file after conversation compaction or when resuming Obelisk from repository
 state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
@@ -127,7 +127,9 @@ priorities, and do not use history files as the active source of truth.
   UE lookup, identity, mutation, or return override.
 - `oDescriptorCatalog` is a release-scope reference plugin for those descriptor helpers.
   It validates descriptor coherence and logs sanitized resource/event metadata only; it
-  registers no callbacks/timers and adds no ABI surface.
+  registers no callbacks/timers and adds no ABI surface. Installed SDK consumer fixtures
+  now cover fail-closed rejection of unknown resource/event kinds and undersized v1
+  descriptor structs.
 - `InventoryPolicyEventDispatcher` and `StructureEventDispatcher` are internal
   copied-scalar infrastructure only. They do not promote public Inventory or
   StructureEvents SDKs.
@@ -149,6 +151,9 @@ priorities, and do not use history files as the active source of truth.
 - Release scope wording separates copied RC plugin events from debug-gated raw
   ProcessEvent callback infrastructure and experimental target-specific gameplay/module
   observers.
+- Runtime timer owner cleanup has regression coverage for cleanup initiated from inside
+  that owner's timer callback: it must not deadlock, must remove the repeating timer, and
+  must prevent later delivery.
 
 ## Evidence Baseline
 
@@ -215,9 +220,15 @@ priorities, and do not use history files as the active source of truth.
   offline focused snapshot with an explicit base root or complete core evidence-pack
   manifest, followed by a distinct second-source compare; do not add either key to release
   targets, ABI enums, descriptors, dispatchers, public docs, or runtime gates.
+- Focal UFunction snapshot planning helpers live in
+  `scripts/ufunction_focal_snapshot_plan.py`; `build_reflection_inventory_pack.py` uses
+  them for candidate-only exact snapshot command plans. Target-set bridge coverage proves
+  named planning sets can emit exact `--snapshot-json` commands from unfiltered redacted
+  inventory without adding release target-set regeneration claims.
 - `ue/MissionReflection.*` is an internal fixture-backed recognizer for
   `mission-compact-intake`: copied bool ranges only, object refs and `OutItemIDs` arrays
-  recognition-only, no hook/runtime dispatcher/public Mission SDK.
+  recognition-only, no hook/runtime dispatcher/public Mission SDK. Tests reject copied
+  bool ranges that exceed `ParameterSize` and clear poisoned output on failure.
   The internal readiness note is
   `docs/research/2026-05-29-mission-reflection-internal-readiness.md`. A local
   test-only `ProcessEventMissionReflection` helper scaffold exists, but it has no live
