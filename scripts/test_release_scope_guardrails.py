@@ -1419,6 +1419,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         slice_note = read("docs/research/2026-05-30-item-return-only-policy-slice.md")
         current = read("docs/agent-handoff/CURRENT.md")
         status = read("docs/STATUS.md")
+        release_gate = read("scripts/check_release_readiness.sh")
 
         for path, text in (
             ("docs/research/2026-05-29-item-return-only-policy-bridge-plan.md", bridge_plan),
@@ -1484,6 +1485,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("identity", compact)
                 self.assertIn("mutation", compact)
                 self.assertIn("return override", compact)
+
+        with self.subTest(file="scripts/check_release_readiness.sh", item="no-core inventory hygiene checks"):
+            self.assertIn("scripts/check_item_return_only_readiness.py --json", release_gate)
+            self.assertIn("scripts/check_inventory_action_fixture_boundary.py --json", release_gate)
 
     def test_installed_sdk_consumer_stays_in_release_gate_not_default_ctest(self) -> None:
         cmake = read("CMakeLists.txt")

@@ -12,6 +12,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+DEFAULT_CONTRACT_DECISIONS_DIR = REPO_ROOT / "docs"
 CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
     "obelisk.chat.local_routing.v1",
@@ -156,6 +158,64 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"(?:complete|full|production|stable|available|supported|included|shipped)\b",
 )
 CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
+BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
+    "obelisk.player_identity.v1": (
+        re.compile(
+            r"(?:PlayerIdentity|PlayerPrincipal|PlayerLookup|PlayerHandle|PlayerId|"
+            r"PrincipalHandle|PrincipalGeneration|PrincipalScope|ObeliskPrincipal)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:PLAYER_IDENTITY|PLAYER_PRINCIPAL|PLAYER_LOOKUP|"
+            r"PRINCIPAL_HANDLE|PRINCIPAL_GENERATION|PRINCIPAL_SCOPE)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:player_identity|player_principal|player_lookup|principal_handle|"
+            r"principal_generation|principal_scope)(?:_|$)"
+        ),
+    ),
+    "obelisk.permissions_admin.v1": (
+        re.compile(
+            r"(?:Permission|Permissions|Admin|Authorization|Authorize|Moderation|"
+            r"Moderator|BanPlayer|KickPlayer|Grant|Revoke)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:PERMISSION|ADMIN|AUTHORIZATION|MODERATION|"
+            r"BAN|KICK|GRANT|REVOKE)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:permission|permissions|admin|authorization|authority_kind|"
+            r"policy_epoch|ban_player|kick_player|grant|revoke)(?:_|$)"
+        ),
+    ),
+    "obelisk.command_chat_response_path.v1": (
+        re.compile(
+            r"(?:Command|Reply|Replies|Response|Respond|SendChat|Broadcast|Notice|Moderation)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:COMMAND|REPLY|RESPONSE|SEND_CHAT|BROADCAST|"
+            r"NOTICE|MODERATION)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:command|reply|replies|response|response_handle|response_kind|"
+            r"send_chat|broadcast|notice|moderation|delivery_scope|delivery_flags)(?:_|$)"
+        ),
+    ),
+    "obelisk.commands_replies.v1": (
+        re.compile(
+            r"(?:Command|Commands|Reply|Replies|CommandRouter|CommandCallback|"
+            r"CommandPayload|CommandRegistration|SendChat|Broadcast|Notice|Moderation)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:COMMAND|COMMANDS|REPLY|REPLIES|SEND_CHAT|"
+            r"BROADCAST|NOTICE|MODERATION)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:command|commands|command_router|command_callback|command_payload|"
+            r"command_registration|reply|replies|send_chat|broadcast|notice|moderation)(?:_|$)"
+        ),
+    ),
+}
+PUBLIC_CONTRACT_DECISIONS_GLOB = "*_public_contract_decisions.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -172,6 +232,18 @@ def parse_args() -> argparse.Namespace:
         "--release-statement",
         type=Path,
         help="Reviewed v1 SDK release statement that names excluded/post-v1 blockers.",
+    )
+    parser.add_argument(
+        "--public-header",
+        type=Path,
+        default=DEFAULT_PUBLIC_HEADER,
+        help="Public C ABI header checked against blocked public contract decision manifests.",
+    )
+    parser.add_argument(
+        "--contract-decisions-dir",
+        type=Path,
+        default=DEFAULT_CONTRACT_DECISIONS_DIR,
+        help="Directory containing *_public_contract_decisions.json manifests.",
     )
     parser.add_argument("--json", action="store_true", help="Emit the full readiness report as JSON.")
     return parser.parse_args()
@@ -200,6 +272,101 @@ def load_release_statement(path: Path | None) -> tuple[str | None, list[str]]:
         return path.read_text(encoding="utf-8"), []
     except OSError as exc:
         return None, [f"release_statement_load_failed:{exc}"]
+
+
+def strip_c_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"//.*", "", text)
+
+
+def load_public_header_symbols(path: Path) -> tuple[set[str], list[str]]:
+    try:
+        text = strip_c_comments(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        return set(), [f"public_header_load_failed:{exc}"]
+    symbols: set[str] = set()
+    symbols.update(re.findall(r"^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\b", text, flags=re.MULTILINE))
+    symbols.update(re.findall(r"\btypedef\s+(?:struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b", text))
+    symbols.update(re.findall(r"\btypedef\b[^;{]*\(\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", text))
+    symbols.update(re.findall(r"\(\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", text))
+    symbols.update(re.findall(r"\b(OBELISK_[A-Z0-9_]+)\b", text))
+    symbols.update(
+        re.findall(
+            r"\b(?:uint(?:32|64)_t|int(?:32|64)_t|size_t|bool|char|void|const\s+char\*)\s+"
+            r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]+\])?\s*;",
+            text,
+        )
+    )
+    return symbols, []
+
+
+def contract_decision_paths(decisions_dir: Path) -> list[Path]:
+    try:
+        return sorted(decisions_dir.glob(PUBLIC_CONTRACT_DECISIONS_GLOB))
+    except OSError:
+        return []
+
+
+def public_header_matches_contract(path: Path, raw_contract_header: Any) -> bool:
+    if not isinstance(raw_contract_header, str) or not raw_contract_header:
+        return True
+    contract_header = Path(raw_contract_header)
+    if contract_header.is_absolute():
+        try:
+            return contract_header.resolve() == path.resolve()
+        except OSError:
+            return False
+    try:
+        return (REPO_ROOT / contract_header).resolve() == path.resolve()
+    except OSError:
+        return False
+
+
+def contract_symbol_patterns(surface_id: Any) -> tuple[re.Pattern[str], ...]:
+    if not isinstance(surface_id, str):
+        return ()
+    return BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS.get(surface_id, ())
+
+
+def symbol_matches_blocked_contract(symbol: str, surface_id: str) -> bool:
+    return any(pattern.search(symbol) for pattern in contract_symbol_patterns(surface_id))
+
+
+def blocked_contract_public_header_symbol_drift(
+    public_header_path: Path,
+    decisions_dir: Path,
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    public_symbols, blockers = load_public_header_symbols(public_header_path)
+    drift: dict[str, dict[str, Any]] = {}
+    for decision_path in contract_decision_paths(decisions_dir):
+        payload, load_blockers = load_manifest(decision_path)
+        if load_blockers:
+            blockers.extend(f"public_contract_decision_load_failed:{decision_path}:{item}" for item in load_blockers)
+            continue
+        if payload is None:
+            continue
+        if not public_header_matches_contract(public_header_path, payload.get("public_header")):
+            continue
+        public_header_allowed = payload.get("public_header_allowed")
+        raw_declared_symbols = payload.get("public_header_symbols_now")
+        declared_symbols = set(as_string_list(raw_declared_symbols))
+        if public_header_allowed is not False and raw_declared_symbols != []:
+            continue
+        surface_id = payload.get("surface")
+        if not isinstance(surface_id, str) or not contract_symbol_patterns(surface_id):
+            continue
+        matching_symbols = sorted(
+            symbol
+            for symbol in public_symbols
+            if symbol not in declared_symbols and symbol_matches_blocked_contract(symbol, surface_id)
+        )
+        if matching_symbols:
+            drift[str(decision_path)] = {
+                "surface": surface_id,
+                "public_header_allowed": public_header_allowed,
+                "undeclared_symbols": matching_symbols,
+            }
+    return drift, blockers
 
 
 def release_statement_names_outcome(text: str, surface_id: str, status: str) -> bool:
@@ -597,10 +764,20 @@ def unresolved_promoted_surface_dependencies(
     return unresolved
 
 
-def build_report(manifest_path: Path, release_statement_path: Path | None = None) -> dict[str, Any]:
+def build_report(
+    manifest_path: Path,
+    release_statement_path: Path | None = None,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+    contract_decisions_dir: Path = DEFAULT_CONTRACT_DECISIONS_DIR,
+) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
     blockers.extend(release_statement_blockers)
+    blocked_contract_header_symbols, contract_symbol_blockers = blocked_contract_public_header_symbol_drift(
+        public_header_path,
+        contract_decisions_dir,
+    )
+    blockers.extend(contract_symbol_blockers)
     if manifest is None:
         return {
             "schema": "obelisk.public-sdk-v1-completion-check.v1",
@@ -608,6 +785,9 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             "ready": False,
             "manifest": str(manifest_path),
             "release_statement": str(release_statement_path) if release_statement_path else None,
+            "public_header": str(public_header_path),
+            "contract_decisions_dir": str(contract_decisions_dir),
+            "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
             "blockers": blockers,
         }
 
@@ -887,6 +1067,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             blockers.append("release_statement_missing_sdk_compatibility_reference")
         if "docs/public_sdk_surfaces.json" not in release_statement_text.lower():
             blockers.append("release_statement_missing_public_sdk_surfaces_reference")
+    if blocked_contract_header_symbols:
+        blockers.append("blocked_public_contract_header_symbols_detected")
 
     return {
         "schema": "obelisk.public-sdk-v1-completion-check.v1",
@@ -894,6 +1076,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "ready": not blockers,
         "manifest": str(manifest_path),
         "release_statement": str(release_statement_path) if release_statement_path else None,
+        "public_header": str(public_header_path),
+        "contract_decisions_dir": str(contract_decisions_dir),
         "sdk_version": manifest.get("sdk_version"),
         "v1_completion_required": manifest.get("v1_completion_required"),
         "stable_claim_allowed": stable_claim_allowed,
@@ -933,6 +1117,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "release_statement_missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
         "release_statement_missing_experimental_outcomes": sorted(set(release_statement_missing_experimental_outcomes)),
         "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
+        "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
         "non_claims": [
             "core-first release readiness, install layout, and package-shape checks do not satisfy this v1 SDK completion gate",
             "post-v1 or excluded surfaces must be named in the manifest and release statement before a stable v1 SDK claim",
@@ -942,7 +1127,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.manifest, args.release_statement)
+    report = build_report(
+        args.manifest,
+        args.release_statement,
+        args.public_header,
+        args.contract_decisions_dir,
+    )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif report["ready"]:

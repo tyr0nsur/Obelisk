@@ -234,12 +234,11 @@ metadata chain:
 
 ## Exact Tooling Gaps
 
-1. Add a batch/focal snapshot planner for closed target sets that can start from an
-   accepted reflection inventory pack and emit one `inspect_core_ufunctions.py
-   --snapshot-json` command per target with complete evidence identity. The newer
-   `build_reflection_inventory_pack.py --plan-target Outer.Name` covers one ad hoc target;
-   the missing ergonomic piece is a safe batch mode for a reviewed closed list without
-   adding it to public target sets first.
+1. The focal snapshot planner now exists as `scripts/plan_ufunction_focal_snapshots.py`.
+   Use it after an accepted reflection inventory pack to emit exact
+   `inspect_core_ufunctions.py --snapshot-json` commands for reviewed targets with
+   complete evidence identity. Keep using explicit target names for one-off candidates;
+   do not treat broad name searches or partial inventories as accepted layout evidence.
 
 2. Add a consume-only gate/report for `obelisk.reflection-inventory-pack-comparison.v1`.
    `compare_reflection_inventory_packs.py` already compares two packs, but the offline

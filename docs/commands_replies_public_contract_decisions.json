@@ -1,0 +1,231 @@
+{
+  "schema": "obelisk.commands-replies-public-contract-decisions.v1",
+  "surface": "obelisk.commands_replies.v1",
+  "status": "blocked",
+  "planning_stage": "post-v1",
+  "not_sufficient_for_v1": true,
+  "public_header_allowed": false,
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "public_header_symbols_now": [],
+  "public_command_router_allowed": false,
+  "public_reply_or_send_chat_abi_allowed": false,
+  "public_response_path_allowed": false,
+  "forbidden_public_contract": [
+    "public command SDK/router",
+    "public command parser",
+    "command parser copied from ArkApi or AseApi",
+    "console command API",
+    "RCON command API",
+    "admin command API",
+    "player command API",
+    "public CallProcessEvent command or reply path",
+    "public command_chat_response_path ABI",
+    "reply ABI",
+    "send-chat ABI",
+    "broadcast/notices ABI",
+    "moderation API",
+    "permission groups",
+    "admin mutation",
+    "storage/persistence",
+    "operator ingress",
+    "raw UE pointers",
+    "raw ProcessEvent params",
+    "raw FString storage",
+    "UObject pointers",
+    "UFunction pointers",
+    "FName/GObjects indices",
+    "ResourceHandle",
+    "player lookup",
+    "mutation",
+    "return override"
+  ],
+  "required_before_public_header": [
+    {
+      "id": "dependency.promoted_player_identity",
+      "category": "dependency",
+      "status": "unresolved",
+      "decision_required": "Promote obelisk.player_identity.v1 before any public command routing, command registration, or reply targeting contract is public."
+    },
+    {
+      "id": "dependency.promoted_permissions_admin",
+      "category": "dependency",
+      "status": "unresolved",
+      "decision_required": "Promote query-only fail-closed permissions/admin before commands can authorize execution or admin-like behavior."
+    },
+    {
+      "id": "dependency.promoted_command_chat_response_path",
+      "category": "dependency",
+      "status": "unresolved",
+      "decision_required": "Promote obelisk.command_chat_response_path.v1 before commands/replies can claim reply, send-chat, broadcast, notice, or directed response behavior.",
+      "required_dependency": "obelisk.command_chat_response_path.v1",
+      "required_behavior": [
+        "commands/replies remains blocked while command_chat_response_path is planning or post-v1",
+        "passive ChatMessageEvent parsing does not authorize replies",
+        "legacy CallProcessEvent debug access does not authorize responses",
+        "no response path is public through commands/replies until the response path is separately promoted"
+      ]
+    },
+    {
+      "id": "abi.future_copied_command_payload",
+      "category": "abi",
+      "status": "unresolved",
+      "decision_required": "Define an append-only copied POD command payload before any command callback, registration, or dispatch ABI is public.",
+      "required_fields_or_equivalent": [
+        "abi_version",
+        "struct_size",
+        "plugin_owner_token",
+        "command_handle",
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "permission_policy_epoch",
+        "command_name_utf8",
+        "command_name_size",
+        "arguments_utf8",
+        "arguments_size",
+        "source_kind",
+        "delivery_scope",
+        "command_flags"
+      ],
+      "required_properties": [
+        "POD C ABI",
+        "append-only layout",
+        "owner-token scoped registration",
+        "capability gated",
+        "copied UTF-8 input",
+        "runtime-owned command lifecycle",
+        "no raw UE pointers or raw params",
+        "no raw FString exposure",
+        "no public UFunction or vtable details"
+      ]
+    },
+    {
+      "id": "abi.no_public_symbols_now",
+      "category": "abi",
+      "status": "unresolved",
+      "decision_required": "Do not add command/reply public header symbols until every commands/replies blocker is resolved.",
+      "required_behavior": [
+        "public_header_symbols_now remains empty",
+        "no commands/replies capability bit is advertised",
+        "no public register/unregister command ABI exists",
+        "no public reply or send-chat ABI exists",
+        "no public command_chat_response_path ABI is exposed through commands/replies",
+        "CallProcessEvent is not a public command or reply mechanism"
+      ]
+    },
+    {
+      "id": "auth.identity_permission_provenance",
+      "category": "authorization",
+      "status": "unresolved",
+      "decision_required": "Define identity, generation, scope, and permission provenance before any command can execute.",
+      "required_behavior": [
+        "missing principal fails closed",
+        "missing principal_generation fails closed",
+        "stale principal fails closed",
+        "unsupported principal_scope_flags fails closed",
+        "missing permission policy provenance fails closed",
+        "permission denial or unknown result never dispatches a command",
+        "command callbacks cannot self-attest permission authority",
+        "admin-like commands require a separately promoted admin authority contract"
+      ]
+    },
+    {
+      "id": "lifecycle.owner_scoped_registration_cleanup",
+      "category": "lifecycle",
+      "status": "unresolved",
+      "decision_required": "Define owner-scoped command registration, unregister, init-failure cleanup, unload cleanup, and in-flight dispatch drain behavior.",
+      "required_behavior": [
+        "command registrations are owner-token scoped",
+        "duplicate command names have deterministic owner-scoped conflict handling",
+        "plugin init failure removes all command registrations before dlclose",
+        "plugin unload unregisters commands and waits for in-flight callbacks or fails closed without dlclose",
+        "self-unregister from a command callback is safe",
+        "command callbacks cannot outlive copied payload storage",
+        "server shutdown does not call into unmapped plugin code"
+      ]
+    },
+    {
+      "id": "parser.no_arkapi_copy",
+      "category": "compatibility",
+      "status": "unresolved",
+      "decision_required": "Design Obelisk command parsing from copied ChatMessageEvent text and promoted Obelisk contracts; do not copy ArkApi/AseApi parser behavior or implementation.",
+      "required_behavior": [
+        "no ArkApi or AseApi command parser code is copied",
+        "no ArkApi or AseApi constants, schemas, control flow, return semantics, offsets, vtables, or native-call wrappers are copied",
+        "plugin-local parser scaffolds remain local helpers and do not become a public SDK router",
+        "public grammar, prefix, quoting, escaping, dispatch ordering, and return behavior require an Obelisk-owned contract",
+        "compatibility naming can inform demand only and cannot substitute for promotion evidence"
+      ]
+    },
+    {
+      "id": "abuse.rate_limit_audit_moderation_boundary",
+      "category": "abuse",
+      "status": "unresolved",
+      "decision_required": "Define abuse controls and moderation boundaries before commands/replies are public.",
+      "required_behavior": [
+        "command dispatch attempts are rate-limited per plugin owner token and source scope",
+        "malformed UTF-8, oversize commands, and unsupported source kinds fail closed",
+        "audit records are sanitized and do not expose raw UE internals, platform IDs, raw player names, or secret policy contents",
+        "operator controls can disable command dispatch without disabling passive chat intake",
+        "moderation, ban, kick, mute, broadcast, scheduled notice, and admin mutation APIs remain separate promotions"
+      ]
+    },
+    {
+      "id": "separation.no_response_send_reply_moderation",
+      "category": "scope",
+      "status": "unresolved",
+      "decision_required": "Commands/replies may not imply response delivery, send-chat, replies, moderation, persistence, or admin mutation.",
+      "required_exclusions": [
+        "public command_chat_response_path ABI",
+        "reply ABI",
+        "send-chat ABI",
+        "broadcast/notices ABI",
+        "moderation API",
+        "ban/kick API",
+        "permission groups",
+        "admin mutation",
+        "storage/persistence",
+        "operator ingress"
+      ]
+    },
+    {
+      "id": "evidence.runtime_sdk_coverage",
+      "category": "evidence",
+      "status": "unresolved",
+      "required_evidence": [
+        "promoted player identity evidence",
+        "promoted permissions/admin evidence",
+        "promoted command_chat_response_path evidence",
+        "copied command ABI layout tests",
+        "owner-token lifecycle tests",
+        "permission fail-closed tests",
+        "SDK consumer tests",
+        "isolated runtime command dispatch evidence",
+        "second-source or independently reviewed command source evidence"
+      ],
+      "not_sufficient": [
+        "passive ChatMessageEvent parsing",
+        "plugin-local command parser scaffold",
+        "static thunk orientation",
+        "candidate vtable slots",
+        "legacy CallProcessEvent debug gate",
+        "raw ProcessEvent callbacks",
+        "ArkApi or AseApi compatibility names",
+        "command_chat_response_path planning status"
+      ]
+    },
+    {
+      "id": "release.not_sufficient_for_v1",
+      "category": "release",
+      "status": "unresolved",
+      "decision_required": "Keep commands/replies as a v1 completion blocker until it is promoted or explicitly named post-v1/excluded in a reviewed v1 release statement.",
+      "required_behavior": [
+        "commands/replies is planning/post-v1 now",
+        "commands/replies is not sufficient for a complete v1 SDK claim now",
+        "public_contract stays empty while status is post-v1 or blocked",
+        "v1_completion_required must not change because of this planning contract alone",
+        "a future exclusion must state that no public command SDK/router, console command API, RCON command API, admin command API, player command API, chat replies, send-chat, broadcast/notices API, or moderation API is included in v1"
+      ]
+    }
+  ]
+}

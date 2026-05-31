@@ -98,10 +98,191 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("v1_completion_required_false", payload["blockers"])
         self.assertIn("promoted_experimental_surfaces_unresolved", payload["blockers"])
         self.assertIn("v1_sdk_completion_blockers_unresolved", payload["blockers"])
+        self.assertNotIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        self.assertEqual(payload["blocked_public_contract_header_symbols"], {})
         self.assertNotIn("non_promoted_surface_has_public_contract", payload["blockers"])
         self.assertIn("obelisk.player_identity.v1", payload["unresolved_completion_blockers"])
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
+
+    def test_blocked_contract_decisions_detect_untracked_public_header_symbols(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#include <stdint.h>\n"
+                "typedef struct ObeliskPlayerIdentity {\n"
+                "    uint32_t abi_version;\n"
+                "    uint64_t principal_handle;\n"
+                "} ObeliskPlayerIdentity;\n"
+                "typedef struct ObeliskApi {\n"
+                "    uint64_t (*RegisterPlayerIdentityWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "} ObeliskApi;\n",
+                encoding="utf-8",
+            )
+            (decisions_dir / "player_identity_public_contract_decisions.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-public-contract-decisions.v1",
+                        "surface": "obelisk.player_identity.v1",
+                        "status": "blocked",
+                        "public_header_allowed": False,
+                        "public_header": str(header_path),
+                        "public_header_symbols_now": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        drift = next(iter(payload["blocked_public_contract_header_symbols"].values()))
+        self.assertEqual(drift["surface"], "obelisk.player_identity.v1")
+        self.assertIn("ObeliskPlayerIdentity", drift["undeclared_symbols"])
+        self.assertIn("RegisterPlayerIdentityWithOwnerTokenHandle", drift["undeclared_symbols"])
+        self.assertIn("principal_handle", drift["undeclared_symbols"])
+
+    def test_blocked_contract_symbol_drift_ignores_existing_chat_message_rc_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#include <stdint.h>\n"
+                "typedef struct ObeliskChatMessageEvent { uint32_t abi_version; } ObeliskChatMessageEvent;\n"
+                "typedef void (*ObeliskChatMessageEventCallback)(const ObeliskChatMessageEvent* event, void* user_data);\n"
+                "typedef struct ObeliskApi {\n"
+                "    uint64_t (*RegisterChatMessageEventWithOwnerTokenHandle)(uint64_t ownerToken, ObeliskChatMessageEventCallback callback, void* userData);\n"
+                "} ObeliskApi;\n",
+                encoding="utf-8",
+            )
+            (decisions_dir / "command_chat_response_public_contract_decisions.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-contract-decisions.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "status": "blocked",
+                        "public_header_allowed": False,
+                        "public_header": str(header_path),
+                        "public_header_symbols_now": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertNotIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        self.assertEqual(payload["blocked_public_contract_header_symbols"], {})
+
+    def test_blocked_commands_replies_contract_detects_command_symbols(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#include <stdint.h>\n"
+                "typedef struct ObeliskCommandPayload { uint32_t abi_version; } ObeliskCommandPayload;\n"
+                "typedef struct ObeliskApi {\n"
+                "    uint64_t (*RegisterCommandWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "} ObeliskApi;\n",
+                encoding="utf-8",
+            )
+            (decisions_dir / "commands_replies_public_contract_decisions.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.commands-replies-public-contract-decisions.v1",
+                        "surface": "obelisk.commands_replies.v1",
+                        "status": "blocked",
+                        "public_header_allowed": False,
+                        "public_header": str(header_path),
+                        "public_header_symbols_now": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        drift = next(iter(payload["blocked_public_contract_header_symbols"].values()))
+        self.assertEqual(drift["surface"], "obelisk.commands_replies.v1")
+        self.assertIn("ObeliskCommandPayload", drift["undeclared_symbols"])
+        self.assertIn("RegisterCommandWithOwnerTokenHandle", drift["undeclared_symbols"])
+
+    def test_blocked_contract_symbols_are_not_reported_when_contract_lists_them(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#include <stdint.h>\n"
+                "typedef struct ObeliskApi {\n"
+                "    uint64_t (*RegisterCommandResponseWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "} ObeliskApi;\n",
+                encoding="utf-8",
+            )
+            (decisions_dir / "command_chat_response_public_contract_decisions.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-contract-decisions.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "status": "blocked",
+                        "public_header_allowed": False,
+                        "public_header": str(header_path),
+                        "public_header_symbols_now": ["RegisterCommandResponseWithOwnerTokenHandle"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertNotIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        self.assertEqual(payload["blocked_public_contract_header_symbols"], {})
 
     def test_current_manifest_reports_exact_unresolved_v1_surface_groups(self) -> None:
         result = self.run_checker("--json", check=False)

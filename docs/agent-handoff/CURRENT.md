@@ -6,10 +6,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Active Objective
 
-- `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime,
-  ProcessEvent hook, plugin lifecycle, central install layout, `oBaseEvents`,
-  `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, descriptors, timers, and
-  refreshed RC evidence.
+- `v0.1.0-rc.2` is the current published core-first RC baseline after a clean release
+  gate and tag/ref verification; stale tags must not be reused.
 - Post-RC work moves toward `v1.0`: a complete public SDK contract for plugin authors,
   not just a stable runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
   `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
@@ -54,7 +52,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 - RC public scope remains limited to `GameplayPolicyEvent`, minimal copied
   `ChatMessageEvent`, `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and
-  process-local owner-token timers. It is not a production-stable `v1.0` claim.
+  process-local owner-token timers with explicit unregister; this is not a gameplay/module timer API, shared scheduler state, UE identity, or persistent handles. It is not a production-stable `v1.0` claim.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list
   for a complete SDK claim. Player identity, permissions/admin, the command/chat response
   path, commands/replies, inventory/items mutation, structure census/build policy,
@@ -111,13 +109,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   orientation-only, and player identity is still blocked on a non-protected core plus a
   complete reflection inventory pack.
 - Inventory, structures, missions, transfers, dinos, buffs, tribes, ResourceHandle, and
-  GObjects remain internal/candidate unless promoted through their own copied ABI, privacy,
-  lifecycle, and evidence gates. While identity waits on copied core evidence, inventory
-  copied signals are the higher-value side lane; structure census remains useful offline
-  planning/consume-only work. Neither side lane displaces identity -> permissions/admin
-  -> commands/replies. Do not restart broad FName, GObjects, or core scans for
-  ResourceHandle. Strict serial policy remains candidate-only; ResourceHandle public
-  lookup remains blocked and does not unlock public handles.
+  GObjects remain internal/candidate. ResourceHandle/public GObjects remain blocked; old
+  flag-policy artifact is obsolete; durable rich-provenance refresh is preserved; Consume
+  mode accepts it and promote mode stays blocked; Do not rerun broad FName, GObjects, or
+  core scans for ResourceHandle. post-callback rejection contract is preserved as candidate-only; helper evidence stays internal; first strict serial reuse/wraparound policy artifact is preserved; manifest consume mode accepts it and promote mode blocks it as candidate-only; does not unlock runtime negative samples, public lookup, object identity. The next strict ResourceHandle blocker is rejected runtime object samples plus runtime serial reuse/wraparound semantics; future-runtime-observation-plan requires an operator-approved live-ops brief names the exact debug target. Do not replace this with another broad offline FName/GObjects scan.
 - Static field-window evidence clears only the static coherent field-window packaging
   blocker, supports `obelisk.fuobjectarray-field-window-redacted.v1` as a durable
   normalized artifact-pack child manifest in consume mode only, and is not a `v1.0` SDK
@@ -151,19 +146,20 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   economy/storage/operator ingress, inventory/items mutation, and structure/build policy.
   P2: dinos/tribes/missions/transfers unless stronger demand appears. This priority map
   does not authorize copying ArkApi/NextGenPlugins implementation details.
-- If no copied core is available, keep progressing offline by tightening guardrails,
+- Current post-RC focus: If no copied core is available, keep progressing offline by tightening guardrails,
   permission/admin query-only minimum design, command/principal contract, inventory
   copied-signal evidence hygiene, and structure census consume/promote-blocked checks
   without claiming SDK promotion. Prefer inventory copied-signal hygiene over structure
   census when choosing one side lane, because it has more near-term Plugin Hub value while
   identity remains core-blocked. Keep that work experimental and non-completion. This
-  does not authorize Transfer runtime work.
-- Current no-core side-lane priority: `item-return-only-policy-slice` is the best
+  does not authorize Transfer runtime work. inventory copied signals are the higher-value side lane; structure census remains useful offline planning/consume-only work; Neither side lane displaces identity -> permissions/admin -> commands/replies. The accepted RC UFunction second-source root is guardrail evidence only, not a broad SDK completion signal.
+- Current no-core side-lane priority: `item-return-only-policy-slice` has three copied
+  `GameplayPolicyEvent` `ReturnValue` checks and is the best
   value/risk target set because it already has release-readiness classification,
   fixture coverage, and second-source layout evidence behind existing
   `GameplayPolicyEvent` event kinds. It still must be described only as copied
-  `ReturnValue` signal evidence; it does not promote an Inventory SDK, Items SDK,
-  identity, lookup, mutation, return override, runtime validation, or v1 completion.
+  `ReturnValue` signal evidence; it does not promote a public Inventory SDK, public Items SDK, identity, lookup, mutation, return override, runtime validation, or v1 completion.
+- Mission copied-bool remains internal/candidate-only: exact bool-tail evidence is `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`; it does not promote Mission SDK, authority, identity, mutation, return override, or v1 completion.
 - Keep `obelisk.command_chat_response_path.v1` as orientation-only until identity and
   permissions/admin are promoted and a copied response contract exists. The current static
   checker is useful for later target matching, but it must not become public ABI or
@@ -195,6 +191,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `examples/sdk_descriptor_catalog` as the external scaffold for descriptor/catalog
   readers; `plugins/oDescriptorCatalog` remains the in-tree runtime reference plugin, not
   the external package scaffold.
+- Plugin cleanup failure policy skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown after shutdown already ran.
 - Revalidate before any checkpoint: identity readiness stays blocked with
   `non_protected_core_input_missing`, public SDK v1 completion stays blocked, Plugin Hub
   docs stay non-promotional, and `git diff --check` passes.

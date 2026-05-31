@@ -781,6 +781,8 @@ run_step cmake --build "${BUILD_DIR}" -j"${JOBS}"
 run_step check_production_runtime_symbols
 run_step ctest --test-dir "${BUILD_DIR}" --output-on-failure
 run_step scripts/run_script_tests.sh
+run_step python3 scripts/check_item_return_only_readiness.py --json
+run_step python3 scripts/check_inventory_action_fixture_boundary.py --json
 if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
     second_source_status=0
     for target_set in "${UFUNCTION_SECOND_SOURCE_TARGET_SETS[@]}"; do
