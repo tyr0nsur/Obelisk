@@ -70,6 +70,9 @@ explicit enough for review: `plugin_id`, display name, plugin version, minimum O
 line, exactly one `Support tier: <tier>` declaration using release-supported seed,
 experimental pattern, or blocked backlog, used capabilities, config path, exported ABI
 entry points, and whether shutdown is exported and why.
+Directory index files such as `examples/README.md` may summarize tiers, but they are not
+package metadata; each candidate package README or manifest owns the single reviewed
+`Support tier:` declaration.
 
 Review must fail if README, package metadata, or public seed docs claim v1 readiness,
 ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies, mutation,

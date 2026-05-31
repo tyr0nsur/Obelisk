@@ -296,19 +296,37 @@ def item_return_only_policy_slice_manifest(
         non_claims = sorted(gate.REQUIRED_ITEM_RETURN_ONLY_NON_CLAIMS) + [
             "does not copy CraftBlueprint, bIgnoreInventoryRequirement, bConsumeResources, toInventory, DestinationItem, or AdditionalData"
         ]
+    input_snapshots = [
+        {
+            "id": f"snapshot-{index:04d}",
+            "sha256": f"{index}" * 64,
+            "target": target,
+        }
+        for index, target in enumerate(
+            [
+                "PrimalItem.AllowEquipItem",
+                "PrimalItem.CanRepair",
+                "PrimalItem.CraftBlueprint",
+                "PrimalItem.UseItemOntoItem",
+            ],
+            start=1,
+        )
+    ]
+    source_by_target = {snapshot["target"]: snapshot for snapshot in input_snapshots}
     copied_return_bools = [
         {
-            "target": field.rsplit(".", 1)[0],
+            "target": target,
             "field": "ReturnValue",
             "copied_field": field,
             "direction": "return",
             "type": "bool",
             "element_size": 1,
             "evidence_status": "copied-return-bool-only",
-            "source_snapshot": f"snapshot-{index:04d}",
-            "source_snapshot_sha256": f"{index}" * 64,
+            "source_snapshot": source_by_target[target]["id"],
+            "source_snapshot_sha256": source_by_target[target]["sha256"],
         }
-        for index, field in enumerate(copied_fields, start=1)
+        for field in copied_fields
+        for target in [field.rsplit(".", 1)[0]]
     ]
     payload = {
         "schema": gate.ITEM_RETURN_ONLY_POLICY_SLICE_SCHEMA,
@@ -319,7 +337,7 @@ def item_return_only_policy_slice_manifest(
         "missing_targets": missing_targets,
         "generated_from": {
             "snapshot_schema": SNAPSHOT_SCHEMA,
-            "input_snapshots": [{"id": f"snapshot-{index:04d}", "sha256": f"{index}" * 64} for index in range(1, 5)],
+            "input_snapshots": input_snapshots,
         },
         "coverage": {
             "status": "complete",
@@ -5486,6 +5504,24 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("item_return_policy_coverage_input_targets_mismatch", reasons)
         self.assertIn("item_return_policy_input_snapshot_count_mismatch", reasons)
         self.assertIn("item_return_policy_copied_bool_target_mismatch", reasons)
+
+    def test_blocks_item_return_only_policy_slice_source_snapshot_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "item-return-policy.json"
+            payload = item_return_only_policy_slice_manifest()
+            payload["copied_return_bools"][0]["source_snapshot"] = "unknown-snapshot"
+            payload["copied_return_bools"][1]["source_snapshot_sha256"] = "7" * 64
+            payload["generated_from"]["input_snapshots"][3]["target"] = "PrimalItem.WrongTarget"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("item_return_policy_copied_bool_source_snapshot_unknown", reasons)
+        self.assertIn("item_return_policy_copied_bool_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("item_return_policy_copied_bool_source_snapshot_target_mismatch", reasons)
 
     def test_blocks_item_return_only_policy_slice_missing_descriptor_preflight(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

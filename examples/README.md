@@ -21,6 +21,16 @@ not ArkApi portability kits, module SDKs, or evidence that Obelisk SDK v1 is com
   top-level Obelisk CMake project, not installed by `scripts/install_obelisk.sh`, and
   not part of the release-supported install layout.
 
+Each example README owns exactly one `Support tier:` declaration. The current installed
+SDK example tiers are:
+
+| Example | Support tier |
+| --- | --- |
+| `sdk_minimal_plugin/` | release-supported seed |
+| `sdk_descriptor_catalog/` | release-supported seed |
+| `sdk_timer_plugin/` | release-supported seed |
+| `sdk_inventory_policy_audit/` | experimental pattern |
+
 Examples must stay inside public `include/obelisk/ObeliskApi.h` contracts. Do not use
 private headers, raw UE pointers, `ProcessEvent` internals, identity, lookup, mutation,
 return overrides, new gameplay APIs, chat replies/send-chat, or ArkApi implementation

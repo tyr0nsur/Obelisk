@@ -4313,6 +4313,7 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
         blockers.append({"reason": "item_return_policy_missing_targets_present", "label": f"{label}:$.missing_targets"})
 
     generated_from = payload.get("generated_from")
+    input_snapshot_sources: dict[str, dict[str, Any]] = {}
     if not isinstance(generated_from, dict):
         blockers.append({"reason": "item_return_policy_generated_from_missing", "label": f"{label}:$.generated_from"})
     else:
@@ -4336,6 +4337,11 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
                     seen_snapshot_ids.add(snapshot_id)
                 if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
                     blockers.append({"reason": "item_return_policy_input_snapshot_sha256_invalid", "label": f"{snapshot_label}.sha256"})
+                elif isinstance(snapshot_id, str) and snapshot_id:
+                    input_snapshot_sources[snapshot_id] = {
+                        "sha256": snapshot_sha256,
+                        "target": snapshot.get("target"),
+                    }
 
     if safety_summary.get("artifact_status") != "evidence_only":
         blockers.append({"reason": "item_return_policy_artifact_status_not_evidence_only", "label": f"{label}:$.safety_summary.artifact_status"})
@@ -4378,6 +4384,24 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
                 blockers.append({"reason": "item_return_policy_copied_bool_not_return_bool", "label": entry_label})
             if entry.get("evidence_status") != "copied-return-bool-only":
                 blockers.append({"reason": "item_return_policy_copied_bool_evidence_status_mismatch", "label": entry_label})
+            source_snapshot = entry.get("source_snapshot")
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "item_return_policy_copied_bool_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif source_snapshot_sha256 != input_snapshot_sources[source_snapshot]["sha256"]:
+                blockers.append(
+                    {
+                        "reason": "item_return_policy_copied_bool_source_snapshot_sha256_mismatch",
+                        "label": f"{entry_label}.source_snapshot_sha256",
+                        "expected": input_snapshot_sources[source_snapshot]["sha256"],
+                        "recorded": source_snapshot_sha256,
+                    }
+                )
+            elif (
+                isinstance(input_snapshot_sources[source_snapshot].get("target"), str)
+                and entry.get("target") != input_snapshot_sources[source_snapshot]["target"]
+            ):
+                blockers.append({"reason": "item_return_policy_copied_bool_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
 
     blockers.extend(
         validate_item_return_descriptor_preflight(

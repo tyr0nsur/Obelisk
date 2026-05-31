@@ -1459,6 +1459,178 @@ def build_report(
     }
 
 
+def format_human_list(items: Any, *, limit: int = 12) -> str:
+    if not isinstance(items, list) or not items:
+        return "none"
+    rendered = [str(item) for item in items[:limit]]
+    if len(items) > limit:
+        rendered.append(f"... {len(items) - limit} more")
+    return ", ".join(rendered)
+
+
+def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
+    guidance: dict[str, list[str]] = {
+        "stable_release_contract_claim_not_allowed": [
+            "stable_release_contract.claim_allowed is not true; keep stable SDK release wording blocked.",
+            "Action: leave the claim off until the manifest, blocker outcomes, and release statement all pass.",
+        ],
+        "v1_completion_required_false": [
+            "v1_completion_required is not true.",
+            "Action: do not describe this tree as a complete v1.0 SDK; finish or explicitly exclude blockers first.",
+        ],
+        "stable_release_contract_claim_requires_incomplete": [
+            "stable_release_contract.claim_requires is missing required guardrail text.",
+            f"Missing: {format_human_list(report.get('stable_release_contract_missing_claim_requires'))}.",
+        ],
+        "stable_release_contract_not_sufficient_incomplete": [
+            "stable_release_contract.not_sufficient is missing non-claim boundaries.",
+            f"Missing: {format_human_list(report.get('stable_release_contract_missing_not_sufficient'))}.",
+        ],
+        "promoted_experimental_surfaces_unresolved": [
+            "Experimental copied-data seeds still need an explicit v1 outcome.",
+            f"Surfaces: {format_human_list(report.get('unresolved_experimental_surfaces'))}.",
+            "Action: promote with evidence, exclude, or mark post-v1 and name each in the release statement.",
+        ],
+        "v1_sdk_completion_blockers_unresolved": [
+            "High-demand v1 completion blockers are still unresolved.",
+            f"Surfaces: {format_human_list(report.get('unresolved_completion_blockers'))}.",
+            "Action: promote with copied C ABI evidence or deliberately exclude/post-v1 where the contract allows it.",
+        ],
+        "planning_surfaces_unresolved_for_v1_claim": [
+            "Planning surfaces remain in the surface table.",
+            f"Surfaces: {format_human_list(report.get('unresolved_planning_surfaces'))}.",
+            "Action: convert each to promoted, excluded, or post-v1 before any complete SDK claim.",
+        ],
+        "top_level_planning_surfaces_unresolved_for_v1_claim": [
+            "The top-level planning_surfaces list is not empty.",
+            f"Surfaces: {format_human_list(report.get('top_level_planning_surfaces'))}.",
+            "Action: keep v1 blocked until those entries have reviewed outcomes.",
+        ],
+        "completion_blocker_exclusion_contract_missing": [
+            "A non-promoted completion blocker lacks a v1_decision_contract.exclusion_requires checklist.",
+            f"Surfaces: {format_human_list(report.get('missing_completion_blocker_exclusion_contracts'))}.",
+        ],
+        "promoted_surface_public_contract_missing": [
+            "Promoted surfaces are missing public_contract entries.",
+            f"Surfaces: {format_human_list(report.get('promoted_without_public_contract'))}.",
+        ],
+        "promoted_surface_evidence_missing": [
+            "Promoted surfaces lack acceptable ABI and SDK-consumer promotion evidence.",
+            f"Surfaces: {format_human_list(report.get('promoted_surfaces_without_evidence'))}.",
+            f"Completion blockers: {format_human_list(report.get('promoted_blockers_without_evidence'))}.",
+        ],
+        "promoted_surface_required_evidence_terms_missing": [
+            "Promoted surfaces are missing required named evidence terms.",
+            "Action: add the required terms to the manifest evidence or keep the surface non-promoted.",
+        ],
+        "promoted_surface_dependency_unresolved": [
+            "A public ABI surface is promoted while required dependency surfaces are not promoted.",
+            "Action: promote the dependencies first, or keep the dependent surface non-promoted.",
+        ],
+        "non_promoted_surface_has_public_contract": [
+            "A non-promoted surface still lists public_contract entries.",
+            f"Surfaces: {format_human_list(report.get('non_promoted_with_public_contract'))}.",
+            "Action: remove the public contract entries or promote the surface with evidence.",
+        ],
+        "non_promoted_surface_has_public_abi": [
+            "A non-promoted surface is marked public_abi=true.",
+            f"Surfaces: {format_human_list(report.get('non_promoted_with_public_abi'))}.",
+            "Action: remove public_abi or promote the surface with dependencies and evidence.",
+        ],
+        "release_statement_required_for_v1_completion": [
+            "The manifest is trying to allow a v1 completion claim without a reviewed release statement.",
+            "Action: pass --release-statement with the reviewed v1 SDK compatibility statement.",
+        ],
+        "release_statement_missing_non_promoted_blocker_outcomes": [
+            "The release statement is missing required outcome records for non-promoted blockers.",
+            f"Surfaces: {format_human_list(report.get('release_statement_missing_blocker_outcomes'))}.",
+            "Action: add one exact record per surface: '<surface-id>: excluded - ...' or '<surface-id>: post-v1 - ...'.",
+        ],
+        "release_statement_missing_exclusion_contract": [
+            "The release statement outcome text does not satisfy the surface exclusion contract.",
+            f"Surfaces: {format_human_list(report.get('release_statement_missing_exclusion_contracts'))}.",
+            "Action: include the required exclusion wording from each surface v1_decision_contract.",
+        ],
+        "release_statement_missing_experimental_outcomes": [
+            "The release statement is missing required outcome records for experimental copied-data seeds.",
+            f"Surfaces: {format_human_list(report.get('release_statement_missing_experimental_outcomes'))}.",
+            "Action: name the seed and state whether it is promoted, excluded, or post-v1.",
+        ],
+        "release_statement_duplicate_or_mixed_surface_records": [
+            "The release statement has duplicate or mixed outcome records for a surface.",
+            f"Surfaces: {format_human_list(report.get('release_statement_duplicate_or_mixed_records'))}.",
+            "Action: keep exactly one promoted/excluded/post-v1 record per surface.",
+        ],
+        "release_statement_forbidden_broad_claims": [
+            "The release statement contains broad SDK/support claims that conflict with blocked surfaces.",
+            f"Claims: {format_human_list(report.get('release_statement_forbidden_broad_claims'), limit=4)}.",
+        ],
+        "release_statement_missing_sdk_compatibility_reference": [
+            "The release statement does not reference docs/SDK_V1_COMPATIBILITY.md.",
+        ],
+        "release_statement_missing_public_sdk_surfaces_reference": [
+            "The release statement does not reference docs/public_sdk_surfaces.json.",
+        ],
+        "blocked_public_contract_header_symbols_detected": [
+            "The public header contains symbols that look like blocked public contract surface drift.",
+            "Action: remove those symbols or update the reviewed public contract decisions before claiming v1.",
+        ],
+        "schema_mismatch": [
+            "The manifest schema is not obelisk.public-sdk-surfaces.v1.",
+        ],
+        "sdk_version_not_v1": [
+            "The manifest sdk_version is not v1.0.",
+        ],
+        "stable_release_contract_missing": [
+            "The manifest is missing stable_release_contract.",
+        ],
+        "surface_id_missing": [
+            f"Missing surfaces: {format_human_list(report.get('missing_surfaces'))}.",
+        ],
+        "canonical_surface_id_missing": [
+            f"Missing canonical surfaces: {format_human_list(report.get('missing_canonical_surfaces'))}.",
+        ],
+        "canonical_v1_completion_blocker_missing": [
+            f"Missing canonical blockers: {format_human_list(report.get('missing_canonical_completion_blockers'))}.",
+        ],
+        "duplicate_surface_id": [
+            f"Duplicate surface IDs: {format_human_list(report.get('duplicate_surface_ids'))}.",
+        ],
+        "debug_only_surface_promoted": [
+            "Debug-only surfaces cannot count as promoted public SDK surfaces.",
+            f"Surfaces: {format_human_list(report.get('debug_only_promoted_surfaces'))}.",
+        ],
+        "promoted_surface_list_mismatch": [
+            f"Promoted surface list mismatches: {format_human_list(report.get('promoted_list_mismatches'))}.",
+        ],
+        "experimental_surface_list_mismatch": [
+            f"Experimental surface list mismatches: {format_human_list(report.get('experimental_list_mismatches'))}.",
+        ],
+        "planning_surface_list_mismatch": [
+            f"Planning surface list mismatches: {format_human_list(report.get('planning_list_mismatches'))}.",
+        ],
+        "post_v1_or_excluded_surface_list_mismatch": [
+            "post_v1_or_excluded_surfaces does not match surface statuses.",
+            f"Surfaces: {format_human_list(report.get('post_v1_or_excluded_list_mismatches'))}.",
+        ],
+    }
+    return guidance.get(blocker, ["Action: inspect the JSON report for this blocker with --json."])
+
+
+def print_human_report(report: dict[str, Any]) -> None:
+    if report["ready"]:
+        print("Public SDK v1 completion gate passed.")
+        return
+    print("Public SDK v1 completion gate blocked.")
+    print("The stable v1 SDK claim remains disabled; this is not a v1.0 complete SDK approval.")
+    print("Blockers:")
+    for blocker in report["blockers"]:
+        print(f"- {blocker}")
+        for detail in blocker_guidance(report, blocker):
+            print(f"  {detail}")
+    print("Use --json for the full machine-readable report.")
+
+
 def main() -> int:
     args = parse_args()
     report = build_report(
@@ -1469,12 +1641,8 @@ def main() -> int:
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
-    elif report["ready"]:
-        print("Public SDK v1 completion gate passed.")
     else:
-        print("Public SDK v1 completion gate blocked:")
-        for blocker in report["blockers"]:
-            print(f"- {blocker}")
+        print_human_report(report)
     return 0 if report["ready"] else 1
 
 

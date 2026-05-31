@@ -105,6 +105,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
 
+    def test_human_output_names_actionable_v1_blocker_details(self) -> None:
+        result = self.run_checker(check=False)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("The stable v1 SDK claim remains disabled", result.stdout)
+        self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
+        self.assertIn("obelisk.player_identity.v1", result.stdout)
+        self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
+        self.assertIn("obelisk.chat_message.v1", result.stdout)
+        self.assertIn("Use --json for the full machine-readable report.", result.stdout)
+
     def test_blocked_contract_decisions_detect_untracked_public_header_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)

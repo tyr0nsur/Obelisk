@@ -79,6 +79,12 @@ SDK_INVENTORY_POLICY_AUDIT_EXAMPLE_FILES = [
     / "sdk_inventory_policy_audit"
     / "inventory_policy_audit_plugin.c",
 ]
+INSTALLED_SDK_EXAMPLE_SUPPORT_TIERS = {
+    "sdk_minimal_plugin": "release-supported seed",
+    "sdk_descriptor_catalog": "release-supported seed",
+    "sdk_timer_plugin": "release-supported seed",
+    "sdk_inventory_policy_audit": "experimental pattern",
+}
 PUBLIC_RELEASE_SCOPE_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_ARCHITECTURE.md",
     REPO_ROOT / "docs" / "RELEASE.md",
@@ -5244,6 +5250,35 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn("foundation/contributor-readiness sample", compact)
                 self.assertIn("not ArkApi portability", compact)
                 self.assertIn("not Obelisk SDK v1 evidence", compact)
+
+    def test_installed_sdk_example_support_tiers_are_explicit_and_stable(self) -> None:
+        examples_index = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+
+        for example_name, expected_tier in INSTALLED_SDK_EXAMPLE_SUPPORT_TIERS.items():
+            readme_path = REPO_ROOT / "examples" / example_name / "README.md"
+            readme = readme_path.read_text(encoding="utf-8")
+            declarations = plugin_hub_support_tier_declarations(readme)
+
+            with self.subTest(path=readme_path.relative_to(REPO_ROOT), check="single tier"):
+                self.assertEqual(declarations, [expected_tier])
+
+            index_row = f"| `{example_name}/` | {expected_tier} |"
+            with self.subTest(path="examples/README.md", row=index_row):
+                self.assertIn(index_row, examples_index)
+
+        release_supported = {
+            name
+            for name, tier in INSTALLED_SDK_EXAMPLE_SUPPORT_TIERS.items()
+            if tier == "release-supported seed"
+        }
+        self.assertEqual(
+            release_supported,
+            {"sdk_minimal_plugin", "sdk_descriptor_catalog", "sdk_timer_plugin"},
+        )
+        self.assertEqual(
+            INSTALLED_SDK_EXAMPLE_SUPPORT_TIERS["sdk_inventory_policy_audit"],
+            "experimental pattern",
+        )
 
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")
