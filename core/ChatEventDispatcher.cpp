@@ -128,9 +128,29 @@ namespace Obelisk::Core
         std::vector<ChatMessageSubscription> removed;
         size_t before = 0;
         size_t after = 0;
+        try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
+            const size_t matchingCount = static_cast<size_t>(
+                std::count_if(m_Registrations.begin(),
+                              m_Registrations.end(),
+                              [registrationId](const Registration& item) {
+                                  return item.Id == registrationId;
+                              }));
+            if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
+                return false;
+            }
+            removed.reserve(matchingCount);
+            if (m_DispatchDepth > 0)
+                m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
                                           [registrationId, &removed](const Registration& item) {
@@ -148,6 +168,18 @@ namespace Obelisk::Core
                      !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event unregister failed: {}", e.what());
+            return false;
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event unregister failed with an unknown exception.");
+            return false;
+        }
         for (const ChatMessageSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
         return after != before;
@@ -161,9 +193,29 @@ namespace Obelisk::Core
         std::vector<ChatMessageSubscription> removed;
         size_t before = 0;
         size_t after = 0;
+        try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
+            const size_t matchingCount = static_cast<size_t>(
+                std::count_if(m_Registrations.begin(),
+                              m_Registrations.end(),
+                              [owner](const Registration& item) {
+                                  return item.Owner == owner;
+                              }));
+            if (matchingCount == 0)
+            {
+                if (!IsInsideAnyGameplayCallback() &&
+                    !IsInsideDispatcherCleanup() &&
+                    !IsDispatchCleanupComplete())
+                {
+                    m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                }
+                return 0;
+            }
+            removed.reserve(matchingCount);
+            if (m_DispatchDepth > 0)
+                m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
                                           m_Registrations.end(),
                                           [owner, &removed](const Registration& item) {
@@ -180,6 +232,18 @@ namespace Obelisk::Core
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+        }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event owner cleanup failed: {}", e.what());
+            return 0;
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Chat event owner cleanup failed with an unknown exception.");
+            return 0;
         }
         for (const ChatMessageSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);

@@ -22,7 +22,7 @@
 ## Validation
 
 - [ ] `git diff --check`
-- [ ] `cmake -S . -B build`
+- [ ] `cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo`
 - [ ] `cmake --build build -j"$(nproc)"`
 - [ ] `ctest --test-dir build --output-on-failure`
 - [ ] `scripts/run_script_tests.sh`

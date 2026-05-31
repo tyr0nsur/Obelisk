@@ -95,16 +95,18 @@ Validation result:
 ```text
 static-global consume gate: accepted
 static-global blockers: []
-manifest sha256: b2929c5061aefdf3cfd24c9a8c42b27490edb89b551dff1a3d544b4da42a9113
+artifact identity sha256: b2929c5061aefdf3cfd24c9a8c42b27490edb89b551dff1a3d544b4da42a9113
+manifest file sha256: bcc44f2b0a007deb50f1605eb78c771834d6739bb7e6ced732e58e6cbe197edc
 field-window sha256: 86957b02e41445595c5082d192fe4988b12397913336d099d3f68b079fdafc1e
 fname_root fields: root_slot
 gobjects fields: chunks, count, root, serial
 ```
 
 This clears the static coherent field-window blocker for the reviewed `gobjects`
-candidate in consume-mode static evidence only. It still does not promote public
-`GObjects`, `ResourceHandle`, object identity, lookup, mutation, return override, runtime
-hooks, or any SDK surface.
+candidate in consume-mode static evidence only. It remains tmp-only until a supported
+normalized artifact-pack shape exists for the redacted field-window input. It still does
+not promote public `GObjects`, `ResourceHandle`, object identity, lookup, mutation,
+return override, runtime hooks, or any SDK surface.
 
 ## Fastest Offline Route
 

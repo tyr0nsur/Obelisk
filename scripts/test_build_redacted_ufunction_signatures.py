@@ -86,6 +86,122 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
             ],
         }
 
+    def add_player_identity_admin_anchor_snapshots(self, snapshot_root: Path) -> None:
+        manifest_path = snapshot_root / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        sha_prefix = manifest["sha_prefix"]
+        module = "sdk_players_identity"
+        entries = [
+            ("ShooterPlayerController", "ServerListPlayers"),
+            ("ShooterPlayerController", "ServerKickPlayer"),
+        ]
+        manifest["targets"].extend(
+            {
+                "file": f"{outer}.{name}.snapshot.json",
+                "module": module,
+                "name": name,
+                "outer": outer,
+            }
+            for outer, name in entries
+        )
+        write_json(manifest_path, manifest)
+
+        common_evidence = {
+            "ark_binary_sha256": manifest["ark_binary_sha256"],
+            "artifact_kind": "offline_core",
+            "artifact_sha256": "1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e",
+            "capture_id": "primary_core_20260527T031311Z",
+            "evidence_pack_id": "primary_core_pack_20260527T031311Z",
+            "obelisk_commit": "5ad06ff",
+            "source": "offline_core",
+            "status": "candidate-only",
+        }
+        target_dir = snapshot_root / sha_prefix / module
+        write_json(
+            target_dir / "ShooterPlayerController.ServerListPlayers.snapshot.json",
+            {
+                "schema": tool.SUPPORTED_SNAPSHOT_SCHEMA,
+                "evidence": common_evidence,
+                "targets": [
+                    {
+                        "target": {"outer_name": "ShooterPlayerController", "name": "ServerListPlayers"},
+                        "function_flags": "0x220cc0",
+                        "num_parms": 0,
+                        "parms_size": 0,
+                        "return_value_offset": "0xffff",
+                        "property_chain": {"expected_count": 0, "observed_count": 0, "properties": []},
+                    }
+                ],
+            },
+        )
+        write_json(
+            target_dir / "ShooterPlayerController.ServerKickPlayer.snapshot.json",
+            {
+                "schema": tool.SUPPORTED_SNAPSHOT_SCHEMA,
+                "evidence": common_evidence,
+                "targets": [
+                    {
+                        "target": {"outer_name": "ShooterPlayerController", "name": "ServerKickPlayer"},
+                        "function_flags": "0x220cc0",
+                        "num_parms": 3,
+                        "parms_size": 25,
+                        "return_value_offset": "0xffff",
+                        "property_chain": {
+                            "expected_count": 3,
+                            "observed_count": 3,
+                            "properties": [
+                                {
+                                    "name": "PlayerId",
+                                    "class_name": "IntProperty",
+                                    "status": "candidate",
+                                    "offset_internal": 0,
+                                    "element_size": 4,
+                                    "array_dim": 1,
+                                    "property_flags": "0x80",
+                                    "membership_status": "candidate-uobject",
+                                    "class_membership_status": "candidate-uobject",
+                                    "outer_membership_status": "candidate-uobject",
+                                    "name_index": 111,
+                                    "object_index": 222,
+                                },
+                                {
+                                    "name": "Reason",
+                                    "class_name": "StrProperty",
+                                    "status": "candidate",
+                                    "offset_internal": 8,
+                                    "element_size": 16,
+                                    "array_dim": 1,
+                                    "property_flags": "0x80",
+                                    "membership_status": "candidate-uobject",
+                                    "class_membership_status": "candidate-uobject",
+                                    "outer_membership_status": "candidate-uobject",
+                                    "name_index": 333,
+                                    "object_index": 444,
+                                },
+                                {
+                                    "name": "bBan",
+                                    "class_name": "BoolProperty",
+                                    "status": "candidate",
+                                    "offset_internal": 24,
+                                    "element_size": 1,
+                                    "array_dim": 1,
+                                    "property_flags": "0x80",
+                                    "membership_status": "candidate-uobject",
+                                    "class_membership_status": "candidate-uobject",
+                                    "outer_membership_status": "candidate-uobject",
+                                    "byte_mask": "0x01",
+                                    "field_mask": "0xff",
+                                    "native_bool": False,
+                                    "name_index": 555,
+                                    "object_index": 666,
+                                },
+                            ],
+                        },
+                    }
+                ],
+            },
+        )
+
     def test_builds_redacted_candidate_only_signature(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             snapshot = Path(tmp) / "snapshot.json"
@@ -185,6 +301,113 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("candidate_only", report["safety_summary"]["artifact_status"])
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertEqual("offline_review_only", report["safety_summary"]["intended_use"])
+
+    def test_players_identity_first_evidence_fails_closed_on_missing_admin_anchors(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+        with self.assertRaisesRegex(
+            SystemExit,
+            "missing_required_target:ShooterPlayerController.ServerListPlayers",
+        ) as raised:
+            tool.build_players_identity_first_evidence(snapshot_root=fixture_root)
+
+        self.assertIn("missing_required_target:ShooterPlayerController.ServerKickPlayer", str(raised.exception))
+
+    def test_players_identity_first_evidence_is_candidate_only_and_force_redacted(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied_root = Path(temp_dir) / "ufunction_snapshots"
+            shutil.copytree(fixture_root, copied_root)
+            self.add_player_identity_admin_anchor_snapshots(copied_root)
+
+            report = tool.build_players_identity_first_evidence(snapshot_root=copied_root)
+
+        self.assertEqual(tool.PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA, report["schema"])
+        self.assertEqual("candidate_only", report["artifact_status"])
+        self.assertEqual("planning_only", report["readiness_classification"])
+        self.assertIs(False, report["promotion_ready"])
+        self.assertIs(False, report["public_sdk_ready"])
+        self.assertIs(False, report["runtime_ready"])
+        self.assertEqual("redacted", report["snapshot_root"])
+        self.assertEqual("players-identity-lifecycle-intake", report["input_target_set"])
+        self.assertEqual("complete", report["target_set_coverage"]["status"])
+        self.assertEqual(12, report["safety_summary"]["target_count"])
+        self.assertEqual(12, len(report["generated_from"]["input_snapshots"]))
+        self.assertTrue(report["artifact_identity"]["path_redacted"])
+        self.assertEqual("7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520", report["artifact_identity"]["ark_binary_sha256"])
+        self.assertEqual("5ad06ff", report["artifact_identity"]["obelisk_commit"])
+
+        target_roles = {entry["target"]: entry["lifecycle_anchor_role"] for entry in report["targets"]}
+        self.assertEqual(
+            "admin_player_listing_candidate_not_session_start",
+            target_roles["ShooterPlayerController.ServerListPlayers"],
+        )
+        self.assertEqual(
+            "admin_player_kick_candidate_not_session_end",
+            target_roles["ShooterPlayerController.ServerKickPlayer"],
+        )
+        self.assertIs(False, report["lifecycle_anchors"]["session_start_accepted"])
+        self.assertIs(False, report["lifecycle_anchors"]["session_end_accepted"])
+        self.assertEqual([], report["lifecycle_anchors"]["accepted_start_targets"])
+        self.assertEqual([], report["lifecycle_anchors"]["accepted_end_targets"])
+
+        fields_by_key = {entry["field"]: entry for entry in report["fields"]}
+        player_id = fields_by_key["ShooterPlayerController.ServerKickPlayer.PlayerId"]
+        self.assertEqual("forced_redacted", player_id["classification"])
+        self.assertEqual("identity_like_scalar_forced_redacted", player_id["redaction_reason"])
+        reason = fields_by_key["ShooterPlayerController.ServerKickPlayer.Reason"]
+        self.assertEqual("forced_redacted", reason["classification"])
+        self.assertEqual("text_identity_or_private_value_forced_redacted", reason["redaction_reason"])
+        bban = fields_by_key["ShooterPlayerController.ServerKickPlayer.bBan"]
+        self.assertEqual("copied_candidate", bban["classification"])
+        self.assertEqual({"byte_mask": "0x01", "field_mask": "0xff"}, bban["bool_masks"])
+
+        copied_fields = {entry["field"] for entry in report["copied_candidates"]}
+        self.assertIn("ShooterPlayerController.ServerKickPlayer.bBan", copied_fields)
+        self.assertNotIn("ShooterPlayerController.ServerKickPlayer.PlayerId", copied_fields)
+        forced_fields = {entry["field"] for entry in report["forced_redacted_fields"]}
+        self.assertIn("ShooterPlayerController.ServerKickPlayer.PlayerId", forced_fields)
+        self.assertIn("ShooterPlayerController.ServerKickPlayer.Reason", forced_fields)
+
+        forbidden_by_key = {entry["forbidden_field"]: entry for entry in report["forbidden_fields"]}
+        self.assertIn("fname_or_gobjects_indices", forbidden_by_key["ShooterPlayerController.ServerKickPlayer.PlayerId"]["forbidden_sources"])
+        self.assertIn("raw_process_event_params", forbidden_by_key["ShooterPlayerController.ServerKickPlayer.PlayerId"]["forbidden_sources"])
+        self.assertIs(False, report["privacy_policy"]["public_principal_ready"])
+        self.assertIsNone(report["privacy_policy"]["copied_public_identifier"])
+        self.assertIs(False, report["promotion_gate"]["ready"])
+        self.assertIn("public_api", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("fname_indices", report["safety_summary"]["explicitly_excluded"])
+        self.assertIn("gobjects_indices", report["safety_summary"]["explicitly_excluded"])
+
+        serialized = json.dumps(report)
+        self.assertNotIn(str(fixture_root), serialized)
+        self.assertNotIn("tests/fixtures/ufunction_snapshots", serialized)
+        self.assertNotIn(str(copied_root), serialized)
+        self.assertNotIn("name_index", serialized)
+        self.assertNotIn("object_index", serialized)
+        self.assertNotIn('"PlayerId", "classification": "copied_candidate"', serialized)
+
+    def test_players_identity_first_evidence_cli_mode_returns_success(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied_root = Path(temp_dir) / "ufunction_snapshots"
+            shutil.copytree(fixture_root, copied_root)
+            self.add_player_identity_admin_anchor_snapshots(copied_root)
+
+            original_argv = sys.argv
+            try:
+                sys.argv = [
+                    "build_redacted_ufunction_signatures.py",
+                    "--players-identity-first-evidence",
+                    "--snapshot-root",
+                    str(copied_root),
+                    "--json",
+                ]
+                with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                    self.assertEqual(0, tool.main())
+                self.assertIn(tool.PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA, stdout.getvalue())
+            finally:
+                sys.argv = original_argv
 
     def test_item_return_only_policy_slice_emits_only_allowed_return_bools(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"

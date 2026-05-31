@@ -9,6 +9,12 @@
   grammar; and recorded consume-only Structure/GObjects evidence without promoting public
   StructureEvents, identity, mutation, return override, ResourceHandle, or GObjects SDK
   surface.
+- Hardened Chat and ItemReturn unregister exceptional paths so cleanup allocation failures
+  fail closed before registration mutation, added a candidate-only player identity evidence
+  builder that force-redacts identity-like fields and fails closed on missing
+  `ServerListPlayers`/`ServerKickPlayer`, added an offline Structure aggregate/census
+  contract test, and aligned the PR template build command with the RelWithDebInfo
+  contributor/release path.
 - Hardened minimal `ChatMessageEvent` lifecycle and installed-SDK release-example
   coverage: init-failure/post-registration failure and in-flight unload paths now have
   regression tests, and the install-layout test builds release-scope examples against the

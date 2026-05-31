@@ -28,6 +28,7 @@ MISSION_COPIED_BOOL_POLICY_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1
 STRUCTURE_RETURN_ONLY_POLICY_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
 STRUCTURE_AGGREGATE_CENSUS_POLICY_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
+PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -59,6 +60,11 @@ STRUCTURE_NONPIN_COPIED_SCALAR_OUTPUT_TARGET_SET = "structure-nonpin-copied-scal
 STRUCTURE_AGGREGATE_CENSUS_INPUT_TARGET_SET = "structure-aggregate-census-planning"
 STRUCTURE_AGGREGATE_CENSUS_OUTPUT_TARGET_SET = "structure-aggregate-census-policy-slice"
 DINO_COMPACT_DESCRIPTOR_INPUT_TARGET_SET = "dino-compact-intake"
+PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET = "players-identity-lifecycle-intake"
+PLAYERS_IDENTITY_REQUIRED_TARGETS = (
+    "ShooterPlayerController.ServerListPlayers",
+    "ShooterPlayerController.ServerKickPlayer",
+)
 
 ITEM_RETURN_ONLY_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "PrimalItem.AllowEquipItem": {
@@ -461,6 +467,45 @@ SENSITIVE_SCALAR_NAMES = {
     "uniquenetid",
 }
 
+IDENTITY_NAME_FRAGMENTS = (
+    "account",
+    "address",
+    "admin",
+    "character",
+    "controller",
+    "eos",
+    "group",
+    "identity",
+    "ip",
+    "netid",
+    "owner",
+    "pawn",
+    "player",
+    "principal",
+    "profile",
+    "rank",
+    "sender",
+    "session",
+    "steam",
+    "team",
+    "tribe",
+    "unique",
+    "user",
+)
+
+FORBIDDEN_IDENTITY_COORDINATE_KEYS = (
+    "array_inner_candidate",
+    "class_name_index",
+    "class_object_index",
+    "name_index",
+    "object_index",
+    "outer_name_index",
+    "outer_object_index",
+    "property_class_name_index",
+    "property_class_object_index",
+    "struct_type_candidate",
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -549,6 +594,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Emit a consume-only structure aggregate/census policy slice with "
             "approved counters, histograms, copied fields, redactions, and PIN exclusions."
+        ),
+    )
+    parser.add_argument(
+        "--players-identity-first-evidence",
+        action="store_true",
+        help=(
+            "Emit a candidate-only player identity first-evidence report for "
+            "players-identity-lifecycle-intake with identity-like fields force-redacted."
         ),
     )
     return parser.parse_args()
@@ -3056,7 +3109,410 @@ def build_structure_aggregate_census_policy_slice(*, snapshot_root: Path = DEFAU
     }
 
 
+def player_identity_field_is_identity_like(prop: dict[str, Any]) -> bool:
+    class_name = prop.get("class_name")
+    name = prop.get("name")
+    normalized_name = name.lower().replace("_", "") if isinstance(name, str) else ""
+    if class_name in REDACTED_TYPE_BY_CLASS or class_name == "NameProperty":
+        return True
+    if normalized_name in SENSITIVE_SCALAR_NAMES:
+        return True
+    if normalized_name.endswith("id") or normalized_name.endswith("ids"):
+        return True
+    return any(fragment in normalized_name for fragment in IDENTITY_NAME_FRAGMENTS)
+
+
+def forbidden_identity_coordinate_sources(prop: dict[str, Any]) -> list[str]:
+    sources: list[str] = []
+    if any(key in prop for key in FORBIDDEN_IDENTITY_COORDINATE_KEYS):
+        sources.append("fname_or_gobjects_indices")
+    if prop.get("class_name") in REDACTED_TYPE_BY_CLASS or prop.get("class_name") == "NameProperty":
+        sources.append("ue_pointer_or_borrowed_payload")
+    sources.append("raw_process_event_params")
+    return sorted(set(sources))
+
+
+def player_identity_redaction_reason(prop: dict[str, Any]) -> str:
+    class_name = prop.get("class_name")
+    name = prop.get("name")
+    normalized_name = name.lower().replace("_", "") if isinstance(name, str) else ""
+    if class_name in {"ObjectProperty", "WeakObjectProperty", "LazyObjectProperty", "SoftObjectProperty", "InterfaceProperty"}:
+        return "ue_object_identity_forced_redacted"
+    if class_name in {"ArrayProperty", "MapProperty", "SetProperty"}:
+        return "container_payload_identity_forced_redacted"
+    if class_name in {"StrProperty", "TextProperty"}:
+        return "text_identity_or_private_value_forced_redacted"
+    if class_name in {"StructProperty"}:
+        return "struct_payload_identity_forced_redacted"
+    if class_name in {"ClassProperty", "SoftClassProperty"}:
+        return "class_identity_forced_redacted"
+    if class_name == "NameProperty":
+        return "fname_identity_forced_redacted"
+    if normalized_name in SENSITIVE_SCALAR_NAMES or normalized_name.endswith("id") or normalized_name.endswith("ids"):
+        return "identity_like_scalar_forced_redacted"
+    return "identity_context_field_forced_redacted"
+
+
+def player_identity_lifecycle_anchor_role(target: str) -> str:
+    if target == "ShooterPlayerController.ServerListPlayers":
+        return "admin_player_listing_candidate_not_session_start"
+    if target == "ShooterPlayerController.ServerKickPlayer":
+        return "admin_player_kick_candidate_not_session_end"
+    if target == "ShooterPlayerController.ServerSendChatMessage":
+        return "chat_to_principal_boundary_non_claim"
+    if target.startswith("MissionType."):
+        return "mission_membership_candidate_not_identity_lifecycle"
+    if "Tribe" in target:
+        return "tribe_membership_candidate_not_identity_lifecycle"
+    if "SpawnPointsForDownloadedCharacters" in target:
+        return "transfer_spawn_candidate_not_identity_lifecycle"
+    return "candidate_not_identity_lifecycle_anchor"
+
+
+def target_policy_blockers(target: str, target_payload: dict[str, Any], property_count: int) -> list[str]:
+    blockers = [
+        *promotion_blockers_for_signature(target_payload, property_count),
+        "accepted_session_start_anchor_missing",
+        "accepted_session_end_anchor_missing",
+        "principal_copy_policy_missing",
+        "principal_invalidation_semantics_missing",
+        "second_source_lifecycle_evidence_missing",
+    ]
+    if target == "ShooterPlayerController.ServerKickPlayer":
+        blockers.append("admin_mutation_surface_not_identity_lifecycle_anchor")
+    if target == "ShooterPlayerController.ServerListPlayers":
+        blockers.append("admin_listing_surface_not_identity_lifecycle_anchor")
+    return sorted(set(blockers))
+
+
+def player_identity_field_entry(
+    *,
+    target: str,
+    target_payload: dict[str, Any],
+    prop: dict[str, Any],
+    source_snapshot: dict[str, str],
+) -> dict[str, Any]:
+    return_value_offset = target_payload.get("return_value_offset")
+    field = classify_property(prop, return_value_offset)
+    field_key = f"{target}.{field['name']}"
+    identity_like = player_identity_field_is_identity_like(prop)
+    copied_kind = scalar_summary_kind(field["type"])
+    blockers = [
+        *field.get("promotion_blockers", []),
+        "public_identity_policy_missing",
+        "runtime_lifecycle_cleanup_not_proven",
+        "public_sdk_not_promoted",
+    ]
+
+    if identity_like:
+        classification = "forced_redacted"
+        evidence_status = "candidate-only-redacted"
+        redaction_reason = player_identity_redaction_reason(prop)
+        blockers.append("identity_like_field_forced_redacted")
+    elif copied_kind is not None:
+        classification = "copied_candidate"
+        evidence_status = "copied-candidate-only"
+        redaction_reason = "non_identity_scalar_candidate_not_public"
+        blockers.append("candidate_scalar_not_public_identity")
+    else:
+        classification = "forbidden"
+        evidence_status = "forbidden"
+        redaction_reason = "unsupported_or_non_scalar_identity_surface_forbidden"
+        blockers.append("field_forbidden_for_identity_evidence")
+
+    entry = {
+        "field": field_key,
+        "target": target,
+        "name": field["name"],
+        "source_property_class": field["source_property_class"],
+        "direction": field["direction"],
+        "offset": field["offset"],
+        "element_size": field["element_size"],
+        "array_dim": field["array_dim"],
+        "property_flags": field.get("property_flags"),
+        "classification": classification,
+        "redaction_reason": redaction_reason,
+        "evidence_status": evidence_status,
+        "source_snapshot": source_snapshot["id"],
+        "source_snapshot_sha256": source_snapshot["sha256"],
+        "blockers": sorted(set(blocker for blocker in blockers if isinstance(blocker, str))),
+    }
+    if "bool_masks" in field:
+        entry["bool_masks"] = field["bool_masks"]
+    return entry
+
+
+def player_identity_forbidden_field(field_entry: dict[str, Any], prop: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "forbidden_field": field_entry["field"],
+        "target": field_entry["target"],
+        "name": field_entry["name"],
+        "source_property_class": field_entry["source_property_class"],
+        "classification": "forbidden_identity_coordinate",
+        "forbidden_sources": forbidden_identity_coordinate_sources(prop),
+        "redaction_reason": "pointer_ue_coordinate_fname_gobjects_and_raw_param_identity_forbidden",
+        "source_snapshot": field_entry["source_snapshot"],
+        "source_snapshot_sha256": field_entry["source_snapshot_sha256"],
+    }
+
+
+def snapshot_artifact_identity(
+    *,
+    manifest: dict[str, Any],
+    snapshot_payloads: list[dict[str, Any]],
+) -> dict[str, Any]:
+    ark_hashes = []
+    obelisk_commits = []
+    build_types = []
+    source_artifact_ids = []
+
+    manifest_ark_hash = manifest.get("ark_binary_sha256")
+    if isinstance(manifest_ark_hash, str) and manifest_ark_hash:
+        ark_hashes.append(manifest_ark_hash)
+    manifest_source = manifest.get("source")
+    if isinstance(manifest_source, str) and manifest_source:
+        build_types.append(manifest_source)
+
+    for payload in snapshot_payloads:
+        evidence = payload.get("evidence")
+        if not isinstance(evidence, dict):
+            continue
+        for key, sink in (
+            ("ark_binary_sha256", ark_hashes),
+            ("obelisk_commit", obelisk_commits),
+            ("artifact_kind", build_types),
+        ):
+            value = evidence.get(key)
+            if isinstance(value, str) and value:
+                sink.append(value)
+        for key in ("artifact_sha256", "capture_id", "evidence_pack_id"):
+            value = evidence.get(key)
+            if isinstance(value, str) and value:
+                source_artifact_ids.append(f"{key}:{value}")
+
+    ark_hash_values = unique_ordered(ark_hashes)
+    obelisk_commit_values = unique_ordered(obelisk_commits)
+    build_type_values = unique_ordered(build_types)
+    return {
+        "ark_binary_sha256": ark_hash_values[0] if len(ark_hash_values) == 1 else "mixed_or_unknown",
+        "obelisk_commit": obelisk_commit_values[0] if len(obelisk_commit_values) == 1 else "mixed_or_unknown",
+        "build_type": build_type_values[0] if len(build_type_values) == 1 else "mixed_or_unknown",
+        "target_set_revision": "reflection_target_sets.py:players-identity-lifecycle-intake",
+        "source_artifact_ids": unique_ordered(source_artifact_ids),
+        "path_redacted": True,
+    }
+
+
+def build_players_identity_first_evidence(*, snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
+    paths, missing_targets = snapshot_paths_from_target_sets(
+        snapshot_root,
+        [PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET],
+    )
+    if missing_targets:
+        blockers = [f"missing_required_target:{target}" for target in missing_targets]
+        raise SystemExit("players identity first evidence failed closed: " + ",".join(blockers))
+
+    required_missing = [target for target in PLAYERS_IDENTITY_REQUIRED_TARGETS if target not in expand_ufunction_targets([PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET])]
+    if required_missing:
+        raise SystemExit(
+            "players identity first evidence failed closed: "
+            + ",".join(f"target_set_missing_required_target:{target}" for target in required_missing)
+        )
+
+    manifest = load_manifest(snapshot_root)
+    input_snapshots: list[dict[str, str]] = []
+    snapshot_payloads: list[dict[str, Any]] = []
+    targets: list[dict[str, Any]] = []
+    fields: list[dict[str, Any]] = []
+    copied_candidates: list[dict[str, Any]] = []
+    forced_redacted_fields: list[dict[str, Any]] = []
+    forbidden_fields: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+
+    for index, path in enumerate(paths, start=1):
+        source_snapshot = {"id": f"snapshot-{index:04d}", "sha256": file_sha256(path)}
+        payload = load_json_file("snapshot", path)
+        snapshot_payloads.append(payload)
+        for target_payload in require_snapshot_payload(payload, path):
+            target_identity = target_payload.get("target")
+            property_chain = target_payload.get("property_chain")
+            if not isinstance(target_identity, dict) or not isinstance(property_chain, dict):
+                raise SystemExit(f"snapshot missing player identity target identity or property chain: {path}")
+            target = target_name(target_identity)
+            if target in seen_targets:
+                raise SystemExit(f"duplicate player identity target: {target}")
+            seen_targets.add(target)
+            source_snapshot["target"] = target
+            input_snapshots.append(dict(source_snapshot))
+
+            properties = property_chain.get("properties")
+            if not isinstance(properties, list):
+                raise SystemExit(f"{target} property_chain.properties is not a list")
+            property_order = []
+            target_field_blockers: list[str] = []
+            for prop in properties:
+                if not isinstance(prop, dict):
+                    raise SystemExit(f"{target} property entry is not an object")
+                name = prop.get("name")
+                if not isinstance(name, str) or not name:
+                    raise SystemExit(f"{target} property missing name")
+                property_order.append(name)
+                if prop.get("status") != "candidate":
+                    target_field_blockers.append(f"{target}.{name}:property_status_not_candidate")
+                    continue
+                field_entry = player_identity_field_entry(
+                    target=target,
+                    target_payload=target_payload,
+                    prop=prop,
+                    source_snapshot=source_snapshot,
+                )
+                fields.append(field_entry)
+                forbidden_fields.append(player_identity_forbidden_field(field_entry, prop))
+                if field_entry["classification"] == "forced_redacted":
+                    forced_redacted_fields.append(field_entry)
+                elif field_entry["classification"] == "copied_candidate":
+                    copied_candidates.append(field_entry)
+
+            targets.append(
+                {
+                    "target": target,
+                    "source_snapshot": source_snapshot["id"],
+                    "source_snapshot_sha256": source_snapshot["sha256"],
+                    "function_flags": target_payload.get("function_flags"),
+                    "num_parms": target_payload.get("num_parms"),
+                    "parms_size": target_payload.get("parms_size"),
+                    "return_value_offset": target_payload.get("return_value_offset"),
+                    "property_order": property_order,
+                    "status": "candidate_only",
+                    "lifecycle_anchor_role": player_identity_lifecycle_anchor_role(target),
+                    "blockers": sorted(
+                        set(
+                            [
+                                *target_policy_blockers(target, target_payload, len(properties)),
+                                *target_field_blockers,
+                            ]
+                        )
+                    ),
+                }
+            )
+
+    expected_targets = expand_ufunction_targets([PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET])
+    for required in PLAYERS_IDENTITY_REQUIRED_TARGETS:
+        if required not in seen_targets:
+            raise SystemExit(f"players identity first evidence failed closed: missing_required_target:{required}")
+    coverage = target_set_coverage(
+        manifest_target_sets=[PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET],
+        source_target_sets=[],
+        emitted_targets=[entry["target"] for entry in targets],
+    )
+
+    blocker_count = sum(len(entry["blockers"]) for entry in targets) + sum(len(entry["blockers"]) for entry in fields)
+    lifecycle_blockers = [
+        "no accepted session-start/login/connect UFunction anchor in players-identity-lifecycle-intake",
+        "no accepted session-end/logout/disconnect UFunction anchor in players-identity-lifecycle-intake",
+        "ServerListPlayers and ServerKickPlayer are admin surfaces, not accepted lifecycle anchors",
+        "second-source lifecycle comparison is missing",
+        "principal invalidation semantics are missing",
+    ]
+    return {
+        "schema": PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
+        "artifact_status": "candidate_only",
+        "readiness_classification": "planning_only",
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "snapshot_root": "redacted",
+        "input_target_set": PLAYERS_IDENTITY_FIRST_EVIDENCE_INPUT_TARGET_SET,
+        "generated_from": {
+            "snapshot_schema": SUPPORTED_SNAPSHOT_SCHEMA,
+            "input_snapshots": input_snapshots,
+        },
+        "target_set_coverage": coverage,
+        "artifact_identity": snapshot_artifact_identity(manifest=manifest, snapshot_payloads=snapshot_payloads),
+        "targets": targets,
+        "fields": fields,
+        "copied_candidates": copied_candidates,
+        "forced_redacted_fields": forced_redacted_fields,
+        "forbidden_fields": forbidden_fields,
+        "lifecycle_anchors": {
+            "session_start_accepted": False,
+            "session_end_accepted": False,
+            "accepted_start_targets": [],
+            "accepted_end_targets": [],
+            "blockers": lifecycle_blockers,
+        },
+        "privacy_policy": {
+            "public_principal_ready": False,
+            "copied_public_identifier": None,
+            "persistent_identifier_ready": False,
+            "process_local_identifier_ready": False,
+            "storage_ready": False,
+            "logging_policy": "identity_values_not_logged",
+        },
+        "promotion_gate": {
+            "ready": False,
+            "ready_scope": "planning_only",
+            "promotion_ready": False,
+            "blockers": [
+                *lifecycle_blockers,
+                "identity-like fields are force-redacted",
+                "forbidden FName/GObjects/UE pointer/raw-param coordinates are not public identity",
+                "no public API, ABI, dispatcher, runtime hook, lookup, persistence, mutation, or return override is promoted",
+            ],
+        },
+        "safety_summary": {
+            "target_count": len(targets),
+            "expected_target_count": len(expected_targets),
+            "missing_target_count": 0,
+            "field_count": len(fields),
+            "copied_candidate_count": len(copied_candidates),
+            "forced_redacted_count": len(forced_redacted_fields),
+            "forbidden_count": len(forbidden_fields),
+            "blocker_count": blocker_count + len(lifecycle_blockers),
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "explicitly_excluded": [
+                "public_api",
+                "public_sdk",
+                "runtime_hook_wiring",
+                "dispatcher_wiring",
+                "commands",
+                "permissions",
+                "economy",
+                "player_identity",
+                "persistent_identity",
+                "process_local_identity",
+                "lookup",
+                "ResourceHandle",
+                "mutation",
+                "return_override",
+                "raw_params",
+                "ue_pointers",
+                "fname_indices",
+                "gobjects_indices",
+                "identity_value_logging",
+            ],
+        },
+        "non_claims": [
+            "candidate-only planning evidence for players-identity-lifecycle-intake",
+            "does not accept ServerListPlayers or ServerKickPlayer as login/logout lifecycle anchors",
+            "does not expose copied public player identity, process-local identity, persistent identity, sender identity, permissions, commands, economy, or moderation APIs",
+            "does not expose UE pointers, raw params, FName/GObjects indices, object identity, lookup, ResourceHandle, mutation, or return overrides",
+            "copied chat text remains unauthenticated and does not establish a principal",
+        ],
+    }
+
+
 def print_text(report: dict[str, Any]) -> None:
+    if "signatures" not in report:
+        print(f"{report.get('schema')} status={report.get('artifact_status') or report.get('policy_status')}")
+        summary = report.get("safety_summary")
+        if isinstance(summary, dict):
+            for key in ("target_count", "field_count", "forced_redacted_count", "copied_candidate_count"):
+                if key in summary:
+                    print(f"  {key}={summary[key]}")
+        return
     for signature in report["signatures"]:
         print(
             "{target} flags={function_flags} parms={num_parms} size={parms_size} ret={return_value_offset}".format(
@@ -3092,6 +3548,7 @@ def main() -> int:
         args.structure_return_only_policy_slice,
         args.structure_nonpin_copied_scalar_policy_slice,
         args.structure_aggregate_census_policy_slice,
+        args.players_identity_first_evidence,
     ]
     if sum(1 for enabled in policy_modes if enabled) > 1:
         raise SystemExit("policy-slice modes cannot be combined")
@@ -3119,6 +3576,10 @@ def main() -> int:
         if args.target_set or args.source_target_set or args.snapshot:
             raise SystemExit("--structure-aggregate-census-policy-slice cannot be combined with target-set or snapshot inputs")
         report = build_structure_aggregate_census_policy_slice(snapshot_root=args.snapshot_root)
+    elif args.players_identity_first_evidence:
+        if args.target_set or args.source_target_set or args.snapshot:
+            raise SystemExit("--players-identity-first-evidence cannot be combined with target-set or snapshot inputs")
+        report = build_players_identity_first_evidence(snapshot_root=args.snapshot_root)
     else:
         report = build_report(
             snapshot_root=args.snapshot_root,

@@ -218,6 +218,23 @@ safety_summary = {
 non_claims[]
 ```
 
+## Candidate Builder Status
+
+The smallest candidate-only mode now lives in
+`scripts/build_redacted_ufunction_signatures.py --players-identity-first-evidence`. It
+requires `players-identity-lifecycle-intake`, emits schema
+`obelisk.players-identity-first-evidence.v1`, keeps `promotion_ready`,
+`public_sdk_ready`, and `runtime_ready` false, and fails closed when the snapshot manifest
+does not include the required `ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer` evidence.
+
+This mode is still planning-only. It force-redacts identity-like fields, records
+FName/GObjects indices, UE pointers, borrowed payloads, and raw params as forbidden
+identity coordinates without emitting their values, and preserves the non-claim that
+copied chat text does not authenticate a sender. It adds no ABI, public API, runtime
+observer, command surface, permissions surface, lookup, persistence, mutation, or return
+override.
+
 The identity classifier must force-redact, even when the generic signature builder would
 otherwise mark them as copied scalars: player IDs, Steam/EOS/platform IDs, names, IPs,
 tribe IDs, transfer IDs, bed/spawn IDs, online-list values, mission tags, object refs,
