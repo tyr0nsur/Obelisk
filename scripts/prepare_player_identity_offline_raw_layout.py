@@ -28,6 +28,7 @@ from snapshot_evidence_pack import (
 REPORT_SCHEMA = "obelisk.player-identity-offline-raw-layout.v1"
 SAFE_RUN_ID_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PROTECTED_ROOT = Path("/servidor/ark")
 
 
 def parse_args() -> argparse.Namespace:
@@ -97,7 +98,26 @@ def detect_obelisk_commit() -> str:
     return result.stdout.strip() or "unknown"
 
 
+def is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def reject_direct_protected_path(path: Path, label: str, *, access: str) -> None:
+    expanded = path.expanduser()
+    if expanded.is_absolute() and is_relative_to(expanded, PROTECTED_ROOT):
+        action = "copy inputs under" if access == "read from" else "use"
+        fail(
+            f"{label} must not {access} protected server root {PROTECTED_ROOT}; "
+            f"{action} a non-protected artifact root first: {expanded}"
+        )
+
+
 def validate_input_file(path: Path, label: str) -> Path:
+    reject_direct_protected_path(path, label, access="read from")
     reject_symlink_component(path, label)
     resolved = reject_protected_input_path(path, label)
     if not resolved.exists():
@@ -108,6 +128,7 @@ def validate_input_file(path: Path, label: str) -> Path:
 
 
 def validate_artifact_root(path: Path) -> Path:
+    reject_direct_protected_path(path, "--artifact-root", access="write under")
     reject_symlink_component(path, "--artifact-root")
     resolved = reject_protected_output_path(path, "--artifact-root")
     try:

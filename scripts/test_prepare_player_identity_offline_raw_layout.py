@@ -259,6 +259,54 @@ class PreparePlayerIdentityOfflineRawLayoutTests(unittest.TestCase):
             self.assertIn("--core must not read from protected server root /servidor/ark", stderr)
             self.assertFalse((root / "artifacts").exists())
 
+    def test_rejects_workspace_offline_binary_direct_path_before_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            _, core = self.write_inputs(root)
+
+            result, _, stderr = self.run_main(
+                [
+                    "prepare_player_identity_offline_raw_layout.py",
+                    "--binary",
+                    "/servidor/ark/workspace-offline/player-identity/ShooterGameServer",
+                    "--core",
+                    str(core),
+                    "--artifact-root",
+                    str(root / "artifacts"),
+                    "--run-id",
+                    "run-workspace-input",
+                ]
+            )
+
+            self.assertEqual(result, 2)
+            self.assertIn("--binary must not read from protected server root /servidor/ark", stderr)
+            self.assertIn("non-protected artifact root", stderr)
+            self.assertFalse((root / "artifacts").exists())
+
+    def test_rejects_workspace_offline_artifact_root_before_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            binary, core = self.write_inputs(root)
+
+            result, _, stderr = self.run_main(
+                [
+                    "prepare_player_identity_offline_raw_layout.py",
+                    "--binary",
+                    str(binary),
+                    "--core",
+                    str(core),
+                    "--artifact-root",
+                    "/servidor/ark/workspace-offline/player-identity",
+                    "--run-id",
+                    "run-workspace-output",
+                ],
+                binary_sha=prep.EXPECTED_SHOOTERGAME_SHA256,
+            )
+
+            self.assertEqual(result, 2)
+            self.assertIn("--artifact-root must not write under protected server root /servidor/ark", stderr)
+            self.assertIn("non-protected artifact root", stderr)
+
     def test_rejects_symlinked_input_even_when_target_is_non_protected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

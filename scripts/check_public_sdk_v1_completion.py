@@ -122,7 +122,9 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "descriptor_preflight",
     "event_seed",
     "gameplay_policy_event_seed",
+    "inventory_policy_event",
     "item_return",
+    "item_return_event",
     "package_shape",
     "planning",
     "plugin_hub",
@@ -857,13 +859,21 @@ def evidence_path_has_non_promotional_marker(raw_path: str) -> bool:
     relative = repo_relative_evidence_path(raw_path)
     if relative is None:
         return False
+
+    def normalized_marker_text(text: str) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
+        return re.sub(r"[^a-z0-9]+", "_", separated.lower()).strip("_")
+
     normalized_parts = [
-        part.lower().replace("-", "_")
+        normalized_marker_text(part)
         for part in relative.with_suffix("").parts
     ]
     for part in normalized_parts:
+        collapsed_part = part.replace("_", "")
         for marker in STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS:
-            if marker.replace("-", "_") in part:
+            normalized_marker = normalized_marker_text(marker)
+            collapsed_marker = normalized_marker.replace("_", "")
+            if normalized_marker in part or collapsed_marker in collapsed_part:
                 return True
     return False
 
