@@ -203,7 +203,41 @@ def call_target_from(data: bytes, call_file_offset: int, call_vma: int) -> int |
     return call_vma + 5 + rel32
 
 
-def find_registration_candidates(data: bytes, segments: list[Segment], name_vma: int) -> list[dict[str, Any]]:
+def read_vma(data: bytes, segments: list[Segment], vma: int, size: int) -> bytes | None:
+    segment = segment_for_vma(segments, vma, size)
+    if segment is None:
+        return None
+    file_offset = segment.file_offset_for(vma)
+    if file_offset + size > len(data):
+        return None
+    return data[file_offset : file_offset + size]
+
+
+def looks_like_x86_64_code(raw: bytes | None) -> bool:
+    if not raw:
+        return False
+    first = raw[0]
+    return first in {
+        0x40,
+        0x41,
+        0x48,
+        0x49,
+        0x53,
+        0x55,
+        0x56,
+        0x57,
+        0xE9,
+        0xEB,
+    }
+
+
+def find_registration_candidates(
+    data: bytes,
+    segments: list[Segment],
+    name_vma: int,
+    *,
+    source_hit: dict[str, Any],
+) -> list[dict[str, Any]]:
     needle = imm32_bytes(name_vma)
     if needle is None:
         return []
@@ -246,15 +280,54 @@ def find_registration_candidates(data: bytes, segments: list[Segment], name_vma:
             {
                 "xref_vma": hex(xref_vma),
                 "status": "candidate",
+                "source_string_hit": {
+                    "encoding": source_hit["encoding"],
+                    "vma": source_hit["vma"],
+                    "file_offset": source_hit["file_offset"],
+                },
                 "registration_window_vma": hex(file_offset_to_vma(segments, search_start, 1) or xref_vma),
                 "name_immediate_vma": hex(xref_vma),
                 "thunk_vma": hex(thunk_vma),
                 "thunk_segment_rx": True,
+                "thunk_prefix_hex": (read_vma(data, segments, thunk_vma, 16) or b"").hex(),
+                "thunk_prefix_code_like": looks_like_x86_64_code(read_vma(data, segments, thunk_vma, 16)),
                 "registrar_call_vma": hex(registrar_call_vma) if registrar_call_vma is not None else None,
                 "registrar_target_vma": hex(registrar_target_vma) if registrar_target_vma is not None else None,
             }
         )
     return candidates
+
+
+def select_best_candidate(
+    candidates: list[dict[str, Any]],
+    registrar_cluster_sizes: dict[str, int],
+) -> dict[str, Any] | None:
+    scored: list[tuple[int, int, dict[str, Any]]] = []
+    for index, candidate in enumerate(candidates):
+        if candidate.get("status") != "candidate":
+            continue
+        registrar = candidate.get("registrar_target_vma")
+        cluster_size = registrar_cluster_sizes.get(registrar, 0) if isinstance(registrar, str) else 0
+        score = 0
+        reasons: list[str] = []
+        if candidate.get("thunk_prefix_code_like") is True:
+            score += 100
+            reasons.append("thunk_prefix_code_like")
+        if cluster_size > 1:
+            score += 20 + cluster_size
+            reasons.append("registrar_shared_across_targets")
+        if candidate.get("registrar_call_vma"):
+            score += 5
+            reasons.append("has_registrar_call")
+        scored_candidate = dict(candidate)
+        scored_candidate["selection_score"] = score
+        scored_candidate["selection_reasons"] = reasons
+        scored_candidate["registrar_cluster_size"] = cluster_size
+        scored.append((score, -index, scored_candidate))
+    if not scored:
+        return None
+    scored.sort(reverse=True)
+    return scored[0][2]
 
 
 def reject_address_like_target(value: str) -> None:
@@ -319,13 +392,24 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
     target_reports: list[dict[str, Any]] = []
     registrar_clusters: dict[str, list[str]] = {}
+    pending_target_reports: list[dict[str, Any]] = []
     for target in targets:
         short_name = target.rsplit(".", 1)[-1]
         string_hits = find_string_hits(data, segments, short_name) if segments else []
+        for hit in string_hits:
+            hit["used_for_registration_candidates"] = hit.get("encoding") == "ascii"
         readable_hits = [hit for hit in string_hits if hit["readable_segment"]]
         registration_candidates: list[dict[str, Any]] = []
-        for hit in readable_hits:
-            registration_candidates.extend(find_registration_candidates(data, segments, int(hit["vma"], 16)))
+        registration_source_hits = [hit for hit in readable_hits if hit.get("encoding") == "ascii"]
+        for hit in registration_source_hits:
+            registration_candidates.extend(
+                find_registration_candidates(
+                    data,
+                    segments,
+                    int(hit["vma"], 16),
+                    source_hit=hit,
+                )
+            )
         candidate_targets = {
             candidate.get("registrar_target_vma")
             for candidate in registration_candidates
@@ -336,9 +420,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         target_blockers = []
         if not readable_hits:
             target_blockers.append({"reason": "target_name_string_not_found"})
+        if readable_hits and not registration_source_hits:
+            target_blockers.append({"reason": "ascii_target_name_string_not_found"})
         if readable_hits and not any(candidate.get("status") == "candidate" for candidate in registration_candidates):
             target_blockers.append({"reason": "registration_candidate_not_found"})
-        target_reports.append(
+        pending_target_reports.append(
             {
                 "target": target,
                 "short_name": short_name,
@@ -348,6 +434,15 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 "status": "candidate" if not target_blockers else "blocked",
             }
         )
+
+    registrar_cluster_sizes = {registrar: len(set(cluster_targets)) for registrar, cluster_targets in registrar_clusters.items()}
+    for target_report in pending_target_reports:
+        selected = select_best_candidate(target_report["registration_candidates"], registrar_cluster_sizes)
+        if selected is None and target_report["status"] == "candidate":
+            target_report["blockers"].append({"reason": "selected_registration_candidate_missing"})
+            target_report["status"] = "blocked"
+        target_report["selected_candidate"] = selected
+        target_reports.append(target_report)
 
     if any(target["status"] == "blocked" for target in target_reports):
         blockers.append({"reason": "one_or_more_targets_blocked"})
@@ -380,6 +475,31 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "binary": {"path": str(binary), "sha256": observed_sha},
         "expected_binary_sha256": args.expected_binary_sha256,
         "inputs": {"target_names": args.target, "target_sets": args.target_set, "input_addresses": []},
+        "preplan_scope": {
+            "target_set": "players-identity-lifecycle-intake"
+            if "players-identity-lifecycle-intake" in args.target_set
+            or {
+                "ShooterPlayerController.ServerListPlayers",
+                "ShooterPlayerController.ServerKickPlayer",
+            }.issubset(set(targets))
+            else None,
+            "focal_targets": [
+                target
+                for target in targets
+                if target
+                in {
+                    "ShooterPlayerController.ServerListPlayers",
+                    "ShooterPlayerController.ServerKickPlayer",
+                }
+            ],
+            "requires_full_12_target_inventory": True,
+            "downstream_blockers": [
+                "requires_non_protected_core_evidence_pack",
+                "requires_reflection_inventory_pack",
+                "requires_focal_snapshots",
+                "requires_privacy_invalidation_policy",
+            ],
+        },
         "load_segments": [segment.to_json() for segment in segments],
         "targets": target_reports,
         "registrar_clusters": [

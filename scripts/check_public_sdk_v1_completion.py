@@ -175,7 +175,8 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"(?:candidate|planning|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
-    r"static[-_ ]?(?:orientation|candidate|target)|admin[-_ ]?thunks?|orientation|preflight|readiness|"
+    r"static[-_ ]?(?:orientation|candidate|target|discovery)|native[-_ ]?ufunction[-_ ]?registration[-_ ]?static[-_ ]?discovery|"
+    r"admin[-_ ]?thunks?|orientation|preflight|readiness|"
     r"item[-_ ]?return[-_ ]?only|return[-_ ]?only|descriptor[-_ ]?preflight|"
     r"descriptor[-_ ]?catalog|consume[-_ ]?only|evidence[-_ ]?only)",
     re.IGNORECASE,

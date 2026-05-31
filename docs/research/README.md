@@ -74,6 +74,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
 - [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)
 - [2026-05-30-nextgenplugins-reference-inventory.md](2026-05-30-nextgenplugins-reference-inventory.md)
+- [2026-05-31-plugin-hub-experimental-chat-audit-template.md](2026-05-31-plugin-hub-experimental-chat-audit-template.md)
 - [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md)
 - [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md)
 - [2026-05-31-commands-principal-routing-contract.md](2026-05-31-commands-principal-routing-contract.md)

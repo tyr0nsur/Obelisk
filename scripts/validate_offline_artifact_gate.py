@@ -1560,6 +1560,27 @@ def collect_ready_overclaims(value: object, *, trail: str = "$") -> list[tuple[s
     ]
 
 
+def validate_static_orientation_report_contract(payload: dict[str, Any], *, label: str) -> list[dict[str, Any]]:
+    if payload.get("schema") not in STATIC_ORIENTATION_REPORT_SCHEMAS:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "static_orientation_report_readiness_overclaim", "label": f"{label}:{trail}"})
+
+    inputs = payload.get("inputs")
+    input_addresses = inputs.get("input_addresses") if isinstance(inputs, dict) else payload.get("input_addresses")
+    if input_addresses is not None and input_addresses != []:
+        blockers.append(
+            {
+                "reason": "static_orientation_report_input_addresses_overclaim",
+                "label": f"{label}:$.inputs.input_addresses",
+            }
+        )
+
+    return blockers
+
+
 def collect_candidate_public_overclaims(
     value: object,
     *,
@@ -8950,6 +8971,7 @@ def validate_artifact(
                     "recorded_schema": schema,
                 }
             )
+            artifact_blockers.extend(validate_static_orientation_report_contract(payload, label=label))
     elif path.suffix == ".json":
         artifact_blockers.extend(payload_blockers)
     provenance, provenance_blockers = validate_provenance(
@@ -9100,20 +9122,22 @@ def validate_manifest(
     except OSError as exc:
         return record, [{"reason": "manifest_not_file", "path": str(path), "detail": str(exc)}]
     resolved = Path(state["resolved"])
-    if payload.get("schema") not in SUPPORTED_MANIFEST_SCHEMAS:
-        if payload.get("schema") in STATIC_ORIENTATION_REPORT_SCHEMAS:
-            blockers.append(
-                {
-                    "reason": "static_orientation_report_not_artifact_gate",
-                    "label": f"{resolved}:$.schema",
-                    "recorded_schema": payload.get("schema"),
-                }
-            )
+    schema = payload.get("schema")
+    if schema in STATIC_ORIENTATION_REPORT_SCHEMAS:
+        blockers.append(
+            {
+                "reason": "static_orientation_report_not_artifact_gate",
+                "label": f"{resolved}:$.schema",
+                "recorded_schema": schema,
+            }
+        )
+        blockers.extend(validate_static_orientation_report_contract(payload, label=str(resolved)))
+    if schema not in SUPPORTED_MANIFEST_SCHEMAS:
         blockers.append(
             {
                 "reason": "unsupported_manifest_schema",
                 "label": f"{resolved}:$.schema",
-                "recorded_schema": payload.get("schema"),
+                "recorded_schema": schema,
                 "supported_schemas": sorted(SUPPORTED_MANIFEST_SCHEMAS),
             }
         )

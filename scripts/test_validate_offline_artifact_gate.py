@@ -3969,6 +3969,45 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
                     self.assertIn("static_orientation_report_not_artifact_gate", reasons)
                     self.assertIn("unsupported_manifest_schema", reasons)
 
+    def test_static_orientation_manifests_block_readiness_and_input_address_overclaims(self) -> None:
+        schema = "obelisk.native-ufunction-registration-static-discovery.v1"
+        self.assertIn(schema, gate.STATIC_ORIENTATION_REPORT_SCHEMAS)
+        self.assertNotIn(schema, gate.SUPPORTED_MANIFEST_SCHEMAS)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "static-orientation" / "manifest.json"
+            write_json(
+                manifest,
+                {
+                    "schema": schema,
+                    "status": "candidate",
+                    "artifact_gate_eligible": False,
+                    "not_artifact_gate": True,
+                    "promotion_ready": True,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "inputs": {
+                        "target_names": ["ShooterPlayerController.ServerListPlayers"],
+                        "input_addresses": ["0x1547450"],
+                    },
+                    "non_claims": [
+                        "does_not_promote_public_sdk",
+                        "does_not_promote_ufunction_abi",
+                    ],
+                },
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("static_orientation_report_not_artifact_gate", reasons)
+        self.assertIn("unsupported_manifest_schema", reasons)
+        self.assertIn("static_orientation_report_readiness_overclaim", reasons)
+        self.assertIn("static_orientation_report_input_addresses_overclaim", reasons)
+
     def test_accepts_normalized_artifact_pack_manifest_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

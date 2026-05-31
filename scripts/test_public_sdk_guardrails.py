@@ -5307,6 +5307,49 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "experimental pattern",
         )
 
+    def test_installed_sdk_templates_name_current_three_and_no_promises(self) -> None:
+        docs = {
+            "docs/PLUGIN_HUB_FOUNDATION_V1.md": (
+                REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md"
+            ).read_text(encoding="utf-8"),
+            "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md": (
+                REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md"
+            ).read_text(encoding="utf-8"),
+            "examples/README.md": (REPO_ROOT / "examples" / "README.md").read_text(
+                encoding="utf-8"
+            ),
+        }
+
+        required_phrases = (
+            "starter template",
+            "descriptor catalog template",
+            "owner-token timer template",
+            "do not promise",
+            "identity",
+            "command routing",
+            "permissions/admin",
+            "replies/send-chat/broadcast",
+            "storage",
+            "mutation",
+            "return override",
+            "ArkApi/AseApi",
+            "SDK v1 completion",
+        )
+        for relative, text in docs.items():
+            compact = normalized(text)
+            with self.subTest(path=relative, check="current templates"):
+                self.assertIn("sdk_minimal_plugin", text)
+                self.assertIn("sdk_descriptor_catalog", text)
+                self.assertIn("sdk_timer_plugin", text)
+            for phrase in required_phrases:
+                with self.subTest(path=relative, phrase=phrase):
+                    self.assertIn(normalized(phrase), compact)
+
+        examples_index = docs["examples/README.md"]
+        for example_name, expected_tier in INSTALLED_SDK_EXAMPLE_SUPPORT_TIERS.items():
+            with self.subTest(path="examples/README.md", example=example_name):
+                self.assertIn(f"| `{example_name}/` | {expected_tier} |", examples_index)
+
     def test_obaseevents_chat_helper_cleanup_guardrail_stays_in_release_tests(self) -> None:
         cmake = (REPO_ROOT / "tests/sdk_consumer/CMakeLists.txt").read_text(encoding="utf-8")
         fixture = (REPO_ROOT / "tests/sdk_consumer/SdkConsumerFixture.cpp").read_text(encoding="utf-8")
@@ -8230,6 +8273,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.player-identity-static-lifecycle-orientation-check.v1",
             "obelisk.player-identity-static-admin-thunks-check.v1",
             "obelisk.static-candidate-orientation-contract.v1",
+            "obelisk.native-ufunction-registration-static-discovery.v1",
         )
         for schema in schemas:
             with self.subTest(schema=schema, gate="offline artifact"):

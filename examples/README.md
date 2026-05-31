@@ -31,6 +31,14 @@ SDK example tiers are:
 | `sdk_timer_plugin/` | release-supported seed |
 | `sdk_inventory_policy_audit/` | experimental pattern |
 
+The three release-supported installed-SDK templates today are the starter template
+(`sdk_minimal_plugin/`), the descriptor catalog template
+(`sdk_descriptor_catalog/`), and the owner-token timer template
+(`sdk_timer_plugin/`). They are package-shape and current-C-ABI hygiene templates only.
+They do not promise Plugin Hub identity, command routing, permissions/admin,
+replies/send-chat/broadcast, storage, inventory/item/structure modules, mutation, return
+override authority, ArkApi/AseApi portability, or Obelisk SDK v1 completion.
+
 Examples must stay inside public `include/obelisk/ObeliskApi.h` contracts. Do not use
 private headers, raw UE pointers, `ProcessEvent` internals, identity, lookup, mutation,
 return overrides, new gameplay APIs, chat replies/send-chat, or ArkApi implementation

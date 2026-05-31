@@ -50,6 +50,16 @@ compatibility surface. First-party runtime reference plugins live under
 `plugins/` and may use repository-local build/test wiring, so they are reference plugins
 in-tree rather than the minimum installed-SDK consumer contract.
 
+The current release-supported installed-SDK templates are exactly the starter template
+(`examples/sdk_minimal_plugin`), descriptor catalog template
+(`examples/sdk_descriptor_catalog`), and owner-token timer template
+(`examples/sdk_timer_plugin`). They teach package shape, installed-SDK CMake use,
+safe-disabled config posture, public C ABI checks, metadata-only descriptor reads, and
+process-local owner-token timer cleanup. They do not promise identity/principal,
+permissions/admin, command routing, replies/send-chat/broadcast, storage, inventory/item
+or structure modules, mutation, return overrides, cross-process scheduling,
+ArkApi/AseApi portability, or SDK v1 completion.
+
 Use `PLUGIN_HUB_CONTRIBUTOR_PATH.md` as the short contributor path for deciding the
 support tier, copying the closest installed-SDK example, validating package hygiene,
 recording package metadata, and knowing when to stop.

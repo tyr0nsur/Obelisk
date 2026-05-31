@@ -33,7 +33,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_native_ufunction_registration_st
 
 Optional enrichment flags may use `radare2` or Ghidra headless when available, but the
 baseline workflow must not require those tools in CI or ordinary docs validation.
-The initial implementation does not add this schema to the offline artifact gate. It
+The initial implementation does not add this schema as an accepted offline artifact gate
+manifest. It is listed only as a rejected static-orientation schema so gate attempts fail
+closed. It
 emits `artifact_gate_eligible=false`, `not_artifact_gate=true`,
 `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`.
 

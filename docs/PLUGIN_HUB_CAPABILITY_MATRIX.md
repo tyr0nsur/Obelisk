@@ -234,10 +234,17 @@ ABI and keep the support tier explicit:
 Installed-SDK consumer seed:
 
 1. `examples/sdk_minimal_plugin` as the minimum package consumer that builds against the
-   installed SDK.
+   installed SDK; this is the starter template.
 2. `examples/sdk_descriptor_catalog` as the installed-SDK descriptor/catalog seed.
 3. `examples/sdk_timer_plugin` as the installed-SDK timer seed for owner-token scheduled
    work and shutdown cleanup.
+
+These three release-supported installed-SDK templates are the starter template, the
+descriptor catalog template, and the owner-token timer template. Their no-promises are
+part of the template contract: they do not promise identity/principal,
+permissions/admin, command routing, replies/send-chat/broadcast, storage,
+inventory/item/structure modules, mutation, return override authority, cross-process
+scheduler, ArkApi/AseApi portability, or Obelisk SDK v1 completion.
 
 Release-supported seed lanes under `plugins/`:
 
