@@ -271,8 +271,8 @@ priorities, and do not use history files as the active source of truth.
   reflection-inventory pack plus exact targets/target files and emits candidate-only
   planned commands without rereading a core, executing commands, writing snapshots, or
   promoting target sets/runtime/API scope. For player identity, the 2026-05-31 workspace
-  route produced a complete 12-target reflection inventory pack and committed candidate
-  fixtures for `ShooterPlayerController.ServerListPlayers` and
+  route produced a complete 12-target `players-identity-lifecycle-intake` reflection
+  inventory pack and committed candidate fixtures for `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`. A distinct vanilla-gdb candidate root at
   `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
   now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
@@ -286,7 +286,9 @@ priorities, and do not use history files as the active source of truth.
   is accepted by the offline artifact gate. Passing both that lifecycle-anchor candidate
   manifest and the principal-invalidation policy manifest to the first-evidence readiness
   checker moves the primary blocker to `approved_runtime_evidence_missing`, still with
-  promotion/public/runtime readiness false.
+  promotion/public/runtime readiness false. The report also carries a requirements-only
+  `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
+  runtime window; it is not accepted evidence and must not be used for promotion.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as

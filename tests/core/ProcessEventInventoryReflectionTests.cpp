@@ -502,9 +502,37 @@ namespace
                             &ignoreCooldown));
         matchedAttempt.Invocation.Fields.push_back(
             makeCanUseField(InventoryReflection::InventoryField::ReturnValue,
-                            kReturnValueNameIndex,
-                            0x01,
-                            &returnValue));
+                             kReturnValueNameIndex,
+                             0x01,
+                             &returnValue));
+
+        CopiedInventoryPolicyEvent copiedEvent;
+        copiedEvent.ScalarStorage[0] = {
+            .Field = Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+            .BoolValue = true,
+        };
+        copiedEvent.ScalarCount = 1;
+        copiedEvent.RebindScalarSpan();
+        Require(!TryBuildAndReserveDispatchBudgetForMatchedAttempt(matchedAttempt,
+                                                                   dispatchCounter,
+                                                                   1,
+                                                                   observationNumber,
+                                                                   copiedEvent),
+                "matched inventory attempt reserved dispatch budget without subscribers");
+        Require(observationNumber == 0,
+                "zero-subscriber inventory dispatch attempt did not clear observation number");
+        Require(dispatchCounter.load() == 0,
+                "zero-subscriber inventory dispatch attempt changed dispatch counter");
+        Require(copiedEvent.View.Scalars.empty(),
+                "zero-subscriber inventory dispatch attempt left stale copied output");
+
+        int owner = 0;
+        std::vector<CapturedInventoryPolicyEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
+        Require(registrationId != 0, "failed to register inventory policy subscriber for budget test");
+
         Require(TryReserveDispatchBudgetForMatchedAttempt(matchedAttempt, dispatchCounter, 1, observationNumber),
                 "matched inventory attempt did not reserve dispatch budget");
         Require(observationNumber == 1, "matched dispatch observation number mismatch");
@@ -518,6 +546,8 @@ namespace
                 "exhausted inventory dispatch observation reported active with subscribers");
         Require(!ShouldAttemptRuntimeObservation(logCounter, 0, dispatchCounter, 1),
                 "exhausted inventory dispatch budget still activated runtime observation");
+
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
     }
 
     void TestDisabledGateDoesNotRead()
@@ -1047,12 +1077,20 @@ namespace
         attempt.Invocation = nonCanonicalBool;
         std::atomic<uint64_t> dispatchCounter{0};
         uint64_t observationNumber = 99;
+        int owner = 0;
+        std::vector<CapturedInventoryPolicyEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
+        Require(registrationId != 0, "failed to register inventory policy subscriber for non-canonical test");
         Require(!TryReserveDispatchBudgetForMatchedAttempt(attempt, dispatchCounter, 1, observationNumber),
                 "non-canonical CanUse consumed copied-bool dispatch budget");
         Require(observationNumber == 0, "non-canonical CanUse did not clear dispatch observation number");
         Require(dispatchCounter.load() == 0, "non-canonical CanUse changed dispatch counter");
         Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, nonCanonicalBool) == 0,
                 "non-canonical CanUse dispatched a copied policy event");
+        Require(captured.empty(), "non-canonical CanUse reached inventory policy callback");
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
     }
 
     void TestRejectsDispatchWhenPolicyFieldSequenceDiffers()

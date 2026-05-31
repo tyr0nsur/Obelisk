@@ -789,6 +789,38 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         policy = payload["first_evidence"]["principal_invalidation_policy"]
         self.assertTrue(policy["policy_consume_ready"])
         self.assertFalse(policy["runtime_evidence_ready"])
+        runtime_requirements = payload["first_evidence"]["runtime_principal_lifecycle_evidence"]
+        self.assertEqual(runtime_requirements["status"], "missing")
+        self.assertFalse(runtime_requirements["accepted_by_this_preflight"])
+        self.assertTrue(runtime_requirements["approval_required"])
+        self.assertIn("promote", runtime_requirements["required_for"])
+        self.assertIn("public_readiness", runtime_requirements["required_for"])
+        self.assertIn("runtime_readiness", runtime_requirements["required_for"])
+        self.assertIn(
+            "offline layout comparison alone",
+            runtime_requirements["insufficient_evidence"],
+        )
+        self.assertIn(
+            "principal invalidation policy manifest alone",
+            runtime_requirements["insufficient_evidence"],
+        )
+        approval_boundary = runtime_requirements["approval_boundary"]
+        self.assertFalse(approval_boundary["approved_runtime_evidence_present"])
+        self.assertFalse(approval_boundary["runtime_work_authorized_by_this_report"])
+        self.assertFalse(approval_boundary["server_operations_authorized_by_this_report"])
+        self.assertFalse(approval_boundary["publication_authorized_by_this_report"])
+        self.assertIn(
+            "debug attachment, ptrace, gcore, or runtime scanners",
+            approval_boundary["separate_operator_approval_required_before"],
+        )
+        self.assertIn(
+            "GitHub publication, tags, pushes, or release claims",
+            approval_boundary["separate_operator_approval_required_before"],
+        )
+        self.assertEqual(
+            payload["next_actionable_blocker"]["next_required_evidence"]["schema"],
+            runtime_requirements["schema"],
+        )
         self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])

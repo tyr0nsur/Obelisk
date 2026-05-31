@@ -118,3 +118,16 @@ higher-level first-evidence readiness gate can now consume the lifecycle layout 
 and principal policy artifact together, but it still reports
 `approved_runtime_evidence_missing` and blocks public SDK promotion until runtime evidence
 and public ABI review exist.
+
+The first-evidence readiness report also emits
+`first_evidence.runtime_principal_lifecycle_evidence`, a requirements-only block for the
+future approved runtime step. That block is not accepted evidence. It keeps the next
+runtime request bounded to copied, private lifecycle observations for
+`ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`, plus fail-closed stale
+or malformed principal checks. Offline layout comparison, lifecycle candidate manifests,
+principal policy manifests, raw `ProcessEvent` traces, admin/listing UFunctions, and any
+claim based on names, platform ids, UE pointers, `GObjects`, `FNames`, `ResourceHandle`,
+lookup, mutation, or return override remain explicitly insufficient.
+The requirements block also records that the current report does not authorize runtime
+work, server operations, debug attachment, `ptrace`, `gcore`, runtime scanners, restarts,
+Discord/community notices, GitHub publication, tags, pushes, or release claims.

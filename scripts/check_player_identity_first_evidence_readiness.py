@@ -911,6 +911,66 @@ def principal_invalidation_policy_diagnosis(path: Path | None) -> dict[str, Any]
     }
 
 
+def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
+    return {
+        "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.requirements.v1",
+        "status": "missing",
+        "approval_required": True,
+        "accepted_by_this_preflight": False,
+        "required_for": ["promote", "public_readiness", "runtime_readiness"],
+        "minimum_required_observations": [
+            {
+                "case": "session_start_anchor",
+                "target": "ShooterGameMode.HandleNewPlayer",
+                "required_signal": "copied_principal_lifecycle_state_created_or_refreshed",
+            },
+            {
+                "case": "session_end_anchor",
+                "target": "ShooterGameMode.OnLogout",
+                "required_signal": "copied_principal_lifecycle_state_invalidated",
+            },
+            {
+                "case": "stale_after_logout",
+                "target": "post_logout_consumer_check",
+                "required_signal": "stale_or_missing_generation_denies_without_lookup",
+            },
+            {
+                "case": "malformed_or_unsupported_evidence",
+                "target": "principal_consumer_boundary",
+                "required_signal": "fail_closed_deny",
+            },
+        ],
+        "privacy_boundary": [
+            "copied opaque principal state only",
+            "no Steam/EOS ids, player names, IP-like values, tribe ids, raw UE pointers, FNames, GObjects, raw params, or persistent lookup keys",
+        ],
+        "approval_boundary": {
+            "approved_runtime_evidence_present": False,
+            "runtime_work_authorized_by_this_report": False,
+            "server_operations_authorized_by_this_report": False,
+            "publication_authorized_by_this_report": False,
+            "separate_operator_approval_required_before": [
+                "server access or player-facing evidence windows",
+                "debug attachment, ptrace, gcore, or runtime scanners",
+                "server starts, stops, restarts, or marker changes",
+                "Discord/community/beta-test notices",
+                "GitHub publication, tags, pushes, or release claims",
+            ],
+        },
+        "insufficient_evidence": [
+            "offline layout comparison alone",
+            "candidate lifecycle layout anchors alone",
+            "principal invalidation policy manifest alone",
+            "raw ProcessEvent traces without copied privacy boundary",
+            "admin/listing UFunctions",
+            "any positive claim based on names, platform ids, UE pointers, GObjects, FNames, ResourceHandle, lookup, mutation, or return override",
+        ],
+        "non_claims": [
+            "requirements only; does not execute runtime work, approve a server window, promote identity, or add public SDK surface",
+        ],
+    }
+
+
 def first_matching_binary_path(offline_inputs: dict[str, Any]) -> str | None:
     candidates = offline_inputs.get("shooter_game_server_candidates")
     if not isinstance(candidates, list):
@@ -1081,6 +1141,7 @@ def next_actionable_blocker(
             "code": "approved_runtime_evidence_missing",
             "blocked_until": "approved_runtime_principal_lifecycle_evidence",
             "why": "principal invalidation policy is consumable for planning, but public identity still lacks approved runtime evidence",
+            "next_required_evidence": runtime_principal_lifecycle_evidence_requirements(),
         }
     return {
         **base,
@@ -1526,6 +1587,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     principal_policy_diagnosis = principal_invalidation_policy_diagnosis(
         getattr(args, "principal_invalidation_policy_manifest", None)
     )
+    runtime_evidence_requirements = runtime_principal_lifecycle_evidence_requirements()
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
@@ -1852,6 +1914,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "generated_lifecycle_anchors": first_evidence_lifecycle_diagnosis,
             "lifecycle_anchor_candidates": lifecycle_candidate_diagnosis,
             "principal_invalidation_policy": principal_policy_diagnosis,
+            "runtime_principal_lifecycle_evidence": runtime_evidence_requirements,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,

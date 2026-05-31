@@ -132,6 +132,14 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
             return false;
         }
 
+        if (Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0 ||
+            !HasObservationBudgetRemaining(counter, limit))
+        {
+            observationNumber = 0;
+            out = {};
+            return false;
+        }
+
         if (!TryBuildCopiedInventoryPolicyEvent(attempt.Invocation, out))
         {
             observationNumber = 0;
