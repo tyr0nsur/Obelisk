@@ -15,6 +15,8 @@ REFLECTION_TARGET_SET_VARS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflect
 TARGET_SETS = REFLECTION_TARGET_SET_VARS["TARGET_SETS"]
 PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SETS"]
 PUBLIC_GAMEPLAY_EVENTS_MANIFEST = REPO_ROOT / "docs" / "public_gameplay_events.json"
+PUBLIC_SDK_SURFACES_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 PUBLIC_DOC_FILES = [
     REPO_ROOT / "README.md",
@@ -934,6 +936,159 @@ def json_string_values(value: object, path: str) -> list[tuple[str, str]]:
 
 
 class PublicSdkGuardrailTests(unittest.TestCase):
+    def test_public_sdk_surfaces_manifest_defines_v1_contract_without_claiming_completion(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["schema"], "obelisk.public-sdk-surfaces.v1")
+        self.assertEqual(manifest["sdk_version"], "v1.0")
+        self.assertEqual(manifest["status"], "planning-contract")
+        self.assertFalse(manifest["v1_completion_required"])
+        self.assertEqual(manifest["public_header"], "include/obelisk/ObeliskApi.h")
+
+        required_top_level = (
+            "compatibility_statement",
+            "promoted_surfaces",
+            "experimental_surfaces",
+            "planning_surfaces",
+            "post_v1_or_excluded_surfaces",
+            "debug_only_surfaces",
+            "promotion_requirements",
+            "release_guardrails",
+        )
+        for key in required_top_level:
+            self.assertIn(key, manifest)
+
+        serialized = json.dumps(manifest, sort_keys=True)
+        self.assertNotIn("/servidor/ark", serialized)
+        self.assertIn("complete, documented SDK contract", manifest["compatibility_statement"])
+
+    def test_public_sdk_surfaces_manifest_classifies_expected_surfaces(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        self.assertEqual(len(surfaces), len(manifest["surfaces"]))
+
+        required_ids = {
+            "obelisk.lifecycle_config_logging.v1",
+            "obelisk.descriptors.v1",
+            "obelisk.process_local_timers.v1",
+            "obelisk.gameplay_policy_event.v1",
+            "obelisk.chat_message.v1",
+            "obelisk.chat.local_routing.v1",
+            "obelisk.player_identity.v1",
+            "obelisk.inventory_item_copied_signals.v1",
+            "obelisk.inventory_items_mutation.v1",
+            "obelisk.commands_replies.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.arkapi_compatibility.v1",
+            "obelisk.debug_raw_process_event.v1",
+        }
+        self.assertTrue(required_ids.issubset(surfaces))
+
+        allowed_statuses = set(manifest["status_values"])
+        for surface in manifest["surfaces"]:
+            with self.subTest(surface=surface["id"]):
+                self.assertRegex(surface["id"], r"^obelisk\.[a-z0-9_.]+\.v1$")
+                self.assertIn(surface["status"], allowed_statuses)
+
+        promoted = set(manifest["promoted_surfaces"])
+        for surface_id in promoted:
+            self.assertEqual(surfaces[surface_id]["status"], "promoted")
+
+        non_public_statuses = {"planning", "post-v1", "excluded", "debug-only"}
+        for surface in manifest["surfaces"]:
+            if surface["status"] in non_public_statuses:
+                with self.subTest(non_public_surface=surface["id"]):
+                    self.assertEqual(surface.get("public_contract", []), [])
+
+    def test_public_sdk_surfaces_manifest_keeps_chat_and_gameplay_experimental_bounds(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+
+        chat = surfaces["obelisk.chat_message.v1"]
+        self.assertEqual(chat["status"], "promoted-experimental-only")
+        for token in (
+            "ObeliskChatMessageEvent",
+            "RegisterChatMessageEventWithOwnerTokenHandle",
+            "UnregisterChatMessageEventWithOwnerToken",
+            "OBELISK_API_CAPABILITY_CHAT_EVENTS",
+            "chat-message-intake",
+            "abi_version",
+            "struct_size",
+            "send_mode",
+            "sequence",
+            "message",
+        ):
+            self.assertIn(token, json.dumps(chat))
+        for exclusion in (
+            "public command SDK/router",
+            "sender identity",
+            "permissions",
+            "replies",
+            "send-chat",
+            "mutation",
+            "return override",
+            "raw FString storage",
+        ):
+            self.assertIn(exclusion, chat["exclusions"])
+
+        gameplay = surfaces["obelisk.gameplay_policy_event.v1"]
+        self.assertEqual(gameplay["status"], "promoted-experimental-only")
+        self.assertEqual(gameplay["evidence"]["manifest"], "docs/public_gameplay_events.json")
+        for exclusion in (
+            "Inventory SDK",
+            "Items SDK",
+            "StructureEvents SDK",
+            "ResourceHandle",
+            "mutation",
+            "return override",
+        ):
+            self.assertIn(exclusion, gameplay["exclusions"])
+
+        inventory_signals = surfaces["obelisk.inventory_item_copied_signals.v1"]
+        self.assertEqual(inventory_signals["status"], "promoted-experimental-only")
+        self.assertEqual(inventory_signals["depends_on"], ["obelisk.gameplay_policy_event.v1"])
+        for token in (
+            "inventory.remote_add_check",
+            "inventory.use_check",
+            "inventory_item.allow_equip_check",
+            "inventory_item.can_repair_check",
+            "inventory_item.use_onto_item_check",
+            "item-return-only-policy-slice",
+        ):
+            self.assertIn(token, json.dumps(inventory_signals))
+        for exclusion in (
+            "Inventory SDK",
+            "Items SDK",
+            "item identity",
+            "inventory identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+        ):
+            self.assertIn(exclusion, inventory_signals["exclusions"])
+
+    def test_sdk_v1_compatibility_doc_tracks_manifest_and_exclusions(self) -> None:
+        text = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
+        required_terms = (
+            "public_sdk_surfaces.json",
+            "v1.0",
+            "SDK contract",
+            "process-local timers",
+            "GameplayPolicyEvent",
+            "ChatMessageEvent",
+            "OBELISK_API_CAPABILITY_CHAT_EVENTS",
+            "principal=unknown",
+            "Inventory SDK",
+            "StructureEvents SDK",
+            "ResourceHandle",
+            "ArkApi",
+            "post-v1",
+            "mutation",
+            "return override",
+        )
+        for term in required_terms:
+            self.assertIn(term, text)
+
     def test_public_gameplay_event_manifest_contains_no_server_paths(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
         offenders: list[str] = []
@@ -3223,6 +3378,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 relative = path.relative_to(REPO_ROOT).as_posix()
                 if relative.startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
                     continue
+                if relative.startswith("tests/sdk_installed_consumer/descriptor_timer_plugin.cpp") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
                 if relative.startswith("plugins/oChatAudit/") and token in CORE_TIMER_PUBLIC_TOKENS:
                     continue
                 if token in text:
@@ -3270,6 +3427,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             for token in forbidden:
                 relative = path.relative_to(REPO_ROOT).as_posix()
                 if relative.startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
+                if (
+                    relative == "tests/sdk_installed_consumer/descriptor_timer_plugin.cpp"
+                    and token in CORE_TIMER_EXAMPLE_TOKENS
+                ):
                     continue
                 if relative.startswith("plugins/oChatAudit/") and token in CORE_TIMER_PUBLIC_TOKENS:
                     continue
@@ -3714,6 +3876,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             for token in forbidden:
                 relative = path.relative_to(REPO_ROOT).as_posix()
                 if relative.startswith("plugins/oProcessTimer/") and token in CORE_TIMER_EXAMPLE_TOKENS:
+                    continue
+                if (
+                    relative == "tests/sdk_installed_consumer/descriptor_timer_plugin.cpp"
+                    and token in CORE_TIMER_EXAMPLE_TOKENS
+                ):
                     continue
                 if relative.startswith("plugins/oChatAudit/") and token in CORE_TIMER_PUBLIC_TOKENS:
                     continue

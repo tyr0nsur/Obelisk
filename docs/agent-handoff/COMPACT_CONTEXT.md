@@ -58,6 +58,11 @@ priorities, and do not use history files as the active source of truth.
   production core through architecture hardening, UE4 reflection evidence, copied-data
   module APIs, and later compatibility for familiar ARK plugin concepts on top of
   Obelisk primitives.
+- `v1.0` stable means the complete public SDK contract for plugin authors, not merely a
+  stable internal runtime. The current v1 surface inventory lives in
+  `docs/public_sdk_surfaces.json`, with human guidance in `docs/SDK_V1_COMPATIBILITY.md`;
+  both are planning-contract artifacts until a future release gate packages or supersedes
+  them.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.

@@ -1,0 +1,617 @@
+{
+  "schema": "obelisk.public-sdk-surfaces.v1",
+  "sdk_version": "v1.0",
+  "abi_version": "0.1",
+  "status": "planning-contract",
+  "v1_completion_required": false,
+  "release_claim": "post-rc-sdk-surface-inventory",
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "compatibility_statement": "Obelisk v1.0 must mean a complete, documented SDK contract for plugin authors. The current post-RC tree may inventory v1 surfaces without claiming v1.0 completion.",
+  "status_values": [
+    "promoted",
+    "promoted-experimental-only",
+    "planning",
+    "post-v1",
+    "excluded",
+    "debug-only"
+  ],
+  "global_rules": [
+    "Public SDK surfaces must use copied C ABI payloads or metadata-only descriptors.",
+    "Every promoted surface must have ABI or installed-SDK consumer coverage, lifecycle cleanup rules, privacy boundaries, and promotion evidence.",
+    "Promoted callback surfaces must be capability_gated, append_only_abi, owner_token_handle_registration, owner_scoped_unregister, plugin_owner_cleanup, and no_ue_internals_in_public_abi.",
+    "Raw UE pointers, raw ProcessEvent params, raw FString storage, FName/GObjects indices, ArkApi offsets, MSVC layouts, vtables, lookup handles, mutation, and return override authority are not public SDK contracts."
+  ],
+  "promoted_surfaces": [
+    "obelisk.lifecycle_config_logging.v1",
+    "obelisk.descriptors.v1",
+    "obelisk.process_local_timers.v1"
+  ],
+  "experimental_surfaces": [
+    "obelisk.gameplay_policy_event.v1",
+    "obelisk.chat_message.v1",
+    "obelisk.chat.local_routing.v1",
+    "obelisk.inventory_item_copied_signals.v1"
+  ],
+  "planning_surfaces": [
+    "obelisk.player_identity.v1",
+    "obelisk.structure_census.v1",
+    "obelisk.mission_transfer_dino_tribe.v1"
+  ],
+  "post_v1_or_excluded_surfaces": [
+    "obelisk.commands_replies.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.arkapi_compatibility.v1"
+  ],
+  "debug_only_surfaces": [
+    "obelisk.debug_raw_process_event.v1"
+  ],
+  "promotion_requirements": [
+    "Named capability bit or documented metadata-only reason.",
+    "Append-only C ABI fields with abi_version and struct_size where data crosses the plugin boundary.",
+    "Owner-token handle registration and owner-scoped unregister for callback surfaces.",
+    "Plugin-owner cleanup coverage.",
+    "ABI layout tests and SDK consumer or installed-SDK consumer tests.",
+    "Second-source or equivalent static/offline evidence when UE gameplay data is exposed.",
+    "Explicit exclusions for identity, lookup, mutation, return override, raw UE internals, and privacy-sensitive data."
+  ],
+  "release_guardrails": [
+    "The manifest is documentary until a release gate explicitly packages it.",
+    "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
+    "No surface may be listed as promoted unless its status is promoted.",
+    "No excluded, debug-only, planning, or post-v1 surface may declare a public_contract.",
+    "docs/public_gameplay_events.json remains the detailed evidence source for GameplayPolicyEvent and ChatMessageEvent backing target sets."
+  ],
+  "surfaces": [
+    {
+      "id": "obelisk.lifecycle_config_logging.v1",
+      "category": "foundation",
+      "status": "promoted",
+      "support_tier": "production seed",
+      "public_name": "Plugin lifecycle, configuration context, and logging",
+      "capabilities": [],
+      "public_contract": [
+        "ObeliskPlugin_GetInfo",
+        "ObeliskPlugin_Init",
+        "ObeliskPlugin_Shutdown",
+        "ObeliskPluginMetadata",
+        "ObeliskPluginInitContext",
+        "ObeliskApi.LogInfo",
+        "ObeliskApi.LogWarn",
+        "ObeliskApi.LogError"
+      ],
+      "abi_contract": [
+        "append_only_abi",
+        "no_ue_internals_in_public_abi"
+      ],
+      "lifecycle_contract": [
+        "plugin_owner_cleanup"
+      ],
+      "evidence": {
+        "abi_tests": [
+          "tests/abi/AbiLayoutTests.cpp",
+          "tests/abi/CAbiLayoutTests.c"
+        ],
+        "sdk_consumer_tests": [
+          "tests/sdk_consumer",
+          "tests/sdk_installed_consumer",
+          "scripts/test_install_obelisk_layout.sh"
+        ],
+        "docs": [
+          "docs/PLUGIN_ARCHITECTURE.md",
+          "docs/STATUS.md"
+        ]
+      },
+      "exclusions": [
+        "hot reload of Obelisk itself",
+        "detached worker ingress without shutdown proof",
+        "cross-process mutable state without plugin-owned locking"
+      ]
+    },
+    {
+      "id": "obelisk.descriptors.v1",
+      "category": "metadata",
+      "status": "promoted",
+      "support_tier": "production seed",
+      "public_name": "Descriptor metadata",
+      "capabilities": [
+        "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
+        "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS"
+      ],
+      "public_contract": [
+        "DescribeResourceKind",
+        "DescribeGameplayPolicyEventKind",
+        "ObeliskResourceKindDescriptor",
+        "ObeliskGameplayPolicyEventDescriptor"
+      ],
+      "abi_contract": [
+        "append_only_abi",
+        "no_ue_internals_in_public_abi"
+      ],
+      "lifecycle_contract": [
+        "plugin_owner_cleanup"
+      ],
+      "evidence": {
+        "manifest": "docs/public_gameplay_events.json",
+        "sdk_consumer_tests": [
+          "tests/sdk_installed_consumer/descriptor_catalog_plugin.cpp",
+          "tests/sdk_installed_consumer/descriptor_timer_plugin.cpp",
+          "plugins/oDescriptorCatalog/oDescriptorCatalog.cpp"
+        ],
+        "install_gate": "scripts/test_install_obelisk_layout.sh"
+      },
+      "exclusions": [
+        "resource identity",
+        "object lookup",
+        "persistent handles",
+        "ResourceHandle",
+        "cross-event correlation",
+        "mutation",
+        "return override"
+      ]
+    },
+    {
+      "id": "obelisk.process_local_timers.v1",
+      "category": "foundation",
+      "status": "promoted",
+      "support_tier": "production seed",
+      "public_name": "Process-local timers",
+      "capabilities": [
+        "OBELISK_API_CAPABILITY_TIMERS"
+      ],
+      "public_contract": [
+        "RegisterTimerWithOwnerTokenHandle",
+        "UnregisterTimerWithOwnerToken",
+        "ObeliskTimerCallback",
+        "OBELISK_TIMER_FLAG_REPEATING"
+      ],
+      "abi_contract": [
+        "capability_gated",
+        "append_only_abi",
+        "owner_token_handle_registration",
+        "owner_scoped_unregister",
+        "plugin_owner_cleanup",
+        "no_ue_internals_in_public_abi"
+      ],
+      "lifecycle_contract": [
+        "process-local handles only",
+        "owner-scoped unregister",
+        "plugin-owner cleanup"
+      ],
+      "evidence": {
+        "tests": [
+          "tests/core/TimerManagerTests.cpp",
+          "tests/sdk_consumer",
+          "tests/sdk_installed_consumer/descriptor_timer_plugin.cpp"
+        ],
+        "reference_plugin": "plugins/oProcessTimer/oProcessTimer.cpp",
+        "install_gate": "scripts/test_install_obelisk_layout.sh"
+      },
+      "exclusions": [
+        "UE gameplay timers",
+        "cluster scheduler",
+        "persistent timer ids",
+        "shared scheduler state",
+        "permission system",
+        "command router"
+      ]
+    },
+    {
+      "id": "obelisk.gameplay_policy_event.v1",
+      "category": "copied gameplay notification",
+      "status": "promoted-experimental-only",
+      "support_tier": "experimental Plugin Hub seed",
+      "public_name": "GameplayPolicyEvent",
+      "capabilities": [
+        "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS"
+      ],
+      "public_contract": [
+        "GameplayPolicyEvent",
+        "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+        "UnregisterGameplayPolicyEventWithOwnerToken"
+      ],
+      "abi_contract": [
+        "capability_gated",
+        "append_only_abi",
+        "owner_token_handle_registration",
+        "owner_scoped_unregister",
+        "plugin_owner_cleanup",
+        "no_ue_internals_in_public_abi"
+      ],
+      "payload_contract": [
+        "copied Obelisk-owned POD storage",
+        "metadata-only resource descriptors",
+        "no UObject",
+        "no raw parameter buffer"
+      ],
+      "evidence": {
+        "manifest": "docs/public_gameplay_events.json",
+        "release_readiness_target_sets": [
+          "minimal-second-source-intake",
+          "structure-observer-intake",
+          "item-return-only-policy-slice"
+        ],
+        "tests": [
+          "tests/sdk_consumer",
+          "tests/core/StructureEventDispatcherTests.cpp",
+          "tests/core/InventoryPolicyEventDispatcherTests.cpp",
+          "tests/core/ItemReturnEventDispatcherTests.cpp"
+        ]
+      },
+      "exclusions": [
+        "Inventory SDK",
+        "Items SDK",
+        "StructureEvents SDK",
+        "identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "pincode values",
+        "ResourceHandle",
+        "UE pointers"
+      ]
+    },
+    {
+      "id": "obelisk.chat_message.v1",
+      "category": "copied chat notification",
+      "status": "promoted-experimental-only",
+      "support_tier": "minimal v0.1-rc SDK ABI surface",
+      "public_name": "ChatMessageEvent",
+      "capabilities": [
+        "OBELISK_API_CAPABILITY_CHAT_EVENTS"
+      ],
+      "public_contract": [
+        "ObeliskChatMessageEvent",
+        "RegisterChatMessageEventWithOwnerTokenHandle",
+        "UnregisterChatMessageEventWithOwnerToken"
+      ],
+      "abi_struct": "ObeliskChatMessageEvent",
+      "public_fields": [
+        "abi_version",
+        "struct_size",
+        "send_mode",
+        "reserved0",
+        "flags",
+        "sequence",
+        "message"
+      ],
+      "send_modes": [
+        "OBELISK_CHAT_SEND_MODE_GLOBAL",
+        "OBELISK_CHAT_SEND_MODE_TRIBE",
+        "OBELISK_CHAT_SEND_MODE_LOCAL",
+        "OBELISK_CHAT_SEND_MODE_ALLIANCE"
+      ],
+      "abi_contract": [
+        "capability_gated",
+        "append_only_abi",
+        "owner_token_handle_registration",
+        "owner_scoped_unregister",
+        "plugin_owner_cleanup",
+        "no_ue_internals_in_public_abi"
+      ],
+      "payload_contract": [
+        "callback-scope copied UTF-8 message",
+        "process-local sequence",
+        "copied-payload flag",
+        "no raw FString"
+      ],
+      "evidence": {
+        "release_readiness_target_sets": [
+          "chat-message-intake"
+        ],
+        "tests": [
+          "tests/sdk_consumer",
+          "tests/core/ChatEventDispatcherTests.cpp"
+        ],
+        "reference_plugins": [
+          "plugins/oChatLogger",
+          "plugins/oChatAudit",
+          "plugins/oBaseEvents"
+        ]
+      },
+      "exclusions": [
+        "public command SDK/router",
+        "command registration",
+        "sender identity",
+        "player identity",
+        "permissions",
+        "replies",
+        "send-chat",
+        "moderation",
+        "blocking",
+        "mutation",
+        "return override",
+        "UE lookup",
+        "raw FString storage",
+        "raw parameter buffers"
+      ]
+    },
+    {
+      "id": "obelisk.chat.local_routing.v1",
+      "category": "plugin-local helper pattern",
+      "status": "promoted-experimental-only",
+      "support_tier": "experimental seed only",
+      "public_name": "Plugin-local chat text routing",
+      "public_abi": false,
+      "adds_obelisk_api": false,
+      "public_contract": [],
+      "depends_on": [
+        "obelisk.chat_message.v1"
+      ],
+      "allowed_inputs": [
+        "ChatMessageEvent.message",
+        "ChatMessageEvent.send_mode",
+        "ChatMessageEvent.sequence",
+        "ChatMessageEvent.flags"
+      ],
+      "current_reference": "plugins/oBaseEvents",
+      "current_reference_limits": [
+        "disabled by default",
+        "plugin-owned prefix only",
+        "one local help command only",
+        "principal=unknown",
+        "sanitized metadata logs only"
+      ],
+      "exclusions": [
+        "public command SDK/router",
+        "ObeliskApi command registration",
+        "runtime command service",
+        "cross-plugin command dispatch",
+        "sender/player identity",
+        "permissions",
+        "replies",
+        "send-chat",
+        "moderation",
+        "blocking",
+        "mutation",
+        "return override",
+        "UE lookup"
+      ]
+    },
+    {
+      "id": "obelisk.player_identity.v1",
+      "category": "identity",
+      "status": "planning",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "evidence": {
+        "target_set": "players-identity-lifecycle-intake",
+        "docs": [
+          "docs/research/2026-05-31-player-identity-first-evidence.md",
+          "docs/research/2026-05-30-player-identity-lifecycle-plan.md"
+        ]
+      },
+      "blockers": [
+        "Missing sanitized ServerListPlayers snapshot.",
+        "Missing sanitized ServerKickPlayer snapshot.",
+        "No accepted login/logout lifecycle anchors.",
+        "No principal privacy, invalidation, or cross-instance semantics."
+      ],
+      "exclusions": [
+        "player lookup",
+        "permissions",
+        "moderation",
+        "economy identity",
+        "send-chat identity"
+      ]
+    },
+    {
+      "id": "obelisk.inventory_item_copied_signals.v1",
+      "category": "inventory/items copied signals",
+      "status": "promoted-experimental-only",
+      "support_tier": "experimental Plugin Hub seed",
+      "public_name": "Inventory and item copied policy signals",
+      "depends_on": [
+        "obelisk.gameplay_policy_event.v1"
+      ],
+      "public_contract": [
+        "GameplayPolicyEvent inventory.remote_add_check",
+        "GameplayPolicyEvent inventory.use_check",
+        "GameplayPolicyEvent inventory_item.allow_equip_check",
+        "GameplayPolicyEvent inventory_item.can_repair_check",
+        "GameplayPolicyEvent inventory_item.use_onto_item_check"
+      ],
+      "payload_contract": [
+        "copied bool ReturnValue signals only where declared by docs/public_gameplay_events.json",
+        "copied bRequestedByPlayer for inventory.remote_add_check",
+        "copied bIgnoreCooldown for inventory.use_check",
+        "resource_kind remains INVENTORY_ITEM metadata only",
+        "post-original observation only; no authority"
+      ],
+      "evidence": {
+        "manifest": "docs/public_gameplay_events.json",
+        "release_readiness_target_sets": [
+          "minimal-second-source-intake",
+          "item-return-only-policy-slice"
+        ],
+        "docs": [
+          "docs/research/2026-05-30-item-return-only-policy-slice.md",
+          "docs/research/2026-05-30-item-compact-redacted-signatures-strict.md"
+        ]
+      },
+      "exclusions": [
+        "Inventory SDK",
+        "Items SDK",
+        "item identity",
+        "inventory identity",
+        "ItemNetID identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle",
+        "CraftBlueprint",
+        "AdditionalData",
+        "UObject pointers"
+      ]
+    },
+    {
+      "id": "obelisk.structure_census.v1",
+      "category": "structure observer",
+      "status": "planning",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "evidence": {
+        "planning_target_sets": [
+          "structure-aggregate-census-planning",
+          "structure-return-only-policy-slice",
+          "structure-nonpin-copied-scalar-policy-slice"
+        ]
+      },
+      "blockers": [
+        "No public Structure SDK.",
+        "No structure/player/base identity.",
+        "No runtime lifecycle or privacy promotion."
+      ],
+      "exclusions": [
+        "StructureEvents SDK",
+        "structure identity",
+        "structure lookup",
+        "PIN outcome aggregate",
+        "mutation",
+        "return override"
+      ]
+    },
+    {
+      "id": "obelisk.mission_transfer_dino_tribe.v1",
+      "category": "gameplay modules",
+      "status": "planning",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "evidence": {
+        "planning_target_sets": [
+          "mission-compact-intake",
+          "mission-copied-bool-policy-slice",
+          "dino-compact-intake",
+          "transfer-ufunction-intake",
+          "transfer-baccept-only-policy-slice",
+          "tribe-compact-intake"
+        ]
+      },
+      "blockers": [
+        "Current lanes are internal, planning-only, or layout-only.",
+        "No public identity, lookup, mutation, return override, or runtime promotion."
+      ],
+      "exclusions": [
+        "Mission SDK",
+        "Transfer SDK",
+        "Dino SDK",
+        "Tribe SDK",
+        "teleport/spawn APIs",
+        "ownership lookup",
+        "cross-map correlation"
+      ]
+    },
+    {
+      "id": "obelisk.commands_replies.v1",
+      "category": "commands",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "blockers": [
+        "Needs identity, permissions, response path, command lifecycle, and abuse boundaries."
+      ],
+      "exclusions": [
+        "public command SDK/router",
+        "admin command API",
+        "player command API",
+        "chat replies",
+        "send-chat",
+        "moderation"
+      ]
+    },
+    {
+      "id": "obelisk.permissions_admin.v1",
+      "category": "permissions/admin",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "blockers": [
+        "No promoted player identity or authority model."
+      ],
+      "exclusions": [
+        "permission groups",
+        "admin groups",
+        "moderation authority",
+        "ban/kick API"
+      ]
+    },
+    {
+      "id": "obelisk.inventory_items_mutation.v1",
+      "category": "inventory/items",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "evidence": {
+        "current_public_slice": "inventory-backed GameplayPolicyEvent only"
+      },
+      "blockers": [
+        "No item/inventory identity.",
+        "No lookup or mutation contract.",
+        "No rollback/privacy policy for item grants or removals."
+      ],
+      "exclusions": [
+        "Inventory SDK",
+        "Items SDK",
+        "give item",
+        "remove item",
+        "inventory lookup",
+        "item handles",
+        "item mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    },
+    {
+      "id": "obelisk.operator_ingress_storage.v1",
+      "category": "operator/storage",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "evidence": {
+        "current_public_slice": "plugin-owned config files only; read-only operator CLI is experimental"
+      },
+      "blockers": [
+        "No secret-safe ingress contract.",
+        "No storage schema/migration contract.",
+        "No queue drain, audit, encoding, or lifecycle policy for sockets/RCON/webhooks."
+      ],
+      "exclusions": [
+        "RCON service",
+        "database service",
+        "webhook client",
+        "secret manager",
+        "cross-instance storage API"
+      ]
+    },
+    {
+      "id": "obelisk.arkapi_compatibility.v1",
+      "category": "compatibility",
+      "status": "excluded",
+      "support_tier": "not a compatibility layer",
+      "public_contract": [],
+      "exclusions": [
+        "ArkApi offsets",
+        "ArkApi vtables",
+        "MSVC layouts",
+        "Windows ABI compatibility",
+        "copied ArkServerApi/AseApi code"
+      ]
+    },
+    {
+      "id": "obelisk.debug_raw_process_event.v1",
+      "category": "debug/raw internals",
+      "status": "debug-only",
+      "support_tier": "not public SDK",
+      "public_contract": [],
+      "exclusions": [
+        "raw ProcessEvent params",
+        "UObject pointers",
+        "UFunction pointers",
+        "FName/GObjects indices",
+        "ResourceHandle",
+        "public plugin ABI"
+      ]
+    }
+  ]
+}

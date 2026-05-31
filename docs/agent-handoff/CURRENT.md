@@ -8,6 +8,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `v0.1.0-rc.2` is the current published core-first RC baseline: Linux runtime, ProcessEvent hook, plugin lifecycle, central install layout, `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, descriptors, timers, and refreshed RC evidence.
 - Publication used a clean release gate and exact tag/ref verification. Do not reinterpret, retag, or expand the published RC for routine post-RC work; treat stale local tags as invalid until revalidated.
 - Post-RC work moves toward `v1.0`: UE4 reflection, copied-data module APIs, lifecycle-safe plugins, operator tooling, and Linux-native equivalents for familiar ARK plugin concepts.
+- `v1.0` stable means the complete public SDK contract for plugin authors, not just a stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and `docs/public_sdk_surfaces.json` as the v1 surface map until the release gate packages or supersedes them.
 - Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers, commands, permissions, timers, config/logging, economy/database, and admin tooling as module areas above the core. Promote each only through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
 
 ## Hard Overrides
@@ -21,6 +22,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 ## Current Routing Facts
 
 - RC public scope remains limited to `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`. `v0.1.0-rc.2` additionally includes process-local owner-token timers as core runtime API without promoting gameplay/module timers. It is not a production-stable `v1.0` claim.
+- The current v1 SDK inventory checkpoint is the latest `Define SDK v1 surface contract` commit: it adds `docs/public_sdk_surfaces.json`, `docs/SDK_V1_COMPATIBILITY.md`, and guardrails in `scripts/test_public_sdk_guardrails.py`. It is a planning contract with `v1_completion_required=false`, not a v1 release claim.
 - `ObeliskApi` v1 remains append-only. New public surfaces require copied-data ownership, capability/`struct_size` gates, lifecycle cleanup, privacy rules, and accepted second-source/static evidence.
 - SDK packaging publishes only `include/obelisk/ObeliskApi.h`; more public headers require explicit install layout/test updates and ABI review.
 - Installed `Obelisk_*` CMake variables are derived from public C header `OBELISK_*` ABI macros at configure time; installed SDK consumers verify package/header parity.

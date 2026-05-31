@@ -18,6 +18,12 @@ reversing evidence, and public SDK promotion gates. Treat chat, inventory, struc
 buffs, dinos, tribes, missions, transfers, and admin surfaces as module areas on top of
 the same core, not as the center of the project.
 
+Treat `v1.0` stable as the complete public SDK contract for plugin authors, not just a
+stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
+`docs/public_sdk_surfaces.json` as the current surface map when planning promotion work,
+while remembering that those documents are a planning contract until a release gate
+packages or supersedes them.
+
 Compatibility research may consult ArkServerApi/AseApi as names and demand dictionaries
 for familiar ARK plugin concepts. Local NextGenPlugins clones are names and demand
 signals only, not porting or copying sources. Obelisk must not copy ArkServerApi/AseApi,

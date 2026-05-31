@@ -10,6 +10,7 @@ on contributors, plugin authors, operators, and reproducible research.
 - `../CONTRIBUTING.md`: local development, review expectations, and contribution flow.
 - `STATUS.md`: current release scope and known limitations.
 - `RELEASE.md`: release readiness gates and RC scope.
+- `SDK_V1_COMPATIBILITY.md`: SDK v1 compatibility target, promoted surfaces, and exclusions.
 - `ARCHITECTURE.md`: runtime and SDK architecture.
 - `OFFLINE_ARTIFACT_PACKS.md`: contributor runbook for normalized offline evidence packs.
 
@@ -25,6 +26,7 @@ storage, RCON, inventory/item APIs, or structure enforcement stays blocked until
 - `PLUGIN_ARCHITECTURE.md`: plugin lifecycle, ABI rules, examples, and promotion gates.
 - `PLUGIN_HUB_FOUNDATION_V1.md`: minimal Plugin Hub foundation contract and anti-promises.
 - `PLUGIN_HUB_CAPABILITY_MATRIX.md`: current safe plugin intents and future Plugin Hub boundaries.
+- `public_sdk_surfaces.json`: machine-readable SDK surface inventory and v1 release boundaries.
 - `oBaseEvents.md`: first-party reference plugin notes.
 - `../include/obelisk/ObeliskApi.h`: public C ABI header.
 
