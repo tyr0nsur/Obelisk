@@ -29,6 +29,35 @@ Decision: `blocked_until_promoted_or_explicitly_excluded`.
 Until one of those outcomes is recorded, `v1_completion_required` must remain false and
 this surface must not declare a public contract.
 
+## Offline Validation Profile
+
+The next useful improvement is offline-only contract evidence. It may refine
+requirements and tests for a future design/API round, but it must not add
+headers, callbacks, services, server experiments, RCON/storage/webhook
+connectivity, or a plugin-facing ABI.
+
+Required offline lanes:
+
+- Ingress contract matrix: list each candidate ingress transport, trust
+  boundary, authorization source, rate limit, backpressure rule, rejected
+  secret class, and fail-closed mode.
+- Storage migration plan: define schema version fields, migration order,
+  rollback posture, retention, corruption handling, and per-instance isolation
+  without naming a promoted backend API.
+- Queue lifecycle model: cover enqueue durability, retry, poison-message
+  handling, shutdown drain, plugin unload drain, restart recovery, and maximum
+  drain deadline.
+- Text and audit policy: define UTF-8 validation, normalization, maximum byte
+  length, rejection behavior, log/audit escaping, stable audit event names, and
+  redacted payload rules.
+- Multi-instance/lifecycle proof: describe shared-root locking, duplicate
+  ingestion, replay protection, crash behavior, init-failure cleanup,
+  `dlclose` safety, and owner-scoped worker/callback teardown.
+
+Completion of this profile is planning evidence only. Promotion still requires
+a reviewed append-only POD C ABI, capability gates, owner-scoped cleanup, and
+SDK consumer or integration coverage.
+
 ## Acceptance Criteria
 
 - The design names the ingress sources, trust boundaries, authorization model,

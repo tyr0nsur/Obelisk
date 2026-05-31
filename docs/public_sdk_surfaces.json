@@ -1059,6 +1059,26 @@
       "evidence": {
         "current_public_slice": "plugin-owned config files only; read-only operator CLI is experimental"
       },
+      "offline_validation_profile": {
+        "status": "planning_only_no_public_abi",
+        "artifact": "docs/research/2026-05-31-operator-ingress-storage-blocker-brief.md",
+        "required_lanes": [
+          "ingress contract matrix",
+          "storage migration plan",
+          "queue lifecycle model",
+          "text and audit policy",
+          "multi-instance/lifecycle proof"
+        ],
+        "must_not_require": [
+          "public header symbols",
+          "server process",
+          "RCON service",
+          "database/storage service",
+          "webhook client",
+          "secret manager"
+        ],
+        "promotion_effect": "none; this profile is planning evidence only and cannot add public_contract entries or flip v1_completion_required"
+      },
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,

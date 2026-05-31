@@ -3074,6 +3074,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
         operator_storage = surfaces["obelisk.operator_ingress_storage.v1"]
         decision_contract = operator_storage["v1_decision_contract"]
+        offline_profile = operator_storage["offline_validation_profile"]
         release_guardrails = " ".join(manifest["release_guardrails"])
 
         self.assertEqual(operator_storage["status"], "post-v1")
@@ -3090,6 +3091,32 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertTrue(decision_contract["must_remain_without_public_contract_until_promotion"])
         self.assertEqual(decision_contract["not_unlocked_by"], ["obelisk.player_identity.v1"])
+        self.assertEqual(offline_profile["status"], "planning_only_no_public_abi")
+        self.assertEqual(
+            offline_profile["artifact"],
+            "docs/research/2026-05-31-operator-ingress-storage-blocker-brief.md",
+        )
+        self.assertIn(
+            "none; this profile is planning evidence only",
+            offline_profile["promotion_effect"],
+        )
+        for lane in (
+            "ingress contract matrix",
+            "storage migration plan",
+            "queue lifecycle model",
+            "text and audit policy",
+            "multi-instance/lifecycle proof",
+        ):
+            self.assertIn(lane, offline_profile["required_lanes"])
+        for forbidden_runtime_dependency in (
+            "public header symbols",
+            "server process",
+            "RCON service",
+            "database/storage service",
+            "webhook client",
+            "secret manager",
+        ):
+            self.assertIn(forbidden_runtime_dependency, offline_profile["must_not_require"])
         for requirement in (
             "secret-safe ingress transport, trust-boundary, authorization, rate-limit, and backpressure contract",
             "storage schema/versioning, migration, rollback, retention, corruption-handling, and per-instance isolation contract",

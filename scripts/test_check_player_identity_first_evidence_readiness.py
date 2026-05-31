@@ -322,6 +322,20 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "stage_matching_binary_and_core_under_same_player_identity_raw_dir",
         )
         self.assertIn("does not validate core contents", " ".join(input_layout["non_claims"]))
+        blocked_resolution = operator_commands["blocked_input_resolution"]
+        self.assertEqual(blocked_resolution["status"], "blocked")
+        self.assertEqual(blocked_resolution["current_blocker"], "offline_binary_and_core_input_missing")
+        self.assertEqual(
+            blocked_resolution["missing_inputs"],
+            [
+                "matching_non_protected_shooter_game_server",
+                "non_protected_core_dump_input",
+            ],
+        )
+        self.assertIn("validate_player_identity_raw_inputs.py", blocked_resolution["validation_command_after_missing_inputs_exist"])
+        self.assertIn("<matching-non-protected-ShooterGameServer>", blocked_resolution["validation_command_after_missing_inputs_exist"])
+        self.assertIn("<non-protected-core-dump-input>", blocked_resolution["validation_command_after_missing_inputs_exist"])
+        self.assertIn("does not make blocked commands runnable", " ".join(blocked_resolution["non_claims"]))
         input_staging = operator_commands["input_staging"]
         self.assertEqual(input_staging["id"], "stage_offline_raw_layout")
         self.assertEqual(input_staging["status"], "blocked")
@@ -672,6 +686,19 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(input_staging["command_argv"][9], "<run-id-suffix>")
         self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
         self.assertIn("does not build or approve core evidence packs", " ".join(input_staging["non_claims"]))
+        blocked_resolution = operator_commands["blocked_input_resolution"]
+        self.assertEqual(blocked_resolution["status"], "blocked")
+        self.assertEqual(blocked_resolution["current_blocker"], "non_protected_core_input_missing")
+        self.assertEqual(blocked_resolution["missing_inputs"], ["non_protected_core_dump_input"])
+        self.assertEqual(blocked_resolution["available_matching_binary"], "/tmp/artifacts/raw/ShooterGameServer")
+        self.assertEqual(blocked_resolution["expected_core_destination"], "/tmp/artifacts/raw/core")
+        self.assertEqual(
+            blocked_resolution["validation_command_argv"][3],
+            "/tmp/artifacts/raw/ShooterGameServer",
+        )
+        self.assertEqual(blocked_resolution["validation_command_argv"][5], "<non-protected-core-dump-input>")
+        self.assertIn("validate_player_identity_raw_inputs.py", blocked_resolution["validation_command_after_missing_inputs_exist"])
+        self.assertIn("does not accept or promote core evidence", " ".join(blocked_resolution["non_claims"]))
         self.assertEqual(
             operator_commands["input_layout_requirements"]["next_input_preparation_action"],
             "stage_core_next_to_matching_binary_under_same_player_identity_raw_dir",
@@ -858,6 +885,23 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             input_staging["command"],
         )
         self.assertEqual(input_staging["command_argv"][5], "<non-protected-core-dump-input>")
+        blocked_resolution = operator_commands["blocked_input_resolution"]
+        self.assertEqual(blocked_resolution["status"], "blocked")
+        self.assertEqual(blocked_resolution["current_blocker"], "non_protected_core_input_missing")
+        self.assertEqual(blocked_resolution["missing_inputs"], ["non_protected_core_dump_input"])
+        self.assertEqual(
+            blocked_resolution["available_matching_binary"],
+            "/tmp/player-identity-artifacts/player-identity-offline-a/raw/ShooterGameServer",
+        )
+        self.assertEqual(
+            blocked_resolution["expected_core_destination"],
+            "/tmp/player-identity-artifacts/player-identity-offline-<run-id>/raw/core",
+        )
+        self.assertEqual(
+            blocked_resolution["validation_command_argv"][3],
+            "/tmp/player-identity-artifacts/player-identity-offline-a/raw/ShooterGameServer",
+        )
+        self.assertEqual(blocked_resolution["validation_command_argv"][5], "<non-protected-core-dump-input>")
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
         self.assertFalse(operator_commands["sequence"][0]["ready"])
         self.assertEqual(operator_commands["sequence"][0]["blocked_until"], "non_protected_core_dump_input")

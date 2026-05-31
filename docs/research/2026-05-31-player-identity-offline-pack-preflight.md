@@ -100,6 +100,12 @@ In that state, `operator_next_commands.runnable_now=[]`,
 `operator_next_commands.ready_to_build_core_evidence_pack=false`, and
 `operator_next_commands.input_staging.status=blocked` until an explicit
 non-protected core input is supplied alongside the matching offline binary.
+The report also includes `operator_next_commands.blocked_input_resolution` so operators
+can see the exact missing `non_protected_core_dump_input`, the already matched
+`ShooterGameServer` path, the expected `raw/core` destination, and the validation/staging
+commands to run only after that explicit core input exists. This field is guidance only:
+it must not add anything to `runnable_now`, must not build a core evidence pack, and must
+not accept or promote the core.
 The signal must not be read as progress beyond the underlying fail-closed checks.
 
 The durable root currently contains normalized artifact packs and a ScriptStruct inventory

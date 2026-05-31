@@ -40,6 +40,7 @@ REFLECTION_INVENTORY_MANIFEST_PATTERN = (
     "player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"
 )
 RAW_LAYOUT_HELPER = "scripts/prepare_player_identity_offline_raw_layout.py"
+RAW_INPUT_VALIDATOR = "scripts/validate_player_identity_raw_inputs.py"
 PROTECTED_SERVER_ROOT = Path("/servidor/ark")
 STATIC_ORIENTATION_SCHEMA_PREFIX = "obelisk.player-identity-static-"
 STATIC_ORIENTATION_MANIFEST_TOKENS = (
@@ -915,6 +916,15 @@ def build_operator_next_commands(
         "hardlink",
     ]
     staging_command = "PYTHONDONTWRITEBYTECODE=1 " + shlex.join(staging_command_argv)
+    validation_command_argv = [
+        "python3",
+        RAW_INPUT_VALIDATOR,
+        "--binary",
+        staging_binary_arg,
+        "--core",
+        staging_core_arg,
+    ]
+    validation_command = "PYTHONDONTWRITEBYTECODE=1 " + shlex.join(validation_command_argv)
     if inventory_ready or ready_to_build_core:
         staging_status = "satisfied"
         staging_blocked_until = None
@@ -1036,6 +1046,35 @@ def build_operator_next_commands(
             "non_claims": [
                 "layout readiness does not validate core contents",
                 "presence of core-like files outside the paired raw directory is not enough",
+            ],
+        },
+        "blocked_input_resolution": {
+            "status": (
+                "satisfied"
+                if not missing_inputs
+                else "ready_to_stage"
+                if staging_status == "ready"
+                else "blocked"
+            ),
+            "current_blocker": next_blocker.get("code"),
+            "next_input_preparation_action": next_input_preparation_action,
+            "missing_inputs": missing_inputs,
+            "available_matching_binary": matching_binary_path,
+            "expected_core_destination": str(raw_core_pattern),
+            "expected_raw_directory": str(raw_binary_pattern.parent),
+            "core_input_requirements": [
+                "explicit non-protected core dump input",
+                "regular file, not a symlink",
+                "stage as raw/core beside the matching ShooterGameServer before building the core evidence pack",
+                "must not be read from or symlink-resolve into /servidor/ark",
+            ],
+            "validation_command_after_missing_inputs_exist": validation_command,
+            "validation_command_argv": validation_command_argv,
+            "staging_command_after_missing_inputs_exist": staging_command,
+            "staging_command_argv": staging_command_argv,
+            "non_claims": [
+                "this field is operator guidance only and does not make blocked commands runnable",
+                "raw input validation checks path/layout/hash metadata only; it does not accept or promote core evidence",
             ],
         },
         "input_staging": {
@@ -1257,6 +1296,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     recipe_root_raw = offline_inputs.get("resolved_root")
     if isinstance(recipe_root_raw, str) and offline_inputs.get("status") != "artifact_root_rejected":
         recipe_root = Path(recipe_root_raw)
+    elif artifact_root_rejection is None:
+        recipe_root = args.artifact_root
     else:
         recipe_root = Path("<non-protected-artifact-root>")
     core_manifest_pattern = recipe_root / CORE_EVIDENCE_MANIFEST_PATTERN
