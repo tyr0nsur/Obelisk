@@ -100,6 +100,9 @@ PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
     REPO_ROOT / "plugins" / "README.md",
 ]
 RESEARCH_MODULE_BOUNDARY_README = REPO_ROOT / "docs" / "research" / "README.md"
+LATEST_V1_SDK_ROUND_RESEARCH_NOTE = (
+    REPO_ROOT / "docs" / "research" / "2026-05-31-v1-sdk-round-identity-static-demand-audit.md"
+)
 V010_CORE_API_CAPABILITY_ALLOWLIST = [
     "OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS",
     "OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS",
@@ -6311,6 +6314,76 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(blocker=blocker):
                 self.assertIn(blocker, payload["blockers"])
+
+    def test_latest_v1_sdk_round_note_does_not_imply_public_or_runtime_promotion(self) -> None:
+        note = LATEST_V1_SDK_ROUND_RESEARCH_NOTE.read_text(encoding="utf-8")
+        readme = RESEARCH_MODULE_BOUNDARY_README.read_text(encoding="utf-8")
+        compact = normalized(note)
+
+        self.assertIn(LATEST_V1_SDK_ROUND_RESEARCH_NOTE.name, readme)
+        self.assertEqual(
+            broad_v1_completion_claims(
+                note,
+                str(LATEST_V1_SDK_ROUND_RESEARCH_NOTE.relative_to(REPO_ROOT)),
+            ),
+            [],
+        )
+        self.assertEqual(
+            experimental_event_v1_completion_claims(
+                note,
+                str(LATEST_V1_SDK_ROUND_RESEARCH_NOTE.relative_to(REPO_ROOT)),
+            ),
+            [],
+        )
+        self.assertEqual(
+            positive_chat_message_event_claims(
+                note,
+                str(LATEST_V1_SDK_ROUND_RESEARCH_NOTE.relative_to(REPO_ROOT)),
+            ),
+            [],
+        )
+
+        required_boundaries = (
+            "v1 completion gate remains blocked by design",
+            "copied `GameplayPolicyEvent` plus `ChatMessageEvent` seeds do\nnot satisfy a complete SDK claim",
+            "No agent touched `/servidor/ark`, Discord, GitHub publication, or live servers",
+            "`promotion_ready`,\n  `public_sdk_ready`, and `runtime_ready` must stay false",
+            "Fail closed if any input resolves under `/servidor/ark`",
+            "any player identifier/raw UE/FName/GObjects/pointer\nfield is copied into public or logged output",
+            "These names are not evidence of SDK readiness or runtime safety",
+        )
+        for boundary in required_boundaries:
+            with self.subTest(boundary=boundary):
+                self.assertIn(normalized(boundary), compact)
+
+        forbidden_positive_claims = (
+            r"\bpublic\s+player\s+identity\s+(?:is|are|has\s+been)\s+"
+            r"(?:available|promoted|ready|supported)\b",
+            r"\b(?:promote|promoted|promotes|ship|shipped|ships|support|supported|supports)\s+"
+            r"(?:public\s+)?player\s+identity\b",
+            r"\b(?:public\s+)?commands?\s+(?:SDKs?|APIs?|routers?|surfaces?)\s+"
+            r"(?:is|are|has\s+been)\s+(?:available|promoted|public|ready|supported)\b",
+            r"\b(?:promote|promoted|promotes|ship|shipped|ships|support|supported|supports)\s+"
+            r"(?:public\s+)?commands?\s+(?:SDKs?|APIs?|routers?|surfaces?)\b",
+            r"\bResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\s+"
+            r"(?:is|are|has\s+been)\s+(?:available|promoted|public|ready|supported)\b",
+            r"\b(?:promote|promoted|promotes|ship|shipped|ships|support|supported|supports)\s+"
+            r"(?:public\s+)?ResourceHandle(?:\s+(?:SDKs?|APIs?|surfaces?))?\b",
+            r"\b(?:runtime|live[- ]server|server[- ]backed)\s+"
+            r"(?:approval|observation|validation|work)\s+(?:is|was|has\s+been)\s+"
+            r"(?:approved|authorized|available|ready)\b",
+        )
+        offenders: list[str] = []
+        for line, segment in sentence_like_segments(note):
+            for pattern in forbidden_positive_claims:
+                if re.search(pattern, segment, flags=re.IGNORECASE):
+                    offenders.append(
+                        f"{LATEST_V1_SDK_ROUND_RESEARCH_NOTE.relative_to(REPO_ROOT)}:{line}: "
+                        f"{normalized(segment)}"
+                    )
+                    break
+
+        self.assertEqual(offenders, [])
 
     def test_route_confidence_readiness_checkers_are_covered_by_run_script_tests(self) -> None:
         run_script_tests = (REPO_ROOT / "scripts" / "run_script_tests.sh").read_text(encoding="utf-8")

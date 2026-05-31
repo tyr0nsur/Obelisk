@@ -236,6 +236,32 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
 
+    def test_distinguishes_known_lifecycle_orientation_targets_not_accepted(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = base_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+        payload["candidate_anchors"][1] = base_anchor("session_end", "ShooterGameMode.OnLogout")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+        orientation_blockers = [
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "candidate_anchor_known_lifecycle_orientation_not_accepted"
+        ]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("candidate_anchor_target_outside_closed_target_set", report["blockers"])
+        self.assertEqual(
+            {blocker["target"] for blocker in orientation_blockers},
+            {"ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"},
+        )
+        self.assertEqual(
+            {blocker["orientation_status"] for blocker in orientation_blockers},
+            {"static_orientation_only_not_in_closed_target_set"},
+        )
+        self.assertEqual(report["accepted_start_targets"], [])
+        self.assertEqual(report["accepted_end_targets"], [])
+
     def test_rejects_principal_invalidation_semantics_overclaim(self) -> None:
         payload = manifest()
         payload["principal_policy"]["invalidation_semantics"] = "stable_cross_instance_principal"

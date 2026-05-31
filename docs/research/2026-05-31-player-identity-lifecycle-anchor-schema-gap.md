@@ -34,6 +34,13 @@ invalidation.
 - `validate_offline_artifact_gate.py` currently rejects lifecycle overclaims; true
   lifecycle anchors or non-empty accepted target lists are blockers for the existing
   candidate-only first-evidence artifact.
+- `check_player_identity_lifecycle_anchor_candidates.py` now distinguishes the known
+  static-orientation-only targets `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout` with
+  `candidate_anchor_known_lifecycle_orientation_not_accepted`. Unknown out-of-set targets
+  still fail with `candidate_anchor_target_outside_closed_target_set`. This preserves the
+  clues without accepting lifecycle semantics or adding them to the closed first-evidence
+  target set.
 
 ## Missing Schema
 

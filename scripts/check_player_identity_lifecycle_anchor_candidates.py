@@ -19,6 +19,12 @@ TARGET_SET = "players-identity-lifecycle-intake"
 TARGET_SET_REVISION = "reflection_target_sets.py:players-identity-lifecycle-intake"
 SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 TARGET_SET_TARGETS = set(schema_target_list(TARGET_SET, SNAPSHOT_SCHEMA))
+KNOWN_LIFECYCLE_ORIENTATION_TARGETS = frozenset(
+    (
+        "ShooterGameMode.HandleNewPlayer",
+        "ShooterGameMode.OnLogout",
+    )
+)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 ROLE_TO_ACCEPTANCE_KEYS = {
@@ -207,7 +213,16 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
     elif target != f"{outer}.{function}":
         add(blockers, "candidate_anchor_target_mismatch", label)
     elif target not in TARGET_SET_TARGETS:
-        add(blockers, "candidate_anchor_target_outside_closed_target_set", label, target=target)
+        if target in KNOWN_LIFECYCLE_ORIENTATION_TARGETS:
+            add(
+                blockers,
+                "candidate_anchor_known_lifecycle_orientation_not_accepted",
+                label,
+                target=target,
+                orientation_status="static_orientation_only_not_in_closed_target_set",
+            )
+        else:
+            add(blockers, "candidate_anchor_target_outside_closed_target_set", label, target=target)
     if accepted:
         for key in ("num_parms", "parms_size", "property_order"):
             value = anchor.get(key)
