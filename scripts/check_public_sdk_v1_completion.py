@@ -114,10 +114,20 @@ PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
 )
 STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "candidate",
+    "chat_message_event_seed",
+    "chat_seed",
+    "copied_data",
+    "core_first",
     "descriptor_catalog",
     "descriptor_preflight",
+    "event_seed",
+    "gameplay_policy_event_seed",
     "item_return",
+    "package_shape",
     "planning",
+    "plugin_hub",
+    "pluginhub",
+    "plugin_hub_seed",
     "orientation",
     "preflight",
     "readiness",
@@ -130,19 +140,30 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
 STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
     "artifact_schema",
     "descriptor_preflight",
+    "evidence_kind",
+    "evidence_kinds",
+    "evidence_terms",
     "input_target_set",
     "output_target_set",
+    "pack",
+    "packs",
+    "promotion_terms",
     "release_readiness_target_sets",
     "contract_kind",
     "schema",
     "schemas",
+    "source_kind",
+    "source_kinds",
     "status",
     "source_target_sets",
     "target_set",
     "target_sets",
+    "terms",
 }
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
-    r"(?:candidate|planning|static[-_ ]?orientation|orientation|preflight|readiness|"
+    r"(?:candidate|planning|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
+    r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
+    r"static[-_ ]?orientation|orientation|preflight|readiness|"
     r"item[-_ ]?return[-_ ]?only|return[-_ ]?only|descriptor[-_ ]?preflight|"
     r"descriptor[-_ ]?catalog|consume[-_ ]?only|evidence[-_ ]?only)",
     re.IGNORECASE,
