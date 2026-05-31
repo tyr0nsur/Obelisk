@@ -58,11 +58,48 @@ def load_release_statement(path: Path | None) -> tuple[str | None, list[str]]:
 
 
 def release_statement_names_outcome(text: str, surface_id: str, status: str) -> bool:
-    lowered = text.lower()
-    if surface_id.lower() not in lowered:
-        return False
     expected = "post-v1" if status == "post-v1" else "excluded"
-    return expected in lowered
+    surface_id_lower = surface_id.lower()
+    for line in text.splitlines():
+        lowered = line.lower()
+        if surface_id_lower not in lowered:
+            continue
+        if "not " in lowered or " no " in lowered:
+            continue
+        if f"{surface_id_lower}: {expected}" in lowered or f"{surface_id_lower} - {expected}" in lowered:
+            return True
+    return False
+
+
+def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str, Any]) -> bool:
+    contract = surface.get("v1_decision_contract")
+    if not isinstance(contract, dict):
+        return True
+    required = as_string_list(contract.get("exclusion_requires"))
+    if not required:
+        return True
+    lowered = text.lower()
+    return all(item.lower() in lowered for item in required)
+
+
+def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
+    evidence = surface.get("evidence")
+    if not isinstance(evidence, dict) or not evidence:
+        return False
+    machine_keys = (
+        "abi_tests",
+        "sdk_consumer_tests",
+        "installed_sdk_consumer_tests",
+        "tests",
+        "install_gate",
+    )
+    for key in machine_keys:
+        value = evidence.get(key)
+        if isinstance(value, list) and value:
+            return True
+        if isinstance(value, str) and value:
+            return True
+    return False
 
 
 def build_report(manifest_path: Path, release_statement_path: Path | None = None) -> dict[str, Any]:
@@ -106,6 +143,11 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
 
     promoted_surfaces = set(as_string_list(manifest.get("promoted_surfaces")))
     experimental_surfaces = set(as_string_list(manifest.get("experimental_surfaces")))
+    status_experimental_surfaces = {
+        surface_id
+        for surface_id, surface in surfaces_by_id.items()
+        if surface.get("status") == "promoted-experimental-only"
+    }
     completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
     post_v1_or_excluded = set(as_string_list(manifest.get("post_v1_or_excluded_surfaces")))
 
@@ -116,9 +158,14 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     promoted_blockers_without_evidence: list[str] = []
     non_promoted_with_contract: list[str] = []
     promoted_list_mismatches: list[str] = []
+    experimental_list_mismatches: list[str] = []
     release_statement_missing_blockers: list[str] = []
+    release_statement_missing_contracts: list[str] = []
 
-    for surface_id in sorted(experimental_surfaces):
+    if experimental_surfaces != status_experimental_surfaces:
+        experimental_list_mismatches = sorted(experimental_surfaces ^ status_experimental_surfaces)
+
+    for surface_id in sorted(experimental_surfaces | status_experimental_surfaces):
         surface = surfaces_by_id.get(surface_id)
         if not surface:
             missing_surfaces.append(surface_id)
@@ -139,7 +186,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
             continue
         status = surface.get("status")
         if status == "promoted":
-            if not surface.get("evidence"):
+            if not surface_has_promotion_evidence(surface):
                 promoted_blockers_without_evidence.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
@@ -147,6 +194,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 release_statement_missing_blockers.append(surface_id)
             elif not release_statement_names_outcome(release_statement_text, surface_id, status):
                 release_statement_missing_blockers.append(surface_id)
+            elif not release_statement_satisfies_exclusion_contract(release_statement_text, surface):
+                release_statement_missing_contracts.append(surface_id)
             continue
         unresolved_completion_blockers.append(surface_id)
 
@@ -183,8 +232,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("non_promoted_surface_has_public_contract")
     if promoted_list_mismatches:
         blockers.append("promoted_surface_list_mismatch")
+    if experimental_list_mismatches:
+        blockers.append("experimental_surface_list_mismatch")
     if release_statement_missing_blockers:
         blockers.append("release_statement_missing_non_promoted_blocker_outcomes")
+    if release_statement_missing_contracts:
+        blockers.append("release_statement_missing_exclusion_contract")
     if release_statement_text is not None:
         if "docs/sdk_v1_compatibility.md" not in release_statement_text.lower():
             blockers.append("release_statement_missing_sdk_compatibility_reference")
@@ -208,7 +261,9 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "promoted_blockers_without_evidence": sorted(set(promoted_blockers_without_evidence)),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "promoted_list_mismatches": sorted(set(promoted_list_mismatches)),
+        "experimental_list_mismatches": sorted(set(experimental_list_mismatches)),
         "release_statement_missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
+        "release_statement_missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
         "non_claims": [
             "core-first release readiness, install layout, and package-shape checks do not satisfy this v1 SDK completion gate",
             "post-v1 or excluded surfaces must be named in the manifest and release statement before a stable v1 SDK claim",

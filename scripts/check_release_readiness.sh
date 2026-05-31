@@ -491,6 +491,11 @@ run_step() {
     "$@"
 }
 
+if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
+    run_step python3 scripts/check_public_sdk_v1_completion.py \
+        --release-statement "${V1_SDK_RELEASE_STATEMENT}"
+fi
+
 validate_second_source_readiness_json() {
     local report_path="$1"
     local target_set="$2"
@@ -813,10 +818,6 @@ run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so" "${RELEASE_CHECK_ROOT}"
 run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oDescriptorCatalog/oDescriptorCatalog.so" "${RELEASE_CHECK_ROOT}"
-if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
-    run_step python3 scripts/check_public_sdk_v1_completion.py \
-        --release-statement "${V1_SDK_RELEASE_STATEMENT}"
-fi
 run_step git diff --check
 
 printf '\n==> git status --short --ignored\n'

@@ -110,6 +110,14 @@ if ! grep -Fq -- "--v1-sdk-release-statement must not read from protected server
     exit 1
 fi
 
+v1_gate_line="$(grep -n 'check_public_sdk_v1_completion.py' scripts/check_release_readiness.sh | head -n1 | cut -d: -f1)"
+configure_line="$(grep -n 'cmake -S . -B' scripts/check_release_readiness.sh | head -n1 | cut -d: -f1)"
+if [[ -z "${v1_gate_line}" || -z "${configure_line}" || "${v1_gate_line}" -ge "${configure_line}" ]]; then
+    printf 'v1 SDK completion gate must run before core configure/build work: gate=%s configure=%s\n' \
+        "${v1_gate_line}" "${configure_line}" >&2
+    exit 1
+fi
+
 if ! grep -Fq -- "production libobelisk.so symbol surface checks" <<<"${help_output}"; then
     printf 'missing production symbol-surface help text\n' >&2
     exit 1

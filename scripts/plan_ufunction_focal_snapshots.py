@@ -252,6 +252,15 @@ def require_player_identity_target_set_scope(
             f"(full_target_count={len(PLAYER_IDENTITY_TARGETS)} "
             f"unexpected_targets={','.join(broad_player_identity_targets)})"
         )
+    requested_short_targets = short_targets_from_requests(requested_targets)
+    unexpected_mixed_targets = sorted(requested_short_targets - DIRECT_PLAYER_IDENTITY_GATE_TARGETS)
+    if requested_player_identity_targets and unexpected_mixed_targets:
+        raise SystemExit(
+            "player identity focal planning must request only "
+            "ShooterPlayerController.ServerListPlayers and "
+            "ShooterPlayerController.ServerKickPlayer "
+            f"(unexpected_targets={','.join(unexpected_mixed_targets)})"
+        )
 
     require_player_identity_core_evidence_pack(manifest_path, manifest)
 
@@ -306,12 +315,15 @@ def require_player_identity_target_set_scope(
 
 
 def player_identity_target_set_targets_from_requests(requested_targets: list[str]) -> set[str]:
+    return short_targets_from_requests(requested_targets) & set(PLAYER_IDENTITY_TARGETS)
+
+
+def short_targets_from_requests(requested_targets: list[str]) -> set[str]:
     matched: set[str] = set()
     for target in requested_targets:
         _, outer, name = focal_planner.parse_exact_target(target)
         short_target = f"{outer}.{name}"
-        if short_target in PLAYER_IDENTITY_TARGETS:
-            matched.add(short_target)
+        matched.add(short_target)
     return matched
 
 

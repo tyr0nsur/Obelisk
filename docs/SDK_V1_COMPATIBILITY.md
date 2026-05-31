@@ -167,8 +167,8 @@ The shortest useful route toward a complete v1 SDK is:
 4. Advance structure census and inventory/items through narrow copied APIs, or explicitly
    exclude them from the first v1 support statement.
 5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID:
-   mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and
-   operator ingress/storage.
+   mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas,
+   operator ingress/storage, and gameplay/server tick callbacks.
 6. Keep gameplay/server tick callbacks separate from process-local timers unless a future
    promoted copied ABI defines cadence, budget, lifecycle, shutdown, and hitch/backpressure
    behavior.

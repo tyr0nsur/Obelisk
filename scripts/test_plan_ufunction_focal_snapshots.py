@@ -330,6 +330,41 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         self.assertIn("--snapshot-json", first_command)
         self.assertEqual(str(missing_core), payload["core"])
 
+    def test_direct_player_identity_targets_reject_mixed_non_player_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            missing_core = root / "reviewed-core-does-not-exist"
+            self.write_pack(
+                pack,
+                core_path=missing_core,
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target",
+                    "ShooterPlayerController.ServerListPlayers",
+                    "--target",
+                    "ShooterPlayerController.ServerKickPlayer",
+                    "--target",
+                    "PrimalStructure.IsAllowedToBuild",
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "player identity focal planning must request only "
+            "ShooterPlayerController.ServerListPlayers and "
+            "ShooterPlayerController.ServerKickPlayer",
+            result.stderr,
+        )
+        self.assertIn("unexpected_targets=PrimalStructure.IsAllowedToBuild", result.stderr)
+
     def test_player_identity_target_set_requires_matching_pack_scope(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
