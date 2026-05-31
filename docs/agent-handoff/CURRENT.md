@@ -150,6 +150,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   standalone snapshots, redacted signatures, static thunks, or a two-function-only
   inventory as satisfying this lane. Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+  If the readiness checker later finds exactly one matching offline `ShooterGameServer`
+  and one non-symlink unpaired core-like file, its `operator_next_commands.input_staging`
+  may become ready with a concrete `prepare_player_identity_offline_raw_layout.py`
+  command. That only stages inputs; it does not validate or promote the core.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0 identity,
   commands/replies/response path, and permissions/admin; P1 economy/storage/operator
   ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
@@ -189,6 +193,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   runtime observer, callback ABI, descriptor, public StructureEvents SDK, identity,
   mutation, enforcement, return override, or v1 completion claim. Detail:
   `docs/research/2026-05-31-aggregate-census-product-priority.md`.
+  Exact build-policy target names such as `PrimalStructure.IsAllowedToBuild` and
+  `APrimalStructure.IsAllowedToBuild` must stay out of public docs, ABI/descriptors,
+  release target sets, and runtime dispatcher surfaces until a separate promotion gate
+  accepts them.
 - Command/chat response-path static orientation is complete for the current reviewed
   binary and remains orientation-only until identity and permissions/admin are promoted
   and a copied response contract exists. The checker is useful for later target matching,

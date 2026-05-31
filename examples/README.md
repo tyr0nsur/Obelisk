@@ -17,7 +17,9 @@ not ArkApi portability kits, module SDKs, or evidence that Obelisk SDK v1 is com
 - `sdk_inventory_policy_audit/`: external C plugin showing an experimental copied-data
   audit pattern for inventory-backed `GameplayPolicyEvent` callbacks; it is not an
   inventory, item, identity, lookup, mutation, return override, command, permission,
-  send-chat, storage, or compatibility surface.
+  send-chat, storage, or compatibility surface. It is intentionally not built by the
+  top-level Obelisk CMake project, not installed by `scripts/install_obelisk.sh`, and
+  not part of the release-supported install layout.
 
 Examples must stay inside public `include/obelisk/ObeliskApi.h` contracts. Do not use
 private headers, raw UE pointers, `ProcessEvent` internals, identity, lookup, mutation,

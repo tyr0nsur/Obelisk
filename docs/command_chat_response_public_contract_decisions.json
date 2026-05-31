@@ -121,6 +121,12 @@
       "id": "separation.no_commands_router_or_moderation",
       "category": "scope",
       "status": "unresolved",
+      "v1_sequence_gate": [
+        "promoted player identity is required before command/chat response principals",
+        "promoted query-only permissions/admin is required before directed responses",
+        "copied command/chat response semantics may be defined only after identity and permissions/admin promotion",
+        "commands/replies remains blocked until command_chat_response_path is promoted or explicitly excluded"
+      ],
       "required_exclusions": [
         "command router",
         "command registration API",

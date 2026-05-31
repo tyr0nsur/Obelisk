@@ -3213,6 +3213,83 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(boundary=boundary):
                 self.assertIn(boundary, candidate["required_boundaries"])
 
+    def test_structure_build_policy_targets_stay_research_only_not_public_or_runtime(self) -> None:
+        forbidden_targets = (
+            "PrimalStructure.IsAllowedToBuild",
+            "APrimalStructure.IsAllowedToBuild",
+        )
+        forbidden_abi_tokens = (
+            "IS_ALLOWED_TO_BUILD",
+            "ALLOWED_TO_BUILD",
+            "BUILD_PLACEMENT",
+            "BUILD_POLICY",
+            "NO_COLLISION",
+            "StructureBuildPolicy",
+            "BuildPolicy",
+        )
+
+        structure = next(
+            surface
+            for surface in json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))["surfaces"]
+            if surface["id"] == "obelisk.structure_census.v1"
+        )
+        self.assertEqual(structure["status"], "planning")
+        self.assertEqual(structure["support_tier"], "blocked")
+        self.assertEqual(structure["public_contract"], [])
+        self.assertEqual(
+            structure["readiness_checker_candidate"]["target_set"],
+            "structure-aggregate-census-planning",
+        )
+        self.assertIn("structure-aggregate-census-planning", PLANNING_ONLY_TARGET_SETS)
+        self.assertNotIn("structure-aggregate-census-planning", RELEASE_READINESS_TARGET_SETS)
+
+        target_set_offenders = [
+            f"{target_set}: {target}"
+            for target_set, targets in TARGET_SETS.items()
+            for target in targets
+            if any(forbidden in target for forbidden in forbidden_targets)
+        ]
+        self.assertEqual(target_set_offenders, [])
+
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        for token in (*forbidden_targets, *forbidden_abi_tokens):
+            with self.subTest(surface="public_header", token=token):
+                self.assertNotIn(token, header)
+
+        descriptor_files = (
+            PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+            PUBLIC_SDK_SURFACES_MANIFEST,
+        )
+        for path in descriptor_files:
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden_targets:
+                with self.subTest(surface=path.relative_to(REPO_ROOT), token=token):
+                    self.assertNotIn(token, text)
+
+        public_doc_files = (
+            *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+            REPO_ROOT / "plugins" / "README.md",
+            REPO_ROOT / "examples" / "README.md",
+        )
+        for path in public_doc_files:
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden_targets:
+                with self.subTest(surface=path.relative_to(REPO_ROOT), token=token):
+                    self.assertNotIn(token, text)
+
+        runtime_dispatcher_files = (
+            *PROMOTED_RUNTIME_PAYLOAD_FILES,
+            REPO_ROOT / "core" / "EventManager.cpp",
+            REPO_ROOT / "core" / "EventManager.h",
+            REPO_ROOT / "core" / "PluginManager.cpp",
+            REPO_ROOT / "core" / "PluginManager.h",
+        )
+        for path in runtime_dispatcher_files:
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden_targets:
+                with self.subTest(surface=path.relative_to(REPO_ROOT), token=token):
+                    self.assertNotIn(token, text)
+
     def test_future_command_principal_routing_requires_new_owner_scoped_lifecycle_surface(self) -> None:
         docs = {
             "sdk_compatibility": PUBLIC_SDK_V1_COMPATIBILITY_DOC,
@@ -4985,6 +5062,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(path=relative, token="sdk target"):
                 self.assertIn("Obelisk::obelisk_sdk", text)
 
+        examples_readme_normalized = re.sub(r"\s+", " ", examples_readme)
+        for token in (
+            "not built by the top-level Obelisk CMake project",
+            "not installed by `scripts/install_obelisk.sh`",
+            "not part of the release-supported install layout",
+        ):
+            with self.subTest(path="examples/README.md", token=token):
+                self.assertIn(token, examples_readme_normalized)
+
         self.assertIn("Support tier: experimental pattern.", audit_readme)
         audit_readme_normalized = re.sub(r"\s+", " ", audit_readme)
         for token in (
@@ -5110,6 +5196,38 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ):
                 with self.subTest(path=relative, forbidden=token):
                     self.assertNotIn(token, text)
+
+    def test_sdk_inventory_policy_audit_example_is_not_release_packaged(self) -> None:
+        root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        installer = (REPO_ROOT / "scripts" / "install_obelisk.sh").read_text(encoding="utf-8")
+        release_layout_script = (
+            REPO_ROOT / "scripts" / "test_install_obelisk_layout.sh"
+        ).read_text(encoding="utf-8")
+        audit_cmake = (
+            REPO_ROOT / "examples" / "sdk_inventory_policy_audit" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+
+        for token in (
+            "add_subdirectory(examples/sdk_inventory_policy_audit)",
+            "obelisk_sdk_inventory_policy_audit",
+            "sdk_inventory_policy_audit",
+        ):
+            with self.subTest(path="CMakeLists.txt", forbidden=token):
+                self.assertNotIn(token, root_cmake)
+
+        for token in (
+            "examples/sdk_inventory_policy_audit",
+            "obelisk_sdk_inventory_policy_audit",
+            "sdk_inventory_policy_audit",
+            "SDK_INVENTORY_POLICY_AUDIT_EXAMPLE_PLUGIN_PATH",
+        ):
+            with self.subTest(path="scripts/install_obelisk.sh", forbidden=token):
+                self.assertNotIn(token, installer)
+            with self.subTest(path="scripts/test_install_obelisk_layout.sh", forbidden=token):
+                self.assertNotIn(token, release_layout_script)
+
+        with self.subTest(path="examples/sdk_inventory_policy_audit/CMakeLists.txt"):
+            self.assertNotRegex(audit_cmake, r"\binstall\s*\(")
 
     def test_installed_sdk_examples_label_package_version_as_prerelease_floor(self) -> None:
         for path in (
@@ -7703,7 +7821,6 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path, text in (
             ("docs/research/2026-05-30-v1-core-capability-map.md", v1_map),
             ("docs/research/README.md", research_readme),
-            ("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", matrix),
         ):
             compact = normalized(text)
             compact_lower = compact.lower()
@@ -7722,6 +7839,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     compact_lower,
                     r"not (?:a )?(?:delivery |sdk )?promise|not .* sdk promise|no public sdk|not ready",
                 )
+        matrix_compact = normalized(matrix)
+        matrix_lower = matrix_compact.lower()
+        with self.subTest(file="docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", item="broad surface terms"):
+            for term in broad_surface_terms:
+                self.assertIn(term, matrix_lower)
+        with self.subTest(file="docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", item="generic build placement lane"):
+            self.assertIn("Structure build placement policy", matrix_compact)
+            self.assertIn("Ark-style build placement compatibility", matrix_compact)
+            self.assertNotIn("PrimalStructure.IsAllowedToBuild", matrix_compact)
+            self.assertNotIn("APrimalStructure.IsAllowedToBuild", matrix_compact)
+        with self.subTest(file="docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", item="no SDK promise from breadth"):
+            self.assertRegex(
+                matrix_lower,
+                r"not (?:a )?(?:delivery |sdk )?promise|not .* sdk promise|no public sdk|not ready",
+            )
 
     def test_plugin_hub_blocked_module_families_stay_unpromoted(self) -> None:
         v1_map = (

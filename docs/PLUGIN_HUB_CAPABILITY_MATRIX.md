@@ -200,7 +200,7 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 | Player identity lifecycle intake | `players-identity-lifecycle-intake` research guidance only | Planning-only | Stable player identity, lookup, permissions, send-chat, moderation, public SDK, runtime hooks, or release readiness |
 | Mission copied-bool planning and mission demand | Internal/test-only research notes; `mission-copied-bool-policy-slice` internal/test-only v0.2 lane | Planning-only/test-only | Not a Production Plugin Hub mission module; no public Mission SDK, Mission module readiness, ArkApi mission compatibility, command SDK dependency, mission identity, mission state mutation, runtime observation approval, or reward/transfer authority |
 | Structure census/proximity | `structure-aggregate-census-planning` research guidance only | Planning-only | Public GObjects traversal, structure handles, exact coordinates, ownership lookup, linked-structure traversal, StructureEvents SDK, or mutation |
-| Structure build placement policy | No public Obelisk SDK yet | Not ready | `APrimalStructure.IsAllowedToBuild` compatibility, placement denial, no-collision behavior, structure identity, location disclosure, mutation, or return override |
+| Structure build placement policy | No public Obelisk SDK yet | Not ready | Ark-style build placement compatibility, placement denial, no-collision behavior, structure identity, location disclosure, mutation, or return override |
 
 ## Current Safe Route
 

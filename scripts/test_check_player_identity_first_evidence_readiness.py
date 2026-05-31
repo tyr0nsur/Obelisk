@@ -334,7 +334,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             ],
         )
         self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
-        self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
+        self.assertEqual(input_staging["command_argv"][5], "<non-protected-core-dump-input>")
         self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
         self.assertEqual(
             [step["id"] for step in operator_commands["sequence"]],
@@ -667,9 +667,9 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
         self.assertIn("--binary /tmp/artifacts/raw/ShooterGameServer", input_staging["command"])
-        self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
+        self.assertEqual(input_staging["command_argv"][5], "<non-protected-core-dump-input>")
         self.assertIn("--artifact-root /tmp", input_staging["command"])
-        self.assertIn("--run-id <run-id-suffix>", input_staging["command"])
+        self.assertEqual(input_staging["command_argv"][9], "<run-id-suffix>")
         self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
         self.assertIn("does not build or approve core evidence packs", " ".join(input_staging["non_claims"]))
         self.assertEqual(
@@ -682,6 +682,58 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             operator_commands["sequence"][0]["blocked_until"],
             "non_protected_core_dump_input",
         )
+
+    def test_operator_recipe_uses_unambiguous_unpaired_core_for_staging(self) -> None:
+        operator_commands = checker.build_operator_next_commands(
+            inventory_ready=False,
+            offline_inputs={
+                "status": "offline_binary_and_unpaired_core_like_inputs_present",
+                "ready_to_build_core_evidence_pack": False,
+                "shooter_game_server_candidates": [
+                    {
+                        "path": "/tmp/artifacts/offline-binaries/current/ShooterGameServer",
+                        "matches_current_binary": True,
+                    }
+                ],
+                "core_like_candidates": [
+                    {
+                        "path": "/tmp/artifacts/unpaired/core.1234",
+                        "size_bytes": 1234,
+                    }
+                ],
+                "omitted_core_like_candidates": 0,
+            },
+            next_blocker={
+                "code": "raw_inputs_unpaired",
+                "blocked_until": "paired_non_protected_raw_binary_and_core",
+            },
+            raw_binary_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/raw/ShooterGameServer"),
+            raw_core_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/raw/core"),
+            core_manifest_pattern=Path("/tmp/artifacts/player-identity-offline-<run-id>/core-evidence-pack/manifest.json"),
+            reflection_inventory_pattern=Path(
+                "/tmp/artifacts/player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"
+            ),
+            next_operator_recipe={
+                "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
+                "build_reflection_inventory_pack": "python3 scripts/build_reflection_inventory_pack.py ...",
+                "check_reflection_inventory_pack": "python3 scripts/check_reflection_inventory_pack_readiness.py ...",
+                "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
+            },
+        )
+
+        input_staging = operator_commands["input_staging"]
+        self.assertEqual(input_staging["status"], "ready")
+        self.assertTrue(input_staging["ready"])
+        self.assertIsNone(input_staging["blocked_until"])
+        self.assertEqual(
+            input_staging["command_argv"][3],
+            "/tmp/artifacts/offline-binaries/current/ShooterGameServer",
+        )
+        self.assertEqual(input_staging["command_argv"][5], "/tmp/artifacts/unpaired/core.1234")
+        self.assertIn("--core /tmp/artifacts/unpaired/core.1234", input_staging["command"])
+        self.assertIn("--artifact-root /tmp/artifacts", input_staging["command"])
+        self.assertEqual(operator_commands["ready_to_build_core_evidence_pack"], False)
+        self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
 
     def test_detect_obelisk_commit_uses_env_then_git_head_then_unknown(self) -> None:
         completed = subprocess.CompletedProcess(
@@ -805,7 +857,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "--binary /tmp/player-identity-artifacts/player-identity-offline-a/raw/ShooterGameServer",
             input_staging["command"],
         )
-        self.assertIn("--core <non-protected-core-dump-input>", input_staging["command"])
+        self.assertEqual(input_staging["command_argv"][5], "<non-protected-core-dump-input>")
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
         self.assertFalse(operator_commands["sequence"][0]["ready"])
         self.assertEqual(operator_commands["sequence"][0]["blocked_until"], "non_protected_core_dump_input")

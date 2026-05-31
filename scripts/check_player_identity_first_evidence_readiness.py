@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -683,6 +684,18 @@ def first_matching_binary_path(offline_inputs: dict[str, Any]) -> str | None:
     return None
 
 
+def unambiguous_core_like_path(offline_inputs: dict[str, Any]) -> str | None:
+    candidates = offline_inputs.get("core_like_candidates")
+    if not isinstance(candidates, list) or len(candidates) != 1:
+        return None
+    if offline_inputs.get("omitted_core_like_candidates") not in (None, 0):
+        return None
+    candidate = candidates[0]
+    if not isinstance(candidate, dict) or not isinstance(candidate.get("path"), str):
+        return None
+    return candidate["path"]
+
+
 def next_actionable_blocker(
     *,
     inventory_ready: bool,
@@ -842,6 +855,7 @@ def build_operator_next_commands(
 
     offline_status = offline_inputs.get("status")
     matching_binary_path = first_matching_binary_path(offline_inputs)
+    unpaired_core_like_path = unambiguous_core_like_path(offline_inputs)
     artifact_root_pattern = raw_binary_pattern.parent.parent.parent
     core_like_candidates = offline_inputs.get("core_like_candidates")
     core_like_present = isinstance(core_like_candidates, list) and bool(core_like_candidates)
@@ -885,16 +899,31 @@ def build_operator_next_commands(
         and next_blocker.get("code") == "admin_focal_snapshots_pending"
     )
     staging_binary_arg = matching_binary_path or "<matching-non-protected-ShooterGameServer>"
-    staging_command = (
-        f"PYTHONDONTWRITEBYTECODE=1 python3 {RAW_LAYOUT_HELPER} "
-        f"--binary {staging_binary_arg} "
-        "--core <non-protected-core-dump-input> "
-        f"--artifact-root {artifact_root_pattern} "
-        "--run-id <run-id-suffix> "
-        "--mode hardlink"
-    )
+    staging_core_arg = unpaired_core_like_path or "<non-protected-core-dump-input>"
+    staging_command_argv = [
+        "python3",
+        RAW_LAYOUT_HELPER,
+        "--binary",
+        staging_binary_arg,
+        "--core",
+        staging_core_arg,
+        "--artifact-root",
+        str(artifact_root_pattern),
+        "--run-id",
+        "<run-id-suffix>",
+        "--mode",
+        "hardlink",
+    ]
+    staging_command = "PYTHONDONTWRITEBYTECODE=1 " + shlex.join(staging_command_argv)
     if inventory_ready or ready_to_build_core:
         staging_status = "satisfied"
+        staging_blocked_until = None
+    elif (
+        matching_binary_path is not None
+        and unpaired_core_like_path is not None
+        and offline_status == "offline_binary_and_unpaired_core_like_inputs_present"
+    ):
+        staging_status = "ready"
         staging_blocked_until = None
     elif matching_binary_path is not None and offline_status == "offline_binary_present_core_like_input_missing":
         staging_status = "blocked"
@@ -1012,7 +1041,7 @@ def build_operator_next_commands(
         "input_staging": {
             "id": "stage_offline_raw_layout",
             "status": staging_status,
-            "ready": False,
+            "ready": staging_status == "ready",
             "blocked_until": staging_blocked_until,
             "explicit_source_inputs_required": [
                 "matching_non_protected_shooter_game_server",
@@ -1023,6 +1052,7 @@ def build_operator_next_commands(
                 "non_protected_core_dump_input",
             ],
             "command": staging_command,
+            "command_argv": staging_command_argv,
             "helper": RAW_LAYOUT_HELPER,
             "non_claims": [
                 "helper stages existing offline binary and core files only",

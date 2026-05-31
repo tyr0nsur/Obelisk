@@ -43,6 +43,21 @@ callback-scope copied payloads.
 - Raw `ProcessEvent`, raw FString, UE object pointers, FName/GObjects indices, ArkApi
   offsets/layouts, and direct native-call wrappers remain excluded from the public ABI.
 
+## Next Admissible Preparation
+
+Near-term work may only strengthen contract documentation, guardrail tests, or
+test-only validation of the dependency order:
+
+```text
+identity -> permissions/admin -> command/chat response path -> commands/replies
+```
+
+This preparation must not add parser APIs, command registration, replies, send-chat,
+public `CallProcessEvent`, moderation, player lookup, raw UE pointers, raw params, or
+runtime delivery behavior. Identity must first provide copied principal semantics;
+permissions/admin must then provide fail-closed authority provenance; only after both are
+promoted may a copied response path define delivery semantics.
+
 ## Non-Claims
 
 This note does not authorize runtime hooks, live-server tests, public SDK headers, command

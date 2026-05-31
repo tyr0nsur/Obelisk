@@ -78,6 +78,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md)
 - [2026-05-31-commands-principal-routing-contract.md](2026-05-31-commands-principal-routing-contract.md)
 - [2026-05-31-command-chat-response-thunk-orientation.md](2026-05-31-command-chat-response-thunk-orientation.md) (candidate-only static thunk orientation)
+- [2026-05-31-radare2-lifecycle-smoke.md](2026-05-31-radare2-lifecycle-smoke.md) (candidate-only lifecycle window smoke)
 - [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md)
 - [2026-05-31-operator-ingress-storage-blocker-brief.md](2026-05-31-operator-ingress-storage-blocker-brief.md)
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)

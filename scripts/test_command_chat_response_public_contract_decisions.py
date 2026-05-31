@@ -182,6 +182,15 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         payload = self.load_decisions()
         requirements = {item["id"]: item for item in payload["required_before_public_header"]}
         separation = requirements["separation.no_commands_router_or_moderation"]
+        self.assertEqual(
+            separation["v1_sequence_gate"],
+            [
+                "promoted player identity is required before command/chat response principals",
+                "promoted query-only permissions/admin is required before directed responses",
+                "copied command/chat response semantics may be defined only after identity and permissions/admin promotion",
+                "commands/replies remains blocked until command_chat_response_path is promoted or explicitly excluded",
+            ],
+        )
         for exclusion in (
             "command router",
             "command registration API",
