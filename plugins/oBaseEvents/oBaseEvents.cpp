@@ -444,7 +444,7 @@ namespace
 
             if (command != "help")
             {
-                LogLocalCommand("rejected reason=unknown-command", command, event->send_mode, event->sequence);
+                LogLocalCommand("rejected reason=unknown-command", "unknown", event->send_mode, event->sequence);
                 return;
             }
 

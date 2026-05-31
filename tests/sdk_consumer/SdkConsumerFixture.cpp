@@ -1487,8 +1487,11 @@ int main(int argc, char** argv)
                 "chat command helper did not accept local help command");
             DispatchValidChatMessageEventWithText("/dance raw-secret");
             Require(HasLogContaining(g_InfoLogs,
-                    "Local chat command rejected reason=unknown-command principal=unknown command=dance"),
+                    "Local chat command rejected reason=unknown-command principal=unknown command=unknown"),
                 "chat command helper did not reject unknown local command");
+            Require(!HasLogContaining(g_InfoLogs, "dance") &&
+                    !HasLogContaining(g_ErrorLogs, "dance"),
+                "chat command helper logged raw unknown command token");
             DispatchValidChatMessageEventWithText("/bad$name raw-secret");
             Require(HasLogContaining(g_ErrorLogs, "Local chat command rejected reason=invalid-command-name"),
                 "chat command helper did not reject invalid local command name");

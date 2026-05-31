@@ -830,6 +830,51 @@ namespace
     void RunDescriptorTimerGuardrails(InitFn init, ShutdownFn shutdown, ObeliskPluginInitContext context)
     {
         Require(shutdown != nullptr, "descriptor+timer guardrails require plugin shutdown cleanup");
+        {
+            ObeliskApi api{};
+            PopulateApi(api);
+
+            ResetFixtureObservations();
+            Require(!init(nullptr, &context), "descriptor+timer accepted null API");
+            Require(!init(&api, nullptr), "descriptor+timer accepted null context");
+
+            api.abi_version = OBELISK_API_ABI_VERSION + 1u;
+            Require(!init(&api, &context), "descriptor+timer accepted bad API ABI version");
+
+            PopulateApi(api);
+            ObeliskPluginInitContext badContext = context;
+            badContext.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION + 1u;
+            Require(!init(&api, &badContext), "descriptor+timer accepted bad context ABI version");
+
+            badContext = context;
+            badContext.config_dir = nullptr;
+            Require(!init(&api, &badContext), "descriptor+timer accepted null config dir");
+
+            badContext = context;
+            badContext.config_path = nullptr;
+            Require(!init(&api, &badContext), "descriptor+timer accepted null config path");
+
+            badContext = context;
+            badContext.instance_id = nullptr;
+            Require(!init(&api, &badContext), "descriptor+timer accepted null instance id");
+
+            badContext = context;
+            badContext.instance_id = "wrong-instance";
+            Require(!init(&api, &badContext), "descriptor+timer accepted wrong instance id");
+
+            badContext = context;
+            badContext.config_path = "/tmp/obelisk-install-layout-missing-config.json";
+            Require(!init(&api, &badContext), "descriptor+timer accepted missing config path");
+
+            Require(g_RegisterCount == 0, "descriptor+timer invalid context registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                    "descriptor+timer invalid context registered gameplay callback");
+            Require(g_ChatMessageRegisterCount == 0, "descriptor+timer invalid context registered chat callback");
+            Require(g_TimerRegisterCount == 0, "descriptor+timer invalid context registered timer");
+            shutdown();
+            Require(g_TimerUnregisterCount == 0, "descriptor+timer invalid context unregistered timer");
+        }
+
         const DescriptorTimerGuardrailCase cases[] = {
             {
                 "descriptor-timer-short-api-before-capabilities",

@@ -15,6 +15,7 @@ else
 fi
 WORK_DIR="$(mktemp -d /tmp/obelisk-sdk-consumer.XXXXXX)"
 CXX_BIN="${CXX:-g++}"
+SDK_CONSUMER_FIXTURE="${BUILD_DIR}/tests/sdk_consumer/sdk_consumer_fixture"
 
 cleanup() {
     rm -rf "${WORK_DIR}"
@@ -315,6 +316,7 @@ require_path "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfig.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskConfigVersion.cmake"
 require_path "${INSTALL_ROOT}/lib/cmake/Obelisk/ObeliskTargets.cmake"
+require_path "${SDK_CONSUMER_FIXTURE}"
 
 installed_headers="$(find "${INSTALL_ROOT}/include" -type f -printf '%P\n' | sort)"
 if [[ "${installed_headers}" != "obelisk/ObeliskApi.h" ]]; then
@@ -455,6 +457,13 @@ fi
     "${CONFIG_DIR}" \
     "${CONFIG_PATH}" \
     "install-layout-test"
+
+"${SDK_CONSUMER_FIXTURE}" "${RELEASE_BASE_EVENTS_PLUGIN_PATH}" oBaseEvents
+"${SDK_CONSUMER_FIXTURE}" "${RELEASE_BASE_EVENTS_PLUGIN_PATH}" oBaseEvents active-chat-command-helper
+"${SDK_CONSUMER_FIXTURE}" "${RELEASE_TIMER_PLUGIN_PATH}" oProcessTimer
+"${SDK_CONSUMER_FIXTURE}" "${RELEASE_TIMER_PLUGIN_PATH}" oProcessTimer active-timer
+"${SDK_CONSUMER_FIXTURE}" "${RELEASE_DESCRIPTOR_PLUGIN_PATH}" oDescriptorCatalog
+"${SDK_CONSUMER_FIXTURE}" "${RELEASE_DESCRIPTOR_PLUGIN_PATH}" oDescriptorCatalog active-descriptor-catalog
 
 SDK_MINIMAL_EXAMPLE_DIR="${WORK_DIR}/sdk_minimal_plugin"
 mkdir -p "${SDK_MINIMAL_EXAMPLE_DIR}"
