@@ -779,6 +779,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_release_gate_rejects_internal_layout_only_target_sets_before_build(self) -> None:
         blocked_cases = [
             ("--ufunction-second-source-target-set", "buff-compact-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "dino-compact-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "mission-compact-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "transfer-ufunction-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "transfer-baccept-only-policy-slice", "UFunction"),
             ("--scriptstruct-second-source-target-set", "transfer-scriptstruct", "ScriptStruct"),
@@ -1991,14 +1993,20 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             if not mentions_mission_copied_bool_dispatcher:
                 continue
 
-            is_test_target = (
+            is_dispatcher_unit_test_target = (
                 kind == "executable"
                 and name == "mission_copied_bool_event_dispatcher_tests"
                 and "tests/core/MissionCopiedBoolEventDispatcherTests.cpp" in source_set
             )
-            if is_test_target:
+            is_process_event_unit_test_target = (
+                kind == "executable"
+                and name == "process_event_mission_reflection_tests"
+                and "tests/core/ProcessEventMissionReflectionTests.cpp" in source_set
+                and "hooks/ProcessEventMissionReflection.cpp" in source_set
+            )
+            if is_dispatcher_unit_test_target:
                 saw_test_target = True
-            else:
+            if not is_dispatcher_unit_test_target and not is_process_event_unit_test_target:
                 offenders.append(f"add_{kind}({name}): {sorted(source_set)}")
 
         if "tests/core/MissionCopiedBoolEventDispatcherTests.cpp" in cmake:

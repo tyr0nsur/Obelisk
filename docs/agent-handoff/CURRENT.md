@@ -125,12 +125,15 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   profile/window/marker/SHA and unsupported-SHA hook gates do no metadata/parameter reads
   and reserve no observation budget; zero budget and non-target FName no-read/no-budget,
   rejection clearing, and non-canonical bool fail-closed remain part of the same local
-  hardening envelope. The next Mission proof is end-to-end local observer/dispatcher
-  lifecycle gating: default-off, disabled/zero/non-target no-dispatch, and copied-bool
-  dispatch only after original success. `transfer-baccept-only-policy-slice` is blocked
-  from release/public SDK gates. This does not authorize Transfer runtime work, public
-  Mission SDK, runtime Mission dispatchers/callbacks, ResourceHandle, identity, arrays,
-  mutation, return override, or server observation.
+  hardening envelope. Mission also has a local test-only ProcessEvent-to-dispatcher proof:
+  default-off, disabled, zero-budget, non-target, pre-original, and rejected attempts do
+  not dispatch, while a matched copied-bool attempt dispatches only after original success.
+  The dispatcher remains linked only into Mission test binaries; it is not part of
+  `libobelisk`, plugin cleanup, runtime hook production, installed SDK, or public ABI.
+  `transfer-baccept-only-policy-slice` is blocked from release/public SDK gates. This does
+  not authorize Transfer runtime work, public Mission SDK, runtime Mission
+  dispatchers/callbacks, ResourceHandle, identity, arrays, mutation, return override, or
+  server observation.
 - ResourceHandle/public GObjects remain blocked; old flag-policy artifact is obsolete and
   durable rich-provenance refresh is preserved. Consume mode accepts it and promote mode
   stays blocked. Do not rerun broad FName, GObjects, or core scans for ResourceHandle
@@ -183,7 +186,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 - Current post-RC focus: preserve RC scope, reduce debt, improve evidence tooling, and promote only copied module APIs through strict gates.
 - Mission test-only copied-bool dispatcher exists outside shared runtime/API targets for
-  three copied-bool functions; next review is lifecycle/runtime observation, not public API.
+  three copied-bool functions, with local post-original dispatch gating covered. Before any
+  runtime/public promotion, Mission still needs full owner-token API design, plugin-manager
+  cleanup, init-failure/unload/in-flight callback lifecycle tests, hot-path subscriber and
+  budget prefilters, and a separately approved live-ops brief. This is not public API.
 - For v0.2 product value, prefer Structure aggregate/census planning over Transfer
   `bAccept`. Transfer `bAccept` remains useful as a fixture/internal bool-layout lane, but
   it is low product value without identity/payload/cross-map/privacy semantics. Do not

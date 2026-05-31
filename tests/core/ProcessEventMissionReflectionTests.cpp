@@ -1,4 +1,5 @@
 #include "hooks/ProcessEventMissionReflection.h"
+#include "core/MissionCopiedBoolEventDispatcher.h"
 
 #include <array>
 #include <atomic>
@@ -17,6 +18,12 @@ namespace
     using namespace Obelisk::Hooks::ProcessEventMissionReflection;
     using namespace Obelisk::UE;
     using namespace Obelisk::UE::RuntimeReflection;
+    using Obelisk::Core::MissionCopiedBoolEventDispatcher;
+    using Obelisk::Core::MissionCopiedBoolEventKind;
+    using Obelisk::Core::MissionCopiedBoolEventSubscription;
+    using Obelisk::Core::MissionCopiedBoolEventView;
+    using Obelisk::Core::MissionCopiedBoolField;
+    using Obelisk::Core::MissionCopiedBoolValue;
 
     constexpr int32_t kBPAllowPlayerToLeaveMissionNameIndex = 1211;
     constexpr int32_t kBPOnPlayerRemovedFromMissionNameIndex = 1582;
@@ -63,6 +70,12 @@ namespace
         int Calls = 0;
     };
 
+    struct CapturedMissionCopiedBoolEvent
+    {
+        MissionCopiedBoolEventKind Kind = MissionCopiedBoolEventKind::AddPlayerToMission;
+        std::vector<MissionCopiedBoolValue> Bools;
+    };
+
     bool RegionReader(const void* address, size_t size, void* context)
     {
         auto* reader = static_cast<ReaderContext*>(context);
@@ -88,6 +101,12 @@ namespace
     {
         if (!condition)
             throw std::runtime_error(message);
+    }
+
+    void CaptureMissionCopiedBoolEvent(const MissionCopiedBoolEventView& event, void* userData)
+    {
+        auto* captured = static_cast<std::vector<CapturedMissionCopiedBoolEvent>*>(userData);
+        captured->push_back({event.Kind, {event.Bools.begin(), event.Bools.end()}});
     }
 
     template <typename T, size_t N>
@@ -366,6 +385,93 @@ namespace
         Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
         Require(!attempt.Invocation.HasParameterRanges, "metadata-only mission invocation exposed ranges");
         return attempt;
+    }
+
+    bool TryMapMissionCopiedBoolEventKind(MissionReflection::MissionFunction function,
+                                          MissionCopiedBoolEventKind& out)
+    {
+        switch (function)
+        {
+        case MissionReflection::MissionFunction::AddPlayerToMission:
+            out = MissionCopiedBoolEventKind::AddPlayerToMission;
+            return true;
+        case MissionReflection::MissionFunction::BPAllowPlayerToLeaveMission:
+            out = MissionCopiedBoolEventKind::BPAllowPlayerToLeaveMission;
+            return true;
+        case MissionReflection::MissionFunction::BPOnPlayerRemovedFromMission:
+            out = MissionCopiedBoolEventKind::BPOnPlayerRemovedFromMission;
+            return true;
+        case MissionReflection::MissionFunction::GetPlayerUsableItems:
+            return false;
+        }
+        return false;
+    }
+
+    bool TryMapMissionCopiedBoolField(MissionReflection::MissionField field,
+                                      MissionCopiedBoolField& out)
+    {
+        switch (field)
+        {
+        case MissionReflection::MissionField::BForceAdd:
+            out = MissionCopiedBoolField::BForceAdd;
+            return true;
+        case MissionReflection::MissionField::BFromMissionCompleteEvent:
+            out = MissionCopiedBoolField::BFromMissionCompleteEvent;
+            return true;
+        case MissionReflection::MissionField::BLastPhaseSuccess:
+            out = MissionCopiedBoolField::BLastPhaseSuccess;
+            return true;
+        case MissionReflection::MissionField::ReturnValue:
+            out = MissionCopiedBoolField::ReturnValue;
+            return true;
+        case MissionReflection::MissionField::Character:
+        case MissionReflection::MissionField::OutItemIDs:
+        case MissionReflection::MissionField::PlayerCharacter:
+        case MissionReflection::MissionField::PlayerPawn:
+        case MissionReflection::MissionField::Player:
+        case MissionReflection::MissionField::Controller:
+            return false;
+        }
+        return false;
+    }
+
+    bool TryBuildMissionCopiedBoolEventView(const CopiedMissionObservation& observation,
+                                            std::array<MissionCopiedBoolValue, 2>& storage,
+                                            MissionCopiedBoolEventView& out)
+    {
+        MissionCopiedBoolEventKind kind{};
+        if (!TryMapMissionCopiedBoolEventKind(observation.Function, kind))
+            return false;
+        if (observation.BoolCount == 0 || observation.BoolCount > storage.size())
+            return false;
+
+        for (size_t i = 0; i < observation.BoolCount; ++i)
+        {
+            MissionCopiedBoolField field{};
+            if (!TryMapMissionCopiedBoolField(observation.BoolStorage[i].Field, field))
+                return false;
+            storage[i] = {.Field = field, .Value = observation.BoolStorage[i].Value};
+        }
+
+        out = {
+            .Kind = kind,
+            .Bools = std::span<const MissionCopiedBoolValue>(storage.data(), observation.BoolCount),
+        };
+        return true;
+    }
+
+    size_t MaybeDispatchObservedMissionCopiedBoolAfterOriginal(bool originalWasCalled, const Attempt& attempt)
+    {
+        CopiedMissionObservation observation;
+        if (!TryBuildCopiedMissionBoolObservationAfterOriginal(originalWasCalled, attempt, observation))
+            return 0;
+
+        std::array<MissionCopiedBoolValue, 2> storage{};
+        MissionCopiedBoolEventView event;
+        if (!TryBuildMissionCopiedBoolEventView(observation, storage, event))
+            return 0;
+
+        return MissionCopiedBoolEventDispatcher::Get().Dispatch(event);
     }
 
     void TestGateEvaluation()
@@ -1350,6 +1456,151 @@ namespace
         }
     }
 
+    void TestMissionCopiedBoolObserverDispatcherEndToEnd()
+    {
+        auto& dispatcher = MissionCopiedBoolEventDispatcher::Get();
+        int owner = 0;
+        std::vector<CapturedMissionCopiedBoolEvent> captured;
+        const uint64_t registrationId = dispatcher.Register(
+            &owner,
+            MissionCopiedBoolEventSubscription{CaptureMissionCopiedBoolEvent, &captured});
+        Require(registrationId != 0, "failed to register mission copied-bool dispatcher callback");
+
+        auto requireNoReadBudgetOrDispatch = [&](const Gate& gate,
+                                                int32_t nameIndex,
+                                                uint64_t observationLimit,
+                                                AttemptStatus expectedStatus,
+                                                const char* statusMessage,
+                                                const char* dispatchMessage) {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+
+            std::atomic<uint64_t> observationCounter{0};
+            uint64_t observationNumber = 99;
+            MemoryReader reader = fixture.Reader();
+            Attempt attempt = TryObserveInvocation(
+                gate,
+                nameIndex,
+                reader,
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                observationLimit,
+                observationNumber);
+
+            Require(attempt.Status == expectedStatus, statusMessage);
+            Require(observationCounter.load() == 0, "gated mission observer consumed dispatch budget");
+            Require(observationNumber == 0, "gated mission observer kept a dispatch observation number");
+            Require(fixture.Context.Calls == 0, "gated mission observer read metadata or params");
+            Require(MaybeDispatchObservedMissionCopiedBoolAfterOriginal(true, attempt) == 0, dispatchMessage);
+            Require(captured.empty(), "gated mission observer reached dispatcher callback");
+        };
+
+        requireNoReadBudgetOrDispatch(
+            Gate{},
+            kAddPlayerToMissionNameIndex,
+            1,
+            AttemptStatus::Disabled,
+            "default-off mission observer status changed",
+            "default-off mission observer dispatched copied bools");
+        requireNoReadBudgetOrDispatch(
+            EvaluateGate("0", true, true, true, kSupportedShooterGameServerSha256.data()),
+            kAddPlayerToMissionNameIndex,
+            1,
+            AttemptStatus::Disabled,
+            "disabled mission observer status changed",
+            "disabled mission observer dispatched copied bools");
+        requireNoReadBudgetOrDispatch(
+            EnabledGate(),
+            kAddPlayerToMissionNameIndex,
+            0,
+            AttemptStatus::BudgetExhausted,
+            "zero-budget mission observer status changed",
+            "zero-budget mission observer dispatched copied bools");
+        requireNoReadBudgetOrDispatch(
+            EnabledGate(),
+            42,
+            1,
+            AttemptStatus::NonMissionFunction,
+            "non-target mission observer status changed",
+            "non-target mission observer dispatched copied bools");
+
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 0;
+
+            std::atomic<uint64_t> observationCounter{0};
+            uint64_t observationNumber = 99;
+            MemoryReader reader = fixture.Reader();
+            Attempt attempt = TryObserveInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                reader,
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                1,
+                observationNumber);
+
+            Require(attempt.Status == AttemptStatus::Matched,
+                    "enabled mission observer did not match AddPlayerToMission");
+            Require(observationCounter.load() == 1, "matched mission observer did not reserve dispatch budget");
+            Require(observationNumber == 1, "matched mission observer observation number mismatch");
+            Require(fixture.Context.Calls > 0, "matched mission observer did not read reflected metadata");
+
+            Require(MaybeDispatchObservedMissionCopiedBoolAfterOriginal(false, attempt) == 0,
+                    "pre-original mission copied-bool observation dispatched");
+            Require(captured.empty(), "pre-original mission copied-bool observation reached dispatcher callback");
+            Require(MaybeDispatchObservedMissionCopiedBoolAfterOriginal(true, attempt) == 1,
+                    "post-original mission copied-bool observation did not dispatch");
+
+            Require(captured.size() == 1, "post-original mission copied-bool callback count mismatch");
+            Require(captured[0].Kind == MissionCopiedBoolEventKind::AddPlayerToMission,
+                    "post-original AddPlayerToMission event kind mismatch");
+            Require(captured[0].Bools.size() == 2, "post-original AddPlayerToMission bool count mismatch");
+            Require(captured[0].Bools[0].Field == MissionCopiedBoolField::BForceAdd,
+                    "post-original AddPlayerToMission bForceAdd field mismatch");
+            Require(captured[0].Bools[0].Value, "post-original AddPlayerToMission bForceAdd value mismatch");
+            Require(captured[0].Bools[1].Field == MissionCopiedBoolField::ReturnValue,
+                    "post-original AddPlayerToMission return field mismatch");
+            Require(!captured[0].Bools[1].Value, "post-original AddPlayerToMission return value mismatch");
+        }
+
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 1;
+            WriteAt(fixture.Function, 0x90, uint32_t{0x0c020c00});
+
+            std::atomic<uint64_t> observationCounter{0};
+            uint64_t observationNumber = 99;
+            MemoryReader reader = fixture.Reader();
+            Attempt attempt = TryObserveInvocation(
+                EnabledGate(),
+                kAddPlayerToMissionNameIndex,
+                reader,
+                fixture.Function.data(),
+                fixture.Params.data(),
+                observationCounter,
+                1,
+                observationNumber);
+
+            Require(attempt.Status == AttemptStatus::Rejected,
+                    "rejected mission observer attempt status changed");
+            Require(MaybeDispatchObservedMissionCopiedBoolAfterOriginal(true, attempt) == 0,
+                    "rejected mission observer attempt dispatched copied bools");
+            Require(captured.size() == 1, "rejected mission observer attempt reached dispatcher callback");
+        }
+
+        Require(dispatcher.UnregisterCallbackForOwner(&owner, registrationId),
+                "failed to unregister mission copied-bool dispatcher callback");
+    }
+
     void TestCopiedObservationRejectsWrongFieldShape()
     {
         {
@@ -1778,6 +2029,7 @@ int main()
     TestCopiedObservationRejectsForgedObjectAndArrayRanges();
     TestMatchedAttemptBoolObservationFence();
     TestPostOriginalBoolObservationHelper();
+    TestMissionCopiedBoolObserverDispatcherEndToEnd();
     TestCopiedObservationRejectsWrongFieldShape();
     TestCopiedObservationRejectsInvalidBoolRangesAndCounts();
     TestCopiedObservationRejectsForgedNonCanonicalBoolRanges();

@@ -337,10 +337,13 @@ add_test(NAME MissionReflectionTests COMMAND mission_reflection_tests)
 add_executable(process_event_mission_reflection_tests
     tests/core/ProcessEventMissionReflectionTests.cpp
     hooks/ProcessEventMissionReflection.cpp
+    core/MissionCopiedBoolEventDispatcher.cpp
     ue/MissionReflection.cpp
     ue/RuntimeReflection.cpp
+    runtime/Logger.cpp
 )
 target_include_directories(process_event_mission_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(process_event_mission_reflection_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME ProcessEventMissionReflectionTests COMMAND process_event_mission_reflection_tests)
 
