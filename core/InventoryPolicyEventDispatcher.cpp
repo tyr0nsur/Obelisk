@@ -17,6 +17,7 @@ namespace Obelisk::Core
         struct DispatchRegistration
         {
             uint64_t Id = 0;
+            uint64_t Generation = 0;
             InventoryPolicyEventSubscription Subscription;
         };
 
@@ -142,7 +143,10 @@ namespace Obelisk::Core
 
         std::lock_guard<std::mutex> lock(m_Mutex);
         const uint64_t id = AllocateRegistrationId();
-        m_Registrations.push_back({id, owner, subscription});
+        const uint64_t generation = m_NextGeneration++;
+        if (m_NextGeneration == 0)
+            m_NextGeneration = 1;
+        m_Registrations.push_back({id, generation, owner, subscription});
         m_SubscriptionCount.fetch_add(1, std::memory_order_release);
         return id;
     }
@@ -169,10 +173,14 @@ namespace Obelisk::Core
                            });
     }
 
-    bool InventoryPolicyEventDispatcher::IsRegistrationActive(uint64_t registrationId) const
+    bool InventoryPolicyEventDispatcher::IsRegistrationActive(uint64_t registrationId, uint64_t generation) const
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
-        return HasRegistrationId(registrationId);
+        return std::any_of(m_Registrations.begin(),
+                           m_Registrations.end(),
+                           [registrationId, generation](const Registration& item) {
+                               return item.Id == registrationId && item.Generation == generation;
+                           });
     }
 
     bool InventoryPolicyEventDispatcher::Unregister(uint64_t registrationId)
@@ -183,6 +191,7 @@ namespace Obelisk::Core
         std::vector<InventoryPolicyEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
+        try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
@@ -224,6 +233,18 @@ namespace Obelisk::Core
                      !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event unregister failed: {}", e.what());
+            return false;
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event unregister failed with an unknown exception.");
+            return false;
+        }
         for (const InventoryPolicyEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
         return after != before;
@@ -237,6 +258,7 @@ namespace Obelisk::Core
         std::vector<InventoryPolicyEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
+        try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
@@ -278,6 +300,18 @@ namespace Obelisk::Core
                      !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
         }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event owner unregister failed: {}", e.what());
+            return false;
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event owner unregister failed with an unknown exception.");
+            return false;
+        }
         for (const InventoryPolicyEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
         return after != before;
@@ -291,6 +325,7 @@ namespace Obelisk::Core
         std::vector<InventoryPolicyEventSubscription> removed;
         size_t before = 0;
         size_t after = 0;
+        try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
             before = m_Registrations.size();
@@ -331,6 +366,18 @@ namespace Obelisk::Core
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+        }
+        catch (const std::exception& e)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event owner cleanup failed: {}", e.what());
+            return 0;
+        }
+        catch (...)
+        {
+            if (Obelisk::Logger::IsInitialized())
+                OBELISK_ERROR("Inventory policy event owner cleanup failed with an unknown exception.");
+            return 0;
         }
         for (const InventoryPolicyEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
@@ -420,13 +467,13 @@ namespace Obelisk::Core
                     if (m_Registrations.size() <= stackCallbacks.size())
                     {
                         for (const Registration& item : m_Registrations)
-                            stackCallbacks[stackCallbackCount++] = {item.Id, item.Subscription};
+                            stackCallbacks[stackCallbackCount++] = {item.Id, item.Generation, item.Subscription};
                     }
                     else
                     {
                         heapCallbacks.reserve(m_Registrations.size());
                         for (const Registration& item : m_Registrations)
-                            heapCallbacks.push_back({item.Id, item.Subscription});
+                            heapCallbacks.push_back({item.Id, item.Generation, item.Subscription});
                     }
                 }
 
@@ -437,7 +484,7 @@ namespace Obelisk::Core
 
                 for (const DispatchRegistration& item : callbacks)
                 {
-                    if (!IsRegistrationActive(item.Id))
+                    if (!IsRegistrationActive(item.Id, item.Generation))
                         continue;
                     if (!item.Subscription.Callback)
                         continue;

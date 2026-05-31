@@ -339,6 +339,68 @@ namespace
         Require(dispatcher.SubscriptionCount() == 1, "wrong inventory policy subscription count after reentrant unregister");
     }
 
+    struct ReuseRegistrationDuringDispatchState
+    {
+        Obelisk::Core::InventoryPolicyEventDispatcher* Dispatcher = nullptr;
+        int* Owner = nullptr;
+        uint64_t RemovedRegistrationId = 0;
+        int FirstCalls = 0;
+        int RemovedCalls = 0;
+        int ReplacementCalls = 0;
+    };
+
+    void ReuseFirstCallback(const Obelisk::Core::InventoryPolicyEventView&, void* userData)
+    {
+        auto* state = static_cast<ReuseRegistrationDuringDispatchState*>(userData);
+        ++state->FirstCalls;
+        if (state->FirstCalls != 1)
+            return;
+
+        Require(state->Dispatcher->Unregister(state->RemovedRegistrationId),
+                "inventory policy stale-snapshot setup could not unregister callback");
+        state->Dispatcher->SetNextRegistrationIdForTesting(state->RemovedRegistrationId);
+        const uint64_t replacementId = state->Dispatcher->Register(state->Owner, {
+            [](const Obelisk::Core::InventoryPolicyEventView&, void* replacementUserData) {
+                auto* replacementState =
+                    static_cast<ReuseRegistrationDuringDispatchState*>(replacementUserData);
+                ++replacementState->ReplacementCalls;
+            },
+            state,
+        });
+        Require(replacementId == state->RemovedRegistrationId,
+                "inventory policy stale-snapshot setup did not reuse removed id");
+    }
+
+    void ReuseRemovedCallback(const Obelisk::Core::InventoryPolicyEventView&, void* userData)
+    {
+        auto* state = static_cast<ReuseRegistrationDuringDispatchState*>(userData);
+        ++state->RemovedCalls;
+    }
+
+    void TestReusedRegistrationIdDoesNotReactivateStaleSnapshot()
+    {
+        Obelisk::Core::InventoryPolicyEventDispatcher dispatcher;
+        int owner = 0;
+        ReuseRegistrationDuringDispatchState state{&dispatcher, &owner, 0, 0, 0, 0};
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> scalars = MakeScalars();
+
+        Require(dispatcher.Register(&owner, {ReuseFirstCallback, &state}) != 0,
+                "inventory policy stale-snapshot first registration failed");
+        state.RemovedRegistrationId = dispatcher.Register(&owner, {ReuseRemovedCallback, &state});
+        Require(state.RemovedRegistrationId != 0, "inventory policy stale-snapshot removed registration failed");
+
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1,
+                "inventory policy stale snapshot reused id as active callback");
+        Require(state.FirstCalls == 1, "inventory policy stale-snapshot first callback did not run");
+        Require(state.RemovedCalls == 0, "inventory policy stale-snapshot removed callback ran");
+        Require(state.ReplacementCalls == 0, "inventory policy replacement callback ran in stale snapshot");
+        Require(dispatcher.Dispatch(MakeEvent(scalars)) == 2,
+                "inventory policy replacement callback was not active for later dispatch");
+        Require(state.FirstCalls == 2, "inventory policy stale-snapshot first callback did not run later");
+        Require(state.RemovedCalls == 0, "inventory policy stale-snapshot removed callback ran later");
+        Require(state.ReplacementCalls == 1, "inventory policy replacement callback did not run later");
+    }
+
     struct ReentrantRegisterState
     {
         Obelisk::Core::InventoryPolicyEventDispatcher* Dispatcher = nullptr;
@@ -657,6 +719,7 @@ int main()
     TestCallbackCanUnregisterItself();
     TestSelfUnregisterDefersUserDataDestroyUntilCallbackReturns();
     TestReentrantUnregisterSkipsRemovedSnapshotCallback();
+    TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
     TestReentrantRegisterDoesNotEnterCurrentSnapshot();
     TestOwnerCleanupWaitsForInFlightDispatch();
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();

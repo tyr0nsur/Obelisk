@@ -165,5 +165,27 @@ returned `status=blocked` with evidence-only/non-claim blockers. That is the int
 state for v0 planning: useful enough to design internal copied counters, not promotable
 as a public Structure SDK or runtime claim.
 
+## Materialized Aggregate Policy Slice
+
+The aggregate/census slice itself is now materialized as an offline artifact pack:
+
+- root: `/home/flowcommunity-ark/obelisk-artifacts/structure-aggregate-census-policy-slice-20260531T034715Z`
+- report: `structure-aggregate-census-policy-slice.json`
+- report sha256: `15bc87854cc85e1bd4ed9a8658a3b1d83b41a4b1f8f52f967d17ea25421180dd`
+- artifact manifest sha256: `876d38ddfdbd9944734741bad2c415c733afac062d91ab533869849927ff5906`
+- `SHA256SUMS` sha256: `df18283db97eaa4c2620460d2a28603f44b9ee3eebd927d6792c83505e6f2251`
+
+Validation on 2026-05-31:
+
+- `normalize_artifact_pack.py --check`: `status=ok`
+- `validate_offline_artifact_gate.py --mode consume`: `status=accepted`
+- `validate_offline_artifact_gate.py --mode promote`: `status=blocked`
+
+The report preserves `policy_status=evidence-only`, `consume_only=true`,
+`promotion_ready=false`, 6 input targets, 8 copied fields, 5 redacted fields, and 2
+explicitly excluded fields. Promote mode blocks with
+`promote_mode_structure_aggregate_census_policy_slice_consume_only` and
+`promote_mode_manifest_has_non_claims`, which is the intended state.
+
 Do not use live roots, restarts, ptrace, gcore, markers, `/servidor/ark`, or
 `ReflectionScanner` for this planning note.
