@@ -1746,6 +1746,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                             f"{relative} must null-check/use {slot} for {surface['name']}",
                         )
 
+    def test_public_sdk_optional_api_consumers_export_shutdown(self) -> None:
+        for path in PUBLIC_SDK_OPTIONAL_API_CONSUMERS:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            self.assertIn(
+                "ObeliskPlugin_Shutdown",
+                text,
+                f"{relative} consumes optional SDK state and must expose idempotent shutdown cleanup",
+            )
+
     def test_public_sdk_consumers_treat_v1_descriptors_as_fixed_size(self) -> None:
         forbidden_checks = (
             "descriptor.struct_size >= sizeof(ObeliskResourceKindDescriptor)",
@@ -3387,6 +3397,67 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, compact)
+
+    def test_plugin_hub_v1_contributor_intake_boundary_is_consistent(self) -> None:
+        docs = {
+            "foundation": REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
+            "matrix": REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+            "roadmap": REPO_ROOT / "docs" / "research" / "2026-05-29-module-surface-roadmap.md",
+            "research_readme": REPO_ROOT / "docs" / "research" / "README.md",
+        }
+        texts = {name: path.read_text(encoding="utf-8") for name, path in docs.items()}
+        compacts = {name: normalized(text) for name, text in texts.items()}
+
+        required = {
+            "foundation": (
+                "## Contributor Intake Checklist",
+                "Production seed now",
+                "Experimental pattern only",
+                "Blocked backlog",
+                "ArkApi/AseApi/NextGenPlugins demand can justify keeping a blocked idea visible",
+                "but it cannot reclassify that idea as a production seed or experimental pattern",
+            ),
+            "matrix": (
+                "## Foundation-To-Roadmap Alignment",
+                "`hub foundation` means production seed work",
+                "`gameplay policy backing` means preserving evidence and tests for already promoted",
+                "`internal recognizer planning` means docs, fixtures, and offline copied-bool planning",
+                "only a named promotion gate can move a row's support tier",
+            ),
+            "roadmap": (
+                "Roadmap-to-Plugin-Hub alignment for contributors",
+                "`hub foundation` is the only production seed lane now",
+                "`gameplay policy backing` protects the existing copied/redacted `GameplayPolicyEvent`",
+                "`internal recognizer planning` stays offline/test-only",
+                "append-only ABI/consumer-test plan",
+            ),
+            "research_readme": (
+                "Plugin Hub contributor intake uses the same three buckets as the public matrix",
+                "production seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging",
+                "experimental pattern only for passive copied chat or copied policy examples",
+                "blocked backlog for commands, identity, persistence, operator ingress, mutation",
+                "cannot change the support tier without a named promotion gate",
+            ),
+        }
+
+        for name, phrases in required.items():
+            for phrase in phrases:
+                with self.subTest(file=name, phrase=phrase):
+                    self.assertIn(normalized(phrase), compacts[name])
+
+        blocked_dependency_terms = (
+            "identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+            "raw UE",
+        )
+        for name in ("foundation", "matrix", "roadmap", "research_readme"):
+            compact = compacts[name]
+            with self.subTest(file=name, item="blocked dependency vocabulary"):
+                for term in blocked_dependency_terms:
+                    self.assertIn(term.lower(), compact.lower())
 
     def test_public_contributor_docs_route_plugin_hub_through_foundation_and_matrix(self) -> None:
         required_phrases = {

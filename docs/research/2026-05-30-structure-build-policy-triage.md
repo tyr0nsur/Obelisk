@@ -94,6 +94,10 @@ Accepted structure work today remains narrower:
 Those lanes do not promote public `StructureEvents`, build-policy SDK, identity, lookup,
 mutation, return override, or runtime hook authorization.
 
+For current `GameplayPolicyEvent` backing, structures remain limited to the copied fields
+already covered by `structure-observer-intake`: access, demolish, variant, activation,
+PIN, and seat checks. Build placement policy is not part of that backing lane.
+
 ## Decision
 
 `APrimalStructure.IsAllowedToBuild` is a valid post-RC research target, but it is not ready
@@ -190,6 +194,11 @@ snapshot and a distinct second source both exist.
 This triage does not promote a public Structure SDK, build-policy API, `StructureEvents`,
 runtime hook, callback, identity/lookup surface, mutation, return override, safe-zone API,
 no-collision compatibility, or ArkApi port.
+
+The next real gate for build placement is still an exact sanitized
+`PrimalStructure.IsAllowedToBuild` snapshot and redaction plan from an approved offline
+artifact. It is not a `GameplayPolicyEvent` extension, dispatcher, or public SDK step
+until a later strict readiness note promotes a copied payload.
 
 ## Offline Follow-up: Existing Artifact Check
 

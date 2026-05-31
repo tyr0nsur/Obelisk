@@ -559,6 +559,19 @@ int main(int argc, char** argv)
             Require(g_ChatMessageRegisterCount == 0,
                     "descriptor catalog consumer unexpectedly registered chat message callback");
             Require(g_TimerRegisterCount == 0, "descriptor catalog consumer unexpectedly registered timer");
+            if (shutdown)
+            {
+                shutdown();
+                Require(!descriptorCatalogValidated(), "descriptor catalog validation state survived shutdown");
+            }
+            Require(g_UnregisterCount == 0, "descriptor catalog consumer unexpectedly unregistered ProcessEvent callback");
+            Require(g_GameplayPolicyUnregisterCount == 0,
+                    "descriptor catalog consumer unexpectedly unregistered gameplay policy callback");
+            Require(g_ChatMessageUnregisterCount == 0,
+                    "descriptor catalog consumer unexpectedly unregistered chat message callback");
+            Require(g_TimerUnregisterCount == 0, "descriptor catalog consumer unexpectedly unregistered timer");
+            dlclose(handle);
+            return 0;
         }
         if (shutdown)
         {

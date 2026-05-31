@@ -2209,6 +2209,58 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             report["non_claims"],
         )
 
+    def test_readiness_report_blocks_overlapping_target_set_promotion_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for target_set in ("minimal-second-source-intake", "structure-observer-intake"):
+                write_target_set_root(root / "base", target_set)
+                write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--target-set",
+                "structure-observer-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 1, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertEqual(report["totals"]["second_source_accepted"], 8)
+        self.assertEqual(
+            report["promotion_gate"],
+            {
+                "ready": False,
+                "ready_scope": "not_ready",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [
+                    {
+                        "reason": "ambiguous_target_set_coverage",
+                        "count": 2,
+                        "targets": [
+                            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+                        ],
+                    }
+                ],
+            },
+        )
+        ambiguity = report["target_set_coverage_ambiguity"]
+        self.assertEqual(
+            [item["target"] for item in ambiguity],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+            ],
+        )
+        self.assertEqual(ambiguity[0]["module_lanes"], ["core_gameplay_policy", "structures"])
+
     def test_assemble_rc_root_rejects_partial_evidence_identity_before_gate_use(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -529,6 +529,77 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
 
+    def test_gameplay_policy_backing_docs_preserve_copied_data_boundaries(self) -> None:
+        readiness = (
+            REPO_ROOT / "docs/research/2026-05-29-public-gameplay-event-readiness-audit.md"
+        ).read_text(encoding="utf-8")
+        minimal = (
+            REPO_ROOT / "docs/research/2026-05-29-minimal-second-source-readiness.md"
+        ).read_text(encoding="utf-8")
+        item_strict = (
+            REPO_ROOT / "docs/research/2026-05-30-item-compact-redacted-signatures-strict.md"
+        ).read_text(encoding="utf-8")
+        structure_build = (
+            REPO_ROOT / "docs/research/2026-05-30-structure-build-policy-triage.md"
+        ).read_text(encoding="utf-8")
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+
+        readiness_compact = normalized(readiness)
+        for phrase in (
+            '"item_return_backing_target_set": "item-return-only-policy-slice"',
+            "structures: `structure-observer-intake`",
+            "compact inventory checks: `minimal-second-source-intake`",
+            "return-only item checks: `item-return-only-policy-slice`",
+            "`INVENTORY_ALLOW_EQUIP_ITEM_CHECK` | `ReturnValue` bool only",
+            "`INVENTORY_CAN_REPAIR_CHECK` | `ReturnValue` bool only",
+            "`INVENTORY_USE_ITEM_ONTO_ITEM_CHECK` | `ReturnValue` bool only",
+            "only copied canonical bool/int32 scalars may cross into `field_mask`, `bool_values`, and `int32_values`",
+            "`item-return-only-policy-slice` is not a standalone public item API",
+            "It does not promote item identity, item lookup, object handles, item mutation, repair semantics, equip authority, item-to-item payloads, or return override.",
+        ):
+            with self.subTest(file="public-gameplay-event-readiness", phrase=phrase):
+                self.assertIn(phrase, readiness_compact)
+
+        minimal_compact = normalized(minimal)
+        for phrase in (
+            "This note backs only the compact inventory and structure part of `GameplayPolicyEvent`",
+            "It does not back the return-only item event kinds",
+            "The only reusable boundary from this note is copied scalar evidence for `GameplayPolicyEvent`.",
+        ):
+            with self.subTest(file="minimal-second-source", phrase=phrase):
+                self.assertIn(phrase, minimal_compact)
+
+        item_compact = normalized(item_strict)
+        for phrase in (
+            "This strict `item-compact-intake` artifact is a review aid for item recognizer shape.",
+            "The public `GameplayPolicyEvent` item backing is the narrower `item-return-only-policy-slice`",
+            "`PrimalItem.AllowEquipItem.ReturnValue`",
+            "`PrimalItem.CanRepair.ReturnValue`",
+            "`PrimalItem.UseItemOntoItem.ReturnValue`",
+            "`CraftBlueprint`, `CanRepair.bIgnoreInventoryRequirement`, destination inventory refs, destination item refs, `AdditionalData`, item identity, lookup, mutation, and return override remain redacted or blocked.",
+        ):
+            with self.subTest(file="item-compact-strict", phrase=phrase):
+                self.assertIn(phrase, item_compact)
+
+        structure_compact = normalized(structure_build)
+        for phrase in (
+            "For current `GameplayPolicyEvent` backing, structures remain limited to the copied fields already covered by `structure-observer-intake`",
+            "Build placement policy is not part of that backing lane.",
+            "It is not a `GameplayPolicyEvent` extension, dispatcher, or public SDK step",
+        ):
+            with self.subTest(file="structure-build-policy", phrase=phrase):
+                self.assertIn(phrase, structure_compact)
+
+        readme_compact = normalized(readme)
+        for phrase in (
+            "`GameplayPolicyEvent` backing currently means exactly three copied-data lanes",
+            "`structure-observer-intake`, `minimal-second-source-intake`, and `item-return-only-policy-slice`",
+            "Preserve the boundary as copied `field_mask`, `bool_values`, and `int32_values` only.",
+            "Do not widen this phrase into public Inventory SDK, Items SDK, `StructureEvents`, build-policy API, identity/lookup, `ResourceHandle`, mutation, return override, runtime observation, or raw UE parameter access.",
+        ):
+            with self.subTest(file="research-readme", phrase=phrase):
+                self.assertIn(phrase, readme_compact)
+
     def test_gap_matrix_minimal_second_source_compare_is_promotion_gate(self) -> None:
         note = REPO_ROOT / "docs/research/2026-05-28-second-source-reversing-gap-matrix.md"
         text = note.read_text(encoding="utf-8")

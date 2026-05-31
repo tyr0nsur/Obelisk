@@ -143,6 +143,21 @@ module prioritization checkpoint. The next useful pass is hub foundation first, 
 after item return-only evidence is preserved. Do not repeat broad discovery on the current
 binary, do not promote new SDK modules, and do not recenter the roadmap on chat.
 
+`GameplayPolicyEvent` backing currently means exactly three copied-data lanes:
+`structure-observer-intake`, `minimal-second-source-intake`, and
+`item-return-only-policy-slice`. Preserve the boundary as copied `field_mask`,
+`bool_values`, and `int32_values` only. Do not widen this phrase into public Inventory
+SDK, Items SDK, `StructureEvents`, build-policy API, identity/lookup, `ResourceHandle`,
+mutation, return override, runtime observation, or raw UE parameter access.
+
+Plugin Hub contributor intake uses the same three buckets as the public matrix:
+production seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging,
+and fail-closed capability work; experimental pattern only for passive copied chat or
+copied policy examples; blocked backlog for commands, identity, persistence, operator
+ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or cross-instance state.
+ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change
+the support tier without a named promotion gate.
+
 Current v1 research lane snapshot from the current notes:
 
 | Lane | Current state | Use next |

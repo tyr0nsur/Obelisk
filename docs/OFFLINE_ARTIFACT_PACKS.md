@@ -200,6 +200,11 @@ must be recorded as empty. Historical missing-coverage markers can allow old con
 checks, but strict mode still blocks them. Each `target_sets` and `source_target_sets`
 list must name a target set at most once; duplicate names are treated as traceability
 blockers even when duplicated coverage rows are otherwise self-consistent.
+Reflection snapshot readiness reports follow the same traceability rule for their
+top-level `target_sets`: every named set must be known, duplicate set names fail closed,
+and target sets with overlapping schema-qualified targets are ambiguous coverage. Keep
+overlapping lanes in separate reports rather than citing one accepted target row as
+coverage for multiple module lanes.
 
 ## Build-Policy Gap Checks
 

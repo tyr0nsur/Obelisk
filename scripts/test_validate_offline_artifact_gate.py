@@ -4456,6 +4456,65 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("readiness_report_missing_target_sets", reasons)
 
+    def test_blocks_readiness_report_duplicate_target_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(
+                manifest,
+                readiness_report_manifest(
+                    ready=False,
+                    target_sets=["minimal-second-source-intake", "minimal-second-source-intake"],
+                ),
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_duplicate_target_sets", reasons)
+
+    def test_blocks_readiness_report_unknown_target_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest(ready=False, target_sets=["not-a-target-set"]))
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("readiness_report_unknown_target_sets", reasons)
+
+    def test_blocks_readiness_report_ambiguous_target_set_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(
+                manifest,
+                readiness_report_manifest(
+                    ready=False,
+                    target_sets=["minimal-second-source-intake", "structure-observer-intake"],
+                ),
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        blockers = result["blockers"]
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertIn("readiness_report_ambiguous_target_set_coverage", reasons)
+        blocker = next(
+            blocker for blocker in blockers if blocker["reason"] == "readiness_report_ambiguous_target_set_coverage"
+        )
+        self.assertEqual(
+            [item["target"] for item in blocker["overlaps"]],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+            ],
+        )
+
     def test_blocks_readiness_report_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

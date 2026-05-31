@@ -836,6 +836,37 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             matrix.index("Player identity lifecycle intake"),
         )
 
+    def test_plugin_hub_seed_path_stays_classified_before_install_or_release_scope(self) -> None:
+        install = read("docs/INSTALL.md")
+        release = read("docs/RELEASE.md")
+        status = read("docs/STATUS.md")
+        pr_template = read(".github/pull_request_template.md")
+
+        for path, text in (
+            ("docs/INSTALL.md", install),
+            ("docs/RELEASE.md", release),
+            ("docs/STATUS.md", status),
+            (".github/pull_request_template.md", pr_template),
+        ):
+            compact = normalized(text)
+            with self.subTest(file=path, item="foundation and matrix route"):
+                self.assertIn("docs/PLUGIN_HUB_FOUNDATION_V1.md", text)
+                self.assertIn("docs/PLUGIN_HUB_CAPABILITY_MATRIX.md", text)
+            with self.subTest(file=path, item="install does not promote public SDK"):
+                self.assertIn("plugin `.so`", compact)
+                self.assertRegex(compact, r"(?i)(does not|do not)[^.]*public SDK")
+
+        self.assertNormalizedIn(
+            "keep support-tier classification separate from installation",
+            install,
+        )
+        self.assertIn("The plugin installer only publishes an already-built `.so`", install)
+        self.assertIn("run the\nplugin installer with `--dry-run`", install)
+        self.assertIn("adding a first-party example", release)
+        self.assertIn("naming a popular plugin\n  family does not promote public SDK surface", release)
+        self.assertNormalizedIn("do not gain new support tier or public SDK scope", status)
+        self.assertIn("names and demand dictionaries only", pr_template)
+
     def test_release_gate_rejects_incomplete_ufunction_metadata_before_build(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             candidate_root = Path(temp_dir) / "candidate"

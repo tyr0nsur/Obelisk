@@ -173,6 +173,23 @@ def target_set_readiness_classification(target_set: str) -> str:
     raise KeyError(target_set)
 
 
+def target_set_target_overlaps(target_sets: list[str]) -> list[dict[str, object]]:
+    coverage: dict[str, list[str]] = {}
+    for target_set in target_sets:
+        for target in TARGET_SETS[target_set]:
+            coverage.setdefault(target, []).append(target_set)
+    return [
+        {
+            "target": target,
+            "target_sets": sorted(names),
+            "module_lanes": sorted({target_set_module_lane(name) for name in names}),
+            "readiness_classifications": sorted({target_set_readiness_classification(name) for name in names}),
+        }
+        for target, names in sorted(coverage.items())
+        if len(names) > 1
+    ]
+
+
 def schema_targets(target_set: str, schema: str) -> set[str]:
     targets = set()
     for target in TARGET_SETS[target_set]:

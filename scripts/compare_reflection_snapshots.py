@@ -18,6 +18,7 @@ from reflection_target_sets import (
     RELEASE_READINESS_TARGET_SETS,
     TARGET_SETS,
     target_set_module_lane,
+    target_set_target_overlaps,
     target_set_readiness_classification,
 )
 
@@ -1495,6 +1496,31 @@ def block_non_release_target_set_promotion(report: dict[str, Any], target_sets: 
         blockers.append({"reason": "target_set_not_release_readiness", "count": len(non_release)})
 
 
+def block_ambiguous_target_set_coverage(report: dict[str, Any], target_sets: list[str]) -> None:
+    if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
+        return
+    if report.get("gate_mode") != "second_source_promotion":
+        return
+    overlaps = target_set_target_overlaps(target_sets)
+    if not overlaps:
+        return
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        return
+    promotion_gate["ready"] = False
+    promotion_gate["ready_scope"] = "not_ready"
+    blockers = promotion_gate.setdefault("blockers", [])
+    if isinstance(blockers, list):
+        blockers.append(
+            {
+                "reason": "ambiguous_target_set_coverage",
+                "count": len(overlaps),
+                "targets": [item["target"] for item in overlaps],
+            }
+        )
+    report["target_set_coverage_ambiguity"] = overlaps
+
+
 def main() -> int:
     args = parse_args()
     if args.list_target_sets:
@@ -1550,6 +1576,7 @@ def main() -> int:
         apply_readiness_gate_mode(report)
         require_target_set_for_promotion(report, args.target_set)
         block_explicit_targets_outside_named_target_sets(report, args.target, args.target_set)
+        block_ambiguous_target_set_coverage(report, args.target_set)
         block_non_release_target_set_promotion(report, args.target_set)
     else:
         if candidate is None:

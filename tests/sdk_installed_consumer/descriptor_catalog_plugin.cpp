@@ -292,6 +292,11 @@ extern "C" __attribute__((visibility("default"))) bool ObeliskPlugin_Init(
     }
 }
 
+extern "C" __attribute__((visibility("default"))) void ObeliskPlugin_Shutdown()
+{
+    g_DescriptorCatalogValidated = false;
+}
+
 extern "C" __attribute__((visibility("default"))) bool InstallLayoutConsumer_DescriptorCatalogValidated()
 {
     return g_DescriptorCatalogValidated;

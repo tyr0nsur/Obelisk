@@ -174,6 +174,22 @@ It does not promote public Inventory SDK, public StructureEvents, object identit
 lookup, `ResourceHandle`, mutation, return override, runtime hook contracts, or raw UE
 internals.
 
+## GameplayPolicyEvent Boundary
+
+This note backs only the compact inventory and structure part of `GameplayPolicyEvent`:
+
+- `PrimalItem.AllowRemoteAddToInventory` -> copied `BRequestedByPlayer` and
+  copied `ReturnValue`;
+- `PrimalItem.CanUse` -> copied `BIgnoreCooldown` and copied `ReturnValue`;
+- `PrimalStructure.AllowStructureAccess` -> copied `ReturnValue`;
+- `PrimalStructure.IsAllowedToDemolish` -> copied `ReturnValue`.
+
+It does not back the return-only item event kinds; those are covered by
+`item-return-only-policy-slice`. It also does not back any public Inventory SDK,
+Items SDK, `StructureEvents`, object identity, lookup, `ResourceHandle`, mutation,
+return override, runtime observation, or raw UE parameter access. The only reusable
+boundary from this note is copied scalar evidence for `GameplayPolicyEvent`.
+
 ## Promotion Boundary
 
 This promotes compact UFunction layout evidence for the listed inventory and structure

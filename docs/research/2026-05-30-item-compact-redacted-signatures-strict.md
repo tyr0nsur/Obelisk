@@ -62,3 +62,21 @@ The useful post-RC path remains internal/test-only return-value exploration for 
 `PrimalItem` functions. Do not map `CanRepair.bIgnoreInventoryRequirement` to the public
 `IGNORE_COOLDOWN` field, and do not expose object refs or `AdditionalData` through the
 public ABI.
+
+## GameplayPolicyEvent Boundary
+
+This strict `item-compact-intake` artifact is a review aid for item recognizer shape. It
+is not the public backing lane by itself. The public `GameplayPolicyEvent` item backing is
+the narrower `item-return-only-policy-slice`, and only these copied fields may cross that
+boundary:
+
+- `PrimalItem.AllowEquipItem.ReturnValue`;
+- `PrimalItem.CanRepair.ReturnValue`;
+- `PrimalItem.UseItemOntoItem.ReturnValue`.
+
+`CraftBlueprint`, `CanRepair.bIgnoreInventoryRequirement`, destination inventory refs,
+destination item refs, `AdditionalData`, item identity, lookup, mutation, and return
+override remain redacted or blocked. The next real gate for richer item work is a separate
+copied-data proposal with second-source evidence, ABI tests, installed SDK consumer tests,
+privacy/redaction policy, lifecycle cleanup, and approved runtime validation if runtime
+evidence is needed.

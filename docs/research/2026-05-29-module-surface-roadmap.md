@@ -89,6 +89,18 @@ and installed consumer tests. `promotion_gate.ready=true`, accepted targets, tar
 names, and labels such as `sdk.inventory` or `sdk.buffs` describe the layout/evidence rung
 only; they do not turn target-set labels into public SDK names.
 
+Roadmap-to-Plugin-Hub alignment for contributors:
+
+- `hub foundation` is the only production seed lane now, and it means current-ABI
+  lifecycle/config/logging, descriptor/catalog, timer, packaging, and fail-closed
+  capability work only.
+- `gameplay policy backing` protects the existing copied/redacted `GameplayPolicyEvent`
+  surface; it does not authorize new Inventory, Items, StructureEvents, enforcement,
+  identity, lookup, mutation, return-override, or ArkApi compatibility claims.
+- `internal recognizer planning` stays offline/test-only until a later note names the
+  exact target, copied payload, privacy rule, lifecycle rule, evidence gate, runtime
+  observation gate, and append-only ABI/consumer-test plan.
+
 0. `resources / ResourceHandle`: do not run more broad FName/GObjects/UFunction scans for
    this track on the current binary. Existing offline evidence is strong enough for target
    work; the live blocker is lifecycle/flag semantics and a fail-closed handle contract.

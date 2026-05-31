@@ -18,7 +18,8 @@ runtime observers, scanners, ptrace, `gcore`, broad tracing, or new module promo
   "public_name": "GameplayPolicyEvent",
   "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
   "backing_target_set": "structure-observer-intake",
-  "inventory_backing_target_set": "minimal-second-source-intake"
+  "inventory_backing_target_set": "minimal-second-source-intake",
+  "item_return_backing_target_set": "item-return-only-policy-slice"
 }
 ```
 
@@ -32,12 +33,15 @@ pincode values.
 ## Promotion Decision
 
 `GameplayPolicyEvent` can be promoted as the first public gameplay event because the
-structure-backed target set and compact inventory extension now have accepted
-second-source evidence:
+structure-backed target set, compact inventory extension, and return-only item slice now
+have accepted second-source evidence:
 
 - `structure-observer-intake` reports `promotion_gate.ready=true` with 6/6 accepted targets;
 - `minimal-second-source-intake` reports `promotion_gate.ready=true` with blockers=[] and
   4/4 accepted targets for `sdk_inventory` and `sdk_structures`;
+- `item-return-only-policy-slice` accepts exactly three copied `ReturnValue` bool targets:
+  `PrimalItem.AllowEquipItem`, `PrimalItem.CanRepair`, and
+  `PrimalItem.UseItemOntoItem`;
 - the public payload is copied Obelisk-owned POD before plugin callbacks run;
 - there are no UE internals in the ABI;
 - the ABI is append-only in `ObeliskApi` and capability-gated by
@@ -69,25 +73,49 @@ scalars by `switch`, not by enum ordinal.
 | `STRUCTURE_SEAT_CHECK` | `BForce` bool, `ReturnValue` bool | `ForPC`, `forCharacter`, player/character identity, seat/object ptr, FName/GObjects, raw params |
 | `INVENTORY_REMOTE_ADD_CHECK` | `BRequestedByPlayer` bool, `ReturnValue` bool | inventory identity, inventory contents, item identity, player identity, caller/object ptr, FName/GObjects, raw params |
 | `INVENTORY_USE_CHECK` | `BIgnoreCooldown` bool, `ReturnValue` bool | inventory identity, item identity, player identity, cooldown/mutable item state, caller/object ptr, FName/GObjects, raw params |
+| `INVENTORY_ALLOW_EQUIP_ITEM_CHECK` | `ReturnValue` bool only | destination inventory object, inventory identity, item identity, caller/object ptr, FName/GObjects, raw params |
+| `INVENTORY_CAN_REPAIR_CHECK` | `ReturnValue` bool only | `bIgnoreInventoryRequirement`, inventory contents, item identity, caller/object ptr, FName/GObjects, raw params |
+| `INVENTORY_USE_ITEM_ONTO_ITEM_CHECK` | `ReturnValue` bool only | `DestinationItem`, `AdditionalData`, item identity, caller/object ptr, FName/GObjects, raw params |
 
 `STRUCTURE_PIN_CODE_CHECK` is ReturnValue-only. That still creates a low-detail success/fail
 timing signal, so plugins that do not need it should omit
 `OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK` from their event-kind mask.
 
+## Backing Boundary Checkpoint
+
+The promoted backing is exactly these three evidence lanes:
+
+- structures: `structure-observer-intake`;
+- compact inventory checks: `minimal-second-source-intake`;
+- return-only item checks: `item-return-only-policy-slice`.
+
+All three lanes preserve copied-data boundaries: only copied canonical bool/int32 scalars
+may cross into `field_mask`, `bool_values`, and `int32_values`; raw params, UE pointers,
+object identity, array/struct payloads, placement context, item detail, and return
+authority stay outside the public ABI. `item-return-only-policy-slice` is not a wider
+item surface: `CanRepair.bIgnoreInventoryRequirement`, `CraftBlueprint`, destination
+object refs, and `AdditionalData` remain redacted even though they are useful recognizer
+evidence.
+
 ## Still Blocked
 
 Inventory-backed policy signals are now promoted only through `GameplayPolicyEvent`
 masks/kinds/fields and `OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED`. No public Inventory SDK is promoted; no public `InventoryPolicyEvent` ABI, Inventory capability bit,
-item handle, lookup API, mutation API, or return-override contract is promoted. Chat,
-players, tribes, dinos, missions, transfers, permissions, timers, admin, commands, public
-`StructureEvents`, mutation, and return overrides also remain blocked until they each have
-copied payloads, ABI tests, privacy/redaction policy, owner-token lifecycle cleanup, and
-accepted target-set evidence.
+Items SDK, item handle, lookup API, mutation API, or return-override contract is
+promoted. Chat, players, tribes, dinos, missions, transfers, permissions, timers, admin,
+commands, public `StructureEvents`, mutation, and return overrides also remain blocked
+until they each have copied payloads, ABI tests, privacy/redaction policy, owner-token
+lifecycle cleanup, and accepted target-set evidence.
 
 `minimal-second-source-intake` is not a standalone public gameplay API. Its inventory
 targets back only the copied/redacted inventory resource kind and event masks inside
 `GameplayPolicyEvent`; its two structure targets remain a compact subset of the broader
 structure observer review.
+
+`item-return-only-policy-slice` is not a standalone public item API. Its three targets
+back only the copied/redacted inventory-item event masks inside `GameplayPolicyEvent`.
+It does not promote item identity, item lookup, object handles, item mutation, repair
+semantics, equip authority, item-to-item payloads, or return override.
 
 ## Evidence And Tests
 
@@ -99,6 +127,7 @@ Second-source evidence:
 - `docs/research/2026-05-28-second-source-core-intake-runbook.md`
 - `docs/research/2026-05-29-structure-observer-intake-refresh.md`
 - `docs/research/2026-05-29-minimal-second-source-readiness.md`
+- `docs/research/2026-05-30-item-return-only-policy-slice.md`
 
 Runtime/ABI coverage:
 

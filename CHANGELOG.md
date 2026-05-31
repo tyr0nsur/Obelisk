@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Hardened Plugin Hub foundation and evidence gates so contributor docs classify seeds
+  before install/release, descriptor catalog consumers prove shutdown cleanup,
+  `GameplayPolicyEvent` backing stays limited to current copied lanes, and
+  second-source readiness rejects duplicate, unknown, or overlapping target sets.
 - Hardened v1 planning and evidence tooling so target-set listings expose module lanes,
   direct-core focal planning requires explicit artifact identity, redacted signature
   manifests reject duplicate target-set declarations, SDK consumers treat v1 descriptors

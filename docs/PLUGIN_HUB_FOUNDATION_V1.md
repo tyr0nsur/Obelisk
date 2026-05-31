@@ -46,6 +46,24 @@ today. If an intent is marked "not ready", a plugin must not fill the gap with r
 pointers, GObjects traversal, raw params, return overrides, mutation, or copied ArkApi
 implementation patterns.
 
+## Contributor Intake Checklist
+
+Classify every Plugin Hub proposal before writing code:
+
+1. Production seed now: the proposal uses only lifecycle/config/logging,
+   descriptor/catalog reads, or process-local timers from the current C ABI.
+2. Experimental pattern only: the proposal passively consumes copied
+   `ChatMessageEvent` or `GameplayPolicyEvent` data and clearly avoids identity, lookup,
+   replies, moderation, enforcement, mutation, return overrides, and module SDK claims.
+3. Blocked backlog: the proposal needs commands, permissions, persistence, operator
+   ingress, send-chat/broadcast, player/tribe/dino/item/structure identity, inventory or
+   item mutation, structure enforcement, `ResourceHandle`, raw UE pointers, raw params,
+   or cross-instance state.
+
+ArkApi/AseApi/NextGenPlugins demand can justify keeping a blocked idea visible in the
+matrix or a research note, but it cannot reclassify that idea as a production seed or
+experimental pattern.
+
 ## C ABI Contract
 
 The ABI is C, append-only, and capability-gated:
@@ -76,6 +94,10 @@ quiescence barrier for every callback family. The runtime owner cleanup performe
 plugin unload is the barrier before plugin code and owner state are finally released, so a
 plugin must not free callback-owned state until its own shutdown path has made that state
 unreachable to callbacks it still owns.
+
+Descriptor-only consumers should also export shutdown when they retain process-local
+catalog, validation, or logging state. Shutdown should clear that state even when the
+consumer never registered callbacks or timers.
 
 Event payloads are callback-scope. A plugin that needs data after the callback returns
 must copy it into plugin-owned storage.

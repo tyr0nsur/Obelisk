@@ -3595,6 +3595,40 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
         blockers.append({"reason": "readiness_report_target_sets_invalid", "label": f"{label}:$.target_sets"})
     elif not target_sets:
         blockers.append({"reason": "readiness_report_missing_target_sets", "label": f"{label}:$.target_sets"})
+    else:
+        try:
+            from reflection_target_sets import TARGET_SETS, target_set_target_overlaps
+        except ImportError:
+            blockers.append({"reason": "readiness_report_target_sets_unavailable", "label": f"{label}:$.target_sets"})
+        else:
+            duplicate_target_sets = duplicate_strings(target_sets)
+            if duplicate_target_sets:
+                blockers.append(
+                    {
+                        "reason": "readiness_report_duplicate_target_sets",
+                        "label": f"{label}:$.target_sets",
+                        "duplicates": duplicate_target_sets,
+                    }
+                )
+            unknown_target_sets = sorted({target_set for target_set in target_sets if target_set not in TARGET_SETS})
+            if unknown_target_sets:
+                blockers.append(
+                    {
+                        "reason": "readiness_report_unknown_target_sets",
+                        "label": f"{label}:$.target_sets",
+                        "unknown_target_sets": unknown_target_sets,
+                    }
+                )
+            elif not duplicate_target_sets:
+                overlaps = target_set_target_overlaps(target_sets)
+                if overlaps:
+                    blockers.append(
+                        {
+                            "reason": "readiness_report_ambiguous_target_set_coverage",
+                            "label": f"{label}:$.target_sets",
+                            "overlaps": overlaps,
+                        }
+                    )
 
     if promotion_gate.get("ready") is True:
         if promotion_gate.get("ready_scope") != "layout_only":

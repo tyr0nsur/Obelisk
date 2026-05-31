@@ -56,6 +56,22 @@ produce design notes, evidence plans, or guardrail tests only; do not start firs
 examples, SDK wrappers, compatibility shims, or public docs that imply those backlog
 modules are supported.
 
+## Foundation-To-Roadmap Alignment
+
+For new contributors, the roadmap maps to this matrix in one direction only:
+
+- `hub foundation` means production seed work on lifecycle/config/logging,
+  descriptor/catalog consumers, timers, packaging, and fail-closed capability checks.
+- `gameplay policy backing` means preserving evidence and tests for already promoted
+  copied/redacted `GameplayPolicyEvent` fields; it is not a new Inventory, Items,
+  StructureEvents, or enforcement SDK.
+- `internal recognizer planning` means docs, fixtures, and offline copied-bool planning
+  for named targets; it is not runtime observation, public callbacks, public module
+  capabilities, identity, lookup, mutation, or return override.
+
+Demand dictionaries can decide which blocked rows deserve clearer notes or evidence
+plans, but only a named promotion gate can move a row's support tier.
+
 ## Dictionary-To-Primitive Rule
 
 The matrix maps demand families to the first Obelisk primitive that can honestly teach a
