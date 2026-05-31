@@ -57,6 +57,16 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "obelisk.reflection-inventory-pack.v1",
             ],
         )
+        recipe = payload["next_operator_recipe"]
+        self.assertEqual(recipe["blocked_until"], "accepted_reflection_inventory_pack")
+        self.assertIn("build_reflection_inventory_pack.py", recipe["build_reflection_inventory_pack"])
+        self.assertIn("--target-set players-identity-lifecycle-intake", recipe["build_reflection_inventory_pack"])
+        self.assertIn("check_reflection_inventory_pack_readiness.py", recipe["check_reflection_inventory_pack"])
+        self.assertIn("plan_ufunction_focal_snapshots.py", recipe["plan_admin_focal_snapshots"])
+        self.assertIn("--target ShooterPlayerController.ServerListPlayers", recipe["plan_admin_focal_snapshots"])
+        self.assertIn("--target ShooterPlayerController.ServerKickPlayer", recipe["plan_admin_focal_snapshots"])
+        self.assertNotIn("--target-set players-identity-lifecycle-intake", recipe["plan_admin_focal_snapshots"])
+        self.assertIn("does not execute commands", " ".join(recipe["non_claims"]))
         self.assertEqual(
             payload["artifact_chain"]["required_admin_targets"],
             [

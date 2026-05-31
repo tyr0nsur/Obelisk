@@ -21,6 +21,12 @@ REQUIRED_ADMIN_TARGETS = [
     "ShooterPlayerController.ServerKickPlayer",
     "ShooterPlayerController.ServerListPlayers",
 ]
+CORE_EVIDENCE_MANIFEST_PATTERN = (
+    "player-identity-offline-<run-id>/core-evidence-pack/manifest.json"
+)
+REFLECTION_INVENTORY_MANIFEST_PATTERN = (
+    "player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -323,6 +329,36 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     elif first_evidence_ready:
         next_step = "validate_players_identity_first_evidence_consume_and_promote_blocked"
 
+    core_manifest_pattern = args.artifact_root / CORE_EVIDENCE_MANIFEST_PATTERN
+    reflection_inventory_pattern = args.artifact_root / REFLECTION_INVENTORY_MANIFEST_PATTERN
+    next_operator_recipe = {
+        "blocked_until": "accepted_reflection_inventory_pack",
+        "build_reflection_inventory_pack": (
+            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py "
+            f"--evidence-pack-manifest {core_manifest_pattern} "
+            "--evidence-pack-fname-root-label verified_fname_root_slot "
+            "--evidence-pack-gobjects-label gobjects "
+            f"--target-set {PLAYER_IDENTITY_TARGET_SET} "
+            f"--include-functions --output-dir {reflection_inventory_pattern.parent}"
+        ),
+        "check_reflection_inventory_pack": (
+            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_inventory_pack_readiness.py "
+            f"--root {reflection_inventory_pattern.parent}"
+        ),
+        "plan_admin_focal_snapshots": (
+            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/plan_ufunction_focal_snapshots.py "
+            f"--inventory-pack {reflection_inventory_pattern} "
+            "--target ShooterPlayerController.ServerListPlayers "
+            "--target ShooterPlayerController.ServerKickPlayer "
+            "--evidence-obelisk-commit <reviewed-obelisk-id> "
+            "--json-out <ignored-output-path>/player-identity-admin-focal-plan.json"
+        ),
+        "non_claims": [
+            "recipe only; this report does not execute commands, read cores, write artifacts, or touch servers",
+            "planned admin focal snapshots remain candidate-only and do not promote public identity, permissions, commands, runtime hooks, mutation, lookup, return override, or SDK surface",
+        ],
+    }
+
     return {
         "schema": REPORT_SCHEMA,
         "status": "ready" if not blockers else "blocked",
@@ -336,25 +372,16 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "next_required_artifacts": [] if inventory_ready else [
             {
                 "schema": "obelisk.core-dump-evidence-pack.v1",
-                "path_pattern": str(
-                    args.artifact_root
-                    / "player-identity-offline-<run-id>"
-                    / "core-evidence-pack"
-                    / "manifest.json"
-                ),
+                "path_pattern": str(core_manifest_pattern),
                 "purpose": "non_protected_complete_core_evidence",
             },
             {
                 "schema": "obelisk.reflection-inventory-pack.v1",
-                "path_pattern": str(
-                    args.artifact_root
-                    / "player-identity-offline-<run-id>"
-                    / "reflection-inventory-pack"
-                    / "manifest.json"
-                ),
+                "path_pattern": str(reflection_inventory_pattern),
                 "purpose": "reviewed_target_inventory_for_player_identity_lifecycle_intake",
             },
         ],
+        "next_operator_recipe": next_operator_recipe,
         "artifact_chain": {
             "core_evidence_pack_required": True,
             "reflection_inventory_pack_required": True,

@@ -654,6 +654,22 @@
         "obelisk.player_identity.v1",
         "obelisk.permissions_admin.v1"
       ],
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "promoted player identity/principal semantics",
+          "promoted permission/authority model",
+          "safe response path for replies/send-chat",
+          "command lifecycle, abuse, rate-limit, and moderation boundaries",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.commands_replies.v1 as excluded",
+          "the v1 release statement states that no public command SDK/router, console command API, RCON command API, admin command API, player command API, chat replies, send-chat, broadcast/notices API, or moderation API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
+      },
       "blockers": [
         "Needs promoted player identity/principal semantics.",
         "Needs promoted permission/authority model.",
@@ -690,6 +706,21 @@
       "depends_on": [
         "obelisk.player_identity.v1"
       ],
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "promoted player identity/principal semantics",
+          "query-only fail-closed permission checks over copied principals",
+          "authority source, abuse controls, and privacy boundaries",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.permissions_admin.v1 as excluded",
+          "the v1 release statement states that no permission groups, admin groups, grant/revoke API, storage/persistence, operator ingress, command router, replies/send-chat, moderation authority, or ban/kick API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
+      },
       "blockers": [
         "No promoted player identity or authority model.",
         "First public slice must be query-only permission checks over a copied principal, not groups/grants/admin actions.",
@@ -715,6 +746,21 @@
       "public_contract": [],
       "evidence": {
         "current_public_slice": "inventory-backed GameplayPolicyEvent only"
+      },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "narrow copied C ABI surface for each promoted inventory/item audit unit",
+          "promoted player, inventory, and item identity semantics needed by that unit",
+          "rollback, privacy, and abuse controls for grants/removals/progression",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.inventory_items_mutation.v1 as excluded",
+          "the v1 release statement states that no Inventory SDK, Items SDK, give item API, remove item API, kits/rewards API, engram/progression API, inventory lookup, item handles, item mutation, return override, or ResourceHandle API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
       },
       "blockers": [
         "No item/inventory identity.",
@@ -758,6 +804,21 @@
         "demand_sources": [
           "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
           "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
+        ]
+      },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "each player-services, economy, mobility, and area-policy audit unit promoted as its own narrow copied C ABI surface",
+          "promoted player identity/principal, permissions/admin, and storage/persistence semantics needed by that unit",
+          "privacy, audit, rollback, abuse, rate-limit, and cross-instance consistency policy",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.player_services_economy_mobility.v1 as excluded",
+          "the v1 release statement states that no economy API, shop API, rewards API, kits API, stats API, homes API, teleport API, safe-zone API, area policy API, broadcast/timed notice service, or cross-instance persistence API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
       },
       "blockers": [
@@ -847,6 +908,21 @@
         "demand_sources": [
           "docs/research/2026-05-30-aseapi-reference-scan.md",
           "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
+        ]
+      },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "defined gameplay tick cadence, budget, threading, hitch/backpressure, lifecycle, and shutdown semantics",
+          "promoted copied payload and capability-gated owner-token callback lifecycle",
+          "clear distinction from process-local timers and local plugin schedulers",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.gameplay_tick_callbacks.v1 as excluded",
+          "the v1 release statement states that no server tick callback API, UE gameplay tick callback API, module tick callback API, per-frame hook API, or gameplay timers API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
         ]
       },
       "blockers": [

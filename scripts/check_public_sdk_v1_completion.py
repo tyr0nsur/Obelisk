@@ -56,6 +56,17 @@ ALLOWED_GENERIC_EVIDENCE_DIRS = {
     "tests/sdk_consumer",
     "tests/sdk_installed_consumer",
 }
+PROMOTION_EVIDENCE_ALLOWED_PREFIXES = (
+    "tests/abi/",
+    "tests/core/",
+    "tests/sdk_consumer/",
+    "tests/sdk_installed_consumer/",
+    "scripts/test_",
+)
+GENERIC_SCRIPT_EVIDENCE_DENYLIST = {
+    "scripts/check_release_readiness.sh",
+    "scripts/check_public_sdk_v1_completion.py",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -150,6 +161,24 @@ def repo_relative_evidence_path(raw_path: str) -> Path | None:
         return None
 
 
+def evidence_path_is_specific(raw_path: str, surface_id: str) -> bool:
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return False
+    relative_text = relative.as_posix()
+    if relative_text in GENERIC_SCRIPT_EVIDENCE_DENYLIST:
+        return False
+    if not relative_text.startswith(PROMOTION_EVIDENCE_ALLOWED_PREFIXES):
+        return False
+    surface_tokens = [
+        token
+        for token in surface_id.removeprefix("obelisk.").removesuffix(".v1").replace(".", "_").split("_")
+        if token
+    ]
+    lowered = relative_text.lower()
+    return any(token.lower() in lowered for token in surface_tokens)
+
+
 def evidence_path_exists(raw_path: str, *, allow_generic_dirs: bool) -> bool:
     relative = repo_relative_evidence_path(raw_path)
     if relative is None:
@@ -167,6 +196,8 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     if not isinstance(evidence, dict) or not evidence:
         return False
     surface_id = surface.get("id")
+    if not isinstance(surface_id, str):
+        return False
     allow_generic_dirs = surface_id not in CANONICAL_V1_COMPLETION_BLOCKERS
     machine_keys = (
         "abi_tests",
@@ -178,11 +209,17 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     for key in machine_keys:
         value = evidence.get(key)
         if isinstance(value, list) and value and all(
-            isinstance(item, str) and evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs)
+            isinstance(item, str)
+            and evidence_path_exists(item, allow_generic_dirs=allow_generic_dirs)
+            and (allow_generic_dirs or evidence_path_is_specific(item, surface_id))
             for item in value
         ):
             return True
-        if isinstance(value, str) and evidence_path_exists(value, allow_generic_dirs=allow_generic_dirs):
+        if (
+            isinstance(value, str)
+            and evidence_path_exists(value, allow_generic_dirs=allow_generic_dirs)
+            and (allow_generic_dirs or evidence_path_is_specific(value, surface_id))
+        ):
             return True
     return False
 
@@ -228,10 +265,16 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
 
     promoted_surfaces = set(as_string_list(manifest.get("promoted_surfaces")))
     experimental_surfaces = set(as_string_list(manifest.get("experimental_surfaces")))
+    planning_surfaces = set(as_string_list(manifest.get("planning_surfaces")))
     status_experimental_surfaces = {
         surface_id
         for surface_id, surface in surfaces_by_id.items()
         if surface.get("status") == "promoted-experimental-only"
+    }
+    status_planning_surfaces = {
+        surface_id
+        for surface_id, surface in surfaces_by_id.items()
+        if surface.get("status") == "planning"
     }
     completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
     completion_blocker_set = set(completion_blockers)
@@ -250,16 +293,23 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     non_promoted_with_contract: list[str] = []
     promoted_list_mismatches: list[str] = []
     experimental_list_mismatches: list[str] = []
+    planning_list_mismatches: list[str] = []
     release_statement_missing_blockers: list[str] = []
     release_statement_missing_contracts: list[str] = []
     release_statement_missing_experimental_outcomes: list[str] = []
+    missing_completion_blocker_exclusion_contracts: list[str] = []
     debug_only_promoted: list[str] = []
+
+    if stable_claim_allowed and manifest.get("v1_completion_required") is True and release_statement_text is None:
+        blockers.append("release_statement_required_for_v1_completion")
 
     if not canonical_debug_only_present.issubset(debug_only_surfaces):
         blockers.append("debug_only_surface_list_missing_canonical_ids")
 
     if experimental_surfaces != status_experimental_surfaces:
         experimental_list_mismatches = sorted(experimental_surfaces ^ status_experimental_surfaces)
+    if planning_surfaces != status_planning_surfaces:
+        planning_list_mismatches = sorted(planning_surfaces ^ status_planning_surfaces)
 
     experimental_outcome_surface_ids = (
         experimental_surfaces
@@ -295,6 +345,11 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
                 promoted_without_evidence.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
+            if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS and not isinstance(
+                surface.get("v1_decision_contract"), dict
+            ):
+                missing_completion_blocker_exclusion_contracts.append(surface_id)
+                continue
             if release_statement_text is None:
                 release_statement_missing_blockers.append(surface_id)
             elif not release_statement_names_outcome(release_statement_text, surface_id, status):
@@ -345,6 +400,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("v1_sdk_completion_blockers_unresolved")
     if unresolved_planning_surfaces:
         blockers.append("planning_surfaces_unresolved_for_v1_claim")
+    if planning_surfaces:
+        blockers.append("top_level_planning_surfaces_unresolved_for_v1_claim")
+    if missing_completion_blocker_exclusion_contracts:
+        blockers.append("completion_blocker_exclusion_contract_missing")
     if debug_only_promoted:
         blockers.append("debug_only_surface_promoted")
     if promoted_without_contract:
@@ -357,6 +416,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("promoted_surface_list_mismatch")
     if experimental_list_mismatches:
         blockers.append("experimental_surface_list_mismatch")
+    if planning_list_mismatches:
+        blockers.append("planning_surface_list_mismatch")
     if release_statement_missing_blockers:
         blockers.append("release_statement_missing_non_promoted_blocker_outcomes")
     if release_statement_missing_contracts:
@@ -382,7 +443,12 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "unresolved_experimental_surfaces": sorted(set(unresolved_experimental)),
         "unresolved_completion_blockers": sorted(set(unresolved_completion_blockers)),
         "unresolved_planning_surfaces": sorted(set(unresolved_planning_surfaces)),
+        "top_level_planning_surfaces": sorted(planning_surfaces),
+        "planning_list_mismatches": planning_list_mismatches,
         "debug_only_promoted_surfaces": sorted(set(debug_only_promoted)),
+        "missing_completion_blocker_exclusion_contracts": sorted(
+            set(missing_completion_blocker_exclusion_contracts)
+        ),
         "missing_surfaces": sorted(set(missing_surfaces)),
         "promoted_without_public_contract": sorted(set(promoted_without_contract)),
         "missing_canonical_surfaces": missing_canonical_surfaces,

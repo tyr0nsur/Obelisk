@@ -32,11 +32,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   consumption; it does not promote blocked gameplay surfaces.
 - The v1 completion checker now fails closed on truncated surface manifests, missing
   canonical v1 blocker IDs, fake or external promotion evidence paths, generic existing
-  directories as evidence for v1 blockers, unlisted `promoted-experimental-only`
-  surfaces, newly added `planning` surfaces without a v1 outcome, attempts to promote
-  debug-only surfaces, missing release-statement outcomes for non-promoted blockers, and
-  missing release-statement outcomes for canonical experimental seed surfaces when they
-  are excluded/post-v1. A release statement line may use
+  directories or unrelated existing release/tooling files as evidence for v1 blockers,
+  unlisted `promoted-experimental-only` surfaces, newly added or top-level-listed
+  `planning` surfaces without a v1 outcome, attempts to promote debug-only surfaces,
+  non-promoted completion blockers without `v1_decision_contract.exclusion_requires`, a
+  missing release statement for any v1 completion claim, missing release-statement
+  outcomes for non-promoted blockers, and missing release-statement outcomes for
+  canonical experimental seed surfaces when they are excluded/post-v1. A release
+  statement line may use
   `surface-id: excluded - no ...` wording; the exact outcome is parsed from the line
   prefix and explanatory `no ...` text does not make the outcome fail.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim: player identity, permissions/admin, commands/replies, inventory/items mutation, structure census/build policy, mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and operator ingress/storage. Foundation/Plugin Hub seed work remains pre-v1 unless those blockers are promoted or explicitly excluded in a v1 release statement.
