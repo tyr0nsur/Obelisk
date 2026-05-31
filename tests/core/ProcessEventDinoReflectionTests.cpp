@@ -132,8 +132,6 @@ namespace
 
     void Poison(CopiedDinoScalarObservation& observation)
     {
-        observation.FunctionNameIndex = 123;
-        observation.OuterNameIndex = 456;
         observation.ScalarCount = 1;
         observation.ScalarStorage[0] = {
             .Field = DinoScalarField::BSkipLineTrace,
@@ -149,8 +147,6 @@ namespace
         Poison(observation);
         Require(!TryBuildCopiedDinoScalarObservation(invocation, observation), message);
         Require(observation.ScalarCount == 0, "rejected copied dino observation left scalar payload");
-        Require(observation.FunctionNameIndex == -1, "rejected copied dino observation left function index");
-        Require(observation.OuterNameIndex == -1, "rejected copied dino observation left outer index");
     }
 
     void RequireScalar(const CopiedDinoScalarObservation& observation,
@@ -183,10 +179,6 @@ namespace
         Require(TryBuildCopiedDinoScalarObservation(invocation, observation),
                 "AddPassenger copied dino observation was rejected");
         Require(observation.Function == DinoFunction::AddPassenger, "AddPassenger function was not copied");
-        Require(observation.FunctionNameIndex == kAddPassengerNameIndex,
-                "AddPassenger function index was not copied");
-        Require(observation.OuterNameIndex == kPrimalDinoCharacterNameIndex,
-                "AddPassenger outer index was not copied");
         Require(observation.ScalarCount == 4, "AddPassenger copied wrong scalar count");
 
         RequireScalar(observation,

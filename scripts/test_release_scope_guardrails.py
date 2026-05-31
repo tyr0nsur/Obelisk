@@ -2004,9 +2004,18 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 and "tests/core/ProcessEventMissionReflectionTests.cpp" in source_set
                 and "hooks/ProcessEventMissionReflection.cpp" in source_set
             )
+            is_benchmark_test_target = (
+                kind == "executable"
+                and name == "mission_copied_bool_event_dispatcher_benchmark"
+                and "tests/perf/MissionCopiedBoolEventDispatcherBenchmark.cpp" in source_set
+            )
             if is_dispatcher_unit_test_target:
                 saw_test_target = True
-            if not is_dispatcher_unit_test_target and not is_process_event_unit_test_target:
+            if (
+                not is_dispatcher_unit_test_target
+                and not is_process_event_unit_test_target
+                and not is_benchmark_test_target
+            ):
                 offenders.append(f"add_{kind}({name}): {sorted(source_set)}")
 
         if "tests/core/MissionCopiedBoolEventDispatcherTests.cpp" in cmake:

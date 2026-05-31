@@ -34,8 +34,6 @@ namespace Obelisk::Hooks::ProcessEventDinoReflection
     {
         Obelisk::UE::DinoReflection::DinoFunction Function =
             Obelisk::UE::DinoReflection::DinoFunction::AddPassenger;
-        int32_t FunctionNameIndex = -1;
-        int32_t OuterNameIndex = -1;
         std::array<DinoScalarValue, 4> ScalarStorage{};
         size_t ScalarCount = 0;
     };

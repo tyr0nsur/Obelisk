@@ -347,8 +347,8 @@ namespace
                 "bAllowFlyersAndWaterDinos range mismatch");
         Require(invocation.Fields[4].Range.Data == fixture.Params.data() + 0x0e,
                 "bSkipLineTrace range mismatch");
-        Require(invocation.Fields[5].Range.Data == fixture.Params.data() + 0x0f,
-                "ReturnValue range mismatch");
+        Require(!invocation.Fields[5].ExposesRange, "ReturnValue should stay post-call only");
+        Require(invocation.Fields[5].Range.Data == nullptr, "ReturnValue range should not be exposed pre-call");
     }
 
     void TestRecognizesAllowCarryCharacterWithoutObjectRange()
@@ -372,8 +372,9 @@ namespace
         Require(invocation.Fields[0].Field == DinoReflection::DinoField::CanCarryPawn,
                 "CanCarryPawn field mismatch");
         Require(invocation.Fields[0].Range.Data == nullptr, "CanCarryPawn range should not be exposed");
-        Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
-                "AllowCarryCharacter ReturnValue range mismatch");
+        Require(!invocation.Fields[1].ExposesRange, "AllowCarryCharacter ReturnValue should stay post-call only");
+        Require(invocation.Fields[1].Range.Data == nullptr,
+                "AllowCarryCharacter ReturnValue range should not be exposed pre-call");
     }
 
     void TestRecognitionOnlyDinoObjectFieldsDoNotReadParams()
@@ -427,8 +428,8 @@ namespace
                     "AllowCarryCharacter kind mismatch with unreadable object params");
             Require(!invocation.Fields[0].ExposesRange, "AllowCarryCharacter object field exposed params");
             Require(invocation.Fields[0].Range.Data == nullptr, "AllowCarryCharacter object field read params");
-            Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
-                    "AllowCarryCharacter scalar range was not still copied");
+            Require(invocation.Fields[1].Range.Data == nullptr,
+                    "AllowCarryCharacter ReturnValue range should stay post-call only");
         }
     }
 
@@ -857,8 +858,10 @@ namespace
                 fixture.Function.data(),
                 fixture.Params.data(),
                 invocation);
-            Require(result.Status == ReadStatus::Implausible,
-                    "non-canonical AllowCarryCharacter ReturnValue was accepted");
+            Require(static_cast<bool>(result),
+                    "pre-call AllowCarryCharacter ReturnValue byte should not reject recognition");
+            Require(invocation.Fields[1].Range.Data == nullptr,
+                    "pre-call AllowCarryCharacter ReturnValue range was exposed");
         }
     }
 

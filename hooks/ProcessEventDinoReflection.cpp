@@ -77,8 +77,6 @@ namespace Obelisk::Hooks::ProcessEventDinoReflection
         }
 
         out.Function = invocation.Function;
-        out.FunctionNameIndex = invocation.FunctionNameIndex;
-        out.OuterNameIndex = invocation.OuterNameIndex;
 
         for (const Obelisk::UE::DinoReflection::DinoFieldRange& field : invocation.Fields)
         {

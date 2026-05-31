@@ -206,9 +206,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/research/2026-05-31-dino-scalar-policy-planning.md` and a local/test-only
   pre-call copied-scalar builder for `AddPassenger` in `ProcessEventDinoReflection`. It
   copies only `PassengerSeatIndex`, `bForcePassenger`, `bAllowFlyersAndWaterDinos`, and
-  `bSkipLineTrace`; `ACharacter`, `CanCarryPawn`, and all `ReturnValue` fields stay out.
-  Dino remains internal: no hook wiring, dispatcher, public ABI, identity, mutation,
-  return override, or runtime observation.
+  `bSkipLineTrace`; `ACharacter`, `CanCarryPawn`, FName indices, and all `ReturnValue`
+  fields stay out. Dino `ReturnValue` ranges are not exposed for the pre-call lane; a
+  future return-value lane needs an explicit post-original policy. Dino remains internal:
+  no hook wiring, dispatcher, public ABI, identity, mutation, return override, or runtime
+  observation.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact
@@ -240,8 +242,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Before adding more runtime copied-event producers, prefer a hot-path benchmark covering
   disabled lanes, closed gates, zero budget, no-subscriber dispatch, nonmatching FNames,
   <=4 subscriber stack snapshots, and 5-subscriber heap fallback. Structure/Inventory lack
-  dispatch allocation benchmarks; Mission has stack-first dispatcher behavior but no perf
-  guard yet.
+  dispatch allocation benchmarks; Mission copied-bool now has a local dispatcher perf
+  guard for invalid/no-subscriber/4-subscriber stack/5-subscriber heap behavior, but it
+  remains test-only and unwired from runtime.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise runbook. UFunction regeneration and RC root assembly require complete
   `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail

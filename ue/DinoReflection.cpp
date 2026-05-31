@@ -158,7 +158,7 @@ namespace Obelisk::UE::DinoReflection
              0x01,
              0xff,
              false,
-             true},
+             false},
         }};
 
         constexpr std::array<DinoFieldSpec, 2> kAllowCarryCharacterFields{{
@@ -187,7 +187,7 @@ namespace Obelisk::UE::DinoReflection
              0x01,
              0xff,
              false,
-             true},
+             false},
         }};
 
         constexpr DinoFunctionSpec kAddPassengerSpec{
