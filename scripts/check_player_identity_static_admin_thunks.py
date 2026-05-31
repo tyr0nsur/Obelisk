@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
+from static_candidate_orientation_contract import build_contract, validate_contract
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -109,6 +110,7 @@ ADMIN_THUNKS = (
         ),
     ),
 )
+ADMIN_TARGETS = tuple(thunk.target for thunk in ADMIN_THUNKS)
 
 
 def parse_args() -> argparse.Namespace:
@@ -518,6 +520,46 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
                     }
                 )
 
+    non_claims = [
+        "valid static admin-thunk orientation is bounded byte evidence for this offline binary only",
+        "does not prove UFunction object identity, FName indices, UProperty chains, parameter offsets, login/logout lifecycle anchors, or player principal mapping",
+        "does not replace a non-protected complete core evidence pack, reviewed reflection inventory pack, focal ServerListPlayers/ServerKickPlayer snapshots, second-source evidence, or privacy/invalidation policy",
+        "does not promote public identity, economy, runtime hooks, object lookup, ResourceHandle, or SDK surface",
+        "does not promote permissions or commands",
+        "does not promote mutation or return override",
+    ]
+    static_contract = build_contract(
+        topic="player_identity_admin_thunks",
+        binary_sha256=binary_sha256,
+        target_set=TARGET_SET,
+        expected_targets=ADMIN_TARGETS,
+        address_convention="non-PIE ELF VMA for this ARK Linux ShooterGameServer binary",
+        subjects=[
+            {
+                "target": target.get("target"),
+                "kind": "admin_thunk_static_orientation",
+                "status": "candidate_only"
+                if target.get("status") == "candidate_orientation_valid"
+                else target.get("status"),
+                "ascii_name_vma": target.get("ascii_name_vma"),
+                "utf32_name_vma": target.get("utf32_name_vma"),
+                "registration_vma": target.get("registration_vma"),
+                "thunk_vma": target.get("thunk_vma"),
+                "probable_fname_slot_vma": target.get("probable_fname_slot_vma"),
+                "observed_vtable_offset": target.get("observed_vtable_offset"),
+            }
+            for target in checked_targets
+        ],
+        non_claims=non_claims,
+        blockers=[
+            "requires_non_protected_core_evidence_pack",
+            "requires_full_reflection_inventory_pack_for_players_identity_lifecycle_intake",
+            "requires_exact_focal_snapshots_for_ServerListPlayers_and_ServerKickPlayer",
+            "requires_principal_privacy_and_invalidation_policy_before_public_sdk_promotion",
+        ],
+    )
+    blockers.extend(validate_contract(static_contract))
+
     valid = not blockers
     return {
         "schema": REPORT_SCHEMA,
@@ -533,13 +575,9 @@ def validate_binary(path: Path, expected_sha256: str) -> dict[str, Any]:
         "expected_binary_sha256": expected_sha256,
         "target_set": TARGET_SET,
         "checked_targets": checked_targets,
+        "static_candidate_orientation_contract": static_contract,
         "blockers": blockers,
-        "non_claims": [
-            "valid static admin-thunk orientation is bounded byte evidence for this offline binary only",
-            "does not prove UFunction object identity, FName indices, UProperty chains, parameter offsets, login/logout lifecycle anchors, or player principal mapping",
-            "does not promote public identity, permissions, commands, economy, runtime hooks, object lookup, ResourceHandle, mutation, return override, or SDK surface",
-            "does not replace a non-protected complete core evidence pack, reviewed reflection inventory pack, focal ServerListPlayers/ServerKickPlayer snapshots, second-source evidence, or privacy/invalidation policy",
-        ],
+        "non_claims": non_claims,
     }
 
 

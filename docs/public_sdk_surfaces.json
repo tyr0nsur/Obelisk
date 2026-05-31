@@ -104,6 +104,7 @@
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
     "No surface may be listed as promoted unless its status is promoted.",
+    "post_v1_or_excluded_surfaces must exactly match surfaces whose status is post-v1 or excluded.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a non-empty public_contract.",
     "docs/public_gameplay_events.json remains the detailed evidence source for GameplayPolicyEvent and ChatMessageEvent backing target sets."
   ],

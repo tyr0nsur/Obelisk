@@ -13,6 +13,7 @@ from typing import Any
 
 from reflection_target_sets import TARGET_SETS
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
+from static_candidate_orientation_contract import build_contract, validate_contract
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -144,8 +145,37 @@ def validate_candidate(candidate: dict[str, Any], expected: set[str], blockers: 
         append_blocker(blockers, "candidate_contains_promotion_token", target=target)
 
 
+def contract_subjects(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    subjects: list[dict[str, Any]] = []
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list):
+        return subjects
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        subjects.append(
+            {
+                "target": candidate.get("target"),
+                "kind": candidate.get("kind"),
+                "status": candidate.get("status"),
+                "confidence": candidate.get("confidence"),
+                "class_slot": candidate.get("class_slot"),
+                "registration_vma": candidate.get("registration_vma"),
+                "registrar_call_vma": candidate.get("registrar_call_vma"),
+                "name_vmas": {
+                    "ascii": candidate.get("string_vma"),
+                    "utf32": candidate.get("fname_init_name_vma"),
+                },
+                "thunk_candidates": candidate.get("thunk_candidates"),
+                "xref_vmas": candidate.get("xref_vmas"),
+            }
+        )
+    return subjects
+
+
 def build_report(path: Path) -> dict[str, Any]:
     payload, blockers, resolved = read_payload(path)
+    static_contract: dict[str, Any] | None = None
     if payload is not None:
         if payload.get("schema") != ORIENTATION_SCHEMA:
             append_blocker(blockers, "schema_mismatch", value=payload.get("schema"))
@@ -224,6 +254,29 @@ def build_report(path: Path) -> dict[str, Any]:
         if "public_sdk_ready" in payload or "runtime_ready" in payload:
             append_blocker(blockers, "orientation_payload_contains_readiness_overclaim")
 
+        static_contract = build_contract(
+            topic="player_identity",
+            binary_sha256=EXPECTED_BINARY_SHA256,
+            target_set=PLAYER_IDENTITY_TARGET_SET,
+            expected_targets=expected_targets(),
+            address_convention="non-PIE ELF VMA for this ARK Linux ShooterGameServer binary",
+            subjects=contract_subjects(payload),
+            non_claims=[
+                "valid orientation is candidate-only navigation evidence",
+                "does not replace core evidence pack, reflection inventory pack, focal snapshots, second-source evidence, or lifecycle anchors",
+                "does not promote public identity, principal mapping, runtime hooks, object lookup, or SDK surface",
+                "does not promote permissions or commands",
+                "does not promote mutation or return override",
+            ],
+            blockers=[
+                "requires_non_protected_core_evidence_pack",
+                "requires_full_reflection_inventory_pack_for_players_identity_lifecycle_intake",
+                "requires_exact_focal_snapshots_for_ServerListPlayers_and_ServerKickPlayer",
+                "requires_principal_privacy_and_invalidation_policy_before_public_sdk_promotion",
+            ],
+        )
+        blockers.extend(validate_contract(static_contract))
+
     valid = not blockers
     return {
         "schema": REPORT_SCHEMA,
@@ -237,6 +290,7 @@ def build_report(path: Path) -> dict[str, Any]:
         "orientation_json": str(resolved if resolved is not None else path),
         "target_set": PLAYER_IDENTITY_TARGET_SET,
         "binary_sha256": EXPECTED_BINARY_SHA256,
+        "static_candidate_orientation_contract": static_contract,
         "blockers": blockers,
         "non_claims": [
             "valid orientation is candidate-only navigation evidence",

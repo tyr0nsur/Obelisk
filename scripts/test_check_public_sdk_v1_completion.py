@@ -1057,6 +1057,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("planning_surface_list_mismatch", payload["blockers"])
         self.assertEqual(payload["top_level_planning_surfaces"], ["obelisk.player_identity.v1"])
 
+    def test_post_v1_or_excluded_surface_list_must_match_surface_statuses(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        manifest["post_v1_or_excluded_surfaces"].remove("obelisk.commands_replies.v1")
+        manifest["post_v1_or_excluded_surfaces"].append("obelisk.descriptors.v1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("post_v1_or_excluded_surface_list_mismatch", payload["blockers"])
+        self.assertEqual(
+            payload["post_v1_or_excluded_list_mismatches"],
+            ["obelisk.commands_replies.v1", "obelisk.descriptors.v1"],
+        )
+
     def test_debug_only_surface_cannot_be_promoted(self) -> None:
         manifest, _ = complete_excluded_manifest()
         for surface in manifest["surfaces"]:

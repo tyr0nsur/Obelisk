@@ -169,6 +169,33 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertNotIn("OBELISK_ERROR", body)
         self.assertGreaterEqual(body.count("cleanupFamily("), 5)
 
+    def test_plugin_owner_cleanup_covers_public_v1_registration_maps(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        body = extract_function_body(
+            text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+
+        public_cleanup_tokens = (
+            "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
+            "UnregisterChatMessageRegistrationsForOwner(owner)",
+        )
+        for token in public_cleanup_tokens:
+            with self.subTest(token=token):
+                self.assertIn(token, body)
+
+        direct_dispatcher_cleanup_tokens = (
+            "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)",
+            "StructureEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+            "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+            "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+        )
+        for public_token in public_cleanup_tokens:
+            with self.subTest(public_token=public_token):
+                public_index = body.index(public_token)
+                for direct_token in direct_dispatcher_cleanup_tokens:
+                    self.assertLess(public_index, body.index(direct_token))
+
     def test_plugin_owner_cleanup_covers_each_plugin_facing_event_dispatcher(self) -> None:
         plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         cleanup_body = extract_function_body(

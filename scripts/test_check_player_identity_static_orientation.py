@@ -44,6 +44,12 @@ class CheckPlayerIdentityStaticOrientationTests(unittest.TestCase):
         self.assertFalse(payload["runtime_ready"])
         self.assertEqual(payload["target_set"], "players-identity-lifecycle-intake")
         self.assertEqual(payload["blockers"], [])
+        self.assertEqual(
+            payload["static_candidate_orientation_contract"]["schema"],
+            "obelisk.static-candidate-orientation-contract.v1",
+        )
+        self.assertFalse(payload["static_candidate_orientation_contract"]["promotion_ready"])
+        self.assertTrue(payload["static_candidate_orientation_contract"]["not_artifact_gate"])
         self.assertIn("candidate-only navigation evidence", " ".join(payload["non_claims"]))
 
     def test_promotional_gate_state_fails_closed(self) -> None:

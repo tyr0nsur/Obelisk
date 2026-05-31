@@ -475,6 +475,11 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
     completion_blocker_set = set(completion_blockers)
     post_v1_or_excluded = set(as_string_list(manifest.get("post_v1_or_excluded_surfaces")))
+    status_post_v1_or_excluded_surfaces = {
+        surface_id
+        for surface_id, surface in surfaces_by_id.items()
+        if surface.get("status") in {"post-v1", "excluded"}
+    }
     debug_only_surfaces = set(as_string_list(manifest.get("debug_only_surfaces")))
     canonical_debug_only_present = CANONICAL_DEBUG_ONLY_SURFACE_IDS & set(surfaces_by_id)
 
@@ -490,6 +495,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
     promoted_list_mismatches: list[str] = []
     experimental_list_mismatches: list[str] = []
     planning_list_mismatches: list[str] = []
+    post_v1_or_excluded_list_mismatches: list[str] = []
     release_statement_missing_blockers: list[str] = []
     release_statement_missing_contracts: list[str] = []
     release_statement_missing_experimental_outcomes: list[str] = []
@@ -507,6 +513,10 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         experimental_list_mismatches = sorted(experimental_surfaces ^ status_experimental_surfaces)
     if planning_surfaces != status_planning_surfaces:
         planning_list_mismatches = sorted(planning_surfaces ^ status_planning_surfaces)
+    if post_v1_or_excluded != status_post_v1_or_excluded_surfaces:
+        post_v1_or_excluded_list_mismatches = sorted(
+            post_v1_or_excluded ^ status_post_v1_or_excluded_surfaces
+        )
 
     experimental_outcome_surface_ids = (
         experimental_surfaces
@@ -637,6 +647,8 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         blockers.append("experimental_surface_list_mismatch")
     if planning_list_mismatches:
         blockers.append("planning_surface_list_mismatch")
+    if post_v1_or_excluded_list_mismatches:
+        blockers.append("post_v1_or_excluded_surface_list_mismatch")
     if release_statement_missing_blockers:
         blockers.append("release_statement_missing_non_promoted_blocker_outcomes")
     if release_statement_missing_contracts:
@@ -666,6 +678,7 @@ def build_report(manifest_path: Path, release_statement_path: Path | None = None
         "unresolved_planning_surfaces": sorted(set(unresolved_planning_surfaces)),
         "top_level_planning_surfaces": sorted(planning_surfaces),
         "planning_list_mismatches": planning_list_mismatches,
+        "post_v1_or_excluded_list_mismatches": post_v1_or_excluded_list_mismatches,
         "debug_only_promoted_surfaces": sorted(set(debug_only_promoted)),
         "missing_completion_blocker_exclusion_contracts": sorted(
             set(missing_completion_blocker_exclusion_contracts)

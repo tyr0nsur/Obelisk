@@ -218,6 +218,9 @@ that contradicts the chosen outcome are release blockers. A promoted record is v
 when the manifest surface is also promoted and has surface-specific ABI evidence,
 SDK-consumer evidence, lifecycle cleanup coverage, privacy/no-internals guarantees, and
 the required gameplay evidence for that surface.
+The manifest's `post_v1_or_excluded_surfaces` list must exactly match surfaces whose
+status is `post-v1` or `excluded`; it cannot be used to classify promoted, planning,
+experimental, or debug-only surfaces as release exclusions.
 
 | Surface or demand family | Required v1 outcome | Depends on | Release-statement detail |
 | --- | --- | --- | --- |
