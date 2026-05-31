@@ -138,7 +138,8 @@ Packaging layout checks:
 
 ```bash
 scripts/install_obelisk.sh --dry-run /tmp/obelisk-install-check
-scripts/test_install_obelisk_layout.sh /tmp/obelisk-layout-check
+LAYOUT_CHECK_ROOT="$(mktemp -d /tmp/obelisk-layout-check.XXXXXX)"
+scripts/test_install_obelisk_layout.sh "${LAYOUT_CHECK_ROOT}"
 ```
 
 Release gate:

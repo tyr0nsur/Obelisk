@@ -1,29 +1,66 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+    cat <<'EOF'
+Usage: scripts/test_install_obelisk_layout.sh <clean-install-root>
+
+Validates the installer, installed runtime layout, CMake SDK package, and public SDK
+consumer examples. Pass a fresh empty absolute install root, such as one created with
+mktemp -d /tmp/obelisk-layout-check.XXXXXX. The test performs a backup reinstall, so
+reusing a populated root can leave stale backup artifacts that make the result unclear.
+
+Options:
+  -h, --help  Show this help.
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+if [[ $# -ne 1 || -z "${1:-}" ]]; then
+    echo "scripts/test_install_obelisk_layout.sh requires a clean explicit install root." >&2
+    usage >&2
+    exit 2
+fi
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${OBELISK_BUILD_DIR:-${REPO_DIR}/build}"
 if [[ "${BUILD_DIR}" != /* ]]; then
     BUILD_DIR="${REPO_DIR}/${BUILD_DIR}"
 fi
-INSTALL_ROOT="${1:-}"
-if [[ -z "${INSTALL_ROOT}" ]]; then
-    INSTALL_ROOT="$(mktemp -d /tmp/obelisk-install-layout.XXXXXX)"
-    CLEAN_INSTALL_ROOT=1
-else
-    CLEAN_INSTALL_ROOT=0
-fi
+INSTALL_ROOT="$1"
 WORK_DIR="$(mktemp -d /tmp/obelisk-sdk-consumer.XXXXXX)"
 CXX_BIN="${CXX:-g++}"
 SDK_CONSUMER_FIXTURE="${BUILD_DIR}/tests/sdk_consumer/sdk_consumer_fixture"
 
 cleanup() {
     rm -rf "${WORK_DIR}"
-    if [[ "${CLEAN_INSTALL_ROOT}" == "1" ]]; then
-        rm -rf "${INSTALL_ROOT}"
-    fi
 }
 trap cleanup EXIT
+
+if [[ "${INSTALL_ROOT}" != /* || "${INSTALL_ROOT}" == "/" ]]; then
+    echo "Install layout test root must be a non-root absolute path: ${INSTALL_ROOT}" >&2
+    usage >&2
+    exit 2
+fi
+if [[ -L "${INSTALL_ROOT}" ]]; then
+    echo "Install layout test root must not be a symlink: ${INSTALL_ROOT}" >&2
+    exit 2
+fi
+if [[ -e "${INSTALL_ROOT}" && ! -d "${INSTALL_ROOT}" ]]; then
+    echo "Install layout test root must be a directory or absent path: ${INSTALL_ROOT}" >&2
+    exit 2
+fi
+if [[ -d "${INSTALL_ROOT}" ]] && find "${INSTALL_ROOT}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    echo "Install layout test root must be clean/empty before validation: ${INSTALL_ROOT}" >&2
+    echo "Create a fresh root with: mktemp -d /tmp/obelisk-layout-check.XXXXXX" >&2
+    exit 2
+fi
 
 require_cmd() {
     local cmd="$1"

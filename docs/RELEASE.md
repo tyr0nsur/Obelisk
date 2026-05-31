@@ -387,7 +387,9 @@ still does not promote commands, identity, moderation/blocking, mutation, return
 overrides, or UE internals. Do not count `enable-chat-reflection` observer evidence for
 that claim.
 
-5. Confirm `scripts/test_install_obelisk_layout.sh` covered runtime backup reinstall:
+5. Run `scripts/test_install_obelisk_layout.sh` with a fresh explicit install root, for
+   example one created with `mktemp -d /tmp/obelisk-layout-check.XXXXXX`, and confirm it
+   covered runtime backup reinstall:
    one backup each for `libobelisk.so` and `libsubhook.so`, no `.incoming.*` files, no
    `.install-runtime.*` staging directory, invalid install roots rejected, failed runtime
    rename cleanup, required positional install roots even when `OBELISK_ROOT` is set, and
