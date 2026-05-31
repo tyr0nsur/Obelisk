@@ -312,7 +312,10 @@ scripts/check_release_readiness.sh \
 
 If internal module recognizer work resumes after the RC, the remaining item
 producer/runtime validation, Mission copied-bool observer, and Transfer `bAccept` lanes
-stay internal unless a release names a separate promotion gate. The three item return-only
+stay internal unless a release names a separate promotion gate. For Transfer `bAccept`,
+internal means offline/test-only evidence only: no runtime target source, no `PluginManager`
+wiring, no marker/env activation, no installed plugin path, and no public manifest,
+documentation, or example exposure. The three item return-only
 checks are public only as copied `GameplayPolicyEvent` `ReturnValue` kinds; they do not
 create an Inventory SDK, Items SDK, identity, lookup, mutation, return override, or
 `ResourceHandle`; those remain absent.

@@ -168,12 +168,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 ## Priority Next Steps
 
 - Current post-RC focus: preserve RC scope, reduce debt, improve evidence tooling, and promote only copied module APIs through strict gates.
-- `mission-copied-bool-policy-slice` remains the best next internal v0.2 module lane:
-  planning-only/consume-only, release/public promotion blocked, `GetPlayerUsableItems`
-  recognition-only, and no Mission SDK, identity, mutation, return override, or runtime
-  observer. See `2026-05-31-v02-module-priority.md`.
 - Mission test-only copied-bool dispatcher exists outside shared runtime/API targets for
   three copied-bool functions; next review is lifecycle/runtime observation, not public API.
+- For v0.2 product value, prefer Structure aggregate/census planning over Transfer
+  `bAccept`. Transfer `bAccept` remains useful as a fixture/internal bool-layout lane, but
+  it is low product value without identity/payload/cross-map/privacy semantics. Do not
+  build Transfer runtime/API work unless a later focused gate makes it necessary.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact

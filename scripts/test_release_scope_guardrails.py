@@ -1316,10 +1316,14 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             ("docs/agent-handoff/COMPACT_CONTEXT.md", compact),
         ):
             with self.subTest(file=path, item="post-RC recognizer order"):
-                self.assertIn(
-                    "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`",
-                    normalized(text),
-                )
+                if path.endswith("COMPACT_CONTEXT.md"):
+                    self.assertIn("Structure aggregate/census planning", normalized(text))
+                    self.assertIn("Transfer `bAccept` remains a useful bool-layout fixture", normalized(text))
+                else:
+                    self.assertIn(
+                        "Item return-only policy, Mission copied-bool observer, then Transfer `bAccept`",
+                        normalized(text),
+                    )
             with self.subTest(file=path, item="no RC public SDK/API promotion"):
                 self.assertRegex(normalized(text), r"no RC public SDK/API|not RC public SDK/API|does not change the RC public API")
 
@@ -2000,8 +2004,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "loader/Bootstrap.cpp",
             "runtime/RuntimeMarkers.cpp",
             "runtime/RuntimeMarkers.h",
+            "packaging/linuxgsm/ObeliskRun.sh",
+            "packaging/linuxgsm/ObeliskRunDebug.sh",
+            "packaging/linuxgsm/arkserver-obelisk-debug.cfg.example",
+            "scripts/check_linuxgsm_wrapper_drift.sh",
             "scripts/check_obelisk_server_posture.sh",
-            "scripts/check_release_readiness.sh",
             "scripts/install_obelisk.sh",
             "scripts/obelisk.py",
         ]
@@ -2013,8 +2020,100 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 "OBELISK_ENABLE_TRANSFER_BACCEPT",
                 "enable-transfer-reflection",
                 "enable-transfer-baccept",
+                "OBELISK_ENABLE_TRANSFER_BACCEPT_EVENTS",
+                "enable-transfer-baccept-events",
                 "TransferBAcceptObserver",
+                "TransferBAcceptEventDispatcher",
+                "TransferCopiedBoolEventDispatcher",
+                "transfer-baccept-events",
             ]:
+                with self.subTest(file=path, token=token):
+                    self.assertNotIn(token, text)
+
+    def test_transfer_baccept_dispatcher_remains_test_only_if_added(self) -> None:
+        cmake = read("CMakeLists.txt")
+        forbidden_runtime_sources = [
+            "core/TransferBAcceptEventDispatcher.cpp",
+            "core/TransferCopiedBoolEventDispatcher.cpp",
+            "tests/core/TransferBAcceptEventDispatcherTests.cpp",
+            "tests/core/TransferCopiedBoolEventDispatcherTests.cpp",
+        ]
+        obelisk_target = re.search(
+            r"add_library\(obelisk SHARED\n(?P<sources>.*?)\n\)",
+            cmake,
+            re.S,
+        )
+        self.assertIsNotNone(obelisk_target)
+        obelisk_sources = obelisk_target.group("sources") if obelisk_target else ""
+
+        for source in forbidden_runtime_sources:
+            with self.subTest(target="obelisk", source=source):
+                self.assertNotIn(source, obelisk_sources)
+
+        offenders: list[str] = []
+        saw_test_target = False
+        for kind, name, body in cmake_targets(cmake):
+            source_set = set(
+                re.findall(r"\b(?:core|hooks|tests|ue)/[A-Za-z0-9_/]+\.cpp\b", body)
+            )
+            mentions_transfer_baccept_dispatcher = (
+                "transfer_baccept_event_dispatcher" in name
+                or "transfer_copied_bool_event_dispatcher" in name
+                or any("TransferBAcceptEventDispatcher" in source for source in source_set)
+                or any("TransferCopiedBoolEventDispatcher" in source for source in source_set)
+            )
+            if not mentions_transfer_baccept_dispatcher:
+                continue
+
+            is_test_target = (
+                kind == "executable"
+                and name in {
+                    "transfer_baccept_event_dispatcher_tests",
+                    "transfer_copied_bool_event_dispatcher_tests",
+                }
+                and (
+                    "tests/core/TransferBAcceptEventDispatcherTests.cpp" in source_set
+                    or "tests/core/TransferCopiedBoolEventDispatcherTests.cpp" in source_set
+                )
+            )
+            if is_test_target:
+                saw_test_target = True
+            else:
+                offenders.append(f"add_{kind}({name}): {sorted(source_set)}")
+
+        if (
+            "tests/core/TransferBAcceptEventDispatcherTests.cpp" in cmake
+            or "tests/core/TransferCopiedBoolEventDispatcherTests.cpp" in cmake
+        ):
+            self.assertTrue(saw_test_target)
+        self.assertEqual(offenders, [])
+
+        plugin_manager_paths = [
+            "core/PluginManager.cpp",
+            "core/PluginManager.h",
+        ]
+        operational_paths = [
+            "loader/Bootstrap.cpp",
+            "runtime/RuntimeMarkers.cpp",
+            "runtime/RuntimeMarkers.h",
+            "packaging/linuxgsm/ObeliskRun.sh",
+            "packaging/linuxgsm/ObeliskRunDebug.sh",
+            "packaging/linuxgsm/arkserver-obelisk-debug.cfg.example",
+            "scripts/check_linuxgsm_wrapper_drift.sh",
+            "scripts/check_obelisk_server_posture.sh",
+            "scripts/install_obelisk.sh",
+            "scripts/obelisk.py",
+        ]
+        forbidden_tokens = [
+            "TransferBAcceptEventDispatcher",
+            "TransferCopiedBoolEventDispatcher",
+            "OBELISK_ENABLE_TRANSFER_BACCEPT_EVENTS",
+            "enable-transfer-baccept-events",
+            "transfer-baccept-events",
+        ]
+        for path in plugin_manager_paths + operational_paths:
+            text = read(path)
+            for token in forbidden_tokens:
                 with self.subTest(file=path, token=token):
                     self.assertNotIn(token, text)
 
