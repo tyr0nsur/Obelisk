@@ -144,6 +144,20 @@ This core-first gate is necessary package/readiness evidence for `v0.1.x` RC/sta
 candidates, but it is not a `v1.0` complete-SDK gate. A `v1.0` claim must still satisfy
 [`SDK_V1_COMPATIBILITY.md`](SDK_V1_COMPATIBILITY.md) and the blocker map in
 [`public_sdk_surfaces.json`](public_sdk_surfaces.json).
+Use the explicit v1 gate when preparing a stable SDK claim:
+
+```bash
+scripts/check_release_readiness.sh \
+  --require-v1-sdk-completion \
+  --v1-sdk-release-statement <reviewed-v1-sdk-release-statement.md>
+```
+
+That option runs `scripts/check_public_sdk_v1_completion.py` before the core build work.
+On the current post-RC tree it must fail closed because `v1_completion_required=false`,
+`stable_release_contract.claim_allowed=false`, unresolved experimental surfaces remain,
+and v1 blocker IDs are still planning or not promoted/excluded by release statement. The
+release-statement path is mandatory for the v1 gate and must name every non-promoted
+blocker as excluded or post-v1.
 
 After assembling an RC second-source root, run the committed RC layout smoke. This checks
 that the copied second-source snapshots compare cleanly against the in-repo sanitized

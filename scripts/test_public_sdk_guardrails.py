@@ -1202,6 +1202,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.mission_transfer_dino_tribe.v1",
                 "obelisk.player_services_economy_mobility.v1",
                 "obelisk.operator_ingress_storage.v1",
+                "obelisk.gameplay_tick_callbacks.v1",
             },
         )
         self.assertTrue(v1_blockers.issubset(planning | post_or_excluded))
@@ -1561,6 +1562,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         gameplay = surfaces["obelisk.mission_transfer_dino_tribe.v1"]
         inventory = surfaces["obelisk.inventory_items_mutation.v1"]
         services = surfaces["obelisk.player_services_economy_mobility.v1"]
+        ticks = surfaces["obelisk.gameplay_tick_callbacks.v1"]
+        commands = surfaces["obelisk.commands_replies.v1"]
+        timers = surfaces["obelisk.process_local_timers.v1"]
 
         for audit_unit in (
             "dino policy/cosmetics/carry restrictions",
@@ -1591,6 +1595,27 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(audit_unit, services["audit_units"])
 
+        self.assertIn("obelisk.gameplay_tick_callbacks.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.gameplay_tick_callbacks.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertEqual(ticks["status"], "post-v1")
+        self.assertEqual(ticks["public_contract"], [])
+        for blocker in (
+            "Process-local timers are not server tick, UE gameplay tick, or module tick callbacks.",
+            "No tick cadence, budget, threading, hitch/backpressure, lifecycle, or shutdown contract.",
+        ):
+            self.assertIn(blocker, ticks["blockers"])
+        for exclusion in (
+            "server tick callbacks",
+            "UE gameplay tick callbacks",
+            "module tick callbacks",
+            "per-frame hook callbacks",
+        ):
+            self.assertIn(exclusion, timers["exclusions"])
+        for audit_unit in ("console command routing", "RCON command routing"):
+            self.assertIn(audit_unit, commands["audit_units"])
+        for exclusion in ("console command API", "RCON command API"):
+            self.assertIn(exclusion, commands["exclusions"])
+
     def test_sdk_v1_compatibility_doc_tracks_manifest_and_exclusions(self) -> None:
         text = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
         compact = normalized(text)
@@ -1612,6 +1637,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "pre-identity production seeds are not enough for v1 completion",
             "structure census/build policy",
             "gameplay modules including buffs",
+            "Gameplay/server tick callbacks",
             "player services/economy/mobility/areas",
             "process-local timers",
             "Experimental Copied Event Patterns",
@@ -1630,6 +1656,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ResourceHandle",
             "buff module SDKs",
             "economy, shops, rewards, kits, stats, player progression/engrams, homes, teleport, safe zones, area policy",
+            "gameplay/server tick callbacks",
+            "console/RCON command routing",
             "chat send/broadcast",
             "dino policy/cosmetics/carry restrictions",
             "tribe identity/notices/policy",
@@ -1977,6 +2005,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for exclusion in (
             "RCON service",
+            "operator reload command API",
+            "Unicode/operator text encoding API",
+            "external operator command lifecycle",
             "database service",
             "webhook client",
             "secret manager",
@@ -3379,9 +3410,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "UnregisterTimerWithOwnerToken",
             "plugin_owner_token != 0",
             "InstallLayoutConsumer_ScheduledCallbackSeen",
+            "OBELISK_PLUGIN_EXPORT",
+            "atomic_load(&g_timer_id)",
+            "atomic_exchange(&g_timer_id, 0)",
         ):
             with self.subTest(path="examples/sdk_timer_plugin/timer_plugin.c", token=token):
                 self.assertIn(token, timer_source)
+        self.assertNotIn("__attribute__((visibility(\"default\")))\nbool", timer_source)
+        self.assertIn("OBELISK_SDK_TIMER_PLUGIN_TEST_PROBES", timer_source)
+        self.assertIn("OBELISK_SDK_TIMER_PLUGIN_TEST_PROBES", timer_cmake)
 
         for token in (
             '#include "',

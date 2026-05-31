@@ -135,6 +135,18 @@ authority, and a safe response path are promoted.
   raw `FString`, raw FName/GObjects indices, ArkApi offsets, MSVC layouts, or vtable
   assumptions.
 
+The executable gate for that claim is:
+
+```bash
+scripts/check_release_readiness.sh \
+  --require-v1-sdk-completion \
+  --v1-sdk-release-statement <reviewed-v1-sdk-release-statement.md>
+```
+
+It intentionally fails on the current post-RC tree; passing the core-first release gate
+alone is not enough to claim `v1.0 stable`. The release statement is part of the gate
+because every non-promoted blocker must be named as excluded or post-v1.
+
 ## Current Game Interaction Boundary
 
 The first stable line should prove the Linux runtime, hook, plugin ABI, install layout, and

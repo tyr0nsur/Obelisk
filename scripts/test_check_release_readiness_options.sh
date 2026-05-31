@@ -37,6 +37,8 @@ done
 
 for expected in \
     "--require-second-source-readiness" \
+    "--require-v1-sdk-completion" \
+    "--v1-sdk-release-statement" \
     "--allow-cross-ref-second-source-root" \
     "--ufunction-second-source-root" \
     "--scriptstruct-second-source-root" \
@@ -51,6 +53,62 @@ for expected in \
         exit 1
     fi
 done
+
+set +e
+v1_sdk_statement_without_gate_output="$(
+    scripts/check_release_readiness.sh --v1-sdk-release-statement /tmp/obelisk-v1-statement.md 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected v1 release statement without gate to exit 2, got %s\n%s\n' \
+        "${status}" "${v1_sdk_statement_without_gate_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "--v1-sdk-release-statement requires --require-v1-sdk-completion." <<<"${v1_sdk_statement_without_gate_output}"; then
+    printf 'missing v1 statement option validation error\n%s\n' "${v1_sdk_statement_without_gate_output}" >&2
+    exit 1
+fi
+
+set +e
+v1_sdk_completion_without_statement_output="$(scripts/check_release_readiness.sh --require-v1-sdk-completion 2>&1)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected v1 SDK completion without release statement to exit 2, got %s\n%s\n' \
+        "${status}" "${v1_sdk_completion_without_statement_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "--require-v1-sdk-completion requires --v1-sdk-release-statement." <<<"${v1_sdk_completion_without_statement_output}"; then
+    printf 'missing v1 SDK completion release-statement-required error\n%s\n' \
+        "${v1_sdk_completion_without_statement_output}" >&2
+    exit 1
+fi
+
+set +e
+v1_sdk_protected_statement_output="$(
+    scripts/check_release_readiness.sh \
+        --require-v1-sdk-completion \
+        --v1-sdk-release-statement /servidor/ark/obelisk/v1-release-statement.md 2>&1
+)"
+status=$?
+set -e
+
+if [[ "${status}" -ne 2 ]]; then
+    printf 'expected protected v1 release statement path to exit 2, got %s\n%s\n' \
+        "${status}" "${v1_sdk_protected_statement_output}" >&2
+    exit 1
+fi
+
+if ! grep -Fq -- "--v1-sdk-release-statement must not read from protected server root /servidor/ark" <<<"${v1_sdk_protected_statement_output}"; then
+    printf 'missing protected v1 release statement path error\n%s\n' \
+        "${v1_sdk_protected_statement_output}" >&2
+    exit 1
+fi
 
 if ! grep -Fq -- "production libobelisk.so symbol surface checks" <<<"${help_output}"; then
     printf 'missing production symbol-surface help text\n' >&2

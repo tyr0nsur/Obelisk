@@ -13,6 +13,8 @@ LAYOUT_CHECK_ROOT=""
 ALLOW_DIRTY=0
 ALLOW_CROSS_REF_SECOND_SOURCE_ROOT=0
 REQUIRE_SECOND_SOURCE_READINESS=0
+REQUIRE_V1_SDK_COMPLETION=0
+V1_SDK_RELEASE_STATEMENT=""
 UFUNCTION_SECOND_SOURCE_ROOT="${OBELISK_UFUNCTION_SECOND_SOURCE_ROOT:-}"
 SCRIPTSTRUCT_SECOND_SOURCE_ROOT="${OBELISK_SCRIPTSTRUCT_SECOND_SOURCE_ROOT:-}"
 SECOND_SOURCE_REPORT_DIR="${OBELISK_SECOND_SOURCE_REPORT_DIR:-}"
@@ -318,6 +320,8 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             cat <<'EOF'
 Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-source-readiness]
+                                          [--require-v1-sdk-completion]
+                                          [--v1-sdk-release-statement <path>]
                                           [--allow-cross-ref-second-source-root]
                                           [--ufunction-second-source-root <path>]
                                           [--scriptstruct-second-source-root <path>]
@@ -331,6 +335,7 @@ status, and clean-tree validation. By default the command fails if tracked or un
 non-ignored files are present before or after validation. Ignored build/cache directories
 are allowed. Gameplay/module second-source promotion gates run only when
 --require-second-source-readiness is supplied.
+The v1 complete-SDK claim gate runs only when --require-v1-sdk-completion is supplied.
 
 Options:
   --allow-dirty                     Permit a dirty worktree while developing the release gate itself.
@@ -340,6 +345,9 @@ Options:
                                     explicit historical tag recovery.
   --require-second-source-readiness Fail if focused reflection promotion target sets lack complete
                                     second-source evidence.
+  --require-v1-sdk-completion       Fail unless docs/public_sdk_surfaces.json allows a complete
+                                    v1.0 SDK claim. This is separate from the core-first gate.
+  --v1-sdk-release-statement        Reviewed v1 SDK release statement naming excluded/post-v1 blockers.
   --ufunction-second-source-root    Candidate UFunction snapshot root for second-source promotion.
   --scriptstruct-second-source-root Candidate ScriptStruct snapshot root for second-source promotion.
   --ufunction-second-source-target-set
@@ -365,6 +373,14 @@ EOF
         --require-second-source-readiness)
             REQUIRE_SECOND_SOURCE_READINESS=1
             shift
+            ;;
+        --require-v1-sdk-completion)
+            REQUIRE_V1_SDK_COMPLETION=1
+            shift
+            ;;
+        --v1-sdk-release-statement)
+            V1_SDK_RELEASE_STATEMENT="${2:?--v1-sdk-release-statement requires a path}"
+            shift 2
             ;;
         --ufunction-second-source-root)
             UFUNCTION_SECOND_SOURCE_ROOT="${2:?--ufunction-second-source-root requires a path}"
@@ -436,6 +452,17 @@ if [[ -n "${SCRIPTSTRUCT_SECOND_SOURCE_ROOT}" ]]; then
 fi
 if [[ -n "${SECOND_SOURCE_REPORT_DIR}" ]]; then
     validate_second_source_report_dir "${SECOND_SOURCE_REPORT_DIR}"
+fi
+if [[ -n "${V1_SDK_RELEASE_STATEMENT}" && "${REQUIRE_V1_SDK_COMPLETION}" != "1" ]]; then
+    echo "--v1-sdk-release-statement requires --require-v1-sdk-completion." >&2
+    exit 2
+fi
+if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" && -z "${V1_SDK_RELEASE_STATEMENT}" ]]; then
+    echo "--require-v1-sdk-completion requires --v1-sdk-release-statement." >&2
+    exit 2
+fi
+if [[ -n "${V1_SDK_RELEASE_STATEMENT}" ]]; then
+    reject_protected_path "--v1-sdk-release-statement" "read from" "${V1_SDK_RELEASE_STATEMENT}"
 fi
 preflight_ufunction_second_source_readiness
 
@@ -786,6 +813,10 @@ run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oProcessTimer/oProcessTimer.so" "${RELEASE_CHECK_ROOT}"
 run_step scripts/install_obelisk_plugin.sh --dry-run \
     "${BUILD_DIR}/plugins/oDescriptorCatalog/oDescriptorCatalog.so" "${RELEASE_CHECK_ROOT}"
+if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
+    run_step python3 scripts/check_public_sdk_v1_completion.py \
+        --release-statement "${V1_SDK_RELEASE_STATEMENT}"
+fi
 run_step git diff --check
 
 printf '\n==> git status --short --ignored\n'
@@ -796,4 +827,9 @@ if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
     printf '\nCore-first release readiness and gameplay/module second-source promotion checks completed.\n'
 else
     printf '\nCore-first release readiness checks completed; gameplay/module second-source promotion gate was not run.\n'
+fi
+if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
+    printf 'Public SDK v1 completion gate completed.\n'
+else
+    printf 'Public SDK v1 completion gate was not run.\n'
 fi

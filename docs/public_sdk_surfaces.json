@@ -61,7 +61,8 @@
     "obelisk.structure_census.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
     "obelisk.player_services_economy_mobility.v1",
-    "obelisk.operator_ingress_storage.v1"
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1"
   ],
   "post_v1_or_excluded_surfaces": [
     "obelisk.permissions_admin.v1",
@@ -69,6 +70,7 @@
     "obelisk.inventory_items_mutation.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
     "obelisk.arkapi_compatibility.v1"
   ],
   "debug_only_surfaces": [
@@ -150,6 +152,11 @@
       },
       "exclusions": [
         "hot reload of Obelisk itself",
+        "hot plugin reload",
+        "plugin watchdog/crash recovery",
+        "process restart orchestration",
+        "server recovery API",
+        "operator reload commands",
         "detached worker ingress without shutdown proof",
         "cross-process mutable state without plugin-owned locking"
       ]
@@ -235,6 +242,10 @@
       },
       "exclusions": [
         "UE gameplay timers",
+        "server tick callbacks",
+        "UE gameplay tick callbacks",
+        "module tick callbacks",
+        "per-frame hook callbacks",
         "cluster scheduler",
         "persistent timer ids",
         "shared scheduler state",
@@ -652,12 +663,16 @@
       ],
       "audit_units": [
         "command router",
+        "console command routing",
+        "RCON command routing",
         "replies/send-chat",
         "broadcast/notices",
         "moderation/admin command authority"
       ],
       "exclusions": [
         "public command SDK/router",
+        "console command API",
+        "RCON command API",
         "admin command API",
         "player command API",
         "chat replies",
@@ -813,10 +828,38 @@
       ],
       "exclusions": [
         "RCON service",
+        "operator reload command API",
+        "Unicode/operator text encoding API",
+        "external operator command lifecycle",
         "database service",
         "webhook client",
         "secret manager",
         "cross-instance storage API"
+      ]
+    },
+    {
+      "id": "obelisk.gameplay_tick_callbacks.v1",
+      "category": "gameplay tick callbacks",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_contract": [],
+      "evidence": {
+        "demand_sources": [
+          "docs/research/2026-05-30-aseapi-reference-scan.md",
+          "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
+        ]
+      },
+      "blockers": [
+        "Process-local timers are not server tick, UE gameplay tick, or module tick callbacks.",
+        "No tick cadence, budget, threading, hitch/backpressure, lifecycle, or shutdown contract.",
+        "No promoted copied payload, capability bit, owner-token callback lifecycle, or SDK consumer coverage."
+      ],
+      "exclusions": [
+        "server tick callback API",
+        "UE gameplay tick callback API",
+        "module tick callback API",
+        "per-frame hook API",
+        "gameplay timers"
       ]
     },
     {

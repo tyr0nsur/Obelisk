@@ -501,6 +501,7 @@ cp -R "${REPO_DIR}/examples/sdk_timer_plugin/." "${SDK_TIMER_EXAMPLE_DIR}/"
 cmake -S "${SDK_TIMER_EXAMPLE_DIR}" -B "${SDK_TIMER_EXAMPLE_DIR}/build" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
+    -DOBELISK_SDK_TIMER_PLUGIN_TEST_PROBES=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build "${SDK_TIMER_EXAMPLE_DIR}/build" --parallel
 SDK_TIMER_EXAMPLE_PLUGIN_PATH="${SDK_TIMER_EXAMPLE_DIR}/build/obelisk_sdk_timer_plugin.so"

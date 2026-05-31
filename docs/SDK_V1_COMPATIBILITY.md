@@ -18,8 +18,10 @@ The machine-readable `v1_sdk_completion_blockers` list records the high-demand c
 that currently prevent a complete SDK claim: player identity, permissions/admin,
 commands/replies, inventory/items mutation, structure census/build policy, gameplay
 modules including buffs, player services/economy/mobility/areas, and operator
-ingress/storage. Those blockers must be promoted or deliberately excluded in the release
-statement before `v1_completion_required` can become true.
+ingress/storage. Gameplay/server tick callbacks are also tracked as a separate
+post-v1 blocker so process-local timers are not mistaken for UE gameplay tick hooks.
+Those blockers must be promoted or deliberately excluded in the release statement before
+`v1_completion_required` can become true.
 
 A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
@@ -167,6 +169,9 @@ The shortest useful route toward a complete v1 SDK is:
 5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID:
    mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas, and
    operator ingress/storage.
+6. Keep gameplay/server tick callbacks separate from process-local timers unless a future
+   promoted copied ABI defines cadence, budget, lifecycle, shutdown, and hitch/backpressure
+   behavior.
 
 This route keeps chat, gameplay-policy slices, descriptors, and timers as useful seed
 surfaces while preventing them from being mistaken for a complete Obelisk SDK for
@@ -175,7 +180,8 @@ familiar ARK server-modding demand.
 Inventory/items mutation, structure ownership/placement/build policy/no-collision,
 dino/tribe/mission/transfer/buff module SDKs, RCON, database/storage services, webhooks,
 economy, shops, rewards, kits, stats, player progression/engrams, homes, teleport, safe
-zones, area policy, chat send/broadcast, timed notices, and permissions remain outside
+zones, area policy, chat send/broadcast, timed notices, gameplay/server tick callbacks,
+console/RCON command routing, Unicode/operator text APIs, and permissions remain outside
 the current promoted scope. The machine-readable blocker entries keep those broad areas
 auditable as release-statement units: structure aggregate/census, ownership/access
 identity, placement/build-policy, no-collision and admin exceptions; dino
@@ -184,7 +190,8 @@ redaction, lifecycle/stacking/invalidation, and aggregate/proximity/count/mutati
 exclusions; command router, replies/send-chat, broadcast/notices, and moderation/admin
 authority; inventory/item lookup, item grants/removal, kits/rewards, and player
 progression/engrams; and player services, economy, mobility, area policy, and
-timed-notice services. Economy and mobility require promoted
+timed-notice services. Tick callbacks are not covered by process-local timers. Economy and
+mobility require promoted
 identity/principal, permissions/admin, and storage/persistence; identity alone is
 insufficient. If they are included in the eventual `v1.0` support statement, they must be
 promoted before the release is called `v1.0`.

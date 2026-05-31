@@ -1145,6 +1145,164 @@ namespace
             Require(g_TimerUnregisterCount == 0, "descriptor+timer failed init unregistered failed timer handle");
         }
     }
+
+    struct TimerOnlyGuardrailCase
+    {
+        const char* name;
+        uint32_t apiStructSize;
+        uint32_t contextStructSize;
+        uint64_t disabledCapability;
+        bool nullTimerRegisterSlot;
+        bool nullTimerUnregisterSlot;
+        bool zeroOwnerToken;
+        bool timerRegistrationFails;
+        int timerRegistrations;
+    };
+
+    void RunTimerOnlyGuardrails(InitFn init, ShutdownFn shutdown, ObeliskPluginInitContext context)
+    {
+        Require(shutdown != nullptr, "timer example guardrails require plugin shutdown cleanup");
+        {
+            ObeliskApi api{};
+            PopulateApi(api);
+
+            ResetFixtureObservations();
+            Require(!init(nullptr, &context), "timer example accepted null API");
+            Require(!init(&api, nullptr), "timer example accepted null context");
+
+            api.abi_version = OBELISK_API_ABI_VERSION + 1u;
+            Require(!init(&api, &context), "timer example accepted bad API ABI version");
+
+            PopulateApi(api);
+            ObeliskPluginInitContext badContext = context;
+            badContext.abi_version = OBELISK_PLUGIN_INIT_CONTEXT_ABI_VERSION + 1u;
+            Require(!init(&api, &badContext), "timer example accepted bad context ABI version");
+            Require(g_TimerRegisterCount == 0, "timer example invalid prefix registered timer");
+            shutdown();
+            Require(g_TimerUnregisterCount == 0, "timer example invalid prefix unregistered timer");
+        }
+
+        const TimerOnlyGuardrailCase cases[] = {
+            {
+                "timer-short-api-before-timer-register",
+                static_cast<uint32_t>(offsetof(ObeliskApi, RegisterTimerWithOwnerTokenHandle)),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                0,
+            },
+            {
+                "timer-short-api-before-timer-unregister",
+                static_cast<uint32_t>(offsetof(ObeliskApi, OBELISK_CONCAT(Unregister, TimerWithOwnerToken))),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                false,
+                0,
+            },
+            {
+                "timer-short-context-before-owner-token",
+                sizeof(ObeliskApi),
+                static_cast<uint32_t>(offsetof(ObeliskPluginInitContext, plugin_owner_token)),
+                0,
+                false,
+                false,
+                false,
+                false,
+                0,
+            },
+            {
+                "timer-missing-capability",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                OBELISK_API_CAPABILITY_TIMERS,
+                false,
+                false,
+                false,
+                false,
+                0,
+            },
+            {
+                "timer-null-register-slot",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                true,
+                false,
+                false,
+                false,
+                0,
+            },
+            {
+                "timer-null-unregister-slot",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                true,
+                false,
+                false,
+                0,
+            },
+            {
+                "timer-zero-owner-token",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                true,
+                false,
+                0,
+            },
+            {
+                "timer-register-failure",
+                sizeof(ObeliskApi),
+                sizeof(ObeliskPluginInitContext),
+                0,
+                false,
+                false,
+                false,
+                true,
+                1,
+            },
+        };
+
+        for (const TimerOnlyGuardrailCase& testCase : cases)
+        {
+            ObeliskApi api{};
+            PopulateApi(api);
+            api.capabilities &= ~testCase.disabledCapability;
+            api.struct_size = testCase.apiStructSize;
+            if (testCase.nullTimerRegisterSlot)
+                api.RegisterTimerWithOwnerTokenHandle = nullptr;
+            if (testCase.nullTimerUnregisterSlot)
+                api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+
+            ObeliskPluginInitContext testContext = context;
+            testContext.struct_size = testCase.contextStructSize;
+            if (testCase.zeroOwnerToken)
+                testContext.plugin_owner_token = 0;
+
+            ResetFixtureObservations();
+            g_TimerRegistrationShouldFail = testCase.timerRegistrationFails;
+            Require(!init(&api, &testContext), testCase.name);
+            Require(g_RegisterCount == 0, "timer example registered ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0, "timer example registered gameplay callback");
+            Require(g_ChatMessageRegisterCount == 0, "timer example registered chat callback");
+            Require(g_TimerRegisterCount == testCase.timerRegistrations,
+                    "unexpected timer registration count in timer example guardrail");
+            Require(g_TimerCallback == nullptr, "timer example failed init left timer callback registered");
+            Require(g_TimerUserData == nullptr, "timer example failed init left timer user data registered");
+            shutdown();
+            Require(g_TimerUnregisterCount == 0, "timer example failed init unregistered failed timer handle");
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -1200,6 +1358,8 @@ int main(int argc, char** argv)
             RunDescriptorCatalogGuardrails(init, shutdown, context);
         if (std::strcmp(argv[2], "install_layout_descriptor_timer_consumer") == 0)
             RunDescriptorTimerGuardrails(init, shutdown, context);
+        if (std::strcmp(argv[2], "obelisk_sdk_timer_plugin") == 0)
+            RunTimerOnlyGuardrails(init, shutdown, context);
 
         ResetFixtureObservations();
         Require(init(&api, &context), "ObeliskPlugin_Init failed");

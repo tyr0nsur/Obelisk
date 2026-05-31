@@ -6,10 +6,18 @@
 #include <stdint.h>
 #include <string.h>
 
+#if defined(_WIN32)
+#define OBELISK_PLUGIN_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
+#define OBELISK_PLUGIN_EXPORT __attribute__((visibility("default")))
+#else
+#define OBELISK_PLUGIN_EXPORT
+#endif
+
 static ObeliskApi g_api;
 static bool g_has_api = false;
 static uint64_t g_owner_token = 0;
-static uint64_t g_timer_id = 0;
+static _Atomic uint64_t g_timer_id = 0;
 static uint64_t g_timer_user_data = 0x0B3115C001u;
 static atomic_bool g_timer_seen = false;
 
@@ -45,23 +53,25 @@ static void reset_state(void)
     memset(&g_api, 0, sizeof(g_api));
     g_has_api = false;
     g_owner_token = 0;
-    g_timer_id = 0;
+    atomic_store(&g_timer_id, 0);
     atomic_store(&g_timer_seen, false);
 }
 
 static void on_timer(uint64_t timer_id, void* user_data)
 {
-    if (timer_id == g_timer_id && user_data == &g_timer_user_data)
+    if (timer_id == atomic_load(&g_timer_id) && user_data == &g_timer_user_data)
         atomic_store(&g_timer_seen, true);
 }
 
-__attribute__((visibility("default")))
+#ifdef OBELISK_SDK_TIMER_PLUGIN_TEST_PROBES
+OBELISK_PLUGIN_EXPORT
 bool InstallLayoutConsumer_ScheduledCallbackSeen(void)
 {
     return atomic_load(&g_timer_seen);
 }
+#endif
 
-__attribute__((visibility("default")))
+OBELISK_PLUGIN_EXPORT
 bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
     if (out == NULL)
@@ -77,7 +87,7 @@ bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
     return true;
 }
 
-__attribute__((visibility("default")))
+OBELISK_PLUGIN_EXPORT
 bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
     if (!has_timer_api(api) || !has_init_context(context))
@@ -89,29 +99,31 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
     g_owner_token = context->plugin_owner_token;
     atomic_store(&g_timer_seen, false);
 
-    g_timer_id = g_api.RegisterTimerWithOwnerTokenHandle(
+    const uint64_t timer_id = g_api.RegisterTimerWithOwnerTokenHandle(
         g_owner_token,
         1000,
         1000,
         OBELISK_TIMER_FLAG_REPEATING,
         on_timer,
         &g_timer_user_data);
-    if (g_timer_id == 0)
+    if (timer_id == 0)
     {
         reset_state();
         return false;
     }
+    atomic_store(&g_timer_id, timer_id);
 
     if (g_api.LogInfo != NULL)
         g_api.LogInfo("[obelisk_sdk_timer_plugin] timer registered");
     return true;
 }
 
-__attribute__((visibility("default")))
+OBELISK_PLUGIN_EXPORT
 void ObeliskPlugin_Shutdown(void)
 {
-    if (g_has_api && g_timer_id != 0 && g_api.UnregisterTimerWithOwnerToken != NULL)
-        g_api.UnregisterTimerWithOwnerToken(g_owner_token, g_timer_id);
+    const uint64_t timer_id = atomic_exchange(&g_timer_id, 0);
+    if (g_has_api && timer_id != 0 && g_api.UnregisterTimerWithOwnerToken != NULL)
+        g_api.UnregisterTimerWithOwnerToken(g_owner_token, timer_id);
     if (g_has_api && g_api.LogInfo != NULL)
         g_api.LogInfo("[obelisk_sdk_timer_plugin] shutdown");
     reset_state();
