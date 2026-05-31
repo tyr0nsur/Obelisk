@@ -14,6 +14,15 @@ It does not use `ProcessEvent`, gameplay events, new gameplay APIs, chat events,
 UE pointers, identity, lookup, mutation, return overrides, chat replies/send-chat, ArkApi
 compatibility, or private Obelisk headers.
 
+In a real Obelisk load, the runtime evaluates the plugin activation envelope before
+calling `ObeliskPlugin_Init`: `enabled=false`, a missing or non-matching
+`instance_allowlist`, or an unsafe allowlist prevents the plugin from initializing. This
+minimal example does not parse config itself and must not be copied as the activation
+model for feature plugins. Once a plugin uses an optional surface such as events or
+timers, follow the reference plugins by checking capabilities, validating
+`plugin_owner_token`, keeping returned handles, and unregistering owned runtime state
+during shutdown or init-failure cleanup.
+
 The example intentionally uses the installed SDK package and the current numeric
 compatibility floor:
 

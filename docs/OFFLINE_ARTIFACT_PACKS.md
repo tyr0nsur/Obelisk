@@ -12,6 +12,12 @@ An artifact pack is a directory container with a normalized
 JSON manifests, reports, consume-gate outputs, comparison outputs, and other payload
 files. The pack container is evidence packaging, not a promotion result.
 
+Reflection inventory packs are separate UFunction planning inputs with their own
+`manifest.json` and `schema: obelisk.reflection-inventory-pack.v1`. Do not pass or cite
+an `artifact-pack.manifest.json` container manifest, normalized artifact-pack root, or
+`obelisk.scriptstruct-inventory-pack.v1` ScriptStruct pack as a reflection inventory
+pack; the player-identity readiness preflight rejects those shapes before acceptance.
+
 Consume-mode acceptance means the pack is hygienic enough to cite as offline evidence for
 the exact scope recorded by its child manifests. It does not promote public SDK APIs,
 object identity, lookup, raw UE pointers, mutation, return overrides, runtime hooks, or

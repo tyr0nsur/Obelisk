@@ -1074,6 +1074,47 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(normalized(term), compatibility)
 
+    def test_pre_identity_plugin_hub_production_seeds_stay_limited_to_core_primitives(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        production_seed_ids = {
+            "obelisk.lifecycle_config_logging.v1",
+            "obelisk.descriptors.v1",
+            "obelisk.process_local_timers.v1",
+        }
+        experimental_ids = {
+            "obelisk.chat_message.v1",
+            "obelisk.chat.local_routing.v1",
+            "obelisk.gameplay_policy_event.v1",
+            "obelisk.inventory_item_copied_signals.v1",
+        }
+
+        self.assertEqual(set(manifest["promoted_surfaces"]), production_seed_ids)
+        self.assertEqual(
+            {
+                surface["id"]
+                for surface in manifest["surfaces"]
+                if surface.get("support_tier") == "production seed"
+            },
+            production_seed_ids,
+        )
+        self.assertIn("obelisk.player_identity.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertNotIn("obelisk.player_identity.v1", manifest["promoted_surfaces"])
+        for surface_id in production_seed_ids:
+            with self.subTest(surface=surface_id):
+                self.assertEqual(surfaces[surface_id]["status"], "promoted")
+        for surface_id in experimental_ids:
+            with self.subTest(surface=surface_id):
+                self.assertEqual(surfaces[surface_id]["status"], "promoted-experimental-only")
+                self.assertNotIn(surface_id, manifest["promoted_surfaces"])
+
+        release_guardrails = normalized(" ".join(manifest["release_guardrails"]))
+        for term in (
+            "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers",
+            "passive chat parsing and plugin-local routing remain promoted-experimental-only",
+        ):
+            self.assertIn(normalized(term), release_guardrails)
+
     def test_public_sdk_surfaces_manifest_keeps_chat_and_gameplay_experimental_bounds(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -2559,6 +2600,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 with self.subTest(path=relative, token=token):
                     self.assertIn(token, text)
 
+        minimal_readme_normalized = re.sub(r"\s+", " ", minimal_readme)
+        for token in (
+            "the runtime evaluates the plugin activation envelope before calling `ObeliskPlugin_Init`",
+            "minimal example does not parse config itself",
+            "must not be copied as the activation model for feature plugins",
+            "validating `plugin_owner_token`",
+            "unregistering owned runtime state",
+        ):
+            with self.subTest(path="examples/sdk_minimal_plugin/README.md", token=token):
+                self.assertIn(token, minimal_readme_normalized)
+
         self.assertIn("#include <obelisk/ObeliskApi.h>", minimal_source)
         for token in (
             '#include "',
@@ -2621,6 +2673,28 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(file="plugins/oBaseEvents/oBaseEvents.cpp", token=token):
                 self.assertIn(token, obase)
+
+    def test_obaseevents_raw_process_event_guardrail_stays_in_release_tests(self) -> None:
+        cmake = (REPO_ROOT / "tests" / "sdk_consumer" / "CMakeLists.txt").read_text(encoding="utf-8")
+        fixture = (REPO_ROOT / "tests" / "sdk_consumer" / "SdkConsumerFixture.cpp").read_text(
+            encoding="utf-8"
+        )
+
+        for token in (
+            "SdkConsumerFixtureOBaseEventsActiveProcessEventNoFilteredCapability",
+            "SdkConsumerFixtureOBaseEventsActiveProcessEventShortApi",
+        ):
+            with self.subTest(file="tests/sdk_consumer/CMakeLists.txt", token=token):
+                self.assertIn(token, cmake)
+
+        for token in (
+            "active-process-event-no-filtered-capability",
+            "active-process-event-short-api-before-process-event-handles",
+            "oBaseEvents accepted unavailable filtered ProcessEvent handle API",
+            "oBaseEvents registered ProcessEvent with unavailable API",
+        ):
+            with self.subTest(file="tests/sdk_consumer/SdkConsumerFixture.cpp", token=token):
+                self.assertIn(token, fixture)
 
     def test_public_sdk_consumers_guard_append_only_api_slots(self) -> None:
         metadata_guard = "api->struct_size < offsetof(ObeliskApi, capabilities) + sizeof(api->capabilities)"

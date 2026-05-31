@@ -125,7 +125,7 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertEqual(self.reason_codes(payload), {"missing_reflection_inventory_pack"})
 
-    def test_schema_mismatch_fails_closed_when_only_non_matching_manifest_exists(self) -> None:
+    def test_scriptstruct_pack_fails_closed_when_only_non_matching_manifest_exists(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             pack = root / "scriptstruct-pack"
@@ -138,7 +138,27 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
             result = self.run_checker(["--root", str(root)], check=False)
 
         payload = json.loads(result.stdout)
-        self.assertEqual(self.reason_codes(payload), {"missing_reflection_inventory_pack", "schema_mismatch"})
+        self.assertEqual(
+            self.reason_codes(payload),
+            {"missing_reflection_inventory_pack", "scriptstruct_pack_not_reflection_inventory"},
+        )
+
+    def test_artifact_pack_container_manifest_cannot_be_used_as_reflection_inventory_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "container"
+            self.write_pack(pack)
+            (pack / "manifest.json").rename(pack / "artifact-pack.manifest.json")
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        self.assertIsNone(payload["accepted_pack"])
+        self.assertEqual(
+            self.reason_codes(payload),
+            {"artifact_pack_container_not_reflection_inventory", "missing_reflection_inventory_pack"},
+        )
 
     def test_missing_ufunction_inventory_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

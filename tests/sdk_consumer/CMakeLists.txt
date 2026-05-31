@@ -115,6 +115,16 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOBaseEventsActiveProcessEventNoFilteredCapability
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-process-event-no-filtered-capability
+)
+
+add_test(
+    NAME SdkConsumerFixtureOBaseEventsActiveProcessEventShortApi
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-process-event-short-api-before-process-event-handles
+)
+
+add_test(
     NAME SdkConsumerFixtureOBaseEventsChatCommandHelper
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oBaseEvents>" oBaseEvents active-chat-command-helper
 )
@@ -215,6 +225,11 @@ add_test(
 )
 
 add_test(
+    NAME SdkConsumerFixtureOProcessTimerRejectsUnsafeInstanceAllowlist
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oProcessTimer>" oProcessTimer unsafe-instance-allowlist
+)
+
+add_test(
     NAME SdkConsumerFixtureODescriptorCatalog
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog
 )
@@ -257,6 +272,11 @@ add_test(
 add_test(
     NAME SdkConsumerFixtureODescriptorCatalogInvalidConfig
     COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog invalid-descriptor-catalog-config
+)
+
+add_test(
+    NAME SdkConsumerFixtureODescriptorCatalogRejectsUnsafeInstanceAllowlist
+    COMMAND sdk_consumer_fixture "$<TARGET_FILE:oDescriptorCatalog>" oDescriptorCatalog unsafe-instance-allowlist
 )
 
 if(TARGET oPolicyAudit)

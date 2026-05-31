@@ -23,6 +23,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 REPORT_SCHEMA = "obelisk.reflection-inventory-pack-readiness-check.v1"
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
+SCRIPTSTRUCT_PACK_SCHEMA = "obelisk.scriptstruct-inventory-pack.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 PLAYER_IDENTITY_TARGETS = tuple(
     schema_target_list(PLAYER_IDENTITY_TARGET_SET, "obelisk.ufunction-chain.snapshot.v1")
@@ -40,7 +41,8 @@ REDACTED_FUNCTION_KEYS = {
     "outer_name",
     "parms_size",
 }
-MANIFEST_FILENAMES = {"manifest.json", "artifact-pack.manifest.json"}
+ARTIFACT_PACK_MANIFEST_FILENAME = "artifact-pack.manifest.json"
+MANIFEST_FILENAMES = {"manifest.json", ARTIFACT_PACK_MANIFEST_FILENAME}
 MAX_REASON_ITEMS = 20
 MAX_INVENTORY_ROW_BLOCKERS = 20
 
@@ -396,29 +398,54 @@ def build_report(root: Path, max_depth: int) -> dict[str, object]:
             "non_claims": non_claims(),
         }
 
+    artifact_pack_container_paths: list[str] = []
+    scriptstruct_pack_paths: list[str] = []
     schema_mismatch_paths: list[str] = []
     candidate_packs: list[dict[str, object]] = []
     for manifest_path in manifest_paths:
         payload, error = load_json(manifest_path)
         if payload is None:
             continue
+        if manifest_path.name == ARTIFACT_PACK_MANIFEST_FILENAME:
+            artifact_pack_container_paths.append(str(manifest_path))
+            continue
+        if payload.get("schema") == SCRIPTSTRUCT_PACK_SCHEMA:
+            scriptstruct_pack_paths.append(str(manifest_path))
+            continue
         if payload.get("schema") != PACK_SCHEMA:
             schema_mismatch_paths.append(str(manifest_path))
             continue
         candidate_packs.append(evaluate_pack(manifest_path, payload))
 
+    non_candidate_reasons: list[dict[str, object]] = []
+    if artifact_pack_container_paths:
+        non_candidate_reasons.append(
+            reason(
+                "artifact_pack_container_not_reflection_inventory",
+                **bounded_list_fields("scanned_paths", artifact_pack_container_paths),
+            )
+        )
+    if scriptstruct_pack_paths:
+        non_candidate_reasons.append(
+            reason(
+                "scriptstruct_pack_not_reflection_inventory",
+                **bounded_list_fields("scanned_paths", scriptstruct_pack_paths),
+            )
+        )
+    if schema_mismatch_paths:
+        non_candidate_reasons.append(
+            reason("schema_mismatch", **bounded_list_fields("scanned_paths", schema_mismatch_paths))
+        )
+
     accepted = next((pack for pack in candidate_packs if pack["ready"]), None)
     if accepted:
         reasons: list[dict[str, object]] = []
     elif candidate_packs:
-        reasons = []
+        reasons = list(non_candidate_reasons)
         for pack in candidate_packs:
             reasons.extend(pack["reasons"])  # type: ignore[arg-type]
     elif manifest_paths:
-        reasons = [
-            reason("missing_reflection_inventory_pack", root=str(root)),
-            reason("schema_mismatch", **bounded_list_fields("scanned_paths", schema_mismatch_paths)),
-        ]
+        reasons = [reason("missing_reflection_inventory_pack", root=str(root)), *non_candidate_reasons]
     else:
         reasons = [reason("missing_reflection_inventory_pack", root=str(root))]
 

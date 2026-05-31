@@ -132,6 +132,9 @@ Default generated config:
 
 The callback stays disabled unless both `enabled` and `process_event.enabled` are `true`
 and `process_event.filtered_function_index` is a validated non-negative `FName` index.
+Active config is not enough: the runtime must also advertise the filtered ProcessEvent
+callback capability and the owner-token handle slots, or the plugin fails closed before
+registering any callback.
 When enabled on more than one server instance, each ARK process receives its own callback
 registration handle and unregisters that process-local handle during plugin shutdown.
 

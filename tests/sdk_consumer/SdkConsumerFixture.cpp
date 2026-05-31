@@ -767,7 +767,10 @@ int main(int argc, char** argv)
         Require(std::strcmp(metadata.config_file, "config.json") == 0, "config file mismatch");
         Require(metadata.default_config_json != nullptr, "missing default config");
         const char* configJson = metadata.default_config_json;
-        if (mode == "active-process-event" || mode == "callback-throw-log")
+        if (mode == "active-process-event" ||
+            mode == "active-process-event-no-filtered-capability" ||
+            mode == "active-process-event-short-api-before-process-event-handles" ||
+            mode == "callback-throw-log")
             configJson = kActiveOBaseEventsConfig;
         else if (mode == "active-chat-command-helper" ||
             mode == "active-chat-command-helper-no-chat-capability" ||
@@ -845,8 +848,9 @@ int main(int argc, char** argv)
         api.struct_size = sizeof(ObeliskApi);
         api.capabilities = OBELISK_API_CAPABILITY_PLUGIN_OWNED_CALLBACKS |
             OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS |
-            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES |
-            OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS;
+            OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES;
+        if (mode != "active-process-event-no-filtered-capability")
+            api.capabilities |= OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS;
         api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle =
             RegisterNamedProcessEventWithOwnerTokenHandle;
         api.UnregisterProcessEventCallbackWithOwnerToken =
@@ -894,6 +898,15 @@ int main(int argc, char** argv)
             api.UnregisterChatMessageEventWithOwnerToken = nullptr;
             api.RegisterTimerWithOwnerTokenHandle = nullptr;
             api.OBELISK_CONCAT(Unregister, TimerWithOwnerToken) = nullptr;
+        }
+        if (mode == "active-process-event-short-api-before-process-event-handles")
+        {
+            api.struct_size = offsetof(ObeliskApi, RegisterPreProcessEventForNameIndexWithOwnerTokenHandle);
+            api.RegisterPreProcessEventWithOwnerTokenHandle = nullptr;
+            api.RegisterPostProcessEventWithOwnerTokenHandle = nullptr;
+            api.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle = nullptr;
+            api.RegisterPostProcessEventForNameIndexWithOwnerTokenHandle = nullptr;
+            api.UnregisterProcessEventCallbackWithOwnerToken = nullptr;
         }
         if (mode == "active-policy-audit-short-api-before-gameplay-policy")
         {
@@ -1100,6 +1113,21 @@ int main(int argc, char** argv)
             Require(!initSucceeded, "active timer example accepted missing or too-short timer API");
             Require(g_TimerRegisterCount == 0, "timer example unexpectedly registered with unavailable timer API");
             Require(g_TimerUnregisterCount == 0, "timer example unexpectedly unregistered with unavailable timer API");
+            cleanupConfigDir();
+            closeHandle();
+            return 0;
+        }
+        if (std::strcmp(expectedPluginId, "oBaseEvents") == 0 &&
+            (mode == "active-process-event-no-filtered-capability" ||
+             mode == "active-process-event-short-api-before-process-event-handles"))
+        {
+            Require(!initSucceeded, "oBaseEvents accepted unavailable filtered ProcessEvent handle API");
+            Require(g_RegisterCount == 0, "oBaseEvents registered ProcessEvent with unavailable API");
+            Require(g_UnregisterCount == 0, "oBaseEvents unregistered ProcessEvent with unavailable API");
+            Require(g_ChatMessageRegisterCount == 0,
+                "oBaseEvents registered chat callback after ProcessEvent API rejection");
+            Require(g_TimerRegisterCount == 0,
+                "oBaseEvents registered timer after ProcessEvent API rejection");
             cleanupConfigDir();
             closeHandle();
             return 0;
@@ -1349,9 +1377,14 @@ int main(int argc, char** argv)
         }
         if (mode == "unsafe-instance-allowlist")
         {
-            Require(!initSucceeded, "oBaseEvents accepted unsafe instance_allowlist entry");
-            Require(g_RegisterCount == 0, "rejected oBaseEvents unexpectedly registered a callback");
-            Require(g_UnregisterCount == 0, "rejected oBaseEvents unexpectedly unregistered a callback");
+            Require(!initSucceeded, "plugin accepted unsafe instance_allowlist entry");
+            Require(g_RegisterCount == 0, "rejected plugin unexpectedly registered a ProcessEvent callback");
+            Require(g_UnregisterCount == 0, "rejected plugin unexpectedly unregistered a ProcessEvent callback");
+            Require(g_GameplayPolicyRegisterCount == 0,
+                "rejected plugin unexpectedly registered a gameplay policy callback");
+            Require(g_ChatMessageRegisterCount == 0,
+                "rejected plugin unexpectedly registered a chat callback");
+            Require(g_TimerRegisterCount == 0, "rejected plugin unexpectedly registered a timer");
             cleanupConfigDir();
             closeHandle();
             return 0;
