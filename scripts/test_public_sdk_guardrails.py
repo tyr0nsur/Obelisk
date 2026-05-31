@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import runpy
@@ -23,6 +24,7 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "README.md",
     REPO_ROOT / "CONTRIBUTING.md",
     REPO_ROOT / "CHANGELOG.md",
+    REPO_ROOT / "docs" / "README.md",
     REPO_ROOT / "docs" / "ARCHITECTURE.md",
     REPO_ROOT / "docs" / "INSTALL.md",
     REPO_ROOT / "docs" / "OPERATOR_CLI.md",
@@ -382,23 +384,34 @@ EXPERIMENTAL_EVENT_V1_COMPLETION_WINDOW = 14
 BROAD_V1_COMPLETION_CLAIM_FILES = [
     *PUBLIC_SDK_GUIDANCE_DOC_FILES,
     PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+    REPO_ROOT / "examples" / "README.md",
+    REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
+    REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
     REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md",
 ]
 BROAD_V1_COMPLETION_POSITIVE_RE = re.compile(
     r"\b(?:"
     r"(?:v1(?:\.0)?\s+stable|v1[- ]?0\s+stable).{0,80}"
     r"(?:available|complete|delivered|for\s+production|production[- ]ready|ready|released|shipped|supported)|"
-    r"(?:complete|full|production[- ]ready)\s+(?:public\s+)?SDK.{0,80}"
+    r"(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK|"
+    r"(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK.{0,80}"
     r"(?:available|delivered|production[- ]ready|ready|released|shipped|supported|today|use)|"
     r"(?:available|delivered|ready|released|shipped|supported|use).{0,80}"
-    r"(?:complete|full|production[- ]ready)\s+(?:public\s+)?SDK"
+    r"(?:complete|full|production[- ]ready)\s+(?:public\s+)?SDK|"
+    r"(?:stable[- ]?(?:v1|v1-0|1-0|1\.0)|(?:v1|v1-0|1-0|1\.0)[- ]?stable).{0,24}(?:public\s+|plugin\s+)?SDK|"
+    r"(?:v1|v1-0|1-0|1\.0)\s+(?:public\s+|plugin\s+)?SDK.{0,48}"
+    r"(?:available|complete|production[- ]ready|ready|released|shipped|supported)|"
+    r"(?:SDK|public\s+SDK|plugin\s+SDK).{0,24}(?:v1|v1-0|1-0|1\.0).{0,48}"
+    r"(?:available|complete|production[- ]ready|ready|released|shipped|stable|supported)|"
+    r"GA\s+(?:public\s+|plugin\s+)?SDK|"
+    r"all\s+v1\s+(?:SDK\s+)?surfaces\s+are\s+available"
     r")\b",
     re.IGNORECASE,
 )
 BROAD_V1_COMPLETION_NEGATED_RE = re.compile(
     r"\b(?:"
-    r"blocked|candidate|candidate-only|claim|definition|does\s+not|do\s+not|foundation|"
-    r"intended|must\s+mean|must\s+not|no|not|planning|post-v1|rc|scanned|toward|track|unless|until|without"
+    r"blocked|candidate|candidate-only|definition|does\s+not|do\s+not|foundation|"
+    r"intended|must\s+mean|must\s+not|no|not|planning|post-v1|prevent|prevents|rc|scanned|toward|track|unless|until|without"
     r")\b",
     re.IGNORECASE,
 )
@@ -1043,6 +1056,8 @@ def experimental_event_v1_completion_claims(text: str, relative_path: str) -> li
 def broad_v1_completion_claims(text: str, relative_path: str) -> list[str]:
     offenders: list[str] = []
     scan_text = re.sub(r"\bv1\.0\b", "v1-0", text)
+    scan_text = re.sub(r"\b1\.0\b", "1-0", scan_text)
+    scan_text = re.sub(r"(?<!\n)\n(?!\n)", " ", scan_text)
 
     for segment_start, segment in sentence_like_segments(scan_text):
         if not BROAD_V1_COMPLETION_POSITIVE_RE.search(segment):
@@ -3297,6 +3312,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "The full SDK has shipped.",
             "The production-ready public SDK is released.",
             "Server owners can use the complete public SDK today.",
+            "Obelisk stable v1 SDK is ready.",
+            "Obelisk v1 SDK is complete.",
+            "SDK v1 is production-ready.",
+            "The GA SDK is published.",
+            "The 1.0 stable SDK is ready.",
+            "The full plugin SDK is supported.",
+            "All v1 surfaces are available.",
+            "SDK v1.0: stable.",
+            "The stable-v1 SDK is available.",
+            "This is a production ready SDK.",
+            "We claim the complete SDK is available.",
+            "Release notes claim the full plugin SDK has shipped.",
         ]
         allowed = [
             "Obelisk is moving toward a complete SDK.",
@@ -3304,6 +3331,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "This is not a complete SDK claim.",
             "The complete SDK remains blocked until the v1 checker allows the claim.",
             "This RC foundation is not v1.0 stable.",
+            "Policy docs must not claim `complete SDK` before the gate passes.",
+            "The v1 SDK complete route remains planning-only.",
         ]
 
         for text in forbidden:
@@ -6030,6 +6059,80 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for path in (v1_map_path, readme_path):
             with self.subTest(file=path.relative_to(REPO_ROOT).as_posix()):
                 self.assertIn(plan_path.name, path.read_text(encoding="utf-8"))
+
+    def test_player_identity_static_orientation_json_stays_candidate_blocked(self) -> None:
+        note_path = REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-static-target-orientation.md"
+        manifest_path = REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-static-target-orientation.json"
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["schema"], "obelisk.player-identity-static-target-orientation.v1")
+        self.assertEqual(payload["artifact_identity"]["source_note"], str(note_path.relative_to(REPO_ROOT)))
+        self.assertEqual(
+            payload["artifact_identity"]["source_note_sha256"],
+            hashlib.sha256(note_path.read_bytes()).hexdigest(),
+        )
+        self.assertRegex(payload["scope"]["binary_sha256"], r"^[0-9a-f]{64}$")
+        self.assertIn("address_convention", payload["scope"])
+        self.assertEqual(payload["scope"]["target_set"], "players-identity-lifecycle-intake")
+        self.assertEqual(payload["gate"]["mode"], "consume")
+        self.assertEqual(payload["gate"]["status"], "candidate_blocked")
+        self.assertIs(payload["gate"]["promotion_ready"], False)
+
+        expected_targets = {
+            target.split(":", 1)[1]
+            for target in TARGET_SETS["players-identity-lifecycle-intake"]
+        }
+        observed_targets = {candidate["target"] for candidate in payload["candidates"]}
+        self.assertEqual(observed_targets, expected_targets)
+        forbidden_tokens = re.compile(
+            r"\b(?:accepted|callback|identity_resolved|mutation|promoted|public_sdk|"
+            r"resource_handle|return_override|runtime_observed)\b",
+            re.IGNORECASE,
+        )
+        for candidate in payload["candidates"]:
+            with self.subTest(target=candidate["target"]):
+                self.assertEqual(candidate["kind"], "ufunction_static_orientation")
+                self.assertEqual(candidate["status"], "candidate_only")
+                self.assertIn(candidate["confidence"], {"candidate", "clue"})
+                self.assertRegex(candidate["class_slot"], r"^0x[0-9a-f]+$")
+                self.assertEqual(candidate["registrar_call_vma"], "0x1ccc140")
+                self.assertRegex(candidate["registration_vma"], r"^0x[0-9a-f]+$")
+                self.assertIn(candidate["registration_vma"], candidate["xref_vmas"])
+                self.assertRegex(candidate["string_vma"], r"^0x[0-9a-f]+$")
+                self.assertGreaterEqual(len(candidate["xref_vmas"]), 1)
+                self.assertGreaterEqual(len(candidate["thunk_candidates"]), 1)
+                self.assertIsNone(forbidden_tokens.search(json.dumps(candidate, sort_keys=True)))
+
+        for non_claim in (
+            "does_not_prove_ufunction_object_identity",
+            "does_not_prove_property_chain_or_param_offsets",
+            "does_not_promote_public_sdk",
+            "does_not_promote_public_callbacks_or_observers",
+            "does_not_authorize_runtime_observation_or_server_probe",
+            "does_not_promote_runtime_identity",
+            "does_not_promote_permissions_or_commands",
+            "does_not_prove_player_principal_mapping",
+            "does_not_prove_controller_or_playerstate_lifetime",
+            "does_not_prove_privacy_safe_identity_surface",
+            "does_not_promote_object_lookup_or_raw_ue_pointer_exposure",
+            "does_not_promote_lifecycle_anchor_acceptance",
+            "does_not_promote_resource_handle",
+            "does_not_promote_mutation",
+            "does_not_promote_return_override",
+            "does_not_claim_login_logout_lifecycle",
+            "does_not_satisfy_core_evidence_pack_or_reflection_inventory_pack",
+        ):
+            with self.subTest(non_claim=non_claim):
+                self.assertIn(non_claim, payload["non_claims"])
+
+        for blocker in (
+            "requires_non_protected_core_evidence_pack",
+            "requires_full_reflection_inventory_pack_for_players_identity_lifecycle_intake",
+            "requires_exact_focal_snapshots_for_ServerListPlayers_and_ServerKickPlayer",
+            "requires_principal_privacy_and_invalidation_policy_before_public_sdk_promotion",
+        ):
+            with self.subTest(blocker=blocker):
+                self.assertIn(blocker, payload["blockers"])
 
     def test_player_identity_next_step_requires_non_protected_ufunction_inventory_pack(self) -> None:
         current_path = REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md"

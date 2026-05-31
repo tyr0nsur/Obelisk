@@ -34,6 +34,23 @@ core evidence pack or reflection inventory pack.
 | `MissionType.BPAllowPlayerToLeaveMission` | string `0x3d65dfb` -> VMA `0x4165dfb`; xref `0x1386fe5`; thunk candidate `0x156c560` | Medium | Candidate-only. |
 | `MissionType.BPOnPlayerRemovedFromMission` | string `0x3d66098` -> VMA `0x4166098`; xref `0x1387654`; thunk candidate `0x156df30` | Medium | No accepted session-end/logout semantics. |
 
+## Static Corroboration Pattern
+
+A second cheap static pass found the same 12 functions in registration-like sequences:
+
+```text
+mov rdi, [class_slot]
+mov esi, <ascii_function_name_addr>
+mov edx, <native_exec_thunk_addr>
+call 0x1ccc140
+```
+
+The useful orientation signal is the tuple `class_slot + name + thunk + registrar call`.
+Name-only matching is ambiguous for at least `AllowTribeGroupPermission` and `IsInTribe`,
+which also appear near a `ShooterPlayerState`-like class slot. The machine-readable
+companion JSON records the selected class slots and `registrar_call_vma=0x1ccc140` for
+each target, but remains `candidate_blocked`.
+
 ## Repro Commands
 
 ```bash

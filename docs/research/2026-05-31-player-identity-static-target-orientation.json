@@ -5,7 +5,7 @@
     "produced_at": "2026-05-31T10:05:13Z",
     "producer": "manual-research-normalizer",
     "source_note": "docs/research/2026-05-31-player-identity-static-target-orientation.md",
-    "source_note_sha256": "6ac8b00385c458369d695c2c6f7af35052ddc6a0ecf0c8debe5878c0816d650a"
+    "source_note_sha256": "ba753c7a4bfff676c0627b5bd8f4711bbb0b5b72e14c202600587f799229afbe"
   },
   "gate": {
     "mode": "consume",
@@ -23,152 +23,248 @@
       "id": "ShooterPlayerController.ServerListPlayers",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.ServerListPlayers",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d632eb",
       "string_vma": "0x41632eb",
-      "xref_vmas": ["0x1368fa9"],
-      "thunk_candidates": ["0x1547450"],
+      "xref_vmas": [
+        "0x1368fa9"
+      ],
+      "thunk_candidates": [
+        "0x1547450"
+      ],
       "static_hint": "registration-like mov esi string; mov edx thunk; call pattern",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1368fa9"
     },
     {
       "id": "ShooterPlayerController.ServerKickPlayer",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.ServerKickPlayer",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d632da",
       "string_vma": "0x41632da",
-      "xref_vmas": ["0x1368f6c"],
-      "thunk_candidates": ["0x1547320"],
+      "xref_vmas": [
+        "0x1368f6c"
+      ],
+      "thunk_candidates": [
+        "0x1547320"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1368f6c"
     },
     {
       "id": "ShooterPlayerController.ServerSendChatMessage",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.ServerSendChatMessage",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d638f1",
       "string_vma": "0x41638f1",
-      "xref_vmas": ["0x1369d01"],
-      "thunk_candidates": ["0x154a600"],
+      "xref_vmas": [
+        "0x1369d01"
+      ],
+      "thunk_candidates": [
+        "0x154a600"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1369d01"
     },
     {
       "id": "ShooterPlayerController.ServerRequestTribeLog",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.ServerRequestTribeLog",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d63853",
       "string_vma": "0x4163853",
-      "xref_vmas": ["0x1369b56"],
-      "thunk_candidates": ["0x1549ef0"],
+      "xref_vmas": [
+        "0x1369b56"
+      ],
+      "thunk_candidates": [
+        "0x1549ef0"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1369b56"
     },
     {
       "id": "ShooterPlayerController.AllowTribeGroupPermission",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.AllowTribeGroupPermission",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d610f3",
       "string_vma": "0x41610f3",
-      "xref_vmas": ["0x135f14e", "0x1364921"],
-      "thunk_candidates": ["0x1535570", "0x153a140"],
+      "xref_vmas": [
+        "0x135f14e",
+        "0x1364921"
+      ],
+      "thunk_candidates": [
+        "0x1535570",
+        "0x153a140"
+      ],
       "static_hint": "multiple registration-like xrefs; overload or duplicate role unresolved",
       "confidence": "clue",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1364921"
     },
     {
       "id": "ShooterPlayerController.IsInTribe",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.IsInTribe",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d612e6",
       "string_vma": "0x41612e6",
-      "xref_vmas": ["0x135f6c9", "0x13679bd"],
-      "thunk_candidates": ["0x15365b0", "0x1543e10"],
+      "xref_vmas": [
+        "0x135f6c9",
+        "0x13679bd"
+      ],
+      "thunk_candidates": [
+        "0x15365b0",
+        "0x1543e10"
+      ],
       "static_hint": "multiple registration-like xrefs; overload or duplicate role unresolved",
       "confidence": "clue",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x13679bd"
     },
     {
       "id": "ShooterPlayerController.ClientReceiveMyTribeOnlineList",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.ClientReceiveMyTribeOnlineList",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d620d9",
       "string_vma": "0x41620d9",
-      "xref_vmas": ["0x1365c31"],
-      "thunk_candidates": ["0x153e780"],
+      "xref_vmas": [
+        "0x1365c31"
+      ],
+      "thunk_candidates": [
+        "0x153e780"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1365c31"
     },
     {
       "id": "ShooterPlayerController.ClientReceiveActiveMissionTags",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerController.ClientReceiveActiveMissionTags",
+      "class_slot": "0x58eebf0",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d62084",
       "string_vma": "0x4162084",
-      "xref_vmas": ["0x1365b7a"],
-      "thunk_candidates": ["0x153e390"],
+      "xref_vmas": [
+        "0x1365b7a"
+      ],
+      "thunk_candidates": [
+        "0x153e390"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1365b7a"
     },
     {
       "id": "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
       "kind": "ufunction_static_orientation",
       "target": "ShooterPlayerState.ServerRequestSpawnPointsForDownloadedCharacters",
+      "class_slot": "0x58eeb80",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d61762",
       "string_vma": "0x4161762",
-      "xref_vmas": ["0x136008e"],
-      "thunk_candidates": ["0x1537ff0"],
+      "xref_vmas": [
+        "0x136008e"
+      ],
+      "thunk_candidates": [
+        "0x1537ff0"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x136008e"
     },
     {
       "id": "MissionType.AddPlayerToMission",
       "kind": "ufunction_static_orientation",
       "target": "MissionType.AddPlayerToMission",
+      "class_slot": "0x58f0018",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d65dbf",
       "string_vma": "0x4165dbf",
-      "xref_vmas": ["0x1386f2e"],
-      "thunk_candidates": ["0x156c280"],
+      "xref_vmas": [
+        "0x1386f2e"
+      ],
+      "thunk_candidates": [
+        "0x156c280"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1386f2e"
     },
     {
       "id": "MissionType.BPAllowPlayerToLeaveMission",
       "kind": "ufunction_static_orientation",
       "target": "MissionType.BPAllowPlayerToLeaveMission",
+      "class_slot": "0x58f0018",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d65dfb",
       "string_vma": "0x4165dfb",
-      "xref_vmas": ["0x1386fe5"],
-      "thunk_candidates": ["0x156c560"],
+      "xref_vmas": [
+        "0x1386fe5"
+      ],
+      "thunk_candidates": [
+        "0x156c560"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1386fe5"
     },
     {
       "id": "MissionType.BPOnPlayerRemovedFromMission",
       "kind": "ufunction_static_orientation",
       "target": "MissionType.BPOnPlayerRemovedFromMission",
+      "class_slot": "0x58f0018",
+      "registrar_call_vma": "0x1ccc140",
       "string_file_offset": "0x3d66098",
       "string_vma": "0x4166098",
-      "xref_vmas": ["0x1387654"],
-      "thunk_candidates": ["0x156df30"],
+      "xref_vmas": [
+        "0x1387654"
+      ],
+      "thunk_candidates": [
+        "0x156df30"
+      ],
       "static_hint": "registration-like xref to target name string",
       "confidence": "candidate",
-      "status": "candidate_only"
+      "status": "candidate_only",
+      "registration_vma": "0x1387654"
     }
   ],
   "non_claims": [
     "does_not_prove_ufunction_object_identity",
     "does_not_prove_property_chain_or_param_offsets",
+    "does_not_promote_public_sdk",
+    "does_not_promote_public_callbacks_or_observers",
+    "does_not_authorize_runtime_observation_or_server_probe",
     "does_not_promote_runtime_identity",
     "does_not_promote_permissions_or_commands",
+    "does_not_prove_player_principal_mapping",
+    "does_not_prove_controller_or_playerstate_lifetime",
+    "does_not_prove_privacy_safe_identity_surface",
+    "does_not_promote_object_lookup_or_raw_ue_pointer_exposure",
+    "does_not_promote_lifecycle_anchor_acceptance",
     "does_not_promote_resource_handle",
     "does_not_promote_mutation",
     "does_not_promote_return_override",
