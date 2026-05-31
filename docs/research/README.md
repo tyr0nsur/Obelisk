@@ -3,6 +3,11 @@
 This directory stores reproducible investigation notes for Obelisk runtime, UE4 reflection,
 ARK server operations, and plugin experiments.
 
+Routing authority: `docs/agent-handoff/CURRENT.md` is the source of truth for active
+agent routing, current next steps, and any lead-approved priority changes. This README is
+a research index and evidence map only; it must not be used to override CURRENT.md,
+authorize release/publication work, or recenter the active route on an older module lane.
+
 Notes written before `OBELISK_INSTANCE_ID` may mention obsolete map-based marker files and
 root-level map logs. New research should record the LinuxGSM instance id, map, ARK binary
 hash, and runtime flags.
@@ -21,7 +26,8 @@ navigation aid, not an exhaustive inventory of every evidence note; unlisted not
 still preserve durable evidence and should not be deleted only because they are absent
 from this index.
 
-Published RC baseline evidence lane (current published tag: `v0.1.0-rc.2` at `1a7cd98`):
+Published RC baseline evidence lane (historical release evidence, not current routing;
+current published tag: `v0.1.0-rc.2` at `1a7cd98`):
 
 - [2026-05-28-reversing-objective-map.md](2026-05-28-reversing-objective-map.md)
 - [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md)
@@ -62,7 +68,8 @@ artifact root; do not cite direct or symlink-resolved protected `/servidor/ark` 
 If an optional tool is absent, record the absence and continue with baseline
 `readelf`/`objdump` or existing provenance-gated artifacts instead of weakening tests.
 
-Current post-RC research lane:
+Current post-RC research evidence lane (side-lane inventory for research reuse; follow
+`docs/agent-handoff/CURRENT.md` for the active assignment):
 
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
 - [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)

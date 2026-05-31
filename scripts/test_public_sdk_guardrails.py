@@ -404,17 +404,17 @@ BROAD_V1_COMPLETION_POSITIVE_RE = re.compile(
     r"\b(?:"
     r"(?:v1(?:\.0)?\s+stable|v1[- ]?0\s+stable).{0,80}"
     r"(?:available|complete|delivered|for\s+production|production[- ]ready|ready|released|shipped|supported)|"
-    r"(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK|"
-    r"(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK.{0,80}"
+    r"(?:complete|full|production[- ]ready)[- ]+(?:public[- ]+|plugin[- ]+)?SDK|"
+    r"(?:complete|full|production[- ]ready)[- ]+(?:public[- ]+|plugin[- ]+)?SDK.{0,80}"
     r"(?:available|delivered|production[- ]ready|ready|released|shipped|supported|today|use)|"
     r"(?:available|delivered|ready|released|shipped|supported|use).{0,80}"
-    r"(?:complete|full|production[- ]ready)\s+(?:public\s+)?SDK|"
-    r"(?:stable[- ]?(?:v1|v1-0|1-0|1\.0)|(?:v1|v1-0|1-0|1\.0)[- ]?stable).{0,24}(?:public\s+|plugin\s+)?SDK|"
-    r"(?:v1|v1-0|1-0|1\.0)\s+(?:public\s+|plugin\s+)?SDK.{0,48}"
+    r"(?:complete|full|production[- ]ready)[- ]+(?:public[- ]+)?SDK|"
+    r"(?:stable[- ]?(?:v1|v1-0|1-0|1\.0)|(?:v1|v1-0|1-0|1\.0)[- ]?stable).{0,24}(?:public[- ]+|plugin[- ]+)?SDK|"
+    r"(?:v1|v1-0|1-0|1\.0)\s+(?:public[- ]+|plugin[- ]+)?SDK.{0,48}"
     r"(?:available|complete|production[- ]ready|ready|released|shipped|supported)|"
-    r"(?:SDK|public\s+SDK|plugin\s+SDK).{0,24}(?:v1|v1-0|1-0|1\.0).{0,48}"
+    r"(?:SDK|public[- ]+SDK|plugin[- ]+SDK).{0,24}(?:v1|v1-0|1-0|1\.0).{0,48}"
     r"(?:available|complete|production[- ]ready|ready|released|shipped|stable|supported)|"
-    r"GA\s+(?:public\s+|plugin\s+)?SDK|"
+    r"GA\s+(?:public[- ]+|plugin[- ]+)?SDK|"
     r"all\s+v1\s+(?:SDK\s+)?surfaces\s+are\s+available"
     r")\b",
     re.IGNORECASE,
@@ -428,8 +428,13 @@ BROAD_V1_COMPLETION_NEGATED_RE = re.compile(
 )
 PRE_V1_RC_COMPLETE_SDK_POSITIVE_RE = re.compile(
     r"\b(?:v0(?:\.1(?:\.\d+)?)?|0\.1(?:\.\d+)?|pre[- ]v1|rc|release\s+candidate|post[- ]rc)\b"
-    r".{0,80}\b(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK\b|"
-    r"\b(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK\b"
+    r".{0,80}\b(?:complete|full|production[- ]ready)[- ]+(?:public[- ]+|plugin[- ]+)?SDK\b|"
+    r"\b(?:complete|full|production[- ]ready)[- ]+(?:public[- ]+|plugin[- ]+)?SDK\b"
+    r".{0,80}\b(?:v0(?:\.1(?:\.\d+)?)?|0\.1(?:\.\d+)?|pre[- ]v1|rc|release\s+candidate|post[- ]rc)\b|"
+    r"\b(?:v0(?:\.1(?:\.\d+)?)?|0\.1(?:\.\d+)?|pre[- ]v1|rc|release\s+candidate|post[- ]rc)\b"
+    r".{0,80}\b(?:SDK|public[- ]+SDK|plugin[- ]+SDK)\b.{0,48}"
+    r"\b(?:complete|full|production[- ]ready)\b|"
+    r"\b(?:SDK|public[- ]+SDK|plugin[- ]+SDK)\b.{0,48}\b(?:complete|full|production[- ]ready)\b"
     r".{0,80}\b(?:v0(?:\.1(?:\.\d+)?)?|0\.1(?:\.\d+)?|pre[- ]v1|rc|release\s+candidate|post[- ]rc)\b",
     re.IGNORECASE,
 )
@@ -439,6 +444,7 @@ PRE_V1_RC_COMPLETE_SDK_NEGATED_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+SCOPE_EXPANSION_NEGATOR_RE = re.compile(r"\bnot\s+(?:just|only|merely|simply)\b", re.IGNORECASE)
 GAMEPLAY_POLICY_SCOPE_FORBIDDEN_RE = re.compile(
     r"\bInventory\s+SDKs?\b|"
     r"\bStructureEvents?\s+SDKs?\b|"
@@ -1084,8 +1090,15 @@ def broad_v1_completion_claims(text: str, relative_path: str) -> list[str]:
     scan_text = re.sub(r"(?<!\n)\n(?!\n)", " ", scan_text)
 
     for segment_start, segment in sentence_like_segments(scan_text):
+        negation_scan_segment = SCOPE_EXPANSION_NEGATOR_RE.sub(
+            "scope expansion",
+            segment,
+        )
         pre_v1_rc_complete_sdk_claim = PRE_V1_RC_COMPLETE_SDK_POSITIVE_RE.search(segment)
-        if pre_v1_rc_complete_sdk_claim and not PRE_V1_RC_COMPLETE_SDK_NEGATED_RE.search(segment):
+        if (
+            pre_v1_rc_complete_sdk_claim
+            and not PRE_V1_RC_COMPLETE_SDK_NEGATED_RE.search(negation_scan_segment)
+        ):
             line = scan_text.count("\n", 0, segment_start) + 1
             offenders.append(f"{relative_path}:{line}: {normalized(segment)}")
             continue
@@ -3625,6 +3638,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "This is a production ready SDK.",
             "We claim the complete SDK is available.",
             "Release notes claim the full plugin SDK has shipped.",
+            "The v0.1 RC ships the complete-SDK for plugin authors.",
+            "The v0.1 RC SDK is complete.",
+            "The v0.1 RC ships the complete SDK, not just runtime fixes.",
+            "This release candidate includes the full-plugin SDK, not only examples.",
         ]
         allowed = [
             "Obelisk is moving toward a complete SDK.",
@@ -6649,10 +6666,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         readiness_checkers = sorted(scripts_dir.glob("check_*readiness*.py"))
         readiness_adjacent_checkers = [
             scripts_dir / "check_player_identity_static_orientation.py",
+            scripts_dir / "check_player_identity_static_lifecycle_orientation.py",
         ]
         required_checkers = readiness_checkers + readiness_adjacent_checkers
         self.assertIn(scripts_dir / "check_player_identity_first_evidence_readiness.py", required_checkers)
         self.assertIn(scripts_dir / "check_player_identity_static_orientation.py", required_checkers)
+        self.assertIn(scripts_dir / "check_player_identity_static_lifecycle_orientation.py", required_checkers)
 
         test_files = {path.name for path in scripts_dir.glob("test_*.py")}
         missing_tests = [

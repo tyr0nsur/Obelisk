@@ -3,7 +3,14 @@
 This file preserves the full `docs/agent-handoff/CURRENT.md` content before the
 2026-05-28 compaction that restored CURRENT.md to a concise routing table.
 
+Historical-only banner: this file is an archive of pre-compaction handoff state. Do not use
+its "Current Agent Handoff", "Active Operating Objective", or "next-step" wording as live
+routing. For active routing, priorities, and next actions, read
+`docs/agent-handoff/CURRENT.md`; keep this file as durable historical evidence only.
+
 # Current Agent Handoff
+
+Historical heading retained from the archived source; it is not the current handoff.
 
 Updated: 2026-05-28
 
@@ -1196,5 +1203,7 @@ Updated: 2026-05-28
 - fact: Static/reversing rounds should read `obelisk-static-binary-analysis`,
   `obelisk-ue4-type-reconstruction`, and `obelisk-tooling-discipline` in addition to the
   UE4 reflection/reversing skills.
-- next-step: After each investigation, update this file only with concise active context and
-  put detailed evidence in `docs/research/`.
+- archived next-step: At the time of this pre-compaction handoff, agents updated the live
+  handoff with concise active context and put detailed evidence in `docs/research/`.
+  Today, update `docs/agent-handoff/CURRENT.md` for active routing instead; keep this file
+  historical unless a task explicitly asks to clarify the archive.
