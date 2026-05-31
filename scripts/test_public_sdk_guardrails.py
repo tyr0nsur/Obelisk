@@ -1521,6 +1521,57 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(normalized(term), release_guardrails)
 
+    def test_public_sdk_surfaces_manifest_keeps_descriptors_metadata_only_not_module_promotion(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        descriptors = surfaces["obelisk.descriptors.v1"]
+
+        self.assertEqual(descriptors["category"], "metadata")
+        self.assertEqual(descriptors["status"], "promoted")
+        self.assertEqual(descriptors["support_tier"], "release-supported seed")
+        self.assertEqual(
+            descriptors["public_contract"],
+            [
+                "DescribeResourceKind",
+                "DescribeGameplayPolicyEventKind",
+                "ObeliskResourceKindDescriptor",
+                "ObeliskGameplayPolicyEventDescriptor",
+            ],
+        )
+        self.assertNotIn("obelisk.descriptors.v1", manifest["v1_sdk_completion_blockers"])
+        for exclusion in (
+            "resource identity",
+            "object lookup",
+            "persistent handles",
+            "ResourceHandle",
+            "cross-event correlation",
+            "mutation",
+            "return override",
+        ):
+            self.assertIn(exclusion, descriptors["exclusions"])
+
+        descriptor_terms = (
+            "obelisk.descriptors.v1",
+            "DescribeResourceKind",
+            "DescribeGameplayPolicyEventKind",
+            "ObeliskResourceKindDescriptor",
+            "ObeliskGameplayPolicyEventDescriptor",
+            "descriptor_catalog_plugin.cpp",
+            "oDescriptorCatalog",
+        )
+        module_blockers = (
+            "obelisk.inventory_items_mutation.v1",
+            "obelisk.structure_census.v1",
+            "obelisk.mission_transfer_dino_tribe.v1",
+        )
+        for surface_id in module_blockers:
+            surface_text = json.dumps(surfaces[surface_id], sort_keys=True)
+            with self.subTest(surface=surface_id):
+                self.assertEqual(surfaces[surface_id].get("public_contract", []), [])
+                self.assertNotIn(surface_id, manifest["promoted_surfaces"])
+                for term in descriptor_terms:
+                    self.assertNotIn(term, surface_text)
+
     def test_public_sdk_surfaces_manifest_keeps_chat_and_gameplay_experimental_bounds(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -3648,6 +3699,33 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(token, consumer)
             with self.subTest(file="consumer_fixture.cpp", required_field_or_resource=token):
                 self.assertIn(token, fixture)
+
+    def test_installed_descriptor_catalog_consumer_covers_promoted_descriptor_limits(self) -> None:
+        descriptor_consumer = (
+            REPO_ROOT / "tests" / "sdk_installed_consumer" / "descriptor_catalog_plugin.cpp"
+        ).read_text(encoding="utf-8")
+
+        for token in [
+            "kExpectedPromotedResourceKindDescriptors",
+            "kExpectedPromotedGameplayPolicyEventDescriptors",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MIN",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MAX",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_COUNT",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
+            "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL",
+            "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM + 1u",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, descriptor_consumer)
+
+        for token in V010_PUBLIC_GAMEPLAY_POLICY_EVENT_TOKENS:
+            with self.subTest(event_kind=token):
+                self.assertIn(token, descriptor_consumer)
+
+        for stable_name in V010_PUBLIC_GAMEPLAY_POLICY_STABLE_NAMES:
+            with self.subTest(stable_name=stable_name):
+                self.assertIn(stable_name, descriptor_consumer)
 
     def test_installed_sdk_layout_keeps_release_scope_examples_on_installed_package(self) -> None:
         consumer_cmake = (REPO_ROOT / "tests/sdk_installed_consumer/CMakeLists.txt").read_text(

@@ -915,6 +915,55 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.structure_census.v1"])
 
+    def test_descriptor_catalog_contract_does_not_promote_module_completion_blockers(self) -> None:
+        cases = (
+            (
+                "obelisk.inventory_items_mutation.v1",
+                "tests/core/InventoryPolicyEventDispatcherTests.cpp",
+                "ObeliskApi.DescribeResourceKind",
+            ),
+            (
+                "obelisk.structure_census.v1",
+                "tests/core/StructureEventDispatcherTests.cpp",
+                "ObeliskApi.DescribeGameplayPolicyEventKind",
+            ),
+            (
+                "obelisk.mission_transfer_dino_tribe.v1",
+                "tests/core/MissionCopiedBoolEventDispatcherTests.cpp",
+                "ObeliskResourceKindDescriptor",
+            ),
+        )
+        for surface_id, abi_test, descriptor_contract in cases:
+            with self.subTest(surface=surface_id):
+                manifest, _ = complete_excluded_manifest()
+                for surface in manifest["surfaces"]:
+                    if surface["id"] == surface_id:
+                        surface["status"] = "promoted"
+                        surface["public_contract"] = [descriptor_contract]
+                        surface["evidence"] = {
+                            "surface_id": surface_id,
+                            "promotion_status": "promoted",
+                            "public_sdk_ready": True,
+                            "abi_tests": [abi_test],
+                            "sdk_consumer_tests": [
+                                "tests/sdk_installed_consumer/descriptor_catalog_plugin.cpp"
+                            ],
+                        }
+                        break
+                manifest["promoted_surfaces"].append(surface_id)
+                manifest["post_v1_or_excluded_surfaces"] = [
+                    item for item in manifest["post_v1_or_excluded_surfaces"] if item != surface_id
+                ]
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+                self.assertIn(surface_id, payload["promoted_blockers_without_evidence"])
+
     def test_duplicate_surface_id_blocks_v1_claim(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         duplicate = {
