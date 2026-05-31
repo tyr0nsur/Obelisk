@@ -1,5 +1,11 @@
 # Inventory Observation Gate Plan
 
+Current note, 2026-05-31: this document is historical runtime-observer planning. The
+statement below that there is "no public SDK event" is superseded only by the narrow
+inventory-backed `GameplayPolicyEvent` copied-signal surface. It does not mean a standalone
+Inventory SDK, Items SDK, inventory observer API, item/inventory identity, lookup,
+mutation, return override, raw UE pointer exposure, or runtime observer has been promoted.
+
 ## Objective
 
 Define the safe shape for a future disabled-by-default `sdk.inventory` runtime observer.

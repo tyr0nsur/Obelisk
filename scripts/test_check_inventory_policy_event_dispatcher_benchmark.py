@@ -57,6 +57,37 @@ class CheckInventoryPolicyEventDispatcherBenchmarkTests(unittest.TestCase):
             errors,
         )
 
+    def test_rejects_malformed_metric_token(self) -> None:
+        text = VALID_OUTPUT.replace("ns_avg=100", "ns_avg=100ms")
+        with self.assertRaisesRegex(ValueError, "malformed metric token 'ns_avg=100ms'"):
+            checker.parse_output(text)
+
+    def test_rejects_unexpected_case(self) -> None:
+        text = (
+            VALID_OUTPUT
+            + "summary iterations=10000 ns_avg=1 allocations=0 allocations_per_iter=0 dispatched=0\n"
+        )
+        with self.assertRaisesRegex(ValueError, "unexpected benchmark case 'summary'"):
+            checker.parse_output(text)
+
+    def test_rejects_unexpected_metric(self) -> None:
+        text = VALID_OUTPUT.replace(
+            "four_subscribers_stack_snapshot iterations=10000",
+            "four_subscribers_stack_snapshot extra=1 iterations=10000",
+        )
+        with self.assertRaisesRegex(ValueError, "unexpected metric 'extra'"):
+            checker.parse_output(text)
+
+    def test_rejects_missing_dispatch_metric(self) -> None:
+        text = VALID_OUTPUT.replace(" dispatched=40000", "")
+        errors = checker.check_cases(checker.parse_output(text), checker.DEFAULT_LIMITS)
+        self.assertIn("four_subscribers_stack_snapshot: missing metric dispatched", errors)
+
+    def test_rejects_zero_iterations(self) -> None:
+        text = VALID_OUTPUT.replace("invalid_event iterations=10000", "invalid_event iterations=0")
+        errors = checker.check_cases(checker.parse_output(text), checker.DEFAULT_LIMITS)
+        self.assertIn("invalid_event: iterations must be greater than zero", errors)
+
 
 if __name__ == "__main__":
     unittest.main()

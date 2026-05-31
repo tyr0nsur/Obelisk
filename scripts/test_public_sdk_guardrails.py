@@ -36,6 +36,7 @@ PUBLIC_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_SEED_BOUNDARY.md",
     REPO_ROOT / "docs" / "RELEASE.md",
     REPO_ROOT / "docs" / "STATUS.md",
     REPO_ROOT / "docs" / "VERSIONING.md",
@@ -103,6 +104,7 @@ PLUGIN_HUB_PUBLIC_BOUNDARY_DOC_FILES = [
     REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md",
     REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+    REPO_ROOT / "docs" / "PLUGIN_HUB_SEED_BOUNDARY.md",
     REPO_ROOT / "plugins" / "README.md",
 ]
 RESEARCH_MODULE_BOUNDARY_README = REPO_ROOT / "docs" / "research" / "README.md"
@@ -5526,6 +5528,93 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ResourceHandle",
         ):
             self.assertIn(required_scope_term, structure_scope)
+
+    def test_inventory_copied_signal_field_masks_stay_notification_only(self) -> None:
+        manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        gameplay_policy = next(
+            (
+                event for event in manifest.get("promoted_events", [])
+                if isinstance(event, dict) and event.get("event_id") == "obelisk.gameplay_policy.v1"
+            ),
+            None,
+        )
+        self.assertIsNotNone(gameplay_policy)
+        self.assertEqual(
+            gameplay_policy.get("inventory_sdk"),
+            "not promoted; inventory-backed policy signals are exposed only through GameplayPolicyEvent",
+        )
+        self.assertEqual(
+            gameplay_policy.get("item_module_sdk"),
+            "not promoted; item-return-backed policy signals are exposed only through GameplayPolicyEvent",
+        )
+
+        inventory_events = {
+            event.get("stable_name"): event
+            for event in gameplay_policy.get("event_kinds", [])
+            if isinstance(event, dict)
+            and event.get("resource_kind") == "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM"
+        }
+        self.assertEqual(
+            inventory_events,
+            {
+                "inventory.remote_add_check": {
+                    "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+                    "stable_name": "inventory.remote_add_check",
+                    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                    "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+                    "field_mask": [
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+                    ],
+                },
+                "inventory.use_check": {
+                    "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+                    "stable_name": "inventory.use_check",
+                    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                    "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+                    "field_mask": [
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+                    ],
+                },
+                "inventory_item.allow_equip_check": {
+                    "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+                    "stable_name": "inventory_item.allow_equip_check",
+                    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                    "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+                    "field_mask": [
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                    ],
+                },
+                "inventory_item.can_repair_check": {
+                    "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+                    "stable_name": "inventory_item.can_repair_check",
+                    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                    "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK",
+                    "field_mask": [
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                    ],
+                },
+                "inventory_item.use_onto_item_check": {
+                    "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+                    "stable_name": "inventory_item.use_onto_item_check",
+                    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                    "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+                    "field_mask": [
+                        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+                    ],
+                },
+            },
+        )
+
+        redacted_fields = gameplay_policy.get("redacted_fields", [])
+        for redacted in (
+            "player identity",
+            "inventory object identity",
+            "item identity",
+            "mutation or return override authority",
+        ):
+            self.assertIn(redacted, redacted_fields)
 
     def test_obasevents_documents_binary_scoped_fname_resolution(self) -> None:
         text = (REPO_ROOT / "docs/oBaseEvents.md").read_text(encoding="utf-8")

@@ -1,5 +1,13 @@
 # Inventory Recognition Plan
 
+Current note, 2026-05-31: this is historical planning for the internal recognizer. Since
+this note was written, `PrimalItem.CanUse` and `PrimalItem.AllowRemoteAddToInventory`
+copied scalars were promoted only through the general `GameplayPolicyEvent` copied policy
+surface as inventory-backed signals. There is still no standalone Inventory SDK, Items
+SDK, item/inventory identity, lookup, mutation, return override, raw UE pointer exposure,
+or item payload decoding. Treat the final 2026-05-27 statement about "no public callback"
+as superseded only by that narrow `GameplayPolicyEvent` path.
+
 ## Objective
 
 Define the next gameplay SDK recognition target after `sdk.structures`: a narrow internal

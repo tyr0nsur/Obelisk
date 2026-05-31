@@ -66,6 +66,14 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
             summary["redacted_struct_fields"],
         )
         self.assertEqual([], payload["public_contract_scan"]["offenders"])
+        surface_summary = payload["public_contract_scan"]["surface_summary"]
+        self.assertEqual(
+            "promoted-experimental-only",
+            surface_summary["obelisk.inventory_item_copied_signals.v1"]["status"],
+        )
+        self.assertEqual(5, surface_summary["obelisk.inventory_item_copied_signals.v1"]["public_contract_count"])
+        self.assertEqual("post-v1", surface_summary["obelisk.inventory_items_mutation.v1"]["status"])
+        self.assertEqual(0, surface_summary["obelisk.inventory_items_mutation.v1"]["public_contract_count"])
 
     def test_mutated_fixture_counts_fail_closed(self) -> None:
         report = checker.build_fixture_report()
@@ -94,6 +102,18 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
                     {
                         "surfaces": [
                             {
+                                "id": "obelisk.inventory_item_copied_signals.v1",
+                                "status": "promoted-experimental-only",
+                                "public_contract": checker.EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
+                                "payload_contract": [],
+                                "exclusions": list(checker.REQUIRED_INVENTORY_COPIED_EXCLUSIONS),
+                            },
+                            {
+                                "id": "obelisk.inventory_items_mutation.v1",
+                                "status": "post-v1",
+                                "public_contract": [],
+                            },
+                            {
                                 "id": "synthetic.inventory",
                                 "public_contract": ["ItemId"],
                                 "payload_contract": ["AdditionalData"],
@@ -114,6 +134,39 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
             {("public_contract", "ItemId"), ("payload_contract", "AdditionalData")},
             {(offender["field"], offender["token"]) for offender in offenders},
         )
+
+    def test_public_inventory_surface_status_drift_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "surfaces": [
+                            {
+                                "id": "obelisk.inventory_item_copied_signals.v1",
+                                "status": "promoted",
+                                "public_contract": checker.EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
+                                "payload_contract": [],
+                                "exclusions": ["Inventory SDK"],
+                            },
+                            {
+                                "id": "obelisk.inventory_items_mutation.v1",
+                                "status": "promoted",
+                                "public_contract": ["GiveItem"],
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker("--public-sdk-surfaces", str(manifest), check=False)
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("inventory_copied_signals_status_mismatch", reasons)
+        self.assertIn("inventory_copied_signals_exclusions_incomplete", reasons)
+        self.assertIn("inventory_mutation_status_mismatch", reasons)
+        self.assertIn("inventory_mutation_public_contract_present", reasons)
 
     def test_item_id_and_additional_data_redaction_mutations_fail_closed(self) -> None:
         report = checker.build_fixture_report()
