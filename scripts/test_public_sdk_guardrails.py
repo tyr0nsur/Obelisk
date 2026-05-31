@@ -2204,6 +2204,45 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(requirement, modules["buff_audit_requirements"])
 
+    def test_structure_census_readiness_checker_candidate_stays_non_public_and_scalar_only(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        structure = surfaces["obelisk.structure_census.v1"]
+        candidate = structure["readiness_checker_candidate"]
+
+        self.assertEqual(structure["status"], "planning")
+        self.assertEqual(structure["support_tier"], "blocked")
+        self.assertEqual(structure["public_contract"], [])
+        self.assertEqual(candidate["status"], "candidate-only")
+        self.assertEqual(candidate["scope"], "offline structure aggregate/census policy audit only")
+        self.assertEqual(candidate["target_set"], "structure-aggregate-census-planning")
+        self.assertEqual(candidate["artifact_schema"], "obelisk.structure-aggregate-census-policy-slice.v1")
+        self.assertIs(candidate["copied_scalar_only"], True)
+        self.assertIs(candidate["public_sdk_ready"], False)
+        self.assertIs(candidate["promotion_ready"], False)
+        self.assertIs(candidate["runtime_ready"], False)
+        self.assertIs(candidate["must_remain_consume_only"], True)
+        self.assertIs(candidate["must_block_promote_mode"], True)
+        self.assertEqual(
+            candidate["required_manifest_flags"],
+            [
+                "policy_status=evidence-only",
+                "consume_only=true",
+                "safety_summary.consume_only=true",
+                "safety_summary.promotion_ready=false",
+            ],
+        )
+        for boundary in (
+            "candidate-only",
+            "copied scalar event views only",
+            "no public StructureEvents SDK",
+            "no structure identity or lookup",
+            "no mutation or return override",
+            "public_sdk_ready=false",
+        ):
+            with self.subTest(boundary=boundary):
+                self.assertIn(boundary, candidate["required_boundaries"])
+
     def test_future_command_principal_routing_requires_new_owner_scoped_lifecycle_surface(self) -> None:
         docs = {
             "sdk_compatibility": PUBLIC_SDK_V1_COMPATIBILITY_DOC,
@@ -6203,6 +6242,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(blocker=blocker):
                 self.assertIn(blocker, payload["blockers"])
+
+    def test_route_confidence_readiness_checkers_are_covered_by_run_script_tests(self) -> None:
+        run_script_tests = (REPO_ROOT / "scripts" / "run_script_tests.sh").read_text(encoding="utf-8")
+        self.assertIn("list_repo_files 'scripts/test_*.py'", run_script_tests)
+        self.assertIn('for test_path in "${python_tests[@]}"; do', run_script_tests)
+        self.assertIn('python3 "${test_path}"', run_script_tests)
+
+        scripts_dir = REPO_ROOT / "scripts"
+        readiness_checkers = sorted(scripts_dir.glob("check_*readiness*.py"))
+        readiness_adjacent_checkers = [
+            scripts_dir / "check_player_identity_static_orientation.py",
+        ]
+        required_checkers = readiness_checkers + readiness_adjacent_checkers
+        self.assertIn(scripts_dir / "check_player_identity_first_evidence_readiness.py", required_checkers)
+        self.assertIn(scripts_dir / "check_player_identity_static_orientation.py", required_checkers)
+
+        test_files = {path.name for path in scripts_dir.glob("test_*.py")}
+        missing_tests = [
+            f"{checker.name} -> test_{checker.name}"
+            for checker in required_checkers
+            if f"test_{checker.name}" not in test_files
+        ]
+        self.assertEqual(missing_tests, [])
 
     def test_player_identity_next_step_requires_non_protected_ufunction_inventory_pack(self) -> None:
         current_path = REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md"

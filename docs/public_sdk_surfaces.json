@@ -610,6 +610,32 @@
           "structure-nonpin-copied-scalar-policy-slice"
         ]
       },
+      "readiness_checker_candidate": {
+        "status": "candidate-only",
+        "scope": "offline structure aggregate/census policy audit only",
+        "target_set": "structure-aggregate-census-planning",
+        "artifact_schema": "obelisk.structure-aggregate-census-policy-slice.v1",
+        "copied_scalar_only": true,
+        "public_sdk_ready": false,
+        "promotion_ready": false,
+        "runtime_ready": false,
+        "must_remain_consume_only": true,
+        "must_block_promote_mode": true,
+        "required_manifest_flags": [
+          "policy_status=evidence-only",
+          "consume_only=true",
+          "safety_summary.consume_only=true",
+          "safety_summary.promotion_ready=false"
+        ],
+        "required_boundaries": [
+          "candidate-only",
+          "copied scalar event views only",
+          "no public StructureEvents SDK",
+          "no structure identity or lookup",
+          "no mutation or return override",
+          "public_sdk_ready=false"
+        ]
+      },
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,
