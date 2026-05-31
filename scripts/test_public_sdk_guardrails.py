@@ -979,6 +979,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.inventory_items_mutation.v1",
             "obelisk.structure_census.v1",
             "obelisk.mission_transfer_dino_tribe.v1",
+            "obelisk.player_services_economy_mobility.v1",
             "obelisk.commands_replies.v1",
             "obelisk.permissions_admin.v1",
             "obelisk.arkapi_compatibility.v1",
@@ -1032,6 +1033,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.structure_census.v1",
                 "obelisk.mission_transfer_dino_tribe.v1",
+                "obelisk.player_services_economy_mobility.v1",
                 "obelisk.operator_ingress_storage.v1",
             },
         )
@@ -1039,6 +1041,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         release_guardrails = " ".join(manifest["release_guardrails"])
         self.assertIn("Every v1_sdk_completion_blocker", release_guardrails)
         self.assertIn("before v1_completion_required can become true", release_guardrails)
+        self.assertIn("Every promoted-experimental-only surface", release_guardrails)
 
         non_public_statuses = {"planning", "post-v1", "excluded", "debug-only"}
         for surface in manifest["surfaces"]:
@@ -1173,6 +1176,43 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(exclusion, player_identity["exclusions"])
 
+    def test_public_sdk_surfaces_manifest_keeps_commands_replies_blocked_on_identity_permissions_and_safe_response(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        commands = surfaces["obelisk.commands_replies.v1"]
+
+        self.assertEqual(commands["status"], "post-v1")
+        self.assertEqual(commands["support_tier"], "blocked")
+        self.assertEqual(commands["public_contract"], [])
+        self.assertEqual(
+            commands["depends_on"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+            ],
+        )
+        self.assertIn("obelisk.commands_replies.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.commands_replies.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertNotIn("obelisk.commands_replies.v1", manifest["promoted_surfaces"])
+
+        for blocker in (
+            "Needs promoted player identity/principal semantics.",
+            "Needs promoted permission/authority model.",
+            "Needs a safe response path for replies/send-chat.",
+            "Needs command lifecycle and abuse boundaries.",
+        ):
+            self.assertIn(blocker, commands["blockers"])
+
+        for exclusion in (
+            "public command SDK/router",
+            "admin command API",
+            "player command API",
+            "chat replies",
+            "send-chat",
+            "moderation",
+        ):
+            self.assertIn(exclusion, commands["exclusions"])
+
     def test_sdk_v1_compatibility_doc_tracks_manifest_and_exclusions(self) -> None:
         text = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
         compact = normalized(text)
@@ -1183,16 +1223,26 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "v1_sdk_completion_blockers",
             "player identity, commands/replies",
             "before `v1_completion_required` can become true",
+            "structure census/build policy",
+            "gameplay modules including buffs",
+            "player services/economy/mobility/areas",
             "process-local timers",
             "Experimental Copied Event Patterns",
             "promoted-experimental-only",
+            "must be promoted, downgraded, or explicitly excluded",
             "GameplayPolicyEvent",
             "ChatMessageEvent",
             "OBELISK_API_CAPABILITY_CHAT_EVENTS",
             "principal=unknown",
+            "Commands/replies is post-v1 and blocked as a combined surface",
+            "depends on a promoted player identity/principal contract",
+            "a promoted permission/authority model",
+            "a safe response path for replies/send-chat",
             "Inventory SDK",
             "StructureEvents SDK",
             "ResourceHandle",
+            "buff module SDKs",
+            "economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy",
             "ArkApi",
             "post-v1",
             "Player identity is planning-only",
@@ -1211,6 +1261,139 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for term in required_terms:
             self.assertIn(normalized(term), compact)
         self.assertNotIn("promoted-minimal", text)
+
+    def test_public_sdk_v1_completion_blocks_unresolved_experimental_surfaces(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        release_guardrails = " ".join(manifest["release_guardrails"])
+        experimental = set(manifest["experimental_surfaces"])
+
+        self.assertTrue(experimental)
+        self.assertFalse(manifest["v1_completion_required"])
+        self.assertIn(
+            "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, "
+            "or explicitly excluded before v1_completion_required can become true.",
+            release_guardrails,
+        )
+        self.assertIn("promoted, downgraded, or explicitly excluded", PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(
+            encoding="utf-8"
+        ))
+
+    def test_public_sdk_surfaces_manifest_blocks_player_services_until_identity_permissions_and_storage(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        services = surfaces["obelisk.player_services_economy_mobility.v1"]
+
+        self.assertEqual(services["status"], "post-v1")
+        self.assertEqual(services["support_tier"], "blocked")
+        self.assertEqual(
+            services["public_name"],
+            "Blocked umbrella for player services, economy, mobility, and area policy",
+        )
+        self.assertEqual(services["public_contract"], [])
+        self.assertEqual(
+            services["depends_on"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.operator_ingress_storage.v1",
+            ],
+        )
+        self.assertIn("obelisk.player_services_economy_mobility.v1", manifest["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.player_services_economy_mobility.v1", manifest["post_v1_or_excluded_surfaces"])
+
+        for blocker in (
+            "Umbrella blocker only; future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy.",
+            "No promoted player/principal identity or permission model.",
+            "No persistence, migration, or cross-instance consistency contract.",
+            "No abuse, rate-limit, rollback, audit, or privacy policy for economy and mobility actions.",
+            "No safe runtime action surface for teleport, homes, rewards, kits, stats, safe zones, or timed notices.",
+        ):
+            self.assertIn(blocker, services["blockers"])
+
+        for exclusion in (
+            "economy API",
+            "shop API",
+            "rewards API",
+            "kits API",
+            "stats API",
+            "homes API",
+            "teleport API",
+            "safe-zone API",
+            "area policy API",
+            "broadcast/timed notice service",
+            "cross-instance persistence",
+        ):
+            self.assertIn(exclusion, services["exclusions"])
+
+    def test_public_sdk_surfaces_manifest_keeps_structure_and_buff_scope_blocked(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        structure = surfaces["obelisk.structure_census.v1"]
+        modules = surfaces["obelisk.mission_transfer_dino_tribe.v1"]
+
+        for token in (
+            "No ownership, placement/build-policy, no-collision, or admin-exception contract.",
+            "ownership lookup",
+            "build placement policy",
+            "no-collision policy",
+        ):
+            self.assertIn(token, json.dumps(structure))
+
+        self.assertIn("buff-compact-intake", modules["evidence"]["planning_target_sets"])
+        for token in (
+            "No public Buff SDK or class/object redaction contract.",
+            "Buff SDK",
+        ):
+            self.assertIn(token, json.dumps(modules))
+
+    def test_future_command_principal_routing_requires_new_owner_scoped_lifecycle_surface(self) -> None:
+        docs = {
+            "sdk_compatibility": PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+            "plugin_hub_matrix": REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md",
+        }
+        shared_required_terms = (
+            "lifecycle and callback-ownership",
+            "new copied C ABI",
+            "named capability bit captured",
+            "nonzero `plugin_owner_token`",
+            "owner-token handle registration",
+            "owner-scoped unregister",
+            "plugin-owner cleanup on init failure or unload before `dlclose`",
+            "callback-scope copied payloads",
+            "principal privacy/invalidation",
+            "ownerless",
+            "process-global capability state",
+            "debug gates",
+        )
+
+        for name, path in docs.items():
+            compact = normalized(path.read_text(encoding="utf-8"))
+            for term in shared_required_terms:
+                with self.subTest(doc=name, term=term):
+                    self.assertIn(normalized(term), compact)
+
+        sdk = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
+        for term in (
+            "not a parser-only extension to `ChatMessageEvent` or plugin-local routing",
+            "plugin's init-time `ObeliskApi` table",
+            "must not authorize routing from process-global capability state or debug gates "
+            "that were not advertised to that plugin at init",
+        ):
+            with self.subTest(doc="sdk_compatibility", term=term):
+                self.assertIn(normalized(term), sdk)
+
+        matrix = normalized((REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md").read_text(
+            encoding="utf-8"
+        ))
+        for term in (
+            "not just a missing parser",
+            "named capability bit captured at plugin init",
+            "Do not route command/principal callbacks through ownerless registrations",
+            "raw `ProcessEvent`",
+            "experimental plugin-local `ChatMessageEvent` parsing lane",
+        ):
+            with self.subTest(doc="plugin_hub_matrix", term=term):
+                self.assertIn(normalized(term), matrix)
 
     def test_public_gameplay_event_manifest_contains_no_server_paths(self) -> None:
         manifest = json.loads(PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
@@ -4172,7 +4355,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "it does not promise ArkApi plugin compatibility",
             "Neither tier means the corresponding ArkApi plugin family can be ported",
             "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
-            "Promoted copied-data ABI surface; experimental Plugin Hub seed",
+            "v0.1 copied-data ABI surface; experimental Plugin Hub seed, not v1-complete",
             "it does not turn copied chat/policy examples into production Plugin Hub modules",
         ):
             with self.subTest(required=required):
@@ -4428,6 +4611,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "missions",
             "timers",
             "storage",
+            "economy",
+            "homes",
+            "teleport",
+            "safe zones",
+            "mobility",
         )
         focused_lane_terms = (
             "chat",
@@ -4466,7 +4654,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for required in (
             "Promotion gate before any v1 surface",
-            "records hypotheses and required evidence, not production support for permissions, RCON, economy, storage, tribes, dinos, transfers, inventory, commands",
+            "records hypotheses and required evidence, not production support for permissions, RCON, economy, homes, teleport, safe zones, mobility, storage, tribes, dinos, transfers, inventory, commands",
         ):
             with self.subTest(required=required):
                 self.assertIn(normalized(required), compact_v1_map)
@@ -4474,6 +4662,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         blocked_family = (
             r"permissions?|RCON|economy|shops?|kits?|storage|database|webhook|"
+            r"rewards?|stats|homes?|teleports?|safe[- ]zones?|area\s+polic(?:y|ies)|"
+            r"mobility|player\s+services?|broadcasts?|timed\s+notices?|"
             r"tribes?|dinos?|transfers?|inventory|items?"
         )
         surface_noun = r"modules?|SDKs?|APIs?|services?|surfaces?"

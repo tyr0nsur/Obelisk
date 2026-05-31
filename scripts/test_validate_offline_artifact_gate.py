@@ -5475,6 +5475,28 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_first_evidence_artifact_identity_build_type_mismatch", reasons)
         self.assertIn("players_identity_first_evidence_artifact_identity_source_ids_invalid", reasons)
 
+    def test_blocks_players_identity_first_evidence_extra_artifact_identity_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            payload["artifact_identity"].update(
+                {
+                    "artifact_kind": gate.PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
+                    "artifact_sha256": "0" * 64,
+                    "capture_id": "unspecified-capture",
+                    "evidence_pack_id": "static-global-default-pack",
+                }
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_artifact_identity_fields_mismatch", reasons)
+
     def test_blocks_players_identity_first_evidence_overclaims_or_target_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

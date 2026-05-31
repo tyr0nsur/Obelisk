@@ -100,9 +100,9 @@ shutdown-cleanup skeletons. It does not promote plugin watchdogs, hot reload, pr
 restart, server recovery, or operator reload commands. Timed notices map to
 process-local timers only when no chat send, broadcast, command, permission, persistence,
 or cross-process scheduling behavior is implied. Economy, shops, kits, rewards, homes,
-safe zones, RCON, tribe notices, and structure tools remain blocked even when a subset of
-their timing, logging, descriptor, or passive parsing needs could be demonstrated by a
-core primitive.
+teleport, safe zones, area policy, mobility, RCON, tribe notices, and structure tools
+remain blocked even when a subset of their timing, logging, descriptor, or passive
+parsing needs could be demonstrated by a core primitive.
 
 ## NextGenPlugins Demand Snapshot
 
@@ -136,13 +136,22 @@ Neither tier means the corresponding ArkApi plugin family can be ported, that co
 identity semantics exist, or that blocked dependencies can be simulated through raw game
 access.
 
+Command/principal routing is blocked as a lifecycle and callback-ownership surface, not
+just a missing parser. A future Plugin Hub command surface must use a new copied C ABI
+entry with a named capability bit captured at plugin init, a nonzero `plugin_owner_token`,
+owner-token handle registration, owner-scoped unregister, plugin-owner cleanup on init
+failure or unload before `dlclose`, callback-scope copied payloads, and principal
+privacy/invalidation rules. Do not route command/principal callbacks through ownerless
+registrations, process-global capability state, raw `ProcessEvent`, debug gates, or the
+experimental plugin-local `ChatMessageEvent` parsing lane.
+
 | Modder intent | Use now | Status | Must not imply |
 | --- | --- | --- | --- |
 | Load a Linux-native plugin | `ObeliskPlugin_GetInfo`, `ObeliskPlugin_Init`, optional `ObeliskPlugin_Shutdown` | Stable baseline | Hot reload of Obelisk itself, detached workers, or background ingress without shutdown proof |
 | Log through Obelisk | `ObeliskApi::LogInfo`, `LogWarn`, and `LogError` after `struct_size` checks | Stable baseline | Long-lived ownership of callback data or cross-thread logging contracts not proven by the plugin |
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
 | Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
-| Observe promoted structure/item policy data | `GameplayPolicyEvent` with owner-token registration for `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake` release-readiness target sets only | Promoted copied-data ABI surface; experimental Plugin Hub seed | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
+| Observe copied structure/item policy data | `GameplayPolicyEvent` with owner-token registration for `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake` release-readiness target sets only | v0.1 copied-data ABI surface; experimental Plugin Hub seed, not v1-complete | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
 | Parse copied chat text locally | `ChatMessageEvent` with owner-token registration; `chat-message-intake` is the exact release-readiness target set | Minimal v0.1-rc ABI surface; experimental local parsing seed | Public command SDK/router, sender identity, replies, permissions, moderation, chat blocking, or send-chat API |
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |
 | Inspect descriptor output safely | `oDescriptorCatalog` | First-party metadata example | Resource discovery, callback subscription, identity, lookup, mutation, or return override |
@@ -247,7 +256,8 @@ design, privacy policy, lifecycle tests, and exact release-readiness target-set 
 gate.
 
 Planning should keep the full demand surface visible: players, tribes, dinos, items,
-structures, permissions, commands, admin, transfers, missions, timers, and storage.
+structures, permissions, commands, admin, transfers, missions, timers, storage, economy,
+homes, teleport, safe zones, and mobility.
 Current attention on passive chat, `ResourceHandle` blockers, or structure build-placement
 triage must not turn those lanes into the Plugin Hub center, nor imply SDK availability
 for the wider surface.

@@ -541,6 +541,14 @@ REQUIRED_PLAYERS_IDENTITY_NON_CLAIMS = {
     "does not expose UE pointers, raw params, FName/GObjects indices, object identity, lookup, ResourceHandle, mutation, or return overrides",
     "copied chat text remains unauthenticated and does not establish a principal",
 }
+REQUIRED_PLAYERS_IDENTITY_ARTIFACT_IDENTITY_KEYS = {
+    "ark_binary_sha256",
+    "obelisk_commit",
+    "build_type",
+    "target_set_revision",
+    "source_artifact_ids",
+    "path_redacted",
+}
 REQUIRED_UOBJECT_FLAG_POLICY_WINDOWS = {
     "weak_helper_reject_0x100",
     "strict_0x4000_behavior",
@@ -5136,6 +5144,8 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
     if not isinstance(artifact_identity, dict):
         blockers.append({"reason": "players_identity_first_evidence_artifact_identity_missing", "label": f"{label}:$.artifact_identity"})
     else:
+        if set(artifact_identity) != REQUIRED_PLAYERS_IDENTITY_ARTIFACT_IDENTITY_KEYS:
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_fields_mismatch", "label": f"{label}:$.artifact_identity"})
         if artifact_identity.get("path_redacted") is not True:
             blockers.append({"reason": "players_identity_first_evidence_artifact_identity_path_not_redacted", "label": f"{label}:$.artifact_identity.path_redacted"})
         if not isinstance(artifact_identity.get("ark_binary_sha256"), str) or SHA256_RE.fullmatch(artifact_identity["ark_binary_sha256"]) is None:

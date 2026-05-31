@@ -30,21 +30,23 @@ UE lookup, or `ResourceHandle` APIs.
 | Structures | Structure-backed policy checks through `GameplayPolicyEvent`; no structure identity or lookup. | Consolidate copied policy events and descriptors; defer full structure identity, coordinates, health, inventory, and mutation. | Protection, limits, logging, decay. |
 | Timers | Process-local owner-token scheduler with zero-failure handles, one-shot/repeating callbacks, explicit unregister, and unload/init-failure cleanup. | Harden examples/docs and keep timers independent of UE4, identity, and shared-cluster state. | Timed plugin tasks, cron-like plugins. |
 | Admin | No gameplay admin API. | Keep core to operator/config/logging primitives until player identity and authority model exist. | Kick/ban/broadcast panels and automation. |
-| Economy/database | No core surface. | Do not include in v1 core unless a generic storage abstraction is separately designed and lifecycle-tested. | Economy, shop, rewards, MySQL-backed plugins. |
+| Economy/database | No core surface. | Do not include in v1 core unless a generic storage abstraction is separately designed and lifecycle-tested. | Economy, shop, rewards, stats, MySQL-backed plugins. |
+| Homes, teleport, safe zones, and mobility | No public player-service surface. | Block until player identity, permissions, location/privacy policy, persistence, and safe mutation/enforcement gates exist. | Homes, teleport, safe-zone, area-policy, and mobility plugins. |
 
 ## Breadth Guardrail
 
 The v1 route must not narrow into only chat helpers, `ResourceHandle` revalidation, or
 `APrimalStructure.IsAllowedToBuild` triage. Those are useful evidence lanes, but the
 planning map stays organized around the broader modding surface: players, tribes, dinos,
-items, structures, permissions, commands, admin, transfers, missions, timers, and storage.
+items, structures, permissions, commands, admin, transfers, missions, timers, storage,
+economy, homes, teleport, safe zones, and mobility.
 
 This breadth is a discovery and prioritization guardrail, not a delivery promise. A family
 can appear in the map as demand or future module work while still having no public SDK,
 identity, lookup, mutation, return override, or handle contract. The promotion-gate column
 records hypotheses and required evidence, not production support for permissions, RCON,
-economy, storage, tribes, dinos, transfers, inventory, commands, or any other unpromoted
-module family.
+economy, homes, teleport, safe zones, mobility, storage, tribes, dinos, transfers,
+inventory, commands, or any other unpromoted module family.
 
 ## Core v1 Principles
 

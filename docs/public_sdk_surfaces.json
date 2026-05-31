@@ -44,12 +44,14 @@
     "obelisk.inventory_items_mutation.v1",
     "obelisk.structure_census.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1"
   ],
   "post_v1_or_excluded_surfaces": [
     "obelisk.commands_replies.v1",
     "obelisk.permissions_admin.v1",
     "obelisk.inventory_items_mutation.v1",
+    "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
     "obelisk.arkapi_compatibility.v1"
   ],
@@ -69,6 +71,7 @@
     "The manifest is documentary until a release gate explicitly packages it.",
     "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly excluded in the v1 release statement before v1_completion_required can become true.",
+    "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "No surface may be listed as promoted unless its status is promoted.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a public_contract.",
     "docs/public_gameplay_events.json remains the detailed evidence source for GameplayPolicyEvent and ChatMessageEvent backing target sets."
@@ -463,7 +466,7 @@
     },
     {
       "id": "obelisk.structure_census.v1",
-      "category": "structure observer",
+      "category": "structure observer and build policy",
       "status": "planning",
       "support_tier": "blocked",
       "public_contract": [],
@@ -477,12 +480,16 @@
       "blockers": [
         "No public Structure SDK.",
         "No structure/player/base identity.",
+        "No ownership, placement/build-policy, no-collision, or admin-exception contract.",
         "No runtime lifecycle or privacy promotion."
       ],
       "exclusions": [
         "StructureEvents SDK",
         "structure identity",
         "structure lookup",
+        "ownership lookup",
+        "build placement policy",
+        "no-collision policy",
         "PIN outcome aggregate",
         "mutation",
         "return override"
@@ -501,18 +508,21 @@
           "dino-compact-intake",
           "transfer-ufunction-intake",
           "transfer-baccept-only-policy-slice",
+          "buff-compact-intake",
           "tribe-compact-intake"
         ]
       },
       "blockers": [
         "Current lanes are internal, planning-only, or layout-only.",
-        "No public identity, lookup, mutation, return override, or runtime promotion."
+        "No public identity, lookup, mutation, return override, or runtime promotion.",
+        "No public Buff SDK or class/object redaction contract."
       ],
       "exclusions": [
         "Mission SDK",
         "Transfer SDK",
         "Dino SDK",
         "Tribe SDK",
+        "Buff SDK",
         "teleport/spawn APIs",
         "ownership lookup",
         "cross-map correlation"
@@ -524,8 +534,15 @@
       "status": "post-v1",
       "support_tier": "blocked",
       "public_contract": [],
+      "depends_on": [
+        "obelisk.player_identity.v1",
+        "obelisk.permissions_admin.v1"
+      ],
       "blockers": [
-        "Needs identity, permissions, response path, command lifecycle, and abuse boundaries."
+        "Needs promoted player identity/principal semantics.",
+        "Needs promoted permission/authority model.",
+        "Needs a safe response path for replies/send-chat.",
+        "Needs command lifecycle and abuse boundaries."
       ],
       "exclusions": [
         "public command SDK/router",
@@ -576,6 +593,45 @@
         "item mutation",
         "return override",
         "ResourceHandle"
+      ]
+    },
+    {
+      "id": "obelisk.player_services_economy_mobility.v1",
+      "category": "player services, economy, mobility, and areas",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_name": "Blocked umbrella for player services, economy, mobility, and area policy",
+      "public_contract": [],
+      "depends_on": [
+        "obelisk.player_identity.v1",
+        "obelisk.permissions_admin.v1",
+        "obelisk.operator_ingress_storage.v1"
+      ],
+      "evidence": {
+        "demand_sources": [
+          "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
+          "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
+        ]
+      },
+      "blockers": [
+        "Umbrella blocker only; future promoted surfaces should split player services, economy/shops/rewards, mobility/homes/teleport, and area policy.",
+        "No promoted player/principal identity or permission model.",
+        "No persistence, migration, or cross-instance consistency contract.",
+        "No abuse, rate-limit, rollback, audit, or privacy policy for economy and mobility actions.",
+        "No safe runtime action surface for teleport, homes, rewards, kits, stats, safe zones, or timed notices."
+      ],
+      "exclusions": [
+        "economy API",
+        "shop API",
+        "rewards API",
+        "kits API",
+        "stats API",
+        "homes API",
+        "teleport API",
+        "safe-zone API",
+        "area policy API",
+        "broadcast/timed notice service",
+        "cross-instance persistence"
       ]
     },
     {

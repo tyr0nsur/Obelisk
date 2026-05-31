@@ -69,6 +69,7 @@ Current post-RC research lane:
 - [2026-05-30-nextgenplugins-reference-inventory.md](2026-05-30-nextgenplugins-reference-inventory.md)
 - [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md)
 - [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md)
+- [2026-05-31-commands-principal-routing-contract.md](2026-05-31-commands-principal-routing-contract.md)
 - [2026-05-30-chat-audit-plugin-plan.md](2026-05-30-chat-audit-plugin-plan.md)
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)
@@ -111,7 +112,8 @@ Current post-RC research lane:
 - [2026-05-29-reflection-inventory-pack-smoke.md](2026-05-29-reflection-inventory-pack-smoke.md)
 
 Keep this lane broad enough to preserve the full modding surface: players, tribes, dinos,
-items, structures, permissions, commands, admin, transfers, missions, timers, and storage.
+items, structures, permissions, commands, admin, transfers, missions, timers, storage,
+economy, homes, teleport, safe zones, and mobility.
 Focused evidence lanes such as copied chat, `ResourceHandle` blocker work, and
 `APrimalStructure.IsAllowedToBuild` triage are inputs to that broader map, not a narrowed
 v1 product center or SDK promise.

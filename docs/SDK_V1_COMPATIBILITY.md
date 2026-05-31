@@ -9,9 +9,10 @@ promote each important modding category through copied ABI contracts and evidenc
 explicitly exclude that category from the `v1.0` support statement.
 The machine-readable `v1_sdk_completion_blockers` list records the high-demand categories
 that currently prevent a complete SDK claim: player identity, commands/replies,
-permissions/admin, inventory/items mutation, structure census, gameplay modules, and
-operator ingress/storage. Those blockers must be promoted or deliberately excluded in the
-release statement before `v1_completion_required` can become true.
+permissions/admin, inventory/items mutation, structure census/build policy, gameplay
+modules including buffs, player services/economy/mobility/areas, and operator
+ingress/storage. Those blockers must be promoted or deliberately excluded in the release
+statement before `v1_completion_required` can become true.
 
 A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
@@ -56,9 +57,10 @@ later callbacks must copy those values into plugin-owned storage during init.
 
 ## Experimental Copied Event Patterns
 
-`GameplayPolicyEvent` is a promoted v0.1 copied ABI surface, but it remains
-`promoted-experimental-only` in the v1 compatibility inventory until the full SDK
-completion bar is met. It carries copied observational policy data for the named event
+`GameplayPolicyEvent` is a v0.1 copied ABI surface with release-readiness evidence, but it
+remains `promoted-experimental-only` in the v1 compatibility inventory until the full SDK
+completion bar is met. It must be promoted, downgraded, or explicitly excluded before a
+complete v1 SDK claim. It carries copied observational policy data for the named event
 kinds in [`public_gameplay_events.json`](public_gameplay_events.json). It is not an
 Inventory SDK, Items SDK, StructureEvents SDK, identity API, lookup API, mutation API, or
 return-override API.
@@ -84,6 +86,21 @@ sanitized logs, and global plugin config. Obelisk v1 does not promise a public c
 SDK/router, sender identity, permissions, replies, send-chat, moderation, blocking,
 mutation, return override, UE lookup, or raw UE/`FString`/params exposure.
 
+Commands/replies is post-v1 and blocked as a combined surface. It depends on a promoted
+player identity/principal contract, a promoted permission/authority model, and a safe
+response path for replies/send-chat before any public command router or reply API can be
+claimed.
+
+Future command/principal routing is a lifecycle and callback-ownership change, not a
+parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design
+must introduce a new copied C ABI surface with a named capability bit captured in the
+plugin's init-time `ObeliskApi` table, a nonzero `plugin_owner_token`, owner-token handle
+registration, owner-scoped unregister, plugin-owner cleanup on init failure or unload
+before `dlclose`, callback-scope copied payloads, and principal privacy/invalidation
+semantics. The runtime must reject ownerless command/principal callbacks and must not
+authorize routing from process-global capability state or debug gates that were not
+advertised to that plugin at init.
+
 Player identity is planning-only. `players-identity-lifecycle-intake` and
 `obelisk.players-identity-first-evidence.v1` are candidate-only,
 consume-only/promote-blocked evidence lanes, not public SDK or runtime readiness. The
@@ -92,10 +109,12 @@ as admin-mutation-not-public-identity, and fails closed until missing sanitized
 `ServerListPlayers` and `ServerKickPlayer` snapshots, accepted lifecycle anchors,
 principal privacy/invalidation semantics, and independent second-source evidence exist.
 
-Inventory/items mutation, structure/dino/tribe/mission/transfer module SDKs, RCON,
-database/storage services, webhooks, economy, homes, teleport, and permissions remain
-outside the current promoted scope. If they are included in the eventual `v1.0` support
-statement, they must be promoted before the release is called `v1.0`.
+Inventory/items mutation, structure ownership/placement/build policy/no-collision,
+dino/tribe/mission/transfer/buff module SDKs, RCON, database/storage services, webhooks,
+economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy,
+broadcast/timed notices, and permissions remain outside the current promoted scope. If
+they are included in the eventual `v1.0` support statement, they must be promoted before
+the release is called `v1.0`.
 
 ## v1.0 Release Bar
 
@@ -110,7 +129,10 @@ SDK compatibility statement based on `public_sdk_surfaces.json`. Any surface mar
 - documentation that does not imply blocked categories are available.
 
 Surfaces marked `promoted-experimental-only` can be useful RC/plugin-hub seeds, but they
-do not satisfy a complete v1 SDK claim by themselves.
+do not satisfy a complete v1 SDK claim by themselves. A complete `v1.0` release cannot
+leave `.v1` experimental contracts in that state; it must promote them to stable SDK
+surfaces, move them back to planning/post-v1, or explicitly exclude them in the release
+statement.
 
 If a high-demand category is not promoted, release notes must name it as excluded or
 post-v1 so plugin authors do not mistake foundation primitives for a complete ArkApi-style
