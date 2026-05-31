@@ -203,9 +203,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   and records consume-accepted/promote-blocked policy-slice gates. After this lane,
   Mission copied-bool is the next fastest internal copied-data bridge; Dino compact now
   has planning-only scalar policy notes in
-  `docs/research/2026-05-31-dino-scalar-policy-planning.md`, but remains behind Mission
-  until recognizer tests, copied-scalar ownership, lifecycle gates, and redaction review
-  exist.
+  `docs/research/2026-05-31-dino-scalar-policy-planning.md` and a local/test-only
+  pre-call copied-scalar builder for `AddPassenger` in `ProcessEventDinoReflection`. It
+  copies only `PassengerSeatIndex`, `bForcePassenger`, `bAllowFlyersAndWaterDinos`, and
+  `bSkipLineTrace`; `ACharacter`, `CanCarryPawn`, and all `ReturnValue` fields stay out.
+  Dino remains internal: no hook wiring, dispatcher, public ABI, identity, mutation,
+  return override, or runtime observation.
 - Item return-only bridge hardening now keeps copied dispatch construction in
   `ProcessEventItemReflection` helpers, with unit coverage for the three supported event
   kinds, `CraftBlueprint` rejection before runtime item-return reflection, exact
@@ -226,6 +229,19 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Plugin Hub planning starts from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
   `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`: production seeds are lifecycle/config/logging,
   descriptor/catalog, and process-local timers; copied chat/policy stays experimental.
+- Chat/commands near-term value is plugin-local parsing over copied `ChatMessageEvent`.
+  Do not promote a public command router, replies, send-chat, moderation, or player
+  permissions until copied player identity and a response path are separately promoted.
+- Player identity remains the main blocker for permissions, commands, economy, and
+  moderation. `players-identity-lifecycle-intake` is planning-only and currently lacks
+  sanitized `ServerListPlayers` and `ServerKickPlayer` snapshots plus accepted
+  login/logout lifecycle anchors, principal-copy policy, invalidation semantics, and an
+  independent second source.
+- Before adding more runtime copied-event producers, prefer a hot-path benchmark covering
+  disabled lanes, closed gates, zero budget, no-subscriber dispatch, nonmatching FNames,
+  <=4 subscriber stack snapshots, and 5-subscriber heap fallback. Structure/Inventory lack
+  dispatch allocation benchmarks; Mission has stack-first dispatcher behavior but no perf
+  guard yet.
 - Artifact-pack contributor onboarding now has `docs/OFFLINE_ARTIFACT_PACKS.md` as the
   concise runbook. UFunction regeneration and RC root assembly require complete
   `offline_core` artifact identity, sanitized capture/pack IDs, and current bool-tail

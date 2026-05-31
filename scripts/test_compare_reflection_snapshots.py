@@ -272,6 +272,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(readiness_scopes["mission-copied-bool-policy-slice"], "planning_only")
         self.assertEqual(classifications["players-identity-lifecycle-intake"], "planning_only")
         self.assertIs(release_flags["players-identity-lifecycle-intake"], False)
+        self.assertEqual(classifications["structure-aggregate-census-planning"], "planning_only")
+        self.assertIs(release_flags["structure-aggregate-census-planning"], False)
+        self.assertEqual(readiness_scopes["structure-aggregate-census-planning"], "planning_only")
         self.assertEqual(classifications["transfer-baccept-only-policy-slice"], "internal_layout_only")
         self.assertIs(release_flags["transfer-baccept-only-policy-slice"], False)
         self.assertEqual(readiness_scopes["transfer-baccept-only-policy-slice"], "internal_layout_only")
@@ -878,6 +881,23 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("target_set=structure-aggregate-census-planning", text_result.stdout)
         self.assertIn("structure_aggregate_census_guidance_only_candidate", text_result.stdout)
         self.assertIn("does not promote Structure aggregate/census SDK", text_result.stdout)
+
+    def test_structure_aggregate_census_note_preserves_default_off_and_pin_exclusion(self) -> None:
+        note = REPO_ROOT / "docs" / "research" / "2026-05-31-structure-aggregate-census-v0.md"
+        text = note.read_text(encoding="utf-8")
+
+        required_guardrails = [
+            "planning-only",
+            "default-off",
+            "VerifyPinCode.ReturnValue",
+            "No result or PIN-derived aggregate",
+            "Output window contains only approved counters and capped histograms",
+            "disabled gate, missing profile/window/marker, missing SHA, unsupported",
+            "Do not use live roots, restarts, ptrace, gcore, markers, `/servidor/ark`",
+        ]
+        for guardrail in required_guardrails:
+            with self.subTest(guardrail=guardrail):
+                self.assertIn(guardrail, text)
 
     def test_target_set_guidance_rejects_duplicate_target_set_filter(self) -> None:
         result = run_compare_raw(

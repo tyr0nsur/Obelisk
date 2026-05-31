@@ -325,6 +325,14 @@ target_include_directories(dino_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_
 
 add_test(NAME DinoReflectionTests COMMAND dino_reflection_tests)
 
+add_executable(process_event_dino_reflection_tests
+    tests/core/ProcessEventDinoReflectionTests.cpp
+    hooks/ProcessEventDinoReflection.cpp
+)
+target_include_directories(process_event_dino_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventDinoReflectionTests COMMAND process_event_dino_reflection_tests)
+
 add_executable(mission_reflection_tests
     tests/core/MissionReflectionTests.cpp
     ue/MissionReflection.cpp
