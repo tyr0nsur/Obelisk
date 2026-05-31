@@ -2083,6 +2083,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(term, promotion_requires)
 
+        self.assertIn(
+            "candidate-only permissions/admin query fail-closed contract",
+            permissions["v1_decision_contract"]["not_sufficient_evidence"],
+        )
+        release_guardrails = " ".join(manifest["release_guardrails"])
+        self.assertIn(
+            "obelisk.permissions-admin-query-failclosed-contract.v1 is a candidate-only pre-ABI permissions/admin artifact; "
+            "consume-mode acceptance is not public permissions/admin ABI, public SDK readiness, runtime readiness, or v1 SDK completion evidence.",
+            release_guardrails,
+        )
+
         for exclusion in (
             "permission groups",
             "admin groups",

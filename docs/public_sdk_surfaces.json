@@ -108,6 +108,7 @@
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Player identity/principal planning requires a non-protected complete core evidence pack plus a reviewed UFunction reflection-inventory pack; an offline ShooterGameServer binary, copied core, manual roots, or direct core/bin planning alone is not public SDK or promotion evidence.",
     "obelisk.players-identity-principal-invalidation-policy.v1 is a planning/candidate-only policy artifact; it does not promote player identity/principal, permissions/admin, command/chat response path, commands/replies, or v1 SDK completion.",
+    "obelisk.permissions-admin-query-failclosed-contract.v1 is a candidate-only pre-ABI permissions/admin artifact; consume-mode acceptance is not public permissions/admin ABI, public SDK readiness, runtime readiness, or v1 SDK completion evidence.",
     "While player identity waits on copied core/reflection evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
@@ -907,6 +908,7 @@
         "not_sufficient_evidence": [
           "player identity planning without promoted player identity",
           "permission cache sketches",
+          "candidate-only permissions/admin query fail-closed contract",
           "command/reply planning",
           "plugin-local command parser scaffolds",
           "static admin thunk orientation",

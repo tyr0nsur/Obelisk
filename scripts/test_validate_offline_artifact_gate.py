@@ -17,6 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import validate_offline_artifact_gate as gate
 import normalize_artifact_pack as artifact_pack
 import build_resource_handle_serial_policy as serial_policy_builder
+from test_check_permissions_admin_query_failclosed_contract import (
+    manifest as permissions_admin_query_failclosed_manifest,
+)
 
 
 BINARY_SHA = "a" * 64
@@ -6519,6 +6522,54 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("blocked", result["status"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_players_identity_principal_invalidation_policy_candidate_only", reasons)
+
+    def test_accepts_permissions_admin_query_failclosed_contract_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "permissions-admin-query-failclosed.json"
+            write_json(manifest, permissions_admin_query_failclosed_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_permissions_admin_query_failclosed_contract_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "permissions-admin-query-failclosed.json"
+            write_json(manifest, permissions_admin_query_failclosed_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_blocked_for_candidate_only_pre_abi_contract", reasons)
+        self.assertIn("candidate_only_permissions_admin_query_contract_not_readiness_evidence", reasons)
+
+    def test_blocks_permissions_admin_query_failclosed_contract_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "permissions-admin-query-failclosed.json"
+            payload = permissions_admin_query_failclosed_manifest()
+            payload["public_sdk_ready"] = True
+            payload["runtime_ready"] = True
+            payload["future_public_surface"] = {
+                "permission_groups": ["admin"],
+                "command_router": "registered",
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("public_sdk_ready_not_false", reasons)
+        self.assertIn("runtime_ready_not_false", reasons)
+        self.assertIn("forbidden_surface_claim", reasons)
 
     def test_blocks_players_identity_principal_invalidation_policy_child_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

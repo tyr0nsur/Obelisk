@@ -29,6 +29,7 @@ from snapshot_evidence_pack import SHA256_RE, SERVER_ROOT, sha256_file  # noqa: 
 import normalize_artifact_pack as artifact_pack  # noqa: E402
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates  # noqa: E402
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy  # noqa: E402
+import check_permissions_admin_query_failclosed_contract as permissions_admin_query_failclosed  # noqa: E402
 
 
 SCHEMA = "obelisk.offline-artifact-gate-result.v1"
@@ -124,6 +125,7 @@ STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-ce
 PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
 PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA = principal_invalidation_policy.SCHEMA
+PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA = permissions_admin_query_failclosed.SCHEMA
 STATIC_ORIENTATION_REPORT_SCHEMAS = {
     "obelisk.command-chat-response-static-orientation-check.v1",
     "obelisk.radare2-static-orientation-windows.v1",
@@ -168,6 +170,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
     PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA,
     PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA,
+    PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -6163,6 +6166,25 @@ def validate_players_identity_principal_invalidation_policy_manifest(
     return blockers
 
 
+def validate_permissions_admin_query_failclosed_contract_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA:
+        return []
+
+    check_mode = "promote" if mode == "promote" else "consume"
+    validation = permissions_admin_query_failclosed.validate_manifest(payload, check_mode=check_mode)
+    blockers: list[dict[str, Any]] = []
+    for blocker in validation.blockers:
+        copied = dict(blocker)
+        copied["label"] = f"{label}:{blocker.get('label', '$')}"
+        blockers.append(copied)
+    return blockers
+
+
 def validate_static_global_promotion_evidence_manifest(
     payload: dict[str, Any],
     *,
@@ -9367,6 +9389,7 @@ def validate_manifest(
     blockers.extend(validate_players_identity_first_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_lifecycle_anchor_candidates_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_principal_invalidation_policy_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_permissions_admin_query_failclosed_contract_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(

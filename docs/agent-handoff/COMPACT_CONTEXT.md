@@ -90,6 +90,9 @@ priorities, and do not use history files as the active source of truth.
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
   player identity. Identity and permissions decision contracts carry `v1_sequence_gate`
   entries preserving identity -> permissions -> command response -> commands/replies.
+  The candidate `obelisk.permissions-admin-query-failclosed-contract.v1` is now supported
+  by the offline artifact gate in consume mode only; it is not public ABI, runtime
+  readiness, public SDK readiness, or v1 completion evidence.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
@@ -269,6 +272,10 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
   now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
   lifecycle anchors plus principal invalidation semantics.
+  Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
+  scratch base-vs-vanilla evidence with `accepted=6`, but committed fixture readiness is
+  still blocked by `missing_base_snapshot=6` and promotion fails as planning-only. See
+  `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.
 - Player identity offline staging has a helper for the raw sibling layout:
   `scripts/prepare_player_identity_offline_raw_layout.py`. Use it only to stage explicit
   offline `ShooterGameServer` and core inputs into a
