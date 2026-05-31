@@ -4449,6 +4449,23 @@ def validate_item_return_only_policy_slice_manifest(payload: dict[str, Any], *, 
                     "recorded": sorted(field for field in excluded_fields if isinstance(field, str)),
                 }
             )
+        for index, entry in enumerate(excluded_entries):
+            entry_label = f"{label}:$.excluded_fields[{index}]"
+            if not isinstance(entry, dict):
+                blockers.append({"reason": "item_return_policy_excluded_field_entry_invalid", "label": entry_label})
+                continue
+            excluded_field = entry.get("excluded_field")
+            expected_target = excluded_field.rsplit(".", 1)[0] if isinstance(excluded_field, str) and "." in excluded_field else None
+            if entry.get("target") != expected_target:
+                blockers.append({"reason": "item_return_policy_excluded_field_target_mismatch", "label": entry_label})
+            source_snapshot = entry.get("source_snapshot")
+            if not isinstance(source_snapshot, str) or source_snapshot not in input_snapshot_sources:
+                blockers.append({"reason": "item_return_policy_excluded_field_source_snapshot_unknown", "label": f"{entry_label}.source_snapshot"})
+            elif (
+                isinstance(input_snapshot_sources[source_snapshot].get("target"), str)
+                and entry.get("target") != input_snapshot_sources[source_snapshot]["target"]
+            ):
+                blockers.append({"reason": "item_return_policy_excluded_field_source_snapshot_target_mismatch", "label": f"{entry_label}.source_snapshot"})
 
     coverage = payload.get("coverage")
     if not isinstance(coverage, dict):

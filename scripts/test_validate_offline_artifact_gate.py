@@ -313,6 +313,10 @@ def item_return_only_policy_slice_manifest(
         )
     ]
     source_by_target = {snapshot["target"]: snapshot for snapshot in input_snapshots}
+    excluded_source_by_target = {
+        snapshot["target"]: snapshot["id"]
+        for snapshot in input_snapshots
+    }
     copied_return_bools = [
         {
             "target": target,
@@ -362,9 +366,9 @@ def item_return_only_policy_slice_manifest(
                 "field": field.rsplit(".", 1)[1],
                 "excluded_field": field,
                 "reason": "unit_test_excluded",
-                "source_snapshot": f"snapshot-{index:04d}",
+                "source_snapshot": excluded_source_by_target[field.rsplit(".", 1)[0]],
             }
-            for index, field in enumerate(excluded_fields, start=1)
+            for field in excluded_fields
         ],
         "non_claims": non_claims,
         "safety_summary": {
@@ -4030,6 +4034,30 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual("accepted", result["status"])
         self.assertEqual([], result["blockers"])
         self.assertEqual(gate.ARTIFACT_PACK_MANIFEST_SCHEMA, result["manifests"][0]["schema"])
+
+    def test_artifact_pack_revalidates_item_return_excluded_field_source_snapshot_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            pack = workspace / "item-return-only-policy-slice-20260530T072255Z"
+            pack.mkdir(parents=True)
+            payload = item_return_only_policy_slice_manifest()
+            payload["excluded_fields"][0]["source_snapshot"] = "unknown-snapshot"
+            write_json(pack / "item-return-policy.json", payload)
+            artifact_pack.normalize_pack(pack, pack.name, "2026-05-30T07:22:55Z")
+
+            result = gate.build_result(
+                args(
+                    root=workspace,
+                    protected_root=protected,
+                    manifests=[pack / artifact_pack.MANIFEST_NAME],
+                    expected_binary_sha256="7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                )
+            )
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("item_return_policy_excluded_field_source_snapshot_unknown", reasons)
 
     def test_artifact_pack_scans_unsupported_child_json_for_generic_blockers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
