@@ -14,6 +14,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 BINARY_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 CORE_SHA = "8" * 64
+PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 
 
 class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
@@ -45,9 +46,12 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         *,
         functions: list[dict[str, object]] | None = None,
         manifest_updates: dict[str, object] | None = None,
+        target_sets: list[str] | None = None,
         write_inventory: bool = True,
     ) -> None:
         path.mkdir(parents=True)
+        if target_sets is None:
+            target_sets = [PLAYER_IDENTITY_TARGET_SET]
         manifest: dict[str, object] = {
             "schema": "obelisk.reflection-inventory-pack.v1",
             "status": "candidate-only",
@@ -60,6 +64,7 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
             },
             "binary": {"sha256": BINARY_SHA},
             "core": {"path": str(path.parent / "missing-core"), "sha256": CORE_SHA},
+            "inputs": {"target_sets": target_sets},
             "summary": {"fname_root_ready": True},
             "blockers": [],
             "artifacts": {"ufunction_inventory": "ufunction-inventory.json"},
@@ -68,7 +73,18 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
             manifest.update(manifest_updates)
         (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         if write_inventory:
-            inventory = {"status": "offline-inventory", "functions": functions or self.default_functions()}
+            rows = functions or self.default_functions()
+            inventory = {
+                "status": "offline-inventory",
+                "functions": rows,
+                "target_set_coverage": {
+                    "target_sets": target_sets,
+                    "requested_targets": [
+                        "ShooterPlayerController.ServerListPlayers",
+                        "ShooterPlayerController.ServerKickPlayer",
+                    ],
+                },
+            }
             (path / "ufunction-inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
 
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -150,6 +166,24 @@ class CheckReflectionInventoryPackReadinessTests(unittest.TestCase):
         self.assertIn("missing_target", codes)
         missing = [reason for reason in payload["reasons"] if reason["reason"] == "missing_target"]
         self.assertEqual(missing[0]["targets"], ["ShooterPlayerController.ServerKickPlayer"])
+
+    def test_wrong_player_identity_target_set_scope_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_pack(root / "pack", target_sets=["chat-message-intake"])
+
+            result = self.run_checker(["--root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertFalse(payload["ready"])
+        scope_reasons = [
+            reason
+            for reason in payload["reasons"]
+            if reason["reason"] == "wrong_target_scope"
+            and reason.get("field") in {"inputs.target_sets", "target_set_coverage.target_sets"}
+        ]
+        self.assertEqual(len(scope_reasons), 2)
+        self.assertIsNone(payload["accepted_pack"])
 
     def test_inventory_row_errors_are_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

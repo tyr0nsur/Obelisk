@@ -22,6 +22,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 REPORT_SCHEMA = "obelisk.reflection-inventory-pack-readiness-check.v1"
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
+PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 REQUIRED_TARGETS = (
     "ShooterPlayerController.ServerListPlayers",
     "ShooterPlayerController.ServerKickPlayer",
@@ -140,19 +141,19 @@ def target_from_row(row: dict[str, Any]) -> str | None:
     return f"{outer}.{name}"
 
 
-def load_inventory_targets(path: Path) -> tuple[set[str], list[dict[str, object]]]:
+def load_inventory_targets(path: Path) -> tuple[set[str], list[dict[str, object]], dict[str, Any] | None]:
     blockers: list[dict[str, object]] = []
     try:
         reject_symlink_component(path, "ufunction inventory")
         resolved = reject_protected_input_path(path, "ufunction inventory")
     except SystemExit as exc:
-        return set(), [reason("missing_ufunction_inventory", path=str(path), detail=str(exc))]
+        return set(), [reason("missing_ufunction_inventory", path=str(path), detail=str(exc))], None
     payload, error = load_json(resolved)
     if payload is None:
-        return set(), [reason("missing_ufunction_inventory", path=str(path), detail=error)]
+        return set(), [reason("missing_ufunction_inventory", path=str(path), detail=error)], None
     rows = payload.get("functions")
     if not isinstance(rows, list):
-        return set(), [reason("missing_ufunction_inventory", path=str(path), detail="functions_not_list")]
+        return set(), [reason("missing_ufunction_inventory", path=str(path), detail="functions_not_list")], payload
 
     targets: set[str] = set()
     seen: set[str] = set()
@@ -214,7 +215,75 @@ def load_inventory_targets(path: Path) -> tuple[set[str], list[dict[str, object]
                 **bounded_list_fields("duplicate_targets", sorted(duplicates)),
             )
         )
-    return targets, blockers
+    return targets, blockers, payload
+
+
+def player_identity_target_set_scope_blockers(
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    inventory_path: Path,
+    inventory: dict[str, Any] | None,
+) -> list[dict[str, object]]:
+    blockers: list[dict[str, object]] = []
+    inputs = manifest.get("inputs")
+    manifest_target_sets = inputs.get("target_sets") if isinstance(inputs, dict) else None
+    if not isinstance(manifest_target_sets, list) or PLAYER_IDENTITY_TARGET_SET not in manifest_target_sets:
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(manifest_path),
+                field="inputs.target_sets",
+                required=PLAYER_IDENTITY_TARGET_SET,
+                recorded=manifest_target_sets,
+            )
+        )
+
+    coverage = inventory.get("target_set_coverage") if isinstance(inventory, dict) else None
+    if not isinstance(coverage, dict):
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(inventory_path),
+                field="target_set_coverage",
+                required=PLAYER_IDENTITY_TARGET_SET,
+            )
+        )
+        return blockers
+
+    coverage_target_sets = coverage.get("target_sets")
+    if not isinstance(coverage_target_sets, list) or PLAYER_IDENTITY_TARGET_SET not in coverage_target_sets:
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(inventory_path),
+                field="target_set_coverage.target_sets",
+                required=PLAYER_IDENTITY_TARGET_SET,
+                recorded=coverage_target_sets,
+            )
+        )
+
+    requested_targets = coverage.get("requested_targets")
+    if not isinstance(requested_targets, list):
+        blockers.append(
+            reason(
+                "wrong_target_scope",
+                path=str(inventory_path),
+                field="target_set_coverage.requested_targets",
+                required=list(REQUIRED_TARGETS),
+            )
+        )
+    else:
+        missing = sorted(target for target in REQUIRED_TARGETS if target not in requested_targets)
+        if missing:
+            blockers.append(
+                reason(
+                    "wrong_target_scope",
+                    path=str(inventory_path),
+                    field="target_set_coverage.requested_targets",
+                    missing_targets=missing,
+                )
+            )
+    return blockers
 
 
 def manifest_scope_blockers(manifest_path: Path, manifest: dict[str, Any]) -> list[dict[str, object]]:
@@ -273,8 +342,11 @@ def evaluate_pack(manifest_path: Path, manifest: dict[str, Any]) -> dict[str, ob
     if inventory_path is None:
         pack_reasons.append(reason("missing_ufunction_inventory", path=str(manifest_path), detail="invalid_artifacts.ufunction_inventory"))
     else:
-        targets, inventory_reasons = load_inventory_targets(inventory_path)
+        targets, inventory_reasons, inventory = load_inventory_targets(inventory_path)
         pack_reasons.extend(inventory_reasons)
+        pack_reasons.extend(
+            player_identity_target_set_scope_blockers(manifest_path, manifest, inventory_path, inventory)
+        )
     missing = sorted(target for target in REQUIRED_TARGETS if target not in targets)
     if missing:
         pack_reasons.append(reason("missing_target", path=str(manifest_path), targets=missing))

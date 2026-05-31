@@ -24,6 +24,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
+PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 REDACTED_FUNCTION_KEYS = {
     "family",
     "function_flags",
@@ -194,7 +195,7 @@ def validate_manifest(manifest_path: Path, manifest: dict[str, object]) -> dict[
     }
 
 
-def load_functions(inventory_path: Path) -> list[dict[str, object]]:
+def load_functions(inventory_path: Path) -> tuple[list[dict[str, object]], dict[str, object]]:
     payload = load_json(inventory_path, "ufunction inventory")
     rows = payload.get("functions")
     if not isinstance(rows, list):
@@ -214,7 +215,46 @@ def load_functions(inventory_path: Path) -> list[dict[str, object]]:
         if not isinstance(outer, str) or not outer or not isinstance(name, str) or not name:
             raise SystemExit(f"{inventory_path}: functions[{index}] missing Outer.Name identity")
         functions.append(row)
-    return functions
+    return functions, payload
+
+
+def require_player_identity_target_set_scope(
+    manifest_path: Path,
+    manifest: dict[str, object],
+    inventory_path: Path,
+    inventory: dict[str, object],
+    requested_target_sets: list[str],
+) -> None:
+    if PLAYER_IDENTITY_TARGET_SET not in requested_target_sets:
+        return
+
+    inputs = manifest.get("inputs")
+    manifest_target_sets = inputs.get("target_sets") if isinstance(inputs, dict) else None
+    if not isinstance(manifest_target_sets, list) or PLAYER_IDENTITY_TARGET_SET not in manifest_target_sets:
+        raise SystemExit(
+            f"{manifest_path}: inputs.target_sets must include {PLAYER_IDENTITY_TARGET_SET} "
+            "before planning player identity snapshots"
+        )
+
+    coverage = inventory.get("target_set_coverage")
+    if not isinstance(coverage, dict):
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage for {PLAYER_IDENTITY_TARGET_SET} is required "
+            "before planning player identity snapshots"
+        )
+    coverage_target_sets = coverage.get("target_sets")
+    if not isinstance(coverage_target_sets, list) or PLAYER_IDENTITY_TARGET_SET not in coverage_target_sets:
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage.target_sets must include {PLAYER_IDENTITY_TARGET_SET} "
+            "before planning player identity snapshots"
+        )
+    requested_targets = coverage.get("requested_targets")
+    expected_targets = [qualified.partition(":")[2] for qualified in TARGET_SETS[PLAYER_IDENTITY_TARGET_SET]]
+    if not isinstance(requested_targets, list) or any(target not in requested_targets for target in expected_targets):
+        raise SystemExit(
+            f"{inventory_path}: target_set_coverage.requested_targets must include the complete "
+            f"{PLAYER_IDENTITY_TARGET_SET} target list before planning player identity snapshots"
+        )
 
 
 def load_targets(args: argparse.Namespace) -> tuple[list[str], dict[str, object]]:
@@ -250,8 +290,15 @@ def build_plan(args: argparse.Namespace) -> dict[str, object]:
     manifest = load_json(manifest_path, "inventory pack manifest")
     inventory_path = inventory_path_from_manifest(manifest_path, manifest)
     pack_defaults = validate_manifest(manifest_path, manifest)
-    functions = load_functions(inventory_path)
+    functions, inventory = load_functions(inventory_path)
     targets, target_source = load_targets(args)
+    require_player_identity_target_set_scope(
+        manifest_path,
+        manifest,
+        inventory_path,
+        inventory,
+        target_source["target_sets"],  # type: ignore[arg-type]
+    )
 
     payload = focal_planner.focal_snapshot_plan(
         functions,

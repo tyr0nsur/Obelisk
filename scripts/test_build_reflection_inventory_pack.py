@@ -719,6 +719,37 @@ class BuildReflectionInventoryPackTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("duplicate --plan-target: ShooterPlayerController.ServerSendChatMessage", result.stderr)
 
+    def test_player_identity_snapshot_target_set_requires_recorded_target_set_coverage(self) -> None:
+        result = self.run_builder(
+            [
+                "--core",
+                "/tmp/missing-core",
+                "--gobjects",
+                "0x1",
+                "--fname-root-slot",
+                "0x2",
+                "--ark-binary-sha256",
+                "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                "--capture-id",
+                "fixture-core",
+                "--evidence-pack-id",
+                "fixture-pack",
+                "--plan-snapshot-target-set",
+                "players-identity-lifecycle-intake",
+                "--evidence-obelisk-commit",
+                "fixture-commit",
+                "--output-dir",
+                "/tmp/obelisk-reflection-pack",
+            ],
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "--plan-snapshot-target-set players-identity-lifecycle-intake requires --target-set",
+            result.stderr,
+        )
+
     def test_plan_target_reports_missing_inventory_target_as_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

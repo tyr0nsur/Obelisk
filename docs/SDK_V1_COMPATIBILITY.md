@@ -90,6 +90,9 @@ Commands/replies is post-v1 and blocked as a combined surface. It depends on a p
 player identity/principal contract, a promoted permission/authority model, and a safe
 response path for replies/send-chat before any public command router or reply API can be
 claimed.
+Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency
+chain: if any of those surfaces remains blocked, planning, or post-v1, no complete v1 SDK
+claim is valid.
 
 Future command/principal routing is a lifecycle and callback-ownership change, not a
 parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design

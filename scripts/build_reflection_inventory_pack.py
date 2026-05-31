@@ -27,6 +27,7 @@ from snapshot_evidence_pack import (  # noqa: E402
 
 
 PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
+PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 DEFAULT_MAX_OBJECTS = ufunction_inventory.DEFAULT_MAX_OBJECTS
 DEFAULT_MAX_GROUPS = 20
 
@@ -191,6 +192,14 @@ def main() -> int:
                     "obelisk.ufunction-chain.snapshot.v1",
                 )
             )
+        )
+    if (
+        PLAYER_IDENTITY_TARGET_SET in args.plan_snapshot_target_set
+        and PLAYER_IDENTITY_TARGET_SET not in args.target_set
+    ):
+        raise SystemExit(
+            f"--plan-snapshot-target-set {PLAYER_IDENTITY_TARGET_SET} requires "
+            f"--target-set {PLAYER_IDENTITY_TARGET_SET} so the pack records player identity coverage"
         )
     if args.max_objects < 0:
         raise SystemExit("--max-objects must be non-negative")

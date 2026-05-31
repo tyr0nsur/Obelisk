@@ -55,7 +55,7 @@ priorities, and do not use history files as the active source of truth.
 - Current release baseline: `v0.1.0-rc.2` is published as the frozen core-first RC
   baseline after a clean release gate and exact tag/ref verification. It is not a
   production-stable `v1.0` claim. Post-RC work should move toward a broader `v1.0`
-  production core through architecture hardening, UE4 reflection evidence, copied-data
+  complete SDK through architecture hardening, UE4 reflection evidence, copied-data
   module APIs, and later compatibility for familiar ARK plugin concepts on top of
   Obelisk primitives.
 - `v1.0` stable means the complete public SDK contract for plugin authors, not merely a

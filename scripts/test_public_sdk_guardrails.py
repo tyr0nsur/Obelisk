@@ -1255,12 +1255,36 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "accepted lifecycle anchors",
             "principal privacy/invalidation semantics",
             "independent second-source evidence",
+            "Promote the smallest copied `player_identity`/principal lifecycle contract",
+            "Build a fail-closed permissions/admin query layer",
+            "Promote commands/replies as a new owner-token copied callback/response surface",
+            "not as a parser-only extension to `ChatMessageEvent`",
+            "preventing them from being mistaken for a complete ArkApi-style SDK",
             "mutation",
             "return override",
         )
         for term in required_terms:
             self.assertIn(normalized(term), compact)
         self.assertNotIn("promoted-minimal", text)
+
+    def test_handoff_resume_docs_do_not_redefine_v1_as_runtime_core(self) -> None:
+        paths = (
+            REPO_ROOT / "docs" / "agent-handoff" / "COMPACT_CONTEXT.md",
+            REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
+            PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+            REPO_ROOT / "README.md",
+            REPO_ROOT / "CHANGELOG.md",
+        )
+        forbidden_re = re.compile(r"v1\.0[^\n.]{0,80}production core|production core[^\n.]{0,80}v1\.0", re.IGNORECASE)
+
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            compact = normalized(text)
+            with self.subTest(path=path.relative_to(REPO_ROOT).as_posix(), check="forbidden-core-claim"):
+                self.assertIsNone(forbidden_re.search(text))
+            with self.subTest(path=path.relative_to(REPO_ROOT).as_posix(), check="sdk-complete-wording"):
+                self.assertRegex(compact, r"v1\.0|v1")
+                self.assertRegex(compact.lower(), r"complete sdk|sdk completo|sdk contract|complete, documented sdk")
 
     def test_public_sdk_v1_completion_blocks_unresolved_experimental_surfaces(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -1277,6 +1301,52 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("promoted, downgraded, or explicitly excluded", PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(
             encoding="utf-8"
         ))
+
+    def test_public_sdk_v1_completion_stays_false_while_command_dependency_chain_is_blocked(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        critical_chain = (
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.commands_replies.v1",
+        )
+        unresolved_statuses = {"planning", "post-v1", "promoted-experimental-only", "debug-only"}
+        unresolved = [
+            surface_id
+            for surface_id in critical_chain
+            if surfaces[surface_id]["status"] in unresolved_statuses
+            or surfaces[surface_id].get("support_tier") == "blocked"
+        ]
+
+        self.assertEqual(
+            surfaces["obelisk.commands_replies.v1"]["depends_on"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+            ],
+        )
+        self.assertTrue(unresolved)
+        self.assertTrue(set(unresolved).issubset(set(manifest["v1_sdk_completion_blockers"])))
+        self.assertFalse(
+            manifest["v1_completion_required"],
+            "v1 completion cannot be claimed while the command dependency chain is blocked",
+        )
+
+        release_guardrails = " ".join(manifest["release_guardrails"])
+        for term in (
+            "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
+            "if any of those surfaces remains blocked, planning, or post-v1",
+            "v1_completion_required must stay false",
+        ):
+            self.assertIn(term, release_guardrails)
+
+        compatibility = normalized(PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8"))
+        for term in (
+            "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain",
+            "if any of those surfaces remains blocked, planning, or post-v1",
+            "no complete v1 SDK claim is valid",
+        ):
+            self.assertIn(normalized(term), compatibility)
 
     def test_public_sdk_surfaces_manifest_blocks_player_services_until_identity_permissions_and_storage(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))

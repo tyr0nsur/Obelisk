@@ -71,6 +71,7 @@
     "The manifest is documentary until a release gate explicitly packages it.",
     "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly excluded in the v1 release statement before v1_completion_required can become true.",
+    "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "No surface may be listed as promoted unless its status is promoted.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a public_contract.",

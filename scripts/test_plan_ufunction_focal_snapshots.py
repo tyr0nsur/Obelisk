@@ -17,6 +17,7 @@ from reflection_target_sets import TARGET_SETS  # noqa: E402
 
 BINARY_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 CORE_SHA = "8" * 64
+PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 
 
 class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
@@ -69,6 +70,7 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         manifest_updates: dict[str, object] | None = None,
         identity_updates: dict[str, object] | None = None,
         summary_updates: dict[str, object] | None = None,
+        target_sets: list[str] | None = None,
     ) -> None:
         path.mkdir(parents=True)
         identity: dict[str, object] = {
@@ -102,7 +104,7 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                 "fname_root_slot": "0x595c000",
                 "fname_table": "0x12340000",
             },
-            "inputs": {"max_objects": 1234},
+            "inputs": {"max_objects": 1234, "target_sets": target_sets or []},
             "artifacts": {
                 "ufunction_inventory": "ufunction-inventory.json",
                 "fname_root_validation": "fname-root-validation.json",
@@ -116,6 +118,15 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
             "status": "offline-inventory",
             "functions": rows,
         }
+        if target_sets:
+            inventory["target_set_coverage"] = {
+                "target_sets": target_sets,
+                "requested_targets": [
+                    qualified.partition(":")[2]
+                    for target_set in target_sets
+                    for qualified in TARGET_SETS[target_set]
+                ],
+            }
         (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         (path / "ufunction-inventory.json").write_text(json.dumps(inventory), encoding="utf-8")
 
@@ -205,7 +216,8 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
             self.write_pack(
                 pack,
                 core_path=missing_core,
-                functions=self.rows_for_target_set("players-identity-lifecycle-intake"),
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
             )
 
             result = self.run_planner(
@@ -213,12 +225,12 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
                     "--inventory-pack",
                     str(pack),
                     "--target-set",
-                    "players-identity-lifecycle-intake",
+                    PLAYER_IDENTITY_TARGET_SET,
                 ]
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["target_source"]["target_sets"], ["players-identity-lifecycle-intake"])
+        self.assertEqual(payload["target_source"]["target_sets"], [PLAYER_IDENTITY_TARGET_SET])
         self.assertEqual(payload["target_source"]["loaded_target_count"], 12)
         self.assertEqual(payload["requested_count"], 12)
         self.assertEqual(payload["planned_command_count"], 12)
@@ -235,6 +247,59 @@ class PlanUFunctionFocalSnapshotsTests(unittest.TestCase):
         first_command = payload["snapshot_commands"][0]["argv"]
         self.assertIn("--snapshot-json", first_command)
         self.assertEqual(str(missing_core), payload["core"])
+
+    def test_player_identity_target_set_requires_matching_pack_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+            )
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-set",
+                    PLAYER_IDENTITY_TARGET_SET,
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("inputs.target_sets must include players-identity-lifecycle-intake", result.stderr)
+
+    def test_player_identity_target_set_requires_complete_coverage_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            pack = root / "pack"
+            self.write_pack(
+                pack,
+                core_path=root / "missing-core",
+                functions=self.rows_for_target_set(PLAYER_IDENTITY_TARGET_SET),
+                target_sets=[PLAYER_IDENTITY_TARGET_SET],
+            )
+            inventory_path = pack / "ufunction-inventory.json"
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory["target_set_coverage"]["requested_targets"] = [
+                "ShooterPlayerController.ServerListPlayers"
+            ]
+            inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+
+            result = self.run_planner(
+                [
+                    "--inventory-pack",
+                    str(pack),
+                    "--target-set",
+                    PLAYER_IDENTITY_TARGET_SET,
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target_set_coverage.requested_targets must include the complete", result.stderr)
 
     def test_unknown_target_set_rejects_before_planning(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
