@@ -2267,6 +2267,134 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             report["non_claims"],
         )
 
+    def test_planning_layout_intake_requires_readiness_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", "structure-aggregate-census-planning")
+
+            result = run_compare(
+                root / "base",
+                None,
+                "--target-set",
+                "structure-aggregate-census-planning",
+                "--planning-layout-intake",
+                "--json",
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("--planning-layout-intake requires --readiness-report", result.stderr)
+
+    def test_planning_layout_intake_rejects_promotion_gate_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", "structure-aggregate-census-planning")
+            write_target_set_root(root / "candidate", "structure-aggregate-census-planning")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                "structure-aggregate-census-planning",
+                "--planning-layout-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn(
+            "--planning-layout-intake is incompatible with --fail-on-readiness-gaps",
+            result.stderr,
+        )
+
+    def test_planning_layout_intake_accepts_only_planning_target_sets(self) -> None:
+        rejected_sets = ("minimal-second-source-intake", "transfer-baccept-only-policy-slice")
+        for target_set in rejected_sets:
+            with self.subTest(target_set=target_set), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_target_set_root(root / "base", target_set)
+                write_target_set_root(root / "candidate", target_set)
+
+                result = run_compare(
+                    root / "base",
+                    root / "candidate",
+                    "--readiness-report",
+                    "--target-set",
+                    target_set,
+                    "--planning-layout-intake",
+                    "--json",
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+                self.assertIn("--planning-layout-intake only accepts planning-only target sets", result.stderr)
+
+    def test_planning_layout_intake_emits_non_promotion_gate_for_planning_target_set(self) -> None:
+        target_set = "structure-aggregate-census-planning"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "planning_layout_intake")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(
+            report["planning_layout_gate"],
+            {
+                "ready": True,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+            },
+        )
+        self.assertIs(report["promotion_gate"]["ready"], False)
+        self.assertIs(report["promotion_gate"]["promotion_ready"], False)
+        self.assertIn(
+            {"reason": "planning_layout_intake_not_promotion_gate", "count": 1},
+            report["promotion_gate"]["blockers"],
+        )
+
+    def test_planning_layout_intake_contract_does_not_change_second_source_promotion_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_minimal_intake_snapshots(root / "base", root / "candidate")
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                "minimal-second-source-intake",
+                "--fail-on-readiness-gaps",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "second_source_promotion")
+        self.assertIs(report["promotion_gate"]["ready"], True)
+        self.assertIs(report["promotion_gate"]["promotion_ready"], False)
+        self.assertEqual(report["promotion_gate"]["blockers"], [])
+
     def test_readiness_report_blocks_overlapping_target_set_promotion_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2410,6 +2538,51 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "promotion_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
+        )
+
+    def test_planning_layout_intake_accepts_planning_only_layout_without_promotion(self) -> None:
+        target_set = "players-identity-lifecycle-intake"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "planning_layout_intake")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["second_source_accepted"], len(compare.TARGET_SETS[target_set]))
+        self.assertEqual(
+            report["planning_layout_gate"],
+            {
+                "ready": True,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+            },
+        )
+        self.assertFalse(report["promotion_gate"]["ready"])
+        self.assertFalse(report["promotion_gate"]["promotion_ready"])
+        self.assertIn(
+            {"reason": "planning_layout_intake_not_promotion_gate", "count": 1},
+            report["promotion_gate"]["blockers"],
+        )
+        self.assertNotIn(
+            {"reason": "not_second_source_promotion_gate", "count": 1},
+            report["promotion_gate"]["blockers"],
         )
 
     def test_readiness_report_blocks_mission_copied_bool_policy_slice_promotion_gate(self) -> None:

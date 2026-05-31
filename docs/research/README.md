@@ -103,6 +103,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md)
 - [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)
 - [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md)
+- [2026-05-31-planning-layout-intake-contract.md](2026-05-31-planning-layout-intake-contract.md)
 - [2026-05-31-player-identity-offline-pack-preflight.md](2026-05-31-player-identity-offline-pack-preflight.md)
 - [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md)
 - [2026-05-31-player-identity-static-target-orientation.md](2026-05-31-player-identity-static-target-orientation.md)
@@ -153,6 +154,10 @@ module-specific notes mean offline evidence readiness for the named layout or ar
 gate only. They do not make the named UE functions callable or usable plugin functions,
 and they do not authorize public SDK surfaces, runtime observers, hooks, mutation, return
 overrides, lookup, identity, or raw UE pointer access.
+The named `planning-layout-intake` contract is even narrower: it is planning-only and
+consume-only for closed layout target sets, currently oriented around player identity
+planning. It is not a promotion gate and must keep `promotion_ready=false`,
+`public_sdk_ready=false`, `runtime_ready=false`, and `release_readiness=false`.
 
 For the current inventory/mission route, the offline hardening target is boundary
 preservation. Inventory may use only the already promoted copied/redacted
@@ -307,6 +312,7 @@ when a task explicitly targets that module.
 | [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md) | Player identity lifecycle plan | Defines the first docs-only `players_identity_lifecycle` seed set from existing target names, with copied/redacted fields only and no ResourceHandle, lookup, SDK, runtime, mutation, or return override. |
 | [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md) | Player identity first evidence | Defines the smallest candidate-only identity evidence package needed before public permissions, commands, or economy SDK design can start. |
 | [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md) | Player identity target-set gap | Records that the planning target set is missing `ServerListPlayers` and `ServerKickPlayer` snapshots and still lacks accepted login/logout lifecycle anchors. |
+| [2026-05-31-planning-layout-intake-contract.md](2026-05-31-planning-layout-intake-contract.md) | Planning layout intake contract | Defines `planning-layout-intake` as a planning-only, consume-only layout contract for player identity target sets, with no promotion, SDK, runtime, or release-readiness claim. |
 | [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md) | Player identity static admin thunks | Preserves lightweight static clues for `ServerListPlayers` and `ServerKickPlayer` native thunks while keeping them orientation-only and not a substitute for core/reflection inventory evidence. |
 | [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md) | Permissions/admin minimum post-identity | Defines the smallest safe post-identity permission/admin design as query-only, owner-scoped, capability-gated, process-local, and fail-closed while keeping public permissions, admin actions, commands, replies, storage, and operator ingress blocked. |
 | [2026-05-31-offline-artifact-curation.md](2026-05-31-offline-artifact-curation.md) | Offline artifact curation | Classifies current non-protected artifact roots into usable planning inputs, legacy/blocked roots, and player-identity non-inputs. |

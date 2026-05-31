@@ -465,6 +465,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--planning-layout-intake",
+        action="store_true",
+        help=(
+            "With --readiness-report, evaluate planning-only target sets as consume-only "
+            "layout planning evidence. This is not a promotion gate."
+        ),
+    )
+    parser.add_argument(
         "--list-target-sets",
         action="store_true",
         help="List named target sets and exit without reading snapshot roots.",
@@ -1446,6 +1454,8 @@ def apply_readiness_gate_mode(report: dict[str, Any]) -> None:
         return
     if report.get("gate_mode") == "second_source_promotion":
         return
+    if report.get("gate_mode") == "planning_layout_intake":
+        return
     promotion_gate = report.get("promotion_gate")
     if not isinstance(promotion_gate, dict) or not promotion_gate.get("ready"):
         return
@@ -1453,6 +1463,50 @@ def apply_readiness_gate_mode(report: dict[str, Any]) -> None:
     blockers = promotion_gate.setdefault("blockers", [])
     if isinstance(blockers, list):
         blockers.append({"reason": "not_second_source_promotion_gate", "count": 1})
+
+
+def apply_planning_layout_intake_gate(report: dict[str, Any], target_sets: list[str]) -> None:
+    if report.get("schema") != "obelisk.reflection-snapshot-readiness.v1":
+        return
+    if report.get("gate_mode") != "planning_layout_intake":
+        return
+
+    totals = report.get("totals", {})
+    blockers: list[dict[str, Any]] = []
+    if totals.get("targets") == 0:
+        blockers.append({"reason": "no_targets", "count": 1})
+    if totals.get("blocked"):
+        blockers.append({"reason": "blocked_base_targets", "count": totals["blocked"]})
+    if totals.get("second_source_rejected"):
+        blockers.append({"reason": "rejected_second_source", "count": totals["second_source_rejected"]})
+    if totals.get("second_source_inconclusive"):
+        blockers.append({"reason": "inconclusive_second_source", "count": totals["second_source_inconclusive"]})
+    if totals.get("second_source_missing"):
+        blockers.append({"reason": "missing_second_source", "count": totals["second_source_missing"]})
+
+    requested = set(target_sets)
+    non_planning = sorted(requested - PLANNING_ONLY_TARGET_SETS)
+    if non_planning:
+        blockers.append({"reason": "target_set_not_planning_only", "count": len(non_planning)})
+
+    report["planning_layout_gate"] = {
+        "ready": not blockers,
+        "ready_scope": "planning_only" if not blockers else "not_ready",
+        "layout_ready": not blockers,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "blockers": blockers,
+    }
+
+    promotion_gate = report.get("promotion_gate")
+    if isinstance(promotion_gate, dict):
+        promotion_gate["ready"] = False
+        promotion_gate["ready_scope"] = "planning_only"
+        promotion_gate["promotion_ready"] = False
+        promotion_blockers = promotion_gate.setdefault("blockers", [])
+        if isinstance(promotion_blockers, list):
+            promotion_blockers.append({"reason": "planning_layout_intake_not_promotion_gate", "count": 1})
 
 
 def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[str]) -> None:
@@ -1582,6 +1636,19 @@ def main() -> int:
         raise SystemExit("--base-root is required unless --list-target-sets or --list-target-guidance is used")
     if args.fail_on_readiness_gaps and args.allow_ark_sha_mismatch:
         raise SystemExit("--allow-ark-sha-mismatch is incompatible with --fail-on-readiness-gaps")
+    if args.planning_layout_intake and not args.readiness_report:
+        raise SystemExit("--planning-layout-intake requires --readiness-report")
+    if args.planning_layout_intake and args.fail_on_readiness_gaps:
+        raise SystemExit("--planning-layout-intake is incompatible with --fail-on-readiness-gaps")
+    if args.planning_layout_intake and not args.target_set:
+        raise SystemExit("--planning-layout-intake requires at least one --target-set")
+    if args.planning_layout_intake:
+        non_planning = sorted(set(args.target_set) - PLANNING_ONLY_TARGET_SETS)
+        if non_planning:
+            raise SystemExit(
+                "--planning-layout-intake only accepts planning-only target sets: "
+                + ", ".join(non_planning)
+            )
     reject_protected_input_path("--base-root", args.base_root)
     if args.candidate_root:
         reject_protected_input_path("--candidate-root", args.candidate_root)
@@ -1600,9 +1667,12 @@ def main() -> int:
             report["gate_mode"] = "second_source_promotion"
         elif args.fail_on_base_readiness_gaps:
             report["gate_mode"] = "base_fixture_readiness"
+        elif args.planning_layout_intake:
+            report["gate_mode"] = "planning_layout_intake"
         else:
             report["gate_mode"] = "informational_gap_report"
         apply_readiness_gate_mode(report)
+        apply_planning_layout_intake_gate(report, args.target_set)
         require_target_set_for_promotion(report, args.target_set)
         block_explicit_targets_outside_named_target_sets(report, args.target, args.target_set)
         block_ambiguous_target_set_coverage(report, args.target_set)
@@ -1636,6 +1706,9 @@ def main() -> int:
             if totals["second_source_inconclusive"] or totals["second_source_missing"]:
                 return 2
             if not report["promotion_gate"].get("ready"):
+                return 1
+        if args.planning_layout_intake:
+            if not report.get("planning_layout_gate", {}).get("ready"):
                 return 1
         return 0
     if report["counts"]["rejected"]:
