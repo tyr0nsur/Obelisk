@@ -16,6 +16,7 @@ from typing import Any
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence
+import validate_offline_artifact_gate as offline_artifact_gate
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -792,6 +793,71 @@ def lifecycle_anchor_diagnosis(first_evidence_payload: dict[str, Any] | None) ->
     }
 
 
+def first_evidence_consume_gate_diagnosis(
+    first_evidence_payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "mode": "consume",
+        "evaluated": False,
+        "status": "not_evaluated",
+        "ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "blockers": [],
+        "blocker_reasons": [],
+        "non_claims": [
+            "schema-specific consume diagnostic only; does not promote player identity, runtime readiness, public SDK readiness, lookup, ResourceHandle, mutation, or return override",
+        ],
+    }
+    if not isinstance(first_evidence_payload, dict):
+        return {**base, "reason": "players_identity_first_evidence_payload_missing_or_malformed"}
+    if first_evidence_payload.get("schema") != FIRST_EVIDENCE_SCHEMA:
+        return {
+            **base,
+            "reason": "players_identity_first_evidence_schema_mismatch",
+            "recorded_schema": first_evidence_payload.get("schema"),
+        }
+    required_gate_fields = {
+        "artifact_identity",
+        "fields",
+        "forced_redacted_fields",
+        "forbidden_fields",
+        "generated_from",
+        "non_claims",
+        "promotion_gate",
+        "safety_summary",
+        "target_set_coverage",
+        "targets",
+    }
+    missing_gate_fields = sorted(required_gate_fields.difference(first_evidence_payload))
+    if missing_gate_fields:
+        return {
+            **base,
+            "reason": "players_identity_first_evidence_payload_not_full_artifact_shape",
+            "missing_gate_fields": missing_gate_fields,
+        }
+
+    blockers = offline_artifact_gate.validate_players_identity_first_evidence_manifest(
+        first_evidence_payload,
+        label="<build_redacted_ufunction_signatures.stdout>",
+        mode="consume",
+    )
+    reasons = [
+        blocker["reason"]
+        for blocker in blockers
+        if isinstance(blocker, dict) and isinstance(blocker.get("reason"), str)
+    ]
+    return {
+        **base,
+        "evaluated": True,
+        "status": "accepted" if not blockers else "blocked",
+        "ready": not blockers,
+        "blockers": blockers,
+        "blocker_reasons": sorted(set(reasons)),
+    }
+
+
 def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str, Any]:
     base: dict[str, Any] = {
         "provided": path is not None,
@@ -1171,6 +1237,13 @@ def next_actionable_blocker(
             "code": "distinct_second_source_evidence_missing_or_not_accepted",
             "blocked_until": "accepted_distinct_second_source_snapshot_comparison",
             "why": "first-source fixtures are present enough to continue, but second-source evidence is not accepted",
+        }
+    if "players_identity_first_evidence_consume_gate_blocked" in downstream_blockers:
+        return {
+            **base,
+            "code": "players_identity_first_evidence_consume_gate_blocked",
+            "blocked_until": "validate_offline_artifact_gate_consume_accepts_players_identity_first_evidence",
+            "why": "the first-evidence builder emitted candidate JSON, but the offline artifact consume gate rejected it",
         }
     if "accepted_lifecycle_anchors_missing" in downstream_blockers:
         return {
@@ -1627,6 +1700,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     )
     first_evidence_ready = first_evidence_result.returncode == 0 and first_evidence_payload_valid
     missing_targets = parse_missing_required_targets(first_evidence_result.stderr)
+    first_evidence_consume_gate = first_evidence_consume_gate_diagnosis(first_evidence_payload)
     first_evidence_lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
     lifecycle_candidate_diagnosis = lifecycle_anchor_candidate_manifest_diagnosis(
         getattr(args, "lifecycle_anchor_candidates_manifest", None)
@@ -1688,6 +1762,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         downstream_blockers.append("second_source_evidence_not_accepted")
     if not first_evidence_ready:
         downstream_blockers.append("players_identity_first_evidence_not_buildable")
+    elif (
+        first_evidence_consume_gate.get("evaluated") is True
+        and first_evidence_consume_gate.get("ready") is not True
+    ):
+        downstream_blockers.append("players_identity_first_evidence_consume_gate_blocked")
     if not lifecycle_ready:
         downstream_blockers.append("accepted_lifecycle_anchors_missing")
     if lifecycle_ready and not principal_invalidation_ready:
@@ -1968,6 +2047,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "returncode": first_evidence_result.returncode,
             "ready": first_evidence_ready,
             "schema": first_evidence_payload.get("schema") if first_evidence_payload else None,
+            "consume_gate": first_evidence_consume_gate,
             "missing_required_targets": missing_targets,
             "lifecycle_anchors": lifecycle_diagnosis,
             "generated_lifecycle_anchors": first_evidence_lifecycle_diagnosis,

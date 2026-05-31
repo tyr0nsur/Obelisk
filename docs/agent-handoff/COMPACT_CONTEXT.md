@@ -286,12 +286,15 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
   is accepted by the offline artifact gate. Passing both that lifecycle-anchor candidate
   manifest and the principal-invalidation policy manifest to the first-evidence readiness
-  checker moves the primary blocker to `approved_runtime_evidence_missing`, still with
-  promotion/public/runtime readiness false. The report also carries a requirements-only
-  `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
-  runtime window; it is not accepted evidence and must not be used for promotion. The
-  optional runtime-principal lifecycle manifest checker accepts only a synthetic/redacted
-  shape fixture and stays blocked on approved runtime evidence.
+  checker now first exposes `players_identity_first_evidence_consume_gate_blocked`: the
+  generated first-evidence payload is rejected for
+  `players_identity_first_evidence_artifact_identity_source_id_count_mismatch` and
+  `players_identity_first_evidence_public_overclaim_public_api`. Fix that offline artifact
+  shape before treating approved runtime evidence as the immediate blocker again. The
+  report still carries a requirements-only `first_evidence.runtime_principal_lifecycle_evidence`
+  block for the future approved runtime window; it is not accepted evidence and must not be
+  used for promotion. The optional runtime-principal lifecycle manifest checker accepts only
+  a synthetic/redacted shape fixture and stays blocked on runtime promotion.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as

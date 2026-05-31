@@ -28,6 +28,8 @@ from reflection_target_sets import schema_target_list  # noqa: E402
 
 class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env.setdefault("OBELISK_COMMIT", "test-obelisk-commit")
         return subprocess.run(
             [
                 sys.executable,
@@ -36,6 +38,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             ],
             check=check,
             cwd=REPO_ROOT,
+            env=env,
             capture_output=True,
             text=True,
         )
@@ -260,6 +263,26 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["fixture_coverage"]["second_source_rejected"], 0)
         self.assertIsNone(payload["candidate_root"])
         self.assertEqual(payload["first_evidence"]["missing_required_targets"], [])
+        consume_gate = payload["first_evidence"]["consume_gate"]
+        self.assertTrue(consume_gate["evaluated"])
+        self.assertEqual(consume_gate["mode"], "consume")
+        self.assertEqual(consume_gate["status"], "blocked")
+        self.assertFalse(consume_gate["ready"])
+        self.assertFalse(consume_gate["promotion_ready"])
+        self.assertFalse(consume_gate["public_sdk_ready"])
+        self.assertFalse(consume_gate["runtime_ready"])
+        self.assertIn(
+            "players_identity_first_evidence_artifact_identity_source_id_count_mismatch",
+            consume_gate["blocker_reasons"],
+        )
+        self.assertIn(
+            "players_identity_first_evidence_public_overclaim_public_api",
+            consume_gate["blocker_reasons"],
+        )
+        self.assertIn(
+            "players_identity_first_evidence_consume_gate_blocked",
+            payload["deferred_until_reflection_inventory_ready"],
+        )
         self.assertFalse(payload["first_evidence"]["lifecycle_anchors"]["session_start_accepted"])
         self.assertFalse(payload["first_evidence"]["lifecycle_anchors"]["session_end_accepted"])
         self.assertIn(
