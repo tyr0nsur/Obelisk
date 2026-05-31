@@ -960,7 +960,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         serialized = json.dumps(manifest, sort_keys=True)
         self.assertNotIn("/servidor/ark", serialized)
-        self.assertIn("complete, documented SDK contract", manifest["compatibility_statement"])
+        self.assertIn("v1.0 stable", manifest["compatibility_statement"])
+        self.assertIn("complete public SDK contract", manifest["compatibility_statement"])
+        self.assertIn("not a runtime/core-first RC", manifest["compatibility_statement"])
 
     def test_public_sdk_surfaces_manifest_classifies_expected_surfaces(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -1039,6 +1041,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertTrue(v1_blockers.issubset(planning | post_or_excluded))
         release_guardrails = " ".join(manifest["release_guardrails"])
+        self.assertIn(
+            "A v1.0 stable claim must mean the complete public SDK contract for plugin authors, "
+            "not runtime/core-first RC readiness or internal runtime stability alone.",
+            release_guardrails,
+        )
+        self.assertIn(
+            "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, "
+            "chat send/broadcast, player progression/engrams, economy, mobility, and operator "
+            "ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly "
+            "excluded by name in the v1 release statement.",
+            release_guardrails,
+        )
         self.assertIn("Every v1_sdk_completion_blocker", release_guardrails)
         self.assertIn("before v1_completion_required can become true", release_guardrails)
         self.assertIn("Every promoted-experimental-only surface", release_guardrails)
@@ -1111,6 +1125,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         release_guardrails = normalized(" ".join(manifest["release_guardrails"]))
         for term in (
             "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers",
+            "those pre-identity production seeds are not enough for v1 completion",
             "passive chat parsing and plugin-local routing remain promoted-experimental-only",
         ):
             self.assertIn(normalized(term), release_guardrails)
@@ -1240,9 +1255,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Needs promoted player identity/principal semantics.",
             "Needs promoted permission/authority model.",
             "Needs a safe response path for replies/send-chat.",
+            "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
             "Needs command lifecycle and abuse boundaries.",
         ):
             self.assertIn(blocker, commands["blockers"])
+
+        for audit_unit in (
+            "command router",
+            "replies/send-chat",
+            "broadcast/notices",
+            "moderation/admin command authority",
+        ):
+            self.assertIn(audit_unit, commands["audit_units"])
 
         for exclusion in (
             "public command SDK/router",
@@ -1250,20 +1274,62 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "player command API",
             "chat replies",
             "send-chat",
+            "broadcast/notices API",
             "moderation",
         ):
             self.assertIn(exclusion, commands["exclusions"])
+
+    def test_public_sdk_surfaces_manifest_names_high_demand_umbrella_audit_units(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        gameplay = surfaces["obelisk.mission_transfer_dino_tribe.v1"]
+        inventory = surfaces["obelisk.inventory_items_mutation.v1"]
+        services = surfaces["obelisk.player_services_economy_mobility.v1"]
+
+        for audit_unit in (
+            "dino policy/cosmetics/carry restrictions",
+            "tribe identity/notices/policy",
+            "buff/status policy",
+        ):
+            self.assertIn(audit_unit, gameplay["audit_units"])
+
+        for exclusion in ("Dino SDK", "Tribe SDK", "Buff/status SDK"):
+            self.assertIn(exclusion, gameplay["exclusions"])
+
+        for audit_unit in (
+            "inventory/item lookup",
+            "item grant/remove mutation",
+            "kits/rewards",
+            "player progression/engrams",
+        ):
+            self.assertIn(audit_unit, inventory["audit_units"])
+
+        for exclusion in ("kits/rewards", "engram/progression API"):
+            self.assertIn(exclusion, inventory["exclusions"])
+
+        for audit_unit in (
+            "economy/shops/rewards/kits/stats",
+            "mobility/homes/teleport",
+            "safe-zone/area policy",
+            "broadcast/timed notices",
+        ):
+            self.assertIn(audit_unit, services["audit_units"])
 
     def test_sdk_v1_compatibility_doc_tracks_manifest_and_exclusions(self) -> None:
         text = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
         compact = normalized(text)
         required_terms = (
             "public_sdk_surfaces.json",
+            "`v1.0 stable` must mean for plugin authors",
+            "the complete public SDK contract",
+            "not a runtime/core-first RC",
+            "not just proof that the internal runtime is stable",
             "v1.0",
             "SDK contract",
             "v1_sdk_completion_blockers",
             "player identity, commands/replies",
             "before `v1_completion_required` can become true",
+            "pre-identity production seeds are not enough for v1 completion",
             "structure census/build policy",
             "gameplay modules including buffs",
             "player services/economy/mobility/areas",
@@ -1283,7 +1349,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "StructureEvents SDK",
             "ResourceHandle",
             "buff module SDKs",
-            "economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy",
+            "economy, shops, rewards, kits, stats, player progression/engrams, homes, teleport, safe zones, area policy",
+            "chat send/broadcast",
+            "dino policy/cosmetics/carry restrictions",
+            "tribe identity/notices/policy",
+            "buff/status",
+            "command router, replies/send-chat, broadcast/notices",
+            "inventory/item lookup, item grants/removal, kits/rewards, and player progression/engrams",
+            "Umbrella names do not imply coverage",
+            "operator ingress/storage each need a\nnarrow copied C ABI surface or an explicit named exclusion",
             "ArkApi",
             "post-v1",
             "Player identity is planning-only",
@@ -1301,6 +1375,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Promote commands/replies as a new owner-token copied callback/response surface",
             "not as a parser-only extension to `ChatMessageEvent`",
             "preventing them from being mistaken for a complete ArkApi-style SDK",
+            "Passing runtime/core-first RC gates",
+            "pre-identity production seed usefulness is insufficient for `v1.0 stable`",
+            "blocker list is promoted or explicitly excluded",
             "mutation",
             "return override",
         )
@@ -1515,10 +1592,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("buff-compact-intake", modules["evidence"]["planning_target_sets"])
         for token in (
             "No public Buff SDK or class/object redaction contract.",
-            "Buff SDK",
+            "Buff/status SDK",
         ):
             self.assertIn(token, json.dumps(modules))
-        self.assertEqual(modules["audit_units"], ["mission", "transfer", "dino", "tribe", "buff"])
+        self.assertEqual(
+            modules["audit_units"],
+            [
+                "mission",
+                "transfer",
+                "dino policy/cosmetics/carry restrictions",
+                "tribe identity/notices/policy",
+                "buff/status policy",
+            ],
+        )
         for requirement in (
             "buff class/object redaction contract",
             "buff lifecycle, stacking, and invalidation semantics",
@@ -1981,8 +2067,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (obase_doc, "optional plugin-local chat command helper layered on copied `ChatMessageEvent`"),
             (descriptor_doc, "metadata-only SDK discovery"),
             (descriptor_doc, "does not register callbacks, timers, chat handlers"),
+            (descriptor_doc, "safe-disabled config before requiring the optional descriptor API slots"),
+            (descriptor_doc, "`ObeliskApi::struct_size` through `DescribeGameplayPolicyEventKind`"),
+            (descriptor_doc, "fail closed without registering callbacks or timers"),
+            (descriptor_doc, "no owner-token runtime state because it does not register\ncallbacks or timers"),
+            (descriptor_doc, "`FName`, `GNames`, `GObjects`,\n`UObject`, or raw UE pointer access"),
             (timer_doc, "process-local timers"),
             (timer_doc, "does not use or imply UE timers, gameplay timers, `ProcessEvent`"),
+            (timer_doc, "`ObeliskApi::struct_size` through `UnregisterTimerWithOwnerToken`"),
+            (timer_doc, "non-null timer\nregister/unregister function pointers"),
+            (timer_doc, "non-zero `plugin_owner_token` before any\nregistration"),
             (plugins_readme, "Production-supported seed examples are limited to lifecycle/config/logging, descriptor\nreaders, and process-local timer utilities"),
             (plugins_readme, "Those production-supported seeds still must\nkeep the shared safe default config posture"),
             (plugins_readme, "raw `ProcessEvent` callbacks\n  require explicit debug gates"),
@@ -2605,6 +2699,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "the runtime evaluates the plugin activation envelope before calling `ObeliskPlugin_Init`",
             "minimal example does not parse config itself",
             "must not be copied as the activation model for feature plugins",
+            "enforcing `struct_size` gates before reading appended API slots",
             "validating `plugin_owner_token`",
             "unregistering owned runtime state",
         ):
@@ -5123,6 +5218,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "promote identity",
             "authorize runtime work",
             "create a public SDK surface",
+            "artifact_pack_container_not_reflection_inventory",
+            "scriptstruct_pack_not_reflection_inventory",
+            "does not currently contain a non-protected `obelisk.core-dump-evidence-pack.v1` manifest",
+            "safe inventory-build route",
         ):
             with self.subTest(doc="preflight", term=term):
                 self.assertIn(normalized(term), docs["preflight"])

@@ -19,9 +19,10 @@ calling `ObeliskPlugin_Init`: `enabled=false`, a missing or non-matching
 `instance_allowlist`, or an unsafe allowlist prevents the plugin from initializing. This
 minimal example does not parse config itself and must not be copied as the activation
 model for feature plugins. Once a plugin uses an optional surface such as events or
-timers, follow the reference plugins by checking capabilities, validating
-`plugin_owner_token`, keeping returned handles, and unregistering owned runtime state
-during shutdown or init-failure cleanup.
+timers, follow the reference plugins by checking capabilities, enforcing `struct_size`
+gates before reading appended API slots, validating `plugin_owner_token`, keeping
+returned handles, and unregistering owned runtime state during shutdown or init-failure
+cleanup.
 
 The example intentionally uses the installed SDK package and the current numeric
 compatibility floor:

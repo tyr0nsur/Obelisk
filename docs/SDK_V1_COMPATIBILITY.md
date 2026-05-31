@@ -1,7 +1,9 @@
 # SDK v1 Compatibility Contract
 
-This document defines what `v1.0` must mean for plugin authors. It is a compatibility
-target, not a claim that the current post-RC tree is already a complete `v1.0` SDK.
+This document defines what `v1.0 stable` must mean for plugin authors: the complete
+public SDK contract, not a runtime/core-first RC and not just proof that the internal
+runtime is stable. It is a compatibility target, not a claim that the current post-RC tree
+is already a complete `v1.0` SDK.
 
 The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfaces.json).
 `v1.0` must not be used for a runtime-only release. A stable SDK release must either
@@ -16,7 +18,8 @@ statement before `v1_completion_required` can become true.
 
 A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
-timers. That seed is useful for contributors, but it is not a `v1.0` complete SDK claim.
+timers. That seed is useful for contributors, but pre-identity production seeds are not
+enough for v1 completion and are not a `v1.0` complete SDK claim.
 Copied chat and gameplay-policy examples are experimental copied-data patterns only.
 Higher-level ArkApi-style categories remain outside the current promoted scope until each
 has its own copied C ABI design, privacy/ownership rules, lifecycle cleanup, SDK consumer
@@ -131,13 +134,17 @@ surfaces while preventing them from being mistaken for a complete ArkApi-style S
 
 Inventory/items mutation, structure ownership/placement/build policy/no-collision,
 dino/tribe/mission/transfer/buff module SDKs, RCON, database/storage services, webhooks,
-economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy,
-broadcast/timed notices, and permissions remain outside the current promoted scope. The
-machine-readable blocker entries keep those broad areas auditable as release-statement
-units: structure aggregate/census, ownership/access identity, placement/build-policy,
-no-collision and admin exceptions; buff redaction, lifecycle/stacking/invalidation, and
-aggregate/proximity/count/mutation exclusions; and player services, economy, mobility,
-area policy, and timed-notice services. Economy and mobility require promoted
+economy, shops, rewards, kits, stats, player progression/engrams, homes, teleport, safe
+zones, area policy, chat send/broadcast, timed notices, and permissions remain outside
+the current promoted scope. The machine-readable blocker entries keep those broad areas
+auditable as release-statement units: structure aggregate/census, ownership/access
+identity, placement/build-policy, no-collision and admin exceptions; dino
+policy/cosmetics/carry restrictions, tribe identity/notices/policy, buff/status
+redaction, lifecycle/stacking/invalidation, and aggregate/proximity/count/mutation
+exclusions; command router, replies/send-chat, broadcast/notices, and moderation/admin
+authority; inventory/item lookup, item grants/removal, kits/rewards, and player
+progression/engrams; and player services, economy, mobility, area policy, and
+timed-notice services. Economy and mobility require promoted
 identity/principal, permissions/admin, and storage/persistence; identity alone is
 insufficient. If they are included in the eventual `v1.0` support statement, they must be
 promoted before the release is called `v1.0`.
@@ -163,3 +170,10 @@ statement.
 If a high-demand category is not promoted, release notes must name it as excluded or
 post-v1 so plugin authors do not mistake foundation primitives for a complete ArkApi-style
 modding framework.
+Umbrella names do not imply coverage: dino, tribe, buff/status, chat send/broadcast,
+player progression/engrams, economy, mobility, and operator ingress/storage each need a
+narrow copied C ABI surface or an explicit named exclusion.
+
+Passing runtime/core-first RC gates, shipping the promoted foundation, or proving
+pre-identity production seed usefulness is insufficient for `v1.0 stable` until the
+blocker list is promoted or explicitly excluded in the release statement.

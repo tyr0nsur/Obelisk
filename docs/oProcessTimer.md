@@ -38,11 +38,14 @@ logs; timer ids are process-local runtime handles only.
 
 On init, the plugin reads its safe-disabled config before requiring the optional timer API
 slots, so discovery/config-preparation can succeed on instances where the timer feature is
-not active. When enabled, it validates the timer capability and owner token, registers one
-one-shot timer with a 1000 ms delay, logs a fixed message when the callback fires, and
-unregisters the handle on shutdown. Shutdown is idempotent, and an init failure after an
-accepted timer registration unregisters the process-local handle before state is reset.
-Timer callbacks use stable process-local user data and do not read borrowed init context.
+not active. When enabled, it requires `OBELISK_API_CAPABILITY_TIMERS`, a sufficient
+`ObeliskApi::struct_size` through `UnregisterTimerWithOwnerToken`, non-null timer
+register/unregister function pointers, and a non-zero `plugin_owner_token` before any
+registration. It then registers one one-shot timer with a 1000 ms delay, logs a fixed
+message when the callback fires, and unregisters the handle on shutdown. Shutdown is
+idempotent, and an init failure after an accepted timer registration unregisters the
+process-local handle before state is reset. Timer callbacks use stable process-local user
+data and do not read borrowed init context.
 
 `UnregisterTimerWithOwnerToken` cancels future timer delivery for the handle, but plugin
 authors should not treat individual timer unregister as a full quiescence barrier. The

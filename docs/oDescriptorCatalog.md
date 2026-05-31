@@ -33,6 +33,21 @@ To activate on one instance, set both `enabled=true` and
 `descriptor_catalog.enabled=true`, and include the current `OBELISK_INSTANCE_ID` in
 `instance_allowlist`.
 
+The plugin reads this safe-disabled config before requiring the optional descriptor API
+slots, so discovery/config-preparation can succeed when descriptor capabilities are not
+advertised. When active, it requires both
+`OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS` and
+`OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS`, a sufficient
+`ObeliskApi::struct_size` through `DescribeGameplayPolicyEventKind`, and non-null
+descriptor function pointers before querying metadata. Missing capabilities, too-short
+API tables, malformed config, unsafe allowlist entries, or incoherent descriptor metadata
+fail closed without registering callbacks or timers.
+
+`oDescriptorCatalog` has no owner-token runtime state because it does not register
+callbacks or timers. Plugins that add callback or timer ownership on top of descriptor
+discovery must follow the owner-token handle pattern used by the event and timer
+examples.
+
 ## Output
 
 When active, the plugin validates descriptor coherence and logs sanitized metadata:
@@ -43,3 +58,5 @@ When active, the plugin validates descriptor coherence and logs sanitized metada
 This metadata is for routing and configuration only. `resource_kind` is a category, not
 object identity, inventory identity, player identity, lookup authority, mutation
 authority, or proof that two events refer to the same in-game object.
+Descriptor names and masks are copied metadata, not `FName`, `GNames`, `GObjects`,
+`UObject`, or raw UE pointer access.

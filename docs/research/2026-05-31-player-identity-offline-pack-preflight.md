@@ -15,7 +15,9 @@ python3 scripts/check_reflection_inventory_pack_readiness.py \
 
 The checker is read-only and emits
 `schema=obelisk.reflection-inventory-pack-readiness-check.v1`. It fails closed with
-machine-readable reasons: `missing_reflection_inventory_pack`, `schema_mismatch`,
+machine-readable reasons: `missing_reflection_inventory_pack`,
+`artifact_pack_container_not_reflection_inventory`,
+`scriptstruct_pack_not_reflection_inventory`, `schema_mismatch`,
 `missing_ufunction_inventory`, `wrong_target_scope`, or `missing_target`.
 
 Current result:
@@ -24,13 +26,19 @@ Current result:
 - `ready=false`;
 - `manifests_scanned=16`;
 - `reason=missing_reflection_inventory_pack`;
-- `reason=schema_mismatch`;
+- `reason=artifact_pack_container_not_reflection_inventory`;
+- `reason=scriptstruct_pack_not_reflection_inventory`;
+- `reason=schema_mismatch` for the static-global preflight manifest;
 - `accepted_pack=null`.
 
 The durable root currently contains normalized artifact packs and a ScriptStruct inventory
 pack, but no UFunction reflection-inventory pack with
 `schema=obelisk.reflection-inventory-pack.v1`. That means the next player-identity
 snapshot step cannot be planned from `/home/flowcommunity-ark/obelisk-artifacts` alone.
+It also does not currently contain a non-protected
+`obelisk.core-dump-evidence-pack.v1` manifest that can be passed directly to
+`scripts/build_reflection_inventory_pack.py`; the current durable root by itself is
+therefore not enough to produce the missing UFunction inventory pack.
 
 ## V1 SDK Progress Signal
 
@@ -93,7 +101,8 @@ Proceed only when the checker reports `ready=true` and the accepted pack contain
 `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer`.
 
-If a complete non-protected core evidence pack is available, a safe planning route is:
+If a complete non-protected core evidence pack is available, a safe inventory-build route
+is:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_reflection_inventory_pack.py \

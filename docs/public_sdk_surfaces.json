@@ -6,7 +6,7 @@
   "v1_completion_required": false,
   "release_claim": "post-rc-sdk-surface-inventory",
   "public_header": "include/obelisk/ObeliskApi.h",
-  "compatibility_statement": "Obelisk v1.0 must mean a complete, documented SDK contract for plugin authors. The current post-RC tree may inventory v1 surfaces without claiming v1.0 completion.",
+  "compatibility_statement": "Obelisk v1.0 stable must mean the complete public SDK contract for plugin authors, not a runtime/core-first RC or internal-runtime stability milestone. The current post-RC tree may inventory v1 surfaces without claiming v1.0 completion.",
   "status_values": [
     "promoted",
     "promoted-experimental-only",
@@ -69,10 +69,12 @@
   ],
   "release_guardrails": [
     "The manifest is documentary until a release gate explicitly packages it.",
+    "A v1.0 stable claim must mean the complete public SDK contract for plugin authors, not runtime/core-first RC readiness or internal runtime stability alone.",
     "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly excluded in the v1 release statement before v1_completion_required can become true.",
     "Identity/principal, permissions/admin, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",
-    "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; passive chat parsing and plugin-local routing remain promoted-experimental-only.",
+    "Before identity/principal is promoted, production-safe Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers; those pre-identity production seeds are not enough for v1 completion, and passive chat parsing and plugin-local routing remain promoted-experimental-only.",
+    "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "No surface may be listed as promoted unless its status is promoted.",
@@ -529,9 +531,9 @@
       "audit_units": [
         "mission",
         "transfer",
-        "dino",
-        "tribe",
-        "buff"
+        "dino policy/cosmetics/carry restrictions",
+        "tribe identity/notices/policy",
+        "buff/status policy"
       ],
       "buff_audit_requirements": [
         "buff class/object redaction contract",
@@ -543,7 +545,7 @@
         "Transfer SDK",
         "Dino SDK",
         "Tribe SDK",
-        "Buff SDK",
+        "Buff/status SDK",
         "teleport/spawn APIs",
         "ownership lookup",
         "cross-map correlation"
@@ -563,7 +565,14 @@
         "Needs promoted player identity/principal semantics.",
         "Needs promoted permission/authority model.",
         "Needs a safe response path for replies/send-chat.",
+        "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
         "Needs command lifecycle and abuse boundaries."
+      ],
+      "audit_units": [
+        "command router",
+        "replies/send-chat",
+        "broadcast/notices",
+        "moderation/admin command authority"
       ],
       "exclusions": [
         "public command SDK/router",
@@ -571,6 +580,7 @@
         "player command API",
         "chat replies",
         "send-chat",
+        "broadcast/notices API",
         "moderation"
       ]
     },
@@ -602,13 +612,22 @@
       "blockers": [
         "No item/inventory identity.",
         "No lookup or mutation contract.",
-        "No rollback/privacy policy for item grants or removals."
+        "No rollback/privacy policy for item grants or removals.",
+        "No player progression, engram unlock, kit grant, or item reward contract."
+      ],
+      "audit_units": [
+        "inventory/item lookup",
+        "item grant/remove mutation",
+        "kits/rewards",
+        "player progression/engrams"
       ],
       "exclusions": [
         "Inventory SDK",
         "Items SDK",
         "give item",
         "remove item",
+        "kits/rewards",
+        "engram/progression API",
         "inventory lookup",
         "item handles",
         "item mutation",
