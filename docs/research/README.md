@@ -142,8 +142,9 @@ internal/test-only copied-bool planning. Neither lane is a public Inventory SDK,
 Mission SDK, new capability family, identity/lookup contract, mutation path, return
 override, or server-observation approval.
 
-Next v1 research round: keep hub foundation first, then
-`GameplayPolicyEvent` backing evidence, then mission copied-bool internal planning only.
+Next v1 research round remains broad; the next post-RC/internal module research pass keeps
+hub foundation first, then `GameplayPolicyEvent` backing evidence, then mission
+copied-bool internal planning only.
 Use [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md) for the
 selected Mission copied-bool internal lane,
 [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)

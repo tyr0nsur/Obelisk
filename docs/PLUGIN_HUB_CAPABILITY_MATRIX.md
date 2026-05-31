@@ -175,9 +175,10 @@ Experimental pattern examples only:
 The current first-party examples already cover this safe seed set: `oBaseEvents`,
 `oProcessTimer`, and `oDescriptorCatalog` cover the release-scope foundation, while
 `oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the experimental copied policy and
-copied chat slices. Those three are seed examples only, not production Plugin Hub modules
-or promises that copied chat/policy auditing is generally available. After those examples,
-the next honest first-party work is not a new ArkApi-style category; it is hardening,
+copied chat slices. Those three are seed examples only, not production Plugin Hub modules;
+specifically, they are experimental pattern examples and not promises that copied
+chat/policy auditing is generally available.
+After those examples, the next honest first-party work is not a new ArkApi-style category; it is hardening,
 documenting, or reviewing one of the existing copied-data examples against promotion
 gates. If only default release examples are counted, passive copied chat
 auditing/parsing is a candidate for promotion review before copied policy auditing, not a

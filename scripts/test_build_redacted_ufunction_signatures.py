@@ -448,32 +448,48 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
 
         report = tool.build_mission_copied_bool_policy_slice(snapshot_root=fixture_root)
 
+        expected_copied_fields = [
+            "MissionType.AddPlayerToMission.bForceAdd",
+            "MissionType.AddPlayerToMission.ReturnValue",
+            "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
+            "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
+            "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+        ]
+        expected_redacted_fields = [
+            "MissionType.AddPlayerToMission.PlayerCharacter",
+            "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
+            "MissionType.BPOnPlayerRemovedFromMission.Controller",
+            "MissionType.BPOnPlayerRemovedFromMission.Player",
+            "MissionType.GetPlayerUsableItems.Character",
+            "MissionType.GetPlayerUsableItems.OutItemIDs",
+        ]
+
         self.assertEqual(tool.MISSION_COPIED_BOOL_POLICY_SCHEMA, report["schema"])
         self.assertEqual("redacted", report["snapshot_root"])
         self.assertEqual("mission-compact-intake", report["input_target_set"])
         self.assertEqual("mission-copied-bool-policy-slice", report["output_target_set"])
         self.assertEqual("complete", report["coverage"]["status"])
         self.assertEqual(4, len(report["generated_from"]["input_snapshots"]))
+        self.assertEqual(expected_copied_fields, [entry["copied_field"] for entry in report["copied_bools"]])
+        self.assertEqual(set(tool.MISSION_COPIED_BOOL_FIELDS), {entry["copied_field"] for entry in report["copied_bools"]})
+        self.assertEqual(expected_redacted_fields, sorted(entry["redacted_field"] for entry in report["redacted_mission_fields"]))
+        self.assertEqual(set(tool.MISSION_REDACTED_FIELD_REASONS), {entry["redacted_field"] for entry in report["redacted_mission_fields"]})
         self.assertEqual(
             [
-                "MissionType.AddPlayerToMission.bForceAdd",
-                "MissionType.AddPlayerToMission.ReturnValue",
-                "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
-                "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
-                "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+                "MissionType.AddPlayerToMission",
+                "MissionType.BPAllowPlayerToLeaveMission",
+                "MissionType.BPOnPlayerRemovedFromMission",
+                "MissionType.GetPlayerUsableItems",
             ],
-            [entry["copied_field"] for entry in report["copied_bools"]],
+            report["coverage"]["input_targets"],
         )
         self.assertEqual(
             [
-                "MissionType.AddPlayerToMission.PlayerCharacter",
-                "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
-                "MissionType.BPOnPlayerRemovedFromMission.Controller",
-                "MissionType.BPOnPlayerRemovedFromMission.Player",
-                "MissionType.GetPlayerUsableItems.Character",
-                "MissionType.GetPlayerUsableItems.OutItemIDs",
+                "MissionType.AddPlayerToMission",
+                "MissionType.BPAllowPlayerToLeaveMission",
+                "MissionType.BPOnPlayerRemovedFromMission",
             ],
-            sorted(entry["redacted_field"] for entry in report["redacted_mission_fields"]),
+            report["coverage"]["copied_targets"],
         )
         self.assertEqual(5, report["safety_summary"]["copied_bool_count"])
         self.assertEqual(6, report["safety_summary"]["redacted_field_count"])
@@ -486,6 +502,12 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertTrue(all(entry["bool_byte_offset"] == 0 for entry in report["copied_bools"]))
         self.assertTrue(all(entry["byte_mask"] == "0x01" for entry in report["copied_bools"]))
         self.assertTrue(all(entry["field_mask"] == "0xff" for entry in report["copied_bools"]))
+        self.assertTrue(all(entry["target"] != "MissionType.GetPlayerUsableItems" for entry in report["copied_bools"]))
+        self.assertTrue(all(entry["evidence_status"] == "recognition-only-redacted" for entry in report["redacted_mission_fields"]))
+        self.assertEqual(
+            {"object_ref_excluded", "array_payload_excluded"},
+            {entry["reason"] for entry in report["redacted_mission_fields"]},
+        )
 
         snapshots = {
             snapshot["id"]: snapshot
@@ -510,6 +532,9 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         copied_serialized = json.dumps(report["copied_bools"])
         self.assertNotIn("PlayerCharacter", copied_serialized)
         self.assertNotIn("PlayerPawn", copied_serialized)
+        self.assertNotIn("Controller", copied_serialized)
+        self.assertNotIn("Character", copied_serialized)
+        self.assertNotIn("GetPlayerUsableItems", copied_serialized)
         self.assertNotIn("OutItemIDs", copied_serialized)
 
     def test_mission_copied_bool_policy_slice_rejects_bool_tail_drift(self) -> None:

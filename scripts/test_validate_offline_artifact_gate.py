@@ -4756,6 +4756,8 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual("consume", result["mode"])
         self.assertEqual(result["blockers"], [])
 
     def test_blocks_mission_copied_bool_policy_slice_in_promote_mode(self) -> None:
@@ -4767,8 +4769,52 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
 
+        self.assertEqual("blocked", result["status"])
+        self.assertEqual("promote", result["mode"])
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("promote_mode_mission_copied_bool_policy_slice_evidence_only", reasons)
+
+    def test_blocks_mission_copied_bool_policy_slice_if_get_player_usable_items_is_copied(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "mission-copied-bool-policy.json"
+            payload = mission_copied_bool_policy_slice_manifest()
+            get_items_snapshot = next(
+                snapshot
+                for snapshot in payload["generated_from"]["input_snapshots"]
+                if snapshot["target"] == "MissionType.GetPlayerUsableItems"
+            )
+            payload["copied_bools"][0].update(
+                {
+                    "target": "MissionType.GetPlayerUsableItems",
+                    "field": "ReturnValue",
+                    "copied_field": "MissionType.GetPlayerUsableItems.ReturnValue",
+                    "direction": "return",
+                    "offset": "0x18",
+                    "offset_internal": 24,
+                    "return_value_offset": "0x18",
+                    "source_snapshot": get_items_snapshot["id"],
+                    "source_snapshot_sha256": get_items_snapshot["sha256"],
+                }
+            )
+            payload["coverage"]["copied_fields"] = [
+                entry["copied_field"]
+                for entry in payload["copied_bools"]
+            ]
+            payload["coverage"]["copied_targets"] = sorted(
+                {entry["target"] for entry in payload["copied_bools"]}
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("mission_copied_bool_policy_copied_fields_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_copied_bool_shape_unknown", reasons)
+        self.assertIn("mission_copied_bool_policy_coverage_copied_fields_mismatch", reasons)
+        self.assertIn("mission_copied_bool_policy_coverage_copied_targets_mismatch", reasons)
 
     def test_blocks_mission_copied_bool_policy_slice_with_bad_counts_or_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

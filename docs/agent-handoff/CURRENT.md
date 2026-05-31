@@ -44,7 +44,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   routine validation, or speculative notes. Prefer `scripts/send_discord_embed.py --dry-run` and
   one public-safe embed. Webhook URLs stay only in ignored `local/discord-webhooks.env`;
   repo text may name only `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and
-  `OBELISK_BETA_TEST_WEBHOOK_URL`.
+  `OBELISK_BETA_TEST_WEBHOOK_URL`. Publication approval does not imply Discord approval.
 
 ## Current Routing Facts
 

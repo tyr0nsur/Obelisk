@@ -692,12 +692,117 @@ namespace
                 AssertOptionalSlotGuardrailCounts(testCase);
                 shutdown();
                 AssertOptionalSlotGuardrailUnregisters(testCase);
+                shutdown();
+                AssertOptionalSlotGuardrailUnregisters(testCase);
             }
             catch (...)
             {
                 shutdown();
                 throw;
             }
+        }
+    }
+
+    struct DescriptorCatalogGuardrailCase
+    {
+        const char* name;
+        uint32_t structSize;
+        uint64_t disabledCapability;
+        bool nullResourceDescriptorSlot;
+        bool nullGameplayDescriptorSlot;
+        bool badApiVersion;
+    };
+
+    void RunDescriptorCatalogGuardrails(InitFn init, ShutdownFn shutdown, const ObeliskPluginInitContext& context)
+    {
+        const DescriptorCatalogGuardrailCase cases[] = {
+            {
+                "descriptor-catalog-bad-api-version",
+                sizeof(ObeliskApi),
+                0,
+                false,
+                false,
+                true,
+            },
+            {
+                "descriptor-catalog-short-api-before-capabilities",
+                static_cast<uint32_t>(offsetof(ObeliskApi, capabilities)),
+                0,
+                false,
+                false,
+                false,
+            },
+            {
+                "descriptor-catalog-short-api-before-resource-descriptor",
+                static_cast<uint32_t>(offsetof(ObeliskApi, DescribeResourceKind)),
+                0,
+                false,
+                false,
+                false,
+            },
+            {
+                "descriptor-catalog-short-api-before-gameplay-descriptor",
+                static_cast<uint32_t>(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind)),
+                0,
+                false,
+                false,
+                false,
+            },
+            {
+                "descriptor-catalog-missing-resource-descriptor-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS,
+                false,
+                false,
+                false,
+            },
+            {
+                "descriptor-catalog-missing-gameplay-descriptor-capability",
+                sizeof(ObeliskApi),
+                OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS,
+                false,
+                false,
+                false,
+            },
+            {
+                "descriptor-catalog-null-resource-descriptor-slot",
+                sizeof(ObeliskApi),
+                0,
+                true,
+                false,
+                false,
+            },
+            {
+                "descriptor-catalog-null-gameplay-descriptor-slot",
+                sizeof(ObeliskApi),
+                0,
+                false,
+                true,
+                false,
+            },
+        };
+
+        for (const DescriptorCatalogGuardrailCase& testCase : cases)
+        {
+            ObeliskApi api{};
+            PopulateApi(api);
+            api.struct_size = testCase.structSize;
+            api.capabilities &= ~testCase.disabledCapability;
+            if (testCase.nullResourceDescriptorSlot)
+                api.DescribeResourceKind = nullptr;
+            if (testCase.nullGameplayDescriptorSlot)
+                api.DescribeGameplayPolicyEventKind = nullptr;
+            if (testCase.badApiVersion)
+                api.abi_version = OBELISK_API_ABI_VERSION + 1u;
+
+            ResetFixtureObservations();
+            Require(!init(&api, &context), testCase.name);
+            Require(g_ResourceDescriptorCount == 0,
+                    "descriptor catalog guardrail queried resource descriptors before validating API guards");
+            Require(g_GameplayPolicyDescriptorCount == 0,
+                    "descriptor catalog guardrail queried gameplay descriptors before validating API guards");
+            if (shutdown)
+                shutdown();
         }
     }
 }
@@ -749,6 +854,8 @@ int main(int argc, char** argv)
 
         if (std::strcmp(argv[2], "install_layout_consumer") == 0)
             RunOptionalSlotGuardrails(init, shutdown, context);
+        if (std::strcmp(argv[2], "install_layout_descriptor_catalog_consumer") == 0)
+            RunDescriptorCatalogGuardrails(init, shutdown, context);
 
         ResetFixtureObservations();
         Require(init(&api, &context), "ObeliskPlugin_Init failed");
@@ -765,6 +872,8 @@ int main(int argc, char** argv)
             {
                 shutdown();
                 Require(!descriptorCatalogValidated(), "descriptor catalog validation state survived shutdown");
+                shutdown();
+                Require(!descriptorCatalogValidated(), "descriptor catalog validation state survived second shutdown");
             }
             Require(g_UnregisterCount == 0, "descriptor catalog consumer unexpectedly unregistered ProcessEvent callback");
             Require(g_GameplayPolicyUnregisterCount == 0,
@@ -825,6 +934,19 @@ int main(int argc, char** argv)
                 Require(g_TimerCallback == nullptr, "timer callback was not cleared");
                 Require(g_TimerUserData == nullptr, "timer user data was not cleared");
             }
+            shutdown();
+            Require(g_UnregisterCount == 1, "second shutdown repeated owner-token callback unregister");
+            if (expectsGameplayPolicy)
+                Require(g_GameplayPolicyUnregisterCount == 1,
+                        "second shutdown repeated gameplay policy callback unregister");
+            else
+                Require(g_GameplayPolicyUnregisterCount == 0,
+                        "second shutdown added unexpected gameplay policy callback unregister");
+            Require(g_ChatMessageUnregisterCount == 1, "second shutdown repeated chat message callback unregister");
+            if (expectsTimer)
+                Require(g_TimerUnregisterCount == 1, "second shutdown repeated timer unregister");
+            else
+                Require(g_TimerUnregisterCount == 0, "second shutdown added unexpected timer unregister");
         }
         else
         {

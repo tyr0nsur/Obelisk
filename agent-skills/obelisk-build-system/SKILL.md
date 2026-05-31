@@ -14,12 +14,14 @@ cmake -S . -B build
 cmake --build build -j"$(nproc)"
 ```
 
-Expected outputs:
+Expected outputs include:
 
 ```text
 build/libobelisk.so
 build/_deps/subhook-build/libsubhook.so
 build/plugins/oBaseEvents/oBaseEvents.so
+build/plugins/oProcessTimer/oProcessTimer.so
+build/plugins/oDescriptorCatalog/oDescriptorCatalog.so
 ```
 
 ## Central Install
@@ -27,11 +29,13 @@ build/plugins/oBaseEvents/oBaseEvents.so
 Use:
 
 ```bash
-./scripts/install_obelisk.sh /servidor/ark/obelisk
+./scripts/install_obelisk.sh <obelisk-root>
 ```
 
 The install root is positional and mandatory; installers must not publish to a default root
 or use inherited `OBELISK_ROOT` when the root argument is omitted.
+Use `/servidor/ark/obelisk` only inside an explicitly approved operator maintenance
+window.
 
 Install layout:
 
@@ -68,8 +72,8 @@ template using `scripts/check_linuxgsm_wrapper_drift.sh --installed <path>/Obeli
 - Pin dependency versions where possible; avoid tracking `master` for reproducible builds.
 - Runtime links currently include `fmt`, `spdlog`, `subhook`, `dl`, and `pthread`.
 - Do not commit `.so` outputs, logs, config state, or build directories.
-- `oBaseEvents` is the first official plugin target and should remain small,
-  instructional, and safe by default.
+- Official reference plugins include `oBaseEvents`, `oProcessTimer`, and
+  `oDescriptorCatalog`; they should remain small, instructional, and safe by default.
 - Experimental/research plugins should not be installed into `plugins/` by default.
 - Install roots and managed subdirectories must not be symlinks. Reject existing symlinks
   for `lib`, `plugins`, `include`, `config`, `logs`, and `state/instances` before writing

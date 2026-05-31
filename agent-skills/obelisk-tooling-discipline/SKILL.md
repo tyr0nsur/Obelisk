@@ -116,8 +116,9 @@ updates.
 
 ## Unattended Automation Rule
 
-Cron or overnight jobs may run read-only observation scripts only. Allowed outputs are
-timestamped snapshots under `/servidor/ark/obelisk/dumps/` or local text summaries.
+Cron or overnight jobs may run read-only observation scripts only. Allowed outputs should
+be local text summaries or an explicitly approved offline snapshot path. Writing under
+`/servidor/ark/obelisk/dumps/` requires current operator approval.
 
 Forbidden unattended actions:
 

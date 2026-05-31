@@ -53,11 +53,11 @@ When patching `.text`:
 
 ## Validation
 
-Run live validation on the currently approved target from `docs/agent-handoff/CURRENT.md`
-or the current operator turn. Live validation has no default target: use only the exact
-instance/map named by a current approved live-ops brief, including start/restart window,
-rollback, evidence path, and shutdown expectations. High-risk hook/scanner captures still
-require separate explicit approval.
+Read `docs/agent-handoff/CURRENT.md` for posture context only. Run live validation only on
+the exact target named by current-turn operator approval. Live validation has no default
+target: use only the exact instance/map named by a current approved live-ops brief,
+including start/restart window, rollback, evidence path, and shutdown expectations.
+High-risk hook/scanner captures still require separate explicit approval.
 
 ```bash
 cmake --build build -j"$(nproc)"

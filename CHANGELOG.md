@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Hardened Mission copied-bool evidence tests, installed SDK shutdown/API guardrails, and
+  contributor/operator wording so Mission remains internal-only, descriptor queries fail
+  closed before invalid API use, shutdown is idempotent, and server/Discord actions stay
+  current-turn approved.
 - Added a standalone candidate-only UFunction focal snapshot planner for reviewed
   reflection inventory packs, hardened installed SDK optional-slot guardrails across
   gameplay policy, descriptors, chat, and timers, and extended timer cleanup regression

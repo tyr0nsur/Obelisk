@@ -196,7 +196,7 @@ discovery.
 
 ## Feature Flags
 
-Instance marker files are preferred for production operations:
+For operator-approved operations, wrappers consume instance marker files:
 
 ```bash
 # Current-turn approved exact debug window only. Do not run from an ordinary install or

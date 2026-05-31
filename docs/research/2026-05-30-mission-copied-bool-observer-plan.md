@@ -48,6 +48,17 @@ This closes the Mission compact bool second-source gap for observer planning onl
 does not close runtime observer, dispatcher lifecycle, callback ABI, public SDK, identity,
 array payload, mutation, return override, or server-validation gates.
 
+## 2026-05-31 Offline Evidence Hardening
+
+The low-risk offline hardening step is to keep the focused policy slice fixture-backed and
+test-enforced. Script tests now pin the exact five canonical copied bool fields, the six
+redacted object/container fields, the exclusion of `MissionType.GetPlayerUsableItems`
+from copied-bool policy output, and the consume-only/promote-blocked gate behavior.
+
+This is evidence hardening only. It does not change runtime code, public SDK headers,
+dispatcher wiring, marker/env behavior, live-server posture, identity exposure, array
+payload handling, mutation, or return override policy.
+
 ## Consume-Only Offline Input
 
 Consume-only means a future worker may read the existing focused policy artifact above as

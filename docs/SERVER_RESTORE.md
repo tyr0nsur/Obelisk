@@ -3,6 +3,10 @@
 Use this when SteamCMD, LinuxGSM, or the ARK app install rewrites server files and the two
 LinuxGSM instances need to be restored quickly.
 
+Operator-only runbook: these commands are not contributor authorization. They require
+current-turn approval before any `/servidor/ark` read/write, stop/start/restart, backup,
+or restore.
+
 ## Current Instances
 
 - `arkserver`: Ragnarok, `OBELISK_INSTANCE_ID=arkserver`
@@ -80,7 +84,7 @@ Ragnarok gameplay config note:
 
 ## Create A Fresh Backup
 
-Run before risky updates:
+Operators may run this during an approved maintenance window before risky updates:
 
 ```bash
 stamp=$(date +%Y%m%d-%H%M%S)
