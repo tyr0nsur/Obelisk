@@ -1095,6 +1095,19 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "accepted_reflection_inventory_core_evidence_pack_manifest_missing",
             ),
             (
+                "radare2_static_orientation_manifest",
+                {
+                    **base_pack,
+                    "inputs": {
+                        "evidence_pack_manifest": "/tmp/radare2-static-orientation/manifest.json",
+                        "evidence_pack_schema": "obelisk.radare2-static-orientation-windows.v1",
+                        "evidence_pack_status": "candidate_only_orientation_captured",
+                        "target_sets": ["players-identity-lifecycle-intake"],
+                    },
+                },
+                "accepted_reflection_inventory_static_orientation_manifest_not_core_evidence",
+            ),
+            (
                 "two_function_only_inventory",
                 {
                     **base_pack,

@@ -21,6 +21,7 @@ REPORT_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
 FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 REFLECTION_INVENTORY_PACK_SCHEMA = "obelisk.reflection-inventory-pack.v1"
 CORE_DUMP_EVIDENCE_PACK_SCHEMA = "obelisk.core-dump-evidence-pack.v1"
+RADARE2_STATIC_ORIENTATION_SCHEMA = "obelisk.radare2-static-orientation-windows.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
 MAX_DIAGNOSIS_ITEMS = 8
@@ -38,6 +39,11 @@ REFLECTION_INVENTORY_MANIFEST_PATTERN = (
     "player-identity-offline-<run-id>/reflection-inventory-pack/manifest.json"
 )
 RAW_LAYOUT_HELPER = "scripts/prepare_player_identity_offline_raw_layout.py"
+STATIC_ORIENTATION_SCHEMA_PREFIX = "obelisk.player-identity-static-"
+STATIC_ORIENTATION_MANIFEST_TOKENS = (
+    "radare2-static-orientation",
+    "static-orientation",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -493,9 +499,28 @@ def reflection_inventory_chain_diagnosis(inventory_payload: dict[str, Any] | Non
     evidence_pack_manifest = inputs.get("evidence_pack_manifest")
     if not isinstance(evidence_pack_manifest, str) or not evidence_pack_manifest.endswith("manifest.json"):
         blockers.append("accepted_reflection_inventory_core_evidence_pack_manifest_missing")
+    else:
+        evidence_pack_path = Path(evidence_pack_manifest)
+        evidence_pack_parts = {part.lower() for part in evidence_pack_path.parts}
+        if evidence_pack_path.name != "manifest.json" or evidence_pack_path.parent.name != "core-evidence-pack":
+            blockers.append("accepted_reflection_inventory_core_evidence_pack_manifest_path_not_core_evidence_pack")
+        if any(
+            token in part
+            for part in evidence_pack_parts
+            for token in STATIC_ORIENTATION_MANIFEST_TOKENS
+        ):
+            blockers.append("accepted_reflection_inventory_static_orientation_manifest_not_core_evidence")
     evidence_pack_schema = inputs.get("evidence_pack_schema")
     if evidence_pack_schema is not None and evidence_pack_schema != CORE_DUMP_EVIDENCE_PACK_SCHEMA:
         blockers.append("accepted_reflection_inventory_core_evidence_pack_schema_mismatch")
+    if (
+        evidence_pack_schema == RADARE2_STATIC_ORIENTATION_SCHEMA
+        or (
+            isinstance(evidence_pack_schema, str)
+            and evidence_pack_schema.startswith(STATIC_ORIENTATION_SCHEMA_PREFIX)
+        )
+    ):
+        blockers.append("accepted_reflection_inventory_static_orientation_manifest_not_core_evidence")
     evidence_pack_status = inputs.get("evidence_pack_status")
     if evidence_pack_status is not None and evidence_pack_status != "complete":
         blockers.append("accepted_reflection_inventory_core_evidence_pack_not_complete")
