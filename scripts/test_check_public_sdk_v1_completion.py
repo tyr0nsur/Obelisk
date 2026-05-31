@@ -284,6 +284,67 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
         self.assertEqual(payload["blocked_public_contract_header_symbols"], {})
 
+    def test_manifest_blocked_side_lane_contracts_detect_public_header_symbols(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            manifest_path = temp_path / "public_sdk_surfaces.json"
+            release_statement_path = temp_path / "RELEASE_STATEMENT.md"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#include <stdint.h>\n"
+                "typedef struct ObeliskStructureCensus { uint32_t abi_version; } ObeliskStructureCensus;\n"
+                "typedef struct ObeliskDinoSdk { uint32_t abi_version; } ObeliskDinoSdk;\n"
+                "typedef struct ObeliskInventoryMutation { uint32_t abi_version; } ObeliskInventoryMutation;\n"
+                "typedef struct ObeliskEconomyApi { uint32_t abi_version; } ObeliskEconomyApi;\n"
+                "typedef struct ObeliskRCONIngress { uint32_t abi_version; } ObeliskRCONIngress;\n"
+                "typedef struct ObeliskPluginWatchdog { uint32_t abi_version; } ObeliskPluginWatchdog;\n"
+                "typedef struct ObeliskGameplayTickCallback { uint32_t abi_version; } ObeliskGameplayTickCallback;\n"
+                "typedef struct ObeliskApi {\n"
+                "    uint64_t (*RegisterStructureCensusWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterMissionWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*GiveItemWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterEconomyWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterOperatorReloadWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterPluginWatchdogWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterGameplayTickWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "} ObeliskApi;\n",
+                encoding="utf-8",
+            )
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            release_statement_path.write_text(release_statement, encoding="utf-8")
+
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(release_statement_path),
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        drift_by_surface = {
+            drift["surface"]: drift["undeclared_symbols"]
+            for drift in payload["blocked_public_contract_header_symbols"].values()
+        }
+        self.assertIn("ObeliskStructureCensus", drift_by_surface["obelisk.structure_census.v1"])
+        self.assertIn("RegisterMissionWithOwnerTokenHandle", drift_by_surface["obelisk.mission_transfer_dino_tribe.v1"])
+        self.assertIn("GiveItemWithOwnerTokenHandle", drift_by_surface["obelisk.inventory_items_mutation.v1"])
+        self.assertIn("RegisterEconomyWithOwnerTokenHandle", drift_by_surface["obelisk.player_services_economy_mobility.v1"])
+        self.assertIn("ObeliskRCONIngress", drift_by_surface["obelisk.operator_ingress_storage.v1"])
+        self.assertIn("ObeliskPluginWatchdog", drift_by_surface["obelisk.lifecycle_ops_recovery.v1"])
+        self.assertIn("RegisterGameplayTickWithOwnerTokenHandle", drift_by_surface["obelisk.gameplay_tick_callbacks.v1"])
+
     def test_current_manifest_reports_exact_unresolved_v1_surface_groups(self) -> None:
         result = self.run_checker("--json", check=False)
         payload = json.loads(result.stdout)

@@ -136,6 +136,15 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
 CANONICAL_DEBUG_ONLY_SURFACE_IDS = {
     "obelisk.debug_raw_process_event.v1",
 }
+MANIFEST_BACKED_BLOCKED_HEADER_SURFACE_IDS = {
+    "obelisk.gameplay_tick_callbacks.v1",
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
+    "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.structure_census.v1",
+}
 ALLOWED_GENERIC_EVIDENCE_DIRS = {
     "tests/sdk_consumer",
     "tests/sdk_installed_consumer",
@@ -214,6 +223,129 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
         re.compile(
             r"(?:^|_)(?:command|commands|command_router|command_callback|command_payload|"
             r"command_registration|reply|replies|send_chat|broadcast|notice|moderation)(?:_|$)"
+        ),
+    ),
+    "obelisk.inventory_items_mutation.v1": (
+        re.compile(
+            r"(?:InventorySdk|ItemsSdk|InventoryLookup|ItemLookup|ItemHandle|GiveItem|"
+            r"RemoveItem|GrantItem|InventoryMutation|ItemMutation|Kit|Kits|Reward|Rewards|"
+            r"Engram|Progression|ResourceHandle)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:INVENTORY_SDK|ITEMS_SDK|INVENTORY_LOOKUP|"
+            r"ITEM_LOOKUP|ITEM_HANDLE|GIVE_ITEM|REMOVE_ITEM|GRANT_ITEM|INVENTORY_MUTATION|"
+            r"ITEM_MUTATION|KIT|KITS|REWARD|REWARDS|ENGRAM|PROGRESSION|"
+            r"RESOURCE_HANDLE)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:inventory_sdk|items_sdk|inventory_lookup|item_lookup|item_handle|"
+            r"give_item|remove_item|grant_item|inventory_mutation|item_mutation|kits?|"
+            r"rewards?|engram|progression|resource_handle)(?:_|$)"
+        ),
+    ),
+    "obelisk.lifecycle_ops_recovery.v1": (
+        re.compile(
+            r"(?:PluginWatchdog|CrashRecovery|HotPluginReload|ObeliskHotReload|"
+            r"RestartOrchestration|ServerRecovery|OperatorReloadCommand|"
+            r"DetachedWorkerIngress|RestartStateRecovery)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:PLUGIN_WATCHDOG|CRASH_RECOVERY|HOT_PLUGIN_RELOAD|"
+            r"OBELISK_HOT_RELOAD|RESTART_ORCHESTRATION|SERVER_RECOVERY|"
+            r"OPERATOR_RELOAD_COMMAND|DETACHED_WORKER_INGRESS|RESTART_STATE_RECOVERY)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:plugin_watchdog|crash_recovery|hot_plugin_reload|obelisk_hot_reload|"
+            r"restart_orchestration|server_recovery|operator_reload_command|"
+            r"detached_worker_ingress|restart_state_recovery)(?:_|$)"
+        ),
+    ),
+    "obelisk.structure_census.v1": (
+        re.compile(
+            r"(?:StructureEvents|StructureCensus|StructureAggregate|StructureIdentity|"
+            r"StructureLookup|StructureHandle|OwnershipLookup|BuildPlacement|"
+            r"NoCollision|PinOutcome)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:STRUCTURE_EVENTS|STRUCTURE_CENSUS|"
+            r"STRUCTURE_AGGREGATE|STRUCTURE_IDENTITY|STRUCTURE_LOOKUP|STRUCTURE_HANDLE|"
+            r"OWNERSHIP_LOOKUP|BUILD_PLACEMENT|NO_COLLISION|PIN_OUTCOME)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:structure_events|structure_census|structure_aggregate|"
+            r"structure_identity|structure_lookup|structure_handle|ownership_lookup|"
+            r"build_placement|no_collision|pin_outcome)(?:_|$)"
+        ),
+    ),
+    "obelisk.mission_transfer_dino_tribe.v1": (
+        re.compile(
+            r"(?:MissionSdk|TransferSdk|DinoSdk|TribeSdk|BuffStatusSdk|BuffSdk|"
+            r"Mission|Transfer|Dino|Tribe|BuffStatus|DinoColors|DinoCosmetics|DinoCarryRules|"
+            r"TribeMotd|TribeNotice|TribePolicy|TeleportSpawn|CrossMapCorrelation|"
+            r"OwnershipLookup|Teleport|Spawn)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:MISSION_SDK|TRANSFER_SDK|DINO_SDK|TRIBE_SDK|"
+            r"BUFF_STATUS_SDK|BUFF_SDK|MISSION|TRANSFER|DINO|BUFF_STATUS|DINO_COLORS|"
+            r"DINO_COSMETICS|DINO_CARRY_RULES|TRIBE_MOTD|TRIBE_NOTICE|TRIBE_POLICY|"
+            r"TELEPORT_SPAWN|CROSS_MAP_CORRELATION|OWNERSHIP_LOOKUP|TELEPORT|"
+            r"SPAWN)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:mission_sdk|transfer_sdk|dino_sdk|tribe_sdk|buff_status_sdk|"
+            r"buff_sdk|mission|transfer|dino|buff_status|dino_colors|dino_cosmetics|"
+            r"dino_carry_rules|tribe_motd|tribe_notice|tribe_policy|teleport_spawn|"
+            r"cross_map_correlation|ownership_lookup|teleport|spawn)(?:_|$)"
+        ),
+    ),
+    "obelisk.player_services_economy_mobility.v1": (
+        re.compile(
+            r"(?:PlayerServices|Economy|Shop|Shops|Reward|Rewards|Kit|Kits|Stats|"
+            r"Homes|HomeTeleport|Teleport|SafeZone|AreaPolicy|TimedNotice|"
+            r"CrossInstancePersistence|Mobility)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:PLAYER_SERVICES|ECONOMY|SHOP|SHOPS|REWARD|"
+            r"REWARDS|KIT|KITS|STATS|HOMES|HOME_TELEPORT|TELEPORT|SAFE_ZONE|"
+            r"AREA_POLICY|TIMED_NOTICE|CROSS_INSTANCE_PERSISTENCE|MOBILITY)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:player_services|economy|shops?|rewards?|kits?|stats|homes|"
+            r"home_teleport|teleport|safe_zone|area_policy|timed_notice|"
+            r"cross_instance_persistence|mobility)(?:_|$)"
+        ),
+    ),
+    "obelisk.operator_ingress_storage.v1": (
+        re.compile(
+            r"(?:Rcon|RCON|OperatorReload|OperatorCommand|Webhook|Database|StorageSchema|"
+            r"StorageMigration|SecretManager|ExternalIngress|CrossInstanceStorage|"
+            r"QueueDrain|PoisonMessage|Storage)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:RCON|OPERATOR_RELOAD|OPERATOR_COMMAND|WEBHOOK|"
+            r"DATABASE|STORAGE_SCHEMA|STORAGE_MIGRATION|SECRET_MANAGER|"
+            r"EXTERNAL_INGRESS|CROSS_INSTANCE_STORAGE|QUEUE_DRAIN|"
+            r"POISON_MESSAGE|STORAGE)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:rcon|operator_reload|operator_command|webhook|database|"
+            r"storage_schema|storage_migration|secret_manager|external_ingress|"
+            r"cross_instance_storage|queue_drain|poison_message|storage)(?:_|$)"
+        ),
+    ),
+    "obelisk.gameplay_tick_callbacks.v1": (
+        re.compile(
+            r"(?:ServerTick|GameplayTick|ModuleTick|PerFrameHook|FrameHook|"
+            r"GameplayTimer|GameplayTimers|TickCallback|TickCallbacks)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:SERVER_TICK|GAMEPLAY_TICK|MODULE_TICK|"
+            r"PER_FRAME_HOOK|FRAME_HOOK|GAMEPLAY_TIMER|GAMEPLAY_TIMERS|"
+            r"TICK_CALLBACK|TICK_CALLBACKS)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:server_tick|gameplay_tick|module_tick|per_frame_hook|"
+            r"frame_hook|gameplay_timers?|tick_callbacks?)(?:_|$)"
         ),
     ),
 }
@@ -330,6 +462,23 @@ def contract_symbol_patterns(surface_id: Any) -> tuple[re.Pattern[str], ...]:
     return BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS.get(surface_id, ())
 
 
+def public_contract_decision_surfaces_for_header(
+    public_header_path: Path,
+    decisions_dir: Path,
+) -> set[str]:
+    surfaces: set[str] = set()
+    for decision_path in contract_decision_paths(decisions_dir):
+        payload, load_blockers = load_manifest(decision_path)
+        if load_blockers or payload is None:
+            continue
+        if not public_header_matches_contract(public_header_path, payload.get("public_header")):
+            continue
+        surface_id = payload.get("surface")
+        if isinstance(surface_id, str):
+            surfaces.add(surface_id)
+    return surfaces
+
+
 def symbol_matches_blocked_contract(symbol: str, surface_id: str) -> bool:
     return any(pattern.search(symbol) for pattern in contract_symbol_patterns(surface_id))
 
@@ -366,6 +515,48 @@ def blocked_contract_public_header_symbol_drift(
             drift[str(decision_path)] = {
                 "surface": surface_id,
                 "public_header_allowed": public_header_allowed,
+                "undeclared_symbols": matching_symbols,
+            }
+    return drift, blockers
+
+
+def surface_blocks_public_header_symbols(surface: dict[str, Any]) -> bool:
+    surface_id = surface.get("id")
+    if not isinstance(surface_id, str) or not contract_symbol_patterns(surface_id):
+        return False
+    if surface_id not in MANIFEST_BACKED_BLOCKED_HEADER_SURFACE_IDS:
+        return False
+    if surface.get("status") == "promoted":
+        return False
+    contract = surface.get("v1_decision_contract")
+    return (
+        isinstance(contract, dict)
+        and contract.get("must_remain_without_public_contract_until_promotion") is True
+    )
+
+
+def manifest_public_header_symbol_drift(
+    public_header_path: Path,
+    manifest_path: Path,
+    surfaces_by_id: dict[str, dict[str, Any]],
+    decision_backed_surface_ids: set[str],
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    public_symbols, blockers = load_public_header_symbols(public_header_path)
+    drift: dict[str, dict[str, Any]] = {}
+    if blockers:
+        return drift, blockers
+    for surface_id, surface in sorted(surfaces_by_id.items()):
+        if surface_id in decision_backed_surface_ids:
+            continue
+        if not surface_blocks_public_header_symbols(surface):
+            continue
+        matching_symbols = sorted(
+            symbol for symbol in public_symbols if symbol_matches_blocked_contract(symbol, surface_id)
+        )
+        if matching_symbols:
+            drift[f"{manifest_path}#{surface_id}"] = {
+                "surface": surface_id,
+                "public_header_allowed": False,
                 "undeclared_symbols": matching_symbols,
             }
     return drift, blockers
@@ -813,6 +1004,18 @@ def build_report(
         for surface in surface_rows
         if isinstance(surface, dict) and isinstance(surface.get("id"), str)
     }
+    decision_backed_surface_ids = public_contract_decision_surfaces_for_header(
+        public_header_path,
+        contract_decisions_dir,
+    )
+    manifest_contract_header_symbols, manifest_symbol_blockers = manifest_public_header_symbol_drift(
+        public_header_path,
+        manifest_path,
+        surfaces_by_id,
+        decision_backed_surface_ids,
+    )
+    blocked_contract_header_symbols.update(manifest_contract_header_symbols)
+    blockers.extend(manifest_symbol_blockers)
 
     if manifest.get("schema") != "obelisk.public-sdk-surfaces.v1":
         blockers.append("schema_mismatch")

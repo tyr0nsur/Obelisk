@@ -59,6 +59,64 @@ REQUIRED_NON_CLAIM_TOKENS = (
     "does not promote runtime hook wiring",
     "does not copy VerifyPinCode.pinCode or VerifyPinCode.ReturnValue",
 )
+STRUCTURE_CENSUS_ALLOWED_BOUNDARY_PREFIXES = (
+    "$.non_claims",
+    "$.safety_summary.explicitly_excluded",
+)
+STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
+    "build_placement_policy_ready",
+    "build_policy_ready",
+    "collision_policy_ready",
+    "mutation_allowed",
+    "mutation_ready",
+    "no_collision_policy_ready",
+    "ownership_ready",
+    "placement_policy_ready",
+    "return_override_allowed",
+    "return_override_ready",
+    "runtime_hook_ready",
+    "runtime_hooks_ready",
+    "structure_identity_ready",
+    "structure_lookup_ready",
+    "structure_ownership_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_ready",
+}
+STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
+    "build placement": "build_placement_policy",
+    "build policy": "build_policy",
+    "collision policy": "no_collision_policy",
+    "isallowedtobuild": "build_policy",
+    "mutation allowed": "mutation",
+    "mutation ready": "mutation",
+    "no collision": "no_collision_policy",
+    "no-collision": "no_collision_policy",
+    "owner identity": "structure_ownership",
+    "owner lookup": "structure_ownership",
+    "ownership lookup": "structure_ownership",
+    "placement policy": "build_placement_policy",
+    "processevent hook": "runtime_hooks",
+    "return override allowed": "return_override",
+    "return override ready": "return_override",
+    "runtime hook": "runtime_hooks",
+    "runtime hooks": "runtime_hooks",
+    "structure identity": "structure_identity",
+    "structure lookup": "structure_lookup",
+    "structure ownership": "structure_ownership",
+    "structureevents sdk": "public_structureevents_sdk",
+    "v1 complete": "v1_completion",
+    "v1 completion": "v1_completion",
+    "v1 done": "v1_completion",
+    "v1 ready": "v1_completion",
+}
+
+
+def is_negative_boundary_statement(text: str) -> bool:
+    stripped = text.strip()
+    return stripped.startswith(("does not", "do not", "not "))
+
+
 FORBIDDEN_COPIED_RE = re.compile(
     r"(?:ForPC|forCharacter|pinCode|VerifyPinCode|identity|lookup|mutation|"
     r"object_refs|public_sdk|resource_handle|return_override|runtime|ue_pointer)",
@@ -170,6 +228,41 @@ def require_set(
     return actual_set
 
 
+def iter_policy_values(value: object, *, trail: str = "$") -> list[tuple[str, object]]:
+    found: list[tuple[str, object]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if isinstance(child, (dict, list)):
+                found.extend(iter_policy_values(child, trail=child_trail))
+            else:
+                found.append((child_trail, child))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            child_trail = f"{trail}[{index}]"
+            if isinstance(child, (dict, list)):
+                found.extend(iter_policy_values(child, trail=child_trail))
+            else:
+                found.append((child_trail, child))
+    return found
+
+
+def validate_no_core_surface_claims(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    for trail, value in iter_policy_values(policy):
+        if value is True:
+            key = trail.rsplit(".", 1)[-1]
+            if key in STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS:
+                append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=key, path=trail)
+        if not isinstance(value, str):
+            continue
+        text = value.casefold()
+        if any(trail.startswith(prefix) for prefix in STRUCTURE_CENSUS_ALLOWED_BOUNDARY_PREFIXES) and is_negative_boundary_statement(text):
+            continue
+        for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES.items():
+            if phrase in text:
+                append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=surface, path=trail)
+
+
 def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
     if policy.get("schema") != POLICY_SCHEMA:
         append_blocker(blockers, "schema_mismatch", value=policy.get("schema"))
@@ -255,6 +348,7 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     for token in REQUIRED_NON_CLAIM_TOKENS:
         if token not in non_claims_text:
             append_blocker(blockers, "required_non_claim_missing", token=token)
+    validate_no_core_surface_claims(policy, blockers)
 
     return {
         "input_targets": sorted(input_targets),
@@ -385,6 +479,8 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         "non_claims": [
             "candidate readiness is internal planning evidence only",
             "does not promote StructureEvents, Structure SDK, structure census public ABI, identity, lookup, ownership, mutation, return override, runtime hooks, or ResourceHandle",
+            "does not promote build placement, no-collision, or IsAllowedToBuild policy",
+            "does not claim v1 completion or production readiness",
             "does not replace player identity, privacy, lifecycle, SDK consumer, public ABI, or live-ops promotion gates",
         ],
     }

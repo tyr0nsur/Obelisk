@@ -391,9 +391,9 @@ priorities, and do not use history files as the active source of truth.
   `UseItemOntoItem.ReturnValue`. Its internal helper can build-and-reserve the copied
   return observation in one operation and clears output on invalid attempts or exhausted
   budget; it remains internal/test-only. The pack now includes relative `SHA256SUMS`
-  (`sha256=ccd33e42337fd5b1ae3c51333c73ec17aeadef29d3c203b6680bb3be49c7a046`) and
+  (`sha256=9984465350ea4b29413135466e93537138e9611a47e95e728704fab3ca8929e1`) and
   `artifact-pack.manifest.json`
-  (`sha256=89e9b4af96472314055614824a2b2fce4a0b4343832ae38a2495d77411a5671a`).
+  (`sha256=2b832a8f32e835e962ae6ab597e041d4b7d73c1a341c5c4cd2f94e393814a3b4`).
   The public shape is now limited to three post-original copied bool observations through
   `GameplayPolicyEvent`, not an Inventory SDK or return override; artifact promote mode
   remains blocked.

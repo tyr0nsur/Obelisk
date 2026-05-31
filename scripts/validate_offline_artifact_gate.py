@@ -575,6 +575,59 @@ REQUIRED_STRUCTURE_AGGREGATE_EXPLICIT_EXCLUSIONS = {
     "return_override",
     "runtime",
 }
+STRUCTURE_AGGREGATE_FORBIDDEN_TRUE_KEYS = {
+    "build_placement_policy_ready",
+    "build_policy_ready",
+    "collision_policy_ready",
+    "mutation_allowed",
+    "mutation_ready",
+    "no_collision_policy_ready",
+    "ownership_ready",
+    "placement_policy_ready",
+    "return_override_allowed",
+    "return_override_ready",
+    "runtime_hook_ready",
+    "runtime_hooks_ready",
+    "structure_identity_ready",
+    "structure_lookup_ready",
+    "structure_ownership_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_ready",
+}
+STRUCTURE_AGGREGATE_FORBIDDEN_CLAIM_PHRASES = {
+    "build placement": "build_placement_policy",
+    "build policy": "build_policy",
+    "collision policy": "no_collision_policy",
+    "isallowedtobuild": "build_policy",
+    "mutation allowed": "mutation",
+    "mutation ready": "mutation",
+    "no collision": "no_collision_policy",
+    "no-collision": "no_collision_policy",
+    "owner identity": "structure_ownership",
+    "owner lookup": "structure_ownership",
+    "ownership lookup": "structure_ownership",
+    "placement policy": "build_placement_policy",
+    "processevent hook": "runtime_hooks",
+    "return override allowed": "return_override",
+    "return override ready": "return_override",
+    "runtime hook": "runtime_hooks",
+    "runtime hooks": "runtime_hooks",
+    "structure identity": "structure_identity",
+    "structure lookup": "structure_lookup",
+    "structure ownership": "structure_ownership",
+    "v1 complete": "v1_completion",
+    "v1 completion": "v1_completion",
+    "v1 done": "v1_completion",
+    "v1 ready": "v1_completion",
+}
+
+
+def is_negative_boundary_statement(text: str) -> bool:
+    stripped = text.strip()
+    return stripped.startswith(("does not", "do not", "not "))
+
+
 REQUIRED_PLAYERS_IDENTITY_INPUT_TARGETS = {
     "ShooterPlayerController.ServerListPlayers",
     "ShooterPlayerController.ServerKickPlayer",
@@ -5614,11 +5667,22 @@ def validate_structure_aggregate_census_policy_slice_manifest(payload: dict[str,
     ):
         blockers.append({"reason": f"structure_aggregate_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
     for trail, raw_value in collect_string_fields(payload):
-        if trail.startswith("$.non_claims") or trail.startswith("$.safety_summary.explicitly_excluded"):
-            continue
         text = raw_value.casefold()
+        if (
+            trail.startswith("$.non_claims") or trail.startswith("$.safety_summary.explicitly_excluded")
+        ) and is_negative_boundary_statement(text):
+            continue
         if "structureevents" in text or "structure events" in text:
             blockers.append({"reason": "structure_aggregate_policy_public_overclaim_public_structure_events", "label": f"{label}:{trail}"})
+        for phrase, surface in STRUCTURE_AGGREGATE_FORBIDDEN_CLAIM_PHRASES.items():
+            if phrase in text:
+                blockers.append({"reason": f"structure_aggregate_policy_surface_overclaim_{surface}", "label": f"{label}:{trail}"})
+    for trail, raw_value in collect_bool_fields(payload):
+        if raw_value is not True:
+            continue
+        key = trail.rsplit(".", 1)[-1]
+        if key in STRUCTURE_AGGREGATE_FORBIDDEN_TRUE_KEYS:
+            blockers.append({"reason": f"structure_aggregate_policy_surface_overclaim_{key}", "label": f"{label}:{trail}"})
     return blockers
 
 

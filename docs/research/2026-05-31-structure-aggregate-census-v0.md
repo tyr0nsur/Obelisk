@@ -11,6 +11,11 @@ The safe unit is "validated reflected event shape plus copied/redacted scalar fa
 It is not "this UE structure", "this player", "this tribe", "this base", or any stable
 cross-event object.
 
+No-core guardrail: v0 must remain an internal copied-scalar census only. It must not imply
+public `StructureEvents` SDK readiness, structure identity, structure lookup, ownership,
+build placement policy, no-collision policy, mutation, return override, runtime hook
+wiring, or v1 completion.
+
 ## Event Sources
 
 v0 may aggregate only the six compact Structure targets already accepted for
@@ -112,6 +117,8 @@ The following remain blocked for v0:
   identity, and exact timestamps in output;
 - placement denial, no-collision, destroy/repair/change APIs, mutation, return override,
   or manually calling original `ProcessEvent`;
+- public or internal claims that v0 is "v1 complete", production-ready, or sufficient for
+  a public Structure aggregate/census SDK;
 - runtime observation, live-server testing, restarts, markers, ptrace, gcore, broad
   tracing, or `/servidor/ark` access without a separate current live-ops brief.
 

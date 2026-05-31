@@ -155,6 +155,50 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_no_core_surface_claims_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload["claims"] = {
+                "sdk": "StructureEvents SDK is ready",
+                "identity": "structure identity and structure lookup are usable",
+                "ownership": "structure ownership lookup is accepted",
+                "build": "build placement and no-collision policy are ready",
+                "mutation": "mutation allowed and return override allowed",
+                "runtime": "runtime hooks and ProcessEvent hook wiring are active",
+            }
+            payload["non_claims"].append("v1 complete")
+            payload["ownership_ready"] = True
+            payload["build_placement_policy_ready"] = True
+            payload["runtime_hooks_ready"] = True
+            payload["v1_complete"] = True
+            manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker("--root", str(root), "--manifest", str(manifest), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        surfaces = {
+            blocker["surface"]
+            for blocker in report["blockers"]
+            if blocker["reason"] == "structure_census_policy_surface_overclaim"
+        }
+        self.assertIn("public_structureevents_sdk", surfaces)
+        self.assertIn("structure_identity", surfaces)
+        self.assertIn("structure_lookup", surfaces)
+        self.assertIn("structure_ownership", surfaces)
+        self.assertIn("build_placement_policy", surfaces)
+        self.assertIn("no_collision_policy", surfaces)
+        self.assertIn("mutation", surfaces)
+        self.assertIn("return_override", surfaces)
+        self.assertIn("runtime_hooks", surfaces)
+        self.assertIn("v1_completion", surfaces)
+        self.assertIn("ownership_ready", surfaces)
+        self.assertIn("build_placement_policy_ready", surfaces)
+        self.assertIn("runtime_hooks_ready", surfaces)
+        self.assertIn("v1_complete", surfaces)
+
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(
             "--root",

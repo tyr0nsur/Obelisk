@@ -6068,6 +6068,45 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_aggregate_policy_readiness_overclaim", reasons)
         self.assertIn("structure_aggregate_policy_public_overclaim_public_structure_events", reasons)
 
+    def test_blocks_structure_aggregate_census_policy_slice_no_core_surface_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-aggregate-policy.json"
+            payload = structure_aggregate_census_policy_slice_manifest()
+            payload["claims"] = {
+                "sdk": "StructureEvents SDK is ready",
+                "identity": "structure identity and structure lookup are usable",
+                "ownership": "structure ownership lookup is accepted",
+                "build": "build placement and no-collision policy are ready",
+                "mutation": "mutation allowed and return override allowed",
+                "runtime": "runtime hooks and ProcessEvent hook wiring are active",
+            }
+            payload["non_claims"].append("v1 complete")
+            payload["ownership_ready"] = True
+            payload["build_placement_policy_ready"] = True
+            payload["runtime_hooks_ready"] = True
+            payload["v1_complete"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_aggregate_policy_public_overclaim_public_structure_events", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_structure_identity", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_structure_lookup", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_structure_ownership", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_build_placement_policy", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_no_collision_policy", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_mutation", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_return_override", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_runtime_hooks", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_v1_completion", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_ownership_ready", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_build_placement_policy_ready", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_runtime_hooks_ready", reasons)
+        self.assertIn("structure_aggregate_policy_surface_overclaim_v1_complete", reasons)
+
     def test_accepts_players_identity_first_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

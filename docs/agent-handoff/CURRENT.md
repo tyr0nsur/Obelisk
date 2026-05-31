@@ -159,7 +159,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   second-source layout evidence. Descriptor-preflight hardening now requires the
   three internal descriptor candidates to stay unassigned to public event kinds/masks and
   blocks drift toward Inventory SDK/Items SDK/identity/lookup/mutation/return override
-  metadata. The preserved artifact gates were regenerated against manifest sha256
+  metadata. The preserved artifact gates were regenerated against policy-slice JSON sha256
   `242d7506703d0164cfd5c2722690d4d865ca4063f4db1c26be4374da133f3f42`. It still must be
   described only as copied `ReturnValue` signal evidence; it does not promote a public
   Inventory SDK, public Items SDK, identity, lookup, mutation, return override, runtime
