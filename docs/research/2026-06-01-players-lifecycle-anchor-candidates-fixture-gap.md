@@ -5,9 +5,10 @@ Date: 2026-06-01
 ## Summary
 
 `players-lifecycle-anchor-candidates` is reproducible offline for all six planning-only
-targets across the two player-identity offline cores. The committed fixture tree still has
-no base snapshots for this target set, so readiness against `tests/fixtures/ufunction_snapshots`
-reports `missing_base_snapshot=6`.
+targets across the two player-identity offline cores. The fixture gap identified during
+the first pass has now been closed by adding all six base snapshots under
+`tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/` and recording them
+in `tests/fixtures/ufunction_snapshots/manifest.json`.
 
 This remains candidate-only layout evidence. It does not claim login/logout runtime order,
 stable player identity, public Player SDK readiness, object identity, lookup,
@@ -15,14 +16,14 @@ stable player identity, public Player SDK readiness, object identity, lookup,
 
 ## Fixture And Snapshot Coverage
 
-Committed fixtures checked under `tests/fixtures/ufunction_snapshots`:
+Committed fixtures under `tests/fixtures/ufunction_snapshots`:
 
-- `GameMode.K2_PostLogin`: missing committed base fixture.
-- `ShooterGameMode.CheckJoinInProgress`: missing committed base fixture.
-- `ShooterGameMode.HandleNewPlayer`: missing committed base fixture.
-- `ShooterGameMode.OnLogout`: missing committed base fixture.
-- `ShooterGameMode.OnPostLogin__DelegateSignature`: missing committed base fixture.
-- `ShooterGameMode.OnStartNewPlayer__DelegateSignature`: missing committed base fixture.
+- `players_lifecycle/GameMode.K2_PostLogin.snapshot.json`
+- `players_lifecycle/ShooterGameMode.CheckJoinInProgress.snapshot.json`
+- `players_lifecycle/ShooterGameMode.HandleNewPlayer.snapshot.json`
+- `players_lifecycle/ShooterGameMode.OnLogout.snapshot.json`
+- `players_lifecycle/ShooterGameMode.OnPostLogin__DelegateSignature.snapshot.json`
+- `players_lifecycle/ShooterGameMode.OnStartNewPlayer__DelegateSignature.snapshot.json`
 
 Existing offline snapshots before this pass:
 
@@ -108,36 +109,24 @@ Promotion-mode check:
 Committed fixture readiness remains blocked:
 
 - `scripts/compare_reflection_snapshots.py --base-root tests/fixtures/ufunction_snapshots --candidate-root /tmp/obelisk-lifecycle-snapshot-probe/vanilla --readiness-report --target-set players-lifecycle-anchor-candidates --json`
-- Result totals: `targets=6`, `blocked=6`, `comparable=0`.
-- Blocker: `missing_base_snapshot=6`.
+- First-pass result before fixture incorporation: `targets=6`, `blocked=6`, `comparable=0`,
+  with blocker `missing_base_snapshot=6`.
 
-## Minimal Incorporation Proposal
+After fixture incorporation:
 
-If this target set should become fixture-backed, add all six base snapshots, not only the
-four newly reproduced targets. Adding only four would still leave
-`players-lifecycle-anchor-candidates` blocked because `HandleNewPlayer` and `OnLogout`
-are not committed under `tests/fixtures/ufunction_snapshots`.
+- Direct compare against `/tmp/obelisk-lifecycle-snapshot-probe/vanilla`: `accepted=6`,
+  `inconclusive=0`, `rejected=0`.
+- Planning-layout intake readiness: `planning_layout_gate.ready=true`,
+  `ready_scope=planning_only`.
+- Promotion/readiness gate with `--fail-on-readiness-gaps`: expected exit `1` with
+  `promotion_gate.ready=false` and blocker `target_set_not_release_readiness`.
 
-Recommended minimal fixture path:
+## Incorporation
 
-- `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/GameMode.K2_PostLogin.snapshot.json`
-- `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.CheckJoinInProgress.snapshot.json`
-- `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.HandleNewPlayer.snapshot.json`
-- `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.OnLogout.snapshot.json`
-- `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.OnPostLogin__DelegateSignature.snapshot.json`
-- `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/ShooterGameMode.OnStartNewPlayer__DelegateSignature.snapshot.json`
-
-Also update `tests/fixtures/ufunction_snapshots/manifest.json` with `module:
-players_lifecycle` entries for the six targets, preserving `source=offline_core` and
-`status=candidate-only`.
-
-Optional small test addition:
-
-- Add `players-lifecycle-anchor-candidates` to the committed-base fixture readiness test
-  only if the expected failure remains `target_set_not_release_readiness` in promotion
-  mode and no release-readiness gate treats it as public SDK evidence.
-
-If the fixture lane is deferred, keep this note as the durable research artifact and do
-not rerun broad discovery. The exact offline reproduction path above is enough to
-regenerate the four additional snapshots when a lead accepts the planning-only fixture
-folder convention.
+The six base snapshots were committed as fixture inputs only. They are useful for local
+planning-layout comparisons and for consuming lifecycle-anchor candidate artifacts. They
+must not be cited as second-source evidence by themselves and must not be used to promote
+public player identity, runtime lifecycle ordering, lookup, `ResourceHandle`, mutation, or
+return override. If this route needs to be regenerated for a new ARK binary hash, reuse
+the exact offline recipe above and compare against a distinct second-source root before
+updating fixture metadata.

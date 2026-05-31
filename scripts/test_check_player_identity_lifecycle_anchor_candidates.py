@@ -382,6 +382,23 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("candidate_layout_anchor_shape_mismatch", report["blockers"])
 
+    def test_rejects_accepted_anchor_that_is_not_lifecycle_layout_candidate(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0]["accepted"] = True
+        payload["candidate_anchors"][0]["acceptance_status"] = "layout_accepted_non_public"
+        payload["candidate_anchors"][0]["corroboration"]["status"] = "static_accepted"
+        payload["candidate_anchors"][0]["blockers"] = []
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["MissionType.AddPlayerToMission"]
+        payload["safety_summary"]["accepted_anchor_count"] = 1
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("accepted_anchor_not_lifecycle_layout_candidate", report["blockers"])
+        self.assertEqual(report["accepted_start_targets"], [])
+
     def test_rejects_lifecycle_object_field_public_copy_overclaim(self) -> None:
         payload = manifest()
         payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
@@ -400,6 +417,38 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("candidate_layout_object_field_not_redacted", report["blockers"])
         self.assertIn("candidate_layout_object_field_public_overclaim", report["blockers"])
+
+    def test_rejects_lifecycle_object_field_forbidden_classification(self) -> None:
+        payload = manifest()
+        payload["candidate_anchors"][0] = lifecycle_layout_anchor("session_start", "ShooterGameMode.HandleNewPlayer")
+        payload["candidate_anchors"][1] = lifecycle_layout_anchor("session_end", "ShooterGameMode.OnLogout")
+        payload["candidate_anchors"][0]["fields"][0]["classification"] = "forbidden"
+        payload["candidate_anchors"][0]["fields"][0]["copied_scalar_eligibility"] = "not_copied"
+        payload["lifecycle_acceptance"]["session_start_accepted"] = True
+        payload["lifecycle_acceptance"]["session_end_accepted"] = True
+        payload["lifecycle_acceptance"]["accepted_start_targets"] = ["ShooterGameMode.HandleNewPlayer"]
+        payload["lifecycle_acceptance"]["accepted_end_targets"] = ["ShooterGameMode.OnLogout"]
+        payload["safety_summary"]["accepted_anchor_count"] = 2
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("candidate_layout_object_field_not_redacted", report["blockers"])
+
+    def test_rejects_missing_public_surface_exclusions(self) -> None:
+        payload = manifest()
+        payload["safety_summary"]["explicitly_excluded"] = [
+            item
+            for item in payload["safety_summary"]["explicitly_excluded"]
+            if item not in {"commands", "lookup", "ResourceHandle", "mutation", "return_override"}
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("explicit_exclusions_missing_required_boundaries", report["blockers"])
 
     def test_rejects_admin_snapshots_as_accepted_lifecycle_anchors(self) -> None:
         payload = manifest()

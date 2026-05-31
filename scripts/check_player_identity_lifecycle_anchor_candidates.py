@@ -63,7 +63,7 @@ ROLE_TO_ACCEPTANCE_KEYS = {
 }
 ACCEPTED_STATUSES = {"layout_accepted_non_public", "layout_accepted_candidate_only"}
 CORROBORATED_STATUSES = {"second_source_accepted", "static_accepted"}
-NON_PUBLIC_OBJECT_FIELD_CLASSIFICATIONS = {"identity_redacted", "recognition_only", "forbidden"}
+NON_PUBLIC_OBJECT_FIELD_CLASSIFICATIONS = {"identity_redacted", "recognition_only"}
 NON_PUBLIC_OBJECT_FIELD_ELIGIBILITY = {
     "identity_redacted",
     "recognition_only",
@@ -369,6 +369,9 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
     else:
         target_acceptance_eligible = True
     if accepted and isinstance(target, str) and target in ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF:
+        target_acceptance_eligible = False
+    if accepted and isinstance(target, str) and target not in LIFECYCLE_LAYOUT_CANDIDATE_TARGETS:
+        add(blockers, "accepted_anchor_not_lifecycle_layout_candidate", label, target=target)
         target_acceptance_eligible = False
     if accepted:
         for key in ("num_parms", "parms_size", "property_order"):

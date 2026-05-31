@@ -273,8 +273,9 @@ priorities, and do not use history files as the active source of truth.
   now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
   lifecycle anchors plus principal invalidation semantics.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
-  scratch base-vs-vanilla evidence with `accepted=6`, but committed fixture readiness is
-  still blocked by `missing_base_snapshot=6` and promotion fails as planning-only. See
+  scratch base-vs-vanilla evidence with `accepted=6` and now have committed
+  planning-only base fixtures under `players_lifecycle`; promotion still fails as
+  planning-only with `target_set_not_release_readiness`. See
   `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.
 - Player identity offline staging has a helper for the raw sibling layout:
   `scripts/prepare_player_identity_offline_raw_layout.py`. Use it only to stage explicit

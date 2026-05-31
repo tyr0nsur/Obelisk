@@ -15,6 +15,11 @@ READINESS_DOC = REPO_ROOT / "docs" / "research" / "2026-05-27-module-readiness-m
 EXPECTED_ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 EXPECTED_ARTIFACT_SHA = "1c4bf8876706b3af40bd9b73fbeb907a31356e62d6c9ff93aed0158d2cb2fe5e"
 EXPECTED_EVIDENCE_BY_MODULE = {
+    "players_lifecycle": {
+        "artifact_sha256": "62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78",
+        "capture_id": "base-identity-core",
+        "evidence_pack_id": "player-identity-base-core-evidence-pack",
+    },
     "sdk_players": {
         "artifact_sha256": "62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78",
         "capture_id": "core",

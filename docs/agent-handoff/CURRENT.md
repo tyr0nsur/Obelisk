@@ -106,8 +106,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   cores for all six `players-lifecycle-anchor-candidates` targets in scratch evidence:
   `accepted=6`, `inconclusive=0`, `rejected=0`. This is still planning-only/candidate-only
   layout evidence; promotion mode fails as expected with `target_set_not_release_readiness`.
-  The committed fixture tree still has no base snapshots for this target set, so fixture
-  readiness remains blocked by `missing_base_snapshot=6`. Details:
+  The committed fixture tree now has the six base snapshots under
+  `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/`; planning-layout
+  intake is ready against the vanilla scratch root, while promotion remains blocked by
+  `target_set_not_release_readiness`. Details:
   `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.
   `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` remain the narrow
   candidate anchors for principal planning; the other four targets are order/admission
@@ -152,11 +154,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `players-identity-lifecycle-intake` set, and accepted distinct second-source layout
   evidence from the vanilla-gdb core. The next work is a lifecycle-anchor candidate schema
   gate that consumes the corroborated `HandleNewPlayer`/`OnLogout` layouts while still
-  blocking public identity until principal invalidation semantics are explicit. First
-  decide whether to fixture-back all six `players-lifecycle-anchor-candidates` snapshots
-  under a planning-only `players_lifecycle` folder. Do not rerun the completed admin
-  snapshot, second-source layout, or lifecycle layout routes or broad FName/GObjects/core
-  discovery unless a new binary hash or rejected evidence requires it. Current recipe:
+  blocking public identity until principal invalidation semantics are explicit. Do not
+  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes or
+  broad FName/GObjects/core discovery unless a new binary hash or rejected evidence
+  requires it. Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`. Additional
   lifecycle fixture note:
   `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.

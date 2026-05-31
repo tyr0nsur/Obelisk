@@ -139,6 +139,42 @@
       "outer": "ShooterPlayerController"
     },
     {
+      "file": "GameMode.K2_PostLogin.snapshot.json",
+      "module": "players_lifecycle",
+      "name": "K2_PostLogin",
+      "outer": "GameMode"
+    },
+    {
+      "file": "ShooterGameMode.CheckJoinInProgress.snapshot.json",
+      "module": "players_lifecycle",
+      "name": "CheckJoinInProgress",
+      "outer": "ShooterGameMode"
+    },
+    {
+      "file": "ShooterGameMode.HandleNewPlayer.snapshot.json",
+      "module": "players_lifecycle",
+      "name": "HandleNewPlayer",
+      "outer": "ShooterGameMode"
+    },
+    {
+      "file": "ShooterGameMode.OnLogout.snapshot.json",
+      "module": "players_lifecycle",
+      "name": "OnLogout",
+      "outer": "ShooterGameMode"
+    },
+    {
+      "file": "ShooterGameMode.OnPostLogin__DelegateSignature.snapshot.json",
+      "module": "players_lifecycle",
+      "name": "OnPostLogin__DelegateSignature",
+      "outer": "ShooterGameMode"
+    },
+    {
+      "file": "ShooterGameMode.OnStartNewPlayer__DelegateSignature.snapshot.json",
+      "module": "players_lifecycle",
+      "name": "OnStartNewPlayer__DelegateSignature",
+      "outer": "ShooterGameMode"
+    },
+    {
       "file": "PrimalBuff.AllowPostProcessEffect.snapshot.json",
       "module": "sdk_buffs",
       "name": "AllowPostProcessEffect",
