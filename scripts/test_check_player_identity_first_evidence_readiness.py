@@ -234,6 +234,19 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertFalse(operator_commands["inputs"]["matching_non_protected_shooter_game_server"]["present"])
         self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
+        input_layout = operator_commands["input_layout_requirements"]
+        self.assertTrue(input_layout["accepted_raw_directory_pattern"].endswith("player-identity-offline-<run-id>/raw"))
+        self.assertEqual(input_layout["binary_filename"], "ShooterGameServer")
+        self.assertEqual(input_layout["core_filename"], "core")
+        self.assertEqual(input_layout["run_directory_prefix"], "player-identity-offline-")
+        self.assertIn("regular, non-symlink sibling files", input_layout["pairing_rule"])
+        self.assertIn("copy or hardlink offline inputs", input_layout["staging_rule"])
+        self.assertEqual(input_layout["protected_paths_rejected"], ["/servidor/ark"])
+        self.assertEqual(
+            input_layout["next_input_preparation_action"],
+            "stage_matching_binary_and_core_under_same_player_identity_raw_dir",
+        )
+        self.assertIn("does not validate core contents", " ".join(input_layout["non_claims"]))
         self.assertEqual(
             [step["id"] for step in operator_commands["sequence"]],
             [
@@ -454,6 +467,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
         self.assertFalse(operator_commands["ready_to_build_core_evidence_pack"])
         self.assertEqual(operator_commands["paired_raw_inputs"], [])
+        self.assertEqual(
+            operator_commands["input_layout_requirements"]["next_input_preparation_action"],
+            "stage_core_next_to_matching_binary_under_same_player_identity_raw_dir",
+        )
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
         self.assertEqual(
             operator_commands["sequence"][0]["blocked_until"],
@@ -518,6 +535,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertEqual(operator_commands["missing_inputs"], ["paired_non_protected_raw_binary_and_core"])
         self.assertEqual(operator_commands["runnable_now"], [])
+        self.assertEqual(
+            operator_commands["input_layout_requirements"]["next_input_preparation_action"],
+            "restage_binary_and_core_as_siblings_under_same_player_identity_raw_dir",
+        )
 
     def test_accepted_inventory_still_fails_closed_on_malformed_coverage_payload(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")

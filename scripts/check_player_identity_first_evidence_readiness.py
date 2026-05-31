@@ -754,6 +754,7 @@ def build_operator_next_commands(
         core_like_present = True
 
     missing_inputs: list[str] = []
+    next_input_preparation_action = "none"
     if not inventory_ready:
         if offline_status in (
             "offline_binary_and_core_like_inputs_missing",
@@ -765,15 +766,19 @@ def build_operator_next_commands(
                 "matching_non_protected_shooter_game_server",
                 "non_protected_core_dump_input",
             ]
+            next_input_preparation_action = "stage_matching_binary_and_core_under_same_player_identity_raw_dir"
         elif offline_status == "offline_binary_present_core_like_input_missing":
             missing_inputs = ["non_protected_core_dump_input"]
+            next_input_preparation_action = "stage_core_next_to_matching_binary_under_same_player_identity_raw_dir"
         elif offline_status == "offline_binary_and_unpaired_core_like_inputs_present":
             missing_inputs = ["paired_non_protected_raw_binary_and_core"]
+            next_input_preparation_action = "restage_binary_and_core_as_siblings_under_same_player_identity_raw_dir"
         elif offline_status in (
             "core_like_input_present_offline_binary_missing",
             "offline_binary_present_hash_mismatch",
         ):
             missing_inputs = ["matching_non_protected_shooter_game_server"]
+            next_input_preparation_action = "stage_matching_binary_next_to_core_under_same_player_identity_raw_dir"
 
     ready_to_build_core = (
         not inventory_ready
@@ -875,6 +880,20 @@ def build_operator_next_commands(
                 "path_pattern": str(raw_core_pattern),
                 "present": core_like_present,
             },
+        },
+        "input_layout_requirements": {
+            "accepted_raw_directory_pattern": str(raw_binary_pattern.parent),
+            "binary_filename": raw_binary_pattern.name,
+            "core_filename": raw_core_pattern.name,
+            "run_directory_prefix": PLAYER_IDENTITY_RAW_RUN_PREFIX,
+            "pairing_rule": "ShooterGameServer and core must be regular, non-symlink sibling files under the same raw directory",
+            "staging_rule": "copy or hardlink offline inputs into the accepted raw directory before building the core evidence pack",
+            "protected_paths_rejected": ["/servidor/ark"],
+            "next_input_preparation_action": next_input_preparation_action,
+            "non_claims": [
+                "layout readiness does not validate core contents",
+                "presence of core-like files outside the paired raw directory is not enough",
+            ],
         },
         "paired_raw_inputs": (
             offline_inputs.get("paired_raw_inputs")

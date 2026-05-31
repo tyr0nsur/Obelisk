@@ -426,6 +426,19 @@ BROAD_V1_COMPLETION_NEGATED_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+PRE_V1_RC_COMPLETE_SDK_POSITIVE_RE = re.compile(
+    r"\b(?:v0(?:\.1(?:\.\d+)?)?|0\.1(?:\.\d+)?|pre[- ]v1|rc|release\s+candidate|post[- ]rc)\b"
+    r".{0,80}\b(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK\b|"
+    r"\b(?:complete|full|production[- ]ready)\s+(?:public\s+|plugin\s+)?SDK\b"
+    r".{0,80}\b(?:v0(?:\.1(?:\.\d+)?)?|0\.1(?:\.\d+)?|pre[- ]v1|rc|release\s+candidate|post[- ]rc)\b",
+    re.IGNORECASE,
+)
+PRE_V1_RC_COMPLETE_SDK_NEGATED_RE = re.compile(
+    r"\b(?:"
+    r"blocked|cannot|does\s+not|do\s+not|insufficient|must\s+not|no|not|planning|prevent|prevents|toward|unless|until|without"
+    r")\b",
+    re.IGNORECASE,
+)
 GAMEPLAY_POLICY_SCOPE_FORBIDDEN_RE = re.compile(
     r"\bInventory\s+SDKs?\b|"
     r"\bStructureEvents?\s+SDKs?\b|"
@@ -1071,6 +1084,12 @@ def broad_v1_completion_claims(text: str, relative_path: str) -> list[str]:
     scan_text = re.sub(r"(?<!\n)\n(?!\n)", " ", scan_text)
 
     for segment_start, segment in sentence_like_segments(scan_text):
+        pre_v1_rc_complete_sdk_claim = PRE_V1_RC_COMPLETE_SDK_POSITIVE_RE.search(segment)
+        if pre_v1_rc_complete_sdk_claim and not PRE_V1_RC_COMPLETE_SDK_NEGATED_RE.search(segment):
+            line = scan_text.count("\n", 0, segment_start) + 1
+            offenders.append(f"{relative_path}:{line}: {normalized(segment)}")
+            continue
+
         if not BROAD_V1_COMPLETION_POSITIVE_RE.search(segment):
             continue
         if BROAD_V1_COMPLETION_NEGATED_RE.search(segment):
@@ -3590,6 +3609,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "The complete SDK is available to plugin authors.",
             "The full SDK has shipped.",
             "The production-ready public SDK is released.",
+            "The v0.1 RC ships the complete SDK for plugin authors.",
+            "This release candidate includes the full plugin SDK.",
+            "Post-RC foundation work means the production-ready SDK is available.",
             "Server owners can use the complete public SDK today.",
             "Obelisk stable v1 SDK is ready.",
             "Obelisk v1 SDK is complete.",
@@ -3610,6 +3632,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "This is not a complete SDK claim.",
             "The complete SDK remains blocked until the v1 checker allows the claim.",
             "This RC foundation is not v1.0 stable.",
+            "The v0.1 RC does not ship the complete SDK.",
+            "Post-RC foundation work moves toward a complete SDK.",
             "Policy docs must not claim `complete SDK` before the gate passes.",
             "The v1 SDK complete route remains planning-only.",
         ]

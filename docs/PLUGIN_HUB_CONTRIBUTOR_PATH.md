@@ -88,6 +88,11 @@ Before review, the package must state:
 - exported ABI entry points
 - whether shutdown is exported and why
 
+Treat the minimum Obelisk SDK line as the installed package floor the example was built
+and reviewed against. Do not present it as `v1` readiness, general Plugin Hub
+compatibility, ArkApi/AseApi compatibility, or support for surfaces outside the declared
+tier.
+
 Ship safe-disabled default config when config is present:
 
 ```json
