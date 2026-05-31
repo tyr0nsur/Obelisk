@@ -4,6 +4,14 @@
 #include <stddef.h>
 #include <string.h>
 
+#if defined(_WIN32)
+#define OBELISK_PLUGIN_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
+#define OBELISK_PLUGIN_EXPORT __attribute__((visibility("default")))
+#else
+#define OBELISK_PLUGIN_EXPORT
+#endif
+
 static ObeliskApi g_api;
 static bool g_has_api = false;
 
@@ -34,7 +42,7 @@ static void reset_state(void)
     g_has_api = false;
 }
 
-__attribute__((visibility("default")))
+OBELISK_PLUGIN_EXPORT
 bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
 {
     if (out == NULL)
@@ -50,7 +58,7 @@ bool ObeliskPlugin_GetInfo(ObeliskPluginMetadata* out)
     return true;
 }
 
-__attribute__((visibility("default")))
+OBELISK_PLUGIN_EXPORT
 bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context)
 {
     if (!has_api_metadata_prefix(api) ||
@@ -69,7 +77,7 @@ bool ObeliskPlugin_Init(ObeliskApi* api, const ObeliskPluginInitContext* context
     return true;
 }
 
-__attribute__((visibility("default")))
+OBELISK_PLUGIN_EXPORT
 void ObeliskPlugin_Shutdown(void)
 {
     if (g_has_api && g_api.LogInfo != NULL)

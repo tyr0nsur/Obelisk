@@ -18,9 +18,9 @@ response targets while preserving the existing rule: static thunk orientation do
 replace core evidence, reflection inventory, sanitized focal snapshots, privacy policy, or
 runtime promotion gates.
 
-## Proposed Tool
+## Initial Tool
 
-Candidate script:
+Initial candidate-only script:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_native_ufunction_registration_static_discovery.py \
@@ -33,6 +33,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_native_ufunction_registration_st
 
 Optional enrichment flags may use `radare2` or Ghidra headless when available, but the
 baseline workflow must not require those tools in CI or ordinary docs validation.
+The initial implementation does not add this schema to the offline artifact gate. It
+emits `artifact_gate_eligible=false`, `not_artifact_gate=true`,
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`.
 
 ## Required Behavior
 

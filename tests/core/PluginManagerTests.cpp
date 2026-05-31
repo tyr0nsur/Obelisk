@@ -2570,6 +2570,14 @@ namespace
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     10,
+                    10,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "one-shot timer with non-zero interval was registered");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    10,
                     0,
                     OBELISK_TIMER_FLAG_REPEATING,
                     FakeTimerCallback,

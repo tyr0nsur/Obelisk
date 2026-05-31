@@ -88,7 +88,33 @@ require_not_contains() {
     fi
 }
 
+require_dynamic_exports() {
+    local path="$1"
+    shift
+    local expected actual symbol
+    expected="$(printf '%s\n' "$@" | LC_ALL=C sort)"
+    actual="$(nm -D --defined-only "${path}" | awk '{print $NF}' | LC_ALL=C sort)"
+    if [[ "${actual}" != "${expected}" ]]; then
+        echo "Unexpected dynamic exports in ${path}" >&2
+        echo "Expected exports:" >&2
+        printf '%s\n' "${expected}" >&2
+        echo "Actual exports:" >&2
+        printf '%s\n' "${actual}" >&2
+        echo "Full nm output:" >&2
+        nm -D --defined-only "${path}" >&2
+        return 1
+    fi
+    for symbol in "$@"; do
+        if ! nm -D --defined-only "${path}" | awk '{print $NF}' | grep -Fx "${symbol}" >/dev/null; then
+            echo "Missing expected dynamic export ${symbol} in ${path}" >&2
+            nm -D --defined-only "${path}" >&2
+            return 1
+        fi
+    done
+}
+
 require_cmd "${CXX_BIN}"
+require_cmd nm
 require_cmd readelf
 
 if env -u OBELISK_ROOT "${REPO_DIR}/scripts/install_obelisk.sh" --dry-run \
@@ -556,6 +582,10 @@ cmake -S "${SDK_MINIMAL_EXAMPLE_DIR}" -B "${SDK_MINIMAL_EXAMPLE_DIR}/build" \
 cmake --build "${SDK_MINIMAL_EXAMPLE_DIR}/build" --parallel
 SDK_MINIMAL_EXAMPLE_PLUGIN_PATH="${SDK_MINIMAL_EXAMPLE_DIR}/build/obelisk_sdk_minimal_plugin.so"
 require_path "${SDK_MINIMAL_EXAMPLE_PLUGIN_PATH}"
+require_dynamic_exports "${SDK_MINIMAL_EXAMPLE_PLUGIN_PATH}" \
+    ObeliskPlugin_GetInfo \
+    ObeliskPlugin_Init \
+    ObeliskPlugin_Shutdown
 
 if ! grep -F "${INSTALL_ROOT}/include" "${SDK_MINIMAL_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
     echo "Minimal SDK example did not include headers from the installed SDK layout" >&2
@@ -587,6 +617,11 @@ cmake -S "${SDK_DESCRIPTOR_EXAMPLE_DIR}" -B "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build
 cmake --build "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build" --parallel
 SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH="${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/obelisk_sdk_descriptor_catalog.so"
 require_path "${SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH}"
+require_dynamic_exports "${SDK_DESCRIPTOR_EXAMPLE_PLUGIN_PATH}" \
+    InstallLayoutConsumer_DescriptorCatalogValidated \
+    ObeliskPlugin_GetInfo \
+    ObeliskPlugin_Init \
+    ObeliskPlugin_Shutdown
 
 if ! grep -F "${INSTALL_ROOT}/include" "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
     echo "Descriptor catalog SDK example did not include headers from the installed SDK layout" >&2
@@ -618,6 +653,11 @@ cmake -S "${SDK_TIMER_EXAMPLE_DIR}" -B "${SDK_TIMER_EXAMPLE_DIR}/build" \
 cmake --build "${SDK_TIMER_EXAMPLE_DIR}/build" --parallel
 SDK_TIMER_EXAMPLE_PLUGIN_PATH="${SDK_TIMER_EXAMPLE_DIR}/build/obelisk_sdk_timer_plugin.so"
 require_path "${SDK_TIMER_EXAMPLE_PLUGIN_PATH}"
+require_dynamic_exports "${SDK_TIMER_EXAMPLE_PLUGIN_PATH}" \
+    InstallLayoutConsumer_ScheduledCallbackSeen \
+    ObeliskPlugin_GetInfo \
+    ObeliskPlugin_Init \
+    ObeliskPlugin_Shutdown
 
 if ! grep -F "${INSTALL_ROOT}/include" "${SDK_TIMER_EXAMPLE_DIR}/build/compile_commands.json" >/dev/null; then
     echo "Timer SDK example did not include headers from the installed SDK layout" >&2

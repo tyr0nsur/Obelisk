@@ -130,6 +130,7 @@ STATIC_ORIENTATION_REPORT_SCHEMAS = {
     "obelisk.player-identity-static-target-orientation.v1",
     "obelisk.player-identity-static-lifecycle-orientation-check.v1",
     "obelisk.player-identity-static-admin-thunks-check.v1",
+    "obelisk.native-ufunction-registration-static-discovery.v1",
 }
 SUPPORTED_MANIFEST_SCHEMAS = {
     CORE_DUMP_EVIDENCE_PACK_SCHEMA,
