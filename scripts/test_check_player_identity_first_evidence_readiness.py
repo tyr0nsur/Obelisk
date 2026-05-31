@@ -42,6 +42,11 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("missing_reflection_inventory_pack_or_core_evidence_pack", payload["blockers"])
         self.assertIn("fixture_coverage_incomplete", payload["blockers"])
         self.assertIn("players_identity_first_evidence_not_buildable", payload["blockers"])
+        self.assertEqual(
+            payload["reflection_inventory"]["artifact_root_diagnosis"]["status"],
+            "no_manifest_files_found",
+        )
+        self.assertEqual(payload["reflection_inventory"]["artifact_root_diagnosis"]["candidate_pack_count"], 0)
         self.assertEqual(payload["fixture_coverage"]["targets"], 12)
         self.assertEqual(payload["fixture_coverage"]["comparable"], 10)
         self.assertEqual(payload["fixture_coverage"]["blocked"], 2)
@@ -58,6 +63,32 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         )
         self.assertIn("does not touch servers", " ".join(payload["non_claims"]))
         self.assertIn("candidate-only planning evidence", " ".join(payload["non_claims"]))
+
+    def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "scriptstruct-pack").mkdir()
+            (root / "scriptstruct-pack" / "manifest.json").write_text(
+                json.dumps({"schema": "obelisk.scriptstruct-inventory-pack.v1"}),
+                encoding="utf-8",
+            )
+            (root / "container").mkdir()
+            (root / "container" / "artifact-pack.manifest.json").write_text(
+                json.dumps({"schema": "obelisk.offline-artifact-pack.v1"}),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(["--artifact-root", str(root)], check=False)
+
+        payload = json.loads(result.stdout)
+        diagnosis = payload["reflection_inventory"]["artifact_root_diagnosis"]
+        self.assertEqual(diagnosis["status"], "no_obelisk_reflection_inventory_pack_manifests_found")
+        self.assertEqual(diagnosis["candidate_pack_count"], 0)
+        self.assertEqual(diagnosis["reason_counts"]["missing_reflection_inventory_pack"], 1)
+        self.assertEqual(diagnosis["reason_counts"]["scriptstruct_pack_not_reflection_inventory"], 1)
+        self.assertEqual(diagnosis["reason_counts"]["artifact_pack_container_not_reflection_inventory"], 1)
+        self.assertIn("scanned_paths", diagnosis["reason_examples"]["scriptstruct_pack_not_reflection_inventory"])
+        self.assertIn("check_reflection_inventory_pack_readiness.py", diagnosis["next_useful_command"])
 
 
 if __name__ == "__main__":

@@ -407,6 +407,7 @@
         "requires": [
           "non-protected complete obelisk.core-dump-evidence-pack.v1 manifest",
           "reviewed UFunction obelisk.reflection-inventory-pack.v1 manifest",
+          "reflection inventory target_set_coverage for the full players-identity-lifecycle-intake target set",
           "reflection inventory containing ShooterPlayerController.ServerListPlayers and ShooterPlayerController.ServerKickPlayer"
         ],
         "non_claims": [
@@ -611,11 +612,18 @@
         "obelisk.player_identity.v1"
       ],
       "blockers": [
-        "No promoted player identity or authority model."
+        "No promoted player identity or authority model.",
+        "First public slice must be query-only permission checks over a copied principal, not groups/grants/admin actions.",
+        "No fail-closed policy source, abuse controls, owner-token/capability/struct_size ABI tests, or SDK consumer coverage."
       ],
       "exclusions": [
         "permission groups",
         "admin groups",
+        "grant/revoke API",
+        "storage/persistence",
+        "operator ingress",
+        "command router",
+        "replies/send-chat",
         "moderation authority",
         "ban/kick API"
       ]

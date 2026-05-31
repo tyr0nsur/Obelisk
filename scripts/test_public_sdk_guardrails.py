@@ -1376,6 +1376,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             [
                 "non-protected complete obelisk.core-dump-evidence-pack.v1 manifest",
                 "reviewed UFunction obelisk.reflection-inventory-pack.v1 manifest",
+                "reflection inventory target_set_coverage for the full players-identity-lifecycle-intake target set",
                 "reflection inventory containing ShooterPlayerController.ServerListPlayers and ShooterPlayerController.ServerKickPlayer",
             ],
         )
@@ -1454,6 +1455,36 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "moderation",
         ):
             self.assertIn(exclusion, commands["exclusions"])
+
+    def test_public_sdk_surfaces_manifest_keeps_permissions_admin_query_only_after_identity(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        permissions = surfaces["obelisk.permissions_admin.v1"]
+
+        self.assertEqual(permissions["status"], "post-v1")
+        self.assertEqual(permissions["support_tier"], "blocked")
+        self.assertEqual(permissions["public_contract"], [])
+        self.assertEqual(permissions["depends_on"], ["obelisk.player_identity.v1"])
+
+        for blocker in (
+            "No promoted player identity or authority model.",
+            "First public slice must be query-only permission checks over a copied principal, not groups/grants/admin actions.",
+            "No fail-closed policy source, abuse controls, owner-token/capability/struct_size ABI tests, or SDK consumer coverage.",
+        ):
+            self.assertIn(blocker, permissions["blockers"])
+
+        for exclusion in (
+            "permission groups",
+            "admin groups",
+            "grant/revoke API",
+            "storage/persistence",
+            "operator ingress",
+            "command router",
+            "replies/send-chat",
+            "moderation authority",
+            "ban/kick API",
+        ):
+            self.assertIn(exclusion, permissions["exclusions"])
 
     def test_public_sdk_surfaces_manifest_names_high_demand_umbrella_audit_units(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -5047,7 +5078,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         compact_lower = compact.lower()
 
         for required in (
-            "Permissions/admin groups",
+            "Permissions/admin query checks",
             "RCON/operator I/O",
             "Economy, shops, kits, rewards",
             "Homes, teleport, safe zones",
@@ -5109,7 +5140,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Passive chat parsing and plugin-local text routing": "experimental seed only",
             "Copied structure/item policy auditing": "experimental seed only",
             "Timed notices and chat broadcasts": "blocked",
-            "Permissions/admin groups": "blocked",
+            "Permissions/admin query checks": "blocked",
             "RCON/operator I/O and Unicode text": "blocked",
             "Economy, shops, kits, rewards, stats": "blocked",
             "Homes, teleport, safe zones, area policy": "blocked",
@@ -5672,6 +5703,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for term in (
             "produce or approve a non-protected UFunction reflection-inventory pack",
+            "target_set_coverage` for the full 12-target `players-identity-lifecycle-intake` set",
+            "do not treat ScriptStruct inventory, standalone snapshots, redacted signatures, static thunks, or a two-function-only inventory as satisfying this lane",
             "use `scripts/plan_ufunction_focal_snapshots.py` for "
             "`ShooterPlayerController.ServerListPlayers` and "
             "`ShooterPlayerController.ServerKickPlayer` only",
@@ -5731,6 +5764,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "scriptstruct_pack_not_reflection_inventory",
             "does not currently contain a non-protected `obelisk.core-dump-evidence-pack.v1` manifest",
             "safe inventory-build route",
+            "full 12-target\n`players-identity-lifecycle-intake` set",
+            "Do not build a two-function-only reflection\ninventory pack",
             "check_player_identity_first_evidence_readiness.py",
             "fixture_coverage.comparable=10",
             "first_evidence.ready=false",
@@ -5822,6 +5857,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(term), compact)
 
         self.assertNotIn("v1.0` core-stability track", status)
+
+    def test_release_gate_docs_do_not_make_core_first_gate_a_v1_completion_gate(self) -> None:
+        release = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")
+        compact = normalized(release)
+
+        for term in (
+            "This core-first gate is necessary package/readiness evidence for `v0.1.x` RC/stable candidates",
+            "it is not a `v1.0` complete-SDK gate",
+            "`SDK_V1_COMPATIBILITY.md`",
+            "`public_sdk_surfaces.json`",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), compact)
 
     def test_field_window_components_sdk_and_seeds_are_not_v1_completion_signals(self) -> None:
         handoff = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(

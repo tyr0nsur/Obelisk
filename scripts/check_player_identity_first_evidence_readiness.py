@@ -16,6 +16,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 REPORT_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
 PLAYER_IDENTITY_TARGET_SET = "players-identity-lifecycle-intake"
 MISSING_TARGET_PREFIX = "missing_required_target:"
+MAX_DIAGNOSIS_ITEMS = 8
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,6 +70,116 @@ def parse_missing_required_targets(stderr: str) -> list[str]:
             if target:
                 missing.append(target)
     return sorted(set(missing))
+
+
+def bounded_values(values: list[Any]) -> dict[str, Any]:
+    if len(values) <= MAX_DIAGNOSIS_ITEMS:
+        return {"items": values}
+    return {
+        "items": values[:MAX_DIAGNOSIS_ITEMS],
+        "total_count": len(values),
+        "omitted_count": len(values) - MAX_DIAGNOSIS_ITEMS,
+    }
+
+
+def artifact_root_diagnosis(inventory_payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not inventory_payload:
+        return {
+            "status": "inventory_readiness_output_missing_or_malformed",
+            "candidate_pack_count": None,
+            "reason_counts": {},
+            "next_useful_command": "rerun_check_reflection_inventory_pack_readiness_with_json_stdout",
+        }
+
+    candidate_packs = inventory_payload.get("candidate_packs")
+    if not isinstance(candidate_packs, list):
+        candidate_packs = []
+    reasons = inventory_payload.get("reasons")
+    if not isinstance(reasons, list):
+        reasons = []
+
+    reason_counts: dict[str, int] = {}
+    reason_examples: dict[str, dict[str, Any]] = {}
+    for reason in reasons:
+        if not isinstance(reason, dict):
+            continue
+        code = reason.get("reason")
+        if not isinstance(code, str):
+            continue
+        reason_counts[code] = reason_counts.get(code, 0) + 1
+        if code not in reason_examples:
+            example: dict[str, Any] = {}
+            if isinstance(reason.get("path"), str):
+                example["path"] = reason["path"]
+            if isinstance(reason.get("field"), str):
+                example["field"] = reason["field"]
+            if isinstance(reason.get("detail"), str):
+                example["detail"] = reason["detail"]
+            scanned_paths = reason.get("scanned_paths")
+            if isinstance(scanned_paths, list):
+                example["scanned_paths"] = bounded_values(scanned_paths)
+            targets = reason.get("targets")
+            if isinstance(targets, list):
+                example["targets"] = bounded_values(targets)
+            if example:
+                reason_examples[code] = example
+
+    blocked_candidate_summaries: list[dict[str, Any]] = []
+    for pack in candidate_packs[:MAX_DIAGNOSIS_ITEMS]:
+        if not isinstance(pack, dict):
+            continue
+        pack_reasons = pack.get("reasons")
+        if not isinstance(pack_reasons, list):
+            pack_reasons = []
+        fields: list[str] = []
+        codes: list[str] = []
+        for reason in pack_reasons:
+            if not isinstance(reason, dict):
+                continue
+            code = reason.get("reason")
+            field = reason.get("field")
+            if isinstance(code, str) and code not in codes:
+                codes.append(code)
+            if isinstance(field, str) and field not in fields:
+                fields.append(field)
+        blocked_candidate_summaries.append(
+            {
+                "manifest": pack.get("manifest"),
+                "ready": pack.get("ready"),
+                "reason_codes": codes[:MAX_DIAGNOSIS_ITEMS],
+                "blocking_fields": fields[:MAX_DIAGNOSIS_ITEMS],
+                "matched_targets": pack.get("matched_targets"),
+            }
+        )
+
+    accepted_pack = inventory_payload.get("accepted_pack")
+    if isinstance(accepted_pack, dict):
+        status = "accepted_reflection_inventory_pack"
+    elif not inventory_payload.get("manifests_scanned"):
+        status = "no_manifest_files_found"
+    elif not candidate_packs:
+        status = "no_obelisk_reflection_inventory_pack_manifests_found"
+    elif "missing_core_evidence_pack" in reason_counts:
+        status = "reflection_inventory_pack_missing_complete_core_evidence_pack"
+    elif "missing_target" in reason_counts:
+        status = "reflection_inventory_pack_missing_required_admin_targets"
+    elif "wrong_target_scope" in reason_counts:
+        status = "reflection_inventory_pack_wrong_scope_or_candidate_status"
+    else:
+        status = "reflection_inventory_pack_blocked"
+
+    return {
+        "status": status,
+        "candidate_pack_count": len(candidate_packs),
+        "accepted_manifest": accepted_pack.get("manifest") if isinstance(accepted_pack, dict) else None,
+        "reason_counts": reason_counts,
+        "reason_examples": reason_examples,
+        "blocked_candidate_packs": blocked_candidate_summaries,
+        "next_useful_command": (
+            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_inventory_pack_readiness.py "
+            "--root <artifact-root>"
+        ),
+    }
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
@@ -142,6 +253,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 for reason in (inventory_payload.get("reasons", []) if inventory_payload else [])
                 if isinstance(reason, dict)
             ],
+            "artifact_root_diagnosis": artifact_root_diagnosis(inventory_payload),
         },
         "fixture_coverage": {
             "returncode": coverage_result.returncode,

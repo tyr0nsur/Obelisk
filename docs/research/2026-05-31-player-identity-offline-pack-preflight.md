@@ -122,9 +122,13 @@ python3 scripts/check_reflection_inventory_pack_readiness.py \
   --root <non-protected-artifact-root>
 ```
 
-Proceed only when the checker reports `ready=true` and the accepted pack contains both
-`ShooterPlayerController.ServerListPlayers` and
-`ShooterPlayerController.ServerKickPlayer`.
+Proceed only when the checker reports `ready=true`. A valid pack for this lane must
+record `target_set_coverage` for the full 12-target
+`players-identity-lifecycle-intake` set and contain inventory rows for both missing admin
+targets: `ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer`. Do not build a two-function-only reflection
+inventory pack; only the later focal snapshot plan narrows to the two missing admin
+snapshots.
 
 The checker and planner also fail closed when the inventory
 `target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so

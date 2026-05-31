@@ -140,6 +140,11 @@ checks with different defaults. A final RC or stable candidate must also pass th
 second-source readiness gate below on a clean worktree with the accepted snapshot root
 configured.
 
+This core-first gate is necessary package/readiness evidence for `v0.1.x` RC/stable
+candidates, but it is not a `v1.0` complete-SDK gate. A `v1.0` claim must still satisfy
+[`SDK_V1_COMPATIBILITY.md`](SDK_V1_COMPATIBILITY.md) and the blocker map in
+[`public_sdk_surfaces.json`](public_sdk_surfaces.json).
+
 After assembling an RC second-source root, run the committed RC layout smoke. This checks
 that the copied second-source snapshots compare cleanly against the in-repo sanitized
 UFunction fixtures for the RC target sets without claiming runtime promotion,
