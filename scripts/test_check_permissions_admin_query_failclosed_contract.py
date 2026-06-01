@@ -177,10 +177,18 @@ def manifest() -> dict:
             "plugin_supplied_principal_tuple_allowed": False,
             "command_supplied_principal_tuple_allowed": False,
             "operator_config_supplied_principal_tuple_allowed": False,
+            "principal_tuple_provenance_required_before_allow": True,
             "principal_generation_provenance_required_before_allow": True,
             "principal_scope_provenance_required_before_allow": True,
             "server_process_epoch_required_before_allow": True,
+            "missing_principal_provenance_result": "deny",
+            "stale_principal_result": "deny",
+            "principal_generation_mismatch_result": "deny",
+            "scope_mismatch_result": "deny",
+            "process_mismatch_result": "deny",
             "server_process_epoch_mismatch_result": "deny",
+            "unsupported_principal_scope_flags_result": "deny",
+            "plugin_supplied_principal_tuple_result": "deny",
             "public_abi_field_allowed": False,
             "runtime_ready": False,
         },
@@ -699,6 +707,30 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         )
         self.assertIn("principal_provenance_policy_server_process_epoch_mismatch_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_public_abi_field_allowed_invalid", report["blockers"])
+
+    def test_rejects_principal_provenance_fail_closed_result_drift(self) -> None:
+        payload = manifest()
+        payload["principal_provenance_policy"].pop("missing_principal_provenance_result")
+        payload["principal_provenance_policy"]["principal_tuple_provenance_required_before_allow"] = False
+        payload["principal_provenance_policy"]["stale_principal_result"] = "allow"
+        payload["principal_provenance_policy"]["scope_mismatch_result"] = "unknown"
+        payload["principal_provenance_policy"]["process_mismatch_result"] = "allow"
+        payload["principal_provenance_policy"]["plugin_supplied_principal_tuple_result"] = "allow"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_provenance_policy_fields_mismatch", report["blockers"])
+        self.assertIn(
+            "principal_provenance_policy_principal_tuple_provenance_required_before_allow_invalid",
+            report["blockers"],
+        )
+        self.assertIn("principal_provenance_policy_missing_principal_provenance_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_stale_principal_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_scope_mismatch_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_process_mismatch_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_plugin_supplied_principal_tuple_result_invalid", report["blockers"])
 
     def test_rejects_missing_or_weakened_query_text_policy(self) -> None:
         payload = manifest()

@@ -140,6 +140,8 @@
   "promoted_events": [
     {
       "event_id": "obelisk.gameplay_policy.v1",
+      "v1_sdk_status": "promoted-experimental-only",
+      "v1_completion_evidence": false,
       "public_name": "GameplayPolicyEvent",
       "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
       "abi_struct": "ObeliskGameplayPolicyEvent",

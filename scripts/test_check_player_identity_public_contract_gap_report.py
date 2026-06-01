@@ -99,6 +99,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertTrue(report["runtime_evidence_missing"])
         self.assertEqual(report["surface_manifest"]["status"], "planning")
         self.assertEqual(report["surface_manifest"]["public_contract"], [])
+        self.assertEqual(
+            self.player_identity_surface(self.load_surfaces())["v1_decision_contract"]["decision_manifest"],
+            "docs/player_identity_public_contract_decisions.json",
+        )
         self.assertEqual(report["public_header_scan"]["detected_player_identity_tokens"], [])
         self.assertEqual(report["blockers"], [])
 

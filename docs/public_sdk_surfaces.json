@@ -602,6 +602,7 @@
       },
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_for_complete_sdk",
+        "decision_manifest": "docs/player_identity_public_contract_decisions.json",
         "must_remain_without_public_contract_until_promotion": true,
         "promotion_requires": [
           "approved runtime principal lifecycle evidence for the candidate HandleNewPlayer/OnLogout route",

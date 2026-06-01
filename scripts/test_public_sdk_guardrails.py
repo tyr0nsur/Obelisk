@@ -7085,6 +7085,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for event in promoted_events:
             with self.subTest(event=event.get("event_id", "<missing>")):
                 self.assertIsInstance(event.get("event_id"), str)
+                self.assertEqual(event.get("v1_sdk_status"), "promoted-experimental-only")
+                self.assertIs(event.get("v1_completion_evidence"), False)
                 self.assertIsInstance(event.get("capability"), str)
                 self.assertRegex(event["capability"], r"^OBELISK_API_CAPABILITY_[A-Z0-9_]+_EVENTS$")
                 target_sets = event.get("target_sets")

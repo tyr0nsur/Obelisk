@@ -508,6 +508,27 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
 
     namespace
     {
+        bool HasExpectedCopiedScalarShape(const CopiedInventoryPolicyEvent& event)
+        {
+            using Obelisk::Core::InventoryPolicyEventKind;
+            using Obelisk::Core::InventoryPolicyScalarField;
+
+            const std::span<const Obelisk::Core::InventoryPolicyScalarValue> scalars =
+                event.View.Scalars;
+            switch (event.View.Kind)
+            {
+            case InventoryPolicyEventKind::AllowRemoteAddToInventory:
+                return scalars.size() == 2 &&
+                       scalars[0].Field == InventoryPolicyScalarField::BRequestedByPlayer &&
+                       scalars[1].Field == InventoryPolicyScalarField::ReturnValue;
+            case InventoryPolicyEventKind::CanUse:
+                return scalars.size() == 2 &&
+                       scalars[0].Field == InventoryPolicyScalarField::BIgnoreCooldown &&
+                       scalars[1].Field == InventoryPolicyScalarField::ReturnValue;
+            }
+            return false;
+        }
+
         bool IsSelfContainedCopiedEvent(const CopiedInventoryPolicyEvent& event)
         {
             if (event.ScalarCount > event.ScalarStorage.size())
@@ -515,8 +536,9 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
             if (event.View.Scalars.size() != event.ScalarCount)
                 return false;
             if (event.ScalarCount == 0)
-                return event.View.Scalars.empty();
-            return event.View.Scalars.data() == event.ScalarStorage.data();
+                return false;
+            return event.View.Scalars.data() == event.ScalarStorage.data() &&
+                   HasExpectedCopiedScalarShape(event);
         }
 
         size_t DispatchCopiedInventoryPolicyEvent(const CopiedInventoryPolicyEvent& event)

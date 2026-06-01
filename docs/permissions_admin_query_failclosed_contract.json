@@ -651,15 +651,23 @@
   "pre_abi": true,
   "principal_provenance_policy": {
     "command_supplied_principal_tuple_allowed": false,
+    "missing_principal_provenance_result": "deny",
     "operator_config_supplied_principal_tuple_allowed": false,
     "plugin_supplied_principal_tuple_allowed": false,
+    "plugin_supplied_principal_tuple_result": "deny",
+    "principal_generation_mismatch_result": "deny",
     "principal_generation_provenance_required_before_allow": true,
     "principal_scope_provenance_required_before_allow": true,
+    "principal_tuple_provenance_required_before_allow": true,
     "principal_tuple_source": "runtime_owned_player_identity_observation",
+    "process_mismatch_result": "deny",
     "public_abi_field_allowed": false,
     "runtime_ready": false,
+    "scope_mismatch_result": "deny",
     "server_process_epoch_mismatch_result": "deny",
-    "server_process_epoch_required_before_allow": true
+    "server_process_epoch_required_before_allow": true,
+    "stale_principal_result": "deny",
+    "unsupported_principal_scope_flags_result": "deny"
   },
   "principal_runtime_identity_policy": {
     "command_text_permission_claim_allowed": false,

@@ -1869,6 +1869,11 @@ namespace
             Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
         Require(registrationId != 0, "failed to register inventory policy event callback for span ownership test");
 
+        CopiedInventoryPolicyEvent empty;
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, empty) == 0,
+                "empty copied inventory policy event dispatched");
+        Require(captured.empty(), "empty copied inventory policy event reached callback");
+
         std::array<Obelisk::Core::InventoryPolicyScalarValue, 2> borrowedScalars{{
             {
                 .Field = Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
@@ -1896,6 +1901,18 @@ namespace
                 "mismatched copied inventory scalar span/count dispatched");
         Require(captured.empty(), "mismatched copied inventory scalar span/count reached callback");
 
+        forged.ScalarStorage[0] = {
+            .Field = Obelisk::Core::InventoryPolicyScalarField::BRequestedByPlayer,
+            .BoolValue = true,
+        };
+        forged.ScalarStorage[1] = borrowedScalars[1];
+        forged.ScalarCount = borrowedScalars.size();
+        forged.RebindScalarSpan();
+        Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(true, forged) == 0,
+                "wrong copied inventory scalar shape dispatched");
+        Require(captured.empty(), "wrong copied inventory scalar shape reached callback");
+
+        forged.ScalarStorage[0] = borrowedScalars[0];
         forged.ScalarCount = borrowedScalars.size();
         forged.RebindScalarSpan();
         Require(MaybeDispatchCopiedInventoryPolicyEventAfterOriginal(false, forged) == 0,
