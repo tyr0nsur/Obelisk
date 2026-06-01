@@ -59,6 +59,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   progress. Inventory copied-signal stability now has a standalone offline checker for the
   exact five allowed copied signals, category-only `resource_kind`, and no Inventory SDK,
   Items SDK, lookup, mutation, `AdditionalData`, or `ResourceHandle` claims.
+- Latest P0 completion-accounting hardening: promoted demand-family equivalents cannot
+  satisfy the P0 dependency chain, the legacy `completion_equivalent_for` alias is ignored
+  for complete-SDK accounting, and any P0 `excluded`/`post-v1` outcome is reported as
+  scoped non-complete bookkeeping that keeps `p0_chain_promoted_count=0` until the
+  canonical P0 surface itself is promoted with evidence. Missing P0 entries in
+  `v1_sdk_completion_blockers` now raise a specific blocker instead of being hidden by
+  broader canonical-blocker drift.
 - Latest copied-signal integration hardening: the v1 completion checker now composes the
   inventory/item copied-signal stability checker and rejects any drift that makes it public
   SDK or v1-completion evidence. It also rejects nested public/runtime claims reported by

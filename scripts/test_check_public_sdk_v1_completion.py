@@ -368,6 +368,45 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(payload["inventory_copied_signals_stability"]["exit_code"], 2)
 
+    def test_missing_p0_dependency_chain_blocker_reports_specific_mismatch(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        p0_chain = [
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+        ]
+        manifest["v1_dependency_sequence"] = list(p0_chain)
+        manifest["v1_required_dependency_chain"] = list(p0_chain)
+        manifest["v1_sdk_completion_blockers"] = [
+            surface_id
+            for surface_id in manifest["v1_sdk_completion_blockers"]
+            if surface_id != "obelisk.command_chat_response_path.v1"
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertIn(
+            "v1_required_dependency_chain_missing_from_completion_blockers",
+            payload["blockers"],
+        )
+        self.assertIn("canonical_v1_completion_blocker_missing", payload["blockers"])
+        self.assertEqual(
+            payload["missing_v1_required_dependency_chain_completion_blockers"],
+            ["obelisk.command_chat_response_path.v1"],
+        )
+        self.assertEqual(payload["v1_required_dependency_chain"], p0_chain)
+        self.assertEqual(payload["v1_dependency_sequence"], p0_chain)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_total"], 4)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        self.assertFalse(payload["v1_sdk_progress"]["stable_claim_allowed"])
+
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)
 
@@ -1026,6 +1065,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertTrue(payload["stable_release_contract_claim_allowed"])
         self.assertEqual(payload["installed_sdk_package_shape_guardrail_drift"], [])
         self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
+        self.assertIn("p0_dependency_chain_outcomes_scoped_non_complete_only", payload["blockers"])
+        self.assertEqual(
+            payload["p0_dependency_chain_scoped_non_complete_outcomes"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+        )
+        self.assertEqual(payload["p0_dependency_chain_scoped_non_complete_outcome_count"], 4)
         self.assertEqual(
             payload["minimum_promoted_demand_family_gaps"],
             payload["minimum_promoted_demand_families"],
@@ -1034,12 +1084,49 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertTrue(payload["v1_sdk_progress"]["stable_release_contract_claim_allowed"])
         self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
         self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_scoped_non_complete_outcome_count"], 4)
+        self.assertEqual(
+            payload["v1_sdk_progress"]["p0_chain_scoped_non_complete_outcomes"],
+            payload["p0_dependency_chain_scoped_non_complete_outcomes"],
+        )
+        self.assertIn(
+            "do not increase p0_chain_promoted_count",
+            payload["v1_sdk_progress"]["p0_chain_scoped_non_complete_note"],
+        )
         self.assertEqual(payload["v1_sdk_progress"]["complete_sdk_claim_progress_percent"], 0)
+        outcome_by_surface = {row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]}
+        identity_outcome = outcome_by_surface["obelisk.player_identity.v1"]
+        self.assertTrue(identity_outcome["is_p0_dependency_chain"])
+        self.assertTrue(identity_outcome["scoped_non_complete_outcome_only"])
+        self.assertFalse(identity_outcome["counts_toward_complete_sdk_claim"])
+        self.assertTrue(identity_outcome["unresolved_for_complete_sdk_claim"])
+        self.assertIn("scoped non-complete outcome only", identity_outcome["next_action"])
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"]["p0_scoped_non_complete_outcomes"],
+            payload["p0_dependency_chain_scoped_non_complete_outcomes"],
+        )
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
+                "p0_scoped_non_complete_outcomes"
+            ],
+            payload["p0_dependency_chain_scoped_non_complete_outcomes"],
+        )
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["runtime_required_blockers"][
+                "p0_scoped_non_complete_outcomes"
+            ],
+            payload["p0_dependency_chain_scoped_non_complete_outcomes"],
+        )
         scoped_payload = json.loads(scoped_result.stdout)
         self.assertFalse(scoped_payload["ready"])
         self.assertTrue(scoped_payload["scoped_release_statement"]["ready"])
+        self.assertFalse(scoped_payload["scoped_release_statement"]["stable_v1_sdk_claim_allowed"])
         self.assertIn(
             "complete_sdk_claim_requires_promoted_demand_families",
+            scoped_payload["scoped_release_statement"]["allowed_remaining_blockers"],
+        )
+        self.assertIn(
+            "p0_dependency_chain_outcomes_scoped_non_complete_only",
             scoped_payload["scoped_release_statement"]["allowed_remaining_blockers"],
         )
         self.assertEqual(scoped_payload["scoped_release_statement"]["blocking_report_blockers"], [])
@@ -1079,6 +1166,79 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertNotIn(blocker_id, gaps)
         self.assertEqual(satisfied_by[blocker_id], equivalent_id)
+
+    def test_minimum_promoted_demand_family_rejects_p0_equivalent(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        blocker_id = "obelisk.player_identity.v1"
+        equivalent_id = "obelisk.player_identity_equivalent.v1"
+        surfaces_by_id = {
+            surface_id: {"id": surface_id, "status": "promoted"}
+            for surface_id in module.CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+        }
+        surfaces_by_id[blocker_id] = {"id": blocker_id, "status": "excluded"}
+        surfaces_by_id[equivalent_id] = {
+            "id": equivalent_id,
+            "status": "promoted",
+            "v1_completion_equivalent_for": [blocker_id],
+            "evidence": {"tests": ["tests/sdk_consumer"]},
+        }
+        stable_contract = {
+            "promoted_demand_family_equivalents": {
+                blocker_id: equivalent_id,
+            }
+        }
+
+        gaps, satisfied_by = module.complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract,
+        )
+
+        self.assertIn(blocker_id, gaps)
+        self.assertNotIn(blocker_id, satisfied_by)
+
+    def test_minimum_promoted_demand_family_ignores_completion_equivalent_alias(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        blocker_id = "obelisk.inventory_items_mutation.v1"
+        equivalent_id = "obelisk.inventory_items_mutation_alias_equivalent.v1"
+        surfaces_by_id = {
+            surface_id: {"id": surface_id, "status": "promoted"}
+            for surface_id in module.CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+        }
+        surfaces_by_id[blocker_id] = {"id": blocker_id, "status": "excluded"}
+        surfaces_by_id[equivalent_id] = {
+            "id": equivalent_id,
+            "status": "promoted",
+            "completion_equivalent_for": [blocker_id],
+            "evidence": {"tests": ["tests/sdk_consumer"]},
+        }
+        stable_contract = {
+            "promoted_demand_family_equivalents": {
+                blocker_id: equivalent_id,
+            }
+        }
+
+        gaps, satisfied_by = module.complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract,
+        )
+
+        self.assertFalse(module.surface_declares_completion_equivalent(surfaces_by_id[equivalent_id], blocker_id))
+        self.assertIn(blocker_id, gaps)
+        self.assertNotIn(blocker_id, satisfied_by)
 
     def test_empty_or_truncated_manifest_fails_closed(self) -> None:
         manifest = {

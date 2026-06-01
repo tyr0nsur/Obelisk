@@ -65,6 +65,7 @@ CANONICAL_V1_DEPENDENCY_SEQUENCE = (
     "obelisk.commands_replies.v1",
 )
 CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN = CANONICAL_V1_DEPENDENCY_SEQUENCE
+P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES = {"excluded", "post-v1"}
 CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.gameplay_policy_event.v1",
     "obelisk.chat_message.v1",
@@ -113,6 +114,7 @@ SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "v1_completion_required_false",
     "promoted_experimental_surfaces_unresolved",
     "v1_sdk_completion_blockers_unresolved",
+    "p0_dependency_chain_outcomes_scoped_non_complete_only",
     "v1_required_dependency_chain_unpromoted",
     "planning_surfaces_unresolved_for_v1_claim",
     "top_level_planning_surfaces_unresolved_for_v1_claim",
@@ -1497,9 +1499,7 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
 
 
 def surface_declares_completion_equivalent(surface: dict[str, Any], blocker_id: str) -> bool:
-    equivalents = as_string_list(surface.get("v1_completion_equivalent_for"))
-    equivalents.extend(as_string_list(surface.get("completion_equivalent_for")))
-    return blocker_id in equivalents
+    return blocker_id in as_string_list(surface.get("v1_completion_equivalent_for"))
 
 
 def explicit_completion_equivalent_satisfies(
@@ -1507,6 +1507,8 @@ def explicit_completion_equivalent_satisfies(
     equivalent_surface_ids: list[str],
     surfaces_by_id: dict[str, dict[str, Any]],
 ) -> str | None:
+    if blocker_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN:
+        return None
     for equivalent_id in equivalent_surface_ids:
         equivalent_surface = surfaces_by_id.get(equivalent_id)
         if not equivalent_surface:
@@ -1702,6 +1704,14 @@ def blocker_outcome_next_action(
         if release_statement_outcome != "promoted":
             return "add one release-statement promoted record after reviewing evidence"
         return "promoted accounting complete; this still does not allow the stable SDK claim by itself"
+    if (
+        surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE
+        and manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
+    ):
+        return (
+            "scoped non-complete outcome only; promote with evidence before "
+            "complete/full/production SDK wording"
+        )
     if manifest_outcome in {"post-v1", "excluded"}:
         if release_statement_contract_satisfied:
             return "release-statement outcome accounted; remaining SDK claim still depends on all blockers"
@@ -1738,22 +1748,31 @@ def completion_blocker_outcome_rows(
                 and release_statement_satisfies_exclusion_contract(release_statement_text, surface)
             )
         required_outcomes = sorted(required_release_statement_outcomes(surface)) if surface else []
+        is_p0_dependency_chain = surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN
+        scoped_non_complete_outcome_only = (
+            is_p0_dependency_chain
+            and manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
+        )
+        counts_toward_complete_sdk_claim = (
+            promotion_evidence_satisfied
+            and release_statement_contract_satisfied
+            and manifest_outcome == "promoted"
+        )
         rows.append(
             {
                 "surface": surface_id,
                 "position": index,
                 "status": status,
                 "support_tier": surface.get("support_tier") if surface else None,
+                "is_p0_dependency_chain": is_p0_dependency_chain,
                 "manifest_outcome": manifest_outcome,
                 "release_statement_outcome": release_statement_outcome,
                 "release_statement_contract_satisfied": release_statement_contract_satisfied,
                 "required_release_statement_outcomes": required_outcomes,
                 "promotion_evidence_satisfied": promotion_evidence_satisfied,
-                "unresolved_for_complete_sdk_claim": not (
-                    promotion_evidence_satisfied
-                    and release_statement_contract_satisfied
-                    and manifest_outcome == "promoted"
-                ),
+                "scoped_non_complete_outcome_only": scoped_non_complete_outcome_only,
+                "counts_toward_complete_sdk_claim": counts_toward_complete_sdk_claim,
+                "unresolved_for_complete_sdk_claim": not counts_toward_complete_sdk_claim,
                 "next_action": blocker_outcome_next_action(
                     surface_id=surface_id,
                     status=status,
@@ -1784,12 +1803,24 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         if row["surface"] in CANONICAL_V1_DEPENDENCY_SEQUENCE
         and row.get("unresolved_for_complete_sdk_claim") is True
     ]
+    p0_scoped_non_complete_outcomes = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is True
+        and row.get("scoped_non_complete_outcome_only") is True
+    ]
     return {
         "total": len(rows),
         "manifest_outcome_missing_count": len(manifest_outcome_missing),
         "release_statement_outcome_missing_count": len(release_statement_outcome_missing),
+        "p0_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
         "manifest_outcome_missing": manifest_outcome_missing,
         "release_statement_outcome_missing": release_statement_outcome_missing,
+        "p0_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
+        "p0_scoped_non_complete_note": (
+            "P0 dependency-chain excluded/post-v1 outcomes are scoped non-complete "
+            "bookkeeping only; they remain unresolved for complete/full/production SDK claims."
+        ),
         "dependency_chain_remaining": dependency_chain_remaining,
         "dependency_chain_remaining_count": len(dependency_chain_remaining),
         "non_claim": "This summary ranks accounting gaps only; stable SDK claim approval still requires the full checker to pass.",
@@ -1874,6 +1905,7 @@ def categorized_v1_report_sections(
             "surface_id_missing",
             "top_level_planning_surfaces_unresolved_for_v1_claim",
             "v1_dependency_sequence_mismatch",
+            "v1_required_dependency_chain_missing_from_completion_blockers",
             "v1_sdk_completion_blockers_unresolved",
         }
     ]
@@ -1899,6 +1931,14 @@ def categorized_v1_report_sections(
             ),
             "release_statement_post_v1_or_excluded_outcomes": (
                 completion_blockers_with_release_statement_post_v1_or_excluded_outcome
+            ),
+            "p0_scoped_non_complete_outcomes": blocker_outcome_summary.get(
+                "p0_scoped_non_complete_outcomes",
+                [],
+            ),
+            "p0_scoped_non_complete_outcome_count": blocker_outcome_summary.get(
+                "p0_scoped_non_complete_outcome_count",
+                0,
             ),
             "missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
             "missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
@@ -1933,6 +1973,14 @@ def categorized_v1_report_sections(
             "dependency_chain_remaining": blocker_outcome_summary.get(
                 "dependency_chain_remaining",
                 [],
+            ),
+            "p0_scoped_non_complete_outcomes": blocker_outcome_summary.get(
+                "p0_scoped_non_complete_outcomes",
+                [],
+            ),
+            "p0_scoped_non_complete_outcome_count": blocker_outcome_summary.get(
+                "p0_scoped_non_complete_outcome_count",
+                0,
             ),
             "manifest_outcome_missing": blocker_outcome_summary.get(
                 "manifest_outcome_missing",
@@ -2135,6 +2183,11 @@ def build_report(
     missing_surfaces: list[str] = []
     missing_canonical_surfaces = sorted(CANONICAL_SURFACE_IDS - set(surfaces_by_id))
     missing_canonical_completion_blockers = sorted(CANONICAL_V1_COMPLETION_BLOCKERS - completion_blocker_set)
+    missing_dependency_chain_completion_blockers = [
+        surface_id
+        for surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN
+        if surface_id not in completion_blocker_set
+    ]
     promoted_without_contract: list[str] = []
     promoted_without_evidence: list[str] = []
     non_promoted_with_contract: list[str] = []
@@ -2290,6 +2343,8 @@ def build_report(
         blockers.append("canonical_surface_id_missing")
     if missing_canonical_completion_blockers:
         blockers.append("canonical_v1_completion_blocker_missing")
+    if missing_dependency_chain_completion_blockers:
+        blockers.append("v1_required_dependency_chain_missing_from_completion_blockers")
     if minimum_promoted_demand_family_gaps:
         blockers.append("complete_sdk_claim_requires_promoted_demand_families")
     if unresolved_experimental:
@@ -2391,6 +2446,9 @@ def build_report(
         release_statement_text,
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
+    p0_scoped_non_complete_outcomes = blocker_outcome_summary["p0_scoped_non_complete_outcomes"]
+    if p0_scoped_non_complete_outcomes:
+        blockers.append("p0_dependency_chain_outcomes_scoped_non_complete_only")
     ready = not blockers
     stable_claim_allowed = manifest_stable_claim_allowed and ready
     report_sections = categorized_v1_report_sections(
@@ -2463,6 +2521,9 @@ def build_report(
         "promoted_without_public_contract": sorted(set(promoted_without_contract)),
         "missing_canonical_surfaces": missing_canonical_surfaces,
         "missing_canonical_completion_blockers": missing_canonical_completion_blockers,
+        "missing_v1_required_dependency_chain_completion_blockers": (
+            missing_dependency_chain_completion_blockers
+        ),
         "promoted_surfaces_without_evidence": sorted(set(promoted_without_evidence)),
         "promoted_surfaces_missing_required_evidence_terms": {
             surface_id: sorted(set(terms))
@@ -2481,6 +2542,8 @@ def build_report(
         "v1_dependency_sequence_mismatches": sorted(set(dependency_sequence_mismatches)),
         "v1_required_dependency_chain": required_dependency_chain,
         "v1_required_dependency_chain_expected": list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
+        "p0_dependency_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
+        "p0_dependency_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
         "unpromoted_required_dependency_chain": unpromoted_required_dependency_chain,
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
@@ -2502,6 +2565,12 @@ def build_report(
             "p0_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
             "p0_chain_promoted_count": (
                 len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN) - len(unpromoted_required_dependency_chain)
+            ),
+            "p0_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
+            "p0_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
+            "p0_chain_scoped_non_complete_note": (
+                "P0 excluded/post-v1 outcomes are scoped release-statement accounting only and do not "
+                "increase p0_chain_promoted_count or complete_sdk_claim_progress_percent."
             ),
             "complete_sdk_claim_progress_percent": (
                 int((len(completion_blockers_with_promoted_outcome) / completion_blocker_total) * 100)
@@ -2634,6 +2703,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             f"Surfaces: {format_human_list(report.get('unpromoted_required_dependency_chain'))}.",
             "Action: promote player identity, permissions/admin, command/chat response path, and commands/replies with evidence before complete/full/production SDK wording.",
         ],
+        "p0_dependency_chain_outcomes_scoped_non_complete_only": [
+            "A P0 dependency-chain surface is recorded as excluded/post-v1.",
+            f"Surfaces: {format_human_list(report.get('p0_dependency_chain_scoped_non_complete_outcomes'))}.",
+            "Action: treat this only as scoped non-complete release-statement accounting; promote the P0 chain with evidence before complete/full/production SDK wording.",
+        ],
         "complete_sdk_claim_requires_promoted_demand_families": [
             "The complete/full/production SDK claim requires promoted demand families, not only excluded or post-v1 outcomes.",
             f"Gaps: {format_human_list(report.get('minimum_promoted_demand_family_gaps'))}.",
@@ -2765,6 +2839,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         ],
         "canonical_v1_completion_blocker_missing": [
             f"Missing canonical blockers: {format_human_list(report.get('missing_canonical_completion_blockers'))}.",
+        ],
+        "v1_required_dependency_chain_missing_from_completion_blockers": [
+            "A P0 dependency-chain surface is missing from v1_sdk_completion_blockers.",
+            f"Surfaces: {format_human_list(report.get('missing_v1_required_dependency_chain_completion_blockers'))}.",
+            "Action: keep the canonical P0 chain in v1_sdk_completion_blockers; exclusions/post-v1 accounting cannot satisfy these surfaces.",
         ],
         "duplicate_surface_id": [
             f"Duplicate surface IDs: {format_human_list(report.get('duplicate_surface_ids'))}.",
