@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -102,6 +103,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     "rollback_delta=removed_observer_env_and_markers_preserved_disable_plugins",
                     "observer_env_survived=false",
                     "observer_marker_survived=false",
+                    "sibling_marker_entries=absent",
+                    "sibling_observer_env=absent",
                     "user_policy=no_regular_users",
                     "notice_sent=not_applicable",
                     "log_budget=10",
@@ -122,12 +125,15 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        env = os.environ.copy()
+        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         result = subprocess.run(
             [sys.executable, str(WINDOW_CHECKER), "--json", str(manifest_path)],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
         )
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         check_path = temp_dir / "window.check.json"

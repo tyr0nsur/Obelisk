@@ -98,6 +98,10 @@ done
 
 [[ -n "${INSTANCE}" ]] || { echo "--instance is required." >&2; exit 2; }
 [[ "${INSTANCE}" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid instance id: ${INSTANCE}" >&2; exit 1; }
+if [[ -n "${MAP}" && ! "${MAP}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+    echo "Invalid map name: ${MAP}" >&2
+    exit 1
+fi
 [[ "${MODE}" == "stable" || "${MODE}" == "observer-window" ]] || {
     echo "--mode must be stable or observer-window." >&2
     exit 2

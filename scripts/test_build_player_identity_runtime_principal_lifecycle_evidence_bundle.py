@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import subprocess
 import sys
 import tempfile
@@ -140,6 +141,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         if window_manifest is None:
             window_manifest = self.write_window_manifest(output_dir.parent, copied_log)
+        env = os.environ.copy()
+        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         return subprocess.run(
             [
                 sys.executable,
@@ -161,6 +164,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
         )
 
     def test_builds_complete_consume_only_bundle(self) -> None:

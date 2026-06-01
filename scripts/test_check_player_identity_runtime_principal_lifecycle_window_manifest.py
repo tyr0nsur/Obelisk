@@ -107,10 +107,20 @@ class WindowManifestCheckerTests(unittest.TestCase):
         workspace = Path("/servidor/ark/workspace-offline")
         if not workspace.is_dir() or not os.access(workspace, os.W_OK):
             self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
-        with tempfile.TemporaryDirectory(dir=workspace) as tmp:
-            path = Path(tmp) / "window-manifest.env"
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+        exact_dir = workspace / "live-validation-logs" / RUN_ID
+        exact_log = exact_dir / "Obelisk.log"
+        exact_manifest = exact_dir / "window-manifest.env"
+        exact_dir.mkdir(parents=True, exist_ok=True)
+        rewritten_lines = []
+        for line in lines:
+            if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                rewritten_lines.append(f"copied_log_path={exact_log}")
+            else:
+                rewritten_lines.append(line)
+        try:
+            path = exact_manifest
+            path.write_text("\n".join(rewritten_lines) + "\n", encoding="utf-8")
+            fields = dict(line.split("=", 1) for line in rewritten_lines if "=" in line)
             copied_log = fields.get("copied_log_path")
             if create_copied_log and copied_log:
                 copied_log_path = Path(copied_log)
@@ -125,6 +135,16 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
+        finally:
+            try:
+                exact_manifest.unlink()
+            except FileNotFoundError:
+                pass
+            if create_copied_log:
+                try:
+                    exact_log.unlink()
+                except FileNotFoundError:
+                    pass
 
     def test_accepts_approved_workspace_window_manifest_without_promoting_identity(self) -> None:
         result = self.run_checker_in_approved_workspace(manifest_lines())
@@ -293,6 +313,36 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("copied_log_path_not_live_validation_run_log", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_approved_workspace_nested_live_validation_alias(self) -> None:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        with tempfile.TemporaryDirectory(dir=workspace) as tmp:
+            alias_log = Path(tmp) / "tmp" / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            alias_log.parent.mkdir(parents=True, exist_ok=True)
+            alias_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            exact_manifest = workspace / "live-validation-logs" / RUN_ID / "window-manifest.env"
+            exact_manifest.parent.mkdir(parents=True, exist_ok=True)
+            exact_manifest.write_text(
+                "\n".join(manifest_lines(copied_log_path=str(alias_log))) + "\n",
+                encoding="utf-8",
+            )
+            try:
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
+                    check=False,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            finally:
+                exact_manifest.unlink(missing_ok=True)
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("copied_log_path_not_exact_approved_run_log", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_unexpected_identity_or_ue_internal_fields(self) -> None:

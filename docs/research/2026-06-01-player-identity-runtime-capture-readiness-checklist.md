@@ -71,16 +71,24 @@ used as approval by themselves:
 
 ```bash
 scripts/check_player_principal_lifecycle_preflight.sh \
+  --offline-only \
+  --allow-stopped \
   --instance <instance-id> \
-  --map <map> \
   --mode stable \
+  --obelisk-root /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/obelisk-root \
+  --installed-wrapper /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/ObeliskRun.sh \
+  --server-binary /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/ShooterGameServer \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 
 scripts/check_player_principal_lifecycle_preflight.sh \
+  --offline-only \
+  --allow-stopped \
   --instance <instance-id> \
   --mode observer-window \
-  --env-file <secret-free-reviewed-window-env> \
-  --allow-stopped \
+  --obelisk-root /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/obelisk-root \
+  --installed-wrapper /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/ObeliskRun.sh \
+  --server-binary /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/ShooterGameServer \
+  --env-file /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/observer-window.env \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 ```
 

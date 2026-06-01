@@ -287,6 +287,17 @@ assert_fail stopped-without-allow "${CHECK}" \
     --expected-binary-sha256 "${server_sha}"
 grep -F 'pass --allow-stopped' "${TMP_DIR}/stopped-without-allow.err" >/dev/null
 
+assert_fail unsafe-map "${CHECK}" \
+    --instance arkserver2 \
+    --map 'TheIsland.*' \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F 'Invalid map name' "${TMP_DIR}/unsafe-map.err" >/dev/null
+
 assert_fail offline-only-live-path "${CHECK}" \
     --instance arkserver2 \
     --mode stable \

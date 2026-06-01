@@ -238,6 +238,15 @@ NEGATIVE_CLAIM_CONTEXT_RE = re.compile(
     r"\b(?:does\s+not|do\s+not|not|no|never|without|blocked|forbidden|reject(?:ed|s)?|fail[-_ ]closed)\b",
     re.IGNORECASE,
 )
+NEGATED_CAPABILITY_ACTION_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|doesn't|don't|cannot|can't|must\s+not|never|no|not)\s+"
+    r"(?:claim|promote|authorize|enable|allow|support|deliver|provide|expose|make|mark|report|treat|set)\b",
+    re.IGNORECASE,
+)
+NEGATED_CAPABILITY_BOUNDARY_RE = re.compile(
+    r"\b(?:without|blocked|forbidden|reject(?:ed|s)?|fail[-_ ]closed)\b",
+    re.IGNORECASE,
+)
 ALLOWED_FORBIDDEN_KEY_PATHS = (
     "$.schema",
     "$.privacy_boundary.copied_opaque_principal_only",
@@ -1077,8 +1086,7 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
             if (
                 child is not False
                 and child is not None
-                and POSITIVE_CAPABILITY_CLAIM_RE.search(str(key))
-                and not NEGATIVE_CLAIM_CONTEXT_RE.search(str(key))
+                and contains_unnegated_positive_capability_claim(str(key))
             ):
                 return str(key), child_trail
             found = find_positive_capability_claim(child, child_trail)
@@ -1091,11 +1099,25 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
                 return found
     elif (
         isinstance(value, str)
-        and POSITIVE_CAPABILITY_CLAIM_RE.search(value)
-        and not NEGATIVE_CLAIM_CONTEXT_RE.search(value)
+        and contains_unnegated_positive_capability_claim(value)
     ):
         return value, trail
     return None
+
+
+def contains_unnegated_positive_capability_claim(value: str) -> bool:
+    for match in POSITIVE_CAPABILITY_CLAIM_RE.finditer(value):
+        if not positive_capability_claim_is_negated(value, match.start()):
+            return True
+    return False
+
+
+def positive_capability_claim_is_negated(value: str, claim_start: int) -> bool:
+    preceding_clause = re.split(r"[.;\n]", value[:claim_start])[-1]
+    return bool(
+        NEGATED_CAPABILITY_ACTION_RE.search(preceding_clause)
+        or NEGATED_CAPABILITY_BOUNDARY_RE.search(preceding_clause)
+    )
 
 
 def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation:

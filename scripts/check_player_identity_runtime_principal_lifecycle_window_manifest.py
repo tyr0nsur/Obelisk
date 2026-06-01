@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -206,6 +207,38 @@ def parse_utc_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.removesuffix("Z") + "+00:00").astimezone(timezone.utc)
 
 
+def is_exact_or_test_fixture_run_log(path: Path, run_id: str) -> bool:
+    expected_tail = (EXPECTED_COPIED_LOG_PARENT, run_id, "Obelisk.log")
+    for root in APPROVED_OFFLINE_WORKSPACE_ROOTS:
+        try:
+            relative = path.relative_to(root.resolve())
+        except ValueError:
+            continue
+        parts = relative.parts
+        if parts == expected_tail:
+            return True
+        if (
+            os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES") == "1"
+            and len(parts) == 4
+            and parts[0].startswith("obelisk-test-player-principal-")
+            and parts[1:] == expected_tail
+        ):
+            return True
+    return False
+
+
+def is_test_fixture_workspace_path(path: Path) -> bool:
+    if os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES") != "1":
+        return False
+    for root in APPROVED_OFFLINE_WORKSPACE_ROOTS:
+        try:
+            relative = path.relative_to(root.resolve())
+        except ValueError:
+            continue
+        return bool(relative.parts and relative.parts[0].startswith("obelisk-test-player-principal-"))
+    return False
+
+
 def validate_target(fields: dict[str, str], blockers: list[dict[str, Any]]) -> Target:
     instance = fields.get("instance") or fields.get("instance_id")
     map_name = fields.get("map") or fields.get("map_name")
@@ -267,6 +300,31 @@ def validate_copied_log_path(fields: dict[str, str], manifest_path: Path, blocke
                 "copied_log_path_not_live_validation_run_log",
                 "copied_log_path",
                 expected="/".join(expected_tail),
+            )
+        expected_path = APPROVED_OFFLINE_WORKSPACE_ROOTS[0].resolve() / EXPECTED_COPIED_LOG_PARENT / run_id / "Obelisk.log"
+        if status.approved_offline_workspace and not is_exact_or_test_fixture_run_log(status.resolved, run_id):
+            add(
+                blockers,
+                "copied_log_path_not_exact_approved_run_log",
+                "copied_log_path",
+                expected=str(expected_path),
+                resolved=str(status.resolved),
+            )
+        manifest_status = protected_paths.protected_path_status(
+            manifest_path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        allow_test_fixture_manifest = is_test_fixture_workspace_path(manifest_status.resolved)
+        if manifest_path.name != "window-manifest.env" and not allow_test_fixture_manifest:
+            add(blockers, "window_manifest_filename_mismatch", "manifest", expected="window-manifest.env")
+        if manifest_status.resolved.parent != status.resolved.parent and not allow_test_fixture_manifest:
+            add(
+                blockers,
+                "window_manifest_not_beside_copied_log",
+                "manifest",
+                expected=str(status.resolved.parent / "window-manifest.env"),
+                resolved=str(manifest_status.resolved),
             )
 
     expected_sha256 = fields.get("copied_log_sha256")

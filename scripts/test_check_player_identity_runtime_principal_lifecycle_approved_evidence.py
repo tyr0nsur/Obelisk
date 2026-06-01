@@ -690,11 +690,32 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
     def test_rejects_positive_capability_claim_inside_extra_non_claims(self) -> None:
         payload = manifest()
         payload["non_claims"].append("public player identity ready with command reply support")
+        payload.pop("output_artifact_identity")
+        add_output_artifact_identity(payload)
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
+    def test_rejects_public_capability_claim_after_unrelated_negative_clause(self) -> None:
+        for claim in (
+            ("non_claims", "not blocking public SDK ready"),
+            ("review_note", "does not promote identity; public SDK ready"),
+        ):
+            with self.subTest(claim=claim):
+                payload = manifest()
+                if claim[0] == "non_claims":
+                    payload["non_claims"].append(claim[1])
+                else:
+                    payload["approval"]["review_note"] = claim[1]
+                payload.pop("output_artifact_identity")
+                add_output_artifact_identity(payload)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
 
     def test_rejects_live_server_source_paths_in_wrapped_summary(self) -> None:
         payload = manifest()
