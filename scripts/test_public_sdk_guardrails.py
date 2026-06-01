@@ -762,6 +762,24 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "ResolvePlayer",
     "ResolvePlayerIdentity",
 )
+UNPROMOTED_INVENTORY_ACTION_OBSERVER_API_TOKENS = (
+    "OBELISK_API_CAPABILITY_INVENTORY_ACTIONS",
+    "OBELISK_API_CAPABILITY_INVENTORY_ACTION_OBSERVERS",
+    "ObeliskInventoryAction",
+    "ObeliskInventoryActionEvent",
+    "ObeliskInventoryActionObserver",
+    "ObeliskInventoryActionSubscription",
+    "InventoryActionEvent",
+    "InventoryActionObserver",
+    "InventoryActionSubscription",
+    "RegisterInventoryAction",
+    "RegisterInventoryActionObserver",
+    "RegisterOnInventoryAction",
+    "UnregisterInventoryAction",
+    "UnregisterInventoryActionObserver",
+    "ServerRequestInventoryUseItem",
+    "ServerRequestInventoryUseItemWithActor",
+)
 PLAYER_PRINCIPAL_INTERNAL_PUBLIC_ABI_TOKENS = (
     "PlayerPrincipalEventDispatcher",
     "PlayerPrincipalEventView",
@@ -904,6 +922,7 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "ObeliskReturnOverride",
     "SetReturnOverride",
     "return_override",
+    *UNPROMOTED_INVENTORY_ACTION_OBSERVER_API_TOKENS,
     *UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS,
     *UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS,
 )
@@ -2248,6 +2267,25 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(note="inventory-action-boundary", term=term):
                 self.assertIn(term, action_note)
 
+    def test_public_sdk_does_not_expose_inventory_action_observer_api_names(self) -> None:
+        scanned_roots = [
+            REPO_ROOT / "include" / "obelisk",
+            REPO_ROOT / "tests" / "sdk_consumer",
+            REPO_ROOT / "tests" / "sdk_installed_consumer",
+        ]
+        offenders: list[str] = []
+
+        for root in scanned_roots:
+            for path in root.rglob("*"):
+                if not path.is_file() or path.suffix not in {".c", ".cpp", ".h", ".hpp", ".txt"}:
+                    continue
+                text = strip_c_comments(path.read_text(encoding="utf-8"))
+                for token in UNPROMOTED_INVENTORY_ACTION_OBSERVER_API_TOKENS:
+                    if token in text:
+                        offenders.append(f"{path.relative_to(REPO_ROOT)}: {token}")
+
+        self.assertEqual(offenders, [])
+
     def test_public_sdk_surfaces_manifest_keeps_player_identity_planning_only_blocked(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -2488,6 +2526,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "GiveItem",
             "RemoveItem",
             "SetItemQuantity",
+            *UNPROMOTED_INVENTORY_ACTION_OBSERVER_API_TOKENS,
             *UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS,
         )
         for token in forbidden_public_header_tokens:
@@ -9351,6 +9390,51 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compatibility)
+
+    def test_inventory_action_redacted_observer_checker_stays_internal_candidate_only(self) -> None:
+        checker = (REPO_ROOT / "scripts" / "check_inventory_action_redacted_observer_gate.py").read_text(
+            encoding="utf-8"
+        )
+        current = (REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md").read_text(
+            encoding="utf-8"
+        )
+        compatibility = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
+        docs = normalized("\n".join([current, compatibility]))
+
+        for term in (
+            "obelisk.inventory-action-redacted-observer-gate-check.v1",
+            "inventory_action_sdk_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "promotion_ready",
+            "dispatch_ready",
+            "candidate redacted observer planning only; no runtime observer is implemented or approved",
+            "no public Inventory SDK, Items SDK, mutation, lookup, ResourceHandle, return override, or public ABI",
+        ):
+            with self.subTest(scope="checker", term=term):
+                self.assertIn(term, checker)
+
+        for term in (
+            "scripts/check_inventory_action_redacted_observer_gate.py",
+            "offline candidate-only checker",
+            "inventory-action-compact-intake",
+            "no runtime readiness",
+            "no public SDK readiness",
+            "no dispatch readiness",
+            "no promotion readiness",
+            "does not add a runtime observer",
+            "public Inventory/Items SDK",
+            "item or inventory identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+            "public callback",
+            "public ABI",
+            "cannot be used as `v1.0` completion evidence",
+        ):
+            with self.subTest(scope="docs", term=term):
+                self.assertIn(normalized(term), docs)
 
     def test_player_identity_preflight_keeps_admin_snapshots_separate_from_principal_promotion(self) -> None:
         note = (REPO_ROOT / "docs" / "research" / "2026-05-31-player-identity-offline-pack-preflight.md").read_text(

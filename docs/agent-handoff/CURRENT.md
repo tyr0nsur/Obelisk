@@ -138,6 +138,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   FName/GObjects scan. The next strict ResourceHandle blocker is rejected runtime object
   samples plus runtime serial reuse/wraparound semantics, with a future-runtime-observation-plan
   only after an operator-approved live-ops brief names the exact debug target.
+- `scripts/check_inventory_action_redacted_observer_gate.py` is an offline
+  candidate-only checker for the future `enable-inventory-action-redacted-observer`
+  marker and `inventory-action-compact-intake` fixtures. It must stay non-promotional:
+  no runtime observer, dispatch readiness, public Inventory/Items SDK, item/inventory
+  identity, lookup, mutation, return override, `ResourceHandle`, public callback, public
+  ABI, runtime readiness, public SDK readiness, or `v1.0` completion claim.
 - Static field-window evidence clears only the field-window packaging blocker, is not a `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are present as package-shape evidence only, not a `v1.0` completion marker.
 ## Priority Next Steps
 

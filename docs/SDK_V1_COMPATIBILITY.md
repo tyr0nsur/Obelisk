@@ -122,6 +122,14 @@ Inventory-named `GameplayPolicyEvent` kinds are promoted only as copied event ki
 the gameplay-policy surface; they are not an Inventory SDK or Items SDK and do not expose
 inventory/item identity, lookup, mutation, item handles, grant/remove, rollback, or
 `ResourceHandle`.
+Controller-side inventory-action observer hygiene is separate from those promoted
+inventory-named `GameplayPolicyEvent` kinds. `scripts/check_inventory_action_redacted_observer_gate.py`
+is an offline candidate-only checker for the `inventory-action-compact-intake` target set
+and a future redacted observer marker. It must continue to report no runtime readiness,
+no public SDK readiness, no dispatch readiness, and no promotion readiness. It does not
+add a runtime observer, public Inventory/Items SDK, item or inventory identity, lookup,
+mutation, return override, `ResourceHandle`, public callback, or public ABI, and it
+cannot be used as `v1.0` completion evidence.
 
 `ChatMessageEvent` is a minimal v0.1-rc copied notification ABI. It exposes only
 `abi_version`, `struct_size`, `send_mode`, `reserved0`, `flags`, process-local

@@ -34,6 +34,52 @@ COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
     ),
 }
 
+BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS = {
+    "inventory-action observer": (
+        "InventoryAction",
+        "InventoryActionObserver",
+        "ObeliskInventoryAction",
+        "RegisterInventoryAction",
+        "UnregisterInventoryAction",
+        "ServerRequestInventoryUseItem",
+        "ServerRequestInventoryUseItemWithActor",
+    ),
+    "player principal": (
+        "ObeliskPlayerPrincipal",
+        "ObeliskPrincipalId",
+        "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL",
+        "RegisterPlayerPrincipal",
+        "UnregisterPlayerPrincipal",
+        "ResolvePlayerPrincipal",
+    ),
+    "permissions/admin": (
+        "ObeliskPermissionQuery",
+        "ObeliskPermissionDecision",
+        "OBELISK_API_CAPABILITY_PERMISSION",
+        "OBELISK_API_CAPABILITY_ADMIN",
+        "RegisterAdminCommand",
+        "GrantPermission",
+        "RevokePermission",
+    ),
+    "command response": (
+        "ObeliskCommandContext",
+        "ObeliskCommandReply",
+        "ObeliskChatResponse",
+        "OBELISK_API_CAPABILITY_COMMAND",
+        "RegisterCommand",
+        "ReplyToCommand",
+        "SendChat",
+    ),
+    "mutation": (
+        "ObeliskMutation",
+        "OBELISK_API_CAPABILITY_RESOURCE_MUTATION",
+        "MutateInventory",
+        "MutateItem",
+        "OverrideReturn",
+        "ReturnOverride",
+    ),
+}
+
 INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES = {
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK": "InventoryPolicy",
     "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK": "InventoryPolicy",
@@ -519,6 +565,27 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                             "Player identity/principal PluginManager wiring must stay absent "
                             "until dispatcher owner cleanup is explicit.",
                         )
+
+    def test_plugin_manager_does_not_wire_blocked_public_sdk_surfaces(self) -> None:
+        api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
+        plugin_manager_text = strip_c_comments(PLUGIN_MANAGER.read_text(encoding="utf-8"))
+
+        offenders: list[str] = []
+        for family, tokens in BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS.items():
+            for token in tokens:
+                with self.subTest(family=family, token=token):
+                    if token in api_header:
+                        offenders.append(f"ObeliskApi.h: {family}: {token}")
+                    if token in plugin_manager_text:
+                        offenders.append(f"PluginManager.cpp: {family}: {token}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "Blocked SDK lanes must not appear in the public API table or PluginManager "
+            "C-wrapper/capability wiring until a deliberate promotion adds ABI, owner "
+            "cleanup, and SDK consumer tests.",
+        )
 
     def test_event_dispatcher_owner_cleanup_failures_propagate_to_plugin_manager(self) -> None:
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):
