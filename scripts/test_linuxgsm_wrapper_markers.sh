@@ -680,4 +680,60 @@ capture_debug_ptrace="${TMP_DIR}/debug-ptrace.env"
 
 assert_contains "${capture_debug_ptrace}" '^OBELISK_DEBUG_ALLOW_PTRACE=1$'
 
+run_pending_inventory_action_redacted_observer_tests() {
+    local root_future="${TMP_DIR}/root-inventory-action-redacted-observer"
+    local capture_future="${TMP_DIR}/inventory-action-redacted-observer.env"
+    prepare_root "${root_future}"
+
+    : > "${root_future}/state/instances/arkserver2/enable-inventory-action-redacted-observer"
+    expect_wrapper_failure inventory-action-redacted-marker-stable-profile env \
+        OBELISK_ROOT="${root_future}" \
+        OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/inventory-action-redacted-marker-stable-profile.env" \
+        "${WRAPPER}" TheIsland?listen
+
+    : > "${root_future}/state/instances/arkserver2/allow-observer-debug-window"
+    : > "${root_future}/state/instances/arkserver2/allow-experimental-observers"
+    : > "${root_future}/state/instances/arkserver2/enable-inventory-action-redacted-observer"
+    expect_wrapper_failure inventory-action-redacted-marker-without-explicit-budget env \
+        OBELISK_ROOT="${root_future}" \
+        OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/inventory-action-redacted-marker-without-explicit-budget.env" \
+        OBELISK_WRAPPER_PROFILE=observer-debug \
+        "${WRAPPER}" TheIsland?listen
+    expect_wrapper_failure inventory-action-redacted-marker-with-dispatch-budget env \
+        OBELISK_ROOT="${root_future}" \
+        OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/inventory-action-redacted-marker-with-dispatch-budget.env" \
+        OBELISK_WRAPPER_PROFILE=observer-debug \
+        OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+        OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_LOG_LIMIT=1 \
+        OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT=1 \
+        "${WRAPPER}" TheIsland?listen
+    mkdir -p "${root_future}/state/instances/arkserver"
+    ln -s "${TMP_DIR}/external-inventory-action-redacted-marker" \
+        "${root_future}/state/instances/arkserver/enable-inventory-action-redacted-observer"
+    expect_wrapper_failure inventory-action-redacted-symlink-marker env \
+        OBELISK_ROOT="${root_future}" \
+        OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/inventory-action-redacted-symlink-marker.env" \
+        "${WRAPPER}" Ragnarok?listen
+
+    (
+        cd "${RUN_CWD}"
+        OBELISK_ROOT="${root_future}" \
+        OBELISK_WRAPPER_CAPTURE="${capture_future}" \
+        OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER=1 \
+        OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256=bad-inventory-action-sha \
+        OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_LOG_LIMIT=99 \
+        OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT=1 \
+        "${WRAPPER}" TheIsland?listen
+    )
+
+    assert_not_contains "${capture_future}" '^OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER='
+    assert_not_contains "${capture_future}" '^OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256='
+    assert_not_contains "${capture_future}" '^OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_LOG_LIMIT='
+    assert_not_contains "${capture_future}" '^OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT='
+}
+
+if [[ "${OBELISK_RUN_PENDING_INVENTORY_ACTION_REDACTED_OBSERVER_TESTS:-0}" == "1" ]]; then
+    run_pending_inventory_action_redacted_observer_tests
+fi
+
 echo "test_linuxgsm_wrapper_markers passed"

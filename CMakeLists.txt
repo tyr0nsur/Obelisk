@@ -104,6 +104,7 @@ add_library(obelisk SHARED
     core/ChatEventDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
     core/ItemReturnEventDispatcher.cpp
+    core/PlayerPrincipalEventDispatcher.cpp
     core/StructureAggregateCensus.cpp
     core/StructureEventDispatcher.cpp
     core/TimerManager.cpp
@@ -232,6 +233,16 @@ target_include_directories(mission_copied_bool_event_dispatcher_tests PRIVATE ${
 target_link_libraries(mission_copied_bool_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
 
 add_test(NAME MissionCopiedBoolEventDispatcherTests COMMAND mission_copied_bool_event_dispatcher_tests)
+
+add_executable(player_principal_event_dispatcher_tests
+    tests/core/PlayerPrincipalEventDispatcherTests.cpp
+    core/PlayerPrincipalEventDispatcher.cpp
+    runtime/Logger.cpp
+)
+target_include_directories(player_principal_event_dispatcher_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(player_principal_event_dispatcher_tests PRIVATE fmt::fmt spdlog::spdlog)
+
+add_test(NAME PlayerPrincipalEventDispatcherTests COMMAND player_principal_event_dispatcher_tests)
 
 add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp

@@ -106,6 +106,8 @@ def manifest() -> dict:
             fail_closed_case("missing_runtime_principal_identity"),
             fail_closed_case("command_text_principal_claim"),
             fail_closed_case("operator_config_principal_claim"),
+            fail_closed_case("missing_action"),
+            fail_closed_case("malformed_action_size"),
             fail_closed_case("missing_principal_generation"),
             fail_closed_case("missing_plugin_owner_token"),
             fail_closed_case("missing_capability"),
@@ -217,6 +219,8 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             [
                 "authority_generation_mismatch",
                 "command_text_principal_claim",
+                "malformed_action_size",
+                "missing_action",
                 "missing_authority_generation",
                 "missing_capability",
                 "missing_plugin_owner_token",
@@ -299,7 +303,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("runtime_promotion_allowed_not_false", report["blockers"])
 
     def test_rejects_missing_required_query_fields(self) -> None:
-        for field_name in ("plugin_owner_token", "principal_generation", "action_size", "request_flags"):
+        for field_name in ("plugin_owner_token", "principal_generation", "action", "action_size", "request_flags"):
             with self.subTest(field_name=field_name):
                 payload = manifest()
                 payload["query_contract"]["fields"] = [
@@ -311,6 +315,20 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("query_fields_missing_required", report["blockers"])
+
+    def test_rejects_malformed_action_and_action_size_field_types(self) -> None:
+        payload = manifest()
+        for field in payload["query_contract"]["fields"]:
+            if field["name"] == "action":
+                field["type"] = "string"
+            if field["name"] == "action_size":
+                field["type"] = "uint32"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_field_type_mismatch", report["blockers"])
 
     def test_rejects_missing_decision_and_provenance_fields(self) -> None:
         payload = manifest()
@@ -345,6 +363,8 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "missing_runtime_principal_identity",
             "command_text_principal_claim",
             "operator_config_principal_claim",
+            "missing_action",
+            "malformed_action_size",
             "missing_policy_source",
             "missing_policy_source_generation",
             "policy_source_generation_mismatch",

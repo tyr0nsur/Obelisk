@@ -80,6 +80,8 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
         "missing_runtime_principal_identity",
         "command_text_principal_claim",
         "operator_config_principal_claim",
+        "missing_action",
+        "malformed_action_size",
         "missing_principal_generation",
         "missing_plugin_owner_token",
         "missing_capability",
@@ -100,6 +102,8 @@ REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "missing_runtime_principal_identity",
     "command_text_principal_claim",
     "operator_config_principal_claim",
+    "missing_action",
+    "malformed_action_size",
     "missing_principal_generation",
     "missing_plugin_owner_token",
     "missing_capability",
@@ -503,6 +507,16 @@ def validate_query_contract(contract: Any, blockers: list[dict[str, Any]]) -> li
         names.append(name)
         if name not in REQUIRED_QUERY_FIELDS:
             add(blockers, "query_field_unexpected", f"{label}.name", field=name)
+        expected_type = REQUIRED_QUERY_FIELD_TYPES.get(name)
+        if expected_type is not None and field.get("type") != expected_type:
+            add(
+                blockers,
+                "query_field_type_mismatch",
+                f"{label}.type",
+                field=name,
+                expected=expected_type,
+                value=field.get("type"),
+            )
         if field.get("copied") is not True:
             add(blockers, "query_field_not_copied", f"{label}.copied", field=name)
         if field.get("source") != "obelisk_owned_copy":
