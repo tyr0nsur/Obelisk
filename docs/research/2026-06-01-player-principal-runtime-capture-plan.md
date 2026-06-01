@@ -98,6 +98,28 @@ If the approved target is intentionally stopped before launch, the preflight may
 with `--allow-stopped`. Do not use `--offline-only` against live install paths; that mode
 is for offline copies and rejects live server paths by design.
 
+For the observer-window marker posture, the preflight must also receive a secret-free
+effective env snapshot:
+
+```bash
+scripts/check_player_principal_lifecycle_preflight.sh \
+  --instance <instance-id> \
+  --mode observer-window \
+  --env-file <reviewed-effective-window-env> \
+  --allow-stopped \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+```
+
+The env snapshot must contain the exact player-principal lifecycle window posture:
+`OBELISK_INSTANCE_ID=<instance-id>`, `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1`,
+`OBELISK_DISABLE_PLUGINS=1`, `OBELISK_WRAPPER_PROFILE=observer-debug`,
+`OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1`,
+`OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=<expected-sha256>`,
+`OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10`,
+`OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0`, and
+`OBELISK_PE_TRACE_LIMIT=0`. Duplicate keys, missing keys, alternate observer env, or
+debug/callback escape env fail closed.
+
 The future observer-window launch must use only these env gates:
 
 ```text

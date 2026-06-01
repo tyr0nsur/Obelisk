@@ -244,7 +244,8 @@ No-repeat rules for this round:
 
 ## Next Steps
 
-1. Keep v0.1 public scope centered on copied/redacted `GameplayPolicyEvent`.
+1. Keep current public scope limited to already promoted copied/redacted event surfaces
+   while complete-SDK blockers remain unresolved.
 2. Stop broad discovery loops on the current binary unless a hash/artifact contradiction
    appears; use existing GObjects/UFunction evidence for focused target-set work.
 3. Make inventory the next internal observer candidate from the accepted minimal layout
@@ -252,8 +253,9 @@ No-repeat rules for this round:
 4. Preserve item return-only evidence as the first post-RC bridge candidate after
    inventory hardening; do not map `bIgnoreInventoryRequirement` to `BIgnoreCooldown` or
    publish an Items SDK.
-5. Do not route mission, tribe, buff, or dino toward public API or runtime promotion before
-   RC; mission remains internal recognizer work after item return-only evidence.
+5. Do not route mission, tribe, buff, or dino toward public API or runtime promotion while
+   the complete-SDK blocker chain remains open; mission remains internal recognizer work
+   after item return-only evidence.
 6. Treat the accepted dino compact pair as internal layout evidence for later recognizer
    design only; do not build a public Dino SDK or runtime observer from it yet.
 7. Keep buff compact and breadth target sets as accepted internal layout evidence only;

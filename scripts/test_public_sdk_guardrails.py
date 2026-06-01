@@ -4183,7 +4183,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "gameplay mutation, inventory mutation",
             "return override authority",
             "persistent or cross-cluster handles",
-            "The pre-v1 Plugin Hub package contract is an intake boundary",
+            "The post-SDK-complete Plugin Hub package contract is an intake boundary",
             "not a registry implementation, a machine-readable manifest\nschema, a compatibility promise, or v1 completion evidence",
             "`plugin_id`, display name, plugin version, minimum Obelisk SDK\nline, exactly one `Support tier: <tier>` declaration",
             "Review must fail if README, package metadata, or public seed docs claim v1 readiness",
@@ -8286,7 +8286,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             REPO_ROOT / "plugins" / "README.md": (
                 "Plugin Hub work is post-SDK-complete planning only",
                 "Do not add new first-party Plugin Hub seed examples while the complete-SDK blockers remain open",
-                "The parked release-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
+                "The parked release-supported additions after SDK completion are descriptor readers and process-local timer utilities",
                 "Passive copied-chat parsers and copied policy auditors are experimental pattern examples only",
                 "promoted in the public ABI, recorded in the capability matrix, and documented with its own evidence gate",
                 "These examples observe copied data only",

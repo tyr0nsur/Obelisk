@@ -76,9 +76,9 @@ External Plugin Hub examples should request the installed SDK component explicit
 
 ## Package Contract
 
-The pre-v1 Plugin Hub package contract is an intake boundary for examples and future
-publisher tooling. It is not a registry implementation, a machine-readable manifest
-schema, a compatibility promise, or v1 completion evidence.
+The post-SDK-complete Plugin Hub package contract is an intake boundary for examples and
+future publisher tooling. It is not a registry implementation, a machine-readable
+manifest schema, a compatibility promise, or v1 completion evidence.
 
 A candidate package should contain one Linux shared object, a README, license text, and a
 config example or schema when the plugin reads config. The package metadata must be

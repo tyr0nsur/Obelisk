@@ -16,6 +16,7 @@ Options:
   --installed-wrapper <path>      Installed LinuxGSM wrapper path.
   --server-binary <path>          ShooterGameServer binary path.
   --expected-binary-sha256 <sha>  Required ShooterGameServer SHA256.
+  --env-file <path>               Effective key=value env snapshot for observer-window mode.
   --proc-root <path>              Procfs root for posture checks. Default: /proc.
   --allow-stopped                 Accept no running process after marker/SHA checks.
   --offline-only                  Reject live server paths and running-process checks.
@@ -30,6 +31,7 @@ OBELISK_ROOT="/servidor/ark/obelisk"
 INSTALLED_WRAPPER="/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh"
 SERVER_BINARY="/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
 EXPECTED_BINARY_SHA256=""
+ENV_FILE=""
 PROC_ROOT="/proc"
 ALLOW_STOPPED=0
 OFFLINE_ONLY=0
@@ -64,6 +66,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --expected-binary-sha256)
             EXPECTED_BINARY_SHA256="${2:?missing expected SHA256}"
+            shift 2
+            ;;
+        --env-file)
+            ENV_FILE="${2:?missing env file}"
             shift 2
             ;;
         --proc-root)
@@ -176,16 +182,24 @@ forbid_marker() {
     fi
 }
 
-require_exact_marker_set() {
-    local allowed_markers=""
-    for marker in "$@"; do
-        allowed_markers="${allowed_markers}${marker}"$'\n'
-    done
+marker_is_allowed() {
+    local marker="$1"
+    local allowed
+    shift
 
+    for allowed in "$@"; do
+        if [[ "${marker}" == "${allowed}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+require_exact_marker_set() {
     while IFS= read -r -d '' path; do
         local marker
         marker="$(basename -- "${path}")"
-        if [[ "${allowed_markers}" != *"${marker}"$'\n'* ]]; then
+        if ! marker_is_allowed "${marker}" "$@"; then
             echo "Unexpected marker exists for player-principal preflight: ${path}" >&2
             exit 1
         fi
@@ -194,6 +208,132 @@ require_exact_marker_set() {
             exit 1
         fi
     done < <(find "${MARKER_DIR}" -mindepth 1 -maxdepth 1 -print0)
+}
+
+ENV_KEYS=()
+ENV_VALUES=()
+
+load_env_file() {
+    local line key value existing line_number=0
+
+    require_regular_file "Env file" "${ENV_FILE}"
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        line_number=$((line_number + 1))
+        line="${line%$'\r'}"
+        [[ -z "${line}" || "${line}" == \#* ]] && continue
+        if [[ "${line}" == export\ * ]]; then
+            echo "Env file must use bare KEY=VALUE lines, not export syntax: ${ENV_FILE}:${line_number}" >&2
+            exit 1
+        fi
+        if [[ "${line}" != *=* ]]; then
+            echo "Env file line must be KEY=VALUE: ${ENV_FILE}:${line_number}" >&2
+            exit 1
+        fi
+        key="${line%%=*}"
+        value="${line#*=}"
+        if [[ ! "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "Env file key is unsafe: ${ENV_FILE}:${line_number}: ${key}" >&2
+            exit 1
+        fi
+        for existing in "${ENV_KEYS[@]}"; do
+            if [[ "${existing}" == "${key}" ]]; then
+                echo "Env file contains duplicate key: ${key}" >&2
+                exit 1
+            fi
+        done
+        ENV_KEYS+=("${key}")
+        ENV_VALUES+=("${value}")
+    done < "${ENV_FILE}"
+}
+
+env_value() {
+    local key="$1"
+    local index
+
+    for index in "${!ENV_KEYS[@]}"; do
+        if [[ "${ENV_KEYS[${index}]}" == "${key}" ]]; then
+            printf '%s' "${ENV_VALUES[${index}]}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+require_env_value() {
+    local key="$1"
+    local expected="$2"
+    local actual
+
+    if ! actual="$(env_value "${key}")"; then
+        echo "Required env is missing from ${ENV_FILE}: ${key}" >&2
+        exit 1
+    fi
+    if [[ "${actual}" != "${expected}" ]]; then
+        echo "Env ${key} must be '${expected}' for player-principal preflight; got '${actual}'." >&2
+        exit 1
+    fi
+}
+
+forbid_env_key() {
+    local key="$1"
+
+    if env_value "${key}" >/dev/null; then
+        echo "Forbidden env exists for player-principal preflight: ${key}" >&2
+        exit 1
+    fi
+}
+
+require_observer_window_env() {
+    [[ -n "${ENV_FILE}" ]] || {
+        echo "--mode observer-window requires --env-file with the exact effective window env posture." >&2
+        exit 2
+    }
+
+    load_env_file
+    require_env_value OBELISK_INSTANCE_ID "${INSTANCE}"
+    require_env_value OBELISK_ENABLE_PROCESS_EVENT_HOOK 1
+    require_env_value OBELISK_DISABLE_PLUGINS 1
+    require_env_value OBELISK_WRAPPER_PROFILE observer-debug
+    require_env_value OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER 1
+    require_env_value OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256 "${EXPECTED_BINARY_SHA256}"
+    require_env_value OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT 10
+    require_env_value OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT 0
+    require_env_value OBELISK_PE_TRACE_LIMIT 0
+
+    for key in \
+        OBELISK_DEBUG_ALLOW_PTRACE \
+        OBELISK_ENABLE_DEBUG_CONTROL \
+        OBELISK_ENABLE_REFLECTION_SCANNER \
+        OBELISK_ENABLE_NATIVE_EXEC_PROBES \
+        OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS \
+        OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS \
+        OBELISK_ALLOW_CALL_PROCESS_EVENT \
+        OBELISK_ALLOW_PROCESS_EVENT_BLOCKING \
+        OBELISK_ENABLE_CHAT_EVENTS \
+        OBELISK_CHAT_EVENTS_BINARY_SHA256 \
+        OBELISK_CHAT_EVENTS_DISPATCH_LIMIT \
+        OBELISK_ENABLE_CHAT_REFLECTION \
+        OBELISK_CHAT_REFLECTION_BINARY_SHA256 \
+        OBELISK_CHAT_REFLECTION_LOG_LIMIT \
+        OBELISK_CHAT_REFLECTION_LOG_TEXT \
+        OBELISK_ENABLE_CHAT_ROUTE_OBSERVER \
+        OBELISK_CHAT_ROUTE_OBSERVER_BINARY_SHA256 \
+        OBELISK_CHAT_ROUTE_OBSERVER_LIMIT \
+        OBELISK_ENABLE_INVENTORY_REFLECTION \
+        OBELISK_INVENTORY_REFLECTION_BINARY_SHA256 \
+        OBELISK_INVENTORY_REFLECTION_LOG_LIMIT \
+        OBELISK_INVENTORY_REFLECTION_DISPATCH_LIMIT \
+        OBELISK_ENABLE_STRUCTURE_REFLECTION \
+        OBELISK_STRUCTURE_REFLECTION_BINARY_SHA256 \
+        OBELISK_STRUCTURE_REFLECTION_LOG_LIMIT \
+        OBELISK_STRUCTURE_REFLECTION_DISPATCH_LIMIT \
+        OBELISK_ENABLE_ITEM_RETURN_EVENTS \
+        OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256 \
+        OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT \
+        OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT
+    do
+        forbid_env_key "${key}"
+    done
 }
 
 find_shooter_pid_for_map() {
@@ -223,6 +363,9 @@ if [[ "${OFFLINE_ONLY}" == "1" ]]; then
     reject_protected_live_path "Obelisk root" "${OBELISK_ROOT}"
     reject_protected_live_path "Installed wrapper" "${INSTALLED_WRAPPER}"
     reject_protected_live_path "Server binary" "${SERVER_BINARY}"
+    if [[ -n "${ENV_FILE}" ]]; then
+        reject_protected_live_path "Env file" "${ENV_FILE}"
+    fi
     if [[ -n "${MAP}" ]]; then
         echo "--offline-only rejects --map because it would inspect live process posture." >&2
         exit 1
@@ -280,6 +423,7 @@ else
         allow-observer-debug-window \
         allow-experimental-observers \
         enable-player-principal-lifecycle-observer
+    require_observer_window_env
 fi
 
 if [[ -n "${MAP}" ]]; then

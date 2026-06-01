@@ -87,6 +87,12 @@ enable-structure-reflection
 enable-item-return-events
 ```
 
+Observer-window preflight must be run with a secret-free effective env snapshot via
+`--env-file`; missing keys, duplicate keys, non-zero dispatch, log limits other than
+`10`, alternate observer env, callback/debug escape env, or env SHA mismatch must fail
+closed. Marker names are matched literally against the exact approved set, so suffix or
+prefix siblings such as `process-event-hook` are not valid stand-ins for approved markers.
+
 The wrapper/preflight must fail closed if the approved target, SHA, marker set, env gates,
 plugin-disabled posture, `dispatch_limit=0`, `log_limit=10`, or observer exclusivity do
 not match the approved brief.

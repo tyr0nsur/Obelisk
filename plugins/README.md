@@ -43,11 +43,11 @@ HTTP endpoints, resource identities, lookups, mutations, return overrides, or ra
 
 Plugin Hub work is post-SDK-complete planning only. Do not add new first-party Plugin Hub
 seed examples while the complete-SDK blockers remain open. The parked release-supported
-additions after `v0.1` are descriptor readers and process-local timer utilities. Passive
-copied-chat parsers and copied policy auditors are experimental pattern examples only. The
-current tree already has examples for both buckets, so treat new first-party work as a
-promotion review or refinement of the existing examples unless a separate copied-data
-surface has passed the capability-matrix evidence gate.
+additions after SDK completion are descriptor readers and process-local timer utilities.
+Passive copied-chat parsers and copied policy auditors are experimental pattern examples
+only. The current tree already has examples for both buckets, so treat new first-party
+work as a promotion review or refinement of the existing examples unless a separate
+copied-data surface has passed the capability-matrix evidence gate.
 
 If an example request is motivated by ArkApi, AseApi, NextGenPlugins, or another
 popular-plugin family, treat that input as names and demand signals only. It is not an

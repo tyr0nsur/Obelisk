@@ -53,6 +53,22 @@ make_server_binary() {
     sha256sum "${path}" | awk '{print $1}'
 }
 
+write_observer_env() {
+    local path="$1"
+    local sha="$2"
+    cat > "${path}" <<EOF
+OBELISK_INSTANCE_ID=arkserver2
+OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
+OBELISK_DISABLE_PLUGINS=1
+OBELISK_WRAPPER_PROFILE=observer-debug
+OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=${sha}
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0
+OBELISK_PE_TRACE_LIMIT=0
+EOF
+}
+
 wrapper="${TMP_DIR}/ObeliskRun.sh"
 cp "${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh" "${wrapper}"
 server_binary="${TMP_DIR}/ShooterGameServer"
@@ -84,10 +100,12 @@ write_proc_fixture "${proc_root}" 4242 "${root_stable}" "TheIsland"
     | grep -F 'player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2' >/dev/null
 
 root_window="${TMP_DIR}/root-window"
+observer_env="${TMP_DIR}/observer-window.env"
 prepare_root "${root_window}"
 : > "${root_window}/state/instances/arkserver2/allow-observer-debug-window"
 : > "${root_window}/state/instances/arkserver2/allow-experimental-observers"
 : > "${root_window}/state/instances/arkserver2/enable-player-principal-lifecycle-observer"
+write_observer_env "${observer_env}" "${server_sha}"
 "${CHECK}" \
     --instance arkserver2 \
     --mode observer-window \
@@ -95,8 +113,19 @@ prepare_root "${root_window}"
     --installed-wrapper "${wrapper}" \
     --server-binary "${server_binary}" \
     --expected-binary-sha256 "${server_sha}" \
+    --env-file "${observer_env}" \
     --allow-stopped \
     | grep -F 'player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2' >/dev/null
+
+assert_fail observer-window-missing-env "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F -- '--mode observer-window requires --env-file' "${TMP_DIR}/observer-window-missing-env.err" >/dev/null
 
 root_residual="${TMP_DIR}/root-residual"
 prepare_root "${root_residual}"
@@ -137,6 +166,19 @@ assert_fail unexpected-marker "${CHECK}" \
     --allow-stopped
 grep -F 'Unexpected marker exists' "${TMP_DIR}/unexpected-marker.err" >/dev/null
 
+root_suffix_marker="${TMP_DIR}/root-suffix-marker"
+prepare_root "${root_suffix_marker}"
+: > "${root_suffix_marker}/state/instances/arkserver2/process-event-hook"
+assert_fail suffix-marker "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --obelisk-root "${root_suffix_marker}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F 'Unexpected marker exists' "${TMP_DIR}/suffix-marker.err" >/dev/null
+
 root_unexpected_dir="${TMP_DIR}/root-unexpected-dir"
 prepare_root "${root_unexpected_dir}"
 mkdir -p "${root_unexpected_dir}/state/instances/arkserver2/enable-process-event-hook-dir"
@@ -163,6 +205,52 @@ assert_fail symlink-marker "${CHECK}" \
     --expected-binary-sha256 "${server_sha}" \
     --allow-stopped
 grep -F 'Forbidden marker exists' "${TMP_DIR}/symlink-marker.err" >/dev/null
+
+bad_observer_env="${TMP_DIR}/observer-window-bad-log.env"
+write_observer_env "${bad_observer_env}" "${server_sha}"
+sed -i 's/^OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=.*/OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=2/' \
+    "${bad_observer_env}"
+assert_fail observer-window-bad-log-env "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${bad_observer_env}" \
+    --allow-stopped
+grep -F "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT must be '10'" \
+    "${TMP_DIR}/observer-window-bad-log-env.err" >/dev/null
+
+forbidden_observer_env="${TMP_DIR}/observer-window-forbidden.env"
+write_observer_env "${forbidden_observer_env}" "${server_sha}"
+printf 'OBELISK_ENABLE_CHAT_EVENTS=1\n' >> "${forbidden_observer_env}"
+assert_fail observer-window-forbidden-env "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${forbidden_observer_env}" \
+    --allow-stopped
+grep -F 'Forbidden env exists for player-principal preflight: OBELISK_ENABLE_CHAT_EVENTS' \
+    "${TMP_DIR}/observer-window-forbidden-env.err" >/dev/null
+
+duplicate_observer_env="${TMP_DIR}/observer-window-duplicate.env"
+write_observer_env "${duplicate_observer_env}" "${server_sha}"
+printf 'OBELISK_PE_TRACE_LIMIT=0\n' >> "${duplicate_observer_env}"
+assert_fail observer-window-duplicate-env "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${duplicate_observer_env}" \
+    --allow-stopped
+grep -F 'Env file contains duplicate key: OBELISK_PE_TRACE_LIMIT' \
+    "${TMP_DIR}/observer-window-duplicate-env.err" >/dev/null
 
 assert_fail bad-sha "${CHECK}" \
     --instance arkserver2 \
