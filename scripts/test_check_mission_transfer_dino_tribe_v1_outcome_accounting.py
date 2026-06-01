@@ -88,11 +88,24 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertTrue(report["candidate_only"])
         self.assertEqual(report["required_leaves"], REQUIRED_LEAVES)
         self.assertEqual(report["observed_leaves"], REQUIRED_LEAVES)
+        self.assertEqual(report["missing_leaf_families"], REQUIRED_LEAVES)
         self.assertEqual(set(report["leaf_statuses"].values()), {"planning"})
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["blockers"], [])
+
+        accounting = report["candidate_only_accounting"]
+        self.assertEqual(accounting["result"], "leaf_families_missing_v1_outcomes")
+        self.assertTrue(accounting["accepted_for_internal_planning"])
+        self.assertEqual(accounting["missing_leaf_families"], REQUIRED_LEAVES)
+        self.assertEqual(accounting["non_promoted_leaf_families"], REQUIRED_LEAVES)
+        self.assertEqual(accounting["status_counts"], {"planning": 5})
+        self.assertIn("mission-copied-bool-policy-slice", accounting["planning_target_sets"])
+        self.assertIn("public_mission_sdk_abi", accounting["leaf_family_gaps"]["mission"]["missing_public_gates"])
+        self.assertIn("cross_map_state_correlation", accounting["leaf_family_gaps"]["transfer"]["missing_public_gates"])
+        self.assertIn("buff_class_object_redaction_contract", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
+        self.assertFalse(accounting["leaf_family_gaps"]["tribe_policy"]["v1_accounted"])
 
     def test_release_statement_accepts_umbrella_excluded_with_all_leaf_exclusions(self) -> None:
         result = self.run_checker(statement=excluded_release_statement())
@@ -104,6 +117,12 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertEqual(report["release_statement"]["forbidden_claims"], [])
         self.assertTrue(all(report["release_statement"]["leaf_exclusions"].values()))
+        self.assertEqual(report["missing_leaf_families"], [])
+        self.assertEqual(report["candidate_only_accounting"]["result"], "all_leaf_families_accounted")
+        self.assertEqual(
+            report["candidate_only_accounting"]["leaf_family_gaps"]["mission"]["accounted_by"],
+            "release_statement_leaf_exclusion",
+        )
 
     def test_release_statement_rejects_missing_leaf_exclusion(self) -> None:
         statement = excluded_release_statement().replace("buff_status excluded. ", "")
@@ -114,6 +133,12 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("release_statement_leaf_exclusions_missing", report["blockers"])
         details = [item for item in report["blocker_details"] if item["reason"] == "release_statement_leaf_exclusions_missing"]
         self.assertEqual(details[0]["missing"], ["buff_status"])
+        self.assertEqual(report["missing_leaf_families"], ["buff_status"])
+        self.assertEqual(
+            report["candidate_only_accounting"]["leaf_family_gaps"]["mission"]["accounted_by"],
+            "release_statement_leaf_exclusion_pending_acceptance",
+        )
+        self.assertFalse(report["candidate_only_accounting"]["leaf_family_gaps"]["buff_status"]["v1_accounted"])
 
     def test_release_statement_rejects_affirmative_forbidden_claims(self) -> None:
         statement = (
@@ -176,6 +201,9 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertTrue(report["promotion_ready"])
         self.assertTrue(report["public_sdk_ready"])
         self.assertTrue(report["runtime_ready"])
+        self.assertEqual(report["missing_leaf_families"], [])
+        self.assertEqual(report["candidate_only_accounting"]["result"], "all_leaf_families_accounted")
+        self.assertEqual(report["candidate_only_accounting"]["missing_public_gate_counts"]["mission"], 0)
 
     def test_future_per_leaf_promoted_route_rejects_missing_or_candidate_evidence(self) -> None:
         manifest = load_manifest()

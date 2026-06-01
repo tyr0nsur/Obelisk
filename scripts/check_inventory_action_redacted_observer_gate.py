@@ -38,6 +38,63 @@ EXPECTED_REDACTED_OBJECT_FIELDS = (
     "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.anActor",
     "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.InventoryComp",
 )
+DECISION_MANIFEST = REPO_ROOT / "docs" / "inventory_item_copied_signals_public_contract_decisions.json"
+DECISION_MANIFEST_SCHEMA = "obelisk.inventory-item-copied-signals-public-contract-decisions.v1"
+EXPECTED_DECISION_SURFACE = "obelisk.inventory_item_copied_signals.v1"
+REQUIRED_PROMOTION_BLOCKERS: dict[str, dict[str, Any]] = {
+    "copied_signal_stability_wording": {
+        "status": "blocked",
+        "required_tokens": (
+            "Inventory SDK",
+            "Items SDK",
+            "item identity",
+            "inventory identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+        ),
+    },
+    "inventory_items_mutation_surface": {
+        "status": "blocked",
+        "required_tokens": (
+            "identity semantics",
+            "append-only POD C ABI",
+            "owner-scoped cleanup",
+            "rollback",
+            "resource_kind as identity",
+            "lookup",
+            "mutation",
+            "return override",
+            "ResourceHandle",
+        ),
+    },
+    "inventory_action_redacted_observer": {
+        "status": "candidate-only-blocked",
+        "required_tokens": (
+            "dispatch budget exactly 0",
+            "no-read/no-budget",
+            "copied output cleared",
+            "public callbacks",
+            "raw params",
+            "AdditionalData stable semantics",
+            "ItemId or ItemID1 identity",
+            "InventoryComp or anActor identity",
+        ),
+    },
+    "resource_handle_identity": {
+        "status": "blocked",
+        "required_tokens": (
+            "runtime object rejection samples",
+            "serial reuse",
+            "UObject flag",
+            "ResourceHandle",
+            "object lookup",
+            "persistent handles",
+            "cross-event correlation",
+        ),
+    },
+}
 SUPPORTED_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 REQUIRED_PROFILE = "observer-debug"
 REQUIRED_MARKERS = (
@@ -73,6 +130,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--snapshot-root", type=Path, default=fixture_boundary.DEFAULT_SNAPSHOT_ROOT)
     parser.add_argument("--public-sdk-surfaces", type=Path, default=fixture_boundary.PUBLIC_SDK_SURFACES_MANIFEST)
+    parser.add_argument("--decision-manifest", type=Path, default=DECISION_MANIFEST)
     parser.add_argument(
         "--gate-enabled",
         action="store_true",
@@ -288,6 +346,112 @@ def validate_fixture_boundary_report(report: dict[str, Any], blockers: list[dict
     return summary
 
 
+def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    manifest = load_json(path)
+    if manifest is None:
+        append_blocker(blockers, "decision_manifest_unreadable", path=str(path))
+        return {"path": str(path), "promotion_blockers": []}
+    if manifest.get("schema") != DECISION_MANIFEST_SCHEMA:
+        append_blocker(
+            blockers,
+            "decision_manifest_schema_mismatch",
+            expected=DECISION_MANIFEST_SCHEMA,
+            value=manifest.get("schema"),
+        )
+    if manifest.get("surface") != EXPECTED_DECISION_SURFACE:
+        append_blocker(
+            blockers,
+            "decision_manifest_surface_mismatch",
+            expected=EXPECTED_DECISION_SURFACE,
+            value=manifest.get("surface"),
+        )
+    if manifest.get("decision") != "copied_signal_only":
+        append_blocker(blockers, "decision_manifest_decision_mismatch", value=manifest.get("decision"))
+
+    blocked_contract = manifest.get("blocked_public_contract")
+    mutation_surface = (
+        blocked_contract.get("inventory_mutation_surface") if isinstance(blocked_contract, dict) else None
+    )
+    if not isinstance(mutation_surface, dict):
+        append_blocker(blockers, "decision_manifest_mutation_surface_missing")
+    else:
+        if mutation_surface.get("id") != "obelisk.inventory_items_mutation.v1":
+            append_blocker(
+                blockers,
+                "decision_manifest_mutation_surface_id_mismatch",
+                value=mutation_surface.get("id"),
+            )
+        if mutation_surface.get("public_contract") != []:
+            append_blocker(
+                blockers,
+                "decision_manifest_mutation_public_contract_present",
+                value=mutation_surface.get("public_contract"),
+            )
+
+    promotion_blockers = manifest.get("next_promotion_blockers")
+    if not isinstance(promotion_blockers, list):
+        append_blocker(blockers, "decision_manifest_promotion_blockers_missing")
+        return {"path": str(path), "promotion_blockers": []}
+
+    blockers_by_id = {
+        blocker.get("id"): blocker
+        for blocker in promotion_blockers
+        if isinstance(blocker, dict) and isinstance(blocker.get("id"), str)
+    }
+    expected_ids = tuple(REQUIRED_PROMOTION_BLOCKERS)
+    actual_ids = tuple(blocker.get("id") for blocker in promotion_blockers if isinstance(blocker, dict))
+    if actual_ids != expected_ids:
+        append_blocker(
+            blockers,
+            "decision_manifest_promotion_blocker_order_mismatch",
+            expected=list(expected_ids),
+            value=list(actual_ids),
+        )
+
+    summary: list[dict[str, Any]] = []
+    for blocker_id, required in REQUIRED_PROMOTION_BLOCKERS.items():
+        entry = blockers_by_id.get(blocker_id)
+        if not isinstance(entry, dict):
+            append_blocker(blockers, "decision_manifest_promotion_blocker_missing", id=blocker_id)
+            continue
+        status = entry.get("status")
+        if status != required["status"]:
+            append_blocker(
+                blockers,
+                "decision_manifest_promotion_blocker_status_mismatch",
+                id=blocker_id,
+                expected=required["status"],
+                value=status,
+            )
+        requires = entry.get("requires")
+        must_not_unlock = entry.get("must_not_unlock")
+        if not isinstance(requires, list) or not all(isinstance(item, str) for item in requires):
+            append_blocker(blockers, "decision_manifest_promotion_blocker_requires_missing", id=blocker_id)
+            requires = []
+        if not isinstance(must_not_unlock, list) or not all(isinstance(item, str) for item in must_not_unlock):
+            append_blocker(blockers, "decision_manifest_promotion_blocker_must_not_unlock_missing", id=blocker_id)
+            must_not_unlock = []
+        blocker_text = "\n".join([str(entry.get("current_state", "")), *requires, *must_not_unlock])
+        missing_tokens = [token for token in required["required_tokens"] if token not in blocker_text]
+        if missing_tokens:
+            append_blocker(
+                blockers,
+                "decision_manifest_promotion_blocker_terms_incomplete",
+                id=blocker_id,
+                missing=missing_tokens,
+            )
+        summary.append(
+            {
+                "id": blocker_id,
+                "status": status,
+                "requires_count": len(requires),
+                "must_not_unlock_count": len(must_not_unlock),
+            }
+        )
+
+    return {"path": str(path), "promotion_blockers": summary}
+
+
 def validate_gate_inputs(
     *,
     gate_enabled: bool,
@@ -342,6 +506,7 @@ def build_check(
     *,
     snapshot_root: Path = fixture_boundary.DEFAULT_SNAPSHOT_ROOT,
     public_sdk_surfaces: Path = fixture_boundary.PUBLIC_SDK_SURFACES_MANIFEST,
+    decision_manifest: Path = DECISION_MANIFEST,
     gate_enabled: bool = False,
     observer_profile: str = "stable",
     markers: list[str] | None = None,
@@ -355,6 +520,7 @@ def build_check(
     if fixture_report is None:
         fixture_report = fixture_boundary.build_check(snapshot_root, public_sdk_surfaces)
     fixture_summary = validate_fixture_boundary_report(fixture_report, blockers)
+    decision_manifest_summary = validate_decision_manifest(decision_manifest, blockers)
     gate = validate_gate_inputs(
         gate_enabled=gate_enabled,
         observer_profile=observer_profile,
@@ -383,6 +549,7 @@ def build_check(
         "snapshot_root": str(snapshot_root),
         "gate": gate,
         "fixture_summary": fixture_summary,
+        "decision_manifest": decision_manifest_summary,
         "public_contract_scan": fixture_report.get("public_contract_scan", {}),
         "blockers": blockers,
         "non_claims": [
@@ -399,6 +566,7 @@ def main() -> int:
     report = build_check(
         snapshot_root=args.snapshot_root,
         public_sdk_surfaces=args.public_sdk_surfaces,
+        decision_manifest=args.decision_manifest,
         gate_enabled=args.gate_enabled,
         observer_profile=args.observer_profile,
         markers=args.marker,

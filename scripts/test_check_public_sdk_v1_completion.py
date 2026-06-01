@@ -182,12 +182,50 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("status accounting", progress["outcome_accounting_note"])
         self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
+        self.assertEqual(progress["manifest_outcome_missing_count"], 3)
+        self.assertEqual(progress["release_statement_outcome_missing_count"], 9)
+        self.assertEqual(progress["dependency_chain_remaining_count"], 4)
+        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["total"], 12)
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.structure_census.v1",
+                "obelisk.mission_transfer_dino_tribe.v1",
+            ],
+        )
+        self.assertEqual(
+            payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing"],
+            [
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+                "obelisk.inventory_items_mutation.v1",
+                "obelisk.object_identity_resource_handle.v1",
+                "obelisk.lifecycle_ops_recovery.v1",
+                "obelisk.player_services_economy_mobility.v1",
+                "obelisk.operator_ingress_storage.v1",
+                "obelisk.gameplay_tick_callbacks.v1",
+            ],
+        )
+        blocker_rows = payload["v1_sdk_blocker_outcomes"]
+        self.assertEqual(len(blocker_rows), 12)
+        self.assertTrue(all(row["unresolved_for_complete_sdk_claim"] for row in blocker_rows))
+        self.assertTrue(all("non_claim" in row for row in blocker_rows))
+        self.assertEqual(blocker_rows[0]["surface"], "obelisk.player_identity.v1")
+        self.assertIsNone(blocker_rows[0]["manifest_outcome"])
+        self.assertIn("priority dependency-chain blocker", blocker_rows[0]["next_action"])
+        self.assertEqual(blocker_rows[1]["surface"], "obelisk.permissions_admin.v1")
+        self.assertEqual(blocker_rows[1]["manifest_outcome"], "post-v1")
+        self.assertIsNone(blocker_rows[1]["release_statement_outcome"])
+        self.assertFalse(blocker_rows[1]["release_statement_contract_satisfied"])
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("The stable v1 SDK claim remains disabled", result.stdout)
+        self.assertIn("12-blocker outcome accounting: 3 need manifest outcomes; 9 need release-statement outcomes", result.stdout)
         self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
         self.assertIn("obelisk.player_identity.v1", result.stdout)
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
@@ -519,6 +557,27 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["v1_sdk_progress"]["completion_blockers_with_release_statement_post_v1_or_excluded_outcome"],
             payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
         )
+        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing_count"], 3)
+        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing_count"], 0)
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        self.assertEqual(
+            outcome_by_surface["obelisk.permissions_admin.v1"]["release_statement_outcome"],
+            "post-v1",
+        )
+        self.assertTrue(
+            outcome_by_surface["obelisk.permissions_admin.v1"][
+                "release_statement_contract_satisfied"
+            ]
+        )
+        self.assertIsNone(outcome_by_surface["obelisk.player_identity.v1"]["manifest_outcome"])
+        self.assertFalse(
+            outcome_by_surface["obelisk.player_identity.v1"][
+                "release_statement_contract_satisfied"
+            ]
+        )
+        self.assertFalse(payload["v1_sdk_progress"]["stable_claim_allowed"])
         self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
         self.assertIn("stable_release_contract_claim_not_allowed", payload["blockers"])

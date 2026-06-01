@@ -9,6 +9,7 @@ plugin delivery, permissions, commands, lookup, mutation, or runtime SDK readine
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -218,6 +219,25 @@ def validate_copied_log_path(fields: dict[str, str], manifest_path: Path, blocke
             resolved=str(status.resolved),
         )
         return "protected"
+    run_id = fields.get("run_id")
+    if run_id and run_id not in copied_log_path.parts:
+        add(blockers, "copied_log_path_run_id_mismatch", "copied_log_path", run_id=run_id)
+
+    expected_sha256 = fields.get("copied_log_sha256")
+    if expected_sha256 == "0" * 64:
+        add(blockers, "copied_log_sha256_placeholder", "copied_log_sha256")
+    if not copied_log_path.is_file():
+        add(blockers, "copied_log_file_missing", "copied_log_path", resolved=str(status.resolved))
+    elif expected_sha256 and SHA256_RE.fullmatch(expected_sha256):
+        actual_sha256 = hashlib.sha256(copied_log_path.read_bytes()).hexdigest()
+        if actual_sha256 != expected_sha256:
+            add(
+                blockers,
+                "copied_log_sha256_mismatch",
+                "copied_log_sha256",
+                expected=expected_sha256,
+                actual=actual_sha256,
+            )
     if status.approved_offline_workspace:
         return "approved_offline_workspace"
     return "unprotected_offline"

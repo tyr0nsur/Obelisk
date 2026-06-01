@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -13,12 +14,14 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
-GOOD_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
+GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
 
 
 def manifest_lines(**overrides: str | None) -> list[str]:
     fields = {
-        "run_id": "20260601T120000Z-player-principal-lifecycle",
+        "run_id": RUN_ID,
         "obelisk_commit": "test-commit",
         "target": "arkserver2/TheIsland",
         "approval": "current-turn operator-approved runtime window, not standing approval",
@@ -26,10 +29,7 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "approved_window_end_utc": "2026-06-01T12:10:00Z",
         "actual_capture_start_utc": "2026-06-01T12:01:00Z",
         "actual_capture_end_utc": "2026-06-01T12:09:00Z",
-        "copied_log_path": (
-            "/servidor/ark/workspace-offline/live-validation-logs/"
-            "20260601T120000Z-player-principal-lifecycle/Obelisk.log"
-        ),
+        "copied_log_path": f"{RUN_ID}/Obelisk.log",
         "copied_log_sha256": GOOD_SHA,
         "pre_posture": "stable",
         "post_posture": "stable",
@@ -66,10 +66,25 @@ def manifest_lines(**overrides: str | None) -> list[str]:
 
 
 class WindowManifestCheckerTests(unittest.TestCase):
-    def run_checker(self, lines: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        lines: list[str],
+        *,
+        check: bool = True,
+        create_copied_log: bool = True,
+        copied_log_text: str = COPIED_LOG_TEXT,
+    ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "window-manifest.env"
             path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            copied_log = fields.get("copied_log_path")
+            if create_copied_log and copied_log:
+                copied_log_path = Path(copied_log)
+                if not copied_log_path.is_absolute():
+                    copied_log_path = path.parent / copied_log_path
+                    copied_log_path.parent.mkdir(parents=True, exist_ok=True)
+                    copied_log_path.write_text(copied_log_text, encoding="utf-8")
             return subprocess.run(
                 [sys.executable, str(SCRIPT), str(path), "--json"],
                 check=check,
@@ -85,7 +100,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertTrue(report["ready"])
         self.assertTrue(report["operational_window_manifest_ready"])
         self.assertEqual(report["obelisk_commit"], "test-commit")
-        self.assertEqual(report["copied_log"]["path_status"], "approved_offline_workspace")
+        self.assertEqual(report["copied_log"]["path_status"], "unprotected_offline")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
@@ -113,6 +128,42 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("copied_log_path_under_protected_server_root", report["blockers"])
         self.assertEqual(report["next_blocker"], "window_manifest_not_accepted")
+        self.assertFalse(report["ready"])
+
+    def test_rejects_missing_copied_log_and_placeholder_sha(self) -> None:
+        result = self.run_checker(
+            manifest_lines(copied_log_sha256="0" * 64),
+            check=False,
+            create_copied_log=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("copied_log_file_missing", report["blockers"])
+        self.assertIn("copied_log_sha256_placeholder", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_copied_log_sha_mismatch(self) -> None:
+        result = self.run_checker(
+            manifest_lines(copied_log_sha256=GOOD_SHA),
+            check=False,
+            copied_log_text="different copied log\n",
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("copied_log_sha256_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_copied_log_path_that_does_not_include_run_id(self) -> None:
+        result = self.run_checker(
+            manifest_lines(copied_log_path="wrong-run/Obelisk.log"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("copied_log_path_run_id_mismatch", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_unexpected_identity_or_ue_internal_fields(self) -> None:
@@ -246,7 +297,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("user_policy_not_accepted", report["blockers"])
 
-    def test_emits_valid_offline_window_manifest_template(self) -> None:
+    def test_emits_parseable_but_not_ready_window_manifest_template(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "window-template.env"
             emit = subprocess.run(
@@ -266,11 +317,13 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 stderr=subprocess.PIPE,
             )
 
-        self.assertEqual(validate.returncode, 0, validate.stderr)
+        self.assertNotEqual(validate.returncode, 0)
         report = json.loads(validate.stdout)
-        self.assertTrue(report["ready"])
+        self.assertFalse(report["ready"])
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertFalse(report["promotion_ready"])
+        self.assertIn("copied_log_file_missing", report["blockers"])
+        self.assertIn("copied_log_sha256_placeholder", report["blockers"])
 
 
 if __name__ == "__main__":

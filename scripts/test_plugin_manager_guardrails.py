@@ -308,6 +308,41 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertGreaterEqual(body.count("try"), 6)
         self.assertGreaterEqual(body.count("SafeLogErrorNoThrow"), 6)
 
+    def test_init_failure_cleanup_failure_retains_unloading_owner_for_retry(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        match = re.search(
+            r"auto initCleanup = MakeScopeExit\(\[\&\]\(\)",
+            text,
+        )
+        self.assertIsNotNone(match)
+        body = extract_braced_body(text, match)
+        failure_match = re.search(
+            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*try\s*\{\s*RemovePluginOwnerToken",
+            body,
+            re.S,
+        )
+        self.assertIsNotNone(failure_match)
+        failure_body = failure_match.group("body")
+
+        for token in (
+            "handleCleanup.Dismiss()",
+            "ownerTokenCleanup.Dismiss()",
+            "initializingOwnerCleanup.Dismiss()",
+            "m_LoadedPlugins.push_back",
+            "true,",
+            "retaining library mapped for retry",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, failure_body)
+
+        for forbidden in (
+            "RemovePluginOwnerToken(pluginOwnerToken)",
+            "ClearPluginOwnerUnloading(pluginOwner)",
+            "SafeCloseLibrary",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, failure_body)
+
     def test_unload_all_wraps_shutdown_and_library_close(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         match = re.search(r"void PluginManager::UnloadAll\(\)\s*\{(?P<body>.*?)\n\s*\}\n\}", text, re.S)
@@ -326,6 +361,52 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn("try", preceding)
                 self.assertIn("catch", following)
                 self.assertIn("SafeLogErrorNoThrow", following)
+
+    def test_unload_cleanup_failure_retains_plugin_without_dlclose(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        body = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
+        failure_match = re.search(
+            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*try\s*\{\s*RemoveLoadedPluginOwner",
+            body,
+            re.S,
+        )
+        self.assertIsNotNone(failure_match)
+        failure_body = failure_match.group("body")
+
+        self.assertIn("retaining plugin for retry", failure_body)
+        self.assertIn("retainedPlugins.push_back(plugin)", failure_body)
+        self.assertIn("continue", failure_body)
+        for forbidden in (
+            "RemovePluginOwnerToken(plugin.ownerToken)",
+            "ClearPluginOwnerUnloading(plugin.owner)",
+            "SafeCloseLibrary",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, failure_body)
+
+    def test_unloading_owner_rejects_new_registrations_but_allows_unregister(self) -> None:
+        text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+
+        registration_body = extract_function_body(
+            text,
+            r"void\* ResolveOwnerTokenForRegistrationLocked\(.*?\)",
+        )
+        self.assertLess(
+            registration_body.index("IsUnloadingPluginOwnerLocked(owner)"),
+            registration_body.index("IsLoadedPluginOwnerLocked(owner)"),
+        )
+        self.assertIn("rejected callback because the plugin owner is unloading", registration_body)
+        self.assertIn("return nullptr", registration_body)
+
+        unregister_body = extract_function_body(
+            text,
+            r"void\* ResolveOwnerTokenForUnregister\(.*?\)",
+        )
+        self.assertIn("IsUnloadingPluginOwnerLocked(owner)", unregister_body)
+        self.assertLess(
+            unregister_body.index("IsUnloadingPluginOwnerLocked(owner)"),
+            unregister_body.index("return owner"),
+        )
 
     def test_unregister_plugin_callbacks_is_per_family_and_cleans_timers(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")

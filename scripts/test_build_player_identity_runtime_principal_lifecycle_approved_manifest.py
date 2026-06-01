@@ -17,6 +17,7 @@ CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approv
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 
 
 def runtime_log_lines() -> list[str]:
@@ -53,7 +54,8 @@ def runtime_log_lines() -> list[str]:
 
 class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
     def write_summary(self, temp_dir: Path) -> Path:
-        log_path = temp_dir / "Obelisk.log"
+        log_path = temp_dir / RUN_ID / "Obelisk.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
         result = subprocess.run(
             [sys.executable, str(ANALYZER), "--obelisk-commit", "test-commit", str(log_path)],
@@ -74,7 +76,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         manifest_path.write_text(
             "\n".join(
                 [
-                    "run_id=20260601T120000Z-player-principal-lifecycle",
+                    f"run_id={RUN_ID}",
                     f"obelisk_commit={summary['evidence']['obelisk_commit']}",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",

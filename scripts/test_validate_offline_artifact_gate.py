@@ -1865,6 +1865,27 @@ def runtime_privacy_contract() -> dict:
     }
 
 
+def runtime_evidence_preflight(*, paired_runtime_schema: str) -> dict:
+    return {
+        "scope": gate.RUNTIME_EVIDENCE_PREFLIGHT_SCOPE,
+        "completion_rule": gate.RUNTIME_EVIDENCE_PREFLIGHT_COMPLETION_RULE,
+        "paired_runtime_schema": paired_runtime_schema,
+        "approved_debug_window_recorded": True,
+        "bounded_allowlist_recorded": True,
+        "source_serial_policy_consume_gate_accepted": True,
+        "raw_disclosure_redaction_checked": True,
+        "runtime_capture_paths_redacted": True,
+        "offline_zero_serial_non_substitution_acknowledged": True,
+        "promotion_claims_disabled": True,
+        "public_api_unchanged": True,
+        "no_broad_tracing_or_scanner_or_core_capture": True,
+        "paired_runtime_manifest_required": True,
+        "promotion_evidence_complete": False,
+        "authorizes_runtime_work": False,
+        "public_resource_handle_ready": False,
+    }
+
+
 def attach_runtime_output_identity(payload: dict, *, schema: str, capture_id: str, evidence_pack_id: str) -> None:
     identity_without_hash = {
         "artifact_kind": schema,
@@ -1892,6 +1913,9 @@ def runtime_rejection_samples_manifest() -> dict:
         "schema": gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
         "evidence_kind": "internal_runtime_rejection_samples_candidate",
         "status": "accepted_internal_candidate_samples",
+        "runtime_evidence_preflight": runtime_evidence_preflight(
+            paired_runtime_schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA
+        ),
         "redacted_run_identity": runtime_redacted_run_identity(),
         "source_artifacts": [runtime_artifact_source_serial_policy()],
         "binary_sha256": BINARY_SHA,
@@ -1953,6 +1977,9 @@ def runtime_serial_semantics_manifest() -> dict:
         "schema": gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
         "evidence_kind": "internal_runtime_serial_semantics_candidate",
         "status": "accepted_internal_candidate_semantics",
+        "runtime_evidence_preflight": runtime_evidence_preflight(
+            paired_runtime_schema=gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA
+        ),
         "redacted_run_identity": runtime_redacted_run_identity(),
         "source_artifacts": [runtime_artifact_source_serial_policy()],
         "binary_sha256": BINARY_SHA,
@@ -7667,6 +7694,54 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("runtime_rejection_samples_source_evidence_pack_id_invalid", reasons)
         self.assertIn("runtime_rejection_samples_source_unexpected_fields", reasons)
 
+    def test_blocks_runtime_rejection_samples_missing_or_promoting_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            payload = runtime_rejection_samples_manifest()
+            payload["runtime_evidence_preflight"]["promotion_evidence_complete"] = True
+            payload["runtime_evidence_preflight"]["authorizes_runtime_work"] = True
+            payload["runtime_evidence_preflight"]["paired_runtime_schema"] = gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA
+            payload["runtime_evidence_preflight"]["offline_zero_serial_non_substitution_acknowledged"] = False
+            attach_runtime_output_identity(
+                payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                capture_id="runtime-rejection-test",
+                evidence_pack_id="runtime-rejection-pack",
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_rejection_samples_preflight_promotion_evidence_complete_not_false", reasons)
+        self.assertIn("runtime_rejection_samples_preflight_authorizes_runtime_work_not_false", reasons)
+        self.assertIn("runtime_rejection_samples_preflight_paired_runtime_schema_mismatch", reasons)
+        self.assertIn("runtime_rejection_samples_preflight_offline_zero_serial_non_substitution_acknowledged_not_true", reasons)
+
+    def test_blocks_runtime_rejection_samples_without_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            payload = runtime_rejection_samples_manifest()
+            payload.pop("runtime_evidence_preflight")
+            attach_runtime_output_identity(
+                payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                capture_id="runtime-rejection-test",
+                evidence_pack_id="runtime-rejection-pack",
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "runtime_rejection_samples_preflight_missing",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_accepts_runtime_serial_semantics_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -7774,6 +7849,32 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("runtime_serial_semantics_source_capture_id_invalid", reasons)
         self.assertIn("runtime_serial_semantics_source_evidence_pack_id_invalid", reasons)
         self.assertIn("runtime_serial_semantics_source_unexpected_fields", reasons)
+
+    def test_blocks_runtime_serial_semantics_incomplete_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            payload = runtime_serial_semantics_manifest()
+            payload["runtime_evidence_preflight"]["scope"] = "promotion"
+            payload["runtime_evidence_preflight"]["completion_rule"] = "single_manifest_complete"
+            payload["runtime_evidence_preflight"]["paired_runtime_manifest_required"] = False
+            payload["runtime_evidence_preflight"]["public_resource_handle_ready"] = True
+            attach_runtime_output_identity(
+                payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                capture_id="runtime-serial-test",
+                evidence_pack_id="runtime-serial-pack",
+            )
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_serial_semantics_preflight_scope_mismatch", reasons)
+        self.assertIn("runtime_serial_semantics_preflight_completion_rule_mismatch", reasons)
+        self.assertIn("runtime_serial_semantics_preflight_paired_runtime_manifest_required_not_true", reasons)
+        self.assertIn("runtime_serial_semantics_preflight_public_resource_handle_ready_not_false", reasons)
 
     def test_blocks_runtime_serial_semantics_summary_negative_reject_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

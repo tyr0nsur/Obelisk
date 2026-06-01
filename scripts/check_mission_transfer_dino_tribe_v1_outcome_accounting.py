@@ -32,6 +32,62 @@ LEAF_ALIASES = {
     "buff_status": ("buff_status", "buff/status", "buff status", "buff"),
 }
 PROMOTED_LEAF_EVIDENCE_KEYS = ("abi_tests", "sdk_consumer_tests", "second_source_evidence")
+LEAF_MISSING_PUBLIC_GATES = {
+    "mission": (
+        "public_mission_sdk_abi",
+        "runtime_observer_approval",
+        "mission_identity_state_reward_authority",
+        "dispatcher_lifecycle",
+        "installed_sdk_consumer_tests",
+        "mutation_return_override_policy",
+    ),
+    "transfer": (
+        "public_transfer_sdk_abi",
+        "transfer_payload_ownership",
+        "downloaded_character_payload_contract",
+        "dino_payload_contract",
+        "player_identity",
+        "cross_map_state_correlation",
+        "ownership_policy",
+        "teleport_spawn_authority",
+        "runtime_wiring",
+        "mutation_return_override_policy",
+    ),
+    "dino_policy": (
+        "public_dino_sdk_abi",
+        "dino_player_passenger_identity",
+        "lookup_ownership_lifetime",
+        "postcall_return_policy",
+        "dispatcher_lifecycle",
+        "runtime_observation",
+        "privacy_contract",
+        "resource_handle_policy",
+        "mutation_return_override_policy",
+    ),
+    "tribe_policy": (
+        "public_tribe_sdk_abi",
+        "tribe_player_identity",
+        "permission_semantics",
+        "log_string_array_payload_policy",
+        "online_list_payload_policy",
+        "mission_tag_payload_policy",
+        "dispatcher_lifecycle",
+        "runtime_observation",
+        "privacy_redaction_contract",
+        "mutation_return_override_policy",
+    ),
+    "buff_status": (
+        "public_buff_status_sdk_abi",
+        "buff_class_object_redaction_contract",
+        "copied_payload_policy",
+        "lifecycle_stacking_invalidation_semantics",
+        "refreshed_compact_evidence",
+        "dispatcher_lifecycle",
+        "runtime_observation",
+        "resource_handle_policy",
+        "mutation_return_override_policy",
+    ),
+}
 NEGATIVE_EVIDENCE_RE = re.compile(
     r"\b(?:candidate[- ]?only|consume[- ]?only|planning[- ]?only|not promoted|"
     r"promotion[_ -]?ready\s*[:=]\s*false|public[_ -]?sdk[_ -]?ready\s*[:=]\s*false|"
@@ -160,6 +216,14 @@ def flattened_strings(value: Any) -> list[str]:
         for child in value:
             items.extend(flattened_strings(child))
         return items
+    return []
+
+
+def string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    if isinstance(value, str):
+        return [value]
     return []
 
 
@@ -298,6 +362,83 @@ def validate_public_contracts(
             add(blockers, "leaf_public_contract_forbidden_claim", f"$.leaf_decision_units[{leaf_id}].public_contract", leaf=leaf_id, claim=claim)
 
 
+def leaf_accounted_by(route: str, leaf_id: str, leaf: dict[str, Any], outcome: dict[str, Any]) -> str | None:
+    if route == "per_leaf_promoted" and leaf.get("status") == "promoted":
+        return "promoted_leaf_evidence"
+    if route == "manifest_umbrella_excluded" and leaf.get("status") == "excluded":
+        return "manifest_leaf_exclusion"
+    if route == "release_statement_umbrella_excluded" and outcome["leaf_exclusions"].get(leaf_id):
+        return "release_statement_leaf_exclusion"
+    if leaf.get("status") == "excluded":
+        return "manifest_leaf_exclusion_pending_acceptance"
+    if outcome["leaf_exclusions"].get(leaf_id):
+        return "release_statement_leaf_exclusion_pending_acceptance"
+    return None
+
+
+def build_leaf_family_accounting(
+    surface: dict[str, Any],
+    leaves: dict[str, dict[str, Any]],
+    outcome: dict[str, Any],
+    route: str,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    gaps: dict[str, Any] = {}
+    missing_leaf_families: list[str] = []
+    non_promoted_leaf_families: list[str] = []
+    missing_public_gate_counts: dict[str, int] = {}
+    status_counts: dict[str, int] = {}
+
+    surface_evidence = surface.get("evidence") if isinstance(surface.get("evidence"), dict) else {}
+    planning_target_sets = string_list(surface_evidence.get("planning_target_sets") if isinstance(surface_evidence, dict) else None)
+
+    for leaf_id in REQUIRED_LEAVES:
+        leaf = leaves.get(leaf_id, {})
+        status = leaf.get("status") if isinstance(leaf.get("status"), str) else "missing"
+        status_counts[status] = status_counts.get(status, 0) + 1
+        accounted_by = leaf_accounted_by(route, leaf_id, leaf, outcome)
+        missing_public_gates = list(LEAF_MISSING_PUBLIC_GATES.get(leaf_id, ()))
+        if not accounted_by:
+            missing_leaf_families.append(leaf_id)
+        if status != "promoted":
+            non_promoted_leaf_families.append(leaf_id)
+        missing_public_gate_counts[leaf_id] = 0 if accounted_by == "promoted_leaf_evidence" else len(missing_public_gates)
+        gaps[leaf_id] = {
+            "status": status,
+            "v1_accounted": accounted_by is not None,
+            "accounted_by": accounted_by,
+            "release_statement_excluded": bool(outcome["leaf_exclusions"].get(leaf_id)),
+            "release_statement_promoted": bool(outcome["leaf_promotions"].get(leaf_id)),
+            "current_evidence": string_list(leaf.get("current_evidence")),
+            "current_blocker": leaf.get("current_blocker") if isinstance(leaf.get("current_blocker"), str) else None,
+            "allowed_v1_outcome": leaf.get("allowed_v1_outcome") if isinstance(leaf.get("allowed_v1_outcome"), str) else None,
+            "missing_public_gates": [] if accounted_by == "promoted_leaf_evidence" else missing_public_gates,
+        }
+
+    missing_gate_catalog = sorted(set(REQUIRED_LEAVES) - set(LEAF_MISSING_PUBLIC_GATES))
+    if missing_gate_catalog:
+        add(blockers, "leaf_family_missing_gate_catalog", "$.checker.leaf_family_accounting", missing=missing_gate_catalog)
+
+    return {
+        "mode": route,
+        "result": "all_leaf_families_accounted" if not missing_leaf_families else "leaf_families_missing_v1_outcomes",
+        "accepted_for_internal_planning": route == "candidate_only" and not blockers,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "promotion_ready": route == "per_leaf_promoted" and not blockers,
+        "planning_target_sets": planning_target_sets,
+        "missing_leaf_families": missing_leaf_families,
+        "non_promoted_leaf_families": non_promoted_leaf_families,
+        "missing_public_gate_counts": missing_public_gate_counts,
+        "status_counts": status_counts,
+        "leaf_family_gaps": gaps,
+        "guardrail": (
+            "candidate-only accounting names missing leaf outcomes and public gates; "
+            "it does not promote public SDK, runtime, identity, lookup, mutation, return override, ResourceHandle, or teleport/spawn"
+        ),
+    }
+
+
 def build_report(manifest_path: Path, split_note_path: Path, release_statement_path: Path | None = None) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     manifest = load_json(manifest_path, "manifest")
@@ -349,6 +490,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         route = "manifest_umbrella_excluded"
     else:
         route = "candidate_only"
+    leaf_family_accounting = build_leaf_family_accounting(surface, leaves, outcome, route, blockers)
 
     return {
         "schema": REPORT_SCHEMA,
@@ -363,6 +505,8 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         "required_leaves": list(REQUIRED_LEAVES),
         "observed_leaves": [leaf_id for leaf_id in REQUIRED_LEAVES if leaf_id in leaves],
         "leaf_statuses": {leaf_id: leaves.get(leaf_id, {}).get("status") for leaf_id in REQUIRED_LEAVES},
+        "candidate_only_accounting": leaf_family_accounting,
+        "missing_leaf_families": leaf_family_accounting["missing_leaf_families"],
         "release_statement": outcome,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,

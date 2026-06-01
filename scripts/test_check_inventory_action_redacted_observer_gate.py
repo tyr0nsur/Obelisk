@@ -74,6 +74,19 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
 
         self.assertEqual("inventory-action-compact-intake", payload["target_set"])
         self.assertEqual(list(fixture_boundary.EXPECTED_TARGETS), payload["expected_targets"])
+        self.assertEqual(
+            [
+                "copied_signal_stability_wording",
+                "inventory_items_mutation_surface",
+                "inventory_action_redacted_observer",
+                "resource_handle_identity",
+            ],
+            [blocker["id"] for blocker in payload["decision_manifest"]["promotion_blockers"]],
+        )
+        self.assertEqual(
+            ["blocked", "blocked", "candidate-only-blocked", "blocked"],
+            [blocker["status"] for blocker in payload["decision_manifest"]["promotion_blockers"]],
+        )
         self.assertEqual([2651, 2652], payload["gate"]["allowed_fname_indices"])
         self.assertEqual(0, payload["gate"]["dispatch_budget"])
         self.assertEqual(
@@ -205,6 +218,41 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("fixture_boundary_failed", reasons)
         self.assertIn("public_contract_leak", reasons)
+
+    def test_decision_manifest_promotion_blocker_drift_fails_closed(self) -> None:
+        decision_manifest = json.loads(checker.DECISION_MANIFEST.read_text(encoding="utf-8"))
+        for blocker in decision_manifest["next_promotion_blockers"]:
+            if blocker["id"] == "resource_handle_identity":
+                blocker["requires"] = [
+                    "approved runtime object rejection samples and serial reuse or wraparound semantics",
+                    "UObject flag and lifetime policy with fail-closed post-callback validity rules",
+                    "separate append-only handle promotion gate",
+                ]
+                blocker["must_not_unlock"] = ["object lookup", "persistent handles"]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "inventory_item_copied_signals_public_contract_decisions.json"
+            manifest.write_text(json.dumps(decision_manifest), encoding="utf-8")
+            result = self.run_checker(
+                "--json",
+                "--decision-manifest",
+                str(manifest),
+                *REQUIRED_GATE_ARGS,
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decision_manifest_promotion_blocker_terms_incomplete", reasons)
+        term_blocker = next(
+            blocker
+            for blocker in payload["blockers"]
+            if blocker["reason"] == "decision_manifest_promotion_blocker_terms_incomplete"
+        )
+        self.assertEqual("resource_handle_identity", term_blocker["id"])
+        self.assertIn("ResourceHandle", term_blocker["missing"])
 
     def test_mutated_fixture_boundary_redaction_and_runtime_flags_fail_closed(self) -> None:
         fixture_report = fixture_boundary.build_check(

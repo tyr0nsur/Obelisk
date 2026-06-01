@@ -770,6 +770,17 @@ def release_statement_surface_record(text: str, surface_id: str, status: str) ->
     return records[0][1]
 
 
+def release_statement_recorded_outcome(text: str | None, surface_id: str) -> str | None:
+    if text is None:
+        return None
+    records = release_statement_surface_records(text, surface_id)
+    if len(records) > 1:
+        return "duplicate-or-mixed"
+    if not records:
+        return None
+    return records[0][0]
+
+
 def release_statement_duplicate_or_mixed_records(text: str, surface_id: str) -> bool:
     records = release_statement_surface_records(text, surface_id)
     if len(records) > 1:
@@ -1283,6 +1294,115 @@ def v1_dependency_sequence_mismatches(
     return mismatches
 
 
+def blocker_outcome_next_action(
+    *,
+    surface_id: str,
+    status: str,
+    manifest_outcome: str | None,
+    release_statement_outcome: str | None,
+    release_statement_contract_satisfied: bool,
+    promotion_evidence_satisfied: bool,
+) -> str:
+    if status == "promoted":
+        if not promotion_evidence_satisfied:
+            return "keep blocked; promoted status lacks acceptable ABI and SDK-consumer evidence"
+        if release_statement_outcome != "promoted":
+            return "add one release-statement promoted record after reviewing evidence"
+        return "promoted accounting complete; this still does not allow the stable SDK claim by itself"
+    if manifest_outcome in {"post-v1", "excluded"}:
+        if release_statement_contract_satisfied:
+            return "release-statement outcome accounted; remaining SDK claim still depends on all blockers"
+        expected = "post-v1 or excluded"
+        return f"add one reviewed {expected} release-statement record satisfying this surface's exclusion contract"
+    if status == "missing":
+        return "restore the canonical blocker row in docs/public_sdk_surfaces.json"
+    if surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE:
+        return "priority dependency-chain blocker: promote with evidence or explicitly exclude before downstream permissions/commands can count"
+    return "choose a reviewed v1 outcome: promote with evidence or explicitly exclude/post-v1 where the contract allows it"
+
+
+def completion_blocker_outcome_rows(
+    completion_blockers: list[str],
+    surfaces_by_id: dict[str, dict[str, Any]],
+    post_v1_or_excluded: set[str],
+    release_statement_text: str | None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for index, surface_id in enumerate(completion_blockers, start=1):
+        surface = surfaces_by_id.get(surface_id, {})
+        status = surface.get("status", "missing")
+        status = status if isinstance(status, str) else "invalid"
+        manifest_outcome = status if status in {"promoted", "post-v1", "excluded"} else None
+        release_statement_outcome = release_statement_recorded_outcome(release_statement_text, surface_id)
+        promotion_evidence_satisfied = bool(surface) and status == "promoted" and surface_has_promotion_evidence(surface)
+        release_statement_contract_satisfied = False
+        if status == "promoted":
+            release_statement_contract_satisfied = release_statement_outcome == "promoted"
+        elif status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
+            release_statement_contract_satisfied = (
+                release_statement_text is not None
+                and release_statement_outcome == status
+                and release_statement_satisfies_exclusion_contract(release_statement_text, surface)
+            )
+        required_outcomes = sorted(required_release_statement_outcomes(surface)) if surface else []
+        rows.append(
+            {
+                "surface": surface_id,
+                "position": index,
+                "status": status,
+                "support_tier": surface.get("support_tier") if surface else None,
+                "manifest_outcome": manifest_outcome,
+                "release_statement_outcome": release_statement_outcome,
+                "release_statement_contract_satisfied": release_statement_contract_satisfied,
+                "required_release_statement_outcomes": required_outcomes,
+                "promotion_evidence_satisfied": promotion_evidence_satisfied,
+                "unresolved_for_complete_sdk_claim": not (
+                    promotion_evidence_satisfied
+                    and release_statement_contract_satisfied
+                    and manifest_outcome == "promoted"
+                ),
+                "next_action": blocker_outcome_next_action(
+                    surface_id=surface_id,
+                    status=status,
+                    manifest_outcome=manifest_outcome,
+                    release_statement_outcome=release_statement_outcome,
+                    release_statement_contract_satisfied=release_statement_contract_satisfied,
+                    promotion_evidence_satisfied=promotion_evidence_satisfied,
+                ),
+                "non_claim": "Accounting row only; it does not authorize complete/full/production/stable SDK wording.",
+            }
+        )
+    return rows
+
+
+def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    manifest_outcome_missing = [
+        row["surface"] for row in rows if row.get("manifest_outcome") is None
+    ]
+    release_statement_outcome_missing = [
+        row["surface"]
+        for row in rows
+        if row.get("manifest_outcome") in {"promoted", "post-v1", "excluded"}
+        and row.get("release_statement_contract_satisfied") is not True
+    ]
+    dependency_chain_remaining = [
+        row["surface"]
+        for row in rows
+        if row["surface"] in CANONICAL_V1_DEPENDENCY_SEQUENCE
+        and row.get("manifest_outcome") != "promoted"
+    ]
+    return {
+        "total": len(rows),
+        "manifest_outcome_missing_count": len(manifest_outcome_missing),
+        "release_statement_outcome_missing_count": len(release_statement_outcome_missing),
+        "manifest_outcome_missing": manifest_outcome_missing,
+        "release_statement_outcome_missing": release_statement_outcome_missing,
+        "dependency_chain_remaining": dependency_chain_remaining,
+        "dependency_chain_remaining_count": len(dependency_chain_remaining),
+        "non_claim": "This summary ranks accounting gaps only; stable SDK claim approval still requires the full checker to pass.",
+    }
+
+
 def build_report(
     manifest_path: Path,
     release_statement_path: Path | None = None,
@@ -1661,6 +1781,13 @@ def build_report(
         if status not in {"promoted", "post-v1", "excluded"}
     )
     completion_blocker_total = len(completion_blockers)
+    blocker_outcome_rows = completion_blocker_outcome_rows(
+        completion_blockers,
+        surfaces_by_id,
+        post_v1_or_excluded,
+        release_statement_text,
+    )
+    blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
 
     return {
         "schema": "obelisk.public-sdk-v1-completion-check.v1",
@@ -1722,6 +1849,8 @@ def build_report(
         "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
         "release_statement_forbidden_broad_claims": release_statement_forbidden_claims,
         "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
+        "v1_sdk_blocker_outcomes": blocker_outcome_rows,
+        "v1_sdk_blocker_outcome_summary": blocker_outcome_summary,
         "v1_sdk_progress": {
             "completion_blocker_total": completion_blocker_total,
             "completion_blockers_with_promoted_outcome": completion_blockers_with_promoted_outcome,
@@ -1744,6 +1873,13 @@ def build_report(
             "unresolved_completion_blocker_count": len(set(unresolved_completion_blockers)),
             "unresolved_experimental_surface_count": len(set(unresolved_experimental)),
             "minimum_promoted_demand_family_gap_count": len(minimum_promoted_demand_family_gaps),
+            "manifest_outcome_missing_count": blocker_outcome_summary["manifest_outcome_missing_count"],
+            "release_statement_outcome_missing_count": (
+                blocker_outcome_summary["release_statement_outcome_missing_count"]
+            ),
+            "dependency_chain_remaining_count": blocker_outcome_summary[
+                "dependency_chain_remaining_count"
+            ],
             "release_statement_required_for_completion_claim": release_statement_text is None,
             "stable_claim_allowed": stable_claim_allowed,
             "outcome_accounting_note": (
@@ -1965,6 +2101,14 @@ def print_human_report(report: dict[str, Any]) -> None:
         return
     print("Public SDK v1 completion gate blocked.")
     print("The stable v1 SDK claim remains disabled; this is not a v1.0 complete SDK approval.")
+    outcome_summary = report.get("v1_sdk_blocker_outcome_summary", {})
+    if isinstance(outcome_summary, dict):
+        print(
+            "12-blocker outcome accounting: "
+            f"{outcome_summary.get('manifest_outcome_missing_count', 0)} need manifest outcomes; "
+            f"{outcome_summary.get('release_statement_outcome_missing_count', 0)} need release-statement outcomes; "
+            f"{outcome_summary.get('dependency_chain_remaining_count', 0)} dependency-chain blockers remain."
+        )
     print("Blockers:")
     for blocker in report["blockers"]:
         print(f"- {blocker}")

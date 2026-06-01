@@ -153,3 +153,28 @@ Invalid zero-serial inputs are named separately with
 `invalid_zero_serial_negative_samples_candidate`, so a malformed or overclaiming offline
 cohort cannot mask the runtime blockers or look like accepted rejected-object runtime
 evidence.
+
+## 2026-06-01 Runtime Manifest Preflight Hardening
+
+Audit after the evaluator non-substitution pass found one repo-local ambiguity left for a
+future approved runtime window: the rejected-object and serial-semantics manifests were
+candidate-only, redacted, and promote-blocked, but did not carry a first-class preflight
+checklist that named the paired runtime manifest and explicitly marked the runtime
+evidence package incomplete.
+
+`scripts/validate_offline_artifact_gate.py` now requires
+`runtime_evidence_preflight` on both future runtime schemas:
+
+- `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1`
+- `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1`
+
+The preflight must record the ResourceHandle runtime-semantics candidate scope, the rule
+that both runtime manifests are required and still candidate-only, the exact paired
+runtime schema, approved-window/bounded-allowlist/redaction/source-policy checks, and the
+zero-serial offline non-substitution acknowledgement. It must also keep
+`promotion_evidence_complete=false`, `authorizes_runtime_work=false`, and
+`public_resource_handle_ready=false`.
+
+This is still offline validation only. It does not approve a server window, does not run
+runtime probes, and does not promote `ResourceHandle`; it prevents an incomplete future
+runtime artifact from looking like complete promotion evidence.

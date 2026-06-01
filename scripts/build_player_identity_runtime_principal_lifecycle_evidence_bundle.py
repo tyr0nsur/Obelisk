@@ -41,7 +41,13 @@ def run_command(command: list[str], *, stdout_path: Path | None = None) -> subpr
         return subprocess.run(command, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     with stdout_path.open("w", encoding="utf-8") as stdout:
-        return subprocess.run(command, check=False, text=True, stdout=stdout, stderr=subprocess.PIPE)
+        result = subprocess.run(command, check=False, text=True, stdout=stdout, stderr=subprocess.PIPE)
+    if result.returncode != 0 and not result.stderr.strip():
+        try:
+            result.stderr = stdout_path.read_text(encoding="utf-8")
+        except OSError:
+            pass
+    return result
 
 
 def require_success(result: subprocess.CompletedProcess[str], label: str) -> None:

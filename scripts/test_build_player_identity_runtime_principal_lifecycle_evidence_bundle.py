@@ -15,6 +15,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 
 
 def runtime_log_lines() -> list[str]:
@@ -49,6 +50,10 @@ def runtime_log_lines() -> list[str]:
     ]
 
 
+def copied_log_path(root: Path) -> Path:
+    return root / RUN_ID / "Obelisk.log"
+
+
 class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def write_window_manifest(self, temp_dir: Path, copied_log: Path) -> Path:
         manifest = temp_dir / "window.env"
@@ -60,7 +65,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         manifest.write_text(
             "\n".join(
                 [
-                    "run_id=20260601T120000Z-player-principal-lifecycle",
+                    f"run_id={RUN_ID}",
                     "obelisk_commit=test-commit",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",
@@ -137,8 +142,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def test_builds_complete_consume_only_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
 
             result = self.run_bundle(copied_log, output_dir)
@@ -184,7 +190,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def test_rejects_protected_output_dir_before_writing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
             window_manifest = self.write_window_manifest(temp_dir, copied_log)
 
@@ -201,7 +208,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def test_rejects_symlinked_output_dir_before_writing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
             window_manifest = self.write_window_manifest(temp_dir, copied_log)
             target = temp_dir / "real-output-root"
@@ -228,8 +236,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
             result = self.run_bundle(copied_log, output_dir)
@@ -241,8 +250,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def test_fails_closed_when_window_manifest_sha_does_not_match_log(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
             window_manifest = self.write_window_manifest(temp_dir, copied_log)
             text = window_manifest.read_text(encoding="utf-8")
@@ -257,13 +267,15 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("window manifest copied_log.sha256 does not match runtime observer summary", result.stderr)
+            self.assertIn("check player principal lifecycle window manifest failed", result.stderr)
+            self.assertIn("copied_log_sha256_mismatch", result.stderr)
 
     def test_fails_closed_when_window_manifest_commit_does_not_match_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
             window_manifest = self.write_window_manifest(temp_dir, copied_log)
             text = window_manifest.read_text(encoding="utf-8")
@@ -284,8 +296,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         ]
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
-            copied_log = temp_dir / "Obelisk.log"
+            copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
             result = self.run_bundle(copied_log, output_dir)

@@ -1179,10 +1179,30 @@ RUNTIME_PRIVACY_REQUIRED_FALSE = {
     "broad_tracing_evidence",
     "fuobjectitem_0xC_as_serial",
 }
+RUNTIME_EVIDENCE_PREFLIGHT_REQUIRED_TRUE = {
+    "approved_debug_window_recorded",
+    "bounded_allowlist_recorded",
+    "source_serial_policy_consume_gate_accepted",
+    "raw_disclosure_redaction_checked",
+    "runtime_capture_paths_redacted",
+    "offline_zero_serial_non_substitution_acknowledged",
+    "promotion_claims_disabled",
+    "public_api_unchanged",
+    "no_broad_tracing_or_scanner_or_core_capture",
+    "paired_runtime_manifest_required",
+}
+RUNTIME_EVIDENCE_PREFLIGHT_REQUIRED_FALSE = {
+    "promotion_evidence_complete",
+    "authorizes_runtime_work",
+    "public_resource_handle_ready",
+}
+RUNTIME_EVIDENCE_PREFLIGHT_SCOPE = "resource_handle_runtime_semantics_candidate"
+RUNTIME_EVIDENCE_PREFLIGHT_COMPLETION_RULE = "both_runtime_manifests_required_and_still_candidate_only"
 RUNTIME_SCHEMA_COMMON_ALLOWED_KEYS = {
     "schema",
     "evidence_kind",
     "status",
+    "runtime_evidence_preflight",
     "redacted_run_identity",
     "source_artifacts",
     "binary_sha256",
@@ -7109,6 +7129,7 @@ def internal_uobject_runtime_rejection_samples_canonical_report(payload: dict[st
         "schema": payload.get("schema"),
         "evidence_kind": payload.get("evidence_kind"),
         "status": payload.get("status"),
+        "runtime_evidence_preflight": payload.get("runtime_evidence_preflight"),
         "redacted_run_identity": payload.get("redacted_run_identity"),
         "source_artifacts": payload.get("source_artifacts"),
         "binary_sha256": payload.get("binary_sha256"),
@@ -7129,6 +7150,7 @@ def internal_uobject_runtime_serial_semantics_canonical_report(payload: dict[str
         "schema": payload.get("schema"),
         "evidence_kind": payload.get("evidence_kind"),
         "status": payload.get("status"),
+        "runtime_evidence_preflight": payload.get("runtime_evidence_preflight"),
         "redacted_run_identity": payload.get("redacted_run_identity"),
         "source_artifacts": payload.get("source_artifacts"),
         "binary_sha256": payload.get("binary_sha256"),
@@ -7274,6 +7296,41 @@ def validate_runtime_privacy_contract(
     return blockers
 
 
+def validate_runtime_evidence_preflight(
+    preflight: object,
+    *,
+    label: str,
+    reason_prefix: str,
+    paired_runtime_schema: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(preflight, dict):
+        return [{"reason": f"{reason_prefix}_preflight_missing", "label": f"{label}:$.runtime_evidence_preflight"}]
+    if preflight.get("scope") != RUNTIME_EVIDENCE_PREFLIGHT_SCOPE:
+        blockers.append({"reason": f"{reason_prefix}_preflight_scope_mismatch", "label": f"{label}:$.runtime_evidence_preflight.scope"})
+    if preflight.get("completion_rule") != RUNTIME_EVIDENCE_PREFLIGHT_COMPLETION_RULE:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_preflight_completion_rule_mismatch",
+                "label": f"{label}:$.runtime_evidence_preflight.completion_rule",
+            }
+        )
+    if preflight.get("paired_runtime_schema") != paired_runtime_schema:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_preflight_paired_runtime_schema_mismatch",
+                "label": f"{label}:$.runtime_evidence_preflight.paired_runtime_schema",
+            }
+        )
+    for key in RUNTIME_EVIDENCE_PREFLIGHT_REQUIRED_TRUE:
+        if preflight.get(key) is not True:
+            blockers.append({"reason": f"{reason_prefix}_preflight_{key}_not_true", "label": f"{label}:$.runtime_evidence_preflight.{key}"})
+    for key in RUNTIME_EVIDENCE_PREFLIGHT_REQUIRED_FALSE:
+        if preflight.get(key) is not False:
+            blockers.append({"reason": f"{reason_prefix}_preflight_{key}_not_false", "label": f"{label}:$.runtime_evidence_preflight.{key}"})
+    return blockers
+
+
 def validate_runtime_schema_common(
     payload: dict[str, Any],
     *,
@@ -7285,6 +7342,7 @@ def validate_runtime_schema_common(
     canonical_report: dict[str, Any],
     promotion_blocker: str,
     allowed_top_level_keys: set[str],
+    paired_runtime_schema: str,
 ) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
     unexpected_top_level = sorted(set(payload) - allowed_top_level_keys)
@@ -7324,6 +7382,14 @@ def validate_runtime_schema_common(
         )
     )
     blockers.extend(validate_runtime_privacy_contract(payload.get("privacy"), label=label, reason_prefix=reason_prefix))
+    blockers.extend(
+        validate_runtime_evidence_preflight(
+            payload.get("runtime_evidence_preflight"),
+            label=label,
+            reason_prefix=reason_prefix,
+            paired_runtime_schema=paired_runtime_schema,
+        )
+    )
 
     if payload.get("promotion_ready") is not False:
         blockers.append({"reason": f"{reason_prefix}_promotion_ready_overclaim", "label": f"{label}:$.promotion_ready"})
@@ -7390,6 +7456,7 @@ def validate_internal_uobject_runtime_rejection_samples_manifest(
         canonical_report=internal_uobject_runtime_rejection_samples_canonical_report(payload),
         promotion_blocker="candidate_only_runtime_rejection_samples",
         allowed_top_level_keys=RUNTIME_REJECTION_SAMPLE_ALLOWED_TOP_LEVEL_KEYS,
+        paired_runtime_schema=INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
     )
 
     if payload.get("evidence_kind") != "internal_runtime_rejection_samples_candidate":
@@ -7472,6 +7539,7 @@ def validate_internal_uobject_runtime_serial_semantics_manifest(
         canonical_report=internal_uobject_runtime_serial_semantics_canonical_report(payload),
         promotion_blocker="candidate_only_runtime_serial_semantics",
         allowed_top_level_keys=RUNTIME_SERIAL_SEMANTICS_ALLOWED_TOP_LEVEL_KEYS,
+        paired_runtime_schema=INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
     )
 
     if payload.get("evidence_kind") != "internal_runtime_serial_semantics_candidate":

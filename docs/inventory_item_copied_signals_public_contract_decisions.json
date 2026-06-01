@@ -152,6 +152,80 @@
       "Promote obelisk.inventory_items_mutation.v1 separately before claiming inventory/item mutation, lookup, grants, removal, kits, rewards, engrams, or return override."
     ]
   },
+  "next_promotion_blockers": [
+    {
+      "id": "copied_signal_stability_wording",
+      "status": "blocked",
+      "current_state": "promoted-experimental-only copied GameplayPolicyEvent seed",
+      "unblocks": "stable wording or explicit v1 exclusion only for the five allowed copied signals",
+      "requires": [
+        "release wording stays scoped to the five allowed_signals or explicitly excludes this surface from v1",
+        "descriptor and SDK consumer tests continue to prove copied POD payloads only",
+        "no release text claims a standalone Inventory SDK or Items SDK"
+      ],
+      "must_not_unlock": [
+        "item identity",
+        "inventory identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    },
+    {
+      "id": "inventory_items_mutation_surface",
+      "status": "blocked",
+      "current_state": "post-v1 with empty public_contract",
+      "unblocks": "future inventory/item mutation, lookup, grants, removal, kits, rewards, engrams, or return override only after separate promotion",
+      "requires": [
+        "promoted player, inventory, and item identity semantics for each audit unit or an explicit no-handle design that avoids object identity",
+        "append-only POD C ABI with capability gate, owner-scoped cleanup, SDK consumer tests, and privacy/abuse controls",
+        "rollback and failure semantics for grants, removals, progression, and multi-instance ownership"
+      ],
+      "must_not_unlock": [
+        "resource_kind as identity",
+        "lookup",
+        "mutation",
+        "return override",
+        "ResourceHandle"
+      ]
+    },
+    {
+      "id": "inventory_action_redacted_observer",
+      "status": "candidate-only-blocked",
+      "current_state": "offline fixture boundary only",
+      "unblocks": "future debug observer planning only; dispatch remains zero",
+      "requires": [
+        "approved live-ops brief before any server-backed observation",
+        "observer-debug profile, same-instance markers, supported SHA, exact fname prefilter, positive log budget, and dispatch budget exactly 0",
+        "no-read/no-budget proof for disabled, missing, unsupported, and non-target paths, with copied output cleared on rejection"
+      ],
+      "must_not_unlock": [
+        "public callbacks",
+        "raw params",
+        "AdditionalData stable semantics",
+        "ItemId or ItemID1 identity",
+        "InventoryComp or anActor identity"
+      ]
+    },
+    {
+      "id": "resource_handle_identity",
+      "status": "blocked",
+      "current_state": "cross-cutting post-v1 blocker outside this copied-signal surface",
+      "unblocks": "nothing for inventory/items until object identity and ResourceHandle promote through a separate gate",
+      "requires": [
+        "approved runtime object rejection samples and serial reuse or wraparound semantics",
+        "UObject flag and lifetime policy with fail-closed post-callback validity rules",
+        "separate append-only ResourceHandle promotion gate"
+      ],
+      "must_not_unlock": [
+        "ResourceHandle",
+        "object lookup",
+        "persistent handles",
+        "cross-event correlation"
+      ]
+    }
+  ],
   "guardrails": [
     "Only the five named GameplayPolicyEvent inventory/item signals are public.",
     "Inventory/item signals are post-original copied observations only.",

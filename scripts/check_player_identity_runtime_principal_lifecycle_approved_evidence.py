@@ -159,8 +159,10 @@ ALLOWED_FORBIDDEN_LEAF_PATHS = (
     "$.schema",
     "$.operational_window.schema",
     "$.operational_window.run_id",
+    "$.operational_window.copied_log.path",
     "$.operational_window.posture.observer_exclusivity",
     "$.operational_window.posture.single_module_summary",
+    "$.source_summary.evidence.sources[0].path",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.HandleNewPlayer.details.principal_id_logged",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.OnLogout.details.principal_id_logged",
 )
