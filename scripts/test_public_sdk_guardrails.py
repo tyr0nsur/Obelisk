@@ -640,6 +640,63 @@ UNPROMOTED_GAMEPLAY_SURFACES = (
     "Admin",
     "Command",
 )
+UNPROMOTED_PUBLIC_MODULE_FAMILIES = (
+    "INVENTORY",
+    "ITEM",
+    "DINO",
+    "STRUCTURE",
+    "MISSION",
+    "TRANSFER",
+    "BUFF",
+    "TRIBE",
+    "PLAYER",
+    "PERMISSION",
+    "ADMIN",
+    "COMMAND",
+)
+V010_PUBLIC_MODULE_SYMBOL_EXCEPTIONS = {
+    "OBELISK_CHAT_SEND_MODE_TRIBE",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_DEMOLISH_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_VARIANT_CHANGE",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACTIVATION_TOGGLE",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_PIN_CODE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_SEAT_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACCESS_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_DEMOLISH_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_VARIANT_CHANGE",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_ACTIVATION_TOGGLE",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_PIN_CODE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_STRUCTURE_SEAT_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_STRUCTURE",
+    "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+    "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+    "OBELISK_GAMEPLAY_POLICY_FIELD_REQUESTED_BY_PLAYER",
+}
+V010_LEGACY_REGISTER_FIELD_EXCEPTIONS = {
+    "RegisterPreProcessEvent",
+    "RegisterPostProcessEvent",
+    "RegisterPreProcessEventForNameIndex",
+    "RegisterPostProcessEventForNameIndex",
+    "RegisterPreProcessEventWithOwnerToken",
+    "RegisterPostProcessEventWithOwnerToken",
+    "RegisterPreProcessEventForNameIndexWithOwnerToken",
+    "RegisterPostProcessEventForNameIndexWithOwnerToken",
+}
 UNPROMOTED_IDENTITY_SURFACE_TOKENS = (
     "ObeliskResourceHandle",
     "ResourceHandle",
@@ -866,6 +923,12 @@ PUBLIC_SDK_OPTIONAL_API_SURFACES = [
     {
         "name": "ProcessEvent owner-token handles",
         "trigger": "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
+        "public_register_slots": [
+            "RegisterPreProcessEventWithOwnerTokenHandle",
+            "RegisterPostProcessEventWithOwnerTokenHandle",
+            "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
+            "RegisterPostProcessEventForNameIndexWithOwnerTokenHandle",
+        ],
         "capabilities": [
             "OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS",
             "OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES",
@@ -876,6 +939,7 @@ PUBLIC_SDK_OPTIONAL_API_SURFACES = [
             "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle",
             "UnregisterProcessEventCallbackWithOwnerToken",
         ],
+        "owner_cleanup_token": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
     },
     {
         "name": "GameplayPolicyEvent callbacks",
@@ -886,6 +950,7 @@ PUBLIC_SDK_OPTIONAL_API_SURFACES = [
             "RegisterGameplayPolicyEventWithOwnerTokenHandle",
             "UnregisterGameplayPolicyEventWithOwnerToken",
         ],
+        "owner_cleanup_token": "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
     },
     {
         "name": "resource kind descriptors",
@@ -910,6 +975,7 @@ PUBLIC_SDK_OPTIONAL_API_SURFACES = [
             "RegisterChatMessageEventWithOwnerTokenHandle",
             "UnregisterChatMessageEventWithOwnerToken",
         ],
+        "owner_cleanup_token": "UnregisterChatMessageRegistrationsForOwner(owner)",
     },
     {
         "name": "timers",
@@ -921,6 +987,7 @@ PUBLIC_SDK_OPTIONAL_API_SURFACES = [
             "UnregisterTimerWithOwnerToken",
         ],
         "terminal_slot_alias": "OBELISK_CONCAT(Unregister, TimerWithOwnerToken)",
+        "owner_cleanup_token": "TimerManager::Get().UnregisterCallbacksForOwner(owner)",
     },
 ]
 
@@ -975,6 +1042,26 @@ def public_api_capability_defines(header: str) -> list[str]:
         header,
         re.MULTILINE,
     )
+
+
+def public_obelisk_macro_defines(header: str) -> list[str]:
+    return re.findall(
+        r"^\s*#define\s+(OBELISK_[A-Z0-9_]+)\b",
+        strip_c_comments(header),
+        re.MULTILINE,
+    )
+
+
+def module_family_hits(symbol: str) -> set[str]:
+    parts = set(symbol.upper().split("_"))
+    hits: set[str] = set()
+    for family in UNPROMOTED_PUBLIC_MODULE_FAMILIES:
+        variants = {family, f"{family}S"}
+        if family.endswith("Y"):
+            variants.add(f"{family[:-1]}IES")
+        if parts.intersection(variants):
+            hits.add(family)
+    return hits
 
 
 def public_abi_version_macros(header: str) -> list[tuple[str, str]]:
@@ -3068,6 +3155,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.reflection-inventory-pack.v1",
                 "ServerListPlayers",
                 "ServerKickPlayer",
+                "approved runtime principal lifecycle evidence",
+                "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                "principal privacy, invalidation, and cross-instance semantics",
+                "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
             ],
         )
 
@@ -3100,6 +3191,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.reflection-inventory-pack.v1",
                 "ServerListPlayers",
                 "ServerKickPlayer",
+                "approved runtime principal lifecycle evidence",
+                "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                "principal privacy, invalidation, and cross-instance semantics",
+                "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
             ],
         )
 
@@ -3125,6 +3220,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "obelisk.reflection-inventory-pack.v1",
                 "ServerListPlayers",
                 "ServerKickPlayer",
+                "approved runtime principal lifecycle evidence",
+                "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                "principal privacy, invalidation, and cross-instance semantics",
+                "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
             ],
         )
 
@@ -3139,6 +3238,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                         "ShooterPlayerController.ServerListPlayers",
                         "ShooterPlayerController.ServerKickPlayer",
                     ],
+                    "runtime_evidence": "approved runtime principal lifecycle evidence",
+                    "lifecycle_ordering": "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                    "privacy_scope": "principal privacy, invalidation, and cross-instance semantics",
+                    "abi_contract": "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
                 },
             }
         )
@@ -4521,6 +4624,36 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertEqual(V010_PLUGIN_INIT_CONTEXT_FIELDS[-1], "plugin_owner_token")
 
+    def test_public_header_has_no_unpromoted_module_macros_or_capabilities(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        symbols = set(public_obelisk_macro_defines(header))
+        for enum_members in public_enum_definitions(header).values():
+            symbols.update(enum_members)
+
+        offenders = []
+        for symbol in sorted(symbols):
+            families = module_family_hits(symbol)
+            if not families or symbol in V010_PUBLIC_MODULE_SYMBOL_EXCEPTIONS:
+                continue
+            offenders.append(f"{symbol}: {', '.join(sorted(families))}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "Public module-family macros/enums need a deliberate allowlist update after promotion.",
+        )
+
+        capability_offenders = [
+            capability
+            for capability in public_api_capability_defines(header)
+            if module_family_hits(capability)
+        ]
+        self.assertEqual(
+            capability_offenders,
+            [],
+            "New public module capabilities require promotion evidence before entering ObeliskApi.h.",
+        )
+
     def test_gameplay_policy_event_payload_stays_minimal_copied_pod(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
 
@@ -5737,6 +5870,51 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                             f"api->{slot}" in text or f"api->{slot_alias}" in text,
                             f"{relative} must null-check/use {slot} for {surface['name']}",
                         )
+
+    def test_public_register_api_slots_require_owner_token_handle_unregister_and_cleanup(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        plugin_manager = (REPO_ROOT / "core" / "PluginManager.cpp").read_text(encoding="utf-8")
+        public_fields = obelisk_api_field_names(header)
+        public_register_fields = [field for field in public_fields if field.startswith("Register")]
+        public_unregister_fields = [field for field in public_fields if field.startswith("Unregister")]
+
+        managed_register_slots: dict[str, dict[str, object]] = {}
+        for surface in PUBLIC_SDK_OPTIONAL_API_SURFACES:
+            trigger = str(surface["trigger"])
+            if not trigger.startswith("Register"):
+                continue
+            for slot in surface.get("public_register_slots", [trigger]):
+                managed_register_slots[str(slot)] = surface
+
+        unmanaged_register_fields = sorted(
+            set(public_register_fields)
+            - V010_LEGACY_REGISTER_FIELD_EXCEPTIONS
+            - set(managed_register_slots)
+        )
+        self.assertEqual(
+            unmanaged_register_fields,
+            [],
+            "New public Register* slots must be owner-token handle registrations with "
+            "an owner-scoped unregister and owner-cleanup guardrail entry.",
+        )
+
+        for slot, surface in sorted(managed_register_slots.items()):
+            with self.subTest(slot=slot, check="register-slot"):
+                self.assertIn(slot, public_fields)
+                self.assertIn("WithOwnerTokenHandle", slot)
+
+            unregister_slot = str(surface["terminal_slot"])
+            with self.subTest(slot=slot, check="unregister-slot"):
+                self.assertIn(unregister_slot, public_fields)
+                self.assertIn("WithOwnerToken", unregister_slot)
+
+            cleanup_token = str(surface["owner_cleanup_token"])
+            with self.subTest(slot=slot, check="owner-cleanup"):
+                self.assertIn(cleanup_token, plugin_manager)
+
+        for field in public_unregister_fields:
+            with self.subTest(field=field, check="owner-scoped-unregister"):
+                self.assertIn("WithOwnerToken", field)
 
     def test_public_sdk_consumers_keep_owner_token_registrations_owner_scoped(self) -> None:
         owner_token_surfaces = [

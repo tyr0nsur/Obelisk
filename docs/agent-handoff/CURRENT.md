@@ -71,6 +71,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `obelisk.command_chat_response_path.v1` is post-v1 planning only and adds no ABI today.
   Replies/send-chat/broadcast/moderation stay blocked; static thunks, passive chat,
   vtable slots, raw callbacks, and legacy `CallProcessEvent` are insufficient.
+  `scripts/check_command_chat_response_public_readiness.py` consumes the durable
+  `command-chat-response-route-planning` second-source readiness report plus
+  `docs/command_chat_response_public_contract_decisions.json` and accepts only
+  planning-layout evidence: `public_readiness_ready`, `public_header_allowed`,
+  `promotion_ready`, `public_sdk_ready`, `public_abi_ready`, and `runtime_ready` must all
+  remain false.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
@@ -187,6 +193,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `native_bool=false`; consume mode accepts it and promote mode blocks it as candidate-only.
   Detail:
   `docs/research/2026-05-31-v02-module-priority.md`.
+- Buff copied-scalar work is viable but not ready for a green readiness checker over both
+  target sets. Current `buff-breadth-intake` second-source is accepted `3/3`, while a
+  fresh `buff-compact-intake` comparison is `1/3` because two compact candidate snapshots
+  lack current `BoolProperty` tail metadata. Do not mark Buff scalar readiness ready until
+  compact evidence is regenerated or independently repaired.
 - Product-planning lane: Structure aggregate/census is planning/consume-only with no
   runtime observer, public StructureEvents SDK, enforcement, return override, or v1 claim.
   Exact build-policy target names stay out of public docs/ABI/descriptors until promoted.
