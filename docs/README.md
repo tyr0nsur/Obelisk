@@ -16,22 +16,24 @@ on contributors, plugin authors, operators, and reproducible research.
 
 ## Plugin Author
 
-Start with the capability matrix when deciding what a plugin can honestly build today.
-The current installed-SDK foundation examples, not active Plugin Hub work, are
-lifecycle/config/logging, descriptor/catalog consumers, and process-local timers. Copied
-chat parsers and `GameplayPolicyEvent` auditors are experimental pattern examples only,
-not production command/chat/policy SDKs. Anything that needs identity, lookup, mutation,
+Start with the plugin architecture, installed examples, SDK v1 compatibility map, and
+public SDK surface inventory when deciding what a plugin can honestly build today. Plugin
+Hub documents are parked planning references until the complete SDK blocker chain is
+resolved. The current installed-SDK foundation examples, not active Plugin Hub work, are
+lifecycle/config/logging, descriptor/catalog consumers, and process-local timers. Copied chat parsers and
+`GameplayPolicyEvent` auditors are experimental pattern examples only, not production
+command/chat/policy SDKs. Anything that needs identity, lookup, mutation,
 replies/send-chat, permissions, storage, RCON, inventory/item APIs, or structure
 enforcement stays blocked until promoted.
 
 - `PLUGIN_ARCHITECTURE.md`: plugin lifecycle, ABI rules, examples, and promotion gates.
-- `PLUGIN_HUB_FOUNDATION_V1.md`: parked Plugin Hub planning boundary and anti-promises.
-- `PLUGIN_HUB_CAPABILITY_MATRIX.md`: parked Plugin Hub planning boundary and safe plugin intents.
 - `public_sdk_surfaces.json`: machine-readable SDK surface inventory and v1 release boundaries.
 - `oBaseEvents.md`: first-party reference plugin notes.
 - `../examples/README.md`: installed-SDK consumer examples, including
   `sdk_minimal_plugin`, `sdk_descriptor_catalog`, and `sdk_timer_plugin`.
 - `../include/obelisk/ObeliskApi.h`: public C ABI header.
+- `PLUGIN_HUB_FOUNDATION_V1.md` and `PLUGIN_HUB_CAPABILITY_MATRIX.md`: archived planning
+  references only; do not use them as the active SDK build queue.
 
 ## Operator
 

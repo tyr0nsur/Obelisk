@@ -293,13 +293,14 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
         by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
         response_path = by_id["obelisk.command_chat_response_path.v1"]
-        self.assertEqual(response_path["status"], "post-v1")
+        self.assertEqual(response_path["status"], "planning")
         self.assertEqual(response_path["public_contract"], [])
         self.assertEqual(
             response_path["depends_on"],
             ["obelisk.player_identity.v1", "obelisk.permissions_admin.v1"],
         )
         self.assertIn("obelisk.command_chat_response_path.v1", surfaces["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.command_chat_response_path.v1", surfaces["v1_required_dependency_chain"])
         self.assertEqual(
             response_path["v1_decision_contract"]["decision_manifest"],
             "docs/command_chat_response_public_contract_decisions.json",

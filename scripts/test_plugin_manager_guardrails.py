@@ -692,6 +692,23 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                     self.assertIn("throw", catch_body)
                     self.assertNotRegex(catch_body, r"\breturn\s+0\s*;")
 
+    def test_deferred_event_dispatcher_owner_cleanup_uses_batch_id(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "TakeDeferredDestroyFailure" not in text:
+                continue
+            body = extract_function_body(
+                text,
+                r"size_t \w+EventDispatcher::UnregisterCallbacksForOwner\(void\* owner\)",
+            )
+            with self.subTest(source=source.name):
+                self.assertIn("std::exception_ptr deferredFailure", body)
+                self.assertIn("uint64_t cleanupBatchId = 0", body)
+                self.assertIn("cleanupBatchId = m_NextCleanupBatchId++", body)
+                self.assertIn("QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId)", body)
+                self.assertIn("deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)", body)
+                self.assertIn("std::rethrow_exception(deferredFailure)", body)
+
     def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         for function_name in ("InvokeGameplayPolicyEventCallback", "InvokeChatMessageEventCallback"):

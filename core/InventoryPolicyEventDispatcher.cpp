@@ -216,6 +216,7 @@ namespace Obelisk::Core
             return false;
 
         std::vector<InventoryPolicyEventSubscription> removed;
+        std::exception_ptr deferredFailure;
         size_t before = 0;
         size_t after = 0;
         try
@@ -253,8 +254,18 @@ namespace Obelisk::Core
             after = m_Registrations.size();
             if (before > after)
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+            }
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
@@ -361,6 +372,7 @@ namespace Obelisk::Core
             return 0;
 
         std::vector<InventoryPolicyEventSubscription> removed;
+        std::exception_ptr deferredFailure;
         size_t before = 0;
         size_t after = 0;
         try
@@ -398,8 +410,18 @@ namespace Obelisk::Core
             after = m_Registrations.size();
             if (before > after)
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+            }
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())

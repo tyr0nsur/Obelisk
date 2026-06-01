@@ -69,9 +69,11 @@ priorities, and do not use history files as the active source of truth.
   stable SDK claim.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   After player identity/principal, the permissions/admin candidate is query-only
-  fail-closed checks; commands/replies still require identity, permissions/admin, and
-  the named post-v1
-  `obelisk.command_chat_response_path.v1` planning dependency. That response path adds no
+  fail-closed checks; commands/replies still require identity, permissions/admin, and the
+  named `obelisk.command_chat_response_path.v1` planning dependency. The P0 chain is
+  tracked as `v1_required_dependency_chain` and those four surfaces are promoted-only for
+  a complete SDK claim; excluded/post-v1 records are scoped non-complete accounting only.
+  That response path adds no
   ABI today and keeps public `CallProcessEvent`, raw UE pointer/params/FString response
   APIs, replies, send-chat, broadcast/notices, and moderation blocked until promoted or
   explicitly excluded. `docs/command_chat_response_public_contract_decisions.json` is the

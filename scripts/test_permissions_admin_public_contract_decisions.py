@@ -365,9 +365,10 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
         by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
         permissions = by_id["obelisk.permissions_admin.v1"]
-        self.assertEqual(permissions["status"], "post-v1")
+        self.assertEqual(permissions["status"], "planning")
         self.assertEqual(permissions["public_contract"], [])
         self.assertEqual(permissions["depends_on"], ["obelisk.player_identity.v1"])
+        self.assertIn("obelisk.permissions_admin.v1", surfaces["v1_required_dependency_chain"])
         self.assertEqual(
             permissions["v1_decision_contract"]["decision_manifest"],
             "docs/permissions_admin_public_contract_decisions.json",

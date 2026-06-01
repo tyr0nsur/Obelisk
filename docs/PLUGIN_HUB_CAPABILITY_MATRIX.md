@@ -128,9 +128,9 @@ parsing needs could be demonstrated by a core primitive.
 ## NextGenPlugins Demand Snapshot
 
 The local dictionary currently points to these high-demand Plugin Hub categories.
-ArkApi/AseApi names corroborate the same broad families for demand and migration
-ergonomics analysis only. The status below describes only what Obelisk can expose safely
-today or after promotion gates; it does not promise ArkApi plugin compatibility.
+ArkApi/AseApi and `NextGenPlugins` names corroborate broad demand families only. The
+status below describes only what Obelisk can expose safely today or after promotion
+gates; it does not promise ArkApi plugin compatibility.
 
 | Priority | Category | Post-RC support tier | Safe interpretation |
 | --- | --- | --- | --- |

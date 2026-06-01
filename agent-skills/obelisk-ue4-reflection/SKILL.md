@@ -11,12 +11,13 @@ metadata.
 
 ## Current Reality
 
-- ArkServerApi/AseApi may be used only as names and demand signals for familiar Unreal/ARK
-  `Class.Function` and `Class.Property` concepts. Do not use it as architecture,
-  ergonomics, behavior, or implementation guidance, and do not copy memory offsets, vtable
+- ArkServerApi/AseApi and local `NextGenPlugins` clones may be used only as names and
+  demand signals for familiar Unreal/ARK `Class.Function` and `Class.Property` concepts.
+  Do not use them as architecture, ergonomics, behavior, porting, or implementation
+  guidance, and do not copy memory offsets, vtable
   definitions, struct layouts, MSVC calling conventions, Windows-only ABI choices, direct
   native call wrappers, constants, schemas, control flow, command parsers, return
-  constants, return semantics, or algorithmic implementations from it. Reimplement any
+  constants, return semantics, or algorithmic implementations from them. Reimplement any
   property/function access through
   Obelisk's Linux-native `ReflectionScanner`, `RuntimeReflection`, and `ProcessEventHook`
   paths with binary-hash-scoped evidence.

@@ -289,6 +289,21 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
             self.assertIn("exact", text)
             self.assertNotIn(obsolete_plan, text)
 
+    def test_compact_context_preserves_p0_promoted_only_sdk_chain(self) -> None:
+        current = normalized(CURRENT.read_text(encoding="utf-8"))
+        compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))
+
+        for label, text in (("CURRENT.md", current), ("COMPACT_CONTEXT.md", compact)):
+            with self.subTest(file=label):
+                self.assertIn("v1_required_dependency_chain", text)
+                self.assertIn("promoted-only", text)
+                self.assertIn("complete SDK claim", text)
+                self.assertIn("scoped non-complete", text)
+                self.assertIn("obelisk.command_chat_response_path.v1", text)
+
+        self.assertNotIn("named post-v1 `obelisk.command_chat_response_path.v1`", compact)
+        self.assertNotIn("post-v1 `obelisk.command_chat_response_path.v1` planning dependency", compact)
+
     def test_learning_skill_keeps_adopted_knowledge_compact(self) -> None:
         skill = (REPO_ROOT / "agent-skills/obelisk-continuous-learning/SKILL.md").read_text(
             encoding="utf-8"

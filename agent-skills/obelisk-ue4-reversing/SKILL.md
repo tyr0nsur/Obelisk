@@ -55,10 +55,10 @@ from the ELF executable segment plus runtime maps over guesses from one crash lo
 
 Known research targets:
 
-- ArkServerApi/AseApi can accelerate target discovery by naming ARK functions,
-  properties, command/timer concepts, and operator demand categories. Treat it as
-  names/demand evidence only; reject architecture, ergonomics, behavior guidance, copied
-  code, offsets, vtables, layouts, constants,
+- ArkServerApi/AseApi and local `NextGenPlugins` clones can accelerate target discovery by
+  naming ARK functions, properties, command/timer concepts, and operator demand
+  categories. Treat them as names/demand evidence only; reject architecture, ergonomics,
+  behavior guidance, porting guidance, copied code, offsets, vtables, layouts, constants,
   schemas, control flow, command parsers, return semantics, implementations,
   Windows/MSVC ABI assumptions, and direct memory access patterns. Linux support must be
   rebuilt through Obelisk `ReflectionScanner` evidence and the native

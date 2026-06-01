@@ -252,7 +252,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
         by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
         commands = by_id["obelisk.commands_replies.v1"]
-        self.assertEqual(commands["status"], "post-v1")
+        self.assertEqual(commands["status"], "planning")
         self.assertEqual(commands["public_contract"], [])
         self.assertEqual(
             commands["depends_on"],
@@ -263,6 +263,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
             ],
         )
         self.assertIn("obelisk.commands_replies.v1", surfaces["v1_sdk_completion_blockers"])
+        self.assertIn("obelisk.commands_replies.v1", surfaces["v1_required_dependency_chain"])
         self.assertTrue(commands["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"])
         self.assertEqual(
             commands["v1_decision_contract"]["decision_manifest"],
@@ -291,6 +292,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
                 "raw ProcessEvent callbacks",
                 "legacy CallProcessEvent debug access",
                 "command copied response intent planning vocabulary",
+                "command copied response intent lifecycle planning vocabulary",
             ],
         )
         self.assertIn(

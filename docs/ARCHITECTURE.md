@@ -137,8 +137,8 @@ Preferred copied-SDK direction:
 5. Treat chat, players, inventory, tribes, dinos, gameplay/module timer abstractions, and
    other gameplay areas as module-after-gates work, not as the core architecture.
 
-Compatibility references such as ArkServerApi/AseApi are names and demand signals only.
-They are not architecture or ergonomics sources, behavior maps, porting
+Compatibility references such as ArkServerApi/AseApi and local `NextGenPlugins` clones are
+names and demand signals only. They are not architecture or ergonomics sources, behavior maps, porting
 targets, copying sources, or implementation guides for offsets, layouts, ABI assumptions,
 wrappers, raw UE pointer APIs, command parsers, return semantics, or implementations.
 
