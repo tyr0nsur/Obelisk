@@ -66,9 +66,9 @@ validation adapters, not the product API.
   adding or promoting plugins.
 - Treat Plugin Hub as post-SDK-complete planning. Do not start new Plugin Hub examples,
   packaging, or intake tooling while complete-SDK blockers remain open. ArkServerApi,
-  AseApi, and NextGenPlugins are names, demand, conceptual architecture, and migration
-  ergonomics references only, not sources for code, offsets, control flow, parsers,
-  schemas, or implementation behavior.
+  AseApi, and NextGenPlugins are names and demand signals only, not architecture or
+  ergonomics sources, behavior maps, porting targets, copying sources, and not sources
+  for code, offsets, control flow, parsers, schemas, or implementation behavior.
 
 ## Build And Release Checks
 
@@ -190,11 +190,11 @@ Harden reflected event parameter decoding
 5. Harden safe plugin examples only after the relevant promotion gates are met.
 6. Reduce operational and documentation debt that can mislead new contributors.
 
-ArkServerApi/AseApi may be consulted only as names, demand, conceptual architecture, and
-migration-ergonomics references for familiar ARK plugin concepts. It is not a behavior
-map, not a porting target, not a copying source, or implementation guide for offsets,
-layouts, ABI assumptions, wrappers, raw UE pointer APIs, command parsers, return
-semantics, or implementations.
+ArkServerApi/AseApi may be consulted only as names and demand signals for familiar ARK
+plugin concepts. It is not an architecture source, ergonomics source, behavior map,
+porting target, copying source, or implementation guide for offsets, layouts, ABI
+assumptions, wrappers, raw UE pointer APIs, command parsers, return semantics, or
+implementations.
 
 Use [docs/STATUS.md](docs/STATUS.md) before changing runtime behavior. It
 defines which pieces are stable baseline, experimental, or not ready.

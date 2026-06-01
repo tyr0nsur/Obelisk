@@ -155,8 +155,8 @@ Read the current v1 route through three gates:
   fixture/internal work only for the named slice. It does not promote adjacent identity,
   lookup, mutation, return override, runtime observer, or SDK surfaces.
 - SDK boundary: public v1 APIs stay copied, redacted, C/POD, owner-token scoped, and
-  capability-discovered. ArkApi/AseApi material remains a names/demand/architecture
-  reference only.
+  capability-discovered. ArkApi/AseApi material remains a names/demand reference only,
+  not an architecture, ergonomics, behavior, or implementation reference.
 
 Historical notes and fixture paths may use labels such as `sdk_buffs`, `sdk_dinos`,
 `sdk.tribes`, or `sdk.transfers`. In this research tree those labels are snapshot or
@@ -275,7 +275,7 @@ when a task explicitly targets that module.
 | [2026-05-29-public-gameplay-event-readiness-audit.md](2026-05-29-public-gameplay-event-readiness-audit.md) | Public gameplay event readiness audit | Promotes `GameplayPolicyEvent` as copied/redacted POD backed by accepted target-set evidence, while keeping public Inventory/Structure SDKs, identity, mutation, and return override blocked. |
 | [2026-05-29-chat-message-second-source-readiness.md](2026-05-29-chat-message-second-source-readiness.md) | Chat message second-source readiness | Records accepted layout evidence plus copied plugin-facing delivery validation for all four known chat send modes, while keeping identity, commands, mutation, and UE internals blocked. |
 | [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md) | v1 core capability map | Defines the post-RC route toward a general Linux ARK modding core and separates v1 infrastructure from later ArkApi-style module/plugin work. |
-| [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md) | AseApi reference scan | Allows ArkServerApi/AseApi as a names/demand/architecture reference while banning copied offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns. |
+| [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md) | AseApi reference scan | Allows ArkServerApi/AseApi as names/demand evidence only while banning copied architecture, ergonomics, behavior, offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns. |
 | [2026-05-30-nextgenplugins-reference-inventory.md](2026-05-30-nextgenplugins-reference-inventory.md) | NextGenPlugins reference inventory | Records the local ArkApi plugin-source clone as a future Plugin Hub demand signal only, not as runtime evidence or portable implementation source. |
 | [2026-05-30-post-rc-targetset-priorities.md](2026-05-30-post-rc-targetset-priorities.md) | Post-RC target-set priorities | Ranks Mission, Dino, Buff, Structure build-policy, Tribe, and Transfer follow-up work for offline/internal research without promoting new SDK surfaces. |
 | [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md) | Chat command helper roadmap | Defines a plugin-local, non-ABI helper pattern over `ChatMessageEvent` with `principal=unknown`, global config-only enablement, and no player permissions or chat response path. |

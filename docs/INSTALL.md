@@ -102,8 +102,8 @@ scope, ArkApi compatibility, public SDK promotion, or release readiness. If arch
 Plugin Hub planning is explicitly requested, read the parked Plugin Hub docs as boundaries
 only: `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
 `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; keep support-tier classification separate from
-installation, keep ArkServerApi/AseApi/NextGen inputs as conceptual architecture, naming,
-demand, and migration-ergonomics references, and run the
+installation, keep ArkServerApi/AseApi/NextGen inputs as names and demand signals only,
+and run the
 plugin installer with `--dry-run` before copying into a shared `plugins/` root.
 
 Useful installer flags:

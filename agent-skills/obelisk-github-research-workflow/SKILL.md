@@ -30,12 +30,9 @@ while those blockers remain planning or post-v1. Explicitly excluded blockers re
 reviewed v1 release statement with scoped wording; exclusions do not permit claiming a
 complete SDK for the excluded capability.
 
-Compatibility research may consult ArkServerApi/AseApi as names, demand, conceptual
-architecture, and migration-ergonomics references for familiar ARK plugin concepts. Local
-NextGenPlugins clones are names, demand, conceptual architecture, and migration-ergonomics
-signals only, not porting or copying sources. They may inform capability grouping,
-owner/operator workflows, plugin families, package expectations, and the shape modders
-expect when moving to Linux. Obelisk must not copy ArkServerApi/AseApi,
+Compatibility research may consult ArkServerApi/AseApi and local NextGenPlugins clones
+only as names and demand signals for familiar ARK plugin concepts. They are not architecture,
+ergonomics, behavior, porting, or implementation sources. Obelisk must not copy ArkServerApi/AseApi,
 NextGenPlugins, or other ArkApi plugin offsets, vtables, layouts, `.lib` artifacts,
 MSVC/Windows ABI assumptions, direct
 `GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, constants, schemas,

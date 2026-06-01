@@ -38,10 +38,9 @@ priorities, and do not use history files as the active source of truth.
   or agent status. Explicit current-turn approval is required for every Discord send;
   publication approval does not imply Discord approval. Always dry-run the embed first and
   verify a public-safe title, description, status/scope, and 2-5 useful fields.
-- `ArkServerApi/AseApi` and local `NextGenPlugins` clones may be used as conceptual
-  architecture, naming, demand, and migration-ergonomics references for familiar ArkApi-
-  style plugin concepts. Use them to understand capability grouping and operator/plugin
-  expectations, but do not import offsets, vtables, layouts, `.lib` artifacts,
+- `ArkServerApi/AseApi` and local `NextGenPlugins` clones may be used only as names and
+  demand signals for familiar ArkApi-style plugin concepts. Do not treat them as
+  architecture or ergonomics sources, and do not import offsets, vtables, layouts, `.lib` artifacts,
   MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall` wrappers, raw
   UE pointer APIs, constants, schemas, control flow, command parsers, return semantics, or
   source-derived implementations; all access must be rebuilt through Obelisk

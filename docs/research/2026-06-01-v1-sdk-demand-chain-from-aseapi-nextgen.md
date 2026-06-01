@@ -84,8 +84,8 @@ Primary inputs:
 
 ## No-Claims
 
-ArkApi, AseApi, and local NextGenPlugins material may inform names, demand grouping,
-conceptual architecture, and migration ergonomics only. Do not copy or port:
+ArkApi, AseApi, and local NextGenPlugins material may inform names and demand grouping
+only. Do not use it as architecture or ergonomics guidance, and do not copy or port:
 
 - source code, control flow, command parsers, schemas, constants, return semantics, or
   plugin behavior;

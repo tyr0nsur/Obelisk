@@ -23,8 +23,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug controls, and observers unless the matching approved env+marker pair is enabled for a scoped debug window.
 - PluginManager unload cleanup skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown when plugin-owned callback cleanup fails.
 - `CallProcessEvent` remains an init-window debug escape hatch only: the current plugin owner is inside `ObeliskPlugin_Init`, has `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and Post-init calls through captured API tables are unsupported until a future replacement must carry an owner token.
-- ArkServerApi/AseApi and local `NextGenPlugins` clones are names, demand, conceptual
-  architecture, and migration-ergonomics references only, not a behavior map, not a porting target, and not a copying source. Do not copy code, offsets, layouts, vtables, ABI assumptions, wrappers, raw UE pointer APIs, constants, schemas, control flow, command parsers, return constants, return semantics, or implementations.
+- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only,
+  not architecture, ergonomics, behavior maps, porting targets, or copying sources. Do not
+  copy code, offsets, layouts, vtables, ABI assumptions, wrappers, raw UE pointer APIs,
+  constants, schemas, control flow, command parsers, return constants, return semantics,
+  or implementations.
 
 ## Current Routing Facts
 

@@ -915,8 +915,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "do not gain new support tier, public SDK scope, or `v1.0` completion weight",
             status,
         )
-        self.assertIn("names, demand, conceptual architecture, and migration-ergonomics references only", pr_template)
-        self.assertIn("no source/API/ABI/behavior copying", pr_template)
+        self.assertIn("names and demand signals only", pr_template)
+        self.assertIn("not architecture, ergonomics, behavior maps, porting targets", pr_template)
+        self.assertIn("source/API/ABI/behavior copying", pr_template)
 
     def test_release_gate_rejects_incomplete_ufunction_metadata_before_build(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1122,12 +1123,11 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         }
         required = [
             "ArkServerApi/AseApi",
-            "names",
-            "demand",
-            "conceptual architecture",
-            "migration",
-            "not a behavior map",
-            "not a porting",
+            "names and demand signals only",
+            "not architecture",
+            "ergonomics",
+            "behavior maps",
+            "porting targets",
             "copying source",
             "offsets",
             "layouts",

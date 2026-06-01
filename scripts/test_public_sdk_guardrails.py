@@ -4099,34 +4099,34 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for text, required in (
             (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "does not promise ArkApi/AseApi\ncompatibility"),
-            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "conceptual architecture, and migration-ergonomics references"),
-            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "surface must be rebuilt through Obelisk reflection"),
-            (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "not as portable behavior, source, ABI, constants, schemas, command parsers, or\nimplementation patterns"),
+            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "names and demand signals\nonly"),
+            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "not architecture, ergonomics, behavior, porting,\nimplementation, or copying sources"),
+            (texts["docs/PLUGIN_HUB_FOUNDATION_V1.md"], "surface must be rebuilt through Obelisk\nreflection"),
+            (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "not as architecture, ergonomics, portable behavior, source, ABI"),
             (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "Rebuild every promoted surface through Obelisk\nreflection"),
             (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "provenance for\n"
              "demand analysis only"),
             (texts["docs/PLUGIN_HUB_CAPABILITY_MATRIX.md"], "not license clearance, runtime evidence, an ArkApi\n"
              "compatibility target, or an ABI reference"),
-            (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "ArkServerApi/AseApi is a names, demand, conceptual architecture"),
+            (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "ArkServerApi/AseApi is a names and demand reference only"),
             (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "this is not ArkApi source, ABI, behavior, or\n  plugin compatibility"),
             (texts["docs/research/2026-05-30-v1-core-capability-map.md"], "Obelisk-native Linux plugins for common ArkApi-style modding\nneeds"),
-            (texts["docs/research/README.md"], "ArkApi/AseApi material remains a names/demand/architecture\n  reference only"),
-            (texts["plugins/README.md"], "names, demand, conceptual architecture, and\nmigration-ergonomics signals only"),
-            (texts["plugins/README.md"], "not a compatibility target, source reference, ABI\n"
-             "reference, schema, command parser, or "
-             "implementation pattern"),
-            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "Use this clone as a names/demand/architecture reference"),
-            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "not as source code to port"),
+            (texts["docs/research/README.md"], "ArkApi/AseApi material remains a names/demand reference only"),
+            (texts["plugins/README.md"], "names and demand signals only"),
+            (texts["plugins/README.md"], "not an\narchitecture source, ergonomics source, compatibility target"),
+            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "Use this clone as names/demand evidence only"),
+            (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "not as architecture guidance or source code\n"
+             "to port"),
             (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "Do not trust `DECLARE_HOOK` declarations as Linux ABI"),
             (texts["docs/research/2026-05-30-nextgenplugins-reference-inventory.md"], "not runtime evidence and do not authorize copied implementation"),
             (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "only as a names and demand dictionary"),
-            (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "not a behavior map,\ncompatibility target, implementation guide, or evidence source"),
+            (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "not a\nbehavior map, compatibility target, architecture guide, ergonomics guide, implementation"),
             (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "Candidate name discovery only"),
             (texts["docs/research/2026-05-30-aseapi-reference-scan.md"], "Behavior parity, control flow, command parsers, schemas, constants, return semantics"),
-            (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "Local\nNextGenPlugins clones are names, demand, conceptual architecture"),
+            (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "ArkServerApi/AseApi and local NextGenPlugins clones\nonly as names and demand signals"),
             (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "Obelisk must not copy ArkServerApi/AseApi,\nNextGenPlugins"),
-            (texts["docs/agent-handoff/CURRENT.md"], "ArkServerApi/AseApi and local `NextGenPlugins` clones are names, demand, conceptual\n  architecture"),
-            (texts["docs/agent-handoff/CURRENT.md"], "Do not copy code, offsets, layouts, vtables, ABI assumptions"),
+            (texts["docs/agent-handoff/CURRENT.md"], "ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only"),
+            (texts["docs/agent-handoff/CURRENT.md"], "Do not\n  copy code, offsets, layouts, vtables, ABI assumptions"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -8027,7 +8027,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Timed notices map to process-local timers only when no chat send, broadcast, command, permission, persistence, or cross-process scheduling behavior is implied",
             "it does not promise ArkApi plugin compatibility",
             "Neither tier means the corresponding ArkApi plugin family can be ported",
-            "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
+            "not as architecture, ergonomics, portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
             "v0.1 copied-data ABI surface; promoted-experimental copied-data seed, not v1-complete",
             "it does not turn copied chat/policy examples into production Plugin Hub modules",
             "Dependency-order note only, not an immediate next public slice",
@@ -8161,8 +8161,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             REPO_ROOT / "CONTRIBUTING.md": (
                 "Treat Plugin Hub as post-SDK-complete planning",
                 "Do not start new Plugin Hub examples",
-                "ArkServerApi,\n  AseApi, and NextGenPlugins are names, demand, conceptual architecture, and migration",
-                "not sources for code, offsets, control flow, parsers,\n  schemas, or implementation behavior",
+                "ArkServerApi,\n  AseApi, and NextGenPlugins are names and demand signals only",
+                "not architecture or\n  ergonomics sources",
+                "not sources for code, offsets, control flow, parsers, schemas,\n  or implementation behavior",
             ),
         }
 
@@ -8184,8 +8185,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             REPO_ROOT / "CONTRIBUTING.md": (
                 "Treat Plugin Hub as post-SDK-complete planning",
                 "Do not start new Plugin Hub examples",
-                "ArkServerApi,\n  AseApi, and NextGenPlugins are names, demand, conceptual architecture, and migration",
-                "not sources for code, offsets, control flow, parsers,\n  schemas, or implementation behavior",
+                "ArkServerApi,\n  AseApi, and NextGenPlugins are names and demand signals only",
+                "not architecture or\n  ergonomics sources",
+                "not sources for code, offsets, control flow, parsers, schemas,\n  or implementation behavior",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md": (
                 "Status: post-SDK-complete planning only",

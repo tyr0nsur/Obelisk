@@ -67,8 +67,8 @@ field is copied into public or logged output.
 
 ## Demand Dictionary
 
-ArkApi/AseApi/NextGenPlugins demand is useful only as names, module-demand, conceptual
-architecture, and migration-ergonomics signals. Do not copy code, offsets, layouts,
+ArkApi/AseApi/NextGenPlugins demand is useful only as names and module-demand signals. Do
+not use it as architecture or ergonomics guidance, and do not copy code, offsets, layouts,
 constants, command parsers, return semantics, MSVC/Windows ABI choices, or control flow.
 
 High-demand names seen in local plugin dictionaries, grouped only as planning inputs:

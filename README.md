@@ -8,15 +8,12 @@ assumptions.
 It aims to bring familiar ARK plugin concepts to Linux as an Obelisk-native SDK:
 runtime injection, UE event hooks, a stable plugin ABI, reflection-driven
 research tooling, and promoted gameplay APIs with explicit ownership, privacy,
-and lifecycle gates. ArkServerApi/AseApi and popular plugin families are product
-architecture references for migration ergonomics: naming, capability grouping,
-operator workflows, post-SDK Plugin Hub planning, and the shape server owners expect.
-They are not a behavior map, not a porting target, and not copying sources,
-runtime evidence, or implementation guides for offsets, layouts, ABI assumptions,
-wrappers, raw UE pointer APIs, command parsers, return semantics, or
-implementations. Local popular-plugin clones such as NextGenPlugins are held to
-the same demand-dictionary boundary and may also inform conceptual architecture
-and migration ergonomics.
+and lifecycle gates. ArkServerApi/AseApi and popular plugin families are names and demand
+signals only. They are not architecture or ergonomics sources, behavior maps, porting
+targets, copying sources, runtime evidence, or implementation guides for offsets, layouts,
+ABI assumptions, wrappers, raw UE pointer APIs, command parsers, return semantics, or
+implementations. Local popular-plugin clones such as NextGenPlugins are held to the same
+demand-dictionary boundary.
 
 ARK: Survival Evolved dedicated servers are the current product target and
 validation environment. ARK/LinuxGSM details are operational adapters around the

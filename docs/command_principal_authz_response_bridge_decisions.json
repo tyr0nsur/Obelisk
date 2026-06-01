@@ -108,6 +108,28 @@
     "legacy CallProcessEvent debug access is not a command, reply, response, permission, or principal bridge",
     "ArkServerApi, ArkApi, AseApi, and NextGenPlugins names may inform demand only and cannot provide offsets, layouts, vtables, code, control flow, or ABI semantics"
   ],
+  "bridge_ergonomics_flow": [
+    {
+      "step": "copied chat text",
+      "required_boundary": "copied ChatMessageEvent text is request input only and cannot establish principal identity, permission authority, dispatch authority, or response delivery"
+    },
+    {
+      "step": "plugin-local parse",
+      "required_boundary": "plugin-local parsing can shape private plugin intent only and cannot become a public command router, public parser, ArkApi/AseApi parser compatibility claim, or dispatch ordering claim"
+    },
+    {
+      "step": "copied command payload",
+      "required_boundary": "future copied command payload must carry nonzero plugin_owner_token plus principal_handle, principal_generation, principal_scope_flags, permission_policy_epoch, source_kind, and normalized command name before dispatch can be considered"
+    },
+    {
+      "step": "permission query",
+      "required_boundary": "permission query must fail closed on deny, unknown, missing provenance, stale principal generation, unsupported scope, malformed action, oversize command, or unsupported source_kind"
+    },
+    {
+      "step": "response request",
+      "required_boundary": "future response request remains copied intent only and cannot imply reply/send-chat/broadcast/moderation delivery until command_chat_response_path is separately promoted"
+    }
+  ],
   "forbidden_public_contract": [
     "public bridge ABI",
     "public header symbols",

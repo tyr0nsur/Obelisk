@@ -7,10 +7,11 @@ Date: 2026-05-30
 `/home/flowcommunity-ark/NextGenPlugins` is an operator-provided local clone of popular
 ArkApi/Windows plugin sources for future Obelisk Plugin Hub planning.
 
-Use this material only as a names, demand, conceptual architecture, and migration
-ergonomics reference. Do not copy Windows ArkApi code, offsets, MSVC ABI assumptions,
-vtables, memory layouts, direct UE pointer API patterns, constants, schemas, control flow,
-command parsers, or implementation details into Obelisk.
+Use this material only as names and demand evidence. Do not treat it as architecture,
+ergonomics, behavior, porting guidance, or source material, and do not copy Windows ArkApi
+code, offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API
+patterns, constants, schemas, control flow, command parsers, or implementation details
+into Obelisk.
 
 This note intentionally records demand categories and visible plugin-family names only.
 It is not a source-mining checklist: do not use the clone to import signatures, constants,
@@ -67,8 +68,7 @@ assumptions, or ArkApi compatibility claims.
 ## Value For Obelisk
 
 This repository is useful after the Obelisk core API is stable enough to model native
-Linux replacement work. It can help rank public SDK surfaces by real plugin demand and
-keep migration ergonomics familiar:
+Linux replacement work. It can help rank public SDK surfaces by real plugin demand:
 
 - permissions and admin capability model;
 - economy/shop/rewards primitives;
@@ -116,7 +116,8 @@ chat/server messages; permissions; and save/respawn/build/damage-style demand.
 build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
 or any return-code semantics today.
 
-Use this clone as a names/demand/architecture reference, not as source code to port.
+Use this clone as names/demand evidence only, not as architecture guidance or source code
+to port.
 Do not trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe
 public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 

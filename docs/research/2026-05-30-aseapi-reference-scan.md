@@ -14,11 +14,9 @@ Windows/MSVC assumptions into the Linux runtime.
 
 ## Result
 
-Useful, but only as a names and demand dictionary for evidence promotion. It is not a behavior map,
-compatibility target, implementation guide, or evidence source for public Obelisk SDK
-surfaces. It is also valuable as conceptual architecture and
-migration-ergonomics input: AseApi helps Obelisk understand the plugin families, service
-boundaries, and operator workflows modders/server owners already expect.
+Useful, but only as a names and demand dictionary for evidence promotion. It is not a
+behavior map, compatibility target, architecture guide, ergonomics guide, implementation
+guide, or evidence source for public Obelisk SDK surfaces.
 
 Use AseApi for:
 

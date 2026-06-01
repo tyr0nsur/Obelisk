@@ -17,11 +17,11 @@ not a replacement for promotion gates. If a row says "not ready", plugins must n
 around the gap with raw UE pointers, `ProcessEvent` mutation, object lookup, or copied
 ArkApi implementation patterns.
 
-ArkApi/AseApi names and the local `NextGenPlugins` clones are names, demand, conceptual
-architecture, and migration-ergonomics references for future Plugin Hub categories only.
-Treat those plugin families as evidence of operator needs and familiar modder workflows,
-not as portable behavior, source, ABI, constants, schemas, command parsers, or
-implementation patterns. They are also not sources for public contract
+ArkApi/AseApi names and the local `NextGenPlugins` clones are names and demand signals for
+future Plugin Hub categories only. Treat those plugin families as evidence of requested
+capability areas, not as architecture, ergonomics, portable behavior, source, ABI,
+constants, schemas, command parsers, or implementation patterns. They are also not sources
+for public contract
 structs/events/descriptors/API tables. Rebuild every promoted surface through Obelisk
 reflection, explicitly named second-source target sets, copied C ABI contracts, and
 runtime safety gates.

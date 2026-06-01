@@ -51,7 +51,10 @@ Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
 
 ## Before Starting
 
-1. If you are the lead, read `docs/agent-handoff/CURRENT.md`.
+1. If you are the lead after compaction, resume, or a new supervised round, read
+   `docs/agent-handoff/CURRENT.md` and `docs/agent-handoff/COMPACT_CONTEXT.md`.
+   For a narrow same-turn continuation, `CURRENT.md` is sufficient unless the task needs
+   stable resume context.
 2. Check `git status --short --ignored` unless the current instruction explicitly
    prohibits Git.
 3. Identify your owned files and avoid editing outside that scope.

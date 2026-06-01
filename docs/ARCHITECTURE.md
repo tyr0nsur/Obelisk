@@ -137,12 +137,10 @@ Preferred copied-SDK direction:
 5. Treat chat, players, inventory, tribes, dinos, gameplay/module timer abstractions, and
    other gameplay areas as module-after-gates work, not as the core architecture.
 
-Compatibility references such as ArkServerApi/AseApi are dictionaries for familiar names,
-demand, conceptual architecture, and migration ergonomics only. They may guide how
-Obelisk groups capabilities, explains Plugin Hub lanes, and meets server-owner workflow
-expectations. They are not a behavior map, not a porting target, not a copying source, or
-implementation guides for offsets, layouts, ABI assumptions, wrappers, raw UE pointer APIs,
-command parsers, return semantics, or implementations.
+Compatibility references such as ArkServerApi/AseApi are names and demand signals only.
+They are not architecture or ergonomics sources, behavior maps, porting
+targets, copying sources, or implementation guides for offsets, layouts, ABI assumptions,
+wrappers, raw UE pointer APIs, command parsers, return semantics, or implementations.
 
 ## Experimental Components
 

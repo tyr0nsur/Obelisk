@@ -12,9 +12,8 @@ This pass did not use a server, `/servidor/ark` direct input, ReflectionScanner,
 runtime observation, ptrace/gcore, Discord, push, tag, rebase, commit, SDK promotion,
 runtime hooks, descriptors, or target-set release work.
 
-ArkApi/AseApi remains a names, demand, conceptual architecture, and migration ergonomics
-reference only. No offsets, layouts, wrappers,
-ABI choices, or allow/deny semantics are imported from it.
+ArkApi/AseApi remains names and demand evidence only. No architecture, ergonomics, offsets,
+layouts, wrappers, ABI choices, or allow/deny semantics are imported from it.
 
 ## Finding
 

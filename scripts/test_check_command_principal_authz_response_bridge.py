@@ -157,6 +157,45 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         ):
             self.assertIn(condition, payload["required_fail_closed_conditions"])
 
+    def test_manifest_defines_planning_only_bridge_ergonomics_flow(self) -> None:
+        payload = self.load_json(DECISIONS)
+        self.assertEqual(
+            [
+                "copied chat text",
+                "plugin-local parse",
+                "copied command payload",
+                "permission query",
+                "response request",
+            ],
+            [step["step"] for step in payload["bridge_ergonomics_flow"]],
+        )
+        flow = {step["step"]: step["required_boundary"] for step in payload["bridge_ergonomics_flow"]}
+        self.assertIn("request input only", flow["copied chat text"])
+        self.assertIn("private plugin intent only", flow["plugin-local parse"])
+        self.assertIn("nonzero plugin_owner_token", flow["copied command payload"])
+        self.assertIn("permission_policy_epoch", flow["copied command payload"])
+        self.assertIn("fail closed", flow["permission query"])
+        self.assertIn("copied intent only", flow["response request"])
+        self.assertIn("command_chat_response_path is separately promoted", flow["response request"])
+
+    def test_rejects_missing_or_incomplete_bridge_ergonomics_flow(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        decisions["bridge_ergonomics_flow"] = [
+            step
+            for step in decisions["bridge_ergonomics_flow"]
+            if step["step"] != "permission query"
+        ]
+        decisions["bridge_ergonomics_flow"][1]["required_boundary"] = "plugin-local parsing is convenient"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("bridge_ergonomics_flow_order_mismatch", report["blockers"])
+        self.assertIn("bridge_ergonomics_flow_step_missing", report["blockers"])
+        self.assertIn("bridge_ergonomics_flow_boundary_incomplete", report["blockers"])
+
     def test_rejects_bridge_public_runtime_and_abi_overclaims(self) -> None:
         decisions = self.load_json(DECISIONS)
         decisions["public_header_allowed"] = True

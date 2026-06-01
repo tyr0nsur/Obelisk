@@ -53,12 +53,11 @@ inventory, commands, or any other unpromoted module family.
 - Public ABI remains C/POD, append-only, owner-token scoped, and capability-discovered.
 - Stable APIs expose copied Obelisk-owned data, not `UObject*`, `UFunction*`, `FString`,
   raw params, FName/GObjects indices, or memory-derived handles.
-- ArkServerApi/AseApi is a names, demand, conceptual architecture, and migration
-  ergonomics reference only. Use its public names, demand taxonomy, capability grouping,
-  and operator workflow expectations to seed candidate discovery, then rederive every
-  `UFunction`/`UProperty` through Obelisk reflection snapshots, second-source gates, and
-  Linux ProcessEvent copied data. Do not copy its offsets, vtables, layouts, MSVC
-  conventions, Windows libraries, or direct field/native-call wrappers.
+- ArkServerApi/AseApi is a names and demand reference only. Use public names and broad
+  demand taxonomy to seed candidate discovery, then rederive every `UFunction`/`UProperty`
+  through Obelisk reflection snapshots, second-source gates, and Linux ProcessEvent copied
+  data. Do not copy its architecture, ergonomics, behavior, offsets, vtables, layouts,
+  MSVC conventions, Windows libraries, or direct field/native-call wrappers.
 - Each module promotion needs accepted target-set evidence, second-source/static support,
   lifecycle cleanup, privacy rules, and tests that prove no mutation or return override is
   implied unless explicitly promoted.

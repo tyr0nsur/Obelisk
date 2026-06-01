@@ -109,6 +109,64 @@ REQUIRED_BEHAVIORS = frozenset(
         "ArkServerApi, ArkApi, AseApi, and NextGenPlugins names may inform demand only and cannot provide offsets, layouts, vtables, code, control flow, or ABI semantics",
     )
 )
+REQUIRED_BRIDGE_ERGONOMICS_STEPS = (
+    "copied chat text",
+    "plugin-local parse",
+    "copied command payload",
+    "permission query",
+    "response request",
+)
+REQUIRED_BRIDGE_ERGONOMICS_BOUNDARY_FRAGMENTS = {
+    "copied chat text": frozenset(
+        (
+            "request input only",
+            "cannot establish principal identity",
+            "permission authority",
+            "dispatch authority",
+            "response delivery",
+        )
+    ),
+    "plugin-local parse": frozenset(
+        (
+            "private plugin intent only",
+            "cannot become a public command router",
+            "public parser",
+            "ArkApi/AseApi parser compatibility claim",
+            "dispatch ordering claim",
+        )
+    ),
+    "copied command payload": frozenset(
+        (
+            "nonzero plugin_owner_token",
+            "principal_handle",
+            "principal_generation",
+            "principal_scope_flags",
+            "permission_policy_epoch",
+            "source_kind",
+            "normalized command name",
+        )
+    ),
+    "permission query": frozenset(
+        (
+            "fail closed",
+            "deny",
+            "unknown",
+            "missing provenance",
+            "stale principal generation",
+            "unsupported scope",
+            "malformed action",
+            "oversize command",
+            "unsupported source_kind",
+        )
+    ),
+    "response request": frozenset(
+        (
+            "copied intent only",
+            "cannot imply reply/send-chat/broadcast/moderation delivery",
+            "command_chat_response_path is separately promoted",
+        )
+    ),
+}
 REQUIRED_FORBIDDEN = frozenset(
     (
         "public bridge ABI",
@@ -313,7 +371,7 @@ POSITIVE_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(blocked|cannot|does\s+not|fail[s-]?closed|forbidden|missing|must\s+not|no|not|planning|without)\b",
+    r"\b(blocked|cannot|does\s+not|fail[s-]?closed|forbidden|missing|must\s+not|never|no|not|planning|until|without)\b",
     re.IGNORECASE,
 )
 
@@ -488,6 +546,47 @@ def validate_bridge_decisions(payload: dict[str, Any], blockers: list[dict[str, 
     missing_behaviors = REQUIRED_BEHAVIORS - string_set(payload.get("required_bridge_behaviors"))
     if missing_behaviors:
         add(blockers, "required_bridge_behaviors_missing", "$.decisions.required_bridge_behaviors", missing=sorted(missing_behaviors))
+    ergonomics_flow = payload.get("bridge_ergonomics_flow")
+    if not isinstance(ergonomics_flow, list):
+        add(blockers, "bridge_ergonomics_flow_not_list", "$.decisions.bridge_ergonomics_flow")
+    else:
+        by_step = {item.get("step"): item for item in ergonomics_flow if isinstance(item, dict)}
+        observed_steps = [item.get("step") for item in ergonomics_flow if isinstance(item, dict)]
+        if observed_steps != list(REQUIRED_BRIDGE_ERGONOMICS_STEPS):
+            add(
+                blockers,
+                "bridge_ergonomics_flow_order_mismatch",
+                "$.decisions.bridge_ergonomics_flow",
+                expected=list(REQUIRED_BRIDGE_ERGONOMICS_STEPS),
+                value=observed_steps,
+            )
+        for step in REQUIRED_BRIDGE_ERGONOMICS_STEPS:
+            item = by_step.get(step)
+            if not isinstance(item, dict):
+                add(blockers, "bridge_ergonomics_flow_step_missing", "$.decisions.bridge_ergonomics_flow", step=step)
+                continue
+            boundary = item.get("required_boundary")
+            if not isinstance(boundary, str) or not boundary:
+                add(
+                    blockers,
+                    "bridge_ergonomics_flow_boundary_missing",
+                    "$.decisions.bridge_ergonomics_flow",
+                    step=step,
+                )
+                continue
+            missing_fragments = sorted(
+                fragment
+                for fragment in REQUIRED_BRIDGE_ERGONOMICS_BOUNDARY_FRAGMENTS[step]
+                if fragment not in boundary
+            )
+            if missing_fragments:
+                add(
+                    blockers,
+                    "bridge_ergonomics_flow_boundary_incomplete",
+                    "$.decisions.bridge_ergonomics_flow",
+                    step=step,
+                    missing=missing_fragments,
+                )
     missing_forbidden = REQUIRED_FORBIDDEN - string_set(payload.get("forbidden_public_contract"))
     if missing_forbidden:
         add(blockers, "forbidden_public_contract_missing", "$.decisions.forbidden_public_contract", missing=sorted(missing_forbidden))
