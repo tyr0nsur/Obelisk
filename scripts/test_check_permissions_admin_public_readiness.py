@@ -162,6 +162,32 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("player_identity_evidence_not_approved", report["blockers"])
 
+    def test_accepts_promoted_player_identity_only_with_approved_runtime_evidence_terms(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["evidence"]["accepted_runtime_evidence"] = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                        "result": "approved runtime principal lifecycle evidence",
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                    surface["blockers"] = [
+                        blocker
+                        for blocker in surface["blockers"]
+                        if blocker != "No approved runtime principal lifecycle evidence."
+                    ]
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path))
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("player_identity_evidence_not_approved", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+
     def test_rejects_query_failclosed_artifact_readiness_overclaim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -341,6 +341,7 @@ def module_record() -> dict[str, Any]:
         "sequence_quality_violations": 0,
         "event_before_gate_lines": 0,
         "observed_event_cases": [],
+        "observer_gate_count": 0,
         "_player_principal_gate_seen_by_source": set(),
         "_player_principal_last_sequence": None,
         "_player_principal_seen_sequences": set(),
@@ -438,6 +439,11 @@ def module_blockers(record: dict[str, Any]) -> list[str]:
         blockers.append("sequence_quality_violation")
     if record["event_before_gate_lines"] > 0:
         blockers.append("player_principal_event_before_safe_gate")
+    if (
+        record.get("observer_gate_count", 0) != 1
+        and record.get("functions", {}).get("observer_gate") is not None
+    ):
+        blockers.append("player_principal_observer_gate_count_mismatch")
     if record["redacted_detail_keys"]:
         blockers.append("redacted_sensitive_or_unapproved_details")
     return blockers
@@ -539,6 +545,7 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             if not player_principal_lifecycle_gate_is_safe(match):
                 record["malformed_observer_lines"] += 1
                 continue
+            record["observer_gate_count"] += 1
             record["_player_principal_gate_seen_by_source"].add(source_index)
             record["_player_principal_log_limit"] = int(match.group("limit"))
             add_unique(record["gate_sha256"], match.group("sha256").lower())
@@ -799,6 +806,7 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             "event_before_gate_lines": record["event_before_gate_lines"],
         }
         if module == "player_principal_lifecycle":
+            normalized_modules[module]["observer_gate_count"] = record["observer_gate_count"]
             normalized_modules[module]["observed_event_cases"] = sorted(
                 record["observed_event_cases"],
                 key=lambda item: item["sequence"],

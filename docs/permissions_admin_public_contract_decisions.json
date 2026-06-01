@@ -50,6 +50,7 @@
       "required_behavior": [
         "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
         "player identity planning evidence alone cannot enable permissions/admin",
+        "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "runtime observation must establish principal identity before permissions/admin can consume it",
         "operator config enables surfaces or policy inputs only and cannot establish principal identity",
         "command text cannot establish principal identity",

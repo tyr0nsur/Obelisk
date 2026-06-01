@@ -273,12 +273,42 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
             add(blockers, "permissions_admin_public_contract_gate_missing", "$.surfaces[permissions_admin].v1_decision_contract")
     if permissions.get("status") == "promoted" and not (isinstance(identity, dict) and identity.get("status") == "promoted"):
         add(blockers, "permissions_admin_promoted_before_player_identity", "$.surfaces[permissions_admin].status")
-    if isinstance(identity, dict) and identity.get("status") == "promoted":
+    if isinstance(identity, dict) and identity.get("status") == "promoted" and not player_identity_has_approved_runtime_evidence(identity):
         add(
             blockers,
             "player_identity_evidence_not_approved",
             "$.surfaces[player_identity].status",
         )
+
+
+def iter_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        strings: list[str] = []
+        for child in value.values():
+            strings.extend(iter_strings(child))
+        return strings
+    if isinstance(value, list):
+        strings = []
+        for child in value:
+            strings.extend(iter_strings(child))
+        return strings
+    return []
+
+
+def player_identity_has_approved_runtime_evidence(identity: dict[str, Any]) -> bool:
+    text = "\n".join(iter_strings(identity)).lower()
+    required_terms = (
+        "approved runtime principal lifecycle evidence",
+        "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+        "identity_public_contract_gate_missing",
+    )
+    forbidden_terms = (
+        "no approved runtime principal lifecycle evidence",
+        "approved_runtime_evidence_missing",
+    )
+    return all(term in text for term in required_terms) and not any(term in text for term in forbidden_terms)
 
 
 def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:

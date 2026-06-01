@@ -653,6 +653,14 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
         return []
     if module.get("gate_sha256") != [EXPECTED_BINARY_SHA256]:
         add(blockers, "runtime_summary_gate_sha256_mismatch", f"$.source_summary.modules.{MODULE}.gate_sha256")
+    if module.get("observer_gate_count") != 1:
+        add(
+            blockers,
+            "runtime_summary_observer_gate_count_mismatch",
+            f"$.source_summary.modules.{MODULE}.observer_gate_count",
+            expected=1,
+            observed=module.get("observer_gate_count"),
+        )
     if module.get("blockers") != ["runtime_observer_evidence_only"]:
         add(blockers, "runtime_summary_quality_blockers_present", f"$.source_summary.modules.{MODULE}.blockers")
     for key in (
@@ -667,8 +675,14 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
             add(blockers, "runtime_summary_quality_counter_nonzero", f"$.source_summary.modules.{MODULE}.{key}")
     if module.get("redacted_detail_keys") != {}:
         add(blockers, "runtime_summary_unapproved_detail_keys", f"$.source_summary.modules.{MODULE}.redacted_detail_keys")
-    if module.get("accepted_count", 0) < 3:
-        add(blockers, "runtime_summary_insufficient_accepted_events", f"$.source_summary.modules.{MODULE}.accepted_count")
+    if module.get("accepted_count") != len(REQUIRED_OBSERVED_EVENT_CASES):
+        add(
+            blockers,
+            "runtime_summary_accepted_event_count_mismatch",
+            f"$.source_summary.modules.{MODULE}.accepted_count",
+            expected=len(REQUIRED_OBSERVED_EVENT_CASES),
+            observed=module.get("accepted_count"),
+        )
 
     functions = module.get("functions")
     if not isinstance(functions, dict):
@@ -676,7 +690,10 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
         return []
     for function in EXPECTED_DETAIL_VALUES:
         require_expected_detail_values(blockers, functions, function)
-    return validate_observed_event_cases(module, blockers)
+    observed_runtime_cases = validate_observed_event_cases(module, blockers)
+    if module.get("observer_gate_count") == 1:
+        observed_runtime_cases.insert(0, "observer_enable")
+    return observed_runtime_cases
 
 
 def validate_operational_window(window: Any, summary: Any, blockers: list[dict[str, Any]]) -> None:

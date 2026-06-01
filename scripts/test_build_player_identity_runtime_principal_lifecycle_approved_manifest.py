@@ -205,7 +205,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertFalse(report["promotion_ready"])
             self.assertEqual(
                 report["observed_runtime_cases"],
-                ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+                ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
             )
 
     def test_rejects_generated_manifest_that_fails_consume_checker(self) -> None:

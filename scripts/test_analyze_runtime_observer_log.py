@@ -224,6 +224,7 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
 
         module = result["modules"]["player_principal_lifecycle"]
         self.assertEqual(module["accepted_count"], 2)
+        self.assertEqual(module["observer_gate_count"], 1)
         self.assertEqual(module["blockers"], ["runtime_observer_evidence_only"])
         self.assertEqual(
             module["observed_event_cases"],
@@ -293,7 +294,32 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
 
         module = result["modules"]["player_principal_lifecycle"]
         self.assertEqual(module["accepted_count"], 3)
+        self.assertEqual(module["observer_gate_count"], 1)
         self.assertNotIn("malformed_observer_lines", module["blockers"])
+
+    def test_flags_duplicate_player_principal_lifecycle_observer_gate(self) -> None:
+        gate = (
+            "[info] PlayerPrincipalLifecycleObserver enabled "
+            "binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 "
+            "target_set=players-lifecycle-anchor-candidates limit=10 dispatch_limit=0 "
+            "delivery_claim=none principal_claim=none."
+        )
+        result = self.run_analyzer(
+            [
+                gate,
+                gate,
+                "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,1 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=candidate_created principal_id_logged=false "
+                "principal_generation_logged=false delivery_claim=none.",
+            ]
+        )
+
+        module = result["modules"]["player_principal_lifecycle"]
+        self.assertEqual(module["observer_gate_count"], 2)
+        self.assertIn("player_principal_observer_gate_count_mismatch", module["blockers"])
 
     def test_flags_malformed_player_principal_lifecycle_lines(self) -> None:
         result = self.run_analyzer(

@@ -5872,6 +5872,11 @@ namespace
         Require(plugin.closeCalls == 1, "cleanup-fail plugin was not closed after cleanup retry");
         Require(plugin.chatSubscriptionsAtClose == 0, "cleanup-fail plugin chat callback was still registered at dlclose");
         Require(chatDispatcher.SubscriptionCount() == 0, "cleanup-fail plugin callback survived cleanup retry");
+        Require(plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    FakeChatMessageEventCallback,
+                    &plugin) == 0,
+                "cleanup-fail plugin owner token remained valid after retained unload retry");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -5893,6 +5898,7 @@ namespace
             .registerStructureCallback = true,
             .registerGameplayPolicyCallback = true,
             .registerTimerCallback = true,
+            .captureApi = true,
         };
         Obelisk::Core::ChatEventDispatcher chatDispatcher;
         plugin.chatDispatcher = &chatDispatcher;
@@ -5933,6 +5939,14 @@ namespace
                 "init-cleanup-fail inventory callbacks were removed during failed retry");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 2,
                 "init-cleanup-fail item-return callbacks were removed during failed retry");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "init-cleanup-fail retained plugin accepted a new owner-token timer while unloading");
 
         Obelisk::Core::SetPluginCallbackCleanupFailureForTesting(false);
         manager.UnloadAll();
@@ -5953,6 +5967,14 @@ namespace
                 "init-cleanup-fail item-return callbacks survived cleanup retry");
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "init-cleanup-fail timer callback survived cleanup retry");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "init-cleanup-fail owner token remained valid after retained cleanup retry");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);

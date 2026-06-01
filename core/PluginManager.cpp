@@ -2770,8 +2770,10 @@ namespace Obelisk::Core
         {
             try
             {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
                 if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
                     throw std::runtime_error("injected plugin retention failure");
+#endif
                 retainedPlugins.push_back(plugin);
                 return true;
             }

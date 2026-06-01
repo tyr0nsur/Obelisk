@@ -258,7 +258,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(diagnosis["remaining_blockers"], [])
         self.assertEqual(
             diagnosis["observed_runtime_cases"],
-            ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+            ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
         )
         self.assertEqual(
             diagnosis["consumer_cases"],

@@ -359,7 +359,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(
             report["observed_runtime_cases"],
-            ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+            ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
         )
         self.assertEqual(
             report["consumer_cases"],
@@ -479,6 +479,33 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime_summary_quality_blockers_present", report["blockers"])
         self.assertIn("runtime_summary_quality_counter_nonzero", report["blockers"])
+
+    def test_rejects_accepted_event_count_that_exceeds_exact_lifecycle_cases(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        module["accepted_count"] = 4
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_accepted_event_count_mismatch", report["blockers"])
+
+    def test_rejects_missing_or_duplicate_observer_gate_count(self) -> None:
+        for count in (0, 2):
+            with self.subTest(count=count):
+                payload = manifest()
+                module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+                module["observer_gate_count"] = count
+                if count == 2:
+                    module["blockers"] = [
+                        "runtime_observer_evidence_only",
+                        "player_principal_observer_gate_count_mismatch",
+                    ]
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("runtime_summary_observer_gate_count_mismatch", report["blockers"])
 
     def test_rejects_aggregated_values_without_complete_observed_event_cases(self) -> None:
         payload = manifest()
