@@ -65,10 +65,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   plugin-invisible. It is evidence collection only; no player identity, permissions,
   commands/replies, runtime/public SDK readiness, or v1 claim is promoted.
 - Player-principal runtime evidence must use the exact single-module, plugins-disabled,
-  dispatch-limit-`0`, no-sibling marker window and a checked `--window-manifest` whose
-  source path/SHA matches the copied log under
+  dispatch-limit-`0`, no-sibling marker window, an observer-window preflight with a
+  secret-free `--env-file`, and a checked `--window-manifest` whose source path/SHA
+  matches the copied log under
   `/servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log`. Live/protected
-  source paths are rejected. Analyzer rules remain strict: copied bool cases,
+  source paths are rejected. The effective env snapshot must fail closed on missing or
+  duplicate required keys, unsupported SHA, `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT`
+  other than `10`, nonzero dispatch or PE trace, wrong instance, alternate observer env,
+  or callback/debug escape env. Analyzer rules remain strict: copied bool cases,
   redaction, lifecycle order, post-gate events, log-budget bounds, monotonic sequence
   quality, stable posture, rollback, no private identity/UE terms in keys or values, and
   no-claim/no-public-readiness semantics.
@@ -113,7 +117,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   and an exact runtime evidence builder/checker path. Current blocker: a real approved
   copied runtime principal lifecycle evidence summary, still with no identity promotion,
   public SDK readiness, or runtime readiness. Do not rerun completed broad/offline routes
-  unless a new binary hash or rejected evidence requires it.
+  unless a new binary hash or rejected evidence requires it. For the current binary hash,
+  the next useful artifact is a consume-accepted
+  `obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1` manifest
+  from a copied, redacted, approved observer log; more FName/GObjects/Ghidra/radare
+  orientation work is not the SDK blocker.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0 principal ->
   permissions/admin -> command response; P1 economy/storage/operator
   ingress, inventory/items mutation, and structure/build policy; P2 dino/tribe/
