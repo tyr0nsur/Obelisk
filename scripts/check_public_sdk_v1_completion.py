@@ -316,8 +316,10 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r".{0,80}\b(?:resourcehandle|resource[- ]?handle|object[- ]?identity|object[- ]?lookup)\s+"
     r"(?:sdk|api|surface|support)?\b",
     r"\b(?:plugin\s+hub|pluginhub)\b.{0,80}"
-    r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b",
-    r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b"
+    r"\b(?:available|complete|full|included|production[- ]?ready|public|publication|published|"
+    r"ready|release[- ]?scope|released|shipped|stable|supported)\b",
+    r"\b(?:available|complete|full|included|production[- ]?ready|public|publication|published|"
+    r"ready|release[- ]?scope|released|shipped|stable|supported)\b"
     r".{0,80}\b(?:plugin\s+hub|pluginhub)\b",
     r"\b(?:candidate(?:[- ]?only)?|planning(?:[- ]?only)?|orientation(?:[- ]?only)?|"
     r"consume[- ]?only|evidence[- ]?only|preflight|readiness|foundation|package[- ]?shape|"
@@ -346,7 +348,16 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER = re.compile(
     r"^\s*(?:(?:is|are|remains?|stays?)\s+)?"
     r"(?:blocked|cannot|disabled|forbidden|not\s+(?:allowed|approved|authorized|ready)|"
-    r"must\s+not)\b",
+    r"must\s+not|post[- ]?sdk(?:[- ]?complete)?|after\s+sdk\s+completion)\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_DEFERRED_CONTEXT = re.compile(
+    r"\b(?:post[- ]?sdk(?:[- ]?complete)?|after\s+sdk\s+completion)\b",
+    re.IGNORECASE,
+)
+PLUGIN_HUB_EXPLICIT_PUBLIC_CLAIM = re.compile(
+    r"\b(?:included\s+in\s+v1|public\s+in\s+v1|published\s+for\s+v1|publication\s+is\s+in\s+"
+    r"release[- ]?scope|release[- ]?scope|stable\s+sdk\s+includes?)\b",
     re.IGNORECASE,
 )
 CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
@@ -977,11 +988,18 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                 claim_prefix = lowered[clause_start : match.start()]
                 claim_clause = lowered[clause_start : match.end()]
                 claim_remainder = lowered[match.end() : clause_end]
+                full_clause = lowered[clause_start:clause_end]
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix):
                     continue
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_clause):
                     continue
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER.search(claim_remainder):
+                    continue
+                if (
+                    re.search(r"\b(?:plugin\s+hub|pluginhub)\b", full_clause)
+                    and PLUGIN_HUB_DEFERRED_CONTEXT.search(full_clause)
+                    and not PLUGIN_HUB_EXPLICIT_PUBLIC_CLAIM.search(full_clause)
+                ):
                     continue
                 if re.match(
                     r"\s*(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|"

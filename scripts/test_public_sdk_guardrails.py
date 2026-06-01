@@ -462,6 +462,7 @@ EXPERIMENTAL_EVENT_V1_COMPLETION_BREAKERS = {
 EXPERIMENTAL_EVENT_V1_COMPLETION_WINDOW = 14
 BROAD_V1_COMPLETION_CLAIM_FILES = [
     PUBLIC_API_HEADER,
+    PUBLIC_SDK_SURFACES_MANIFEST,
     *PUBLIC_SDK_GUIDANCE_DOC_FILES,
     PUBLIC_SDK_V1_COMPATIBILITY_DOC,
     REPO_ROOT / "examples" / "README.md",
@@ -490,7 +491,7 @@ BROAD_V1_COMPLETION_POSITIVE_RE = re.compile(
 )
 BROAD_V1_COMPLETION_NEGATED_RE = re.compile(
     r"\b(?:"
-    r"blocked|candidate|candidate-only|definition|does\s+not|do\s+not|foundation|"
+    r"blocked|candidate|candidate-only|definition|does\s+not|do\s+not|foundation|meaning|"
     r"intended|must\s+mean|must\s+not|no|not|planning|post-v1|prevent|prevents|rc|scanned|toward|track|unless|until|without"
     r")\b",
     re.IGNORECASE,
@@ -5369,8 +5370,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             *PUBLIC_SDK_GUIDANCE_DOC_FILES,
             *AGENT_SKILL_FILES,
             PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+            PUBLIC_SDK_SURFACES_MANIFEST,
             REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
             REPO_ROOT / "docs" / "agent-handoff" / "COMPACT_CONTEXT.md",
+            REPO_ROOT / "docs" / "research" / "README.md",
             REPO_ROOT / "scripts" / "send_discord_embed.py",
         ]
 

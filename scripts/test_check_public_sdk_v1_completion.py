@@ -1470,6 +1470,70 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
 
+    def test_release_statement_allows_plugin_hub_post_sdk_deferred_wording(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Plugin Hub post-SDK-complete planning remains parked.\n"
+            "Plugin Hub seed/package publication remains post-SDK.\n"
+            "Plugin Hub work resumes after SDK completion.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
+        self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+
+    def test_release_statement_rejects_plugin_hub_publication_and_scope_overclaims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Plugin Hub is included in v1.\n"
+            "Plugin Hub API is public.\n"
+            "Plugin Hub package is published for v1.\n"
+            "Plugin Hub publication is in release scope.\n"
+            "Stable SDK includes Plugin Hub.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "Plugin Hub is included in v1.",
+            "Plugin Hub API is public.",
+            "Plugin Hub package is published for v1.",
+            "Plugin Hub publication is in release scope.",
+            "Stable SDK includes Plugin Hub.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
     def test_release_statement_rejects_identity_permissions_command_mission_buff_claims(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement += (
