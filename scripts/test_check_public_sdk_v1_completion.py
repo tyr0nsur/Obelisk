@@ -1453,6 +1453,50 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn(blocker_id, gaps)
         self.assertNotIn(blocker_id, satisfied_by)
 
+    def test_promoted_experimental_only_gameplay_policy_event_cannot_count_as_completion_evidence(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        blocker_id = "obelisk.inventory_items_mutation.v1"
+        equivalent_id = "obelisk.gameplay_policy_event.v1"
+        gameplay_policy_event = {
+            "id": equivalent_id,
+            "status": "promoted-experimental-only",
+            "v1_completion_equivalent_for": [blocker_id],
+            "evidence": {
+                "surface_id": equivalent_id,
+                "promotion_status": "promoted",
+                "public_sdk_ready": True,
+                "abi_tests": ["tests/core/StructureEventDispatcherTests.cpp"],
+                "sdk_consumer_tests": ["tests/sdk_consumer/CAbiPlugin.c"],
+            },
+        }
+        surfaces_by_id = {
+            surface_id: {"id": surface_id, "status": "promoted"}
+            for surface_id in module.CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+        }
+        surfaces_by_id[blocker_id] = {"id": blocker_id, "status": "excluded"}
+        surfaces_by_id[equivalent_id] = gameplay_policy_event
+        stable_contract = {
+            "promoted_demand_family_equivalents": {
+                blocker_id: equivalent_id,
+            }
+        }
+
+        gaps, satisfied_by = module.complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract,
+        )
+
+        self.assertFalse(module.surface_has_promotion_evidence(gameplay_policy_event))
+        self.assertIn(blocker_id, gaps)
+        self.assertNotIn(blocker_id, satisfied_by)
+
     def test_empty_or_truncated_manifest_fails_closed(self) -> None:
         manifest = {
             "schema": "obelisk.public-sdk-surfaces.v1",

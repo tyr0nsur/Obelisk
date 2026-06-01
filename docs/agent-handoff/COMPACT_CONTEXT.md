@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-06-01
+Updated: 2026-06-02
 
 Use this file after conversation compaction or when resuming Obelisk from repository
 state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
@@ -73,6 +73,11 @@ priorities, and do not use history files as the active source of truth.
   named `obelisk.command_chat_response_path.v1` planning dependency. The P0 chain is
   tracked as `v1_required_dependency_chain` and those four surfaces are promoted-only for
   a complete SDK claim; excluded/post-v1 records are scoped non-complete accounting only.
+  Official complete-SDK progress remains `0%` (`0/12` complete-SDK rows and `0/4` P0
+  promoted rows). The technical foundation is estimated at roughly `20-25%`: RC
+  core/runtime, copied plugin events, installed package-shape checks, offline intake
+  tooling, and consume-only module slices exist, but none can replace the promoted P0
+  dependency chain.
   That response path adds no
   ABI today and keeps public `CallProcessEvent`, raw UE pointer/params/FString response
   APIs, replies, send-chat, broadcast/notices, and moderation blocked until promoted or
@@ -101,6 +106,8 @@ priorities, and do not use history files as the active source of truth.
   permissions/admin -> commands/replies. Prefer inventory copied-signal hygiene over
   structure census when choosing one side lane, while structure census remains useful
   offline planning/consume-only work.
+  If the current offline identity packs still pass, identity is blocked on an approved
+  runtime principal lifecycle window, not on more broad offline pack rebuilding.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -184,6 +191,10 @@ priorities, and do not use history files as the active source of truth.
   do not promote permissions, RCON, economy, homes/safe zones, structure enforcement,
   dinos, tribes, transfers, inventory, item mutation, identity, lookup, replies,
   send-chat, moderation, or ArkApi portability.
+- Post-P0 module routing should favor Mission copied bools and item return-only copied
+  signals as rentable SDK hardening paths because they have focused consume-only evidence
+  and explicit no-public-SDK/no-mutation/no-identity boundaries. They remain side lanes
+  until identity -> permissions/admin -> command response -> commands/replies is promoted.
 - `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.
   It returns copied POD descriptors with supported gameplay-policy event/field masks and
   explicit no-identity/no-lookup flags.

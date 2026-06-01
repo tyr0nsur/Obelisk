@@ -325,6 +325,42 @@ V010_CHAT_MESSAGE_EVENT_PAYLOAD_FIELDS = [
     "sequence",
     "message",
 ]
+V010_COPIED_EVENT_AND_DESCRIPTOR_STRUCTS = [
+    "ObeliskGameplayPolicyEvent",
+    "ObeliskChatMessageEvent",
+    "ObeliskResourceKindDescriptor",
+    "ObeliskGameplayPolicyEventDescriptor",
+]
+V010_PUBLIC_EVENT_DESCRIPTOR_FORBIDDEN_IDENTITY_LOOKUP_TERMS = {
+    "coordinate",
+    "coordinates",
+    "coords",
+    "fname",
+    "gobject",
+    "gobjects",
+    "handle",
+    "handles",
+    "id",
+    "identity",
+    "lookup",
+    "lookupkey",
+    "location",
+    "locations",
+    "mutation",
+    "mutations",
+    "mutate",
+    "pincode",
+    "pin",
+    "player",
+    "players",
+    "resolve",
+    "resolver",
+    "resolvers",
+    "tribe",
+    "tribes",
+    "ufunction",
+    "uobject",
+}
 UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS = (
     "OBELISK_API_CAPABILITY_CHAT_COMMANDS",
     "OBELISK_API_CAPABILITY_CHAT_RESPONSES",
@@ -1265,6 +1301,57 @@ def public_struct_field_names(header: str, struct_name: str) -> list[str]:
         if field:
             fields.append(field.group(1))
     return fields
+
+
+def public_struct_field_declarations(header: str, struct_name: str) -> list[str]:
+    match = re.search(
+        rf"typedef\s+struct\s+{re.escape(struct_name)}\s*\{{(?P<body>.*?)\}}\s*"
+        rf"{re.escape(struct_name)}\s*;",
+        strip_c_comments(header),
+        re.DOTALL,
+    )
+    if not match:
+        raise AssertionError(f"typedef struct {struct_name} block not found")
+
+    return [
+        " ".join(declaration.split())
+        for declaration in match.group("body").split(";")
+        if declaration.split()
+    ]
+
+
+def identifier_fragments(identifier: str) -> set[str]:
+    fragments = {identifier.lower()}
+    collapsed = re.sub(r"[^A-Za-z0-9]+", "", identifier).lower()
+    if collapsed:
+        fragments.add(collapsed)
+    for part in re.split(r"[^A-Za-z0-9]+", identifier):
+        if not part:
+            continue
+        fragments.add(part.lower())
+        for camel_part in re.findall(
+            r"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+",
+            part,
+        ):
+            fragments.add(camel_part.lower())
+    return fragments
+
+
+def public_struct_forbidden_identity_lookup_terms(header: str, struct_name: str) -> list[str]:
+    offenders: list[str] = []
+    for declaration in public_struct_field_declarations(header, struct_name):
+        identifiers = re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", declaration)
+        terms = {
+            fragment
+            for identifier in identifiers
+            for fragment in identifier_fragments(identifier)
+        }
+        forbidden_terms = sorted(
+            terms & V010_PUBLIC_EVENT_DESCRIPTOR_FORBIDDEN_IDENTITY_LOOKUP_TERMS
+        )
+        if forbidden_terms:
+            offenders.append(f"{struct_name}: {declaration}: {', '.join(forbidden_terms)}")
+    return offenders
 
 
 def public_callback_typedefs(header: str) -> list[str]:
@@ -7071,6 +7158,17 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ]
         self.assertEqual(offenders, [])
 
+    def test_public_copied_event_and_descriptor_structs_do_not_expose_identity_lookup_or_mutation(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+
+        offenders = [
+            offender
+            for struct_name in V010_COPIED_EVENT_AND_DESCRIPTOR_STRUCTS
+            for offender in public_struct_forbidden_identity_lookup_terms(header, struct_name)
+        ]
+
+        self.assertEqual(offenders, [])
+
     def test_public_gameplay_event_capability_regex_matches_event_defines(self) -> None:
         header = "#define OBELISK_API_CAPABILITY_STRUCTURE_EVENTS (1ull << 42)\n"
         public_event_capabilities = {
@@ -9363,7 +9461,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 with self.subTest(surface=surface_id, schema="none"):
                     self.assertTrue(
                         checker["surface_has_promotion_evidence"](
-                            {"id": surface_id, "evidence": base_evidence}
+                            {"id": surface_id, "status": "promoted", "evidence": base_evidence}
                         )
                     )
                 for schema in schemas:
@@ -9371,7 +9469,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     with self.subTest(surface=surface_id, schema=schema):
                         self.assertFalse(
                             checker["surface_has_promotion_evidence"](
-                                {"id": surface_id, "evidence": evidence}
+                                {"id": surface_id, "status": "promoted", "evidence": evidence}
                             )
                         )
 

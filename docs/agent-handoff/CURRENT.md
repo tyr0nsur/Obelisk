@@ -23,9 +23,13 @@ This file is an active routing table only. Durable evidence belongs in
   is promoted-only for a complete SDK claim; excluded/post-v1 results are scoped
   non-complete bookkeeping.
 - Current SDK accounting is intentionally blocked: complete-SDK progress remains `0/12`
-  and P0 promoted count remains `0/4`. The next promoted work starts with approved copied
-  runtime principal lifecycle evidence, then the reviewed player-identity public contract,
-  permissions/admin, command response, and commands/replies.
+  and P0 promoted count remains `0/4`. The official complete-SDK claim is still `0%`;
+  the technical foundation is estimated at roughly `20-25%` because RC core/runtime,
+  copied events, offline intake tooling, and several consume-only module slices exist but
+  the required public SDK dependency chain has no promoted rows. The next promoted work
+  starts with approved copied runtime principal lifecycle evidence, then the reviewed
+  player-identity public contract, permissions/admin, command response, and
+  commands/replies.
 
 ## Hard Overrides
 
@@ -64,6 +68,10 @@ This file is an active routing table only. Durable evidence belongs in
 
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
+- The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
+  command response -> commands/replies. Do not substitute package shape, Plugin Hub work,
+  static orientation, planning-layout readiness, or side-lane module evidence for this
+  chain.
 - Command/permission routing is planning-only. `planning_layout_gate.ready=true` on command
   response layout does not promote reply/send-chat ABI, command router, public header, ABI,
   SDK, runtime readiness, public SDK readiness, or v1 completion.
@@ -86,6 +94,8 @@ This file is an active routing table only. Durable evidence belongs in
   layout routes.
 - Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
+- If the identity offline packs remain accepted, identity is blocked on an approved
+  runtime principal lifecycle window rather than more offline rediscovery.
 - The old `20260601T120000Z-player-principal-lifecycle` request-pack is expired and should
   report `approved_window_expired`, `request_pack_ready=false`, and `bundle_inputs_ready=false`.
   It is not runtime evidence. Missing runtime artifacts remain copied `Obelisk.log`,
@@ -151,6 +161,10 @@ This file is an active routing table only. Durable evidence belongs in
   command response; P1 economy/storage/operator ingress, inventory/items mutation, and
   structure/build policy; P2 dino/tribe/buff-status/mission/transfer leaves. Names are
   demand signals only.
+- Post-P0 target map: after the P0 chain is promoted, the rentable module routes are
+  Mission copied bools and item return-only copied signals because they already have
+  focused consume-only evidence and clear no-mutation/no-identity boundaries. Treat them
+  as next SDK hardening candidates, not as current v1 completion substitutes.
 
 ## Agent Protocol
 

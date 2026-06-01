@@ -1527,6 +1527,8 @@ def evidence_has_non_promotional_schema_marker(
 
 
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
+    if surface.get("status") != "promoted":
+        return False
     evidence = surface.get("evidence")
     if not isinstance(evidence, dict) or not evidence:
         return False

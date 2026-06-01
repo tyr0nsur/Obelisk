@@ -253,6 +253,11 @@ be reported internally as:
 - `runtime_ready=false`;
 - `target_set=planning_only`.
 
+Runtime principal lifecycle promotion still requires at least one real session-start
+anchor and one real session-end anchor captured through an approved copied observer
+window. The accepted consume-only lifecycle pack and admin snapshots do not satisfy that
+runtime evidence requirement by themselves.
+
 Closing `ShooterPlayerController.ServerListPlayers` and
 `ShooterPlayerController.ServerKickPlayer` removed the admin-surface fixture gap. It does
 not unblock permissions, command routing, operator ingress/storage, Inventory SDK, runtime
