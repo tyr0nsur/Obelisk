@@ -147,3 +147,17 @@ The dedicated tests cover fail-closed blockers for disabled gate, missing marker
 unsupported SHA, non-target FName, public contract leak, incomplete coverage, redaction
 drift, and non-zero dispatch budget. This remains planning hygiene only and does not
 authorize any runtime/live work.
+
+## C++ Metadata Recognition
+
+`ue/InventoryReflection` now recognizes the two `inventory-action-compact-intake`
+targets by exact metadata only:
+
+- `ShooterPlayerController.ServerRequestInventoryUseItem`
+- `ShooterPlayerController.ServerRequestInventoryUseItemWithActor`
+
+All fields for these targets keep `ExposesRange=false`, including `AdditionalData`.
+`ProcessEventInventoryReflection` still rejects their FName indices before reading
+UFunction memory, so this is an offline recognizer hardening step only. It does not add
+runtime observation, dispatch, copied payloads, public ABI, public SDK symbols, identity,
+lookup, mutation, or return override.

@@ -10,31 +10,49 @@ namespace Obelisk::UE::InventoryReflection
     {
         constexpr int32_t kAllowRemoteAddToInventoryNameIndex = 6236;
         constexpr int32_t kCanUseNameIndex = 6252;
+        constexpr int32_t kServerRequestInventoryUseItemNameIndex = 2651;
+        constexpr int32_t kServerRequestInventoryUseItemWithActorNameIndex = 2652;
         constexpr int32_t kPrimalItemNameIndex = 6231;
         constexpr int32_t kPrimalItemObjectIndex = 17;
+        constexpr int32_t kShooterPlayerControllerNameIndex = 6721;
+        constexpr int32_t kShooterPlayerControllerObjectIndex = 50;
 
         constexpr int32_t kBoolPropertyClassNameIndex = 3;
         constexpr int32_t kFunctionClassNameIndex = 10650;
+        constexpr int32_t kIntPropertyClassNameIndex = 2;
         constexpr int32_t kObjectPropertyClassNameIndex = 5;
+        constexpr int32_t kStructPropertyClassNameIndex = 10;
         constexpr int32_t kBoolPropertyClassObjectIndex = 532;
         constexpr int32_t kFunctionClassObjectIndex = 518;
+        constexpr int32_t kIntPropertyClassObjectIndex = 539;
         constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+        constexpr int32_t kStructPropertyClassObjectIndex = 548;
 
         constexpr int32_t kInvCompNameIndex = 18798;
+        constexpr int32_t kInventoryCompNameIndex = 16929;
         constexpr int32_t kByPCNameIndex = 18797;
         constexpr int32_t kBRequestedByPlayerNameIndex = 18796;
         constexpr int32_t kReturnValueNameIndex = 17716;
         constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
+        constexpr int32_t kItemIdNameIndex = 16928;
+        constexpr int32_t kItemID1NameIndex = 16926;
+        constexpr int32_t kAdditionalDataNameIndex = 19290;
+        constexpr int32_t kAnActorNameIndex = 20098;
 
         constexpr uint32_t kAllowRemoteAddToInventoryFunctionFlags = 0x04020400;
         constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
+        constexpr uint32_t kInventoryActionFunctionFlags = 0x00220cc0;
         constexpr size_t kObjectPropertySize = 0x8;
         constexpr size_t kBoolPropertySize = 0x1;
+        constexpr size_t kIntPropertySize = 0x4;
+        constexpr size_t kRedactedStructPropertySize = 0x8;
 
         constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
         constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
         constexpr uint64_t kRemoteAddInventoryComponentPropertyFlags = 0x1044080280;
         constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kStructInputPropertyFlags = 0x1040000280;
 
         struct InventoryFieldSpec
         {
@@ -116,6 +134,60 @@ namespace Obelisk::UE::InventoryReflection
              true},
         }};
 
+        constexpr std::array<InventoryFieldSpec, 2> kServerRequestInventoryUseItemFields{{
+            {InventoryField::InventoryComponent,
+             kInventoryCompNameIndex,
+             0x00,
+             kObjectPropertySize,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kRemoteAddInventoryComponentPropertyFlags,
+             false},
+            {InventoryField::RedactedItemId,
+             kItemIdNameIndex,
+             0x08,
+             kRedactedStructPropertySize,
+             kStructPropertyClassNameIndex,
+             kStructPropertyClassObjectIndex,
+             kStructInputPropertyFlags,
+             false},
+        }};
+
+        constexpr std::array<InventoryFieldSpec, 4> kServerRequestInventoryUseItemWithActorFields{{
+            {InventoryField::Actor,
+             kAnActorNameIndex,
+             0x00,
+             kObjectPropertySize,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
+             false},
+            {InventoryField::InventoryComponent,
+             kInventoryCompNameIndex,
+             0x08,
+             kObjectPropertySize,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kRemoteAddInventoryComponentPropertyFlags,
+             false},
+            {InventoryField::RedactedItemId1,
+             kItemID1NameIndex,
+             0x10,
+             kRedactedStructPropertySize,
+             kStructPropertyClassNameIndex,
+             kStructPropertyClassObjectIndex,
+             kStructInputPropertyFlags,
+             false},
+            {InventoryField::AdditionalData,
+             kAdditionalDataNameIndex,
+             0x18,
+             kIntPropertySize,
+             kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex,
+             kIntInputPropertyFlags,
+             false},
+        }};
+
         constexpr InventoryFunctionSpec kAllowRemoteAddToInventorySpec{
             InventoryFunction::AllowRemoteAddToInventory,
             kAllowRemoteAddToInventoryNameIndex,
@@ -142,6 +214,32 @@ namespace Obelisk::UE::InventoryReflection
             kCanUseFields.size(),
         };
 
+        constexpr InventoryFunctionSpec kServerRequestInventoryUseItemSpec{
+            InventoryFunction::ServerRequestInventoryUseItem,
+            kServerRequestInventoryUseItemNameIndex,
+            kShooterPlayerControllerNameIndex,
+            kShooterPlayerControllerObjectIndex,
+            kInventoryActionFunctionFlags,
+            2,
+            0x10,
+            0xffff,
+            kServerRequestInventoryUseItemFields.data(),
+            kServerRequestInventoryUseItemFields.size(),
+        };
+
+        constexpr InventoryFunctionSpec kServerRequestInventoryUseItemWithActorSpec{
+            InventoryFunction::ServerRequestInventoryUseItemWithActor,
+            kServerRequestInventoryUseItemWithActorNameIndex,
+            kShooterPlayerControllerNameIndex,
+            kShooterPlayerControllerObjectIndex,
+            kInventoryActionFunctionFlags,
+            4,
+            0x1c,
+            0xffff,
+            kServerRequestInventoryUseItemWithActorFields.data(),
+            kServerRequestInventoryUseItemWithActorFields.size(),
+        };
+
         const InventoryFunctionSpec* FindSpec(int32_t nameIndex)
         {
             switch (nameIndex)
@@ -150,6 +248,10 @@ namespace Obelisk::UE::InventoryReflection
                 return &kAllowRemoteAddToInventorySpec;
             case kCanUseNameIndex:
                 return &kCanUseSpec;
+            case kServerRequestInventoryUseItemNameIndex:
+                return &kServerRequestInventoryUseItemSpec;
+            case kServerRequestInventoryUseItemWithActorNameIndex:
+                return &kServerRequestInventoryUseItemWithActorSpec;
             default:
                 return nullptr;
             }

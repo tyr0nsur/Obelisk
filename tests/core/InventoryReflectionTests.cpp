@@ -15,25 +15,41 @@ namespace
 
     constexpr int32_t kAllowRemoteAddToInventoryNameIndex = 6236;
     constexpr int32_t kCanUseNameIndex = 6252;
+    constexpr int32_t kServerRequestInventoryUseItemNameIndex = 2651;
+    constexpr int32_t kServerRequestInventoryUseItemWithActorNameIndex = 2652;
     constexpr int32_t kPrimalItemNameIndex = 6231;
     constexpr int32_t kPrimalItemObjectIndex = 17;
+    constexpr int32_t kShooterPlayerControllerNameIndex = 6721;
+    constexpr int32_t kShooterPlayerControllerObjectIndex = 50;
     constexpr int32_t kBoolPropertyClassNameIndex = 3;
     constexpr int32_t kFunctionClassNameIndex = 10650;
+    constexpr int32_t kIntPropertyClassNameIndex = 2;
     constexpr int32_t kObjectPropertyClassNameIndex = 5;
+    constexpr int32_t kStructPropertyClassNameIndex = 10;
     constexpr int32_t kBoolPropertyClassObjectIndex = 532;
     constexpr int32_t kFunctionClassObjectIndex = 518;
+    constexpr int32_t kIntPropertyClassObjectIndex = 539;
     constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+    constexpr int32_t kStructPropertyClassObjectIndex = 548;
     constexpr int32_t kInvCompNameIndex = 18798;
+    constexpr int32_t kInventoryCompNameIndex = 16929;
     constexpr int32_t kByPCNameIndex = 18797;
     constexpr int32_t kBRequestedByPlayerNameIndex = 18796;
     constexpr int32_t kReturnValueNameIndex = 17716;
     constexpr int32_t kBIgnoreCooldownNameIndex = 18814;
+    constexpr int32_t kItemIdNameIndex = 16928;
+    constexpr int32_t kItemID1NameIndex = 16926;
+    constexpr int32_t kAdditionalDataNameIndex = 19290;
+    constexpr int32_t kAnActorNameIndex = 20098;
     constexpr uint32_t kAllowRemoteAddToInventoryFunctionFlags = 0x04020400;
     constexpr uint32_t kCanUseFunctionFlags = 0x54020400;
+    constexpr uint32_t kInventoryActionFunctionFlags = 0x00220cc0;
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
     constexpr uint64_t kRemoteAddInventoryComponentPropertyFlags = 0x1044080280;
     constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kStructInputPropertyFlags = 0x1040000280;
 
     struct Region
     {
@@ -132,6 +148,8 @@ namespace
         std::array<uint8_t, 0x80> PropertyD{};
         std::array<uint8_t, 0x40> ObjectPropertyClass{};
         std::array<uint8_t, 0x40> BoolPropertyClass{};
+        std::array<uint8_t, 0x40> IntPropertyClass{};
+        std::array<uint8_t, 0x40> StructPropertyClass{};
         std::array<uint8_t, 0x40> FunctionClass{};
         std::array<uint8_t, 0x40> Outer{};
         std::array<uint8_t, 0x20> Params{};
@@ -147,6 +165,8 @@ namespace
             Context.Regions.push_back({PropertyD.data(), PropertyD.size()});
             Context.Regions.push_back({ObjectPropertyClass.data(), ObjectPropertyClass.size()});
             Context.Regions.push_back({BoolPropertyClass.data(), BoolPropertyClass.size()});
+            Context.Regions.push_back({IntPropertyClass.data(), IntPropertyClass.size()});
+            Context.Regions.push_back({StructPropertyClass.data(), StructPropertyClass.size()});
             Context.Regions.push_back({FunctionClass.data(), FunctionClass.size()});
             Context.Regions.push_back({Outer.data(), Outer.size()});
             Context.Regions.push_back({Params.data(), Params.size()});
@@ -171,6 +191,16 @@ namespace
                     kBoolPropertyClassObjectIndex,
                     nullptr,
                     nullptr);
+        WriteObject(fixture.IntPropertyClass,
+                    kIntPropertyClassNameIndex,
+                    kIntPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
+        WriteObject(fixture.StructPropertyClass,
+                    kStructPropertyClassNameIndex,
+                    kStructPropertyClassObjectIndex,
+                    nullptr,
+                    nullptr);
         WriteObject(fixture.FunctionClass, kFunctionClassNameIndex, kFunctionClassObjectIndex, nullptr, nullptr);
     }
 
@@ -181,10 +211,11 @@ namespace
                        uint16_t numParms,
                        uint16_t parmsSize,
                        uint16_t returnValueOffset,
-                       const std::array<FieldDef, 4>& fields)
+                       const std::array<FieldDef, 4>& fields,
+                       int32_t outerObjectIndex = kPrimalItemObjectIndex)
     {
         InitClasses(fixture);
-        WriteObject(fixture.Outer, outerNameIndex, kPrimalItemObjectIndex, nullptr, nullptr);
+        WriteObject(fixture.Outer, outerNameIndex, outerObjectIndex, nullptr, nullptr);
         WriteObject(fixture.Function,
                     functionNameIndex,
                     functionNameIndex,
@@ -240,6 +271,62 @@ namespace
                           {},
                           {},
                       }});
+    }
+
+    void BuildServerRequestInventoryUseItem(InventoryFixture& fixture)
+    {
+        BuildFunction(fixture,
+                      kServerRequestInventoryUseItemNameIndex,
+                      kShooterPlayerControllerNameIndex,
+                      kInventoryActionFunctionFlags,
+                      2,
+                      0x10,
+                      0xffff,
+                      {{
+                          {kInventoryCompNameIndex,
+                           0x00,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kRemoteAddInventoryComponentPropertyFlags},
+                          {kItemIdNameIndex,
+                           0x08,
+                           0x08,
+                           fixture.StructPropertyClass.data(),
+                           kStructInputPropertyFlags},
+                          {},
+                          {},
+                      }},
+                      kShooterPlayerControllerObjectIndex);
+    }
+
+    void BuildServerRequestInventoryUseItemWithActor(InventoryFixture& fixture)
+    {
+        BuildFunction(fixture,
+                      kServerRequestInventoryUseItemWithActorNameIndex,
+                      kShooterPlayerControllerNameIndex,
+                      kInventoryActionFunctionFlags,
+                      4,
+                      0x1c,
+                      0xffff,
+                      {{
+                          {kAnActorNameIndex, 0x00, 0x08, fixture.ObjectPropertyClass.data(), kObjectInputPropertyFlags},
+                          {kInventoryCompNameIndex,
+                           0x08,
+                           0x08,
+                           fixture.ObjectPropertyClass.data(),
+                           kRemoteAddInventoryComponentPropertyFlags},
+                          {kItemID1NameIndex,
+                           0x10,
+                           0x08,
+                           fixture.StructPropertyClass.data(),
+                           kStructInputPropertyFlags},
+                          {kAdditionalDataNameIndex,
+                           0x18,
+                           0x04,
+                           fixture.IntPropertyClass.data(),
+                           kIntInputPropertyFlags},
+                      }},
+                      kShooterPlayerControllerObjectIndex);
     }
 
     void BuildAllowRemoteAdd(InventoryFixture& fixture)
@@ -397,6 +484,114 @@ namespace
         Require(invocation.Fields[3].Range.Data == fixture.Params.data() + 0x11,
                 "ReturnValue range mismatch");
         Require(invocation.Fields[3].Range.Size == 0x01, "ReturnValue range size mismatch");
+    }
+
+    void TestRecognizesInventoryActionsAsMetadataOnly()
+    {
+        {
+            InventoryFixture fixture;
+            BuildServerRequestInventoryUseItem(fixture);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                reinterpret_cast<const void*>(0x20000),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function == InventoryReflection::InventoryFunction::ServerRequestInventoryUseItem,
+                    "ServerRequestInventoryUseItem kind mismatch");
+            Require(invocation.Fields.size() == 2, "ServerRequestInventoryUseItem field count mismatch");
+            Require(invocation.HasParameterRanges,
+                    "ServerRequestInventoryUseItem should record params availability without exposing ranges");
+            RequireFieldMetadata(invocation.Fields[0],
+                                 InventoryReflection::InventoryField::InventoryComponent,
+                                 kInventoryCompNameIndex,
+                                 kObjectPropertyClassNameIndex,
+                                 kObjectPropertyClassObjectIndex,
+                                 kRemoteAddInventoryComponentPropertyFlags,
+                                 0x00,
+                                 0x08,
+                                 false);
+            Require(invocation.Fields[0].Range.Data == nullptr,
+                    "ServerRequestInventoryUseItem InventoryComp range should stay hidden");
+            RequireFieldMetadata(invocation.Fields[1],
+                                 InventoryReflection::InventoryField::RedactedItemId,
+                                 kItemIdNameIndex,
+                                 kStructPropertyClassNameIndex,
+                                 kStructPropertyClassObjectIndex,
+                                 kStructInputPropertyFlags,
+                                 0x08,
+                                 0x08,
+                                 false);
+            Require(invocation.Fields[1].Range.Data == nullptr,
+                    "ServerRequestInventoryUseItem ItemId range should stay hidden");
+        }
+        {
+            InventoryFixture fixture;
+            BuildServerRequestInventoryUseItemWithActor(fixture);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                reinterpret_cast<const void*>(0x20000),
+                invocation);
+
+            Require(static_cast<bool>(result), result.Reason.c_str());
+            Require(invocation.Function ==
+                        InventoryReflection::InventoryFunction::ServerRequestInventoryUseItemWithActor,
+                    "ServerRequestInventoryUseItemWithActor kind mismatch");
+            Require(invocation.Fields.size() == 4,
+                    "ServerRequestInventoryUseItemWithActor field count mismatch");
+            RequireFieldMetadata(invocation.Fields[0],
+                                 InventoryReflection::InventoryField::Actor,
+                                 kAnActorNameIndex,
+                                 kObjectPropertyClassNameIndex,
+                                 kObjectPropertyClassObjectIndex,
+                                 kObjectInputPropertyFlags,
+                                 0x00,
+                                 0x08,
+                                 false);
+            Require(invocation.Fields[0].Range.Data == nullptr,
+                    "ServerRequestInventoryUseItemWithActor actor range should stay hidden");
+            RequireFieldMetadata(invocation.Fields[1],
+                                 InventoryReflection::InventoryField::InventoryComponent,
+                                 kInventoryCompNameIndex,
+                                 kObjectPropertyClassNameIndex,
+                                 kObjectPropertyClassObjectIndex,
+                                 kRemoteAddInventoryComponentPropertyFlags,
+                                 0x08,
+                                 0x08,
+                                 false);
+            Require(invocation.Fields[1].Range.Data == nullptr,
+                    "ServerRequestInventoryUseItemWithActor InventoryComp range should stay hidden");
+            RequireFieldMetadata(invocation.Fields[2],
+                                 InventoryReflection::InventoryField::RedactedItemId1,
+                                 kItemID1NameIndex,
+                                 kStructPropertyClassNameIndex,
+                                 kStructPropertyClassObjectIndex,
+                                 kStructInputPropertyFlags,
+                                 0x10,
+                                 0x08,
+                                 false);
+            Require(invocation.Fields[2].Range.Data == nullptr,
+                    "ServerRequestInventoryUseItemWithActor ItemID1 range should stay hidden");
+            RequireFieldMetadata(invocation.Fields[3],
+                                 InventoryReflection::InventoryField::AdditionalData,
+                                 kAdditionalDataNameIndex,
+                                 kIntPropertyClassNameIndex,
+                                 kIntPropertyClassObjectIndex,
+                                 kIntInputPropertyFlags,
+                                 0x18,
+                                 0x04,
+                                 false);
+            Require(invocation.Fields[3].Range.Data == nullptr,
+                    "ServerRequestInventoryUseItemWithActor AdditionalData range should stay hidden");
+        }
     }
 
     void TestRejectsWrongOuterAndNameNumber()
@@ -668,6 +863,62 @@ namespace
                 invocation);
             Require(result.Status == ReadStatus::Implausible, "wrong object property class was accepted");
         }
+        {
+            InventoryFixture fixture;
+            BuildServerRequestInventoryUseItem(fixture);
+            WriteObject(fixture.Outer,
+                        kShooterPlayerControllerNameIndex,
+                        kPrimalItemObjectIndex,
+                        nullptr,
+                        nullptr);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong inventory action outer object index was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildServerRequestInventoryUseItemWithActor(fixture);
+            WriteAt(fixture.Function, 0x98, uint16_t{0x20});
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong inventory action ParmsSize was accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildServerRequestInventoryUseItemWithActor(fixture);
+            WriteProperty(fixture.PropertyD,
+                          nullptr,
+                          fixture.Function.data(),
+                          fixture.BoolPropertyClass.data(),
+                          kAdditionalDataNameIndex,
+                          0x18,
+                          0x01,
+                          kBoolInputPropertyFlags);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong inventory action AdditionalData property class was accepted");
+        }
     }
 
     void TestRejectsWrongPropertyMetadata()
@@ -920,6 +1171,7 @@ int main()
 {
     TestRecognizesCanUseScalarShape();
     TestRecognizesAllowRemoteAddWithoutObjectRanges();
+    TestRecognizesInventoryActionsAsMetadataOnly();
     TestRejectsWrongOuterAndNameNumber();
     TestRejectsWrongFunctionClass();
     TestRejectsWrongShape();
