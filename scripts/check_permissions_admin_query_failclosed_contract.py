@@ -54,6 +54,8 @@ REQUIRED_QUERY_FIELD_TYPES = {
 }
 REQUIRED_DECISIONS = frozenset(("deny", "allow", "unknown"))
 REQUIRED_DECISION_SEQUENCE = ("deny", "allow", "unknown")
+REQUIRED_DECISION_FIELDS = frozenset(("decision", "reason_flags"))
+REQUIRED_DECISION_FIELD_SEQUENCE = ("decision", "reason_flags")
 REQUIRED_PROVENANCE_FIELDS = frozenset(
     (
         "policy_source_id",
@@ -77,17 +79,23 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
     (
         "stale_principal",
         "scope_mismatch",
+        "process_mismatch",
+        "missing_principal",
         "missing_runtime_principal_identity",
         "command_text_principal_claim",
+        "command_text_permission_claim",
         "operator_config_principal_claim",
+        "operator_config_permission_claim",
         "missing_action",
         "malformed_action_size",
         "missing_principal_generation",
         "principal_generation_mismatch",
         "missing_plugin_owner_token",
+        "zero_plugin_owner_token",
         "missing_capability",
         "rate_limit_exceeded",
         "unknown_authority",
+        "missing_authority_kind",
         "missing_policy_source",
         "missing_policy_source_generation",
         "policy_source_generation_mismatch",
@@ -100,17 +108,23 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
 REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "stale_principal",
     "scope_mismatch",
+    "process_mismatch",
+    "missing_principal",
     "missing_runtime_principal_identity",
     "command_text_principal_claim",
+    "command_text_permission_claim",
     "operator_config_principal_claim",
+    "operator_config_permission_claim",
     "missing_action",
     "malformed_action_size",
     "missing_principal_generation",
     "principal_generation_mismatch",
     "missing_plugin_owner_token",
+    "zero_plugin_owner_token",
     "missing_capability",
     "rate_limit_exceeded",
     "unknown_authority",
+    "missing_authority_kind",
     "missing_policy_source",
     "missing_policy_source_generation",
     "policy_source_generation_mismatch",
@@ -248,6 +262,7 @@ class Validation:
     blockers: list[dict[str, Any]]
     query_fields: list[str]
     decisions: list[str]
+    decision_fields: list[str]
     provenance_fields: list[str]
     fail_closed_cases: list[str]
     recognized_authority_kinds: list[str]
@@ -324,6 +339,7 @@ def build_template_manifest() -> dict[str, Any]:
             ],
         },
         "decision_contract": {
+            "decision_fields": list(REQUIRED_DECISION_FIELD_SEQUENCE),
             "results": [
                 {
                     "decision": decision,
@@ -532,14 +548,39 @@ def validate_query_contract(contract: Any, blockers: list[dict[str, Any]]) -> li
     return sorted(names)
 
 
-def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) -> tuple[list[str], list[str], list[str]]:
     if not isinstance(contract, dict):
         add(blockers, "decision_contract_missing", "$.decision_contract")
-        return [], []
+        return [], [], []
     if contract.get("allow_without_provenance_allowed") is not False:
         add(blockers, "allow_without_provenance_allowed_not_false", "$.decision_contract.allow_without_provenance_allowed")
     if contract.get("unknown_authority_result") not in {"deny", "unknown"}:
         add(blockers, "unknown_authority_result_not_fail_closed", "$.decision_contract.unknown_authority_result")
+
+    fields = contract.get("decision_fields")
+    if not isinstance(fields, list):
+        add(blockers, "decision_fields_not_list", "$.decision_contract.decision_fields")
+        field_names: list[str] = []
+    else:
+        field_names = [item for item in fields if isinstance(item, str)]
+        if len(field_names) != len(fields):
+            add(blockers, "decision_field_invalid", "$.decision_contract.decision_fields")
+        unexpected = set(field_names) - REQUIRED_DECISION_FIELDS
+        if unexpected:
+            add(
+                blockers,
+                "decision_fields_unexpected",
+                "$.decision_contract.decision_fields",
+                fields=sorted(unexpected),
+            )
+        missing = REQUIRED_DECISION_FIELDS - set(field_names)
+        if missing:
+            add(
+                blockers,
+                "decision_fields_missing_required",
+                "$.decision_contract.decision_fields",
+                missing=sorted(missing),
+            )
 
     result_names: list[str] = []
     results = contract.get("results")
@@ -591,7 +632,7 @@ def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) ->
                 missing=sorted(missing),
             )
 
-    return sorted(result_names), sorted(provenance_names)
+    return sorted(result_names), sorted(field_names), sorted(provenance_names)
 
 
 def validate_authority_kind_list(
@@ -740,7 +781,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
-        return Validation(blockers, [], [], [], [], [])
+        return Validation(blockers, [], [], [], [], [], [])
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -759,7 +800,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
             add(blockers, f"{key}_not_false", f"$.{key}")
 
     query_fields = validate_query_contract(payload.get("query_contract"), blockers)
-    decisions, provenance_fields = validate_decision_contract(payload.get("decision_contract"), blockers)
+    decisions, decision_fields, provenance_fields = validate_decision_contract(payload.get("decision_contract"), blockers)
     recognized_authority_kinds, allow_capable_authority_kinds = validate_authority_policy(
         payload.get("authority_policy"), blockers
     )
@@ -796,6 +837,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         blockers,
         query_fields,
         decisions,
+        decision_fields,
         provenance_fields,
         fail_closed_cases,
         recognized_authority_kinds,
@@ -818,6 +860,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "runtime_ready": False,
         "query_fields": validation.query_fields,
         "decisions": validation.decisions,
+        "decision_fields": validation.decision_fields,
         "provenance_fields": validation.provenance_fields,
         "fail_closed_cases": validation.fail_closed_cases,
         "recognized_authority_kinds": validation.recognized_authority_kinds,

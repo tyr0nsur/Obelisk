@@ -106,10 +106,10 @@ later callbacks must copy those values into plugin-owned storage during init.
 ## Experimental Copied Event Patterns
 
 `GameplayPolicyEvent` is a v0.1 copied ABI surface with release-readiness evidence, but it
-remains `promoted-experimental-only` in the v1 compatibility inventory until the full SDK
-completion bar is met. It must be promoted, downgraded to planning/post-v1, or explicitly excluded before a
-complete v1 SDK claim. It carries copied observational policy data for the named event
-kinds in [`public_gameplay_events.json`](public_gameplay_events.json). It is not an
+remains `promoted-experimental-only` in the v1 compatibility inventory until the v1
+completion bar is met. It must be promoted, downgraded to planning/post-v1, or explicitly excluded
+before a complete v1 SDK claim. It carries copied observational policy data for the named
+event kinds in [`public_gameplay_events.json`](public_gameplay_events.json). It is not an
 Inventory SDK, Items SDK, StructureEvents SDK, identity API, lookup API, mutation API, or
 return-override API.
 
@@ -299,6 +299,10 @@ the required gameplay evidence for that surface.
 The manifest's `post_v1_or_excluded_surfaces` list must exactly match surfaces whose
 status is `post-v1` or `excluded`; it cannot be used to classify promoted, planning,
 experimental, or debug-only surfaces as release exclusions.
+Post-v1 or excluded records are support-statement accounting only. They do not authorize
+complete, full, production, or stable SDK wording unless
+`scripts/check_public_sdk_v1_completion.py --json` reports that the stable claim is
+allowed.
 
 | Surface or demand family | Required v1 outcome | Depends on | Release-statement detail |
 | --- | --- | --- | --- |

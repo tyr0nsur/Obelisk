@@ -17,11 +17,20 @@ CORE_DIR = REPO_ROOT / "core"
 COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
     "MissionCopiedBoolEventDispatcher": (
         "internal/test-only copied lifecycle dispatcher; not plugin-facing until a later "
-        "promotion wires a public ABI registration path"
+        "promotion wires a public ABI registration path and PluginManager owner cleanup"
     ),
     "PlayerPrincipalEventDispatcher": (
         "internal/test-only copied lifecycle dispatcher; not plugin-facing until player "
-        "identity promotion wires a public ABI registration path"
+        "identity promotion wires a public ABI registration path and PluginManager owner cleanup"
+    ),
+}
+
+COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
+    "PlayerPrincipalEventDispatcher": (
+        "PlayerPrincipal",
+        "PLAYER_PRINCIPAL",
+        "PlayerIdentity",
+        "PLAYER_IDENTITY",
     ),
 }
 
@@ -117,6 +126,18 @@ def assert_tokens_present(test_case: unittest.TestCase, body: str, tokens: set[s
     for token in sorted(tokens):
         with test_case.subTest(token=token):
             test_case.assertIn(token, body)
+
+
+def cleaned_dispatcher_classes(cleanup_body: str) -> set[str]:
+    dispatchers = set(
+        re.findall(
+            r"\b(\w+EventDispatcher)::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
+            cleanup_body,
+        )
+    )
+    if "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)" in cleanup_body:
+        dispatchers.add("ChatEventDispatcher")
+    return dispatchers
 
 
 class PluginManagerGuardrailTests(unittest.TestCase):
@@ -432,14 +453,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             self.assertIsNotNone(match, f"{header} has owner cleanup but no dispatcher class")
             dispatcher_classes.add(match.group(1))
 
-        cleaned_dispatchers = set(
-            re.findall(
-                r"\b(\w+EventDispatcher)::Get\(\)\.UnregisterCallbacksForOwner\(owner\)",
-                cleanup_body,
-            )
-        )
-        if "m_ChatDispatcher->UnregisterCallbacksForOwner(owner)" in cleanup_body:
-            cleaned_dispatchers.add("ChatEventDispatcher")
+        cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
 
         missing = sorted(
             dispatcher_classes
@@ -462,7 +476,49 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             with self.subTest(dispatcher=dispatcher):
                 self.assertIn(dispatcher, dispatcher_classes)
                 self.assertIn("internal/test-only", reason)
+                self.assertIn("not plugin-facing", reason)
+                self.assertIn("PluginManager owner cleanup", reason)
                 self.assertNotIn(dispatcher, cleaned_dispatchers)
+
+    def test_internal_test_only_dispatcher_exceptions_are_not_public_abi_or_plugin_manager_wired(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+        cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
+
+        for dispatcher, blocked_tokens in COPIED_DISPATCHER_PUBLIC_ABI_TOKENS.items():
+            if dispatcher in cleaned_dispatchers:
+                continue
+            with self.subTest(dispatcher=dispatcher):
+                self.assertIn(
+                    dispatcher,
+                    COPIED_DISPATCHER_CLEANUP_EXCEPTIONS,
+                    "Dispatcher-specific public ABI tokens should be blocked only while the "
+                    "dispatcher is documented as an internal/test-only cleanup exception.",
+                )
+                self.assertNotIn(
+                    dispatcher,
+                    plugin_manager_text,
+                    "Internal/test-only dispatcher exceptions must not be wired through "
+                    "PluginManager until owner cleanup is added.",
+                )
+                for token in blocked_tokens:
+                    with self.subTest(dispatcher=dispatcher, token=token):
+                        self.assertNotIn(
+                            token,
+                            api_header,
+                            "Player identity/principal public ABI must stay absent until the "
+                            "dispatcher is covered by PluginManager owner cleanup.",
+                        )
+                        self.assertNotIn(
+                            token,
+                            plugin_manager_text,
+                            "Player identity/principal PluginManager wiring must stay absent "
+                            "until dispatcher owner cleanup is explicit.",
+                        )
 
     def test_event_dispatcher_owner_cleanup_failures_propagate_to_plugin_manager(self) -> None:
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):

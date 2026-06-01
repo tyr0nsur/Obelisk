@@ -66,6 +66,7 @@ def manifest() -> dict:
             ],
         },
         "decision_contract": {
+            "decision_fields": ["decision", "reason_flags"],
             "results": [
                 {"decision": "deny", "fail_closed": True, "requires_provenance": False},
                 {"decision": "allow", "fail_closed": False, "requires_provenance": True},
@@ -103,17 +104,23 @@ def manifest() -> dict:
         "fail_closed_cases": [
             fail_closed_case("stale_principal"),
             fail_closed_case("scope_mismatch"),
+            fail_closed_case("process_mismatch"),
+            fail_closed_case("missing_principal"),
             fail_closed_case("missing_runtime_principal_identity"),
             fail_closed_case("command_text_principal_claim"),
+            fail_closed_case("command_text_permission_claim"),
             fail_closed_case("operator_config_principal_claim"),
+            fail_closed_case("operator_config_permission_claim"),
             fail_closed_case("missing_action"),
             fail_closed_case("malformed_action_size"),
             fail_closed_case("missing_principal_generation"),
             fail_closed_case("principal_generation_mismatch"),
             fail_closed_case("missing_plugin_owner_token"),
+            fail_closed_case("zero_plugin_owner_token"),
             fail_closed_case("missing_capability"),
             fail_closed_case("rate_limit_exceeded"),
             fail_closed_case("unknown_authority"),
+            fail_closed_case("missing_authority_kind"),
             fail_closed_case("missing_policy_source"),
             fail_closed_case("missing_policy_source_generation"),
             fail_closed_case("policy_source_generation_mismatch"),
@@ -203,6 +210,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             ],
         )
         self.assertEqual(report["decisions"], ["allow", "deny", "unknown"])
+        self.assertEqual(report["decision_fields"], ["decision", "reason_flags"])
         self.assertEqual(
             report["provenance_fields"],
             [
@@ -219,25 +227,31 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             report["fail_closed_cases"],
             [
                 "authority_generation_mismatch",
+                "command_text_permission_claim",
                 "command_text_principal_claim",
                 "malformed_action_size",
                 "missing_action",
                 "missing_authority_generation",
+                "missing_authority_kind",
                 "missing_capability",
                 "missing_plugin_owner_token",
                 "missing_policy_epoch",
                 "missing_policy_source",
                 "missing_policy_source_generation",
+                "missing_principal",
                 "missing_principal_generation",
                 "missing_runtime_principal_identity",
+                "operator_config_permission_claim",
                 "operator_config_principal_claim",
                 "plugin_supplied_provenance",
                 "policy_source_generation_mismatch",
                 "principal_generation_mismatch",
+                "process_mismatch",
                 "rate_limit_exceeded",
                 "scope_mismatch",
                 "stale_principal",
                 "unknown_authority",
+                "zero_plugin_owner_token",
             ],
         )
 
@@ -332,8 +346,9 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("query_field_type_mismatch", report["blockers"])
 
-    def test_rejects_missing_decision_and_provenance_fields(self) -> None:
+    def test_rejects_missing_decision_field_and_provenance_fields(self) -> None:
         payload = manifest()
+        payload["decision_contract"]["decision_fields"].remove("reason_flags")
         payload["decision_contract"]["results"] = [
             result for result in payload["decision_contract"]["results"] if result["decision"] != "unknown"
         ]
@@ -343,6 +358,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 1)
+        self.assertIn("decision_fields_missing_required", report["blockers"])
         self.assertIn("decision_results_missing_required", report["blockers"])
         self.assertIn("provenance_fields_missing_required", report["blockers"])
 
@@ -362,15 +378,21 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
     def test_rejects_missing_fail_closed_blocker_cases(self) -> None:
         for case_name in (
             "scope_mismatch",
+            "process_mismatch",
+            "missing_principal",
             "missing_runtime_principal_identity",
             "command_text_principal_claim",
+            "command_text_permission_claim",
             "operator_config_principal_claim",
+            "operator_config_permission_claim",
             "missing_action",
             "malformed_action_size",
+            "zero_plugin_owner_token",
             "missing_policy_source",
             "missing_policy_source_generation",
             "policy_source_generation_mismatch",
             "missing_policy_epoch",
+            "missing_authority_kind",
             "missing_authority_generation",
             "authority_generation_mismatch",
             "plugin_supplied_provenance",
