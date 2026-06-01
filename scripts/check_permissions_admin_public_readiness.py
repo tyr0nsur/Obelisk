@@ -257,6 +257,8 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if not isinstance(permissions, dict):
         add(blockers, "permissions_admin_surface_missing", "$.surfaces")
         return
+    if not isinstance(identity, dict):
+        add(blockers, "player_identity_surface_missing", "$.surfaces")
     if permissions.get("status") not in {"planning", "post-v1", "blocked"}:
         add(blockers, "permissions_admin_surface_status_unexpected", "$.surfaces[permissions_admin].status")
     if permissions.get("public_contract") != []:
@@ -298,17 +300,22 @@ def iter_strings(value: Any) -> list[str]:
 
 
 def player_identity_has_approved_runtime_evidence(identity: dict[str, Any]) -> bool:
-    text = "\n".join(iter_strings(identity)).lower()
-    required_terms = (
-        "approved runtime principal lifecycle evidence",
-        "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
-        "identity_public_contract_gate_missing",
-    )
+    evidence = identity.get("evidence")
+    accepted = evidence.get("accepted_runtime_evidence") if isinstance(evidence, dict) else None
+    if not isinstance(accepted, dict):
+        return False
+    if accepted.get("schema") != "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1":
+        return False
+    if accepted.get("result") != "approved runtime principal lifecycle evidence":
+        return False
+    if accepted.get("next_blocker") != "identity_public_contract_gate_missing":
+        return False
     forbidden_terms = (
         "no approved runtime principal lifecycle evidence",
         "approved_runtime_evidence_missing",
     )
-    return all(term in text for term in required_terms) and not any(term in text for term in forbidden_terms)
+    text = "\n".join(iter_strings(identity)).lower()
+    return not any(term in text for term in forbidden_terms)
 
 
 def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:

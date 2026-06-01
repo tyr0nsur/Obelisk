@@ -1141,12 +1141,22 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
     validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(payload, check_mode="consume")
     report = approved_runtime_principal_lifecycle_evidence.build_report(payload, validation, check_mode="consume")
     blockers = [blocker["reason"] for blocker in validation.blockers]
+    if not validation.blockers:
+        if report.get("approved_runtime_evidence_present") is not True:
+            blockers.append("approved_runtime_report_evidence_present_not_true")
+        if report.get("runtime_evidence_ready") is not True:
+            blockers.append("approved_runtime_report_runtime_evidence_ready_not_true")
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+            if report.get(key) is not False:
+                blockers.append(f"approved_runtime_report_{key}_not_false")
+        if report.get("next_blocker") != "identity_public_contract_gate_missing":
+            blockers.append("approved_runtime_report_next_blocker_not_identity_public_contract_gate")
     ready = not blockers
     return {
         **base,
         "ready": ready,
-        "approved_runtime_evidence_present": report["approved_runtime_evidence_present"],
-        "runtime_evidence_ready": report["runtime_evidence_ready"],
+        "approved_runtime_evidence_present": ready,
+        "runtime_evidence_ready": ready,
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,

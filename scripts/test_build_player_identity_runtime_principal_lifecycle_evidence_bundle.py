@@ -16,6 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_first_evidence_readiness as first_evidence_checker
+import build_player_identity_runtime_principal_lifecycle_evidence_bundle as bundle_builder
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
@@ -283,7 +284,26 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("check player principal lifecycle window manifest failed", result.stderr)
+            self.assertIn("--copied-log must be an offline copy, not a live server path", result.stderr)
+
+    def test_rejects_live_copied_log_before_analysis_even_with_offline_manifest(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            output_dir = temp_dir / "bundle"
+
+            result = self.run_bundle(
+                Path("/servidor/ark/obelisk/logs/arkserver2/Obelisk.log"),
+                output_dir,
+                window_manifest=window_manifest,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--copied-log must be an offline copy, not a live server path", result.stderr)
+            self.assertFalse((output_dir / "runtime-observer-summary.json").exists())
 
     def test_rejects_protected_output_dir_before_writing(self) -> None:
         with self.temp_offline_workspace() as temp:
@@ -406,6 +426,44 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 "runtime observer summary gate limit does not match exact first-window log budget",
                 result.stderr,
             )
+
+    def test_rejects_negative_readiness_report_that_overclaims_public_sdk(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_negative_readiness_report(
+                {
+                    "ready": False,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": True,
+                    "runtime_ready": False,
+                    "blockers": ["public_readiness_blocked_until_identity_public_contract_gate"],
+                    "next_blocker": "identity_public_contract_gate_missing",
+                },
+                "public-readiness approved runtime principal lifecycle evidence check",
+                "public_readiness_blocked_until_identity_public_contract_gate",
+            )
+
+        self.assertIn("overclaims public_sdk_ready", str(raised.exception))
+
+    def test_rejects_negative_readiness_report_with_wrong_blocker(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_negative_readiness_report(
+                {
+                    "ready": False,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "blockers": ["approved_runtime_evidence_not_accepted"],
+                    "next_blocker": "approved_runtime_evidence_not_accepted",
+                },
+                "promote approved runtime principal lifecycle evidence check",
+                "promote_blocked_until_identity_public_contract_gate",
+            )
+
+        self.assertIn("failed for an unexpected blocker", str(raised.exception))
 
 
 if __name__ == "__main__":

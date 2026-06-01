@@ -96,6 +96,50 @@ REQUIRED_PROMOTION_BLOCKERS: dict[str, dict[str, Any]] = {
         ),
     },
 }
+EXPECTED_ALLOWED_SIGNALS: tuple[dict[str, Any], ...] = (
+    {
+        "stable_name": "inventory.remote_add_check",
+        "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+        "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+        "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+        ],
+    },
+    {
+        "stable_name": "inventory.use_check",
+        "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+        "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+        "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+        ],
+    },
+    {
+        "stable_name": "inventory_item.allow_equip_check",
+        "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+        "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+        "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        ],
+    },
+    {
+        "stable_name": "inventory_item.can_repair_check",
+        "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+        "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK",
+        "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        ],
+    },
+    {
+        "stable_name": "inventory_item.use_onto_item_check",
+        "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+        "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+        "field_mask": [
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        ],
+    },
+)
 SUPPORTED_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 REQUIRED_PROFILE = "observer-debug"
 MAX_OBSERVATION_BUDGET = 10
@@ -377,6 +421,17 @@ def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> di
         )
     if manifest.get("decision") != "copied_signal_only":
         append_blocker(blockers, "decision_manifest_decision_mismatch", value=manifest.get("decision"))
+
+    allowed_signals = manifest.get("allowed_signals")
+    if not isinstance(allowed_signals, list):
+        append_blocker(blockers, "decision_manifest_allowed_signals_missing")
+    elif allowed_signals != list(EXPECTED_ALLOWED_SIGNALS):
+        append_blocker(
+            blockers,
+            "decision_manifest_allowed_signals_mismatch",
+            expected=list(EXPECTED_ALLOWED_SIGNALS),
+            value=allowed_signals,
+        )
 
     blocked_contract = manifest.get("blocked_public_contract")
     mutation_surface = (

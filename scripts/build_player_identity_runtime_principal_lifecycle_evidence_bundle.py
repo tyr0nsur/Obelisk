@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import protected_paths
 from snapshot_evidence_pack import reject_protected_output_path, reject_symlink_component
 
 
@@ -23,6 +24,9 @@ BUILDER = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_approv
 CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 WINDOW_MANIFEST_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
 OFFLINE_GATE = SCRIPT_DIR / "validate_offline_artifact_gate.py"
+SERVER_ROOT = Path("/servidor/ark")
+APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,6 +63,59 @@ def require_success(result: subprocess.CompletedProcess[str], label: str) -> Non
 def require_expected_failure(result: subprocess.CompletedProcess[str], label: str) -> None:
     if result.returncode == 0:
         raise SystemExit(f"{label} unexpectedly passed; evidence bundle overclaims readiness")
+
+
+def require_false_readiness_flags(payload: dict[str, Any], label: str) -> None:
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if payload.get(key) is not False:
+            raise SystemExit(f"{label} overclaims {key}")
+
+
+def require_consume_only_check_report(payload: dict[str, Any], label: str) -> None:
+    if payload.get("ready") is not True:
+        raise SystemExit(f"{label} did not accept consume-only runtime evidence")
+    if payload.get("approved_runtime_evidence_present") is not True:
+        raise SystemExit(f"{label} did not preserve approved runtime evidence presence")
+    if payload.get("runtime_evidence_ready") is not True:
+        raise SystemExit(f"{label} did not preserve runtime evidence readiness")
+    require_false_readiness_flags(payload, label)
+    if payload.get("next_blocker") != "identity_public_contract_gate_missing":
+        raise SystemExit(f"{label} did not route to the identity public contract gate")
+
+
+def require_negative_readiness_report(payload: dict[str, Any], label: str, expected_blocker: str) -> None:
+    if payload.get("ready") is not False:
+        raise SystemExit(f"{label} did not fail closed")
+    if payload.get("approved_runtime_evidence_present") is not True:
+        raise SystemExit(f"{label} lost consume-only runtime evidence acceptance")
+    if payload.get("runtime_evidence_ready") is not True:
+        raise SystemExit(f"{label} lost runtime evidence readiness")
+    require_false_readiness_flags(payload, label)
+    blockers = payload.get("blockers")
+    if not isinstance(blockers, list) or expected_blocker not in blockers:
+        raise SystemExit(f"{label} failed for an unexpected blocker")
+    if payload.get("next_blocker") != "identity_public_contract_gate_missing":
+        raise SystemExit(f"{label} did not preserve the identity public contract gate blocker")
+
+
+def require_approved_copied_log(path: Path) -> Path:
+    reject_symlink_component(path, "--copied-log")
+    status = protected_paths.protected_path_status(
+        path.expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected:
+        raise SystemExit(f"--copied-log must be an offline copy, not a live server path: {status.resolved}")
+    if not status.approved_offline_workspace:
+        raise SystemExit("--copied-log must be under /servidor/ark/workspace-offline")
+    if not status.resolved.is_file():
+        raise SystemExit(f"--copied-log does not exist: {status.resolved}")
+    if len(status.resolved.parts) < 3 or status.resolved.parts[-3] != EXPECTED_COPIED_LOG_PARENT:
+        raise SystemExit("--copied-log must be live-validation-logs/<run-id>/Obelisk.log")
+    if status.resolved.parts[-1] != "Obelisk.log":
+        raise SystemExit("--copied-log must be live-validation-logs/<run-id>/Obelisk.log")
+    return status.resolved
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -105,6 +162,7 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
 
 def main() -> int:
     args = parse_args()
+    copied_log = require_approved_copied_log(args.copied_log)
     output_dir = args.output_dir.expanduser()
     reject_symlink_component(output_dir, "--output-dir")
     output_dir = reject_protected_output_path(output_dir, "--output-dir")
@@ -140,7 +198,7 @@ def main() -> int:
                 "--obelisk-commit",
                 args.obelisk_commit,
                 "--fail-on-quality-blockers",
-                str(args.copied_log),
+                str(copied_log),
             ],
             stdout_path=summary_path,
         ),
@@ -148,7 +206,7 @@ def main() -> int:
     )
     window_check = load_json(window_check_path)
     summary = load_json(summary_path)
-    require_window_matches_summary(window_check, summary, args.copied_log)
+    require_window_matches_summary(window_check, summary, copied_log)
     require_success(
         run_command(
             [
@@ -222,13 +280,29 @@ def main() -> int:
     public_check = load_json(public_check_path)
     runtime_check = load_json(runtime_check_path)
     gate = load_json(gate_path)
+    require_consume_only_check_report(check, "consume approved runtime principal lifecycle evidence check")
+    require_negative_readiness_report(
+        promote_check,
+        "promote approved runtime principal lifecycle evidence check",
+        "promote_blocked_until_identity_public_contract_gate",
+    )
+    require_negative_readiness_report(
+        public_check,
+        "public-readiness approved runtime principal lifecycle evidence check",
+        "public_readiness_blocked_until_identity_public_contract_gate",
+    )
+    require_negative_readiness_report(
+        runtime_check,
+        "runtime-readiness approved runtime principal lifecycle evidence check",
+        "runtime_readiness_blocked_until_identity_public_contract_gate",
+    )
     report = {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle.v1",
         "status": "accepted",
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
-        "source_log": str(args.copied_log),
+        "source_log": str(copied_log),
         "operational_window": {
             "check": str(window_check_path),
             "copied_log_sha256": window_check.get("copied_log", {}).get("sha256"),

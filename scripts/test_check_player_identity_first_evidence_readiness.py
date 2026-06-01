@@ -2140,6 +2140,38 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
         )
 
+    def test_approved_runtime_manifest_diagnosis_rejects_checker_report_overclaim(self) -> None:
+        original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
+
+        def overclaiming_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["public_sdk_ready"] = True
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                checker.approved_runtime_principal_lifecycle_evidence,
+                "build_report",
+                side_effect=overclaiming_report,
+            ):
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    approved_manifest
+                )
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+        self.assertFalse(diagnosis["runtime_evidence_ready"])
+        self.assertFalse(diagnosis["promotion_ready"])
+        self.assertFalse(diagnosis["public_sdk_ready"])
+        self.assertFalse(diagnosis["runtime_ready"])
+        self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertIn("approved_runtime_report_public_sdk_ready_not_false", diagnosis["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

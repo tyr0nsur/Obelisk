@@ -307,6 +307,37 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertEqual("resource_handle_identity", term_blocker["id"])
         self.assertIn("ResourceHandle", term_blocker["missing"])
 
+    def test_decision_manifest_allowed_signal_drift_fails_closed(self) -> None:
+        decision_manifest = json.loads(checker.DECISION_MANIFEST.read_text(encoding="utf-8"))
+        decision_manifest["allowed_signals"][2]["field_mask"].append(
+            "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
+        )
+        decision_manifest["allowed_signals"].append(
+            {
+                "stable_name": "inventory_item.craft_blueprint",
+                "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CRAFT_BLUEPRINT",
+                "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CRAFT_BLUEPRINT",
+                "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "inventory_item_copied_signals_public_contract_decisions.json"
+            manifest.write_text(json.dumps(decision_manifest), encoding="utf-8")
+            result = self.run_checker(
+                "--json",
+                "--decision-manifest",
+                str(manifest),
+                *REQUIRED_GATE_ARGS,
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decision_manifest_allowed_signals_mismatch", reasons)
+
     def test_mutated_fixture_boundary_redaction_and_runtime_flags_fail_closed(self) -> None:
         fixture_report = fixture_boundary.build_check(
             fixture_boundary.DEFAULT_SNAPSHOT_ROOT,
