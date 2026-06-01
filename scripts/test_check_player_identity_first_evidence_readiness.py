@@ -1064,18 +1064,16 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "principal invalidation policy manifest alone",
             runtime_requirements["insufficient_evidence"],
         )
-        observations = runtime_requirements["minimum_required_observations"]
+        observations = runtime_requirements["minimum_required_runtime_observations"]
         self.assertEqual(
             [observation["case"] for observation in observations],
             [
                 "session_start_anchor",
                 "session_start_rejected_anchor",
                 "session_end_anchor",
-                "stale_after_logout",
-                "malformed_or_unsupported_evidence",
             ],
         )
-        self.assertEqual([observation["required_order"] for observation in observations], [1, 2, 3, 4, 5])
+        self.assertEqual([observation["required_order"] for observation in observations], [1, 2, 3])
         self.assertEqual(observations[0]["required_role"], "session_start")
         self.assertEqual(observations[0]["required_copied_fields"], ["bIsFromLogin", "ReturnValue"])
         self.assertEqual(observations[0]["required_copied_bool_fields"], ["bIsFromLogin", "ReturnValue"])
@@ -1086,10 +1084,18 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(observations[1]["required_copied_bool_values"], ["0", "1"])
         self.assertEqual(observations[2]["required_role"], "session_end")
         self.assertEqual(observations[2]["required_copied_fields"], [])
-        self.assertEqual(observations[3]["required_role"], "none")
-        self.assertEqual(observations[3]["required_copied_fields"], ["generation_state"])
-        self.assertEqual(observations[4]["required_role"], "none")
-        self.assertEqual(observations[4]["required_copied_fields"], [])
+        assertions = runtime_requirements["required_consumer_boundary_assertions"]
+        self.assertEqual(
+            [assertion["case"] for assertion in assertions],
+            ["stale_after_logout", "malformed_or_unsupported_evidence"],
+        )
+        self.assertEqual([assertion["required_order"] for assertion in assertions], [1, 2])
+        self.assertFalse(assertions[0]["runtime_observed"])
+        self.assertEqual(assertions[0]["provenance"], "consumer_boundary_assertion_not_runtime_observation")
+        self.assertEqual(assertions[0]["required_copied_fields"], ["generation_state"])
+        self.assertFalse(assertions[1]["runtime_observed"])
+        self.assertEqual(assertions[1]["provenance"], "consumer_boundary_assertion_not_runtime_observation")
+        self.assertEqual(assertions[1]["required_copied_fields"], [])
         approval_boundary = runtime_requirements["approval_boundary"]
         self.assertFalse(approval_boundary["approved_runtime_evidence_present"])
         self.assertFalse(approval_boundary["runtime_work_authorized_by_this_report"])

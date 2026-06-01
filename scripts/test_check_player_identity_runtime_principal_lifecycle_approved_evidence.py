@@ -171,6 +171,8 @@ def manifest() -> dict:
             {
                 "case": "stale_after_logout",
                 "result": "fail_closed",
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
+                "runtime_observed": False,
                 "lookup_allowed": False,
                 "mutation_allowed": False,
                 "return_override_allowed": False,
@@ -179,6 +181,8 @@ def manifest() -> dict:
             {
                 "case": "malformed_or_unsupported_evidence",
                 "result": "fail_closed",
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
+                "runtime_observed": False,
                 "lookup_allowed": False,
                 "mutation_allowed": False,
                 "return_override_allowed": False,
@@ -282,6 +286,8 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             {
                 "case": "stale_after_logout",
                 "result": "fail_closed",
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
+                "runtime_observed": False,
                 "lookup_allowed": False,
                 "mutation_allowed": False,
                 "return_override_allowed": False,
@@ -290,6 +296,8 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             {
                 "case": "malformed_or_unsupported_evidence",
                 "result": "fail_closed",
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
+                "runtime_observed": False,
                 "lookup_allowed": False,
                 "mutation_allowed": False,
                 "return_override_allowed": False,
@@ -735,6 +743,24 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime_summary_detail_values_missing", report["blockers"])
         self.assertIn("consumer_boundary_cases_missing", report["blockers"])
+
+    def test_rejects_consumer_boundary_case_that_claims_runtime_observation(self) -> None:
+        payload = copy.deepcopy(manifest())
+        payload["consumer_boundary_cases"][0]["runtime_observed"] = True
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("consumer_boundary_runtime_observed_not_false", report["blockers"])
+
+    def test_rejects_consumer_boundary_case_without_assertion_provenance(self) -> None:
+        payload = copy.deepcopy(manifest())
+        payload["consumer_boundary_cases"][0].pop("provenance")
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("consumer_boundary_case_provenance_mismatch", report["blockers"])
 
 
 if __name__ == "__main__":

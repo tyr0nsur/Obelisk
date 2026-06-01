@@ -100,7 +100,11 @@ the relevant log into:
 /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log
 ```
 
-Keep the secret-free `window-manifest.env` beside the copied log. The manifest checker
+Keep the secret-free `window-manifest.env` beside the copied log. After the log has been
+copied, generate the initial sidecar with
+`check_player_identity_runtime_principal_lifecycle_window_manifest.py --emit-template
+... --copied-log ...` so `run_id`, `copied_log_path`, and `copied_log_sha256` come from
+the approved-workspace copy rather than manual transcription. The manifest checker
 validates offline sidecar posture only; it does not approve the run and cannot substitute
 for the wrapper/preflight marker exclusivity checks.
 

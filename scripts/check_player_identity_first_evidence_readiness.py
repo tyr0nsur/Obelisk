@@ -1164,7 +1164,7 @@ def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
         "approval_required": True,
         "accepted_by_this_preflight": False,
         "required_for": ["promote", "public_readiness", "runtime_readiness"],
-        "minimum_required_observations": [
+        "minimum_required_runtime_observations": [
             {
                 "case": "session_start_anchor",
                 "target": "ShooterGameMode.HandleNewPlayer",
@@ -1195,25 +1195,31 @@ def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
                 "required_copied_fields": [],
                 "required_order": 3,
             },
+        ],
+        "required_consumer_boundary_assertions": [
             {
                 "case": "stale_after_logout",
                 "target": "post_logout_consumer_check",
                 "required_signal": "stale_or_missing_generation_denies_without_lookup",
                 "required_role": "none",
+                "runtime_observed": False,
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
                 "required_copied_bool_fields": [],
                 "required_copied_bool_values": [],
                 "required_copied_fields": ["generation_state"],
-                "required_order": 4,
+                "required_order": 1,
             },
             {
                 "case": "malformed_or_unsupported_evidence",
                 "target": "principal_consumer_boundary",
                 "required_signal": "fail_closed_deny",
                 "required_role": "none",
+                "runtime_observed": False,
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
                 "required_copied_bool_fields": [],
                 "required_copied_bool_values": [],
                 "required_copied_fields": [],
-                "required_order": 5,
+                "required_order": 2,
             },
         ],
         "privacy_boundary": [

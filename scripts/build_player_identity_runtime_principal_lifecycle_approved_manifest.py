@@ -308,6 +308,8 @@ def build_manifest(
             {
                 "case": "stale_after_logout",
                 "result": "fail_closed",
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
+                "runtime_observed": False,
                 "lookup_allowed": False,
                 "mutation_allowed": False,
                 "return_override_allowed": False,
@@ -316,6 +318,8 @@ def build_manifest(
             {
                 "case": "malformed_or_unsupported_evidence",
                 "result": "fail_closed",
+                "provenance": "consumer_boundary_assertion_not_runtime_observation",
+                "runtime_observed": False,
                 "lookup_allowed": False,
                 "mutation_allowed": False,
                 "return_override_allowed": False,

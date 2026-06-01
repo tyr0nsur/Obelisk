@@ -308,16 +308,18 @@ the checker rather than hand-writing fields:
 
 ```bash
 python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
-  --emit-template /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env
+  --emit-template /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log
 ```
 
-Then replace the template values with the reviewed run id, target, timestamps,
-`copied_log_path`, `copied_log_sha256`, `obelisk_commit`, posture fields, rollback fields,
-and notice/user-policy fields for the approved window. Validate the manifest before
-building an evidence bundle; stale or extra keys must fail closed. The emitted template is
-not acceptance-ready evidence by itself: the checker must run only after replacing the
-placeholder SHA, copying the log under the matching `<run-id>` evidence directory, and
-verifying that `copied_log_sha256` matches the copied file bytes.
+With `--copied-log`, the template fills `run_id`, `copied_log_path`, and
+`copied_log_sha256` from the existing approved-workspace log copy. Then replace the
+remaining template values with the reviewed target, timestamps, `obelisk_commit`, posture
+fields, rollback fields, and notice/user-policy fields for the approved window. Validate
+the manifest before building an evidence bundle; stale or extra keys must fail closed. The
+emitted template is not acceptance-ready evidence by itself: the checker must run only
+after copying the log under the matching `<run-id>` evidence directory and verifying the
+reviewed sidecar fields.
 
 If users are involved, the manifest may record only a notice path label and a sanitized
 notice digest. It must not record endpoints, webhooks, tokens, message URLs, player

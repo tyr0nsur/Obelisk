@@ -111,6 +111,8 @@ ALLOWED_CONSUMER_CASE_KEYS = frozenset(
     (
         "case",
         "result",
+        "provenance",
+        "runtime_observed",
         "lookup_allowed",
         "mutation_allowed",
         "return_override_allowed",
@@ -842,6 +844,20 @@ def validate_consumer_boundary(cases: Any, blockers: list[dict[str, Any]]) -> li
             add(blockers, "consumer_boundary_case_unexpected", f"{label}.case", case=name)
         if case.get("result") != "fail_closed":
             add(blockers, "consumer_boundary_case_not_fail_closed", f"{label}.result", case=name)
+        if case.get("provenance") != "consumer_boundary_assertion_not_runtime_observation":
+            add(
+                blockers,
+                "consumer_boundary_case_provenance_mismatch",
+                f"{label}.provenance",
+                case=name,
+            )
+        if case.get("runtime_observed") is not False:
+            add(
+                blockers,
+                "consumer_boundary_runtime_observed_not_false",
+                f"{label}.runtime_observed",
+                case=name,
+            )
         for key in ("lookup_allowed", "mutation_allowed", "return_override_allowed", "public_sdk_surface"):
             if case.get(key) is not False:
                 add(blockers, f"consumer_boundary_{key}_not_false", f"{label}.{key}", case=name)
@@ -1040,6 +1056,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         ),
         "observed_runtime_cases": validation.observed_runtime_cases,
         "consumer_cases": validation.consumer_cases,
+        "consumer_boundary_assertions": validation.consumer_cases,
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,
         "non_claims": [
