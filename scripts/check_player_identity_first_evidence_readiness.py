@@ -52,6 +52,8 @@ STATIC_ORIENTATION_MANIFEST_TOKENS = (
     "radare2-static-orientation",
     "static-orientation",
 )
+DEFAULT_ARTIFACT_ROOT = Path("/home/flowcommunity-ark/obelisk-artifacts")
+APPROVED_WORKSPACE_FALLBACK_ROOT = Path("/servidor/ark/workspace-offline")
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,7 +66,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--artifact-root",
         type=Path,
-        default=Path("/home/flowcommunity-ark/obelisk-artifacts"),
+        default=DEFAULT_ARTIFACT_ROOT,
         help="Non-protected artifact root to scan for reflection inventory packs.",
     )
     parser.add_argument(
@@ -469,6 +471,38 @@ def artifact_root_diagnosis(inventory_payload: dict[str, Any] | None) -> dict[st
             "--root <artifact-root>"
         ),
     }
+
+
+def root_has_no_identity_inventory_candidate(inventory_payload: dict[str, Any] | None) -> bool:
+    diagnosis = artifact_root_diagnosis(inventory_payload)
+    return diagnosis.get("status") in {
+        "no_manifest_files_found",
+        "no_obelisk_reflection_inventory_pack_manifests_found",
+    }
+
+
+def scan_reflection_inventory_root(root: Path) -> tuple[subprocess.CompletedProcess[str], dict[str, Any] | None, str | None]:
+    try:
+        reject_player_identity_artifact_root(root, "--artifact-root")
+    except SystemExit as exc:
+        return (
+            subprocess.CompletedProcess(
+                ["check_reflection_inventory_pack_readiness.py", "--root", str(root)],
+                1,
+                "",
+                str(exc),
+            ),
+            rejected_artifact_root_inventory_payload(root, str(exc)),
+            str(exc),
+        )
+    result, payload = run_json_command(
+        [
+            str(SCRIPT_DIR / "check_reflection_inventory_pack_readiness.py"),
+            "--root",
+            str(root),
+        ]
+    )
+    return result, payload, None
 
 
 def second_source_missing_count(coverage_payload: dict[str, Any] | None) -> int | None:
@@ -1697,31 +1731,47 @@ def build_progress_signal(
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
-    try:
-        reject_player_identity_artifact_root(args.artifact_root, "--artifact-root")
-        artifact_root_rejection = None
-    except SystemExit as exc:
-        artifact_root_rejection = str(exc)
-
-    if artifact_root_rejection is None:
-        inventory_result, inventory_payload = run_json_command(
-            [
-                str(SCRIPT_DIR / "check_reflection_inventory_pack_readiness.py"),
-                "--root",
-                str(args.artifact_root),
-            ]
-        )
-    else:
-        inventory_result = subprocess.CompletedProcess(
-            ["check_reflection_inventory_pack_readiness.py", "--root", str(args.artifact_root)],
-            1,
-            "",
-            artifact_root_rejection,
-        )
-        inventory_payload = rejected_artifact_root_inventory_payload(
-            args.artifact_root,
-            artifact_root_rejection,
-        )
+    requested_artifact_root = args.artifact_root
+    effective_artifact_root = requested_artifact_root
+    inventory_result, inventory_payload, artifact_root_rejection = scan_reflection_inventory_root(requested_artifact_root)
+    artifact_root_fallback: dict[str, Any] = {
+        "used": False,
+        "root": None,
+        "reason": None,
+        "primary_root": str(requested_artifact_root),
+        "primary_diagnosis": artifact_root_diagnosis(inventory_payload),
+    }
+    if (
+        artifact_root_rejection is None
+        and requested_artifact_root == DEFAULT_ARTIFACT_ROOT
+        and root_has_no_identity_inventory_candidate(inventory_payload)
+    ):
+        fallback_result, fallback_payload, fallback_rejection = scan_reflection_inventory_root(APPROVED_WORKSPACE_FALLBACK_ROOT)
+        if (
+            fallback_rejection is None
+            and isinstance(fallback_payload, dict)
+            and fallback_payload.get("ready") is True
+            and isinstance(fallback_payload.get("accepted_pack"), dict)
+        ):
+            effective_artifact_root = APPROVED_WORKSPACE_FALLBACK_ROOT
+            inventory_result = fallback_result
+            inventory_payload = fallback_payload
+            artifact_root_fallback = {
+                **artifact_root_fallback,
+                "used": True,
+                "root": str(APPROVED_WORKSPACE_FALLBACK_ROOT),
+                "reason": "default_root_had_no_reflection_inventory_pack",
+                "fallback_diagnosis": artifact_root_diagnosis(fallback_payload),
+            }
+        else:
+            artifact_root_fallback = {
+                **artifact_root_fallback,
+                "attempted": True,
+                "root": str(APPROVED_WORKSPACE_FALLBACK_ROOT),
+                "reason": "default_root_had_no_reflection_inventory_pack",
+                "fallback_rejected": fallback_rejection,
+                "fallback_diagnosis": artifact_root_diagnosis(fallback_payload),
+            }
     coverage_command = [
         str(SCRIPT_DIR / "compare_reflection_snapshots.py"),
         "--base-root",
@@ -1822,7 +1872,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         principal_invalidation_ready=principal_invalidation_ready,
         lifecycle_diagnosis=lifecycle_diagnosis,
     )
-    offline_inputs = bounded_artifact_file_scan(args.artifact_root)
+    offline_inputs = bounded_artifact_file_scan(effective_artifact_root)
 
     downstream_blockers: list[str] = []
     if not inventory_ready:
@@ -1876,7 +1926,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     if isinstance(recipe_root_raw, str) and offline_inputs.get("status") != "artifact_root_rejected":
         recipe_root = Path(recipe_root_raw)
     elif artifact_root_rejection is None:
-        recipe_root = args.artifact_root
+        recipe_root = effective_artifact_root
     else:
         recipe_root = Path("<non-protected-artifact-root>")
     core_manifest_pattern = recipe_root / CORE_EVIDENCE_MANIFEST_PATTERN
@@ -1987,7 +2037,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "accepted_for_internal_planning": ready,
         "not_artifact_gate": True,
         "promotion_ready": False,
-        "artifact_root": str(args.artifact_root),
+        "artifact_root": str(requested_artifact_root),
+        "effective_artifact_root": str(effective_artifact_root),
+        "artifact_root_fallback": artifact_root_fallback,
         "snapshot_root": str(args.snapshot_root),
         "candidate_root": str(args.candidate_root) if args.candidate_root else None,
         "lifecycle_anchor_candidates_manifest": (

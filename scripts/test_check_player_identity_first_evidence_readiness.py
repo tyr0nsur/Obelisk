@@ -520,6 +520,156 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIsNone(payload["reflection_inventory"]["manifests_scanned"])
         self.assertEqual(payload["reflection_inventory"]["reason_codes"], [])
 
+    def test_default_artifact_root_can_fallback_to_approved_workspace_when_no_identity_pack_exists(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        scanned_roots: list[str] = []
+        offline_scan_roots: list[Path] = []
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                root = args[args.index("--root") + 1]
+                scanned_roots.append(root)
+                if root == str(checker.DEFAULT_ARTIFACT_ROOT):
+                    return ok, {
+                        "ready": False,
+                        "accepted_pack": None,
+                        "manifests_scanned": 0,
+                        "candidate_packs": [],
+                        "reasons": [],
+                    }
+                if root == str(checker.APPROVED_WORKSPACE_FALLBACK_ROOT):
+                    return ok, self.lower_level_accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 0,
+                        "second_source_missing": 12,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "missing_candidate_root",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        def fake_bounded_artifact_file_scan(root: Path, *, max_depth: int = 6):
+            offline_scan_roots.append(root)
+            return {
+                "status": "offline_binary_and_core_like_inputs_missing",
+                "artifact_root_only": True,
+                "resolved_root": str(root),
+                "server_root_excluded": "/servidor/ark",
+                "shooter_game_server_candidates": [],
+                "core_like_candidates": [],
+                "ready_to_build_core_evidence_pack": False,
+            }
+
+        args = SimpleNamespace(
+            artifact_root=checker.DEFAULT_ARTIFACT_ROOT,
+            snapshot_root=Path("/tmp/player-identity-snapshots"),
+            candidate_root=None,
+        )
+        with (
+            mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+            mock.patch.object(checker, "bounded_artifact_file_scan", side_effect=fake_bounded_artifact_file_scan),
+        ):
+            payload = checker.build_report(args)
+
+        self.assertEqual(
+            scanned_roots,
+            [
+                str(checker.DEFAULT_ARTIFACT_ROOT),
+                str(checker.APPROVED_WORKSPACE_FALLBACK_ROOT),
+            ],
+        )
+        self.assertEqual(offline_scan_roots, [checker.APPROVED_WORKSPACE_FALLBACK_ROOT])
+        self.assertEqual(payload["artifact_root"], str(checker.DEFAULT_ARTIFACT_ROOT))
+        self.assertEqual(payload["effective_artifact_root"], str(checker.APPROVED_WORKSPACE_FALLBACK_ROOT))
+        self.assertTrue(payload["artifact_root_fallback"]["used"])
+        self.assertEqual(
+            payload["artifact_root_fallback"]["reason"],
+            "default_root_had_no_reflection_inventory_pack",
+        )
+        self.assertTrue(payload["reflection_inventory"]["ready"])
+        self.assertTrue(payload["artifact_chain"]["ready_to_plan_admin_snapshots"])
+
+    def test_explicit_artifact_root_does_not_use_workspace_fallback(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        scanned_roots: list[str] = []
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                root = args[args.index("--root") + 1]
+                scanned_roots.append(root)
+                return ok, {
+                    "ready": False,
+                    "accepted_pack": None,
+                    "manifests_scanned": 0,
+                    "candidate_packs": [],
+                    "reasons": [],
+                }
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_missing": 12,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "missing_candidate_root",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            explicit_root = Path(temp_dir)
+            args = SimpleNamespace(
+                artifact_root=explicit_root,
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=None,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertEqual(scanned_roots, [str(explicit_root)])
+        self.assertEqual(payload["artifact_root"], str(explicit_root))
+        self.assertEqual(payload["effective_artifact_root"], str(explicit_root))
+        self.assertFalse(payload["artifact_root_fallback"]["used"])
+
     def test_candidate_root_reports_second_source_not_accepted_separately_from_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = self.run_checker(
