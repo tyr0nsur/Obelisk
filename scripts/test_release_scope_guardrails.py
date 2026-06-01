@@ -911,7 +911,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             "do not gain new support tier, public SDK scope, or `v1.0` completion weight",
             status,
         )
-        self.assertIn("names and demand dictionaries only", pr_template)
+        self.assertIn("names, demand, conceptual architecture, and migration-ergonomics references only", pr_template)
+        self.assertIn("no source/API/ABI/behavior copying", pr_template)
 
     def test_release_gate_rejects_incomplete_ufunction_metadata_before_build(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1117,7 +1118,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         }
         required = [
             "ArkServerApi/AseApi",
-            "names and demand",
+            "names",
+            "demand",
+            "conceptual architecture",
+            "migration",
             "not a behavior map",
             "not a porting",
             "copying source",
@@ -2290,6 +2294,8 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("Do not draft or send Discord updates unless explicitly approved", workflow_skill)
         self.assertIn("Endpoints are operator secrets", workflow_skill)
         self.assertIn("scripts/send_discord_embed.py --dry-run", workflow_skill)
+        self.assertIn("--confirm-approved-send", workflow_skill)
+        self.assertIn("--approval-scope community", workflow_skill)
         self.assertIn("name every promoted second-source target set explicitly", normalized_workflow)
         self.assertIn("Runtime-observer summaries are review artifacts only", workflow_skill)
         self.assertIn("Module-level field aggregates are not promotable layouts", normalized_workflow)

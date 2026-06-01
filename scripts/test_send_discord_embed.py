@@ -233,6 +233,81 @@ class SendDiscordEmbedTests(unittest.TestCase):
 
         self.assertIn("OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL", str(raised.exception))
 
+    def test_real_send_requires_explicit_confirmation_and_matching_scope(self) -> None:
+        base_args = [
+            "--channel",
+            "community",
+            "--title",
+            "Obelisk update",
+            "--description",
+            "Public update for plugin authors.",
+            "--status",
+            "Approved milestone",
+            "--scope",
+            "Community update",
+            "--field",
+            "A=B",
+            "--field",
+            "C=D",
+        ]
+        missing_confirm = subprocess.run(
+            [sys.executable, str(SCRIPT), *base_args],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertNotEqual(missing_confirm.returncode, 0)
+        self.assertIn("--confirm-approved-send", missing_confirm.stderr)
+
+        wrong_scope = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                *base_args,
+                "--confirm-approved-send",
+                "--approval-scope",
+                "beta-test",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertNotEqual(wrong_scope.returncode, 0)
+        self.assertIn("--approval-scope matches --channel", wrong_scope.stderr)
+
+    def test_real_send_with_confirmation_uses_matching_webhook(self) -> None:
+        args = [
+            "--channel",
+            "community",
+            "--title",
+            "Obelisk update",
+            "--description",
+            "Public update for plugin authors.",
+            "--status",
+            "Approved milestone",
+            "--scope",
+            "Community update",
+            "--field",
+            "A=B",
+            "--field",
+            "C=D",
+            "--confirm-approved-send",
+            "--approval-scope",
+            "community",
+        ]
+
+        with (
+            mock.patch.object(send_discord_embed, "load_webhook_url", return_value="https://example.invalid/webhook") as load,
+            mock.patch.object(send_discord_embed, "send_payload") as send,
+        ):
+            rc = send_discord_embed.main(args)
+
+        self.assertEqual(0, rc)
+        load.assert_called_once()
+        send.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

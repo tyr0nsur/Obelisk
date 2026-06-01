@@ -40,6 +40,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   controls, and observers unless the matching approved env+marker pair is enabled for a
   scoped debug window.
+- PluginManager unload cleanup skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown when plugin-owned callback cleanup fails.
 - `CallProcessEvent` remains an init-window debug escape hatch only: the current plugin
   owner is inside `ObeliskPlugin_Init`, has
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and Post-init calls through captured API

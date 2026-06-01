@@ -141,6 +141,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--color", type=lambda value: int(value, 0))
     parser.add_argument("--env-file", type=Path, default=DEFAULT_ENV_PATH)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--confirm-approved-send",
+        action="store_true",
+        help="Required for a real webhook send after a current-turn approval and dry-run review.",
+    )
+    parser.add_argument(
+        "--approval-scope",
+        choices=sorted(CHANNELS),
+        help="Required for a real webhook send and must match --channel.",
+    )
     return parser.parse_args(argv)
 
 
@@ -151,6 +161,11 @@ def main(argv: list[str]) -> int:
     if args.dry_run:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
+
+    if not args.confirm_approved_send:
+        raise SystemExit("refusing real Discord send without --confirm-approved-send after dry-run review")
+    if args.approval_scope != args.channel:
+        raise SystemExit("refusing real Discord send unless --approval-scope matches --channel")
 
     webhook_url = load_webhook_url(args)
     send_payload(webhook_url, payload)

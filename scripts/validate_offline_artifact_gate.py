@@ -29,6 +29,7 @@ from snapshot_evidence_pack import SHA256_RE, SERVER_ROOT, sha256_file  # noqa: 
 import normalize_artifact_pack as artifact_pack  # noqa: E402
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates  # noqa: E402
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy  # noqa: E402
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence  # noqa: E402
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence  # noqa: E402
 import check_permissions_admin_query_failclosed_contract as permissions_admin_query_failclosed  # noqa: E402
 
@@ -126,6 +127,7 @@ STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-ce
 PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
 PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA = principal_invalidation_policy.SCHEMA
+PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_APPROVED_EVIDENCE_SCHEMA = approved_runtime_principal_lifecycle_evidence.SCHEMA
 PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_EVIDENCE_SCHEMA = runtime_principal_lifecycle_evidence.SCHEMA
 PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA = permissions_admin_query_failclosed.SCHEMA
 STATIC_ORIENTATION_REPORT_SCHEMAS = {
@@ -172,6 +174,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
     PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA,
     PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA,
+    PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_APPROVED_EVIDENCE_SCHEMA,
     PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_EVIDENCE_SCHEMA,
     PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA,
 }
@@ -6221,6 +6224,38 @@ def validate_players_identity_runtime_principal_lifecycle_evidence_manifest(
     return blockers
 
 
+def validate_players_identity_runtime_principal_lifecycle_approved_evidence_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_APPROVED_EVIDENCE_SCHEMA:
+        return []
+
+    check_mode = "promote" if mode == "promote" else "consume"
+    validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(payload, check_mode=check_mode)
+    blockers: list[dict[str, Any]] = []
+    for blocker in validation.blockers:
+        copied = dict(blocker)
+        copied["label"] = f"{label}:{blocker.get('label', '$')}"
+        blockers.append(copied)
+    for trail, _ in collect_ready_overclaims(payload):
+        if trail in {
+            "$.approved_runtime_evidence_present",
+            "$.runtime_evidence_ready",
+            "$.promotion_gate.runtime_evidence_ready",
+        }:
+            continue
+        blockers.append(
+            {
+                "reason": "players_identity_runtime_principal_lifecycle_approved_evidence_readiness_overclaim",
+                "label": f"{label}:{trail}",
+            }
+        )
+    return blockers
+
+
 def validate_permissions_admin_query_failclosed_contract_manifest(
     payload: dict[str, Any],
     *,
@@ -9445,6 +9480,7 @@ def validate_manifest(
     blockers.extend(validate_players_identity_lifecycle_anchor_candidates_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_principal_invalidation_policy_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_runtime_principal_lifecycle_evidence_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_players_identity_runtime_principal_lifecycle_approved_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_permissions_admin_query_failclosed_contract_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))

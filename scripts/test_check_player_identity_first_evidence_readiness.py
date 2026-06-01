@@ -22,6 +22,9 @@ if str(SCRIPT_DIR) not in sys.path:
 import check_player_identity_first_evidence_readiness as checker
 from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
 from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
+from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
+    manifest as approved_runtime_principal_lifecycle_manifest,
+)
 from test_check_player_identity_runtime_principal_lifecycle_evidence import manifest as runtime_principal_lifecycle_manifest
 from test_validate_offline_artifact_gate import players_identity_first_evidence_manifest
 from reflection_target_sets import schema_target_list  # noqa: E402
@@ -1792,6 +1795,34 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["status"], "blocked")
         self.assertIn("players_identity_first_evidence_not_buildable", payload["blockers"])
         self.assertNotIn("accepted_lifecycle_anchors_missing", payload["blockers"])
+
+    def test_approved_runtime_principal_lifecycle_manifest_clears_runtime_blocker_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+
+            diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                approved_manifest
+            )
+
+        self.assertTrue(diagnosis["ready"])
+        self.assertTrue(diagnosis["approved_runtime_evidence_present"])
+        self.assertTrue(diagnosis["runtime_evidence_ready"])
+        self.assertFalse(diagnosis["promotion_ready"])
+        self.assertFalse(diagnosis["public_sdk_ready"])
+        self.assertFalse(diagnosis["runtime_ready"])
+        self.assertEqual(diagnosis["remaining_blockers"], [])
+        self.assertEqual(
+            diagnosis["observed_runtime_cases"],
+            ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+        )
+        self.assertEqual(
+            diagnosis["consumer_cases"],
+            ["malformed_or_unsupported_evidence", "stale_after_logout"],
+        )
 
 
 if __name__ == "__main__":

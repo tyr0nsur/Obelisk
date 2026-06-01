@@ -222,6 +222,10 @@ python3 scripts/send_discord_embed.py --channel community --title "..." \
   --field "Cambio=..." --field "Impacto=..."
 ```
 
+After the dry-run has been reviewed and the current turn explicitly approves a real send,
+repeat the command with `--confirm-approved-send --approval-scope community` or
+`--approval-scope beta-test`; the approval scope must match `--channel`.
+
 ## Research Notes
 
 Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation. Use

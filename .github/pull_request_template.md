@@ -7,7 +7,7 @@
 - [ ] I did not commit build outputs, `.so` files, logs, cores, local config, or state markers.
 - [ ] I did not include Discord webhook URLs/tokens, copied secrets, operator absolute paths, or server-local roots; operator webhooks stay only in ignored `local/discord-webhooks.env`.
 - [ ] Runtime/reversing changes include a matching research note or public documentation update.
-- [ ] Plugin Hub seed/example changes started from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; installing or documenting a plugin `.so` does not promote new public SDK scope, and ArkServerApi/AseApi/NextGen inputs stayed names and demand dictionaries only.
+- [ ] Plugin Hub seed/example changes started from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; installing or documenting a plugin `.so` does not promote new public SDK scope, and ArkServerApi/AseApi/NextGen inputs stayed names, demand, conceptual architecture, and migration-ergonomics references only, with no source/API/ABI/behavior copying.
 - [ ] This PR does not promote chat beyond minimal `ChatMessageEvent` or any gameplay module to public SDK/release scope unless `docs/STATUS.md`, `docs/RELEASE.md`, `docs/public_gameplay_events.json`, `CHANGELOG.md`, installed SDK evidence, and explicitly named second-source gates are updated.
 - [ ] This PR does not expose public Inventory SDKs, `ResourceHandle`, resource/object identity, UE pointers, raw `FString`, raw params, FName/GObjects indices, mutation, or return overrides without a separately named promotion gate.
 - [ ] If this PR claims runtime `ChatMessageEvent` delivery, the evidence uses the `enable-chat-events` path during an approved operator-selected beta-test window after an operator-approved notice; historical `enable-chat-reflection` observer logs are not counted as delivery evidence.
@@ -17,6 +17,7 @@
 - [ ] Experimental scanners, runtime observers, and native exec probes remain disabled by default.
 - [ ] New plugin or hook behavior is gated by explicit flags or marker files.
 - [ ] Global `ProcessEvent` callbacks are avoided unless the risk is documented and bounded.
+- [ ] Server-backed runs have a current approved live-ops brief naming instance/map, marker/env deltas, start/restart/stop window, evidence capture, notice path when players are involved, and rollback.
 - [ ] Live-server changes include rollback notes.
 
 ## Validation
