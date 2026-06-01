@@ -8,6 +8,13 @@ TARGET_SETS = {
     "chat-message-intake": (
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerSendChatMessage",
     ),
+    # Planning/guidance only for a future command/chat response route. This is not a
+    # reply/send-chat ABI, command router, public response path, or release target set.
+    "command-chat-response-route-planning": (
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientChatMessage",
+    ),
     "buff-compact-intake": (
         "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.AllowPostProcessEffect",
         "obelisk.ufunction-chain.snapshot.v1:PrimalBuff.BPBuffPreventUploading",
@@ -137,6 +144,7 @@ TARGET_SETS = {
 
 PLANNING_ONLY_TARGET_SETS = frozenset(
     (
+        "command-chat-response-route-planning",
         "mission-copied-bool-policy-slice",
         "players-lifecycle-anchor-candidates",
         "players-identity-lifecycle-intake",
@@ -162,6 +170,7 @@ TARGET_SET_MODULE_LANES = {
     "buff-breadth-intake": "buff",
     "buff-compact-intake": "buff",
     "chat-message-intake": "chat",
+    "command-chat-response-route-planning": "command_chat_response",
     "dino-compact-intake": "dino",
     "inventory-action-compact-intake": "inventory",
     "item-compact-intake": "items",

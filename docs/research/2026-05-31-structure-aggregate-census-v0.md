@@ -219,6 +219,15 @@ For the current materialized aggregate/census slice, all six targets are expecte
 report `second-source-missing`: they are fixture-backed first-source evidence for
 internal planning, not promoted runtime or public SDK evidence.
 
+Follow-up audit on 2026-06-01 checked the offline snapshot root
+`/servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots`
+against `structure-aggregate-census-planning` with `--planning-layout-intake`. The root
+does contain all six target snapshot files, but it does not close the second-source gate:
+the comparison reports `second_source_inconclusive=6` because candidate bool properties
+lack `bool_field_size` and `bool_byte_offset` metadata. Treat this root as a useful
+historical observer intake only, not as accepted second-source evidence for the aggregate
+census lane.
+
 The same JSON includes machine-readable non-claims. These are intentional and must stay
 visible in future edits: no public `StructureEvents`, no public Structure SDK, no
 identity/lookup, no mutation, no return override, no enforcement, and no runtime claim.

@@ -233,6 +233,36 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "ResourceHandle, mutation, return override, runtime hooks, or release readiness"
         ),
     },
+    "command-chat-response-route-planning": {
+        "classification": "command_chat_response_route_guidance_only_candidate",
+        "why_blocked": [
+            "planning_guidance_only",
+            "not_release_readiness_target",
+            "public_response_path_blocked",
+            "player_identity_principal_blocked",
+            "permissions_admin_blocked",
+            "command_router_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "generate focal snapshots for ClientServerChatDirectMessage, "
+            "ClientServerChatMessage, and ClientChatMessage from reviewed non-protected "
+            "offline evidence, then compare a distinct second-source root through "
+            "--target-set command-chat-response-route-planning for planning review only"
+        ),
+        "snapshot_prep_checks": [
+            "keep ClientChatMessage.Chat as redacted or recognition-only until a separate ScriptStruct and privacy review exists",
+            "keep sender identity, directed recipient identity, raw FString data, UE pointers, ProcessEvent params, and object refs redacted",
+            "keep reply API, send-chat API, broadcast/notices, moderation, command router, permission checks, mutation, and return override blocked",
+            "require promoted player identity/principal and permissions/admin before any public response path is considered",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote command/chat response path, public reply/send-chat ABI, "
+            "command router, permissions, player identity, raw FString access, mutation, "
+            "return override, runtime hooks, or release readiness"
+        ),
+    },
     "structure-aggregate-census-planning": {
         "classification": "structure_aggregate_census_guidance_only_candidate",
         "why_blocked": [

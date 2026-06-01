@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DECISIONS = REPO_ROOT / "docs" / "permissions_admin_public_contract_decisions.json"
+IDENTITY_DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 NOTE = REPO_ROOT / "docs" / "research" / "2026-05-31-permissions-admin-minimum-post-identity.md"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
@@ -52,6 +53,9 @@ FORBIDDEN_HEADER_TOKENS = {
 class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
     def load_decisions(self) -> dict:
         return json.loads(DECISIONS.read_text(encoding="utf-8"))
+
+    def load_identity_decisions(self) -> dict:
+        return json.loads(IDENTITY_DECISIONS.read_text(encoding="utf-8"))
 
     def test_decision_manifest_lists_every_pre_header_blocker(self) -> None:
         payload = self.load_decisions()
@@ -278,6 +282,38 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         for token in FORBIDDEN_HEADER_TOKENS:
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
+
+    def test_permissions_admin_stays_locked_while_player_identity_is_blocked(self) -> None:
+        identity = self.load_identity_decisions()
+        permissions = self.load_decisions()
+        dependency = next(
+            item
+            for item in permissions["required_before_public_header"]
+            if item["id"] == "dependency.promoted_player_identity"
+        )
+
+        self.assertEqual(identity["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(identity["status"], "blocked")
+        self.assertFalse(identity["public_header_allowed"])
+        self.assertEqual(identity["public_header_symbols_now"], [])
+
+        self.assertEqual(permissions["surface"], "obelisk.permissions_admin.v1")
+        self.assertEqual(permissions["status"], "blocked")
+        self.assertFalse(permissions["public_header_allowed"])
+        self.assertEqual(permissions["public_header_symbols_now"], [])
+        self.assertFalse(permissions["public_cache_abi_allowed"])
+        self.assertEqual(permissions["public_permission_cache_contract"], "none")
+        self.assertEqual(permissions["public_command_reply_contract"], "none")
+        self.assertEqual(permissions["public_admin_mutation_contract"], "none")
+        self.assertEqual(dependency["status"], "unresolved")
+        self.assertEqual(
+            dependency["decision_required"],
+            "Promote obelisk.player_identity.v1 before any permission check API is public.",
+        )
+        self.assertIn(
+            "player identity planning evidence alone cannot enable permissions/admin",
+            dependency["required_behavior"],
+        )
 
     def test_note_and_decision_manifest_share_minimum_query_field_names(self) -> None:
         payload = self.load_decisions()

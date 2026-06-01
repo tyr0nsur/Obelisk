@@ -81,6 +81,10 @@ priorities, and do not use history files as the active source of truth.
   blocked pre-ABI checklist for that future response path; static thunk orientation,
   passive copied chat parsing, candidate vtable slots, raw ProcessEvent callbacks, and
   legacy `CallProcessEvent` are not sufficient response-path evidence.
+  `command-chat-response-route-planning` exists only as a planning-only focal snapshot
+  target set for `ClientServerChatDirectMessage`, `ClientServerChatMessage`, and
+  `ClientChatMessage`; it is not a release-readiness target set, public reply/send-chat
+  ABI, command router, or runtime response claim.
   While identity waits on copied core evidence, inventory copied signals are the
   higher-value side lane. Neither side lane displaces identity -> permissions/admin ->
   commands/replies. Prefer inventory copied-signal hygiene over structure census when
@@ -347,6 +351,9 @@ priorities, and do not use history files as the active source of truth.
   exposure, mutation, runtime readiness, or public SDK promotion. Details:
   `docs/research/2026-05-31-command-chat-response-static-orientation.md` and
   `docs/research/2026-05-31-command-chat-response-thunk-orientation.md`.
+  The current repo fixture root reports `missing_base_snapshot=3` for
+  `command-chat-response-route-planning`; the next offline step is generating/reviewing
+  base snapshots from non-protected evidence, not adding ABI/runtime wiring.
 - Mission copied-bool is the selected v0.2 internal hardening lane only. Keep it
   internal/test-only and default-off; it does not promote a Mission SDK, runtime observer,
   public callback ABI, authority, identity, mutation, return override, or v1 completion.
@@ -359,6 +366,10 @@ priorities, and do not use history files as the active source of truth.
   override, or v1 completion claim. Details:
   `docs/research/2026-05-31-aggregate-census-product-priority.md` and
   `docs/research/2026-05-31-structure-aggregate-census-v0.md`.
+  The offline root
+  `/servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots`
+  has all six files but remains `second_source_inconclusive=6` because bool metadata is
+  incomplete; do not treat it as accepted second-source evidence.
 - Inventory item return-only copied signals are the preferred no-core side lane because
   they already ride copied `GameplayPolicyEvent` evidence. They remain consume/evidence
   only and do not promote public Inventory SDK, public Items SDK, identity, lookup,

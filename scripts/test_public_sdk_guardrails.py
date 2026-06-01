@@ -8953,6 +8953,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         public_target_sets = set(V010_GAMEPLAY_POLICY_TARGET_SETS + V010_CHAT_MESSAGE_TARGET_SETS)
 
         self.assertIn("mission-copied-bool-policy-slice", PLANNING_ONLY_TARGET_SETS)
+        self.assertIn("command-chat-response-route-planning", PLANNING_ONLY_TARGET_SETS)
         self.assertIn("players-identity-lifecycle-intake", PLANNING_ONLY_TARGET_SETS)
         self.assertIn("structure-aggregate-census-planning", PLANNING_ONLY_TARGET_SETS)
         self.assertEqual(sorted(set(PLANNING_ONLY_TARGET_SETS) & public_manifest_sets), [])
@@ -8981,7 +8982,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         required_boundary = normalized(
             "Planning-only target-set artifact packs are consume-mode planning evidence only. "
-            "The planning-only target sets are `mission-copied-bool-policy-slice`, "
+            "The planning-only target sets are `command-chat-response-route-planning`, "
+            "`mission-copied-bool-policy-slice`, "
             "`players-identity-lifecycle-intake`, `players-lifecycle-anchor-candidates`, "
             "and `structure-aggregate-census-planning`; "
             "their packs, container manifests, and child evidence must not be cited as "

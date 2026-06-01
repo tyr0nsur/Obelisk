@@ -244,6 +244,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         public_sdk_flags = {item["name"]: item["public_sdk_ready"] for item in report["target_sets"]}
         self.assertEqual(set(lanes), set(compare.TARGET_SETS))
         self.assertEqual(lanes["chat-message-intake"], "chat")
+        self.assertEqual(lanes["command-chat-response-route-planning"], "command_chat_response")
         self.assertEqual(lanes["mission-copied-bool-policy-slice"], "mission")
         self.assertEqual(lanes["players-lifecycle-anchor-candidates"], "players_lifecycle")
         self.assertEqual(lanes["structure-observer-intake"], "structures")
@@ -279,6 +280,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(classifications["structure-aggregate-census-planning"], "planning_only")
         self.assertIs(release_flags["structure-aggregate-census-planning"], False)
         self.assertEqual(readiness_scopes["structure-aggregate-census-planning"], "planning_only")
+        self.assertEqual(classifications["command-chat-response-route-planning"], "planning_only")
+        self.assertIs(release_flags["command-chat-response-route-planning"], False)
+        self.assertEqual(readiness_scopes["command-chat-response-route-planning"], "planning_only")
         self.assertEqual(classifications["transfer-baccept-only-policy-slice"], "internal_layout_only")
         self.assertIs(release_flags["transfer-baccept-only-policy-slice"], False)
         self.assertEqual(readiness_scopes["transfer-baccept-only-policy-slice"], "internal_layout_only")
@@ -896,6 +900,44 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("target_set=structure-aggregate-census-planning", text_result.stdout)
         self.assertIn("structure_aggregate_census_guidance_only_candidate", text_result.stdout)
         self.assertIn("does not promote Structure aggregate/census SDK", text_result.stdout)
+
+    def test_command_chat_response_route_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "command-chat-response-route-planning",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_sets"], ["command-chat-response-route-planning"])
+        self.assertEqual(report["targets"], [])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "command-chat-response-route-planning")
+        self.assertEqual(guidance["classification"], "command_chat_response_route_guidance_only_candidate")
+        self.assertIn("planning_guidance_only", guidance["why_blocked"])
+        self.assertIn("not_release_readiness_target", guidance["why_blocked"])
+        self.assertIn("public_response_path_blocked", guidance["why_blocked"])
+        self.assertIn("ClientChatMessage.Chat", " ".join(guidance["snapshot_prep_checks"]))
+        self.assertIn("do not use this target set for release/readiness or public SDK promotion gates", guidance["snapshot_prep_checks"])
+        self.assertIn("public reply/send-chat ABI", guidance["non_claim"])
+        self.assertIn("command router", guidance["non_claim"])
+        self.assertIn("release readiness", guidance["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "command-chat-response-route-planning",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=0 scope=offline_planning_only target_set_guidance=1", text_result.stdout)
+        self.assertIn("target_set=command-chat-response-route-planning", text_result.stdout)
+        self.assertIn("command_chat_response_route_guidance_only_candidate", text_result.stdout)
+        self.assertIn("does not promote command/chat response path", text_result.stdout)
 
     def test_structure_aggregate_census_note_preserves_default_off_and_pin_exclusion(self) -> None:
         note = REPO_ROOT / "docs" / "research" / "2026-05-31-structure-aggregate-census-v0.md"

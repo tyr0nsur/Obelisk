@@ -24,12 +24,13 @@ python3 scripts/check_reflection_inventory_pack_readiness.py \
 ## Current Routing
 
 Planning-only target-set artifact packs are consume-mode planning evidence only. The
-planning-only target sets are `mission-copied-bool-policy-slice`,
-`players-identity-lifecycle-intake`, `players-lifecycle-anchor-candidates`, and
-`structure-aggregate-census-planning`; their packs, container manifests, and child
-evidence must not be cited as release-readiness roots, public SDK promotion evidence, or
-`v1.0` completion signals. The `players-lifecycle-anchor-candidates` target set is
-layout-planning only and carries no runtime lifecycle ordering claim.
+planning-only target sets are `command-chat-response-route-planning`,
+`mission-copied-bool-policy-slice`, `players-identity-lifecycle-intake`,
+`players-lifecycle-anchor-candidates`, and `structure-aggregate-census-planning`; their
+packs, container manifests, and child evidence must not be cited as release-readiness
+roots, public SDK promotion evidence, or `v1.0` completion signals. The
+`players-lifecycle-anchor-candidates` target set is layout-planning only and carries no
+runtime lifecycle ordering claim.
 
 Primary current planning inputs:
 
