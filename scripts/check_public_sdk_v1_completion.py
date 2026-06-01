@@ -576,6 +576,9 @@ REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS = {
 REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS = {
     "obelisk.command_principal_authz_response_bridge.v1": "command_principal_authz_response_bridge_decisions.json",
 }
+REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS = {
+    "obelisk.command_copied_response_intent.planning.v1": "command_copied_response_intent_planning_decisions.json",
+}
 CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES = CANONICAL_V1_COMPLETION_BLOCKERS
 
 
@@ -686,7 +689,10 @@ def load_public_header_symbols(path: Path) -> tuple[set[str], list[str]]:
 def contract_decision_paths(decisions_dir: Path) -> list[Path]:
     try:
         paths = set(decisions_dir.glob(PUBLIC_CONTRACT_DECISIONS_GLOB))
-        for filename in REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS.values():
+        for filename in (
+            *REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS.values(),
+            *REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS.values(),
+        ):
             path = decisions_dir / filename
             if path.exists():
                 paths.add(path)
@@ -703,12 +709,14 @@ def missing_required_contract_decision_manifests(decisions_dir: Path) -> dict[st
         return {
             **REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
             **REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS,
+            **REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS,
         }
 
     missing: dict[str, str] = {}
     required_manifests = {
         **REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
         **REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS,
+        **REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS,
     }
     for surface_id, filename in required_manifests.items():
         path = decisions_dir / filename

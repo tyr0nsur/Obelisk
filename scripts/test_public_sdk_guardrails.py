@@ -26,6 +26,9 @@ PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISIONS = (
 COMMAND_CHAT_RESPONSE_PUBLIC_CONTRACT_DECISIONS = (
     REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
 )
+COMMAND_COPIED_RESPONSE_INTENT_PLANNING_DECISIONS = (
+    REPO_ROOT / "docs" / "command_copied_response_intent_planning_decisions.json"
+)
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PLUGIN_HUB_PACKAGE_TEMPLATE_DOC = REPO_ROOT / "docs" / "PLUGIN_HUB_PACKAGE_TEMPLATE.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
@@ -1793,6 +1796,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         requirements = decisions.get("required_before_public_header")
         self.assertIsInstance(requirements, list)
         requirement_ids = {item.get("id") for item in requirements if isinstance(item, dict)}
+        self.assertIn("dependency.promoted_player_identity", requirement_ids)
+        self.assertIn("dependency.promoted_permissions_admin", requirement_ids)
         self.assertTrue(
             {
                 "dependency.promoted_player_identity",
@@ -1820,6 +1825,31 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "raw ProcessEvent callbacks",
         ):
             self.assertIn(insufficient, evidence["not_sufficient"])
+
+    def test_command_copied_response_intent_planning_decisions_remain_non_public(self) -> None:
+        decisions = json.loads(COMMAND_COPIED_RESPONSE_INTENT_PLANNING_DECISIONS.read_text(encoding="utf-8"))
+        header = strip_c_comments(PUBLIC_API_HEADER.read_text(encoding="utf-8"))
+
+        self.assertEqual(decisions["schema"], "obelisk.command-copied-response-intent-planning-decisions.v1")
+        self.assertEqual(decisions["surface"], "obelisk.command_copied_response_intent.planning.v1")
+        self.assertTrue(decisions["planning_only"])
+        self.assertFalse(decisions["promotion_ready"])
+        self.assertFalse(decisions["public_sdk_ready"])
+        self.assertFalse(decisions["public_abi_ready"])
+        self.assertFalse(decisions["runtime_ready"])
+        self.assertFalse(decisions["public_header_allowed"])
+        self.assertFalse(decisions["reply_api_allowed"])
+        self.assertFalse(decisions["send_chat_api_allowed"])
+        self.assertFalse(decisions["command_router_allowed"])
+        self.assertFalse(decisions["runtime_delivery_allowed"])
+        self.assertEqual(decisions["public_header_symbols_now"], [])
+        self.assertEqual(decisions["public_capability_bits_now"], [])
+        self.assertEqual(decisions["public_response_abi_now"], [])
+        for token in decisions["public_header_forbidden_tokens"]:
+            self.assertNotIn(token, header)
+        self.assertIn("policy_source_id", decisions["intent_field_vocabulary"])
+        self.assertIn("permission_policy_epoch", decisions["intent_field_vocabulary"])
+        self.assertIn("does not bypass promoted player identity", " ".join(decisions["non_claims"]))
 
     def test_public_sdk_surfaces_manifest_defines_v1_contract_without_claiming_completion(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
@@ -2508,6 +2538,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             response["v1_decision_contract"]["decision_manifest"],
             "docs/command_chat_response_public_contract_decisions.json",
         )
+        self.assertIn(
+            "docs/command_copied_response_intent_planning_decisions.json",
+            response["v1_decision_contract"]["planning_guardrail_decision_manifests"],
+        )
+        self.assertIn(
+            "command copied response intent planning vocabulary",
+            response["v1_decision_contract"]["not_sufficient_evidence"],
+        )
 
         response_text = json.dumps(response, sort_keys=True)
         for term in (
@@ -2535,6 +2573,31 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "moderation API",
         ):
             self.assertIn(exclusion, response["exclusions"])
+
+    def test_command_copied_response_intent_planning_guardrail_is_not_a_surface(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surface_ids = {surface["id"] for surface in manifest["surfaces"]}
+        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", surface_ids)
+        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", manifest["promoted_surfaces"])
+        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", manifest["planning_surfaces"])
+        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", manifest["v1_sdk_completion_blockers"])
+        release_guardrails = " ".join(manifest["release_guardrails"])
+        self.assertIn("obelisk.command_copied_response_intent.planning.v1 is planning-only", release_guardrails)
+        self.assertIn("does not promote command_chat_response_path", release_guardrails)
+
+        checker = runpy.run_path(str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"))
+        required = checker["REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS"]
+        self.assertEqual(
+            required["obelisk.command_copied_response_intent.planning.v1"],
+            "command_copied_response_intent_planning_decisions.json",
+        )
+        contract_paths = {
+            path.name
+            for path in checker["contract_decision_paths"](REPO_ROOT / "docs")
+        }
+        self.assertIn("command_copied_response_intent_planning_decisions.json", contract_paths)
+        missing = checker["missing_required_contract_decision_manifests"](REPO_ROOT / "docs")
+        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", missing)
 
     def test_public_header_does_not_expose_blocked_v1_sdk_surface_tokens(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
