@@ -17,6 +17,8 @@ of these outcomes:
 - Research note under `docs/research/`.
 - Skill update under `agent-skills/`.
 - Explicit rejected hypothesis documented so future agents do not repeat it.
+- For read-only assignments, a concise list of recommended deltas with evidence; do not
+  edit files just to satisfy this learning loop.
 
 If the finding changes how agents should behave, update a skill. If it only records one
 experiment or evidence trail, update `docs/research/`.
@@ -42,6 +44,8 @@ Sub-agents may recommend skill changes in their final report or in an assigned r
 note. An explicitly assigned docs/skills worker may edit the named skill files; otherwise
 the lead owns process-rule edits and publication. Leave changes unstaged/uncommitted
 unless the current turn says otherwise.
+When the prompt says read-only, recommend skill/doc/research deltas instead of editing
+them; the lead decides whether to integrate those changes.
 
 ## What To Capture
 

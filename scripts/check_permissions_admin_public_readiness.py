@@ -96,6 +96,12 @@ REQUIRED_FAIL_CLOSED_NEVER_ALLOW = frozenset(
         "operator-config allow-capability claim",
         "operator-config authority before separate allow-capable promotion",
         "runtime-local authority without runtime-owned provenance",
+        "unknown plugin owner token",
+        "unloading plugin owner token",
+        "zero plugin owner token",
+        "missing plugin owner token",
+        "missing capability",
+        "rate limit exceeded",
     )
 )
 REQUIRED_FAIL_CLOSED_DENY_OR_UNKNOWN = frozenset(
@@ -109,6 +115,11 @@ REQUIRED_FAIL_CLOSED_DENY_OR_UNKNOWN = frozenset(
         "authority_generation_mismatch",
         "missing policy_epoch provenance",
         "policy source generation mismatch",
+        "zero plugin owner token",
+        "unknown plugin owner token",
+        "unloading plugin owner token",
+        "missing capability",
+        "rate limit exceeded",
     )
 )
 REQUIRED_ALLOWED_PUBLIC_SURFACE_AFTER_IDENTITY = (

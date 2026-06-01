@@ -44,6 +44,9 @@ namespace obelisk::permissions_admin
     struct OwnerContext
     {
         bool HasOwnerToken = false;
+        bool OwnerTokenNonZero = false;
+        bool OwnerKnown = false;
+        bool OwnerUnloading = false;
         bool HasCapability = false;
     };
 

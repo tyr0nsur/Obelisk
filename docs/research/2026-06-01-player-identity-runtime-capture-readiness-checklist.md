@@ -70,6 +70,11 @@ Use these checks only under the future approved brief. They are read-only and mu
 used as approval by themselves:
 
 ```bash
+scripts/check_player_principal_lifecycle_window_request.py \
+  /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/window-request.json \
+  --env-file /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/observer-window.env \
+  --json
+
 scripts/check_player_principal_lifecycle_preflight.sh \
   --offline-only \
   --allow-stopped \

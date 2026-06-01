@@ -115,6 +115,24 @@ namespace
                         Decision::Deny,
                         "missing owner token returned allow");
 
+        PermissionQuery zeroOwnerToken = CompleteRuntimeOwnedQuery();
+        zeroOwnerToken.Owner.OwnerTokenNonZero = false;
+        RequireDecision(EvaluatePermissionQuery(zeroOwnerToken),
+                        Decision::Deny,
+                        "zero owner token returned allow");
+
+        PermissionQuery unknownOwner = CompleteRuntimeOwnedQuery();
+        unknownOwner.Owner.OwnerKnown = false;
+        RequireDecision(EvaluatePermissionQuery(unknownOwner),
+                        Decision::Deny,
+                        "unknown owner token returned allow");
+
+        PermissionQuery unloadingOwner = CompleteRuntimeOwnedQuery();
+        unloadingOwner.Owner.OwnerUnloading = true;
+        RequireDecision(EvaluatePermissionQuery(unloadingOwner),
+                        Decision::Deny,
+                        "unloading owner token returned allow");
+
         PermissionQuery missingCapability = CompleteRuntimeOwnedQuery();
         missingCapability.Owner.HasCapability = false;
         RequireDecision(EvaluatePermissionQuery(missingCapability),

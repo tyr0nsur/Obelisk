@@ -45,7 +45,8 @@ namespace obelisk::permissions_admin
         const PolicyProvenance& provenance = query.Provenance;
         const AbuseControls& abuse = query.Abuse;
 
-        if (!owner.HasOwnerToken || !owner.HasCapability)
+        if (!owner.HasOwnerToken || !owner.OwnerTokenNonZero || !owner.OwnerKnown ||
+            owner.OwnerUnloading || !owner.HasCapability)
             return Decision::Deny;
 
         if (!HasWellFormedCopiedQueryText(query.Text))
@@ -96,6 +97,9 @@ namespace obelisk::permissions_admin
         query.PrincipalValue.SameProcess = true;
 
         query.Owner.HasOwnerToken = true;
+        query.Owner.OwnerTokenNonZero = true;
+        query.Owner.OwnerKnown = true;
+        query.Owner.OwnerUnloading = false;
         query.Owner.HasCapability = true;
 
         query.Provenance.HasSourceId = true;

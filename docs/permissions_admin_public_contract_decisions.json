@@ -266,9 +266,11 @@
         "operator-config authority before separate allow-capable promotion",
         "runtime-local authority without runtime-owned provenance",
         "plugin-supplied provenance",
+        "missing plugin owner token",
         "zero plugin owner token",
         "unknown plugin owner token",
         "unloading plugin owner token",
+        "missing capability",
         "rate limit exceeded"
       ]
     },
