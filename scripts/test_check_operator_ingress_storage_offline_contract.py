@@ -83,12 +83,51 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             }
         )
         contract["lanes"][0]["required_checks"].remove("offline_only")
+        contract["lanes"][0]["required_fields"].remove("candidate_ingress_transport")
+        contract["lanes"][1]["decision_required"] = ""
 
         errors = checker.validate_contract(contract)
 
         self.assertIn("missing required lane: queue_lifecycle", errors)
         self.assertIn("unexpected lane: unexpected_lane", errors)
         self.assertIn("ingress.required_checks missing offline_only", errors)
+        self.assertIn(
+            "ingress.required_fields missing candidate_ingress_transport",
+            errors,
+        )
+        self.assertIn(
+            "storage_migration.decision_required must be a non-empty string",
+            errors,
+        )
+
+    def test_rejected_secret_classes_allowed_only_as_required_field(self) -> None:
+        contract = self.load_valid_contract()
+        self.assertIn("rejected_secret_classes", contract["lanes"][0]["required_fields"])
+        self.assertEqual(checker.validate_contract(contract), [])
+
+        contract = self.load_valid_contract()
+        contract["lanes"][0]["label"] = "rejected_secret_classes"
+        errors = checker.validate_contract(contract)
+
+        self.assertTrue(
+            any(
+                "only allowed as a required rejection/classification field" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+        contract = self.load_valid_contract()
+        contract["lanes"][0]["rejected_secret_classes"] = []
+        errors = checker.validate_contract(contract)
+
+        self.assertTrue(
+            any(
+                "only allowed as a required rejection/classification field" in error
+                for error in errors
+            ),
+            errors,
+        )
 
     def test_rejects_prohibited_claims(self) -> None:
         prohibited_values = [
@@ -99,6 +138,9 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "database",
             "secret-manager",
             "API",
+            "runtime ready",
+            "public ABI",
+            "v1 completion",
             "v1_completion_required",
         ]
         for value in prohibited_values:
