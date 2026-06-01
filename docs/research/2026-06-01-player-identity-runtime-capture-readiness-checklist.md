@@ -142,7 +142,7 @@ Generate the manifest template from the copied log, then replace template values
 reviewed window facts:
 
 ```bash
-python3 scripts/check_player_principal_lifecycle_window_manifest.py \
+python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
   --emit-template /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log
 ```
@@ -150,7 +150,7 @@ python3 scripts/check_player_principal_lifecycle_window_manifest.py \
 Validate the completed manifest:
 
 ```bash
-python3 scripts/check_player_principal_lifecycle_window_manifest.py \
+python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
   --json \
   /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env
 ```

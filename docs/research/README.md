@@ -185,7 +185,7 @@ override, or server-observation approval.
 
 Current v1 research indexing keeps the full modding surface visible, but the active order
 is SDK-complete first: player identity/principal evidence, permissions/admin query-only
-groundwork, then command response/commands. Plugin Hub notes are archived boundaries, not
+groundwork, then command response, then commands/replies. Plugin Hub notes are archived boundaries, not
 active priority before SDK completion. `GameplayPolicyEvent` backing evidence and mission
 copied-bool internal planning remain side lanes only.
 Next v1 research round: keep the complete-SDK blocker route first, not hub foundation
@@ -222,7 +222,7 @@ Current v1 research lane snapshot from the current notes:
 
 | Lane | Current state | Use next |
 | --- | --- | --- |
-| Complete-SDK route: identity -> permissions/admin -> command response | Fact: current blocker chain requires player identity before permissions and commands. | Keep active rounds on SDK blockers; Plugin Hub work stays parked. |
+| Complete-SDK route: identity/principal -> permissions/admin -> command response -> commands/replies | Fact: current blocker chain requires player identity before permissions, command response, and commands/replies. | Keep active rounds on SDK blockers; Plugin Hub work stays parked. |
 | Passive copied chat notification/parsing | Fact: minimal copied `ChatMessageEvent` exists; plugin-local parsing is only an experimental copied-pattern lane. | Treat chat as one small copied notification lane, not the v1 module center. Keep sender identity, permissions, replies/send-chat, moderation, and command SDK blocked until copied identity and authority are promoted. |
 | Inventory lane | Fact: current inventory evidence is promoted publicly only through copied/redacted `GameplayPolicyEvent` fields. | Preserve copied scalar observation and fixture gates without publishing a public Inventory SDK, item identity, lookup, mutation, return override, or `ResourceHandle`. |
 | Structures lane | Fact: structure access/demolish/variant/activation/PIN/seat policy slices back current copied gameplay policy. Build placement remains second-wave. | Keep structure target sets layout-only unless a strict readiness note promotes a named copied surface; do not publish StructureEvents, build-policy SDKs, return override, identity, lookup, or raw params. |

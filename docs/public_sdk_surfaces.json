@@ -148,7 +148,7 @@
     "obelisk.command_copied_response_intent.planning.v1 is planning-only copied response intent vocabulary; it does not promote command_chat_response_path, commands_replies, reply/send-chat, runtime delivery, public ABI, public SDK readiness, or v1 SDK completion.",
     "obelisk.command_copied_response_intent_lifecycle.planning.v1 is planning-only copied response intent lifecycle vocabulary; it does not promote command_chat_response_path, commands_replies, reply/send-chat, runtime delivery, public ABI, public SDK readiness, or v1 SDK completion.",
     "scripts/check_command_permission_route_gate.py is a planning-only aggregate posture check for the identity/principal -> permissions/admin -> command response -> commands/replies dependency chain; a passing report is not release evidence, public ABI readiness, runtime readiness, command router readiness, reply/send-chat readiness, or v1 completion evidence.",
-    "While player identity waits on approved copied runtime principal lifecycle evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
+    "While player identity waits on approved copied runtime principal lifecycle evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> command response -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
     "scripts/check_public_sdk_v1_completion.py reports stable_release_contract_claim_allowed as the manifest switch and stable_claim_allowed as the final computed gate result; stable_claim_allowed must remain false whenever any checker blocker remains.",
     "scripts/check_public_sdk_v1_completion.py reports v1_sdk_blocker_outcomes as accounting-only prioritization for the 12 blockers; those rows do not approve complete/full/production/stable SDK wording.",
@@ -575,7 +575,7 @@
             "promotion_ready": false,
             "runtime_ready": false,
             "v1_completion_evidence": false,
-            "route": "principal -> permissions/admin -> command response",
+            "route": "identity/principal -> permissions/admin -> command response -> commands/replies",
             "non_claims": [
               "does not promote player identity/principal",
               "does not claim stable principal identity",
@@ -591,7 +591,7 @@
             "public_sdk_ready": false,
             "promotion_ready": false,
             "v1_completion_evidence": false,
-            "route": "principal -> permissions/admin -> command response",
+            "route": "identity/principal -> permissions/admin -> command response -> commands/replies",
             "non_claims": [
               "does not promote player identity/principal",
               "does not promote permissions/admin",

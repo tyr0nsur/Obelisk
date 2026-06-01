@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,13 @@ PREPARE = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 CHECK = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+SPEC = importlib.util.spec_from_file_location("check_player_principal_lifecycle_window_request", CHECK)
+assert SPEC is not None and SPEC.loader is not None
+REQUEST_CHECKER = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = REQUEST_CHECKER
+SPEC.loader.exec_module(REQUEST_CHECKER)
 
 
 def prepare_args(output_dir: Path) -> list[str]:
@@ -184,6 +192,98 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("beta_user_policy_requires_notice_path", report["blockers"])
         self.assertIn("approval_required_mismatch", report["blockers"])
+        self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
+    def test_accepts_negated_private_or_ue_boundary_text(self) -> None:
+        blockers: list[dict[str, object]] = []
+        REQUEST_CHECKER.validate_secret_free(
+            {
+                "privacy_boundary": [
+                    "must not expose raw_params",
+                    "do not log player_id",
+                    "does not capture player_id",
+                    "does not collect player_id",
+                    "does not record raw_params",
+                    "never report ue_pointer values",
+                    "forbidden: raw_params",
+                    "without fname_index output",
+                ]
+            },
+            blockers,
+        )
+
+        self.assertEqual([], blockers)
+
+    def test_rejects_unnegated_private_or_ue_boundary_text(self) -> None:
+        blockers: list[dict[str, object]] = []
+        REQUEST_CHECKER.validate_secret_free(
+            {
+                "privacy_boundary": [
+                    "logs raw_params",
+                    "captures player_id",
+                ]
+            },
+            blockers,
+        )
+
+        self.assertEqual(["forbidden_private_or_ue_value", "forbidden_private_or_ue_value"], [
+            item["reason"] for item in blockers
+        ])
+
+    def test_rejects_mixed_negated_and_unnegated_private_or_ue_text(self) -> None:
+        blockers: list[dict[str, object]] = []
+        REQUEST_CHECKER.validate_secret_free(
+            {"privacy_boundary": "must not expose raw_params; captures player_id"},
+            blockers,
+        )
+
+        self.assertEqual(["forbidden_private_or_ue_value"], [item["reason"] for item in blockers])
+
+    def test_rejects_mixed_negation_with_but_then_private_or_ue_text(self) -> None:
+        for text in (
+            "must not expose raw_params but captures player_id",
+            "does not record raw_params then captures player_id",
+        ):
+            with self.subTest(text=text):
+                blockers: list[dict[str, object]] = []
+                REQUEST_CHECKER.validate_secret_free({"privacy_boundary": text}, blockers)
+
+                self.assertEqual(["forbidden_private_or_ue_value"], [item["reason"] for item in blockers])
+
+    def test_rejects_mixed_negation_with_but_runtime_readiness_claim(self) -> None:
+        self.assertTrue(
+            REQUEST_CHECKER.contains_unnegated_positive_capability_claim(
+                "does not authorize runtime readiness but runtime ready"
+            )
+        )
+
+    def test_accepts_negated_runtime_readiness_suffix_claims(self) -> None:
+        for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):
+            with self.subTest(text=text):
+                self.assertFalse(REQUEST_CHECKER.contains_unnegated_positive_capability_claim(text))
+
+    def test_rejects_blocked_prefix_as_private_or_ue_negation(self) -> None:
+        blockers: list[dict[str, object]] = []
+        REQUEST_CHECKER.validate_secret_free(
+            {"privacy_boundary": "blocked player_id raw_params"},
+            blockers,
+        )
+
+        self.assertEqual(["forbidden_private_or_ue_value"], [item["reason"] for item in blockers])
+
+    def test_rejects_blocked_prefix_as_runtime_readiness_negation_in_request_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["user_policy"] = "operator_approved_beta_users"
+            request["notice_path"] = "blocked runtime readiness enabled"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
 
     def test_rejects_live_server_request_path(self) -> None:

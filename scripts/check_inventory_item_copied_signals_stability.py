@@ -72,6 +72,20 @@ EXPECTED_SIGNAL_MASKS = frozenset(signal["event_kind_mask"] for signal in EXPECT
 EXPECTED_SIGNAL_FIELDS = frozenset(
     field for signal in EXPECTED_ALLOWED_SIGNALS for field in signal["field_mask"]
 )
+EXPECTED_REQUIRED_FLAGS = frozenset(
+    (
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+    )
+)
+EXPECTED_DECISIONS_PAYLOAD_CONTRACT = "copied POD scalar observation only"
+EXPECTED_SURFACE_PAYLOAD_CONTRACT = (
+    "copied bool ReturnValue signals only where declared by docs/public_gameplay_events.json",
+    "copied bRequestedByPlayer for inventory.remote_add_check",
+    "copied bIgnoreCooldown for inventory.use_check",
+    "resource_kind remains INVENTORY_ITEM metadata only",
+    "post-original observation only; no authority",
+)
 EXPECTED_PUBLIC_CONTRACT = tuple(
     f"GameplayPolicyEvent {signal['stable_name']}" for signal in EXPECTED_ALLOWED_SIGNALS
 )
@@ -156,6 +170,12 @@ NEGATED_OR_BOUNDARY_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+CLAUSE_SPLIT_RE = re.compile(r"[,.;:\n\r]+")
+NEGATION_LIST_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]+")
+POSITIVE_TERM_SUFFIX_RE = re.compile(
+    r"^\s+(?:ready|enabled|public|supported|allowed|live|operational|exposes?|provides?)\b",
+    re.IGNORECASE,
+)
 C_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 CPP_COMMENT_RE = re.compile(r"//.*")
 
@@ -236,6 +256,31 @@ def string_values(value: Any, trail: str) -> list[tuple[str, str]]:
     return []
 
 
+def preceding_clause(text: str, start: int) -> str:
+    prefix = text[:start]
+    parts = CLAUSE_SPLIT_RE.split(prefix)
+    return parts[-1] if parts else prefix
+
+
+def preceding_negation_list_scope(text: str, start: int) -> str:
+    prefix = text[:start]
+    parts = NEGATION_LIST_SCOPE_SPLIT_RE.split(prefix)
+    return parts[-1] if parts else prefix
+
+
+def has_positive_term_suffix(text: str, end: int) -> bool:
+    return bool(POSITIVE_TERM_SUFFIX_RE.match(text[end:]))
+
+
+def is_negated_for_match(text: str, start: int, end: int) -> bool:
+    if has_positive_term_suffix(text, end):
+        return False
+    return bool(
+        NEGATED_OR_BOUNDARY_RE.search(preceding_clause(text, start))
+        or NEGATED_OR_BOUNDARY_RE.search(preceding_negation_list_scope(text, start))
+    )
+
+
 def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -245,9 +290,10 @@ def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: s
             if key in CONTRACT_SCAN_KEYS:
                 for text_path, text in string_values(child, child_trail):
                     for term in PUBLIC_CLAIM_TERMS:
-                        if not re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE):
+                        match = re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE)
+                        if not match:
                             continue
-                        if NEGATED_OR_BOUNDARY_RE.search(text):
+                        if is_negated_for_match(text, match.start(), match.end()):
                             continue
                         add(blockers, "public_claim_forbidden_term", text_path, term=term, value=text)
                 continue
@@ -286,11 +332,19 @@ def find_gameplay_policy_event(payload: dict[str, Any]) -> dict[str, Any] | None
 
 
 def find_resource_descriptor(payload: dict[str, Any]) -> dict[str, Any] | None:
+    return find_metadata_surface(payload, "obelisk.resource_kind_descriptors.v1")
+
+
+def find_gameplay_policy_event_descriptor(payload: dict[str, Any]) -> dict[str, Any] | None:
+    return find_metadata_surface(payload, "obelisk.gameplay_policy_event_descriptors.v1")
+
+
+def find_metadata_surface(payload: dict[str, Any], surface_id: str) -> dict[str, Any] | None:
     surfaces = payload.get("metadata_surfaces")
     if not isinstance(surfaces, list):
         return None
     for surface in surfaces:
-        if isinstance(surface, dict) and surface.get("surface_id") == "obelisk.resource_kind_descriptors.v1":
+        if isinstance(surface, dict) and surface.get("surface_id") == surface_id:
             return surface
     return None
 
@@ -328,6 +382,13 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         add(blockers, "decisions_public_contract_missing", f"{label}.public_contract")
     else:
         require_equal(contract, "resource_kind", RESOURCE_KIND, f"{label}.public_contract", blockers)
+        require_equal(
+            contract,
+            "payload_contract",
+            EXPECTED_DECISIONS_PAYLOAD_CONTRACT,
+            f"{label}.public_contract",
+            blockers,
+        )
         resource_contract = str(contract.get("resource_contract") or "")
         for term in ("category-only", "no identity", "lookup", "handle"):
             if term not in resource_contract:
@@ -349,6 +410,15 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
             "int32_values",
         }:
             add(blockers, "decisions_public_fields_mismatch", f"{label}.public_contract.public_fields")
+        actual_flags = set(contract.get("required_flags") or [])
+        if actual_flags != EXPECTED_REQUIRED_FLAGS:
+            add(
+                blockers,
+                "decisions_required_flags_mismatch",
+                f"{label}.public_contract.required_flags",
+                expected=sorted(EXPECTED_REQUIRED_FLAGS),
+                value=sorted(actual_flags),
+            )
 
     blocked = payload.get("blocked_public_contract")
     if not isinstance(blocked, dict):
@@ -436,6 +506,30 @@ def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict
             add(blockers, "public_gameplay_inventory_event_mask_mismatch", f"{label}.event_kinds[{index}]", kind=kind)
         if list(item.get("field_mask") or []) != signal["field_mask"]:
             add(blockers, "public_gameplay_inventory_field_mask_mismatch", f"{label}.event_kinds[{index}]", kind=kind)
+        actual_flags = set(item.get("required_flags") or [])
+        if actual_flags != EXPECTED_REQUIRED_FLAGS:
+            add(
+                blockers,
+                "public_gameplay_inventory_required_flags_mismatch",
+                f"{label}.event_kinds[{index}].required_flags",
+                kind=kind,
+                expected=sorted(EXPECTED_REQUIRED_FLAGS),
+                value=sorted(actual_flags),
+            )
+
+    event_descriptor = find_gameplay_policy_event_descriptor(payload)
+    if not isinstance(event_descriptor, dict):
+        add(blockers, "gameplay_policy_event_descriptor_missing", f"{label}.metadata_surfaces")
+    else:
+        descriptor_flags = set(event_descriptor.get("flags") or [])
+        missing_descriptor_flags = sorted(EXPECTED_REQUIRED_FLAGS - descriptor_flags)
+        if missing_descriptor_flags:
+            add(
+                blockers,
+                "gameplay_policy_event_descriptor_required_flags_missing",
+                f"{label}.metadata_surfaces.gameplay_policy_event_descriptors.flags",
+                missing=missing_descriptor_flags,
+            )
 
     resource_descriptor = find_resource_descriptor(payload)
     if not isinstance(resource_descriptor, dict):
@@ -510,16 +604,15 @@ def validate_public_sdk_surfaces(payload: dict[str, Any], blockers: list[dict[st
                 expected=list(EXPECTED_PUBLIC_CONTRACT),
                 value=surface.get("public_contract"),
             )
-        payload_contract = " ".join(str(item) for item in surface.get("payload_contract") or [])
-        for term in ("copied", "resource_kind remains INVENTORY_ITEM metadata only", "post-original observation only", "no authority"):
-            if term not in payload_contract:
-                add(
-                    blockers,
-                    "inventory_copied_payload_contract_guardrail_missing",
-                    f"{label}.{SURFACE}.payload_contract",
-                    term=term,
-                    value=payload_contract,
-                )
+        payload_contract = tuple(surface.get("payload_contract") or [])
+        if payload_contract != EXPECTED_SURFACE_PAYLOAD_CONTRACT:
+            add(
+                blockers,
+                "inventory_copied_payload_contract_mismatch",
+                f"{label}.{SURFACE}.payload_contract",
+                expected=list(EXPECTED_SURFACE_PAYLOAD_CONTRACT),
+                value=list(payload_contract),
+            )
         exclusions = set(surface.get("exclusions") or [])
         missing = sorted(REQUIRED_FORBIDDEN_TERMS - exclusions)
         if missing:

@@ -58,7 +58,7 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                 "event_family": "GameplayPolicyEvent",
                 "resource_kind": stability.RESOURCE_KIND,
                 "resource_contract": "category-only metadata; no identity, no lookup, no handle, persistence, or cross-event correlation",
-                "payload_contract": "copied POD scalar observation only",
+                "payload_contract": stability.EXPECTED_DECISIONS_PAYLOAD_CONTRACT,
                 "public_fields": [
                     "abi_version",
                     "struct_size",
@@ -69,6 +69,7 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                     "bool_values",
                     "int32_values",
                 ],
+                "required_flags": sorted(stability.EXPECTED_REQUIRED_FLAGS),
             },
             "allowed_signals": [dict(signal) for signal in stability.EXPECTED_ALLOWED_SIGNALS],
             "blocked_public_contract": {
@@ -107,7 +108,19 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                             "supported_gameplay_policy_field_mask": sorted(stability.EXPECTED_SIGNAL_FIELDS),
                         }
                     ],
-                }
+                },
+                {
+                    "surface_id": "obelisk.gameplay_policy_event_descriptors.v1",
+                    "scope": (
+                        "metadata-only descriptors for promoted GameplayPolicyEvent kinds; no identity, "
+                        "no lookup, no cross-event correlation, no mutation, no return override, and no UE object access"
+                    ),
+                    "flags": [
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_STRUCTURE_BACKED",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+                    ],
+                },
             ],
             "promoted_events": [
                 {
@@ -117,7 +130,11 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                     "resource_contract": "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
                     "payload": "copied POD scalar fields only",
                     "event_kinds": [
-                        {**dict(signal), "resource_kind": stability.RESOURCE_KIND}
+                        {
+                            **dict(signal),
+                            "resource_kind": stability.RESOURCE_KIND,
+                            "required_flags": sorted(stability.EXPECTED_REQUIRED_FLAGS),
+                        }
                         for signal in stability.EXPECTED_ALLOWED_SIGNALS
                     ],
                 }
@@ -137,13 +154,7 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                     "status": "promoted-experimental-only",
                     "support_tier": "promoted-experimental-only copied-data seed",
                     "public_contract": list(stability.EXPECTED_PUBLIC_CONTRACT),
-                    "payload_contract": [
-                        "copied bool ReturnValue signals only where declared by docs/public_gameplay_events.json",
-                        "copied bRequestedByPlayer for inventory.remote_add_check",
-                        "copied bIgnoreCooldown for inventory.use_check",
-                        "resource_kind remains INVENTORY_ITEM metadata only",
-                        "post-original observation only; no authority",
-                    ],
+                    "payload_contract": list(stability.EXPECTED_SURFACE_PAYLOAD_CONTRACT),
                     "exclusions": sorted(stability.REQUIRED_FORBIDDEN_TERMS),
                 },
                 {
@@ -283,6 +294,67 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("resource_descriptor_scope_guardrail_missing", reasons)
         self.assertIn("resource_descriptor_category_only_flags_missing", reasons)
 
+    def test_required_copied_inventory_flags_must_stay_declared(self) -> None:
+        fixtures = self.make_fixture()
+        fixtures["decisions"]["public_contract"]["required_flags"] = [
+            "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD"
+        ]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("decisions_required_flags_mismatch", reasons)
+
+    def test_gameplay_event_descriptor_must_keep_inventory_flags(self) -> None:
+        fixtures = self.make_fixture()
+        descriptor = fixtures["public_gameplay_events"]["metadata_surfaces"][1]
+        descriptor["flags"].remove("OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED")
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("gameplay_policy_event_descriptor_required_flags_missing", reasons)
+
+    def test_inventory_event_required_flags_must_match_public_manifest(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]["event_kinds"][0]
+        event["required_flags"] = ["OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD"]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("public_gameplay_inventory_required_flags_mismatch", reasons)
+
+    def test_inventory_event_required_flags_must_not_be_replaced_by_flags_alias(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]["event_kinds"][0]
+        expected_flags = list(event["required_flags"])
+        del event["required_flags"]
+        event["flags"] = expected_flags
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("public_gameplay_inventory_required_flags_mismatch", reasons)
+
+    def test_non_copied_payload_contract_wording_is_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        fixtures["decisions"]["public_contract"]["payload_contract"] = "non-copied POD scalar observation only"
+        fixtures["public_sdk_surfaces"]["surfaces"][0]["payload_contract"][0] = (
+            "non-copied bool ReturnValue signals only where declared by docs/public_gameplay_events.json"
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("payload_contract_mismatch", reasons)
+        self.assertIn("inventory_copied_payload_contract_mismatch", reasons)
+
     def test_public_inventory_items_sdk_and_authority_claims_are_rejected(self) -> None:
         fixtures = self.make_fixture()
         surface = fixtures["public_sdk_surfaces"]["surfaces"][0]
@@ -300,6 +372,28 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("inventory_copied_surface_public_contract_mismatch", reasons)
         self.assertIn("public_claim_forbidden_term", reasons)
         self.assertIn("gameplay_policy_resource_contract_guardrail_missing", reasons)
+
+    def test_mixed_negation_does_not_hide_public_inventory_sdk_claim(self) -> None:
+        fixtures = self.make_fixture()
+        surface = fixtures["public_sdk_surfaces"]["surfaces"][0]
+        surface["public_contract"].append("Inventory SDK ready; not mutation")
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+
+    def test_mixed_negation_does_not_hide_public_items_sdk_claim(self) -> None:
+        fixtures = self.make_fixture()
+        surface = fixtures["public_sdk_surfaces"]["surfaces"][0]
+        surface["public_contract"].append("without ResourceHandle, Items SDK ready")
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
 
     def test_positive_return_override_claim_is_rejected(self) -> None:
         fixtures = self.make_fixture()

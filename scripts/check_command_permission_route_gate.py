@@ -37,6 +37,14 @@ EXPECTED_ROUTE_CHECK_SCHEMAS = {
     "command_chat_response_public_readiness": "obelisk.command-chat-response-public-readiness-check.v1",
     "commands_replies_public_readiness": "obelisk.commands-replies-public-readiness-check.v1",
 }
+REQUIRED_PLANNING_ONLY_CHECKS = {
+    "permissions_admin_public_readiness",
+    "command_copied_response_intent_planning",
+    "command_copied_response_intent_lifecycle_planning",
+    "command_principal_authz_response_bridge",
+    "command_chat_response_public_readiness",
+    "commands_replies_public_readiness",
+}
 ALLOWED_CRITICAL_PATH_BLOCKERS = {
     "approved_runtime_evidence_missing",
     "identity_public_contract_gate",
@@ -84,18 +92,26 @@ FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = {
     "command_text",
     "operator_config",
 }
-POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_TERMS = (
-    "command routing is public and ready",
-    "command response path is live",
-    "permissions/admin is public and ready",
-    "public abi is ready",
-    "reply endpoint is live",
-    "replies api is public and ready",
-    "reply api is public and ready",
-    "send chat api is operational",
-    "send-chat abi is public and ready",
-    "send chat abi is public and ready",
+POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
+    r"\b(?:"
+    r"command[_ -]?(?:routing|router|response[_ -]?path)|"
+    r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
+    r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime"
+    r")\b(?:\s+(?:is|are))?\s+"
+    r"\b(?:public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
+    re.IGNORECASE,
 )
+NEGATED_CLAIM_PREFIX_RE = re.compile(
+    r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|excludes?|future|must\s+not|no|not|"
+    r"only|outside|post-v1|prevent|prevents|remain|remains|without)\b",
+    re.IGNORECASE,
+)
+NEGATED_CLAIM_SUFFIX_RE = re.compile(
+    r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
+    r"unauthorized|unsupported)\b",
+    re.IGNORECASE,
+)
+CLAIM_SCOPE_SPLIT_RE = re.compile(r"[,.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
 
 
 def is_positive_claim_value(value: Any) -> bool:
@@ -118,6 +134,24 @@ def is_positive_claim_value(value: Any) -> bool:
             "unlocked",
             "yes",
         }
+    return False
+
+
+def preceding_claim_scope(text: str, start: int) -> str:
+    parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
+    return parts[-1] if parts else text[:start]
+
+
+def is_negated_text_claim(text: str, match: re.Match[str]) -> bool:
+    if NEGATED_CLAIM_PREFIX_RE.search(preceding_claim_scope(text, match.start())):
+        return True
+    return bool(NEGATED_CLAIM_SUFFIX_RE.match(text[match.end() :]))
+
+
+def contains_positive_public_or_runtime_text_claim(text: str) -> bool:
+    for match in POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE.finditer(text):
+        if not is_negated_text_claim(text, match):
+            return True
     return False
 
 
@@ -262,8 +296,7 @@ def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]
         for index, item in enumerate(value):
             claims.extend(collect_public_or_runtime_claims(item, path=f"{path}[{index}]"))
     elif isinstance(value, str):
-        text = value.casefold()
-        if any(term in text for term in POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_TERMS):
+        if contains_positive_public_or_runtime_text_claim(value):
             claims.append(f"{path}:positive_text_claim")
     return sorted(set(claims))
 
@@ -296,6 +329,14 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         and report is not None
         and schema_valid
         and report.get("valid", True) is True
+        and (
+            name not in REQUIRED_PLANNING_ONLY_CHECKS
+            or (
+                report.get("valid") is True
+                and report.get("planning_only") is True
+                and report.get("accepted_for_planning") is True
+            )
+        )
         and not public_or_runtime_claims
     )
 
@@ -424,6 +465,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         if check["public_or_runtime_claims"]:
             joined = ", ".join(check["public_or_runtime_claims"])
             blockers.append(f"{check['name']}: unexpected public/runtime claim: {joined}")
+        if check["name"] in REQUIRED_PLANNING_ONLY_CHECKS:
+            if check["planning_only"] is not True:
+                blockers.append(f"{check['name']}: planning_only must stay true")
+            if check["accepted_for_planning"] is not True:
+                blockers.append(f"{check['name']}: accepted_for_planning must stay true")
         if not check["valid"]:
             blockers.append(f"{check['name']}: invalid route prerequisite")
     critical_path_phase = build_critical_path_phase()

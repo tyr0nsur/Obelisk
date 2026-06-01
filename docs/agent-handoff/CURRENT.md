@@ -66,6 +66,24 @@ This file is an active routing table only. Durable evidence belongs in
 
 ## Current Routing Facts
 
+- 2026-06-02 post-compaction reorganization checkpoint: the lead reran the canonical
+  offline checks from the current worktree. `PYTHONDONTWRITEBYTECODE=1 python3
+  scripts/check_command_permission_route_gate.py --json` passes as planning-only with
+  `approved_runtime_evidence_missing`; `PYTHONDONTWRITEBYTECODE=1 python3
+  scripts/check_public_sdk_v1_completion.py --json` still fails closed with
+  `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`;
+  `PYTHONDONTWRITEBYTECODE=1 python3
+  scripts/check_inventory_item_copied_signals_stability.py --json` passes with five
+  allowed copied inventory/item signals while keeping public SDK/v1 completion false; and
+  `PYTHONDONTWRITEBYTECODE=1 python3
+  scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+  passes as planning-only with ResourceHandle/object identity still blocked. See
+  `docs/research/2026-06-02-sdk-complete-priority-map.md`.
+- Follow-up hardening in the same checkpoint tightened planning-only child posture in the
+  command/permission route gate, inventory copied-signal required flags across decisions
+  and `docs/public_gameplay_events.json`, and request-pack privacy/readiness negation
+  scanning. These guardrails do not change runtime approval, public SDK readiness, or v1
+  completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -164,10 +182,10 @@ This file is an active routing table only. Durable evidence belongs in
 - ResourceHandle: wait for rejected runtime object samples plus runtime serial
   reuse/wraparound semantics from an approved live-ops brief; offline/core artifacts cannot
   synthesize that blocker away.
-- Demand-map priority from NextGenPlugins names is P0 principal -> permissions/admin ->
-  command response; P1 economy/storage/operator ingress, inventory/items mutation, and
-  structure/build policy; P2 dino/tribe/buff-status/mission/transfer leaves. Names are
-  demand signals only.
+- Demand-map priority from NextGenPlugins names is P0 identity/principal ->
+  permissions/admin -> command response -> commands/replies; P1 economy/storage/operator
+  ingress, inventory/items mutation, and structure/build policy; P2
+  dino/tribe/buff-status/mission/transfer leaves. Names are demand signals only.
 - Post-P0 target map: after the P0 chain is promoted, the rentable module routes are
   Mission copied bools and item return-only copied signals because they already have
   focused consume-only evidence and clear no-mutation/no-identity boundaries. Treat them

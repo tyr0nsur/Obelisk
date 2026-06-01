@@ -96,11 +96,18 @@ POSITIVE_CAPABILITY_RE = re.compile(
 )
 NEGATED_CAPABILITY_ACTION_RE = re.compile(
     r"\b(?:does\s+not|do\s+not|doesn't|don't|cannot|can't|must\s+not|never|no|not)\s+"
-    r"(?:claim|promote|authorize|enable|allow|support|deliver|provide|expose|make|mark|report|treat|set)\b",
+    r"(?:claim|promote|authorize|enable|allow|support|deliver|provide|expose|log|make|mark|"
+    r"report|treat|set|capture|collect|record)\b",
     re.IGNORECASE,
 )
-NEGATED_CAPABILITY_BOUNDARY_RE = re.compile(
-    r"\b(?:without|blocked|forbidden|reject(?:ed|s)?|fail[-_ ]closed)\b",
+NEGATION_SCOPE_SPLIT_RE = re.compile(r"[,.;\n]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+NEGATED_BOUNDARY_PREFIX_RE = re.compile(
+    r"\b(?:without|forbidden|reject(?:ed|s)?|fail[-_ ]closed(?:\s+on)?)\s*:?\s*$",
+    re.IGNORECASE,
+)
+NEGATED_CAPABILITY_SUFFIX_RE = re.compile(
+    r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
+    r"unauthorized|unsupported)\b",
     re.IGNORECASE,
 )
 
@@ -206,16 +213,27 @@ def string_at(payload: dict[str, Any], key: str, blockers: list[dict[str, Any]])
 
 def contains_unnegated_positive_capability_claim(value: str) -> bool:
     for match in POSITIVE_CAPABILITY_RE.finditer(value):
-        preceding_clause = re.split(r"[.;\n]", value[: match.start()])[-1]
-        if not (
-            NEGATED_CAPABILITY_ACTION_RE.search(preceding_clause)
-            or NEGATED_CAPABILITY_BOUNDARY_RE.search(preceding_clause)
-        ):
+        if not is_negated_for_match(value, match.start()) and not is_negated_after_match(value, match.end()):
             return True
     return False
 
 
+def preceding_negation_scope(value: str, start: int) -> str:
+    return NEGATION_SCOPE_SPLIT_RE.split(value[:start])[-1]
+
+
+def is_negated_for_match(value: str, start: int) -> bool:
+    prefix = preceding_negation_scope(value, start)
+    return bool(NEGATED_CAPABILITY_ACTION_RE.search(prefix) or NEGATED_BOUNDARY_PREFIX_RE.search(prefix))
+
+
+def is_negated_after_match(value: str, end: int) -> bool:
+    return bool(NEGATED_CAPABILITY_SUFFIX_RE.match(value[end:]))
+
+
 def find_forbidden_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
+    if trail == "$.non_claims":
+        return None
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
@@ -233,7 +251,7 @@ def find_forbidden_claim(value: Any, trail: str = "$") -> tuple[str, str] | None
 
 
 def validate_secret_free(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
-    if trail == "$.forbidden_markers":
+    if trail in ("$.forbidden_markers", "$.non_claims"):
         return
     if isinstance(value, dict):
         for key, child in value.items():
@@ -245,8 +263,10 @@ def validate_secret_free(value: Any, blockers: list[dict[str, Any]], trail: str 
         for index, child in enumerate(value):
             validate_secret_free(child, blockers, f"{trail}[{index}]")
     elif isinstance(value, str):
-        if FORBIDDEN_VALUE_RE.search(value) and "does not " not in value:
-            add(blockers, "forbidden_private_or_ue_value", trail, value=value)
+        for match in FORBIDDEN_VALUE_RE.finditer(value):
+            if not is_negated_for_match(value, match.start()):
+                add(blockers, "forbidden_private_or_ue_value", trail, value=value)
+                break
 
 
 def validate_paths(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:

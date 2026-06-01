@@ -67,7 +67,8 @@ priorities, and do not use history files as the active source of truth.
   `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub
   package shape, RC package readiness, and copied event surfaces remain non-sufficient for a
   stable SDK claim.
-- The active P0 dependency route is principal -> permissions/admin -> command response.
+- The active P0 dependency route is identity/principal -> permissions/admin ->
+  command response -> commands/replies.
   After player identity/principal, the permissions/admin candidate is query-only
   fail-closed checks; commands/replies still require identity, permissions/admin, and the
   named `obelisk.command_chat_response_path.v1` planning dependency. The P0 chain is
@@ -112,7 +113,8 @@ priorities, and do not use history files as the active source of truth.
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
   player identity. Identity and permissions decision contracts carry `v1_sequence_gate`
-  entries preserving identity -> permissions -> command response -> commands/replies.
+  entries preserving identity/principal -> permissions/admin -> command response ->
+  commands/replies.
   The candidate `obelisk.permissions-admin-query-failclosed-contract.v1` is now supported
   by the offline artifact gate in consume mode only; it is not public ABI, runtime
   readiness, public SDK readiness, or v1 completion evidence.
@@ -191,9 +193,10 @@ priorities, and do not use history files as the active source of truth.
 - Plugin Hub work is post-SDK-complete planning only. Do not spend current rounds on
   Plugin Hub examples, packaging, intake tooling, or package hardening while the complete SDK
   blocker chain remains open. Historical Plugin Hub docs may be read as boundaries only;
-  they do not replace identity/principal, permissions/admin, command/response, storage,
-  mutation, or gameplay module promotion work. Passive copied chat parsing and copied
-  policy auditing remain experimental pattern examples only;
+  they do not replace the active identity/principal -> permissions/admin -> command
+  response -> commands/replies route. Storage, mutation, ResourceHandle, and gameplay
+  module surfaces remain later blockers or scoped side lanes. Passive copied chat parsing
+  and copied policy auditing remain experimental pattern examples only;
   demand-map or `NextGenPlugins` dictionary entries do not make an idea release-ready and
   do not promote permissions, RCON, economy, homes/safe zones, structure enforcement,
   dinos, tribes, transfers, inventory, item mutation, identity, lookup, replies,
@@ -395,8 +398,9 @@ priorities, and do not use history files as the active source of truth.
   and public permission queries need owner-scoped rate-limit/audit gates.
 - Plugin Hub guardrails are archived boundaries only until SDK completion: keep them
   non-promotional and do not reopen examples, packaging, intake tooling, or review while
-  identity/principal, permissions/admin, command/response, storage, mutation,
-  ResourceHandle, and gameplay module blockers remain open.
+  the identity/principal -> permissions/admin -> command response -> commands/replies
+  route remains open. Storage, mutation, ResourceHandle, and gameplay module surfaces
+  remain later blockers or scoped side lanes unless `CURRENT.md` routes them.
 - Public v1 completion evidence rejects strict blocker evidence paths or schema/status
   fields that are candidate/planning/orientation/preflight/readiness/consume-only/
   evidence-only. Do not let static orientation, planning docs, or candidate reports

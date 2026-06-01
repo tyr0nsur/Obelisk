@@ -276,6 +276,111 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             report["blockers"],
         )
 
+    def test_collect_public_or_runtime_claims_rejects_runtime_ready_text_variants(self) -> None:
+        for text in ("runtime ready", "runtime is ready", "runtime readiness enabled"):
+            with self.subTest(text=text):
+                claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
+                self.assertEqual(["claim:positive_text_claim"], claims)
+
+    def test_collect_public_or_runtime_claims_accepts_negated_runtime_ready_text(self) -> None:
+        for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):
+            with self.subTest(text=text):
+                claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
+                self.assertEqual([], claims)
+
+    def test_route_check_rejects_child_report_that_drops_planning_only_posture(self) -> None:
+        original = ROUTE_GATE.run_check
+
+        def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+            result = original(name, argv)
+            if name == "commands_replies_public_readiness":
+                result["planning_only"] = False
+                result["accepted_for_planning"] = True
+                result["valid"] = False
+            return result
+
+        args = SimpleNamespace(
+            query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+            player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+            public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            json=True,
+        )
+        try:
+            ROUTE_GATE.run_check = fake_run_check
+            report = ROUTE_GATE.build_report(args)
+        finally:
+            ROUTE_GATE.run_check = original
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("commands_replies_public_readiness: planning_only must stay true", report["blockers"])
+        self.assertIn("commands_replies_public_readiness: invalid route prerequisite", report["blockers"])
+
+    def test_run_check_rejects_planning_only_child_report_posture_drift(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        for planning_only, accepted_for_planning in ((False, True), (True, False)):
+            with self.subTest(planning_only=planning_only, accepted_for_planning=accepted_for_planning):
+
+                def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+                    report = {
+                        "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["commands_replies_public_readiness"],
+                        "valid": True,
+                        "accepted_for_planning": accepted_for_planning,
+                        "planning_only": planning_only,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                    }
+                    return subprocess.CompletedProcess(
+                        args=[],
+                        returncode=0,
+                        stdout=json.dumps(report),
+                        stderr="",
+                    )
+
+                try:
+                    ROUTE_GATE.subprocess.run = fake_run
+                    result = ROUTE_GATE.run_check("commands_replies_public_readiness", ["unused.py", "--json"])
+                finally:
+                    ROUTE_GATE.subprocess.run = original_run
+
+                self.assertFalse(result["valid"])
+                self.assertEqual(planning_only, result["planning_only"])
+                self.assertEqual(accepted_for_planning, result["accepted_for_planning"])
+                self.assertEqual([], result["public_or_runtime_claims"])
+
+    def test_run_check_rejects_required_planning_only_child_missing_valid_field(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            report = {
+                "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["commands_replies_public_readiness"],
+                "accepted_for_planning": True,
+                "planning_only": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+            }
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps(report), stderr="")
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("commands_replies_public_readiness", ["unused.py", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertTrue(result["planning_only"])
+        self.assertTrue(result["accepted_for_planning"])
+        self.assertEqual([], result["public_or_runtime_claims"])
+
     def test_route_gate_composes_response_path_report_into_commands_replies(self) -> None:
         original = ROUTE_GATE.run_check
         seen_response_path_report = False
