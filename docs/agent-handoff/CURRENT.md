@@ -113,6 +113,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Runtime-log and evidence-shape analyzers reject identity/internals leaks, require the
   expected copied fields for each lifecycle case, and enforce lifecycle case order,
   duplicate rejection, gate log-budget bounds, and monotonic observer sequence quality.
+  Runtime-log summaries also require player-principal lifecycle events to appear only
+  after a safe `PlayerPrincipalLifecycleObserver enabled` gate in the same copied source;
+  `event_before_gate_lines` is a hard quality blocker for bundles and approved evidence
+  manifests.
   The runtime principal lifecycle evidence shape also requires an explicit
   `session_start_rejected_anchor` case, observer-safe `role`, `post_original`,
   `copied_bool_fields`, `copied_bool_values`, redaction fields/count,

@@ -115,6 +115,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("analyze_runtime_observer_log failed", result.stderr)
 
+    def test_fails_closed_for_events_before_safe_gate(self) -> None:
+        lines = runtime_log_lines()
+        lines.insert(
+            7,
+            "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
+            "target=ShooterGameMode.HandleNewPlayer post_original=true "
+            "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,1 "
+            "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+            "principal_action=candidate_created principal_id_logged=false "
+            "principal_generation_logged=false delivery_claim=none.",
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            copied_log = temp_dir / "Obelisk.log"
+            output_dir = temp_dir / "bundle"
+            copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            result = self.run_bundle(copied_log, output_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("analyze_runtime_observer_log failed", result.stderr)
+            self.assertIn("player_principal_event_before_safe_gate", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

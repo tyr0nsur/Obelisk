@@ -321,6 +321,7 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
         "out_of_order_field_lines",
         "field_count_mismatches",
         "sequence_quality_violations",
+        "event_before_gate_lines",
     ):
         if module.get(key) != 0:
             add(blockers, "runtime_summary_quality_counter_nonzero", f"$.source_summary.modules.{MODULE}.{key}")

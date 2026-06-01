@@ -339,7 +339,9 @@ def module_record() -> dict[str, Any]:
         "out_of_order_field_lines": 0,
         "field_count_mismatches": 0,
         "sequence_quality_violations": 0,
+        "event_before_gate_lines": 0,
         "observed_event_cases": [],
+        "_player_principal_gate_seen_by_source": set(),
         "_player_principal_last_sequence": None,
         "_player_principal_seen_sequences": set(),
         "_player_principal_log_limit": None,
@@ -434,6 +436,8 @@ def module_blockers(record: dict[str, Any]) -> list[str]:
         blockers.append("field_count_mismatch")
     if record["sequence_quality_violations"] > 0:
         blockers.append("sequence_quality_violation")
+    if record["event_before_gate_lines"] > 0:
+        blockers.append("player_principal_event_before_safe_gate")
     if record["redacted_detail_keys"]:
         blockers.append("redacted_sensitive_or_unapproved_details")
     return blockers
@@ -535,6 +539,7 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             if not player_principal_lifecycle_gate_is_safe(match):
                 record["malformed_observer_lines"] += 1
                 continue
+            record["_player_principal_gate_seen_by_source"].add(source_index)
             record["_player_principal_log_limit"] = int(match.group("limit"))
             add_unique(record["gate_sha256"], match.group("sha256").lower())
             gate_function = "observer_gate"
@@ -550,6 +555,9 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             record = modules[module]
             record["source_merge_explicit"] = source_merge_explicit
             add_source_index(record, source_index)
+            if source_index not in record["_player_principal_gate_seen_by_source"]:
+                record["event_before_gate_lines"] += 1
+                continue
             if not player_principal_lifecycle_event_is_safe(match):
                 record["malformed_observer_lines"] += 1
                 continue
@@ -788,6 +796,7 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             "out_of_order_field_lines": record["out_of_order_field_lines"],
             "field_count_mismatches": record["field_count_mismatches"],
             "sequence_quality_violations": record["sequence_quality_violations"],
+            "event_before_gate_lines": record["event_before_gate_lines"],
         }
         if module == "player_principal_lifecycle":
             normalized_modules[module]["observed_event_cases"] = sorted(

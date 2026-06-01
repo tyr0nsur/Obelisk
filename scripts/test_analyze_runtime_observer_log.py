@@ -367,6 +367,52 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(module["sequence_quality_violations"], 2)
         self.assertIn("sequence_quality_violation", module["blockers"])
 
+    def test_flags_player_principal_lifecycle_events_before_safe_gate(self) -> None:
+        lines = [
+            "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
+            "target=ShooterGameMode.HandleNewPlayer post_original=true "
+            "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,1 "
+            "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+            "principal_action=candidate_created principal_id_logged=false "
+            "principal_generation_logged=false delivery_claim=none.",
+            "[info] PlayerPrincipalLifecycleObserver event sequence=2 role=session_start_rejected "
+            "target=ShooterGameMode.HandleNewPlayer post_original=true "
+            "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=0,1 "
+            "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+            "principal_action=none principal_id_logged=false principal_generation_logged=false "
+            "delivery_claim=none.",
+            "[info] PlayerPrincipalLifecycleObserver event sequence=3 role=session_end "
+            "target=ShooterGameMode.OnLogout post_original=true copied_bool_fields= "
+            "copied_bool_values= redacted_count=1 redacted_fields=Exiting "
+            "principal_action=candidate_invalidated principal_id_logged=false "
+            "principal_generation_logged=false delivery_claim=none.",
+            "[info] PlayerPrincipalLifecycleObserver enabled "
+            "binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 "
+            "target_set=players-lifecycle-anchor-candidates limit=10 dispatch_limit=0 "
+            "delivery_claim=none principal_claim=none.",
+        ]
+        result = self.run_analyzer(lines)
+        module = result["modules"]["player_principal_lifecycle"]
+
+        self.assertEqual(module["accepted_count"], 0)
+        self.assertEqual(module["observed_event_cases"], [])
+        self.assertEqual(module["event_before_gate_lines"], 3)
+        self.assertIn("player_principal_event_before_safe_gate", module["blockers"])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "Obelisk.log"
+            log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            failed = subprocess.run(
+                [sys.executable, str(ANALYZER), "--fail-on-quality-blockers", str(log_path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(failed.returncode, 1)
+        self.assertIn("player_principal_event_before_safe_gate", failed.stderr)
+
     def test_flags_unsafe_player_principal_lifecycle_event_semantics(self) -> None:
         result = self.run_analyzer(
             [

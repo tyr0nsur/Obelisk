@@ -1617,6 +1617,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "obelisk.reflection-inventory-pack.v1",
                             "ServerListPlayers",
                             "ServerKickPlayer",
+                            "approved runtime principal lifecycle evidence",
+                            "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                            "principal privacy, invalidation, and cross-instance semantics",
+                            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
                         ],
                     }
                     break
@@ -1703,6 +1707,72 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
+
+    def test_player_identity_requires_runtime_privacy_abi_and_sdk_evidence_terms(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PlayerIdentityPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="player_identity_promotion",
+            ) as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity SDK placeholder\n", encoding="utf-8")
+            manifest, _ = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "obelisk.core-dump-evidence-pack.v1",
+                            "obelisk.reflection-inventory-pack.v1",
+                            "ServerListPlayers",
+                            "ServerKickPlayer",
+                        ],
+                    }
+                    break
+            manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id != "obelisk.player_identity.v1"
+            ]
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            header_path = Path(core_dir) / "ObeliskApi.h"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_required_evidence_terms_missing", payload["blockers"])
+        self.assertEqual(
+            payload["promoted_surfaces_missing_required_evidence_terms"]["obelisk.player_identity.v1"],
+            [
+                "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
+                "approved runtime principal lifecycle evidence",
+                "principal privacy, invalidation, and cross-instance semantics",
+            ],
+        )
 
     def test_candidate_only_player_identity_preflight_test_does_not_promote_completion_blocker(self) -> None:
         manifest, _ = complete_excluded_manifest()
@@ -1981,6 +2051,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "obelisk.reflection-inventory-pack.v1",
                             "ServerListPlayers",
                             "ServerKickPlayer",
+                            "approved runtime principal lifecycle evidence",
+                            "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                            "principal privacy, invalidation, and cross-instance semantics",
+                            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
                         ],
                     }
                 if surface["id"] == "obelisk.permissions_admin.v1":
@@ -2603,6 +2677,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "obelisk.reflection-inventory-pack.v1",
                             "ServerListPlayers",
                             "ServerKickPlayer",
+                            "approved runtime principal lifecycle evidence",
+                            "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                            "principal privacy, invalidation, and cross-instance semantics",
+                            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
                         ],
                     }
                 if surface["id"] == "obelisk.permissions_admin.v1":

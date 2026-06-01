@@ -77,8 +77,13 @@ class Validation:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("manifest", type=Path, help="Offline key=value window manifest.")
+    parser.add_argument("manifest", type=Path, nargs="?", help="Offline key=value window manifest.")
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
+    parser.add_argument(
+        "--emit-template",
+        type=Path,
+        help="Write a canonical secret-free key=value window manifest template and exit.",
+    )
     return parser.parse_args()
 
 
@@ -265,6 +270,58 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
     )
 
 
+def build_template_fields() -> dict[str, str]:
+    return {
+        "run_id": "20260601T120000Z-player-principal-lifecycle",
+        "target": "arkserver2/TheIsland",
+        "approval": EXPECTED_APPROVAL,
+        "approved_window_start_utc": "2026-06-01T12:00:00Z",
+        "approved_window_end_utc": "2026-06-01T12:10:00Z",
+        "actual_capture_start_utc": "2026-06-01T12:01:00Z",
+        "actual_capture_end_utc": "2026-06-01T12:09:00Z",
+        "copied_log_path": (
+            "/servidor/ark/workspace-offline/live-validation-logs/"
+            "20260601T120000Z-player-principal-lifecycle/Obelisk.log"
+        ),
+        "copied_log_sha256": "0" * 64,
+        "pre_posture": "stable",
+        "post_posture": "stable",
+        "pre_check": "passed",
+        "post_check": "passed",
+        "rollback_start_utc": "2026-06-01T12:09:00Z",
+        "rollback_end_utc": "2026-06-01T12:10:00Z",
+        "rollback_completed": "true",
+        "rollback_delta": "removed_observer_env_and_markers_preserved_disable_plugins",
+        "observer_env_survived": "false",
+        "observer_marker_survived": "false",
+        "user_policy": "no_regular_users",
+        "notice_sent": "not_applicable",
+        "log_budget": "5",
+        "plugins_disabled": "true",
+        "scanner_disabled": "true",
+        "dispatch_limit": "0",
+        "delivery_claim": "none",
+        "principal_claim": "none",
+    }
+
+
+def write_template(path: Path) -> None:
+    reject_symlink_component(path, "--emit-template")
+    resolved = protected_paths.reject_protected_input_path(
+        path,
+        "--emit-template",
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Secret-free operational manifest for a future approved player-principal lifecycle window.",
+        "# Replace timestamps, run_id, copied_log_path, copied_log_sha256, and target with the reviewed window values.",
+    ]
+    lines.extend(f"{key}={value}" for key, value in build_template_fields().items())
+    resolved.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def build_report(fields: dict[str, str], validation: Validation, manifest_path: Path) -> dict[str, Any]:
     accepted = not validation.blockers
     return {
@@ -318,6 +375,11 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
 
 def main() -> int:
     args = parse_args()
+    if args.emit_template is not None:
+        write_template(args.emit_template)
+        return 0
+    if args.manifest is None:
+        raise SystemExit("manifest is required unless --emit-template is used")
     fields = load_manifest(args.manifest)
     validation = validate_manifest(fields, args.manifest)
     report = build_report(fields, validation, args.manifest)

@@ -90,6 +90,10 @@ PROMOTION_EVIDENCE_REQUIRED_TERMS = {
         "obelisk.reflection-inventory-pack.v1",
         "ServerListPlayers",
         "ServerKickPlayer",
+        "approved runtime principal lifecycle evidence",
+        "accepted login/logout lifecycle ordering and principal invalidation semantics",
+        "principal privacy, invalidation, and cross-instance semantics",
+        "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
     ),
     "obelisk.permissions_admin.v1": (
         "query-only fail-closed permission checks over copied principals",

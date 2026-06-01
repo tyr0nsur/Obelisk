@@ -199,6 +199,18 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("runtime_summary_quality_blockers_present", report["blockers"])
         self.assertIn("runtime_summary_quality_counter_nonzero", report["blockers"])
 
+    def test_rejects_events_before_safe_gate_counter_from_analyzer_summary(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        module["blockers"] = ["runtime_observer_evidence_only", "player_principal_event_before_safe_gate"]
+        module["event_before_gate_lines"] = 1
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_quality_blockers_present", report["blockers"])
+        self.assertIn("runtime_summary_quality_counter_nonzero", report["blockers"])
+
     def test_rejects_aggregated_values_without_complete_observed_event_cases(self) -> None:
         payload = manifest()
         module = payload["source_summary"]["modules"]["player_principal_lifecycle"]

@@ -162,6 +162,32 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("user_policy_not_accepted", report["blockers"])
 
+    def test_emits_valid_offline_window_manifest_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "window-template.env"
+            emit = subprocess.run(
+                [sys.executable, str(SCRIPT), "--emit-template", str(path)],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(emit.returncode, 0, emit.stderr)
+
+            validate = subprocess.run(
+                [sys.executable, str(SCRIPT), str(path), "--json"],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertEqual(validate.returncode, 0, validate.stderr)
+        report = json.loads(validate.stdout)
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
+        self.assertFalse(report["promotion_ready"])
+
 
 if __name__ == "__main__":
     unittest.main()
