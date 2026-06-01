@@ -9136,9 +9136,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_route_confidence_readiness_checkers_are_covered_by_run_script_tests(self) -> None:
         run_script_tests = (REPO_ROOT / "scripts" / "run_script_tests.sh").read_text(encoding="utf-8")
-        self.assertIn("list_repo_files 'scripts/test_*.py'", run_script_tests)
+        self.assertIn("list_script_files 'test_*.py'", run_script_tests)
         self.assertIn('for test_path in "${python_tests[@]}"; do', run_script_tests)
-        self.assertIn('python3 "${test_path}"', run_script_tests)
+        self.assertIn('python3 -B "${test_path}"', run_script_tests)
 
         scripts_dir = REPO_ROOT / "scripts"
         readiness_checkers = sorted(scripts_dir.glob("check_*readiness*.py"))

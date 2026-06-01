@@ -177,17 +177,7 @@ def detect_obelisk_commit() -> str:
     env_commit = os.environ.get("OBELISK_COMMIT", "").strip()
     if env_commit:
         return env_commit
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short=12", "HEAD"],
-            check=True,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
-    return result.stdout.strip() or "unknown"
+    return "unknown"
 
 
 def is_relative_to(path: Path, root: Path) -> bool:
@@ -1897,7 +1887,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     next_operator_recipe = {
         "blocked_until": "accepted_reflection_inventory_pack",
         "obelisk_commit": obelisk_commit,
-        "obelisk_commit_source": "OBELISK_COMMIT environment variable if set; otherwise current Git HEAD, or unknown when unavailable",
+        "obelisk_commit_source": "OBELISK_COMMIT environment variable if set; otherwise unknown; this checker does not invoke Git",
         "build_core_evidence_pack": (
             "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_core_dump_evidence_pack.py "
             f"--binary {raw_binary_pattern} "

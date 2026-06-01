@@ -10,6 +10,7 @@ permissions, commands, lookup, mutation, or SDK readiness.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -51,6 +52,7 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
 WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ALLOWED_APPROVAL_KEYS = frozenset(
     (
         "runtime_evidence_reviewed",
@@ -319,6 +321,14 @@ def load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def source_path_is_copied_or_offline(path_text: Any) -> bool:
     if not isinstance(path_text, str) or not path_text:
         return False
@@ -339,6 +349,34 @@ def source_path_is_approved_offline_workspace(path_text: Any) -> bool:
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
     return not status.protected and status.approved_offline_workspace
+
+
+def validate_copied_source_file(source: dict[str, Any], label: str, blockers: list[dict[str, Any]]) -> None:
+    path_text = source.get("path")
+    expected_sha256 = source.get("sha256")
+    if not isinstance(expected_sha256, str) or SHA256_RE.fullmatch(expected_sha256) is None:
+        add(blockers, "source_summary_source_sha256_invalid", f"{label}.sha256")
+        return
+    if not isinstance(path_text, str) or not path_text:
+        add(blockers, "source_summary_source_path_missing", f"{label}.path")
+        return
+    path = Path(path_text).expanduser()
+    try:
+        actual_sha256 = sha256_file(path)
+    except FileNotFoundError:
+        add(blockers, "source_summary_source_file_missing", f"{label}.path")
+        return
+    except OSError as exc:
+        add(blockers, "source_summary_source_file_unreadable", f"{label}.path", error=str(exc))
+        return
+    if actual_sha256 != expected_sha256:
+        add(
+            blockers,
+            "source_summary_source_sha256_mismatch",
+            f"{label}.sha256",
+            expected=expected_sha256,
+            actual=actual_sha256,
+        )
 
 
 def detail_values(functions: dict[str, Any], function: str, key: str) -> list[Any]:
@@ -518,6 +556,8 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
                     add(blockers, "source_summary_source_path_not_copied_or_offline", f"{label}.path")
                 elif not source_path_is_approved_offline_workspace(source.get("path")):
                     add(blockers, "source_summary_source_path_not_approved_offline_workspace", f"{label}.path")
+                else:
+                    validate_copied_source_file(source, label, blockers)
 
     runtime = summary.get("runtime")
     if not isinstance(runtime, dict):

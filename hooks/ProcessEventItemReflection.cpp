@@ -552,6 +552,10 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
                                                                   CopiedItemObservation& out)
     {
         observationNumber = 0;
+        out = {};
+        if (!HasObservationBudgetRemaining(counter, observationLimit))
+            return false;
+
         if (!TryBuildCopiedItemReturnObservationForMatchedAttempt(attempt, out))
             return false;
 

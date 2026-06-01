@@ -184,7 +184,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertNotIn("<reviewed-obelisk-id>", json.dumps(payload))
         self.assertEqual(
             recipe["obelisk_commit_source"],
-            "OBELISK_COMMIT environment variable if set; otherwise current Git HEAD, or unknown when unavailable",
+            "OBELISK_COMMIT environment variable if set; otherwise unknown; this checker does not invoke Git",
         )
         self.assertIn("build_core_dump_evidence_pack.py", recipe["build_core_evidence_pack"])
         self.assertIn("--binary", recipe["build_core_evidence_pack"])
@@ -1202,13 +1202,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(operator_commands["ready_to_build_core_evidence_pack"], False)
         self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
 
-    def test_detect_obelisk_commit_uses_env_then_git_head_then_unknown(self) -> None:
-        completed = subprocess.CompletedProcess(
-            ["git"],
-            0,
-            "abc123def456\n",
-            "",
-        )
+    def test_detect_obelisk_commit_uses_env_then_unknown_without_git(self) -> None:
         with (
             mock.patch.dict(os.environ, {"OBELISK_COMMIT": "envcommit123"}, clear=False),
             mock.patch.object(checker.subprocess, "run") as run,
@@ -1218,20 +1212,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         with (
             mock.patch.dict(os.environ, {"OBELISK_COMMIT": ""}, clear=False),
-            mock.patch.object(checker.subprocess, "run", return_value=completed) as run,
-        ):
-            self.assertEqual(checker.detect_obelisk_commit(), "abc123def456")
-            run.assert_called_once()
-
-        with (
-            mock.patch.dict(os.environ, {"OBELISK_COMMIT": ""}, clear=False),
-            mock.patch.object(
-                checker.subprocess,
-                "run",
-                side_effect=subprocess.CalledProcessError(1, ["git"]),
-            ),
+            mock.patch.object(checker.subprocess, "run") as run,
         ):
             self.assertEqual(checker.detect_obelisk_commit(), "unknown")
+            run.assert_not_called()
 
     def test_report_stays_blocked_when_non_protected_core_input_is_missing(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")

@@ -38,11 +38,11 @@ Scope terms used here:
 - published RC baseline: the frozen `v0.1.0-rc.2` tag and its public contract;
 - current post-RC candidate: `HEAD` work that still needs a fresh clean release gate before
   publication;
-- Plugin Hub seed: post-SDK-complete planning only. Plugin Hub examples, packaging, and
-  intake tooling do not gain priority, support tier, public SDK scope, or `v1.0`
-  completion weight while complete-SDK blockers remain open. Use
+- Plugin Hub seed: post-SDK-complete planning only. Plugin Hub examples, packaging,
+  intake tooling, archived docs, and installed plugin `.so` files do not gain priority,
+  support tier, public SDK scope, or `v1.0` completion weight while complete-SDK blockers remain open. Use
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` only as
-  archived boundaries; installing a plugin `.so` does not promote public SDK scope; they
+  archived boundaries; installed plugin `.so` files do not promote public SDK scope and
   do not gain new support tier, public SDK scope, or `v1.0` completion weight;
 - planning-only lane: guidance/demand work that is not release evidence or public SDK
   surface.

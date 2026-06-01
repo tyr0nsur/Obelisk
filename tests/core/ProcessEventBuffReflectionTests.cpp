@@ -347,13 +347,18 @@ namespace
         return value;
     }
 
-    BuffReflection::BuffInvocation MakeBuffOverrideInvocation(uint8_t& inputPressed, uint8_t& returnValue)
+    template <size_t N>
+    BuffReflection::BuffInvocation MakeBuffOverrideInvocation(std::array<uint8_t, N>& params)
     {
+        Require(params.size() >= 0x0a, "BuffOverrideInventoryAccessInput params fixture is too small");
+
         BuffReflection::BuffInvocation invocation;
         invocation.Function = BuffReflection::BuffFunction::BuffOverrideInventoryAccessInput;
         invocation.FunctionNameIndex = kBuffOverrideInventoryAccessInputNameIndex;
         invocation.OuterNameIndex = kPrimalBuffNameIndex;
         invocation.HasParameterRanges = true;
+        invocation.ParameterData = params.data();
+        invocation.ParameterSize = 0x0a;
         invocation.Fields.push_back(MakeField(BuffReflection::BuffField::InController,
                                               kInControllerNameIndex,
                                               kObjectPropertyClassNameIndex,
@@ -370,8 +375,8 @@ namespace
                                               0x08,
                                               sizeof(uint8_t),
                                               true,
-                                              &inputPressed,
-                                              sizeof(inputPressed)));
+                                              params.data() + 0x08,
+                                              sizeof(uint8_t)));
         invocation.Fields.push_back(MakeField(BuffReflection::BuffField::ReturnValue,
                                               kReturnValueNameIndex,
                                               kBoolPropertyClassNameIndex,
@@ -380,8 +385,8 @@ namespace
                                               0x09,
                                               sizeof(uint8_t),
                                               true,
-                                              &returnValue,
-                                              sizeof(returnValue)));
+                                              params.data() + 0x09,
+                                              sizeof(uint8_t)));
         return invocation;
     }
 
@@ -593,15 +598,15 @@ namespace
 
     void TestBuildsSupportedCopiedBuffShapes()
     {
-        uint8_t falseValue = 0;
-        uint8_t trueValue = 1;
-
         {
+            std::array<uint8_t, 0x01> params{{1}};
             BuffReflection::BuffInvocation invocation;
             invocation.Function = BuffReflection::BuffFunction::AllowPostProcessEffect;
             invocation.FunctionNameIndex = kAllowPostProcessEffectNameIndex;
             invocation.OuterNameIndex = kPrimalBuffNameIndex;
             invocation.HasParameterRanges = true;
+            invocation.ParameterData = params.data();
+            invocation.ParameterSize = params.size();
             invocation.Fields.push_back(MakeField(BuffReflection::BuffField::ReturnValue,
                                                   kReturnValueNameIndex,
                                                   kBoolPropertyClassNameIndex,
@@ -610,8 +615,8 @@ namespace
                                                   0x00,
                                                   sizeof(uint8_t),
                                                   true,
-                                                  &trueValue,
-                                                  sizeof(trueValue)));
+                                                  params.data(),
+                                                  sizeof(uint8_t)));
 
             CopiedBuffObservation observation;
             Require(TryBuildCopiedBuffObservation(invocation, observation),
@@ -625,7 +630,10 @@ namespace
         }
 
         {
-            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(trueValue, falseValue);
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 1;
+            params[0x09] = 0;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
 
             CopiedBuffObservation observation;
             Require(TryBuildCopiedBuffObservation(invocation, observation),
@@ -644,11 +652,15 @@ namespace
         }
 
         {
+            std::array<uint8_t, 0x11> params{};
+            params[0x10] = 1;
             BuffReflection::BuffInvocation invocation;
             invocation.Function = BuffReflection::BuffFunction::BPCustomAllowAddBuff;
             invocation.FunctionNameIndex = kBPCustomAllowAddBuffNameIndex;
             invocation.OuterNameIndex = kPrimalBuffNameIndex;
             invocation.HasParameterRanges = true;
+            invocation.ParameterData = params.data();
+            invocation.ParameterSize = params.size();
             invocation.Fields.push_back(MakeField(BuffReflection::BuffField::ForCharacter,
                                                   kForCharacterNameIndex,
                                                   kObjectPropertyClassNameIndex,
@@ -673,8 +685,8 @@ namespace
                                                   0x10,
                                                   sizeof(uint8_t),
                                                   true,
-                                                  &trueValue,
-                                                  sizeof(trueValue)));
+                                                  params.data() + 0x10,
+                                                  sizeof(uint8_t)));
 
             CopiedBuffObservation observation;
             Require(TryBuildCopiedBuffObservation(invocation, observation),
@@ -703,29 +715,66 @@ namespace
 
     void TestRejectsForgedOrNonCanonicalCopiedDataAndClearsOutput()
     {
-        uint8_t validValue = 1;
-        uint8_t invalidValue = 2;
-
         {
-            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(validValue, validValue);
-            invocation.Fields[0].Range = {&validValue, sizeof(validValue)};
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 1;
+            params[0x09] = 1;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
+            invocation.Fields[0].Range = {params.data() + 0x08, sizeof(uint8_t)};
             RequireRejected(invocation, "recognition-only object range was accepted");
         }
 
         {
-            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(invalidValue, validValue);
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 2;
+            params[0x09] = 1;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
             RequireRejected(invocation, "non-canonical bInputPressed was accepted");
         }
 
         {
-            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(validValue, invalidValue);
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 1;
+            params[0x09] = 2;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
             RequireRejected(invocation, "non-canonical ReturnValue was accepted");
         }
 
         {
-            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(validValue, validValue);
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 1;
+            params[0x09] = 1;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
             invocation.Fields[1].PropertyNameIndex = kReturnValueNameIndex;
             RequireRejected(invocation, "wrong copied bool metadata was accepted");
+        }
+
+        {
+            std::array<uint8_t, 0x0a> params{};
+            std::array<uint8_t, 1> forged{{1}};
+            params[0x08] = 1;
+            params[0x09] = 1;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
+            invocation.Fields[1].Range = {forged.data(), forged.size()};
+            RequireRejected(invocation, "copied bool outside params buffer was accepted");
+        }
+
+        {
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 1;
+            params[0x09] = 1;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
+            invocation.Fields[1].Range = {params.data() + 0x09, sizeof(uint8_t)};
+            RequireRejected(invocation, "copied bool at wrong params offset was accepted");
+        }
+
+        {
+            std::array<uint8_t, 0x0a> params{};
+            params[0x08] = 1;
+            params[0x09] = 1;
+            BuffReflection::BuffInvocation invocation = MakeBuffOverrideInvocation(params);
+            invocation.ParameterSize = 0x09;
+            RequireRejected(invocation, "copied bool past declared params size was accepted");
         }
     }
 

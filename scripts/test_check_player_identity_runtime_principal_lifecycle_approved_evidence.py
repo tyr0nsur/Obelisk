@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -19,6 +20,20 @@ ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
+
+
+def load_script_module(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load {path}")
+    script_dir = str(path.parent)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def temp_offline_workspace() -> tempfile.TemporaryDirectory[str]:
@@ -60,17 +75,18 @@ def runtime_log_lines() -> list[str]:
 
 
 def analyzer_summary() -> dict:
-    with temp_offline_workspace() as tmp:
-        log_path = Path(tmp) / "live-validation-logs" / RUN_ID / "Obelisk.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
-        result = subprocess.run(
-            [sys.executable, str(ANALYZER), "--obelisk-commit", "test-commit", str(log_path)],
-            check=True,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+    temp_dir = temp_offline_workspace()
+    LIVE_TEMP_DIRS.append(temp_dir)
+    log_path = Path(temp_dir.name) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(ANALYZER), "--obelisk-commit", "test-commit", str(log_path)],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     return json.loads(result.stdout)
 
 
@@ -101,6 +117,117 @@ def manifest() -> dict:
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             "copied_log": {"path": source["path"], "path_status": "approved_offline_workspace", "sha256": source["sha256"]},
+            "posture": {
+                "pre_check": "passed",
+                "post_check": "passed",
+                "pre_posture": "stable",
+                "post_posture": "stable",
+                "plugins_disabled": True,
+                "scanner_disabled": True,
+                "dispatch_limit": "0",
+                "wrapper_profile": "observer-debug",
+                "observer_exclusivity": "player_principal_lifecycle_only",
+                "debug_escape_markers": "absent",
+                "callback_escape_markers": "absent",
+                "native_exec_disabled": True,
+                "ptrace_disabled": True,
+                "single_module_summary": "player_principal_lifecycle",
+            },
+            "rollback": {
+                "completed": True,
+                "observer_env_survived": False,
+                "observer_marker_survived": False,
+            },
+            "claims": {"delivery_claim": "none", "principal_claim": "none"},
+            "user_policy": "no_regular_users",
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+        },
+        "source_summary": summary,
+        "consumer_boundary_cases": [
+            {
+                "case": "stale_after_logout",
+                "result": "fail_closed",
+                "lookup_allowed": False,
+                "mutation_allowed": False,
+                "return_override_allowed": False,
+                "public_sdk_surface": False,
+            },
+            {
+                "case": "malformed_or_unsupported_evidence",
+                "result": "fail_closed",
+                "lookup_allowed": False,
+                "mutation_allowed": False,
+                "return_override_allowed": False,
+                "public_sdk_surface": False,
+            },
+        ],
+        "privacy_boundary": {
+            "copied_opaque_principal_only": True,
+            "redacted_runtime_observer": True,
+            "player_identifiers_logged": False,
+            "lookup_allowed": False,
+            "resource_handle_allowed": False,
+            "mutation_allowed": False,
+            "return_override_allowed": False,
+        },
+        "promotion_gate": {
+            "runtime_evidence_ready": True,
+            "ready": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+        },
+        "non_claims": [
+            "approved runtime observer evidence only",
+            "does not promote public player identity, lookup, permissions, commands, moderation, admin authority, mutation, return override, ResourceHandle, or v1 SDK readiness",
+            "does not expose Steam/EOS ids, player names, IPs, tribe ids, UE pointers, FNames, GObjects, raw params, or persistent lookup keys",
+            "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
+        ],
+    }
+
+
+def manifest_for_copied_log(copied_log: Path) -> dict:
+    analyzer = load_script_module(ANALYZER, "test_player_principal_analyzer")
+    summary = analyzer.analyze_lines(runtime_log_lines())
+    source_sha256 = hashlib.sha256(copied_log.read_bytes()).hexdigest()
+    summary["evidence"] = {
+        "kind": "runtime-observer-log",
+        "obelisk_commit": "test-commit",
+        "sources": [
+            {
+                "path": str(copied_log),
+                "sha256": source_sha256,
+                "line_count": len(runtime_log_lines()),
+            }
+        ],
+        "server_paths_allowed": False,
+    }
+    return {
+        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+        "artifact_status": "approved_runtime_observer_summary",
+        "readiness_classification": "runtime_evidence_only",
+        "approved_runtime_evidence_present": True,
+        "runtime_evidence_ready": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "approval": {
+            "runtime_evidence_reviewed": True,
+            "runtime_work_authorized_by_this_manifest": False,
+            "server_operations_authorized_by_this_manifest": False,
+            "publication_authorized_by_this_manifest": False,
+            "discord_authorized_by_this_manifest": False,
+        },
+        "operational_window": {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1",
+            "ready": True,
+            "operational_window_manifest_ready": True,
+            "run_id": RUN_ID,
+            "obelisk_commit": "test-commit",
+            "target": {"instance": "arkserver2", "map": "TheIsland"},
+            "copied_log": {"path": str(copied_log), "path_status": "approved_offline_workspace", "sha256": source_sha256},
             "posture": {
                 "pre_check": "passed",
                 "post_check": "passed",
@@ -207,6 +334,31 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertEqual(
             report["consumer_cases"],
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
+        )
+
+    def test_validate_manifest_recomputes_copied_log_sha_without_server_workspace_write(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker")
+        old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        with tempfile.TemporaryDirectory() as tmp:
+            offline_root = Path(tmp)
+            copied_log = offline_root / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (offline_root,)
+            try:
+                payload = manifest_for_copied_log(copied_log)
+                accepted = checker.validate_manifest(payload, check_mode="consume")
+                self.assertEqual([], accepted.blockers)
+
+                payload["source_summary"]["evidence"]["sources"][0]["sha256"] = hashlib.sha256(b"other").hexdigest()
+                payload["operational_window"]["copied_log"]["sha256"] = payload["source_summary"]["evidence"]["sources"][0]["sha256"]
+                rejected = checker.validate_manifest(payload, check_mode="consume")
+            finally:
+                checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+
+        self.assertIn(
+            "source_summary_source_sha256_mismatch",
+            {blocker["reason"] for blocker in rejected.blockers},
         )
 
     def test_promote_mode_blocks_even_when_runtime_evidence_is_accepted(self) -> None:

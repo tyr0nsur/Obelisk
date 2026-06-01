@@ -168,6 +168,45 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("query_failclosed_artifact_public_sdk_ready_not_false", report["blockers"])
         self.assertIn("query_failclosed_artifact_runtime_ready_not_false", report["blockers"])
 
+    def test_rejects_query_failclosed_manifest_that_only_matches_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifact = {
+                "schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
+                "artifact_status": "candidate_only",
+                "promotion_ready": False,
+                "public_header_allowed": False,
+                "public_cache_abi_allowed": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+            }
+            artifact_path = write_json(root, "query-manifest.json", artifact)
+
+            result = run_checker("--query-failclosed-artifact", str(artifact_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_failclosed_manifest_contract_invalid", report["blockers"])
+
+    def test_rejects_permission_query_abi_boundary_properties_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            abi = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "abi.permission_query_identity_fields"
+            )
+            abi["required_properties"].remove("owner-token scoped call")
+            abi["required_properties"].remove("no UE pointers or raw params")
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_text_boundary_properties_missing", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

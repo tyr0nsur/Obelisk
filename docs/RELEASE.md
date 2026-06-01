@@ -17,8 +17,7 @@ Read scope labels literally:
   layer, module SDK roadmap, identity/lookup surface, mutation path, or return-override
   authority while the complete-SDK blockers remain open. Start archived Plugin Hub
   planning from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
-  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; adding a first-party example or naming a popular
-  plugin family does not promote public SDK surface. Likewise, naming a popular plugin
+  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; adding a first-party example or naming a popular plugin
   family does not promote public SDK surface.
 - Planning-only lanes and target sets are guidance or demand signals. They are not release
   evidence, not public SDK surface, and are rejected by the release gate until replaced by

@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import check_permissions_admin_query_failclosed_contract as query_failclosed_contract
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -67,10 +69,18 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
 )
 REQUIRED_QUERY_TEXT_FRAGMENTS = frozenset(
     (
+        "POD C ABI",
+        "abi_version and struct_size front-loaded",
+        "owner-token scoped call",
+        "capability gated",
+        "query-only result contract only",
         "action bytes are required, copied, and bounded to 128 bytes before allow",
         "resource_scope bytes are optional, copied, and bounded to 256 bytes before allow",
         "no command parser compatibility claim from action or resource_scope bytes",
         "no UTF-8 or text decoding claim before a separate reviewed parser contract",
+        "no mutation of permission policy or admin state",
+        "no command/reply handles",
+        "no UE pointers or raw params",
     )
 )
 REQUIRED_ALLOWED_PUBLIC_SURFACE_AFTER_IDENTITY = (
@@ -101,6 +111,8 @@ REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
 )
 QUERY_READY_FALSE_KEYS = (
     "promotion_ready",
+    "public_header_allowed",
+    "public_cache_abi_allowed",
     "public_sdk_ready",
     "runtime_ready",
 )
@@ -244,8 +256,14 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
     else:
         if payload.get("artifact_status") != "candidate_only":
             add(blockers, "query_failclosed_manifest_not_candidate_only", f"{path}:artifact_status")
-        if payload.get("public_header_allowed") is not False:
-            add(blockers, "query_failclosed_manifest_public_header_allowed", f"{path}:public_header_allowed")
+        validation = query_failclosed_contract.validate_manifest(payload, check_mode="consume")
+        if validation.blockers:
+            add(
+                blockers,
+                "query_failclosed_manifest_contract_invalid",
+                str(path),
+                reasons=[blocker["reason"] for blocker in validation.blockers],
+            )
     return str(schema)
 
 

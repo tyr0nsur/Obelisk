@@ -337,6 +337,26 @@ namespace Obelisk::Hooks::ProcessEventBuffReflection
             out.Value = value != 0;
             return true;
         }
+
+        bool IsRangeInsideCopiedParams(const Obelisk::UE::BuffReflection::BuffInvocation& invocation,
+                                       const Obelisk::UE::BuffReflection::BuffFieldRange& field)
+        {
+            if (!invocation.HasParameterRanges || !invocation.ParameterData || !field.Range.Data)
+                return false;
+            if (field.Offset < 0)
+                return false;
+
+            const auto offset = static_cast<size_t>(field.Offset);
+            if (offset > invocation.ParameterSize ||
+                field.Range.Size > invocation.ParameterSize - offset)
+            {
+                return false;
+            }
+
+            const auto paramBegin = reinterpret_cast<uintptr_t>(invocation.ParameterData);
+            const auto rangeBegin = reinterpret_cast<uintptr_t>(field.Range.Data);
+            return rangeBegin >= paramBegin && rangeBegin - paramBegin == offset;
+        }
     }
 
     Attempt TryObserveInvocation(const Gate& gate,
@@ -440,6 +460,12 @@ namespace Obelisk::Hooks::ProcessEventBuffReflection
                     return false;
                 }
                 continue;
+            }
+
+            if (!IsRangeInsideCopiedParams(invocation, field))
+            {
+                out = {};
+                return false;
             }
 
             BuffBoolObservation copiedBool;

@@ -11,7 +11,7 @@ Usage: scripts/run_script_tests.sh [--list-python-files|--python-tests-only|--ve
 Runs the repository script validation suite.
 
 Options:
-  --list-python-files       Print tracked and untracked non-ignored Python scripts/tests.
+  --list-python-files       Print discovered Python scripts/tests under scripts/.
   --python-tests-only       Run Python compile checks and Python tests, then exit.
   --verify-shell-test-list  Fail if scripts/test_*.sh includes an unlisted shell test.
 EOF
@@ -47,15 +47,16 @@ if (($# > 1)); then
     exit 2
 fi
 
-list_repo_files() {
-    {
-        git ls-files "$@"
-        git ls-files --others --exclude-standard "$@"
-    } | sort -u
+export PYTHONDONTWRITEBYTECODE=1
+
+list_script_files() {
+    local pattern="$1"
+
+    find scripts -maxdepth 1 -type f -name "${pattern}" -print | LC_ALL=C sort -u
 }
 
-mapfile -t python_scripts < <(list_repo_files 'scripts/*.py')
-mapfile -t python_tests < <(list_repo_files 'scripts/test_*.py')
+mapfile -t python_scripts < <(list_script_files '*.py')
+mapfile -t python_tests < <(list_script_files 'test_*.py')
 
 if [[ "${mode}" == "python-tests-only" && "${OBELISK_RUN_SCRIPT_TESTS_PROBE_ONLY:-0}" == "1" ]]; then
     probe_tests=()
@@ -109,7 +110,7 @@ verify_shell_test_list() {
     local test_path
     local missing_tests=()
 
-    mapfile -t discovered_shell_tests < <(list_repo_files 'scripts/test_*.sh')
+    mapfile -t discovered_shell_tests < <(list_script_files 'test_*.sh')
     for test_path in "${discovered_shell_tests[@]}"; do
         if ! is_listed_shell_script "${test_path}"; then
             missing_tests+=("${test_path}")
@@ -124,6 +125,28 @@ verify_shell_test_list() {
     fi
 }
 
+check_python_syntax() {
+    python3 - "$@" <<'PY'
+import pathlib
+import sys
+
+failed = False
+for filename in sys.argv[1:]:
+    path = pathlib.Path(filename)
+    try:
+        compile(path.read_text(encoding="utf-8"), filename, "exec")
+    except SyntaxError as exc:
+        print(f"{filename}:{exc.lineno}:{exc.offset}: {exc.msg}", file=sys.stderr)
+        failed = True
+    except OSError as exc:
+        print(f"{filename}: {exc}", file=sys.stderr)
+        failed = True
+
+if failed:
+    raise SystemExit(1)
+PY
+}
+
 if [[ "${mode}" == "list-python-files" ]]; then
     printf '%s\n' "${python_scripts[@]}" "${python_tests[@]}" | sort -u
     exit 0
@@ -135,11 +158,11 @@ if [[ "${mode}" == "verify-shell-test-list" ]]; then
 fi
 
 if ((${#python_scripts[@]} > 0)); then
-    python3 -m py_compile "${python_scripts[@]}"
+    check_python_syntax "${python_scripts[@]}"
 fi
 
 for test_path in "${python_tests[@]}"; do
-    python3 "${test_path}"
+    python3 -B "${test_path}"
 done
 
 if [[ "${mode}" == "python-tests-only" ]]; then

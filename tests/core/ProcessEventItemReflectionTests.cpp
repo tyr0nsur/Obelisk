@@ -874,6 +874,53 @@ namespace
         }
     }
 
+    void TestBuildAndReserveItemReturnObservationDoesNotTouchParamsWithoutBudget()
+    {
+        Attempt matched;
+        matched.Status = AttemptStatus::Matched;
+        matched.Invocation.Function = Obelisk::UE::ItemReflection::ItemFunction::AllowEquipItem;
+        matched.Invocation.FunctionNameIndex = kAllowEquipItemNameIndex;
+        matched.Invocation.OuterNameIndex = kPrimalItemNameIndex;
+        matched.Invocation.HasParameterRanges = true;
+        matched.Invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::ToInventory,
+                                                      kToInventoryNameIndex,
+                                                      0x00,
+                                                      sizeof(uint64_t),
+                                                      false));
+        matched.Invocation.Fields.push_back(MakeField(Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+                                                      kReturnValueNameIndex,
+                                                      0x08,
+                                                      sizeof(uint8_t),
+                                                      true,
+                                                      reinterpret_cast<const uint8_t*>(0x1),
+                                                      sizeof(uint8_t)));
+
+        std::atomic<uint64_t> zeroBudgetCounter{0};
+        uint64_t observationNumber = 99;
+        CopiedItemObservation observation;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    matched, zeroBudgetCounter, 0, observationNumber, observation),
+                "zero-budget item return observation touched copied params");
+        Require(zeroBudgetCounter.load() == 0, "zero-budget item return observation advanced counter");
+        Require(observationNumber == 0, "zero-budget item return observation left observation number");
+        Require(observation.BoolCount == 0, "zero-budget item return observation left copied output");
+
+        std::atomic<uint64_t> exhaustedCounter{1};
+        observationNumber = 99;
+        observation.BoolCount = 1;
+        observation.BoolStorage[0].Value = true;
+
+        Require(!TryBuildAndReserveItemReturnObservationForMatchedAttempt(
+                    matched, exhaustedCounter, 1, observationNumber, observation),
+                "exhausted item return observation touched copied params");
+        Require(exhaustedCounter.load() == 1, "exhausted item return observation advanced counter");
+        Require(observationNumber == 0, "exhausted item return observation left observation number");
+        Require(observation.BoolCount == 0, "exhausted item return observation left copied output");
+    }
+
     void TestReturnOnlyHelpersRejectUnsupportedFunctions()
     {
         uint8_t returnValue = 1;
@@ -1368,6 +1415,7 @@ int main()
     TestItemReturnEventViewRejectsUnsupportedOrMalformedObservations();
     TestBuildAndReserveItemReturnObservationForMatchedAttempt();
     TestBuildAndReserveItemReturnObservationFailsClosedBeforeReservation();
+    TestBuildAndReserveItemReturnObservationDoesNotTouchParamsWithoutBudget();
     TestReturnOnlyHelpersRejectUnsupportedFunctions();
     TestReturnOnlyHelpersRejectMalformedUseItemOntoItem();
     TestInvalidItemReturnObservationDoesNotReserveBudget();

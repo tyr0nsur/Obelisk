@@ -21,14 +21,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if git ls-files --error-unmatch "${probe}" >/dev/null 2>&1; then
-    printf 'probe path unexpectedly tracked: %s\n' "${probe}" >&2
-    exit 1
-fi
-if git ls-files --error-unmatch "${shell_probe}" >/dev/null 2>&1; then
-    printf 'shell probe path unexpectedly tracked: %s\n' "${shell_probe}" >&2
-    exit 1
-fi
 if [[ -e "${probe}" || -e "${marker}" || -e "${shell_probe}" || -e "${shell_marker}" ]]; then
     printf 'stale run_script_tests probe state exists: %s %s %s %s\n' \
         "${probe}" \
@@ -93,7 +85,7 @@ if [[ -e "${shell_marker}" ]]; then
 fi
 rm -f "${shell_probe}" "${shell_marker}"
 
-scripts/run_script_tests.sh --python-tests-only >/dev/null
+OBELISK_RUN_SCRIPT_TESTS_PROBE_ONLY=1 scripts/run_script_tests.sh --python-tests-only >/dev/null
 if [[ ! -e "${marker}" ]]; then
     printf 'run_script_tests.sh --python-tests-only did not execute untracked python test %s\n' "${probe}" >&2
     exit 1
