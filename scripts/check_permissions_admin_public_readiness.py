@@ -83,6 +83,25 @@ REQUIRED_QUERY_TEXT_FRAGMENTS = frozenset(
         "no UE pointers or raw params",
     )
 )
+REQUIRED_FAIL_CLOSED_NEVER_ALLOW = frozenset(
+    (
+        "principal_generation_mismatch",
+        "missing principal_handle",
+        "stale principal",
+        "scope mismatch",
+        "operator-config authority before separate allow-capable promotion",
+        "runtime-local authority without runtime-owned provenance",
+    )
+)
+REQUIRED_FAIL_CLOSED_DENY_OR_UNKNOWN = frozenset(
+    (
+        "mismatched principal_generation",
+        "missing_authority_generation",
+        "authority_generation_mismatch",
+        "missing policy_epoch provenance",
+        "policy source generation mismatch",
+    )
+)
 REQUIRED_ALLOWED_PUBLIC_SURFACE_AFTER_IDENTITY = (
     "query-only fail-closed permission decision checks over copied principals"
 )
@@ -197,6 +216,32 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     properties = abi.get("required_properties") if isinstance(abi, dict) else None
     if not isinstance(properties, list) or not REQUIRED_QUERY_TEXT_FRAGMENTS.issubset(set(properties)):
         add(blockers, "query_text_boundary_properties_missing", "$.required_before_public_header")
+    fail_closed = next(
+        (
+            item
+            for item in required
+            if isinstance(item, dict) and item.get("id") == "fail_closed.stale_or_scope_mismatch"
+        ),
+        None,
+    )
+    if not isinstance(fail_closed, dict):
+        return
+    never_allow = fail_closed.get("must_never_return_allow_for")
+    if not isinstance(never_allow, list) or not REQUIRED_FAIL_CLOSED_NEVER_ALLOW.issubset(set(never_allow)):
+        add(
+            blockers,
+            "fail_closed_never_allow_cases_missing",
+            "$.required_before_public_header[fail_closed.stale_or_scope_mismatch].must_never_return_allow_for",
+        )
+    deny_or_unknown = fail_closed.get("deny_or_unknown_conditions")
+    if not isinstance(deny_or_unknown, list) or not REQUIRED_FAIL_CLOSED_DENY_OR_UNKNOWN.issubset(
+        set(deny_or_unknown)
+    ):
+        add(
+            blockers,
+            "fail_closed_deny_or_unknown_cases_missing",
+            "$.required_before_public_header[fail_closed.stale_or_scope_mismatch].deny_or_unknown_conditions",
+        )
 
 
 def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:

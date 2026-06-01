@@ -207,6 +207,26 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("query_text_boundary_properties_missing", report["blockers"])
 
+    def test_rejects_missing_generation_mismatch_fail_closed_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            fail_closed = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "fail_closed.stale_or_scope_mismatch"
+            )
+            fail_closed["must_never_return_allow_for"].remove("principal_generation_mismatch")
+            fail_closed["deny_or_unknown_conditions"].remove("mismatched principal_generation")
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("fail_closed_never_allow_cases_missing", report["blockers"])
+        self.assertIn("fail_closed_deny_or_unknown_cases_missing", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()
