@@ -64,8 +64,8 @@ validation adapters, not the product API.
 - Avoid hardcoded offsets when reflection can be used.
 - Follow [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md) before
   adding or promoting plugins.
-- Start Plugin Hub work from [docs/PLUGIN_HUB_FOUNDATION_V1.md](docs/PLUGIN_HUB_FOUNDATION_V1.md)
-  and [docs/PLUGIN_HUB_CAPABILITY_MATRIX.md](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md); ArkServerApi,
+- Treat Plugin Hub as post-SDK-complete planning. Do not start new Plugin Hub examples,
+  packaging, or intake tooling while complete-SDK blockers remain open. ArkServerApi,
   AseApi, and NextGenPlugins are names, demand, conceptual architecture, and migration
   ergonomics references only, not sources for code, offsets, control flow, parsers,
   schemas, or implementation behavior.

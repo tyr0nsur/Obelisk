@@ -65,8 +65,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   The checker also enforces canonical `stable_release_contract.claim_requires` and
   `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data
   seeds cannot become sufficient evidence by manifest drift.
-- `oDescriptorCatalog` and Plugin Hub foundation work are metadata/contributor seeds only,
-  not substitutes for v1 blockers. Installed SDK examples are Linux x86_64 only.
+- Plugin Hub foundation work is post-SDK-complete planning only. Do not route active
+  rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK
+  blockers remain open. Installed SDK examples are Linux x86_64 only.
 - `obelisk.command_chat_response_path.v1` is post-v1 planning only and adds no ABI today.
   Replies/send-chat/broadcast/moderation stay blocked; static thunks, passive chat,
   vtable slots, raw callbacks, and legacy `CallProcessEvent` are insufficient.
@@ -192,9 +193,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   until copied identity/principal semantics, provenance, scope/generation, epoch,
   rate-limit/audit, and v1 sequence gates are resolved. `operator-config` is recognized
   for planning/audit but is not allow-capable.
-- Plugin Hub seed review requires exactly one package `Support tier: <tier>` declaration
-  and rejects unnegated v1/ArkApi/permissions/identity/replies/mutation/storage/module
-  support claims outside that tier.
+- Plugin Hub seed review is parked until SDK completion. Current rounds should keep
+  Plugin Hub docs non-promotional and focus on SDK blockers.
 - Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
   stays blocked on lifecycle-anchor evidence unless an explicit lifecycle-anchor candidate
   manifest is provided; with both lifecycle-anchor and principal-invalidation policy

@@ -1,12 +1,16 @@
 # Plugin Hub Foundation V1
 
+Status: post-SDK-complete planning only.
+
 Read `PLUGIN_HUB_SEED_BOUNDARY.md` first: Plugin Hub seeds are not evidence that the
 Obelisk v1 SDK is complete.
 
-Plugin Hub Foundation V1 is the minimum contributor-facing contract for Linux-native
+Plugin Hub Foundation V1 is a deferred contributor-facing seed contract for Linux-native
 Obelisk plugins that consume `include/obelisk/ObeliskApi.h`. In this document, `V1`
 means the first reviewed Plugin Hub foundation/intake contract revision. It is not
 Obelisk SDK v1, not `v1.0 stable`, and not a Plugin Hub completion claim.
+Do not treat this document as active roadmap work while the complete SDK blocker chain
+remains open. Current engineering priority is the SDK itself.
 
 It is a boundary document, not a roadmap freeze. It does not add public symbols, structs,
 callbacks, capabilities, or gameplay modules. More specifically, it does not add public
@@ -19,21 +23,21 @@ posture, and Plugin Hub priority. They are not porting or copying sources. Every
 surface must be rebuilt through Obelisk reflection, copied C ABI contracts, explicitly
 named second-source target sets, and runtime safety gates.
 
-This foundation is a post-RC contributor seed for the current ABI, not a change to the
-published `v0.1.0-rc.2` tag. It explains what small native examples can honestly teach
-while module lanes such as commands, permissions, inventory, structures, players,
-missions, transfers, and storage services remain planning-only until separately promoted.
+This foundation is post-SDK planning, not a change to the published `v0.1.0-rc.2` tag.
+It records what future native examples may honestly teach after the SDK blocker chain is
+closed. It must not compete with current work on players, commands, permissions,
+inventory, structures, missions, transfers, storage services, or other SDK surfaces.
 
-Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons,
-descriptor/catalog consumers, and process-local timer utilities that use the current C ABI
-with fail-closed capability checks. Copied `ChatMessageEvent` parsing and copied
+When Plugin Hub resumes after SDK completion, release-supported seed work can start with
+lifecycle/config/logging skeletons, descriptor/catalog consumers, and process-local timer
+utilities that use the public C ABI with fail-closed capability checks. Copied `ChatMessageEvent` parsing and copied
 `GameplayPolicyEvent` auditing remain experimental seed patterns only; they are not
 production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of
 a new ABI. They are also not public command SDK/router surfaces, replies, permissions,
 identity, send-chat, or moderation.
 
-For release notes, package READMEs, and contributor reviews, the supported seed set is
-exactly lifecycle/config/logging minimal plugins, descriptor/catalog readers, and
+For future Plugin Hub release notes, package READMEs, and contributor reviews, the seed
+set should start from lifecycle/config/logging plugin skeletons, descriptor/catalog readers, and
 process-local timer utilities. Passive copied chat parsing and copied policy auditing are
 experimental examples only. Permissions/admin, commands/replies/send-chat/broadcast,
 economy, kits, homes, teleport, and item grants stay blocked until the required
@@ -41,7 +45,7 @@ identity/principal, permissions/admin, command routing, response path,
 persistence/storage, and safe mutation/grant surfaces are separately promoted.
 
 Creator-facing examples that build against an installed SDK package live under
-`examples/`; `examples/sdk_minimal_plugin` is the minimum seed for an installed SDK
+`examples/`; `examples/sdk_minimal_plugin` is the starter seed for an installed SDK
 consumer, `examples/sdk_descriptor_catalog` demonstrates descriptor/catalog reads, and
 `examples/sdk_timer_plugin` demonstrates the promoted process-local timer surface using
 only the installed package. `examples/sdk_inventory_policy_audit` demonstrates an
@@ -50,7 +54,7 @@ categories only; it is not release-supported and does not add inventory/item ide
 lookup, mutation, return override, command, permission, send-chat, storage, or
 compatibility surface. First-party runtime reference plugins live under
 `plugins/` and may use repository-local build/test wiring, so they are reference plugins
-in-tree rather than the minimum installed-SDK consumer contract.
+in-tree rather than the starter installed-SDK consumer contract.
 
 The current release-supported installed-SDK templates are exactly the starter template
 (`examples/sdk_minimal_plugin`), descriptor catalog template
@@ -117,7 +121,7 @@ Foundation V1 contains only the public ABI already exposed by `ObeliskApi.h`:
 - metadata-only descriptors through `DescribeGameplayPolicyEventKind`
 - copied `GameplayPolicyEvent` observers as experimental pattern examples only for
   target-set-promoted event kinds
-- minimal copied `ChatMessageEvent` observers as experimental pattern examples only
+- copied notification-only `ChatMessageEvent` observers as experimental pattern examples only
 - owner-token, process-local timers
 - raw `ProcessEvent` callbacks only as debug-gated runtime plumbing, not as Plugin Hub API
 
@@ -204,10 +208,10 @@ tokens must be validated as safe path components. Runtime handles, owner tokens,
 handles, timer ids, and event sequence values are process-local and must not be persisted
 or shared across maps, processes, or clusters.
 
-## Safe Uses Now
+## Deferred Uses
 
-Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is
-explicit:
+Foundation V1 defines honest future Plugin Hub seeds after the SDK blocker chain is
+closed and support tiers are explicit:
 
 Release-supported seeds:
 
@@ -232,8 +236,8 @@ dino, tribe, mission, transfer, storage/database, webhook, or structure modules.
 
 ## Fastest Honest Creator Path
 
-After `v0.1`, the fastest useful path for plugin creators is to build narrow
-Obelisk-native examples in this order:
+After `v0.1`, the first useful path for plugin creators is to build contributor-ready
+Obelisk-native SDK seeds in this order:
 
 1. Start from lifecycle, config, logging, and `struct_size`/capability checks.
 2. Add descriptor reads so plugins can explain which copied event categories are actually

@@ -38,10 +38,9 @@ Scope terms used here:
 - published RC baseline: the frozen `v0.1.0-rc.2` tag and its public contract;
 - current post-RC candidate: `HEAD` work that still needs a fresh clean release gate before
   publication;
-- Plugin Hub seed: narrow examples that consume only existing ABI surfaces, start from
-  `docs/PLUGIN_HUB_FOUNDATION_V1.md` plus `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`, and do
-  not gain new support tier, public SDK scope, or `v1.0` completion weight merely by being
-  installed as a plugin `.so`;
+- Plugin Hub seed: post-SDK-complete planning only. Plugin Hub examples, packaging, and
+  intake tooling do not gain priority, support tier, public SDK scope, or `v1.0`
+  completion weight while complete-SDK blockers remain open;
 - planning-only lane: guidance/demand work that is not release evidence or public SDK
   surface.
 

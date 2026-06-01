@@ -86,6 +86,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-29-module-surface-roadmap.md](2026-05-29-module-surface-roadmap.md)
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)
 - [2026-05-31-v1-sdk-round-identity-static-demand-audit.md](2026-05-31-v1-sdk-round-identity-static-demand-audit.md)
+- [2026-06-01-v1-sdk-demand-chain-from-aseapi-nextgen.md](2026-06-01-v1-sdk-demand-chain-from-aseapi-nextgen.md)
 - [2026-05-31-aggregate-census-product-priority.md](2026-05-31-aggregate-census-product-priority.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
 - [2026-05-31-batch-snapshot-planner-design.md](2026-05-31-batch-snapshot-planner-design.md)
@@ -112,6 +113,8 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md)
 - [2026-05-31-player-identity-static-target-orientation.md](2026-05-31-player-identity-static-target-orientation.md)
 - [2026-05-31-player-identity-static-target-orientation.json](2026-05-31-player-identity-static-target-orientation.json)
+- [2026-06-01-player-principal-offline-to-runtime-plan.md](2026-06-01-player-principal-offline-to-runtime-plan.md)
+- [2026-06-01-player-principal-runtime-capture-plan.md](2026-06-01-player-principal-runtime-capture-plan.md)
 - [2026-05-31-native-ufunction-registration-static-discovery-plan.md](2026-05-31-native-ufunction-registration-static-discovery-plan.md)
 - [2026-05-31-arktribute-playerdata-identity-boundary.md](2026-05-31-arktribute-playerdata-identity-boundary.md)
 - [2026-05-28-fname-index-manifest-plan.md](2026-05-28-fname-index-manifest-plan.md)
@@ -324,6 +327,8 @@ when a task explicitly targets that module.
 | [2026-05-31-player-identity-privacy-invalidation-contract.md](2026-05-31-player-identity-privacy-invalidation-contract.md) | Player identity privacy invalidation contract | Defines the candidate-only future principal contract: opaque copied principal plus generation, lifecycle invalidation, process-local multi-instance limits, and explicit non-claims for SDK/runtime/lookup. |
 | [2026-05-31-planning-layout-intake-contract.md](2026-05-31-planning-layout-intake-contract.md) | Planning layout intake contract | Defines `planning-layout-intake` as a planning-only, consume-only layout contract for player identity target sets, with no promotion, SDK, runtime, or release-readiness claim. |
 | [2026-05-31-player-identity-static-admin-thunks.md](2026-05-31-player-identity-static-admin-thunks.md) | Player identity static admin thunks | Preserves lightweight static clues for `ServerListPlayers` and `ServerKickPlayer` native thunks while keeping them orientation-only and not a substitute for core/reflection inventory evidence. |
+| [2026-06-01-player-principal-offline-to-runtime-plan.md](2026-06-01-player-principal-offline-to-runtime-plan.md) | Player principal offline-to-runtime plan | Records the golden path from reviewed `0x5956f30`/`0x595b7e0` offline evidence through focal `HandleNewPlayer`/`OnLogout` snapshots to the next private runtime consume-only observer evidence, without public SDK or live-run approval. |
+| [2026-06-01-player-principal-runtime-capture-plan.md](2026-06-01-player-principal-runtime-capture-plan.md) | Player principal runtime capture plan | Documents the approval-required consume-only runtime capture window for `PlayerPrincipalLifecycleObserver`, including prerequisites, markers/env, copied-log evidence, manifest/checker flow, rollback, user no-go conditions, and remaining gaps. |
 | [2026-05-31-radare2-static-orientation-wrapper.md](2026-05-31-radare2-static-orientation-wrapper.md) | Radare2 static orientation wrapper | Documents the `/tmp`-rooted candidate-only radare2 window capture wrapper for player identity, admin, and chat-response UFunction addresses, with SHA/tool provenance and no artifact-gate or promotion claim. |
 | [2026-05-31-permissions-admin-minimum-post-identity.md](2026-05-31-permissions-admin-minimum-post-identity.md) | Permissions/admin minimum post-identity | Defines the smallest safe post-identity permission/admin design as query-only, owner-scoped, capability-gated, process-local, and fail-closed while keeping public permissions, admin actions, commands, replies, storage, and operator ingress blocked. |
 | [2026-05-31-offline-artifact-curation.md](2026-05-31-offline-artifact-curation.md) | Offline artifact curation | Classifies current non-protected artifact roots into usable planning inputs, legacy/blocked roots, and player-identity non-inputs. |

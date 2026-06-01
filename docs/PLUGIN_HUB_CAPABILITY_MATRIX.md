@@ -1,9 +1,13 @@
 # Plugin Hub Capability Matrix
 
+Status: post-SDK-complete planning only.
+
 This matrix is a contributor-facing planning aid for future Obelisk Plugin Hub work. It
 maps common modder intents to the public Obelisk surface that is safe today and separates
 post-RC release-supported seed work from experimental copied-data examples.
-`PLUGIN_HUB_FOUNDATION_V1.md` defines the minimal foundation contract that this matrix
+It must not drive current engineering priority while the complete SDK blocker chain is
+open.
+`PLUGIN_HUB_FOUNDATION_V1.md` defines the first foundation seed contract that this matrix
 builds on. The `Foundation V1` label means the first reviewed foundation/intake contract
 revision for contributor readiness; it is not Obelisk SDK v1, `v1.0 stable`, or a Plugin
 Hub completion claim.
@@ -26,17 +30,17 @@ The detailed local inventory lives in
 demand analysis only; it is not license clearance, runtime evidence, an ArkApi
 compatibility target, or an ABI reference.
 
-## Post-RC Support Boundary
+## Deferred Support Boundary
 
-Post-RC release-supported Plugin Hub seed work is limited to lifecycle/config/logging
-skeletons, descriptor/catalog consumers, and process-local timer utilities that use the
-current C ABI with fail-closed capability checks. Copied `ChatMessageEvent` parsing and
+Plugin Hub seed work resumes after SDK completion. At that point it can start with
+lifecycle/config/logging skeletons, descriptor/catalog consumers, and process-local timer
+utilities that use the public C ABI with fail-closed capability checks. Copied `ChatMessageEvent` parsing and
 copied `GameplayPolicyEvent` auditing may remain useful experimental seed examples, but
 they are not production Plugin Hub modules, public command SDK/router surfaces, replies,
 permissions, identity, send-chat, moderation, policy-enforcement SDKs, or compatibility
 targets for ArkApi plugin families.
 
-Release-supported seeds are exactly lifecycle/config/logging minimal plugins,
+Future release-supported seeds should start from lifecycle/config/logging plugin skeletons,
 descriptor/catalog readers, and process-local timer utilities. Passive copied chat
 parsing and copied policy auditing are experimental examples only. Permissions/admin,
 commands/replies/send-chat/broadcast, economy, kits, homes, teleport, and item grants
@@ -58,7 +62,7 @@ server modding framework.
 
 ## Support Tier Legend
 
-- `release-supported seed available`: supported for narrow Obelisk-native examples that use only
+- `release-supported seed available`: supported for scoped Obelisk-native examples that use only
   the current public C ABI, fail-closed capability checks, safe-disabled config, and
   process-local ownership.
 - `experimental seed only`: allowed for explicitly labeled pattern examples that teach
@@ -105,7 +109,7 @@ the exact release-readiness target sets.
 ## Dictionary-To-Primitive Rule
 
 The matrix maps demand families to the first Obelisk primitive that can honestly teach a
-small pattern; it does not map a popular plugin family to a rebuildable Plugin Hub module.
+starter SDK pattern; it does not map a popular plugin family to a rebuildable Plugin Hub module.
 Names from ArkApi/AseApi or local `NextGenPlugins` can corroborate demand, but they do not
 widen a row's support tier.
 
@@ -135,7 +139,7 @@ today or after promotion gates; it does not promise ArkApi plugin compatibility.
 | 6 | RCON/operator I/O and Unicode text | blocked | Needs secret-safe ingress, audit policy, encoding rules, and command lifecycle |
 | 7 | Economy, shops, kits, rewards, stats | blocked | Needs identity/principal, permissions/admin, command routing, response path, persistence/storage, item grant/mutation, and event evidence |
 | 8 | Homes, teleport, safe zones, area policy | blocked | Needs location/area data, identity/principal, permissions/admin, command routing, response path, combat/enemy restrictions, and safe teleport/mutation/enforcement contracts |
-| 9 | Structure counts, placement, ownership, collision policy | blocked except experimental auditing | Only narrow copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
+| 9 | Structure counts, placement, ownership, collision policy | blocked except experimental auditing | Only copied policy observer examples are experimental; census, ownership, placement denial, collision control, and mutation are not public surfaces |
 | 10 | Dino colors, carry rules, spawn/cosmetic policy | blocked | Needs dino/player identity, classification, interaction events, and safe mutation/enforcement |
 | 11 | Tribe MOTD, tribe-facing notices, and tribe policy | blocked | Needs tribe/player identity, privacy policy, send-chat/broadcast or command surface, and moderation/visibility rules |
 | 12 | Engrams, inventory, item give/remove flows | blocked | Needs player/inventory/item identity, permissions/admin where gated, command routing and response path where user-triggered, item grant/mutation APIs, rollback, and privacy policy |
@@ -187,12 +191,12 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 | Discover resource categories | `DescribeResourceKind` | Promoted metadata | Resource identity, object lookup, persistent handles, or correlation between events |
 | Discover promoted policy event kinds | `DescribeGameplayPolicyEventKind` | Promoted metadata | No complete gameplay inventory, public module SDK, mutation path, or return override |
 | Observe copied structure/item policy data | `GameplayPolicyEvent` with owner-token registration for `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake` release-readiness target sets only | v0.1 copied-data ABI surface; experimental Plugin Hub seed, not v1-complete | Public `StructureEvents`, Inventory SDK, Items SDK, UE pointers, player/item/structure identity, mutation, or return override |
-| Parse copied chat text locally | `ChatMessageEvent` with owner-token registration; `chat-message-intake` is the exact release-readiness target set | Minimal v0.1-rc ABI surface; experimental local parsing seed | Public command SDK/router, sender identity, replies, permissions, moderation, chat blocking, or send-chat API |
+| Parse copied chat text locally | `ChatMessageEvent` with owner-token registration; `chat-message-intake` is the exact release-readiness target set | Notification-only v0.1-rc ABI surface; experimental local parsing seed | Public command SDK/router, sender identity, replies, permissions, moderation, chat blocking, or send-chat API |
 | Run process-local scheduled work | Owner-token timers | Promoted v0.1 core primitive | UE/gameplay timers, cluster scheduler, persistent ids, permission system, or command router |
 | Inspect descriptor output safely | `oDescriptorCatalog` | First-party metadata example | Resource discovery, callback subscription, identity, lookup, mutation, or return override |
-| Build an installed-SDK consumer | `examples/sdk_minimal_plugin`, `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Minimum installed SDK seed, descriptor seed, and timer seed | Runtime reference-plugin wiring, gameplay authority, module SDK coverage, private runtime headers, or ArkApi plugin portability |
+| Build an installed-SDK consumer | `examples/sdk_minimal_plugin`, `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Installed SDK starter seed, descriptor seed, and timer seed | Runtime reference-plugin wiring, gameplay authority, module SDK coverage, private runtime headers, or ArkApi plugin portability |
 | Study an installed-SDK copied policy audit pattern | `examples/sdk_inventory_policy_audit` with `find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)` and `Obelisk::obelisk_sdk` | Experimental pattern only | Inventory SDK, Items SDK, identity, lookup, mutation, return override, commands, permissions, send-chat, storage, policy enforcement, or ArkApi compatibility |
-| Study in-tree reference plugins | `plugins/oBaseEvents`, `plugins/oProcessTimer`, descriptor examples | Reference plugins | Minimum installed-SDK consumer contract, gameplay authority, module SDK coverage, or ArkApi plugin portability |
+| Study in-tree reference plugins | `plugins/oBaseEvents`, `plugins/oProcessTimer`, descriptor examples | Reference plugins | Starter installed-SDK consumer contract, gameplay authority, module SDK coverage, or ArkApi plugin portability |
 | Use raw `ProcessEvent` callbacks | Filtered callbacks behind explicit debug gates | Debug-gated runtime plumbing | Stable gameplay API, borrowed pointer lifetime, raw param API, or public Plugin Hub dependency |
 | Commands, permissions, economy, kits, shops, RCON | No public Obelisk SDK yet | Not ready | ArkApi compatibility, player identity, reply/send-chat, database service, or operator command lifecycle |
 | Persistent storage, databases, webhooks | Plugin-owned config files only | Not ready | Public storage SDK, database service, schema/migration contract, secret management, webhook/RCON integration, or cross-instance state |
@@ -234,7 +238,7 @@ ABI and keep the support tier explicit:
 
 Installed-SDK consumer seed:
 
-1. `examples/sdk_minimal_plugin` as the minimum package consumer that builds against the
+1. `examples/sdk_minimal_plugin` as the starter package consumer that builds against the
    installed SDK; this is the starter template.
 2. `examples/sdk_descriptor_catalog` as the installed-SDK descriptor/catalog seed.
 3. `examples/sdk_timer_plugin` as the installed-SDK timer seed for owner-token scheduled
@@ -285,7 +289,7 @@ evidence gates are satisfied.
 ## Plugin Hub Direction
 
 The first useful Plugin Hub seed examples should be built from surfaces that already
-exist. The minimum installed-SDK consumers are `examples/sdk_minimal_plugin`,
+exist. The installed-SDK starter consumers are `examples/sdk_minimal_plugin`,
 `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin`; `plugins/*` contains
 in-tree runtime reference plugins.
 

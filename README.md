@@ -58,7 +58,7 @@ v0.1-rc public C ABI slices:
 - Promoted `GameplayPolicyEvent` callback ABI for copied POD structure-backed policy
   signals tied to fresh [`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md)
   and inventory-backed policy signals through the same generic family.
-- Minimal v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
+- v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
   copied plugin-facing delivery has accepted `enable-chat-events` validation for all four
   known send modes (`0..3`). Historical `enable-chat-reflection` observer output is not
   delivery evidence. This remains a copied notification contract only, not commands,
@@ -87,7 +87,7 @@ Experimental:
 
 Not ready:
 
-- Public gameplay module APIs beyond `GameplayPolicyEvent` and the minimal
+- Public gameplay module APIs beyond `GameplayPolicyEvent` and notification-only
   `ChatMessageEvent`: players, richer chat, tribes, inventory, items, dinos, full
   structure/resources APIs, missions, transfers, permissions, gameplay/module timer
   abstractions, admin, and commands.
@@ -130,12 +130,11 @@ packaging/            Harness adapters and wrapper templates
 Plugin policy is documented in
 [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md). The initial read-only
 operator CLI is documented in [docs/OPERATOR_CLI.md](docs/OPERATOR_CLI.md).
-Plugin Hub work starts with
+Plugin Hub work is deferred until the complete SDK contract is closed. The current notes in
 [docs/PLUGIN_HUB_FOUNDATION_V1.md](docs/PLUGIN_HUB_FOUNDATION_V1.md) and
-[docs/PLUGIN_HUB_CAPABILITY_MATRIX.md](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md); those files
-define the current supported seed boundary before any new public SDK surface is proposed.
-Keep copied event examples explicitly experimental. Harden the small release-supported
-Plugin Hub seed set before widening public SDK scope.
+[docs/PLUGIN_HUB_CAPABILITY_MATRIX.md](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md) are retained
+only as post-SDK planning boundaries. They must not drive current prioritization, release
+claims, or new public SDK surface work. Finish the SDK blocker chain first.
 
 ## Build And Test
 
@@ -560,12 +559,9 @@ Near-term engineering:
   plugin-facing gameplay events.
 - Generalize FName/GObjects/UFunction lookup only after another capture or binary hash
   validates the current field layout.
-- Harden the release-supported Plugin Hub seed boundary for contributors:
-  installed package consumers, lifecycle/config examples, descriptors, and
-  process-local timers. These seeds improve contributor readiness but do not
-  replace the complete v1 SDK blocker track. Keep copied event examples
-  explicitly experimental and inside the Plugin Hub Foundation and Capability
-  Matrix instead of relying on raw UE pointers or compatibility-source behavior.
+- Keep Plugin Hub planning parked until the complete SDK contract is done. Do not spend
+  current engineering rounds on Plugin Hub packaging, examples, or intake tooling unless
+  the SDK blocker chain has already been closed.
 
 Later:
 

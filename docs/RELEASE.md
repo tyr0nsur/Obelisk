@@ -11,12 +11,11 @@ Read scope labels literally:
   examples, or release-gate hardening do not expand that tag retroactively.
 - Current post-RC candidate means `HEAD` work for a future RC/stable candidate. It must
   pass a fresh clean release gate before any tag or release-ref push.
-- Plugin Hub seed means examples built only from the current public ABI and classified by
-  `docs/PLUGIN_HUB_FOUNDATION_V1.md` plus `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`.
-  Installing a plugin `.so`, adding a first-party example, or naming a popular plugin
-  family does not promote public SDK surface. It is not an ArkApi compatibility layer,
-  module SDK roadmap, identity/lookup surface, mutation path, or return-override
-  authority.
+- Plugin Hub seed means post-SDK-complete planning only. Plugin Hub examples, packaging,
+  intake tooling, installed plugin `.so` files, or popular plugin-family names do not
+  promote public SDK surface or completion. Plugin Hub is not an ArkApi compatibility
+  layer, module SDK roadmap, identity/lookup surface, mutation path, or return-override
+  authority while the complete-SDK blockers remain open.
 - Planning-only lanes and target sets are guidance or demand signals. They are not release
   evidence, not public SDK surface, and are rejected by the release gate until replaced by
   a separately promoted target set.

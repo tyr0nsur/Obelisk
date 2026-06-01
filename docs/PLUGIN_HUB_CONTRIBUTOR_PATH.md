@@ -1,8 +1,10 @@
 # Plugin Hub Contributor Path
 
-This is the short path for adding a Plugin Hub foundation example without widening the
-SDK. It starts from the current installed SDK package and stops before identity,
-permissions, mutation, or complete v1 claims.
+Status: post-SDK-complete planning only.
+
+This path is parked until Obelisk has a complete SDK contract. Do not start new Plugin
+Hub examples, packaging, or intake work while identity, permissions, commands/responses,
+storage, mutation, and other SDK blockers remain open.
 
 ## 1. Decide The Tier
 
@@ -16,8 +18,9 @@ Classify the idea before copying code:
   identity, lookup, persistence, storage services, inventory/item mutation, structure
   enforcement, return overrides, raw UE pointers, raw params, or cross-instance state.
 
-The supported seed set is intentionally small: lifecycle/config/logging minimal plugins,
-descriptor/catalog readers, and process-local timer utilities. Passive copied chat
+After SDK completion, the initial seed set should stay scoped:
+lifecycle/config/logging plugin skeletons, descriptor/catalog readers, and process-local
+timer utilities. Passive copied chat
 parsing and copied policy auditing are experimental examples only. Permissions/admin,
 commands/replies/send-chat/broadcast, economy, kits, homes, teleport, and item grants
 remain blocked until Obelisk promotes the required identity/principal, permissions/admin,
@@ -47,7 +50,7 @@ find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(<plugin-target> PRIVATE Obelisk::obelisk_sdk)
 ```
 
-Do not start from `plugins/` when writing the minimum external package. The `plugins/`
+Do not start from `plugins/` when writing the starter external package. The `plugins/`
 tree contains first-party runtime reference plugins and may use repository-local wiring.
 
 ## 3. Validate The Installed SDK
@@ -77,7 +80,7 @@ rg -n --glob '!README.md' --glob '!build/**' \
   '#include .*(core/|plugins/|private|ArkApi|AseApi)|ProcessEvent|UObject|UFunction|FString|GObjects|GetNativePointerField|NativeCall|ResourceHandle' .
 ```
 
-For a narrow lifecycle/config/logging package, `nm -D --defined-only build/<plugin>.so`
+For a lifecycle/config/logging package, `nm -D --defined-only build/<plugin>.so`
 should expose only the Obelisk plugin entry points.
 
 ## 4. Package Metadata

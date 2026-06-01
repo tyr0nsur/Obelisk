@@ -675,6 +675,53 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "ResolvePlayer",
     "ResolvePlayerIdentity",
 )
+PLAYER_PRINCIPAL_INTERNAL_PUBLIC_ABI_TOKENS = (
+    "PlayerPrincipalEventDispatcher",
+    "PlayerPrincipalEventView",
+    "PlayerPrincipalEventSubscription",
+    "PlayerPrincipalEventCallback",
+    "PlayerPrincipalEventKind",
+    "PlayerPrincipalAction",
+    "PlayerPrincipalBoolField",
+    "PlayerPrincipalBoolValue",
+    "ObeliskPlayerPrincipal",
+    "ObeliskPrincipal",
+    "ObeliskPrincipalId",
+    "ObeliskPlayerPrincipalEvent",
+    "ObeliskPlayerPrincipalEventCallback",
+    "ObeliskPlayerPrincipalSubscription",
+    "ObeliskPlayerPrincipalLifecycle",
+    "ObeliskPlayerPrincipalLifecycleEvent",
+    "ObeliskPrincipalLifecycleEvent",
+    "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_EVENTS",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_LIFECYCLE",
+    "OBELISK_API_CAPABILITY_PRINCIPAL_EVENTS",
+    "OBELISK_API_CAPABILITY_PRINCIPAL_LIFECYCLE",
+    "RegisterPlayerPrincipal",
+    "RegisterPlayerPrincipalEvent",
+    "RegisterPlayerPrincipalWithOwnerToken",
+    "RegisterPlayerPrincipalWithOwnerTokenHandle",
+    "RegisterPlayerPrincipalLifecycle",
+    "RegisterPlayerPrincipalLifecycleEvent",
+    "RegisterPlayerPrincipalLifecycleWithOwnerToken",
+    "RegisterPlayerPrincipalLifecycleWithOwnerTokenHandle",
+    "UnregisterPlayerPrincipal",
+    "UnregisterPlayerPrincipalEvent",
+    "UnregisterPlayerPrincipalWithOwnerToken",
+    "UnregisterPlayerPrincipalLifecycle",
+    "UnregisterPlayerPrincipalLifecycleEvent",
+    "UnregisterPlayerPrincipalLifecycleWithOwnerToken",
+    "DescribePlayerPrincipal",
+    "DescribePlayerIdentity",
+    "ResolvePlayerPrincipal",
+    "ResolvePlayerIdentity",
+    "LookupPlayerPrincipal",
+    "LookupPlayerIdentity",
+    "FindPlayerPrincipal",
+    "FindPlayerIdentity",
+)
 ROADMAP_COMMAND_HELPER_PROMOTION_TOKENS = (
     "Command",
     "Permission",
@@ -1489,6 +1536,40 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "runtime.evidence_intake",
             },
         )
+
+    def test_player_principal_dispatcher_stays_internal_until_identity_promotion(self) -> None:
+        header = strip_c_comments(PUBLIC_API_HEADER.read_text(encoding="utf-8"))
+        public_header_texts = {
+            path.relative_to(REPO_ROOT).as_posix(): strip_c_comments(path.read_text(encoding="utf-8"))
+            for path in sorted((REPO_ROOT / "include" / "obelisk").rglob("*"))
+            if path.is_file() and path.suffix in {".h", ".hpp"}
+        }
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        player_identity = surfaces["obelisk.player_identity.v1"]
+
+        self.assertEqual(player_identity["status"], "planning")
+        self.assertEqual(player_identity["public_contract"], [])
+        self.assertNotIn("obelisk.player_identity.v1", manifest["promoted_surfaces"])
+        self.assertEqual(player_identity["evidence"].get("public_header_symbols_now", []), [])
+        self.assertEqual(player_identity["evidence"].get("public_capability_bits_now", []), [])
+
+        public_abi_tokens = set(public_api_capability_defines(header))
+        public_abi_tokens.update(obelisk_api_field_names(header))
+        public_abi_tokens.update(public_struct_typedefs(header))
+        public_abi_tokens.update(public_enum_typedefs(header))
+        public_abi_tokens.update(public_callback_typedefs(header))
+
+        leaked_tokens = []
+        for token in PLAYER_PRINCIPAL_INTERNAL_PUBLIC_ABI_TOKENS:
+            if token in public_abi_tokens:
+                leaked_tokens.append(f"include/obelisk/ObeliskApi.h ABI: {token}")
+                continue
+            for relative, text in public_header_texts.items():
+                if token in text:
+                    leaked_tokens.append(f"{relative}: {token}")
+        leaked_tokens.sort()
+        self.assertEqual(leaked_tokens, [])
 
     def test_command_chat_response_public_contract_decisions_block_public_header(self) -> None:
         decisions = json.loads(COMMAND_CHAT_RESPONSE_PUBLIC_CONTRACT_DECISIONS.read_text(encoding="utf-8"))
@@ -3855,8 +3936,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         required = (
             "In this document, `V1` means the first reviewed Plugin Hub foundation/intake contract revision",
             "It is not Obelisk SDK v1, not `v1.0 stable`, and not a Plugin Hub completion claim",
-            "post-RC contributor seed for the current ABI, not a change to the published `v0.1.0-rc.2` tag",
-            "Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons",
+            "This foundation is post-SDK planning, not a change to the published `v0.1.0-rc.2` tag",
+            "When Plugin Hub resumes after SDK completion, release-supported seed work can start with lifecycle/config/logging skeletons",
             "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
             "not production Plugin Hub modules, command/chat SDKs, policy-enforcement SDKs, or evidence of a new ABI",
             "does not add public symbols, structs, callbacks, capabilities, or gameplay modules",
@@ -3935,8 +4016,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (matrix, "Passive chat text parsers"),
             (matrix, "Timer utilities"),
             (matrix, "Copied policy auditors"),
-            (matrix, "## Post-RC Support Boundary"),
-            (matrix, "Post-RC release-supported Plugin Hub seed work is limited to lifecycle/config/logging"),
+            (matrix, "## Deferred Support Boundary"),
+            (matrix, "Plugin Hub seed work resumes after SDK completion"),
             (matrix, "Copied `ChatMessageEvent` parsing and\ncopied `GameplayPolicyEvent` auditing may remain useful experimental seed examples"),
             (matrix, "Those three are seed examples only, not production Plugin Hub modules"),
         ):
@@ -7594,7 +7675,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "## Support Tier Legend",
             "The `Foundation V1` label means the first reviewed foundation/intake contract revision for contributor readiness",
             "it is not Obelisk SDK v1, `v1.0 stable`, or a Plugin Hub completion claim",
-            "`release-supported seed available`: supported for narrow Obelisk-native examples",
+            "`release-supported seed available`: supported for scoped Obelisk-native examples",
             "`experimental seed only`: allowed for explicitly labeled pattern examples",
             "not supported as production Plugin Hub modules or as general chat, command, policy, structure, inventory, identity, mutation, or enforcement SDKs",
             "`blocked` and `blocked except experimental auditing`: backlog demand only",
@@ -7732,15 +7813,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_public_contributor_docs_route_plugin_hub_through_foundation_and_matrix(self) -> None:
         required_phrases = {
             REPO_ROOT / "README.md": (
-                "Plugin Hub work starts with",
+                "Plugin Hub work is deferred until the complete SDK contract is closed",
                 "docs/PLUGIN_HUB_FOUNDATION_V1.md",
                 "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
-                "NextGenPlugins are held to the same demand-dictionary boundary",
+                "Finish the SDK blocker chain first",
             ),
             REPO_ROOT / "CONTRIBUTING.md": (
-                "Start Plugin Hub work from",
-                "docs/PLUGIN_HUB_FOUNDATION_V1.md",
-                "docs/PLUGIN_HUB_CAPABILITY_MATRIX.md",
+                "Treat Plugin Hub as post-SDK-complete planning",
+                "Do not start new Plugin Hub examples",
                 "ArkServerApi,\n  AseApi, and NextGenPlugins are names, demand, conceptual architecture, and migration",
                 "not sources for code, offsets, control flow, parsers,\n  schemas, or implementation behavior",
             ),
@@ -7756,31 +7836,34 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         required_phrases = {
             REPO_ROOT / "README.md": (
                 "v0.1-rc public C ABI slices",
-                "Plugin Hub work starts with",
-                "define the current supported seed boundary before any new public SDK surface is proposed",
-                "Harden the small release-supported Plugin Hub seed set",
-                "Keep copied event examples explicitly experimental",
+                "Plugin Hub work is deferred until the complete SDK contract is closed",
+                "post-SDK planning boundaries",
+                "They must not drive current prioritization",
+                "Finish the SDK blocker chain first",
             ),
             REPO_ROOT / "CONTRIBUTING.md": (
-                "Start Plugin Hub work from",
+                "Treat Plugin Hub as post-SDK-complete planning",
+                "Do not start new Plugin Hub examples",
                 "ArkServerApi,\n  AseApi, and NextGenPlugins are names, demand, conceptual architecture, and migration",
                 "not sources for code, offsets, control flow, parsers,\n  schemas, or implementation behavior",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_CONTRIBUTOR_PATH.md": (
-                "adding a Plugin Hub foundation example without widening the\nSDK",
+                "Status: post-SDK-complete planning only",
+                "This path is parked until Obelisk has a complete SDK contract",
                 "`release-supported seed`: lifecycle/config/logging, descriptor/catalog reads, or\n  process-local timers",
                 "`experimental pattern`: passive copied `ChatMessageEvent` parsing or copied\n  `GameplayPolicyEvent` auditing",
                 "`blocked backlog`: anything that needs commands, replies, send-chat, permissions,\n  identity",
-                "Do not start from `plugins/` when writing the minimum external package",
+                "Do not start from `plugins/` when writing the starter external package",
                 "Stop at experimental pattern when the example passively observes copied chat or policy\ndata",
                 "Plugin Hub foundation examples help contributors learn the current C ABI",
                 "They do not\ndeclare a complete v1 SDK",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_FOUNDATION_V1.md": (
-                "Post-RC release-supported seed work is limited to lifecycle/config/logging skeletons",
+                "Status: post-SDK-complete planning only",
+                "Do not treat this document as active roadmap work",
+                "When Plugin Hub resumes after SDK completion",
                 "Copied `ChatMessageEvent` parsing and copied `GameplayPolicyEvent` auditing remain experimental seed patterns only",
-                "Foundation V1 is enough for small, honest Plugin Hub seeds when the support tier is explicit",
-                "Release-supported seeds:",
+                "Foundation V1 defines honest future Plugin Hub seeds after the SDK blocker chain is\nclosed",
                 "process-local timer utilities",
                 "This list names ABI primitives, not Plugin Hub module tiers",
                 "Experimental pattern examples only:",
@@ -7790,7 +7873,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "Foundation V1 does not provide or imply",
             ),
             REPO_ROOT / "docs" / "PLUGIN_HUB_CAPABILITY_MATRIX.md": (
-                "Post-RC release-supported Plugin Hub seed work is limited to lifecycle/config/logging",
+                "Status: post-SDK-complete planning only",
+                "Plugin Hub seed work resumes after SDK completion",
                 "`experimental seed only`: allowed for explicitly labeled pattern examples",
                 "not supported as production Plugin Hub modules",
                 "keep the support tier explicit",
@@ -8005,7 +8089,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ),
             (
                 contributor_path,
-                "Do not start from `plugins/` when writing the minimum external package",
+                "Do not start from `plugins/` when writing the starter external package",
             ),
             (
                 foundation,
@@ -8908,7 +8992,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "not a `v1.0` SDK blocker, route shortcut, or completion signal",
             "CMake package target are present",
             "package-shape evidence only, not a `v1.0` completion marker",
-            "do not gain new support tier, public SDK scope, or `v1.0` completion weight",
+            "do not gain priority, support tier, public SDK scope, or `v1.0`\n  completion weight while complete-SDK blockers remain open",
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)

@@ -1,8 +1,12 @@
 # Plugin Hub Package Manifest Schema
 
+Status: post-SDK-complete planning only.
+
 This document defines the minimum machine-readable package manifest for Plugin Hub
 intake. It converts the current read-only package proposal into a JSON manifest contract
 for review tooling and future package indexes.
+Do not implement or prioritize Plugin Hub manifest tooling while the complete Obelisk SDK
+blocker chain remains open.
 
 This is not a registry implementation, not a package manager lockfile, not Obelisk SDK
 v1 evidence, and not an ArkApi/AseApi compatibility format. It must not copy ArkApi,
@@ -32,6 +36,10 @@ obelisk-plugin-package.json
 The manifest is UTF-8 JSON. Unknown top-level fields are rejected for the foundation
 schema so review tooling can fail closed when a package tries to imply support outside the
 declared support tier.
+
+Artifact path strings are package-local relative paths. Foundation review tooling rejects
+absolute paths, `~`, backslashes, empty path segments, `.` or `..` segments, and unsafe
+path characters even when the schema fragment below only shows the broad JSON type shape.
 
 Required top-level fields:
 
@@ -452,7 +460,8 @@ Release-supported packages may use only `release-supported seed` catalog IDs.
 Experimental packages may combine `experimental pattern` IDs with release-supported
 foundation IDs when needed for metadata, config, logging, or timers; they must also
 include the relevant release-readiness target set and avoid production module wording.
-Blocked packages may include blocked IDs, but they must not ship as runtime modules.
+Blocked packages may include blocked IDs, but they must not ship as runtime modules and
+must declare `artifacts.shared_object: null`.
 
 ## Non-Claims
 

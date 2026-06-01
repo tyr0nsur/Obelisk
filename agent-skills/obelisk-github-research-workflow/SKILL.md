@@ -41,8 +41,11 @@ MSVC/Windows ABI assumptions, direct
 `GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, constants, schemas,
 control flow, command parsers, return semantics, or algorithmic implementations; Linux
 support is rebuilt from Obelisk reflection and ProcessEvent copied-data evidence.
-For Plugin Hub work, start from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
-`docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` before proposing new public SDK surface.
+Plugin Hub work is post-SDK-complete planning. Do not spend current rounds on Plugin Hub
+packaging, examples, intake tooling, or seed hardening while the complete SDK blocker
+chain remains open, unless the user explicitly asks to inspect archived planning. Current
+priority is the SDK itself: identity/principal, permissions/admin, command/response,
+storage/mutation, gameplay module surfaces, and their promotion evidence.
 
 Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts unless
 that context changes the agent's concrete task.
