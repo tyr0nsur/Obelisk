@@ -282,6 +282,37 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("public_response_abi_now_not_empty", report["blockers"])
         self.assertIn("positive_public_or_runtime_claim", report["blockers"])
 
+    def test_rejects_camel_hyphen_space_aliases_and_positive_readiness_texts(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        decisions["alias_claims"] = {
+            "publicReplyAbiReady": True,
+            "public-response-path-ready": True,
+            "send chat ready": True,
+            "publicAbiReady": True,
+            "runtimeReady": True,
+            "permissions-admin-ready": True,
+            "commandRouterAllowed": True,
+            "publicBridgeAbiAllowed": True,
+            "public response abi allowed": True,
+            "authorityClaimSource": "command text",
+            "principal-source": {"source": "operator-config"},
+        }
+        decisions["positive_claims"] = [
+            "public ABI is ready",
+            "permissions/admin is public and ready",
+            "reply endpoint is live",
+            "command response path is live",
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("public_or_runtime_overclaim", report["blockers"])
+        self.assertIn("pre_runtime_principal_or_authority_claim_source", report["blockers"])
+        self.assertIn("positive_public_or_runtime_claim", report["blockers"])
+
     def test_rejects_missing_shared_principal_vocabulary(self) -> None:
         decisions = self.load_json(DECISIONS)
         decisions["shared_principal_vocabulary"] = [

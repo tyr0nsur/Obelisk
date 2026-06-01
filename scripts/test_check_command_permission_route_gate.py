@@ -281,15 +281,27 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "valid": True,
                 "nested": {
                     "public_reply_abi_allowed": True,
+                    "publicReplyAbiReady": True,
                     "public_send_chat_abi_allowed": "ready",
+                    "public-response-path-ready": True,
                     "reply_allowed": 1,
                     "send_chat_allowed": "true",
+                    "send chat ready": True,
                     "reply_send_chat_router_claims_allowed": True,
+                    "commandRouterAllowed": True,
                     "public_abi_allowed": "ready",
+                    "publicAbiReady": True,
+                    "runtimeReady": True,
+                    "permissions-admin-ready": True,
+                    "publicBridgeAbiAllowed": True,
+                    "public response abi allowed": True,
+                    "authorityClaimSource": "command text",
+                    "principal-source": {"source": "operator-config"},
                     "public-reply-api": True,
                     "publicSendChatApi": True,
                     "permissions_admin_ready": True,
                     "notes": [
+                        "public ABI is ready",
                         "send-chat ABI is public and ready",
                         "command routing is public and ready",
                         "permissions/admin is public and ready",
@@ -315,11 +327,22 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertFalse(result["valid"])
         self.assertIn("nested.public_reply_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.publicReplyAbiReady", result["public_or_runtime_claims"])
         self.assertIn("nested.public_send_chat_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.public-response-path-ready", result["public_or_runtime_claims"])
         self.assertIn("nested.reply_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.send_chat_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.send chat ready", result["public_or_runtime_claims"])
         self.assertIn("nested.reply_send_chat_router_claims_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.commandRouterAllowed", result["public_or_runtime_claims"])
         self.assertIn("nested.public_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.publicAbiReady", result["public_or_runtime_claims"])
+        self.assertIn("nested.runtimeReady", result["public_or_runtime_claims"])
+        self.assertIn("nested.permissions-admin-ready", result["public_or_runtime_claims"])
+        self.assertIn("nested.publicBridgeAbiAllowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.public response abi allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.authorityClaimSource", result["public_or_runtime_claims"])
+        self.assertIn("nested.principal-source", result["public_or_runtime_claims"])
         self.assertIn("nested.public-reply-api", result["public_or_runtime_claims"])
         self.assertIn("nested.publicSendChatApi", result["public_or_runtime_claims"])
         self.assertIn("nested.permissions_admin_ready", result["public_or_runtime_claims"])
@@ -330,6 +353,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.notes[4]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[5]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[6]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[7]:positive_text_claim", result["public_or_runtime_claims"])
 
 
 if __name__ == "__main__":

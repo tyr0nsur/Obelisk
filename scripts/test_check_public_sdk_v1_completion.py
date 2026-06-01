@@ -1165,6 +1165,35 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["scoped_release_statement"]["blocking_report_blockers"],
         )
 
+    def test_scoped_release_statement_scope_rejects_unrelated_negator_complete_sdk_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "This is not just a runtime RC and the complete SDK is ready.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertIn(
+            "This is not just a runtime RC and the complete SDK is ready.",
+            "\n".join(payload["release_statement_forbidden_broad_claims"]),
+        )
+
     def test_scoped_release_statement_scope_rejects_v1_stable_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
@@ -2078,6 +2107,42 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "Mission SDK is ready in v1.",
             "Buff SDK is supported in v1.",
             "Buff/status SDK is included in v1.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
+    def test_release_statement_rejects_v1_includes_blocked_surface_claims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "v1 includes player identity.\n"
+            "v1 includes command replies.\n"
+            "v1 includes ResourceHandle/object lookup.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["v1_sdk_progress"]["stable_claim_allowed"])
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "v1 includes player identity.",
+            "v1 includes command replies.",
+            "v1 includes ResourceHandle/object lookup.",
         ):
             with self.subTest(term=term):
                 self.assertIn(term, forbidden_claims)
@@ -3558,6 +3623,96 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
 
         self.assertEqual(record, "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.")
+        self.assertIsNone(
+            module.release_statement_surface_record(
+                "obelisk.chat_message.v1: promoted\n",
+                "obelisk.chat_message.v1",
+                "promoted",
+            )
+        )
+        self.assertIsNone(
+            module.release_statement_surface_record(
+                "obelisk.chat_message.v1 - promoted - reviewed ABI and SDK evidence.\n",
+                "obelisk.chat_message.v1",
+                "promoted",
+            )
+        )
+        self.assertTrue(
+            module.release_statement_duplicate_or_mixed_records(
+                "obelisk.chat_message.v1: promoted - reviewed ABI and SDK evidence.\n"
+                "obelisk.chat_message.v1 - promoted - duplicate alternate record.\n",
+                "obelisk.chat_message.v1",
+            )
+        )
+
+    def test_release_statement_rejects_bare_promoted_record_for_promoted_surface(self) -> None:
+        manifest = {
+            "schema": "obelisk.public-sdk-surfaces.v1",
+            "sdk_version": "v1.0",
+            "v1_completion_required": True,
+            "stable_release_contract": {"claim_allowed": True},
+            "promoted_surfaces": ["obelisk.player_identity.v1"],
+            "experimental_surfaces": [],
+            "planning_surfaces": [],
+            "v1_sdk_completion_blockers": ["obelisk.player_identity.v1"],
+            "post_v1_or_excluded_surfaces": [],
+            "surfaces": [
+                {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "promoted",
+                    "public_contract": ["ObeliskApi.RegisterPlayerIdentityCallback"],
+                    "evidence": {
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                    },
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(
+                "Reviewed against docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json.\n"
+                "obelisk.player_identity.v1: promoted\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], ["obelisk.player_identity.v1"])
+        self.assertIsNone(payload["v1_sdk_blocker_outcomes"][0]["release_statement_outcome"])
+
+    def test_release_statement_rejects_mixed_alternate_promoted_surface_records(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += "obelisk.player_identity.v1 - promoted - duplicate alternate record.\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_duplicate_or_mixed_surface_records", payload["blockers"])
+        self.assertEqual(payload["release_statement_duplicate_or_mixed_records"], ["obelisk.player_identity.v1"])
 
     def test_new_planning_surface_blocks_v1_claim_until_outcome_is_named(self) -> None:
         manifest, _ = complete_excluded_manifest()

@@ -275,6 +275,39 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_surface_overclaim", report["blockers"])
         self.assertIn("positive_public_surface_claim", report["blockers"])
 
+    def test_rejects_camel_hyphen_space_aliases_and_positive_readiness_texts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["alias_claims"] = {
+                "publicReplyAbiReady": True,
+                "public-response-path-ready": True,
+                "send chat ready": True,
+                "publicAbiReady": True,
+                "runtimeReady": True,
+                "permissions-admin-ready": True,
+                "commandRouterAllowed": True,
+                "publicBridgeAbiAllowed": True,
+                "public response abi allowed": True,
+                "authorityClaimSource": "command text",
+                "principal-source": {"source": "operator-config"},
+            }
+            decisions["positive_claims"] = [
+                "public ABI is ready",
+                "permissions/admin is public and ready",
+                "reply endpoint is live",
+                "command response path is live",
+            ]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_surface_overclaim", report["blockers"])
+        self.assertIn("pre_runtime_principal_or_authority_claim_source", report["blockers"])
+        self.assertIn("positive_public_surface_claim", report["blockers"])
+
     def test_rejects_surface_promoted_before_player_identity_or_public_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

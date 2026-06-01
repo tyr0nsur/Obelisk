@@ -46,10 +46,15 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "public_sdk_ready",
     "public_abi_ready",
     "public_abi_allowed",
+    "public_reply_abi_ready",
+    "public_response_path_ready",
     "runtime_ready",
+    "send_chat_ready",
     "public_header_allowed",
     "public_readiness_ready",
+    "public_bridge_abi_allowed",
     "public_command_router_allowed",
+    "public_response_abi_allowed",
     "public_reply_or_send_chat_abi_allowed",
     "public_reply_abi_allowed",
     "public_send_chat_abi_allowed",
@@ -70,10 +75,19 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "public_response_path_allowed",
     "v1_completion_evidence",
 }
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = {
+    "authority_claim_source",
+    "principal_source",
+}
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = {
+    "command_text",
+    "operator_config",
+}
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_TERMS = (
     "command routing is public and ready",
     "command response path is live",
     "permissions/admin is public and ready",
+    "public abi is ready",
     "reply endpoint is live",
     "replies api is public and ready",
     "reply api is public and ready",
@@ -216,12 +230,27 @@ def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]
 
     def normalized_key(key: object) -> str:
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
-        return separated.casefold().replace("-", "_").replace(" ", "_")
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+    def normalized_source(value: object) -> str:
+        return re.sub(r"[^a-z0-9]+", "_", str(value).casefold()).strip("_")
+
+    def contains_forbidden_claim_source(item: Any) -> bool:
+        if isinstance(item, str):
+            return normalized_source(item) in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+        if isinstance(item, list):
+            return any(contains_forbidden_claim_source(child) for child in item)
+        if isinstance(item, dict):
+            return any(contains_forbidden_claim_source(child) for child in item.values())
+        return False
 
     if isinstance(value, dict):
         for key, item in value.items():
             item_path = f"{path}.{key}" if path else str(key)
-            if normalized_key(key) in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and is_positive_claim_value(item):
+            key_name = normalized_key(key)
+            if key_name in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and is_positive_claim_value(item):
+                claims.append(item_path)
+            if key_name in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS and contains_forbidden_claim_source(item):
                 claims.append(item_path)
             if key == "public_or_runtime_claims" and isinstance(item, list):
                 for claim in item:

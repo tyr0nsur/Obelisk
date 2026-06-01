@@ -416,13 +416,25 @@ FALSE_ONLY_KEYS = frozenset(
         "server_validation_allowed",
         "public_bridge_abi_allowed",
         "public_command_router_allowed",
+        "command_router_allowed",
+        "permissions_admin_ready",
+        "public_reply_abi_ready",
         "public_reply_or_send_chat_abi_allowed",
-        "public_response_path_allowed",
         "public_response_abi_allowed",
+        "public_response_path_allowed",
+        "public_response_path_ready",
         "response_abi_allowed",
         "capability_bit_allowed",
+        "send_chat_ready",
     )
 )
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
+    (
+        "authority_claim_source",
+        "principal_source",
+    )
+)
+FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(("command_text", "operator_config"))
 NEGATIVE_CONTEXT_TOKENS = (
     "blocked",
     "fail_closed",
@@ -433,9 +445,9 @@ NEGATIVE_CONTEXT_TOKENS = (
 )
 POSITIVE_CLAIM_RE = re.compile(
     r"\b("
-    r"bridge|capability|command[_ -]?router|commands?/replies|permissions?/admin|"
-    r"player[_ -]?identity|principal|reply|response|send[_ -]?chat"
-    r")\b.{0,90}\b(allowed|available|enabled|implemented|promoted|public|ready|runtime)\b",
+    r"bridge|capability|command[_ -]?router|command\s+response\s+path|commands?/replies|permissions?/admin|"
+    r"player[_ -]?identity|principal|public\s+abi|reply(?:\s+endpoint)?|response|send[_ -]?chat"
+    r")\b.{0,90}\b(allowed|available|enabled|implemented|live|promoted|public|ready|runtime)\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
@@ -488,7 +500,22 @@ def string_set(value: Any) -> set[str]:
 
 
 def normalized_key(value: Any) -> str:
-    return str(value).casefold().replace("-", "_").replace(" ", "_")
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def normalized_claim_source(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).casefold()).strip("_")
+
+
+def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
+    if isinstance(value, str):
+        return normalized_claim_source(value) in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+    if isinstance(value, list):
+        return any(contains_forbidden_pre_runtime_claim_source(item) for item in value)
+    if isinstance(value, dict):
+        return any(contains_forbidden_pre_runtime_claim_source(item) for item in value.values())
+    return False
 
 
 def is_negative_context(trail: str) -> bool:
@@ -517,8 +544,14 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
-            if normalized_key(key) in FALSE_ONLY_KEYS and child is not False:
+            key_name = normalized_key(key)
+            if key_name in FALSE_ONLY_KEYS and child is not False:
                 add(blockers, "public_or_runtime_overclaim", child_trail, field=str(key), value=child)
+            if (
+                key_name in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS
+                and contains_forbidden_pre_runtime_claim_source(child)
+            ):
+                add(blockers, "pre_runtime_principal_or_authority_claim_source", child_trail, field=str(key), value=child)
             collect_overclaims(child, blockers, child_trail)
         return
     if isinstance(value, list):

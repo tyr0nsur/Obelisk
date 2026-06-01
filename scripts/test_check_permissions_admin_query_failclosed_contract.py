@@ -912,9 +912,12 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
     def test_rejects_principal_or_permission_claim_sources_before_runtime_identity(self) -> None:
         for key, value in (
             ("principal_source", "command_text"),
+            ("principalSource", "command text"),
+            ("principal-source", {"source": "operator-config"}),
             ("identity_claim_source", "operator-config"),
             ("permission_claim_source", ["operator config"]),
             ("authority_claim_source", {"source": "command text"}),
+            ("authorityClaimSource", {"source": "operator config"}),
         ):
             with self.subTest(key=key):
                 payload = manifest()
@@ -986,6 +989,47 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("public_sdk_ready_string_overclaim", report["blockers"])
         self.assertIn("runtime_ready_string_overclaim", report["blockers"])
         self.assertIn("promoted_string_overclaim", report["blockers"])
+
+    def test_rejects_camel_hyphen_space_readiness_aliases_and_positive_texts(self) -> None:
+        payload = manifest()
+        payload["nested_claim"] = {
+            "publicReplyAbiReady": True,
+            "public-response-path-ready": True,
+            "send chat ready": True,
+            "publicAbiReady": True,
+            "runtimeReady": True,
+            "permissions-admin-ready": True,
+            "commandRouterAllowed": True,
+            "publicBridgeAbiAllowed": True,
+            "public response abi allowed": True,
+        }
+        payload["claim_texts"] = [
+            "public ABI is ready",
+            "permissions/admin is public and ready",
+            "reply endpoint is live",
+            "command response path is live",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "public_reply_abi_ready_overclaim",
+            "public_response_path_ready_overclaim",
+            "send_chat_ready_overclaim",
+            "public_abi_ready_overclaim",
+            "runtime_ready_overclaim",
+            "permissions_admin_ready_overclaim",
+            "command_router_allowed_overclaim",
+            "public_bridge_abi_allowed_overclaim",
+            "public_response_abi_allowed_overclaim",
+            "public_abi_ready_string_overclaim",
+            "permissions_admin_ready_string_overclaim",
+            "public_reply_abi_ready_string_overclaim",
+            "public_response_path_ready_string_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
 
     def test_rejects_ue_pointer_or_raw_coordinate_leakage(self) -> None:
         for key in ("ue_pointer", "fname_index", "object_address"):

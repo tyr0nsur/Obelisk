@@ -361,16 +361,28 @@ FORBIDDEN_SURFACE_RE = re.compile(
 )
 READY_OVERCLAIM_KEYS = frozenset(
     (
+        "command_router_allowed",
+        "permissions_admin_ready",
         "promoted",
         "promote_ready",
         "promotion_ready",
+        "public_abi_ready",
+        "public_bridge_abi_allowed",
+        "public_reply_abi_ready",
+        "public_response_abi_allowed",
+        "public_response_path_ready",
         "public_sdk_ready",
         "runtime_ready",
+        "send_chat_ready",
     )
 )
 READY_OVERCLAIM_STRINGS = {
+    "command response path is live": "public_response_path_ready",
     "promoted": "promoted",
+    "public abi is ready": "public_abi_ready",
     "public sdk ready": "public_sdk_ready",
+    "permissions/admin is public and ready": "permissions_admin_ready",
+    "reply endpoint is live": "public_reply_abi_ready",
     "runtime ready": "runtime_ready",
     "promotion ready": "promotion_ready",
     "promote ready": "promote_ready",
@@ -577,6 +589,11 @@ def is_negative_context(trail: str) -> bool:
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
 
 
+def normalized_key(value: Any) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
 def find_forbidden_coordinate(value: Any, trail: str = "$") -> tuple[str, str] | None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -617,7 +634,7 @@ def find_forbidden_surface(value: Any, trail: str = "$") -> tuple[str, str] | No
 
 def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
     if isinstance(value, str):
-        return value.casefold() in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+        return normalized_key(value) in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
     if isinstance(value, list):
         return any(contains_forbidden_pre_runtime_claim_source(item) for item in value)
     if isinstance(value, dict):
@@ -631,8 +648,8 @@ def find_forbidden_pre_runtime_claim_source(value: Any, trail: str = "$") -> tup
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
-            normalized_key = str(key).casefold().replace("-", "_").replace(" ", "_")
-            if normalized_key in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS and contains_forbidden_pre_runtime_claim_source(child):
+            key_name = normalized_key(key)
+            if key_name in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS and contains_forbidden_pre_runtime_claim_source(child):
                 return str(key), child_trail
             found = find_forbidden_pre_runtime_claim_source(child, child_trail)
             if found is not None:
@@ -652,8 +669,9 @@ def collect_overclaim_fields(value: Any, trail: str = "$") -> list[dict[str, str
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
-            if key in READY_OVERCLAIM_KEYS and child is True:
-                found.append({"reason": f"{key}_overclaim", "label": child_trail})
+            key_name = normalized_key(key)
+            if key_name in READY_OVERCLAIM_KEYS and child is True:
+                found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
             found.extend(collect_overclaim_fields(child, child_trail))
     elif isinstance(value, list):
         for index, child in enumerate(value):

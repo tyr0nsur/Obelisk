@@ -362,6 +362,10 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
+    r"\b(?:complete|full|production[- ]?ready|production|stable)\s+"
+    r"(?:sdk|api|support)\b.{0,80}"
+    r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
+    r"shipped|stable|supported|public|promoted)\b",
     r"\b(?:this|statement|release)\s+"
     r"(?:is|declares?|approves?|allows?|authorizes?)\s+"
     r"(?:a\s+)?v1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim))?\b",
@@ -387,6 +391,15 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
     r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
     r"(?:sdk|api|surface|support)\b",
+    r"\bv1(?:\.0)?\s+includes?\b.{0,80}"
+    r"\b(?:player[-_ ]?identity|player[-_ ]?principal|playeridentity|"
+    r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
+    r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
+    r"commands?/replies|commands?[-_ ]?replies|command[-_ ]?router|"
+    r"inventory[-_ ]?(?:identity|lookup|mutation)|item[-_ ]?(?:identity|lookup|mutation|handles?)|"
+    r"give[-_ ]?item|remove[-_ ]?item|object[-_ ]?identity|uobject[-_ ]?identity|"
+    r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
+    r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\b",
     r"\b(?:inventory\s+sdk|items\s+sdk)\b.{0,80}"
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b",
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b"
@@ -443,6 +456,10 @@ PLUGIN_HUB_EXPLICIT_PUBLIC_CLAIM = re.compile(
     re.IGNORECASE,
 )
 CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
+BROAD_CLAIM_CLAUSE_START_PATTERN = re.compile(
+    r"[.;\n]|(?:\s+-\s+)|(?:\s+\b(?:and|but)\b\s+)",
+    re.IGNORECASE,
+)
 BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     "obelisk.player_identity.v1": (
         re.compile(
@@ -1163,20 +1180,41 @@ def release_statement_names_outcome(text: str, surface_id: str, status: str) -> 
     return release_statement_surface_record(text, surface_id, status) is not None
 
 
-def release_statement_surface_records(text: str, surface_id: str, status: str | None = None) -> list[tuple[str, str]]:
+def release_statement_surface_record_candidates(
+    text: str,
+    surface_id: str,
+    status: str | None = None,
+) -> list[tuple[str, str, bool]]:
     pattern = re.compile(
-        rf"^\s*{re.escape(surface_id)}\s*:\s*(?P<status>promoted|excluded|post-v1)(?:\s+-\s*(?P<details>.+)|\s*)$",
+        rf"^\s*{re.escape(surface_id)}\s*(?P<delimiter>:|\s+-\s+)\s*"
+        rf"(?P<status>promoted|excluded|post-v1)(?:\s+-\s*(?P<details>.+)|\s*)$",
         re.IGNORECASE,
     )
-    records: list[tuple[str, str]] = []
+    records: list[tuple[str, str, bool]] = []
     for line in text.splitlines():
         match = pattern.fullmatch(line)
         if not match:
             continue
         found_status = match.group("status").lower()
         if status is None or found_status == status.lower():
-            records.append((found_status, line.strip()))
+            has_reviewed_details = bool((match.group("details") or "").strip())
+            canonical_reviewed_record = match.group("delimiter") == ":" and (
+                found_status != "promoted" or has_reviewed_details
+            )
+            records.append((found_status, line.strip(), canonical_reviewed_record))
     return records
+
+
+def release_statement_surface_records(text: str, surface_id: str, status: str | None = None) -> list[tuple[str, str]]:
+    return [
+        (found_status, line)
+        for found_status, line, canonical_reviewed_record in release_statement_surface_record_candidates(
+            text,
+            surface_id,
+            status,
+        )
+        if canonical_reviewed_record
+    ]
 
 
 def release_statement_surface_record(text: str, surface_id: str, status: str) -> str | None:
@@ -1198,7 +1236,7 @@ def release_statement_recorded_outcome(text: str | None, surface_id: str) -> str
 
 
 def release_statement_duplicate_or_mixed_records(text: str, surface_id: str) -> bool:
-    records = release_statement_surface_records(text, surface_id)
+    records = release_statement_surface_record_candidates(text, surface_id)
     if len(records) > 1:
         return True
     return False
@@ -1273,10 +1311,10 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
             for match in re.finditer(pattern, lowered, flags=re.IGNORECASE):
                 prefix = lowered[: match.start()]
                 clause_start = 0
-                for boundary in CLAUSE_START_PATTERN.finditer(prefix):
+                for boundary in BROAD_CLAIM_CLAUSE_START_PATTERN.finditer(prefix):
                     clause_start = boundary.end()
                 clause_end = len(lowered)
-                for boundary in CLAUSE_START_PATTERN.finditer(lowered, match.end()):
+                for boundary in BROAD_CLAIM_CLAUSE_START_PATTERN.finditer(lowered, match.end()):
                     clause_end = boundary.start()
                     break
                 claim_prefix = lowered[clause_start : match.start()]
