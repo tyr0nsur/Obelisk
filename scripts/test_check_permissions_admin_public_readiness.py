@@ -113,6 +113,22 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_header_contains_permissions_admin_symbol", report["blockers"])
 
+    def test_rejects_expanded_post_identity_allowed_surface(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["allowed_public_surface_after_player_identity"].append("admin mutation actions")
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "allowed_public_surface_after_player_identity_not_exact_query_only",
+            report["blockers"],
+        )
+
     def test_rejects_surface_promoted_before_player_identity_or_public_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

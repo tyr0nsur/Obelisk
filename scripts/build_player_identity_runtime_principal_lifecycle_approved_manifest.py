@@ -23,6 +23,7 @@ WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-wind
 EXPECTED_MODULE = "player_principal_lifecycle"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
 FORBIDDEN_REVIEW_TEXT_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
     r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
@@ -163,6 +164,20 @@ def path_is_copied_or_offline(path_text: Any) -> bool:
     return not blocked
 
 
+def path_is_approved_offline_workspace(path_text: Any) -> bool:
+    if not isinstance(path_text, str) or not path_text:
+        return False
+    blocked, resolved = protected_path_status(Path(path_text))
+    if blocked:
+        return False
+    return any(
+        Path(path_text).expanduser().is_absolute()
+        and is_under_path(Path(path_text).expanduser(), root)
+        and is_under_path(resolved, root.resolve())
+        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
+    )
+
+
 def validate_source_summary(summary: dict[str, Any]) -> None:
     if summary.get("schema") != SUMMARY_SCHEMA:
         raise SystemExit(f"--source-summary schema must be {SUMMARY_SCHEMA}")
@@ -181,6 +196,11 @@ def validate_source_summary(summary: dict[str, Any]) -> None:
             raise SystemExit(
                 "--source-summary evidence.sources "
                 f"[{index}].path must point to copied/offline evidence, not a protected server path"
+            )
+        if not path_is_approved_offline_workspace(source.get("path")):
+            raise SystemExit(
+                "--source-summary evidence.sources "
+                f"[{index}].path must point under /servidor/ark/workspace-offline"
             )
     modules = summary.get("modules")
     if not isinstance(modules, dict):
@@ -205,6 +225,10 @@ def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> No
     copied = window.get("copied_log")
     if not isinstance(copied, dict):
         raise SystemExit("--window-manifest-check must include copied_log object")
+    if copied.get("path_status") != EXPECTED_COPIED_LOG_PATH_STATUS:
+        raise SystemExit("--window-manifest-check copied_log.path_status must be approved_offline_workspace")
+    if not path_is_approved_offline_workspace(copied.get("path")):
+        raise SystemExit("--window-manifest-check copied_log.path must point under /servidor/ark/workspace-offline")
     evidence = summary.get("evidence")
     sources = evidence.get("sources") if isinstance(evidence, dict) else None
     if not isinstance(sources, list) or not sources or not isinstance(sources[0], dict):

@@ -5115,6 +5115,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_public_handoff_and_community_text_avoid_narrow_base_framing(self) -> None:
+        narrow_base_framing = re.compile(
+            r"\b(?:small|narrow|minimal|foundation(?:[- ]only)?|core[- ]only)\s+"
+            r"(?:base|baseline|sdk[- ]seed[- ]set)\b|"
+            r"\bsmall\s+SDK[- ]seed[- ]set\b|"
+            r"\b(?:base\s+pequeñ[ao]|base\s+m[ií]nima|n[uú]cleo\s+pequeñ[ao])\b",
+            re.IGNORECASE,
+        )
+        scanned_files = [
+            *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+            PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+            REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
+            REPO_ROOT / "docs" / "agent-handoff" / "COMPACT_CONTEXT.md",
+            REPO_ROOT / "scripts" / "send_discord_embed.py",
+        ]
+
+        for text in (
+            "small base for production users",
+            "narrow baseline release",
+            "foundation baseline",
+            "base pequeña",
+        ):
+            with self.subTest(kind="forbidden-synthetic", text=text):
+                self.assertRegex(text, narrow_base_framing)
+        for text in (
+            "core-first RC baseline",
+            "scoped runtime/SDK subset",
+            "post-SDK-complete planning only",
+            "minimal copied ChatMessageEvent",
+        ):
+            with self.subTest(kind="allowed-synthetic", text=text):
+                self.assertIsNone(narrow_base_framing.search(text))
+
+        offenders: list[str] = []
+        for path in scanned_files:
+            text = path.read_text(encoding="utf-8")
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            for segment_start, segment in sentence_like_segments(text):
+                if narrow_base_framing.search(segment):
+                    line = text.count("\n", 0, segment_start) + 1
+                    offenders.append(f"{relative}:{line}: {normalized(segment)}")
+
+        self.assertEqual(offenders, [])
+
     def test_cpp_public_sdk_examples_catch_exceptions_at_entry_points(self) -> None:
         files = [
             REPO_ROOT / "README.md",

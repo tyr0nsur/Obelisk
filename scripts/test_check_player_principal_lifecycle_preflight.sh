@@ -25,6 +25,28 @@ prepare_root() {
     : > "${root}/state/instances/arkserver2/disable-plugins"
 }
 
+write_proc_fixture() {
+    local proc_root="$1"
+    local pid="$2"
+    local root="$3"
+    local map="$4"
+
+    mkdir -p "${proc_root}/${pid}"
+    printf '%s\0' \
+        "${server_binary}" \
+        "${map}?SessionName=ObeliskPreflight" \
+        > "${proc_root}/${pid}/cmdline"
+    printf '%s\0' \
+        "OBELISK_ROOT=${root}" \
+        "LD_PRELOAD=${root}/lib/libobelisk.so" \
+        "OBELISK_INSTANCE_ID=arkserver2" \
+        "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+        "OBELISK_DISABLE_PLUGINS=1" \
+        > "${proc_root}/${pid}/environ"
+    printf '7f000000-7f001000 r-xp 00000000 00:00 0 %s/lib/libobelisk.so\n' "${root}" \
+        > "${proc_root}/${pid}/maps"
+}
+
 make_server_binary() {
     local path="$1"
     printf 'ShooterGameServer fixture\n' > "${path}"
@@ -46,6 +68,19 @@ prepare_root "${root_stable}"
     --server-binary "${server_binary}" \
     --expected-binary-sha256 "${server_sha}" \
     --allow-stopped \
+    | grep -F 'player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2' >/dev/null
+
+proc_root="${TMP_DIR}/proc"
+write_proc_fixture "${proc_root}" 4242 "${root_stable}" "TheIsland"
+"${CHECK}" \
+    --instance arkserver2 \
+    --map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --proc-root "${proc_root}" \
     | grep -F 'player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2' >/dev/null
 
 root_window="${TMP_DIR}/root-window"

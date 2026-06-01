@@ -50,6 +50,7 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
 )
 WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
+EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
 ALLOWED_APPROVAL_KEYS = frozenset(
     (
         "runtime_evidence_reviewed",
@@ -79,6 +80,7 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
         "runtime_ready",
     )
 )
+ALLOWED_OPERATIONAL_WINDOW_COPIED_LOG_KEYS = frozenset(("path", "path_status", "sha256"))
 ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
     (
         "pre_check",
@@ -328,6 +330,17 @@ def source_path_is_copied_or_offline(path_text: Any) -> bool:
     return not status.protected
 
 
+def source_path_is_approved_offline_workspace(path_text: Any) -> bool:
+    if not isinstance(path_text, str) or not path_text:
+        return False
+    status = protected_paths.protected_path_status(
+        Path(path_text).expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    return not status.protected and status.approved_offline_workspace
+
+
 def detail_values(functions: dict[str, Any], function: str, key: str) -> list[Any]:
     details = functions.get(function, {}).get("details", {})
     value = details.get(key, [])
@@ -503,6 +516,8 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
                     continue
                 if not source_path_is_copied_or_offline(source.get("path")):
                     add(blockers, "source_summary_source_path_not_copied_or_offline", f"{label}.path")
+                elif not source_path_is_approved_offline_workspace(source.get("path")):
+                    add(blockers, "source_summary_source_path_not_approved_offline_workspace", f"{label}.path")
 
     runtime = summary.get("runtime")
     if not isinstance(runtime, dict):
@@ -592,8 +607,29 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     if not isinstance(copied, dict):
         add(blockers, "operational_window_copied_log_missing", f"{label}.copied_log")
         return
+    unexpected_copied_keys = set(copied) - ALLOWED_OPERATIONAL_WINDOW_COPIED_LOG_KEYS
+    if unexpected_copied_keys:
+        add(
+            blockers,
+            "operational_window_copied_log_keys_unexpected",
+            f"{label}.copied_log",
+            unexpected=sorted(unexpected_copied_keys),
+        )
+    if copied.get("path_status") != EXPECTED_COPIED_LOG_PATH_STATUS:
+        add(
+            blockers,
+            "operational_window_copied_log_path_status_mismatch",
+            f"{label}.copied_log.path_status",
+            expected=EXPECTED_COPIED_LOG_PATH_STATUS,
+        )
     if not source_path_is_copied_or_offline(copied.get("path")):
         add(blockers, "operational_window_copied_log_path_not_copied_or_offline", f"{label}.copied_log.path")
+    elif not source_path_is_approved_offline_workspace(copied.get("path")):
+        add(
+            blockers,
+            "operational_window_copied_log_path_not_approved_offline_workspace",
+            f"{label}.copied_log.path",
+        )
     evidence = summary.get("evidence") if isinstance(summary, dict) else None
     sources = evidence.get("sources") if isinstance(evidence, dict) else None
     if not isinstance(sources, list) or not sources or not isinstance(sources[0], dict):

@@ -73,6 +73,9 @@ REQUIRED_QUERY_TEXT_FRAGMENTS = frozenset(
         "no UTF-8 or text decoding claim before a separate reviewed parser contract",
     )
 )
+REQUIRED_ALLOWED_PUBLIC_SURFACE_AFTER_IDENTITY = (
+    "query-only fail-closed permission decision checks over copied principals"
+)
 REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
     (
         "OBELISK_API_CAPABILITY_ADMIN",
@@ -150,6 +153,14 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         add(blockers, "public_admin_mutation_contract_not_none", "$.public_admin_mutation_contract")
     if payload.get("operator_config_allow_capable") is not False:
         add(blockers, "operator_config_allow_capable_not_false", "$.operator_config_allow_capable")
+    if payload.get("allowed_public_surface_after_player_identity") != [
+        REQUIRED_ALLOWED_PUBLIC_SURFACE_AFTER_IDENTITY
+    ]:
+        add(
+            blockers,
+            "allowed_public_surface_after_player_identity_not_exact_query_only",
+            "$.allowed_public_surface_after_player_identity",
+        )
 
     forbidden = payload.get("forbidden_public_contract")
     if not isinstance(forbidden, list) or not REQUIRED_FORBIDDEN_PUBLIC_CONTRACT.issubset(set(forbidden)):

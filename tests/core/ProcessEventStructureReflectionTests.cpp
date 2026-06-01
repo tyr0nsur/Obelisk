@@ -546,6 +546,30 @@ namespace
                 "reader exception did not fail closed as an implausible read");
     }
 
+    void TestRejectsPrefilterFunctionNameMismatch()
+    {
+        StructureFixture fixture;
+        BuildSetVariant(fixture);
+        const int32_t variant = 7;
+        WriteAt(fixture.Params, 0x00, variant);
+        fixture.Params[0x04] = 1;
+        fixture.Params[0x05] = 1;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kCanSeatNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Rejected,
+                "structure prefilter/reflected FunctionName mismatch was accepted");
+        Require(attempt.Result.Status == ReadStatus::Implausible,
+                "structure prefilter/reflected FunctionName mismatch did not fail closed");
+        Require(attempt.Invocation.Fields.empty(),
+                "structure prefilter/reflected FunctionName mismatch retained invocation fields");
+    }
+
     void TestGeneralIdentifyStillRecognizesVerifyPinCode()
     {
         StructureFixture fixture;
@@ -1138,6 +1162,7 @@ int main()
     TestDisabledGateDoesNotRead();
     TestNonStructureNameDoesNotRead();
     TestIdentifyContainsReaderExceptions();
+    TestRejectsPrefilterFunctionNameMismatch();
     TestGeneralIdentifyStillRecognizesVerifyPinCode();
     TestIdentifiesAllStructureHookTargets();
     TestNonPinExcludedTargetsDoNotReserveDispatchBudget();

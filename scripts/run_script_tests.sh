@@ -57,6 +57,19 @@ list_repo_files() {
 mapfile -t python_scripts < <(list_repo_files 'scripts/*.py')
 mapfile -t python_tests < <(list_repo_files 'scripts/test_*.py')
 
+if [[ "${mode}" == "python-tests-only" && "${OBELISK_RUN_SCRIPT_TESTS_PROBE_ONLY:-0}" == "1" ]]; then
+    probe_tests=()
+    for test_path in "${python_tests[@]}"; do
+        case "${test_path}" in
+            scripts/test_*_tmp_untracked_probe.py)
+                probe_tests+=("${test_path}")
+                ;;
+        esac
+    done
+    python_scripts=("${probe_tests[@]}")
+    python_tests=("${probe_tests[@]}")
+fi
+
 shell_scripts=(
     scripts/install_obelisk.sh
     scripts/install_obelisk_plugin.sh
@@ -144,7 +157,7 @@ scripts/test_check_linuxgsm_wrapper_drift.sh
 scripts/test_check_release_readiness_options.sh
 scripts/test_install_obelisk_plugin.sh
 if [[ -f scripts/test_run_script_tests.sh ]]; then
-    bash scripts/test_run_script_tests.sh
+    OBELISK_RUN_SCRIPT_TESTS_PROBE_ONLY=1 bash scripts/test_run_script_tests.sh
 fi
 scripts/test_obelisk_supervisor_snapshot.sh
 scripts/test_linuxgsm_wrapper_markers.sh

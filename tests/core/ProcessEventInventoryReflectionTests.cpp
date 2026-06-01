@@ -597,6 +597,28 @@ namespace
                 "reader exception did not fail closed as an implausible read");
     }
 
+    void TestRejectsPrefilterFunctionNameMismatch()
+    {
+        InventoryFixture fixture;
+        BuildCanUse(fixture);
+        fixture.Params[0] = 1;
+        fixture.Params[1] = 0;
+
+        Attempt attempt = TryIdentifyInvocation(
+            EnabledGate(),
+            kAllowRemoteAddToInventoryNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data());
+
+        Require(attempt.Status == AttemptStatus::Rejected,
+                "inventory prefilter/reflected FunctionName mismatch was accepted");
+        Require(attempt.Result.Status == ReadStatus::Implausible,
+                "inventory prefilter/reflected FunctionName mismatch did not fail closed");
+        Require(attempt.Invocation.Fields.empty(),
+                "inventory prefilter/reflected FunctionName mismatch retained invocation fields");
+    }
+
     void TestMetadataOnlyInventoryActionNamesDoNotRead()
     {
         constexpr int32_t metadataOnlyNames[] = {
@@ -1689,6 +1711,7 @@ int main()
     TestDisabledGateDoesNotRead();
     TestNonInventoryNameDoesNotRead();
     TestIdentifyContainsReaderExceptions();
+    TestRejectsPrefilterFunctionNameMismatch();
     TestMetadataOnlyInventoryActionNamesDoNotRead();
     TestIdentifiesCanUse();
     TestIdentifiesAllowRemoteAddWithoutObjectRanges();

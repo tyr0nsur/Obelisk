@@ -81,7 +81,7 @@ Use these labels consistently:
 | `0.1.0-dev` | Active development toward the first minor baseline. APIs can break. | No |
 | `0.1.0-alpha.N` | A named preview for contributors when a specific checkpoint is useful to test. | Optional |
 | `0.1.0-rc.N` | A release candidate after scope freeze and validation checklist pass. | Yes |
-| `0.1.0` | Scoped foundation baseline for the documented runtime/SDK subset only; not complete `v1.0` SDK stability. | Yes |
+| `0.1.0` | Scoped runtime/SDK subset for the documented release contract only; not complete `v1.0` SDK stability. | Yes |
 | `0.2.0-dev` | Development after `0.1.0`, likely reflection/event API work. | No |
 
 Do not tag every useful commit. Prefer commits, research notes, and status updates until

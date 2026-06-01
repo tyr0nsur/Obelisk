@@ -100,7 +100,7 @@ def manifest() -> dict:
             "run_id": RUN_ID,
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
             "target": {"instance": "arkserver2", "map": "TheIsland"},
-            "copied_log": {"path": source["path"], "path_status": "unprotected_offline", "sha256": source["sha256"]},
+            "copied_log": {"path": source["path"], "path_status": "approved_offline_workspace", "sha256": source["sha256"]},
             "posture": {
                 "pre_check": "passed",
                 "post_check": "passed",
@@ -416,6 +416,20 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("source_summary_source_path_not_copied_or_offline", report["blockers"])
 
+    def test_rejects_runtime_summary_or_window_paths_outside_approved_offline_workspace(self) -> None:
+        payload = manifest()
+        outside_path = f"/tmp/live-validation-logs/{RUN_ID}/Obelisk.log"
+        payload["source_summary"]["evidence"]["sources"][0]["path"] = outside_path
+        payload["operational_window"]["copied_log"]["path"] = outside_path
+        payload["operational_window"]["copied_log"]["path_status"] = "unprotected_offline"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_source_path_not_approved_offline_workspace", report["blockers"])
+        self.assertIn("operational_window_copied_log_path_status_mismatch", report["blockers"])
+        self.assertIn("operational_window_copied_log_path_not_approved_offline_workspace", report["blockers"])
+
     def test_rejects_multiple_runtime_summary_sources(self) -> None:
         payload = manifest()
         payload["source_summary"]["evidence"]["sources"].append(
@@ -457,6 +471,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         payload = manifest()
         payload["approval"]["server_restart_authorized_by_this_manifest"] = True
         payload["operational_window"]["runtime_work_authorized"] = True
+        payload["operational_window"]["copied_log"]["uobject_pointer"] = "redacted"
         payload["operational_window"]["posture"]["plugin_delivery_ready"] = True
         payload["operational_window"]["rollback"]["manual_followup_required"] = True
         payload["operational_window"]["claims"]["runtime_ready_claim"] = "ready"
@@ -468,6 +483,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("approval_keys_unexpected", report["blockers"])
         self.assertIn("operational_window_keys_unexpected", report["blockers"])
+        self.assertIn("operational_window_copied_log_keys_unexpected", report["blockers"])
         self.assertIn("operational_window_posture_keys_unexpected", report["blockers"])
         self.assertIn("operational_window_rollback_keys_unexpected", report["blockers"])
         self.assertIn("operational_window_claims_keys_unexpected", report["blockers"])

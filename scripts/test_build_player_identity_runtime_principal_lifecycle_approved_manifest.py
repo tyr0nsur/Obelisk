@@ -268,6 +268,37 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertIn("must point to copied/offline evidence", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_rejects_summary_or_window_check_outside_approved_offline_workspace(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["evidence"]["sources"][0]["path"] = f"/tmp/live-validation-logs/{RUN_ID}/Obelisk.log"
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            output = temp_dir / "manifest.json"
+
+            result = self.run_builder(summary_path, window_check, output)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must point under /servidor/ark/workspace-offline", result.stderr)
+            self.assertFalse(output.exists())
+
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            window = json.loads(window_check.read_text(encoding="utf-8"))
+            window["copied_log"]["path_status"] = "unprotected_offline"
+            window_check.write_text(json.dumps(window), encoding="utf-8")
+            output = temp_dir / "manifest.json"
+
+            result = self.run_builder(summary_path, window_check, output)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("copied_log.path_status must be approved_offline_workspace", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_rejects_summary_with_multiple_sources(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

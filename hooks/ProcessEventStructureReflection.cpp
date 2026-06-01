@@ -305,6 +305,16 @@ namespace Obelisk::Hooks::ProcessEventStructureReflection
         }
         if (!result)
             return {AttemptStatus::Rejected, std::move(result), {}};
+        if (invocation.FunctionNameIndex != nameIndex)
+        {
+            return {
+                AttemptStatus::Rejected,
+                Obelisk::UE::RuntimeReflection::ReadResult::Fail(
+                    Obelisk::UE::RuntimeReflection::ReadStatus::Implausible,
+                    "structure prefilter FName does not match reflected UFunction FName"),
+                {},
+            };
+        }
 
         return {AttemptStatus::Matched, std::move(result), std::move(invocation)};
     }

@@ -196,6 +196,29 @@ require_exact_marker_set() {
     done < <(find "${MARKER_DIR}" -mindepth 1 -maxdepth 1 -print0)
 }
 
+find_shooter_pid_for_map() {
+    local map="$1"
+    local proc_dir pid cmdline
+
+    if [[ "${PROC_ROOT}" == "/proc" ]]; then
+        PGREP_BIN="${PGREP_BIN:-pgrep}"
+        "${PGREP_BIN}" -f "(^|/)ShooterGameServer ${map}" | head -n1 || true
+        return 0
+    fi
+
+    for proc_dir in "${PROC_ROOT%/}"/*; do
+        [[ -d "${proc_dir}" ]] || continue
+        pid="$(basename -- "${proc_dir}")"
+        [[ "${pid}" =~ ^[0-9]+$ ]] || continue
+        [[ -r "${proc_dir}/cmdline" ]] || continue
+        cmdline="$(tr '\0' ' ' < "${proc_dir}/cmdline")"
+        if [[ "${cmdline}" =~ (^|/)ShooterGameServer[[:space:]]+${map} ]]; then
+            printf '%s\n' "${pid}"
+            return 0
+        fi
+    done
+}
+
 if [[ "${OFFLINE_ONLY}" == "1" ]]; then
     reject_protected_live_path "Obelisk root" "${OBELISK_ROOT}"
     reject_protected_live_path "Installed wrapper" "${INSTALLED_WRAPPER}"
@@ -260,14 +283,15 @@ else
 fi
 
 if [[ -n "${MAP}" ]]; then
-    if pgrep -f "(^|/)ShooterGameServer ${MAP}" >/dev/null; then
+    shooter_pid="$(find_shooter_pid_for_map "${MAP}")"
+    if [[ -n "${shooter_pid}" ]]; then
         if [[ "${MODE}" != "stable" ]]; then
             echo "Running observer-window posture is not checked by this preflight; use it before launch or after rollback." >&2
             exit 1
         fi
         scripts/check_obelisk_server_posture.sh \
             --expect-stable \
-            --map "${MAP}" \
+            --pid "${shooter_pid}" \
             --instance "${INSTANCE}" \
             --proc-root "${PROC_ROOT}" >/dev/null
     elif [[ "${ALLOW_STOPPED}" != "1" ]]; then
