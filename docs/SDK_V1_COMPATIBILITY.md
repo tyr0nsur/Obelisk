@@ -197,6 +197,10 @@ The pre-ABI decision checklist for that future path is
 It is a blocking checklist only: static thunk orientation, passive `ChatMessageEvent`
 parsing, candidate vtable slots, raw `ProcessEvent` callbacks, and the legacy
 `CallProcessEvent` debug gate are not sufficient response-path evidence.
+The public-readiness checker also scans `include/obelisk/ObeliskApi.h`; capability bits,
+ABI versions, register/unregister APIs, reply/send/broadcast/notice APIs, or public
+`CallProcessEvent` response symbols in that header are blockers while the surface remains
+planning-only.
 
 Future command/principal routing is a lifecycle and callback-ownership change, not a
 parser-only extension to `ChatMessageEvent` or plugin-local routing. Any promoted design
@@ -207,6 +211,11 @@ before `dlclose`, callback-scope copied payloads, and principal privacy/invalida
 semantics. The runtime must reject ownerless command/principal callbacks and must not
 authorize routing from process-global capability state or debug gates that were not
 advertised to that plugin at init.
+Familiar migration vocabulary is allowed only as planning language. Terms such as chat
+command, console command, admin-like command, reply request, and permission action do not
+claim ArkApi/AseApi parser compatibility, dispatch ordering compatibility, return
+semantics compatibility, direct plugin portability, copied parser/control flow, or ABI
+compatibility.
 
 Player identity is planning-only. `players-identity-lifecycle-intake` and
 `obelisk.players-identity-first-evidence.v1` are candidate-only,
@@ -244,6 +253,10 @@ storage service, RCON service, webhook client, secret manager, or cross-instance
 API is part of the SDK. `scripts/check_operator_ingress_storage_offline_contract.py`
 validates the offline planning contract only and must not be cited as public ABI,
 runtime readiness, promotion readiness, or v1 completion evidence.
+Any acceptable runtime principal lifecycle evidence must come from a copied offline
+workspace log plus a checked operational window manifest. Live/protected source paths,
+private identity terms, UE internals, public capability claims, and readiness claims keep
+the evidence out of the promotion path.
 
 The shortest useful route toward a complete v1 SDK is:
 
@@ -335,6 +348,7 @@ approval and must not be cited as evidence that a surface is included in v1.
 | `obelisk.commands_replies.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity, permissions/admin, and command/chat response path | Name command router, console/RCON commands, player/admin commands, chat replies, send-chat, broadcast/notices, and moderation. |
 | `obelisk.inventory_items_mutation.v1` | `promoted`, `excluded`, or `post-v1` | player/inventory/item identity plus rollback/privacy controls | Name Inventory SDK, Items SDK, give/remove item, kits/rewards, engrams/progression, lookup, item handles, mutation, return override, and `ResourceHandle`. |
 | `obelisk.structure_census.v1` | `promoted` or `excluded` | copied structure evidence, privacy/redaction, identity policy if exposed | Name StructureEvents SDK, structure census, structure identity, lookup, build placement policy, no-collision policy, and ownership lookup. |
+| `obelisk.object_identity_resource_handle.v1` | `promoted`, `excluded`, or `post-v1` | lifecycle/reuse semantics, privacy/redaction, paired runtime ResourceHandle evidence | Name ResourceHandle, object identity, object lookup, post-callback handles, persistent handles, serial reuse/wraparound, mutation, and return override. |
 | `obelisk.mission_transfer_dino_tribe.v1` | `promoted` or `excluded` | each module promoted as a narrow copied ABI or explicitly left out | Name Mission SDK, Transfer SDK, Dino SDK, dino colors/cosmetics/carry rules, Tribe SDK, tribe MOTD/notices/policy, Buff/status SDK, teleport/spawn, ownership lookup, and cross-map correlation. |
 | `obelisk.player_services_economy_mobility.v1` | `promoted`, `excluded`, or `post-v1` | identity, permissions/admin, storage/persistence, audit/rollback/abuse controls | Name economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy, timed notices, and cross-instance persistence. |
 | `obelisk.operator_ingress_storage.v1` | `promoted`, `excluded`, or `post-v1` | secret-safe ingress, storage schema/migration, queue drain, audit, encoding, lifecycle policy | Name RCON, operator reload command API, Unicode/operator text encoding, webhooks, database/storage, secret manager, external ingress, and cross-instance storage. |

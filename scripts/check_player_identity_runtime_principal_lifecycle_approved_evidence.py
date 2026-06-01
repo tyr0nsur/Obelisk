@@ -203,8 +203,27 @@ REQUIRED_NON_CLAIMS = frozenset(
 )
 FORBIDDEN_KEY_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
+    r"platform[_-]?ids?|transfer[_-]?ids?|private[_-]?(?:identifier|user[_-]?data)|"
+    r"chat[_-]?(?:text|message|payload)|command[_-]?(?:text|message|payload)|"
+    r"permission[_-]?state|admin[_-]?state|"
     r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
-    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace)|object[_-]?address)",
+    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace|buffers?)|"
+    r"object[_-]?(?:address|name|coordinates?|coords)|"
+    r"(?:identity|identifier|player|steam|eos)[_-]?hash|hashed[_-]?(?:private|identity|identifier|player))",
+    re.IGNORECASE,
+)
+POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
+    r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
+    r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
+    r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
+    r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
+    r"(?:ready|readiness|enabled|allowed|supported|promoted|delivered)|"
+    r"command[_ -]?(?:reply|response|routing|support)|"
+    r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
+    re.IGNORECASE,
+)
+NEGATIVE_CLAIM_CONTEXT_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|not|no|never|without|blocked|forbidden|reject(?:ed|s)?|fail[-_ ]closed)\b",
     re.IGNORECASE,
 )
 ALLOWED_FORBIDDEN_KEY_PATHS = (
@@ -784,6 +803,34 @@ def find_forbidden_key(value: Any, trail: str = "$") -> tuple[str, str] | None:
     return None
 
 
+def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if (
+                child is not False
+                and child is not None
+                and POSITIVE_CAPABILITY_CLAIM_RE.search(str(key))
+                and not NEGATIVE_CLAIM_CONTEXT_RE.search(str(key))
+            ):
+                return str(key), child_trail
+            found = find_positive_capability_claim(child, child_trail)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = find_positive_capability_claim(child, f"{trail}[{index}]")
+            if found is not None:
+                return found
+    elif (
+        isinstance(value, str)
+        and POSITIVE_CAPABILITY_CLAIM_RE.search(value)
+        and not NEGATIVE_CLAIM_CONTEXT_RE.search(value)
+    ):
+        return value, trail
+    return None
+
+
 def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation:
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
@@ -819,6 +866,10 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     if forbidden is not None:
         value, trail = forbidden
         add(blockers, "forbidden_identity_or_ue_internal_leakage", trail, value=value)
+    positive_claim = find_positive_capability_claim(payload)
+    if positive_claim is not None:
+        value, trail = positive_claim
+        add(blockers, "forbidden_public_capability_or_readiness_claim", trail, value=value)
     if check_mode != "consume":
         add(blockers, f"{check_mode}_blocked_until_identity_public_contract_gate", "$.promotion_gate")
     return Validation(blockers, observed_runtime_cases, consumer_cases)

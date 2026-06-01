@@ -246,6 +246,28 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("forbidden_identity_or_ue_value", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_extended_private_identity_terms_from_current_notes(self) -> None:
+        result = self.run_checker(
+            manifest_lines(rollback_delta="removed_observer_env_after_permission_state_and_identity_hash_redaction"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden_identity_or_ue_value", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_public_capability_or_readiness_terms_in_allowed_values(self) -> None:
+        result = self.run_checker(
+            manifest_lines(rollback_delta="removed_observer_env_after_public_sdk_ready_and_command_reply_support"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden_public_capability_or_readiness_value", report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_claims_dispatch_and_budget_that_would_enable_delivery(self) -> None:
         result = self.run_checker(
             manifest_lines(

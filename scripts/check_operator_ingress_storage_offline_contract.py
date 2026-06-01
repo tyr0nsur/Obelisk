@@ -119,7 +119,12 @@ CLAIM_KEY_EXEMPTIONS = frozenset(
 )
 
 PROHIBITED_CLAIM_RE = re.compile(
-    r"secret[-_ ]?manager|secret(s)?|rcon|webhook|database|\bdb\b|\bapi\b|"
+    r"secret[-_ ]?manager|secret(s)?|rcon|webhook|database|"
+    r"(?<![A-Za-z0-9])db(?:[-_ ]?(?:service|storage|backend|migration|persistence|connector|adapter))?(?![A-Za-z0-9])|"
+    r"(?<![A-Za-z0-9])storage[-_ ]?(?:service|api|runtime|implementation|backend|provider|connector|adapter)(?![A-Za-z0-9])|"
+    r"(?<![A-Za-z0-9])cross[-_ ]?instance[-_ ]?(?:persistence|persistent[-_ ]?storage|"
+    r"storage[-_ ]?(?:api|service|persistence)|state[-_ ]?persistence|db|database)(?![A-Za-z0-9])|"
+    r"\bapi\b|"
     r"\bruntime(?:[-_ ]?(?:ready|readiness|services?|validated|validation|entrypoint|"
     r"code|hook|wiring|implementation))?\b|public[_ -]?(?:c[_ -]?)?abi|"
     r"v1(?:[_ -]?sdk)?[_ -]?completion(?:[_ -]?required)?",

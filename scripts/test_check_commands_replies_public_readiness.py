@@ -243,6 +243,51 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("missing principal_handle fails closed", detail["missing"])
         self.assertIn("missing principal_scope_flags fails closed", detail["missing"])
 
+    def test_rejects_missing_migration_vocabulary_guardrail(self) -> None:
+        decisions = self.load_decisions()
+        decisions.pop("migration_vocabulary_not_compatibility", None)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("migration_vocabulary_not_compatibility_missing", report["blockers"])
+
+    def test_rejects_incomplete_migration_vocabulary_semantics(self) -> None:
+        decisions = self.load_decisions()
+        migration = decisions["migration_vocabulary_not_compatibility"]
+        migration["allowed_terms"].remove("admin-like command")
+        migration["recognized_source_kinds"].remove("server_console")
+        migration["registration_semantics"].remove("permission denial or unknown result never dispatches a command")
+        migration["non_compatibility_claims"].remove("no direct plugin portability claim")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("migration_vocabulary_allowed_terms_missing", report["blockers"])
+        self.assertIn("migration_vocabulary_source_kinds_missing", report["blockers"])
+        self.assertIn("migration_vocabulary_registration_semantics_missing", report["blockers"])
+        self.assertIn("migration_vocabulary_non_compatibility_missing", report["blockers"])
+
     def test_accepts_optional_response_path_planning_report_only(self) -> None:
         response_report = {
             "schema": "obelisk.command-chat-response-public-readiness-check.v1",

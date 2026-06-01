@@ -10,6 +10,39 @@
   "public_command_router_allowed": false,
   "public_reply_or_send_chat_abi_allowed": false,
   "public_response_path_allowed": false,
+  "migration_vocabulary_not_compatibility": {
+    "status": "planning_only",
+    "purpose": "Keep future command/reply docs familiar for ArkApi/AseApi modders without claiming direct compatibility or copying parsers, ordering, return semantics, offsets, layouts, vtables, or implementation.",
+    "allowed_terms": [
+      "chat command",
+      "console command",
+      "admin-like command",
+      "reply request",
+      "permission action"
+    ],
+    "recognized_source_kinds": [
+      "chat",
+      "server_console",
+      "rcon"
+    ],
+    "registration_semantics": [
+      "future command registration must be owner-token scoped",
+      "future command names must be normalized by an Obelisk-owned contract before duplicate detection",
+      "duplicate normalized command names must have deterministic owner-token scoped conflict handling",
+      "unsupported or unknown source_kind fails closed",
+      "permission denial or unknown result never dispatches a command",
+      "missing permission policy provenance fails closed",
+      "reply request is copied request data only and never implies response delivery until command_chat_response_path is separately promoted"
+    ],
+    "non_compatibility_claims": [
+      "no ArkApi parser compatibility",
+      "no AseApi parser compatibility",
+      "no ArkApi or AseApi dispatch ordering compatibility",
+      "no ArkApi or AseApi return semantics compatibility",
+      "no direct plugin portability claim",
+      "no copied command parser, control flow, offsets, layouts, vtables, native-call wrappers, or ABI semantics"
+    ]
+  },
   "forbidden_public_contract": [
     "public command SDK/router",
     "public command parser",

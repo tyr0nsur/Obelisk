@@ -47,6 +47,37 @@ REQUIRED_DECISION_IDS = frozenset(
         "release.not_sufficient_for_v1",
     )
 )
+REQUIRED_MIGRATION_ALLOWED_TERMS = frozenset(
+    (
+        "chat command",
+        "console command",
+        "admin-like command",
+        "reply request",
+        "permission action",
+    )
+)
+REQUIRED_MIGRATION_SOURCE_KINDS = frozenset(("chat", "server_console", "rcon"))
+REQUIRED_MIGRATION_REGISTRATION_SEMANTICS = frozenset(
+    (
+        "future command registration must be owner-token scoped",
+        "future command names must be normalized by an Obelisk-owned contract before duplicate detection",
+        "duplicate normalized command names must have deterministic owner-token scoped conflict handling",
+        "unsupported or unknown source_kind fails closed",
+        "permission denial or unknown result never dispatches a command",
+        "missing permission policy provenance fails closed",
+        "reply request is copied request data only and never implies response delivery until command_chat_response_path is separately promoted",
+    )
+)
+REQUIRED_MIGRATION_NON_COMPATIBILITY = frozenset(
+    (
+        "no ArkApi parser compatibility",
+        "no AseApi parser compatibility",
+        "no ArkApi or AseApi dispatch ordering compatibility",
+        "no ArkApi or AseApi return semantics compatibility",
+        "no direct plugin portability claim",
+        "no copied command parser, control flow, offsets, layouts, vtables, native-call wrappers, or ABI semantics",
+    )
+)
 REQUIRED_DECISION_PREFIX = (
     "dependency.promoted_player_identity",
     "dependency.promoted_permissions_admin",
@@ -332,6 +363,58 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         )
     if payload.get("public_contract", []) != []:
         add(blockers, "public_contract_not_empty", "$.decisions.public_contract", value=payload.get("public_contract"))
+
+    migration = payload.get("migration_vocabulary_not_compatibility")
+    if not isinstance(migration, dict):
+        add(
+            blockers,
+            "migration_vocabulary_not_compatibility_missing",
+            "$.decisions.migration_vocabulary_not_compatibility",
+        )
+    else:
+        if migration.get("status") != "planning_only":
+            add(
+                blockers,
+                "migration_vocabulary_status_mismatch",
+                "$.decisions.migration_vocabulary_not_compatibility.status",
+                value=migration.get("status"),
+            )
+        missing_terms = REQUIRED_MIGRATION_ALLOWED_TERMS - string_set(migration.get("allowed_terms"))
+        if missing_terms:
+            add(
+                blockers,
+                "migration_vocabulary_allowed_terms_missing",
+                "$.decisions.migration_vocabulary_not_compatibility.allowed_terms",
+                missing=sorted(missing_terms),
+            )
+        missing_sources = REQUIRED_MIGRATION_SOURCE_KINDS - string_set(migration.get("recognized_source_kinds"))
+        if missing_sources:
+            add(
+                blockers,
+                "migration_vocabulary_source_kinds_missing",
+                "$.decisions.migration_vocabulary_not_compatibility.recognized_source_kinds",
+                missing=sorted(missing_sources),
+            )
+        missing_semantics = REQUIRED_MIGRATION_REGISTRATION_SEMANTICS - string_set(
+            migration.get("registration_semantics")
+        )
+        if missing_semantics:
+            add(
+                blockers,
+                "migration_vocabulary_registration_semantics_missing",
+                "$.decisions.migration_vocabulary_not_compatibility.registration_semantics",
+                missing=sorted(missing_semantics),
+            )
+        missing_non_compatibility = REQUIRED_MIGRATION_NON_COMPATIBILITY - string_set(
+            migration.get("non_compatibility_claims")
+        )
+        if missing_non_compatibility:
+            add(
+                blockers,
+                "migration_vocabulary_non_compatibility_missing",
+                "$.decisions.migration_vocabulary_not_compatibility.non_compatibility_claims",
+                missing=sorted(missing_non_compatibility),
+            )
 
     forbidden = string_set(payload.get("forbidden_public_contract"))
     missing_forbidden = REQUIRED_FORBIDDEN_PUBLIC_CONTRACT - forbidden

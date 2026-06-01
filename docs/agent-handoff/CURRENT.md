@@ -42,7 +42,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/command_chat_response_public_contract_decisions.json` and accepts only
   planning-layout evidence: `public_readiness_ready`, `public_header_allowed`,
   `promotion_ready`, `public_sdk_ready`, `public_abi_ready`, and `runtime_ready` must all
-  remain false. The checker now also requires explicit redaction guidance for
+  remain false. It also scans `include/obelisk/ObeliskApi.h` and fails if command response
+  capability bits, ABI versions, reply/send/broadcast APIs, or public `CallProcessEvent`
+  response symbols appear early. The checker now also requires explicit redaction guidance for
   `ClientChatMessage.Chat`, raw FString message text, sender identity, directed recipient
   identity, and future targeting through promoted copied principal handle/generation only.
   The offline readiness artifact under
@@ -52,7 +54,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `scripts/check_commands_replies_public_readiness.py` is the current commands/replies
   readiness guardrail. It must keep `obelisk.commands_replies.v1` blocked/post-v1 until
   promoted player identity, permissions/admin, and `obelisk.command_chat_response_path.v1`
-  all exist; a green blocked report is not public header, runtime, or SDK readiness.
+  all exist; a green blocked report is not public header, runtime, or SDK readiness. It
+  now requires a planning-only migration vocabulary block so familiar terms like chat
+  command, console command, admin-like command, reply request, and permission action stay
+  allowed as vocabulary only, with explicit no ArkApi/AseApi parser, ordering, return
+  semantics, direct portability, copied control-flow, or ABI-compatibility claims.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
@@ -85,9 +91,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   commands/replies, runtime/public SDK readiness, or v1 claim is promoted.
 - Player-principal runtime evidence must use the exact single-module, plugins-disabled,
   dispatch-limit-`0`, no-sibling marker window and a checked `--window-manifest` whose
-  source path/SHA matches the copied log. Analyzer rules remain strict: copied bool cases,
+  source path/SHA matches the copied log under
+  `/servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log`. Live/protected
+  source paths are rejected. Analyzer rules remain strict: copied bool cases,
   redaction, lifecycle order, post-gate events, log-budget bounds, monotonic sequence
-  quality, stable posture, rollback, and no-claim/no-public-readiness semantics.
+  quality, stable posture, rollback, no private identity/UE terms in keys or values, and
+  no-claim/no-public-readiness semantics.
 - Candidate lifecycle layouts are reproducible for all six
   `players-lifecycle-anchor-candidates` targets, but remain planning-only. The narrow
   candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
@@ -121,7 +130,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   copied cores and remains candidate-blocked. This does not unlock runtime negative
   samples, public lookup, object identity, mutation, or fail-closed semantic helper
   promotion. Do not rerun broad FName, GObjects, or core scans for ResourceHandle. Do not
-  replace this with another broad offline FName/GObjects scan. The next strict ResourceHandle
+  replace this with another broad offline FName/GObjects scan. Future runtime
+  ResourceHandle evidence must include both paired schemas for rejection samples and
+  runtime serial semantics; duplicate schemas, half-pairs, source/run mismatches, or
+  binary SHA mismatch block consume. The next strict ResourceHandle
   blocker is rejected runtime object samples plus runtime serial reuse/wraparound semantics,
   with a future-runtime-observation-plan only after an operator-approved live-ops brief
   names the exact debug target.
@@ -174,6 +186,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Structure aggregate/census remains planning/consume-only, and build-policy intake now
   has accepted planning-only `3/3` second-source layout evidence; no runtime observer,
   public StructureEvents SDK, enforcement, return override, or v1 claim is promoted.
+  `scripts/check_structure_build_policy_offline_intake.py` validates only the offline
+  build-policy intake manifest/target set/SHA/non-claim/readiness-false shape and its OK
+  result is `accepted_for_offline_planning`, not SDK or runtime readiness.
 - Command/principal/authz/response bridge is planning-only over
   `principal_handle + principal_generation + principal_scope_flags`; it adds no public
   header, capability bit, response ABI, runtime wiring, or server validation.

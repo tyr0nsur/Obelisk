@@ -7850,6 +7850,61 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         )
         self.assertEqual(["capture_id", "evidence_pack_id"], pair_blocker["fields"])
 
+    def test_blocks_runtime_evidence_pair_duplicate_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            rejection_manifest_a = workspace / "runtime-rejection-samples-a.json"
+            rejection_manifest_b = workspace / "runtime-rejection-samples-b.json"
+            serial_manifest = workspace / "runtime-serial-semantics.json"
+            rejection_payload_b = runtime_rejection_samples_manifest()
+            rejection_payload_b["rows"][0]["row_id"] = "reject-row-duplicate"
+            attach_runtime_output_identity(
+                rejection_payload_b,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                capture_id="runtime-rejection-test",
+                evidence_pack_id="runtime-rejection-pack",
+            )
+            write_json(rejection_manifest_a, runtime_rejection_samples_manifest())
+            write_json(rejection_manifest_b, rejection_payload_b)
+            write_json(serial_manifest, runtime_serial_semantics_manifest())
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[rejection_manifest_a, rejection_manifest_b, serial_manifest])
+            )
+
+        duplicate_blocker = next(
+            blocker for blocker in result["blockers"] if blocker["reason"] == "runtime_evidence_pair_duplicate_schema"
+        )
+        self.assertEqual(gate.INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA, duplicate_blocker["schema"])
+        self.assertEqual(2, duplicate_blocker["count"])
+
+    def test_blocks_runtime_evidence_pair_binary_sha256_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            rejection_manifest = workspace / "runtime-rejection-samples.json"
+            serial_manifest = workspace / "runtime-serial-semantics.json"
+            serial_payload = runtime_serial_semantics_manifest()
+            serial_payload["binary_sha256"] = "f" * 64
+            attach_runtime_output_identity(
+                serial_payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                capture_id="runtime-serial-test",
+                evidence_pack_id="runtime-serial-pack",
+            )
+            write_json(rejection_manifest, runtime_rejection_samples_manifest())
+            write_json(serial_manifest, serial_payload)
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[rejection_manifest, serial_manifest])
+            )
+
+        self.assertIn(
+            "runtime_evidence_pair_binary_sha256_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
     def test_blocks_runtime_rejection_samples_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

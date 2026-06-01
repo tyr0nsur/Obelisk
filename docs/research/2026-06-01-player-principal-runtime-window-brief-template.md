@@ -169,8 +169,8 @@ The window manifest checker
 `log_budget=10`, `dispatch_limit=0`, `plugins_disabled=true`,
 `wrapper_profile=observer-debug`, `observer_exclusivity=player_principal_lifecycle_only`,
 `delivery_claim=none`, `principal_claim=none`, a copied log path ending in
-`live-validation-logs/<run-id>/Obelisk.log`, and no identity/UE-internal terms in either
-manifest keys or values.
+`live-validation-logs/<run-id>/Obelisk.log`, and no private identity, UE-internal,
+public capability, or readiness terms in either manifest keys or values.
 
 Passing the checker means only that the offline manifest is acceptable for the next
 consume-only evidence step. It does not authorize server operations and does not promote a

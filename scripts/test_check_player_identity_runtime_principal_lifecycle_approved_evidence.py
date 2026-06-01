@@ -379,6 +379,27 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("public_sdk_ready_not_false", report["blockers"])
         self.assertIn("forbidden_identity_or_ue_internal_leakage", report["blockers"])
 
+    def test_rejects_extended_private_identity_terms_from_current_notes(self) -> None:
+        payload = manifest()
+        payload["source_summary"]["modules"]["player_principal_lifecycle"]["functions"][
+            "ShooterGameMode.HandleNewPlayer"
+        ]["details"]["permission_state"] = ["admin"]
+        payload["consumer_boundary_cases"][0]["chat_text"] = "redacted"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden_identity_or_ue_internal_leakage", report["blockers"])
+
+    def test_rejects_positive_capability_claim_inside_extra_non_claims(self) -> None:
+        payload = manifest()
+        payload["non_claims"].append("public player identity ready with command reply support")
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
     def test_rejects_live_server_source_paths_in_wrapped_summary(self) -> None:
         payload = manifest()
         payload["source_summary"]["evidence"]["sources"][0]["path"] = "/servidor/ark/obelisk/logs/live.log"

@@ -34,14 +34,34 @@ SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 FORBIDDEN_KEY_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
+    r"platform[_-]?ids?|transfer[_-]?ids?|private[_-]?(?:identifier|user[_-]?data)|"
+    r"chat[_-]?(?:text|message|payload)|command[_-]?(?:text|message|payload)|"
+    r"permission[_-]?state|admin[_-]?state|"
     r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
-    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace)|object[_-]?address)",
+    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace|buffers?)|"
+    r"object[_-]?(?:address|name|coordinates?|coords)|"
+    r"(?:identity|identifier|player|steam|eos)[_-]?hash|hashed[_-]?(?:private|identity|identifier|player))",
     re.IGNORECASE,
 )
 FORBIDDEN_VALUE_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|\bip(?:v4|v6)?\b|tribe[_-]?id|"
+    r"platform[_-]?ids?|transfer[_-]?ids?|private[_-]?(?:identifier|user[_-]?data)|"
+    r"chat[_-]?(?:text|message|payload)|command[_-]?(?:text|message|payload)|"
+    r"permission[_-]?state|admin[_-]?state|"
     r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
-    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace)|object[_-]?address)",
+    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace|buffers?)|"
+    r"object[_-]?(?:address|name|coordinates?|coords)|"
+    r"(?:identity|identifier|player|steam|eos)[_-]?hash|hashed[_-]?(?:private|identity|identifier|player))",
+    re.IGNORECASE,
+)
+POSITIVE_CAPABILITY_VALUE_RE = re.compile(
+    r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
+    r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
+    r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
+    r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
+    r"(?:ready|readiness|enabled|allowed|supported|promoted|delivered)|"
+    r"command[_ -]?(?:reply|response|routing|support)|"
+    r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
     re.IGNORECASE,
 )
 
@@ -293,6 +313,8 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
             add(blockers, "forbidden_identity_or_ue_field", key)
         if FORBIDDEN_VALUE_RE.search(fields[key]):
             add(blockers, "forbidden_identity_or_ue_value", key)
+        if POSITIVE_CAPABILITY_VALUE_RE.search(fields[key]):
+            add(blockers, "forbidden_public_capability_or_readiness_value", key)
     for key in REQUIRED_SIMPLE_FIELDS:
         if key not in fields:
             add(blockers, "required_field_missing", key)

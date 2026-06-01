@@ -136,7 +136,18 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "webhook",
             "db",
             "database",
+            "db_service",
+            "db-persistence",
             "secret-manager",
+            "storage service",
+            "storage_service",
+            "storage-service",
+            "storage_backend",
+            "persistent storage service",
+            "cross-instance persistence",
+            "cross_instance_persistence",
+            "cross instance persistent storage",
+            "cross-instance storage API",
             "API",
             "runtime ready",
             "public ABI",
@@ -147,6 +158,24 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             with self.subTest(value=value):
                 contract = self.load_valid_contract()
                 contract["lanes"][0]["label"] = value
+                errors = checker.validate_contract(contract)
+                self.assertTrue(
+                    any("prohibited claim" in error for error in errors),
+                    errors,
+                )
+
+    def test_rejects_prohibited_claims_in_field_names(self) -> None:
+        prohibited_keys = [
+            "storage_service",
+            "db_persistence",
+            "cross_instance_persistence",
+            "public_c_abi",
+            "runtime_storage_service",
+        ]
+        for key in prohibited_keys:
+            with self.subTest(key=key):
+                contract = self.load_valid_contract()
+                contract["lanes"][0][key] = False
                 errors = checker.validate_contract(contract)
                 self.assertTrue(
                     any("prohibited claim" in error for error in errors),
