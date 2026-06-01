@@ -137,12 +137,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "response delivery never creates identity or permission claims",
                 "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
                 "generic chat routing cannot establish principal identity",
+                "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish principal identity or roadmap priority",
                 "commands/replies planning cannot bypass identity promotion",
             ]},
             {"id": "dependency.promoted_permissions_admin", "status": "unresolved", "required_behavior": [
                 "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
                 "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
                 "generic chat routing cannot establish permissions or admin authority",
+                "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish permissions, targeting, command authority, moderation authority, or roadmap priority",
                 "commands/replies planning cannot bypass permissions/admin promotion",
             ]},
             {"id": "abi.copied_response_payload", "status": "unresolved"},
@@ -175,6 +177,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             ], "v1_sequence_gate": [
                 "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
                 "generic chat routing cannot bypass promoted identity and permissions/admin",
+                "chat intake is observation only and cannot become identity, permission, command authority, moderation authority, targeting, or roadmap priority",
                 "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
             ]},
             {
@@ -595,6 +598,59 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         }
         self.assertIn("generic chat routing cannot establish principal identity", detail_behaviors)
         self.assertIn("generic chat routing cannot establish permissions or admin authority", detail_behaviors)
+
+    def test_rejects_missing_chat_intake_is_not_authority_guardrails(self) -> None:
+        decisions = self.make_decisions()
+        identity = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "dependency.promoted_player_identity"
+        )
+        permissions = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "dependency.promoted_permissions_admin"
+        )
+        separation = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "separation.no_commands_router_or_moderation"
+        )
+        identity["required_behavior"] = [
+            item
+            for item in identity["required_behavior"]
+            if item != "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish principal identity or roadmap priority"
+        ]
+        permissions["required_behavior"] = [
+            item
+            for item in permissions["required_behavior"]
+            if item != "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish permissions, targeting, command authority, moderation authority, or roadmap priority"
+        ]
+        separation["v1_sequence_gate"] = [
+            item
+            for item in separation["v1_sequence_gate"]
+            if item != "chat intake is observation only and cannot become identity, permission, command authority, moderation authority, targeting, or roadmap priority"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(
+                Path(temp_dir),
+                decisions=decisions,
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("identity_dependency_behavior_missing", report["blockers"])
+        self.assertIn("permissions_dependency_behavior_missing", report["blockers"])
+        self.assertIn("separation_sequence_gate_missing", report["blockers"])
 
     def test_rejects_response_target_shortcut_evidence_gap(self) -> None:
         decisions = self.make_decisions()

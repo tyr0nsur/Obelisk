@@ -542,6 +542,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "response delivery never creates identity or permission claims",
         "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
         "generic chat routing cannot establish principal identity",
+        "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish principal identity or roadmap priority",
         "commands/replies planning cannot bypass identity promotion",
     ):
         if required not in behaviors:
@@ -553,6 +554,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
         "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
         "generic chat routing cannot establish permissions or admin authority",
+        "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish permissions, targeting, command authority, moderation authority, or roadmap priority",
         "commands/replies planning cannot bypass permissions/admin promotion",
     ):
         if required not in permission_behaviors:
@@ -575,6 +577,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     for required in (
         "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
         "generic chat routing cannot bypass promoted identity and permissions/admin",
+        "chat intake is observation only and cannot become identity, permission, command authority, moderation authority, targeting, or roadmap priority",
         "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
     ):
         if required not in sequence_gate:

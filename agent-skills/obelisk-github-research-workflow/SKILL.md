@@ -41,11 +41,12 @@ MSVC/Windows ABI assumptions, direct
 `GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, constants, schemas,
 control flow, command parsers, return semantics, or algorithmic implementations; Linux
 support is rebuilt from Obelisk reflection and ProcessEvent copied-data evidence.
-Plugin Hub work is post-SDK-complete planning. Do not spend current rounds on Plugin Hub
-packaging, examples, intake tooling, or package hardening while the complete SDK blocker
-chain remains open, unless the user explicitly asks to inspect archived planning. Current
-priority is the SDK itself: identity/principal, permissions/admin, command/response,
-storage/mutation, gameplay module surfaces, and their promotion evidence.
+Plugin Hub work is post-SDK-complete planning. Do not spend current rounds on
+Plugin Hub-specific packaging, catalog/example packages, intake tooling, or package
+hardening while the complete SDK blocker chain remains open, unless the user explicitly
+asks to inspect archived planning. Current priority is the SDK itself:
+identity/principal, permissions/admin, command/response, storage/mutation, gameplay
+module surfaces, and their promotion evidence.
 Identity/principal work must be blocker-driven and targeted: use the named lifecycle
 anchors, evidence gaps, and runtime-capture preflight instead of broad rediscovery unless
 a new binary/hash or explicit SDK blocker contradicts the current evidence. Structure
