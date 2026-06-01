@@ -22,6 +22,10 @@ import check_inventory_action_redacted_observer_gate as checker
 
 
 SUPPORTED_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+EXPECTED_TARGET_BY_FNAME_INDEX = {
+    2651: "ShooterPlayerController.ServerRequestInventoryUseItem",
+    2652: "ShooterPlayerController.ServerRequestInventoryUseItemWithActor",
+}
 REQUIRED_GATE_ARGS = [
     "--gate-enabled",
     "--observer-profile",
@@ -58,63 +62,75 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         )
 
     def test_candidate_gate_accepts_exact_fixture_shape_without_runtime_promotion(self) -> None:
-        result = self.run_checker("--json", *REQUIRED_GATE_ARGS)
-        payload = json.loads(result.stdout)
+        for fname_index, expected_target in EXPECTED_TARGET_BY_FNAME_INDEX.items():
+            with self.subTest(fname_index=fname_index):
+                args = list(REQUIRED_GATE_ARGS)
+                args[args.index("2651")] = str(fname_index)
+                result = self.run_checker("--json", *args)
+                payload = json.loads(result.stdout)
 
-        self.assertEqual("obelisk.inventory-action-redacted-observer-gate-check.v1", payload["schema"])
-        self.assertTrue(payload["ready"])
-        self.assertEqual("accepted_candidate_offline_gate", payload["status"])
-        self.assertTrue(payload["candidate_only"])
-        self.assertTrue(payload["fixture_only"])
-        self.assertFalse(payload["runtime_ready"])
-        self.assertFalse(payload["public_sdk_ready"])
-        self.assertFalse(payload["public_inventory_sdk_ready"])
-        self.assertFalse(payload["inventory_action_sdk_ready"])
-        self.assertFalse(payload["promotion_ready"])
-        self.assertFalse(payload["dispatch_ready"])
-        self.assertEqual([], payload["blockers"])
+                self.assertEqual("obelisk.inventory-action-redacted-observer-gate-check.v1", payload["schema"])
+                self.assertTrue(payload["ready"])
+                self.assertEqual("accepted_candidate_offline_gate", payload["status"])
+                self.assertTrue(payload["candidate_only"])
+                self.assertTrue(payload["fixture_only"])
+                self.assertFalse(payload["runtime_ready"])
+                self.assertFalse(payload["public_sdk_ready"])
+                self.assertFalse(payload["public_inventory_sdk_ready"])
+                self.assertFalse(payload["inventory_action_sdk_ready"])
+                self.assertFalse(payload["promotion_ready"])
+                self.assertFalse(payload["dispatch_ready"])
+                self.assertEqual([], payload["blockers"])
 
-        self.assertEqual("inventory-action-compact-intake", payload["target_set"])
-        self.assertEqual(list(fixture_boundary.EXPECTED_TARGETS), payload["expected_targets"])
-        self.assertEqual(
-            [
-                "copied_signal_stability_wording",
-                "inventory_items_mutation_surface",
-                "inventory_action_redacted_observer",
-                "resource_handle_identity",
-            ],
-            [blocker["id"] for blocker in payload["decision_manifest"]["promotion_blockers"]],
-        )
-        self.assertEqual(
-            ["blocked", "blocked", "candidate-only-blocked", "blocked"],
-            [blocker["status"] for blocker in payload["decision_manifest"]["promotion_blockers"]],
-        )
-        self.assertEqual([2651, 2652], payload["gate"]["allowed_fname_indices"])
-        self.assertEqual(0, payload["gate"]["dispatch_budget"])
-        self.assertEqual(1, payload["gate"]["observation_budget"])
-        self.assertTrue(payload["gate"]["cheap_gate_passed"])
-        self.assertTrue(payload["gate"]["observation_budget_reservation_allowed"])
-        self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
-        self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
-        self.assertEqual(
-            ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
-            payload["fixture_summary"]["copied_integer_fields"],
-        )
-        self.assertEqual(
-            [
-                "ShooterPlayerController.ServerRequestInventoryUseItem.ItemId",
-                "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.ItemID1",
-            ],
-            payload["fixture_summary"]["redacted_struct_fields"],
-        )
-        self.assertEqual(
-            [
-                "ShooterPlayerController.ServerRequestInventoryUseItem.InventoryComp",
-                "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.anActor",
-                "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.InventoryComp",
-            ],
-            payload["fixture_summary"]["redacted_object_fields"],
-        )
+                self.assertEqual("inventory-action-compact-intake", payload["target_set"])
+                self.assertEqual(list(fixture_boundary.EXPECTED_TARGETS), payload["expected_targets"])
+                self.assertEqual(
+                    [
+                        "copied_signal_stability_wording",
+                        "inventory_items_mutation_surface",
+                        "inventory_action_redacted_observer",
+                        "resource_handle_identity",
+                    ],
+                    [blocker["id"] for blocker in payload["decision_manifest"]["promotion_blockers"]],
+                )
+                self.assertEqual(
+                    ["blocked", "blocked", "candidate-only-blocked", "blocked"],
+                    [blocker["status"] for blocker in payload["decision_manifest"]["promotion_blockers"]],
+                )
+                self.assertEqual([2651, 2652], payload["gate"]["allowed_fname_indices"])
+                self.assertEqual(
+                    {
+                        "2651": "ShooterPlayerController.ServerRequestInventoryUseItem",
+                        "2652": "ShooterPlayerController.ServerRequestInventoryUseItemWithActor",
+                    },
+                    payload["gate"]["target_by_fname_index"],
+                )
+                self.assertEqual(expected_target, payload["gate"]["selected_target"])
+                self.assertEqual(0, payload["gate"]["dispatch_budget"])
+                self.assertEqual(1, payload["gate"]["observation_budget"])
+                self.assertTrue(payload["gate"]["cheap_gate_passed"])
+                self.assertTrue(payload["gate"]["observation_budget_reservation_allowed"])
+                self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
+                self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
+                self.assertEqual(
+                    ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
+                    payload["fixture_summary"]["copied_integer_fields"],
+                )
+                self.assertEqual(
+                    [
+                        "ShooterPlayerController.ServerRequestInventoryUseItem.ItemId",
+                        "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.ItemID1",
+                    ],
+                    payload["fixture_summary"]["redacted_struct_fields"],
+                )
+                self.assertEqual(
+                    [
+                        "ShooterPlayerController.ServerRequestInventoryUseItem.InventoryComp",
+                        "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.anActor",
+                        "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.InventoryComp",
+                    ],
+                    payload["fixture_summary"]["redacted_object_fields"],
+                )
 
     def test_default_invocation_fails_closed_before_any_runtime_window(self) -> None:
         result = self.run_checker("--json", check=False)

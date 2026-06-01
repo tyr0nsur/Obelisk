@@ -664,6 +664,12 @@ def validate_gate_inputs(
     supported_shas = snapshot_identity.get("supported_ark_binary_sha256", [])
     fname_indices_by_target = snapshot_identity.get("target_fname_indices", {})
     allowed_fname_indices = sorted(fname_indices_by_target.values()) if isinstance(fname_indices_by_target, dict) else []
+    target_by_fname_index = (
+        {str(value): target for target, value in sorted(fname_indices_by_target.items())}
+        if isinstance(fname_indices_by_target, dict)
+        else {}
+    )
+    selected_target = target_by_fname_index.get(str(fname_index)) if fname_index is not None else None
 
     if not gate_enabled:
         append_blocker(blockers, "disabled_gate")
@@ -723,6 +729,8 @@ def validate_gate_inputs(
         "supported_ark_binary_sha256": supported_shas,
         "fname_index": fname_index,
         "allowed_fname_indices": allowed_fname_indices,
+        "target_by_fname_index": target_by_fname_index,
+        "selected_target": selected_target,
         "dispatch_budget": dispatch_budget,
         "observation_budget": observation_budget,
         "cheap_gate_passed": cheap_gate_passed,
