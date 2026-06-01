@@ -186,6 +186,24 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("observation_copied_fields_mismatch", report["blockers"])
         self.assertEqual(report["blockers"].count("observation_copied_fields_mismatch"), 2)
 
+    def test_rejects_duplicate_or_reordered_lifecycle_cases(self) -> None:
+        payload = copy.deepcopy(manifest())
+        payload["observations"][0], payload["observations"][1] = payload["observations"][1], payload["observations"][0]
+        result = self.run_checker(payload, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("observations_sequence_mismatch", report["blockers"])
+
+        payload = copy.deepcopy(manifest())
+        payload["observations"][1] = copy.deepcopy(payload["observations"][0])
+        result = self.run_checker(payload, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("observations_duplicate_cases", report["blockers"])
+        self.assertIn("observations_missing_required_cases", report["blockers"])
+
     def test_rejects_raw_logs_and_dump_paths_as_manifest_evidence(self) -> None:
         payload = manifest()
         payload["raw_log_path"] = "/tmp/obelisk-runtime.log"

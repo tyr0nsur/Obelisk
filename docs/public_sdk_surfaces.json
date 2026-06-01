@@ -777,6 +777,7 @@
       ],
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "decision_manifest": "docs/command_chat_response_public_contract_decisions.json",
         "must_remain_without_public_contract_until_promotion": true,
         "not_sufficient_evidence": [
           "static thunk orientation",

@@ -2145,6 +2145,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("obelisk.command_chat_response_path.v1", manifest["post_v1_or_excluded_surfaces"])
         self.assertNotIn("obelisk.command_chat_response_path.v1", manifest["promoted_surfaces"])
         self.assertIn("obelisk.command_chat_response_path.v1", commands["depends_on"])
+        self.assertEqual(
+            response["v1_decision_contract"]["decision_manifest"],
+            "docs/command_chat_response_public_contract_decisions.json",
+        )
 
         response_text = json.dumps(response, sort_keys=True)
         for term in (

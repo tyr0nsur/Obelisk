@@ -253,8 +253,10 @@ def csv_values(
 
 
 def player_principal_lifecycle_gate_is_safe(match: re.Match[str]) -> bool:
+    limit = int(match.group("limit"))
     return (
         match.group("target_set") == "players-lifecycle-anchor-candidates"
+        and 1 <= limit <= 10
         and match.group("dispatch_limit") == "0"
         and match.group("delivery_claim") == "none"
         and match.group("principal_claim") == "none"
@@ -336,6 +338,10 @@ def module_record() -> dict[str, Any]:
         "orphan_field_lines": 0,
         "out_of_order_field_lines": 0,
         "field_count_mismatches": 0,
+        "sequence_quality_violations": 0,
+        "_player_principal_last_sequence": None,
+        "_player_principal_seen_sequences": set(),
+        "_player_principal_log_limit": None,
     }
 
 
@@ -425,6 +431,8 @@ def module_blockers(record: dict[str, Any]) -> list[str]:
         blockers.append("out_of_order_field_lines")
     if record["field_count_mismatches"] > 0:
         blockers.append("field_count_mismatch")
+    if record["sequence_quality_violations"] > 0:
+        blockers.append("sequence_quality_violation")
     if record["redacted_detail_keys"]:
         blockers.append("redacted_sensitive_or_unapproved_details")
     return blockers
@@ -526,6 +534,7 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             if not player_principal_lifecycle_gate_is_safe(match):
                 record["malformed_observer_lines"] += 1
                 continue
+            record["_player_principal_log_limit"] = int(match.group("limit"))
             add_unique(record["gate_sha256"], match.group("sha256").lower())
             gate_function = "observer_gate"
             record["functions"].setdefault(gate_function, function_record())
@@ -543,6 +552,19 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             if not player_principal_lifecycle_event_is_safe(match):
                 record["malformed_observer_lines"] += 1
                 continue
+            sequence = int(match.group("sequence"))
+            seen_sequences = record["_player_principal_seen_sequences"]
+            last_sequence = record["_player_principal_last_sequence"]
+            log_limit = record["_player_principal_log_limit"]
+            if (
+                sequence < 1
+                or sequence in seen_sequences
+                or (last_sequence is not None and sequence <= last_sequence)
+                or (log_limit is not None and sequence > log_limit)
+            ):
+                record["sequence_quality_violations"] += 1
+            seen_sequences.add(sequence)
+            record["_player_principal_last_sequence"] = sequence
             record["accepted_count"] += 1
             functions = record["functions"]
             functions.setdefault(function, function_record())
@@ -747,6 +769,7 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             "orphan_field_lines": record["orphan_field_lines"],
             "out_of_order_field_lines": record["out_of_order_field_lines"],
             "field_count_mismatches": record["field_count_mismatches"],
+            "sequence_quality_violations": record["sequence_quality_violations"],
         }
 
     return {

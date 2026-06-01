@@ -197,6 +197,10 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             ["obelisk.player_identity.v1", "obelisk.permissions_admin.v1"],
         )
         self.assertIn("obelisk.command_chat_response_path.v1", surfaces["v1_sdk_completion_blockers"])
+        self.assertEqual(
+            response_path["v1_decision_contract"]["decision_manifest"],
+            "docs/command_chat_response_public_contract_decisions.json",
+        )
         self.assertTrue(response_path["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"])
 
     def test_scope_separation_excludes_command_router_and_moderation(self) -> None:

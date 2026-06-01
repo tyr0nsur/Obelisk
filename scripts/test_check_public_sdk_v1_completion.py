@@ -103,6 +103,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("v1_sdk_completion_blockers_unresolved", payload["blockers"])
         self.assertNotIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
         self.assertEqual(payload["blocked_public_contract_header_symbols"], {})
+        self.assertNotIn("required_public_contract_decision_manifest_missing", payload["blockers"])
+        self.assertEqual(payload["missing_required_public_contract_decision_manifests"], {})
         self.assertNotIn("non_promoted_surface_has_public_contract", payload["blockers"])
         self.assertIn("obelisk.player_identity.v1", payload["unresolved_completion_blockers"])
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])

@@ -29,6 +29,12 @@ REQUIRED_CASES = frozenset(
         "malformed_or_unsupported_evidence",
     )
 )
+REQUIRED_CASE_SEQUENCE = (
+    "session_start_anchor",
+    "session_end_anchor",
+    "stale_after_logout",
+    "malformed_or_unsupported_evidence",
+)
 REQUIRED_TARGETS = {
     "session_start_anchor": "ShooterGameMode.HandleNewPlayer",
     "session_end_anchor": "ShooterGameMode.OnLogout",
@@ -307,6 +313,17 @@ def validate_observations(observations: Any, blockers: list[dict[str, Any]]) -> 
     missing = REQUIRED_CASES - set(seen)
     if missing:
         add(blockers, "observations_missing_required_cases", "$.observations", missing=sorted(missing))
+    duplicates = sorted(case for case in set(seen) if seen.count(case) > 1)
+    if duplicates:
+        add(blockers, "observations_duplicate_cases", "$.observations", duplicates=duplicates)
+    if tuple(seen) != REQUIRED_CASE_SEQUENCE:
+        add(
+            blockers,
+            "observations_sequence_mismatch",
+            "$.observations",
+            expected=list(REQUIRED_CASE_SEQUENCE),
+            observed=seen,
+        )
     return sorted(seen)
 
 

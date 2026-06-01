@@ -451,6 +451,12 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     ),
 }
 PUBLIC_CONTRACT_DECISIONS_GLOB = "*_public_contract_decisions.json"
+REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS = {
+    "obelisk.player_identity.v1": "player_identity_public_contract_decisions.json",
+    "obelisk.permissions_admin.v1": "permissions_admin_public_contract_decisions.json",
+    "obelisk.command_chat_response_path.v1": "command_chat_response_public_contract_decisions.json",
+    "obelisk.commands_replies.v1": "commands_replies_public_contract_decisions.json",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -548,6 +554,22 @@ def contract_decision_paths(decisions_dir: Path) -> list[Path]:
         return sorted(decisions_dir.glob(PUBLIC_CONTRACT_DECISIONS_GLOB))
     except OSError:
         return []
+
+
+def missing_required_contract_decision_manifests(decisions_dir: Path) -> dict[str, str]:
+    try:
+        if decisions_dir.resolve() != DEFAULT_CONTRACT_DECISIONS_DIR.resolve():
+            return {}
+    except OSError:
+        return dict(REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS)
+
+    missing: dict[str, str] = {}
+    for surface_id, filename in REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS.items():
+        path = decisions_dir / filename
+        payload, blockers = load_manifest(path)
+        if blockers or payload is None or payload.get("surface") != surface_id:
+            missing[surface_id] = filename
+    return missing
 
 
 def public_header_matches_contract(path: Path, raw_contract_header: Any) -> bool:
@@ -1129,6 +1151,9 @@ def build_report(
         contract_decisions_dir,
     )
     blockers.extend(contract_symbol_blockers)
+    missing_required_contract_decisions = missing_required_contract_decision_manifests(contract_decisions_dir)
+    if missing_required_contract_decisions:
+        blockers.append("required_public_contract_decision_manifest_missing")
     if manifest is None:
         return {
             "schema": "obelisk.public-sdk-v1-completion-check.v1",
@@ -1139,6 +1164,7 @@ def build_report(
             "public_header": str(public_header_path),
             "contract_decisions_dir": str(contract_decisions_dir),
             "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
+            "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
             "blockers": blockers,
         }
 
@@ -1447,6 +1473,7 @@ def build_report(
         "release_statement": str(release_statement_path) if release_statement_path else None,
         "public_header": str(public_header_path),
         "contract_decisions_dir": str(contract_decisions_dir),
+        "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
         "v1_completion_required": manifest.get("v1_completion_required"),
         "stable_claim_allowed": stable_claim_allowed,

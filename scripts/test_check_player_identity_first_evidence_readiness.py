@@ -809,6 +809,21 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             "principal invalidation policy manifest alone",
             runtime_requirements["insufficient_evidence"],
         )
+        observations = runtime_requirements["minimum_required_observations"]
+        self.assertEqual(
+            [observation["case"] for observation in observations],
+            [
+                "session_start_anchor",
+                "session_end_anchor",
+                "stale_after_logout",
+                "malformed_or_unsupported_evidence",
+            ],
+        )
+        self.assertEqual([observation["required_order"] for observation in observations], [1, 2, 3, 4])
+        self.assertEqual(observations[0]["required_copied_fields"], ["bIsFromLogin", "ReturnValue"])
+        self.assertEqual(observations[1]["required_copied_fields"], [])
+        self.assertEqual(observations[2]["required_copied_fields"], ["generation_state"])
+        self.assertEqual(observations[3]["required_copied_fields"], [])
         approval_boundary = runtime_requirements["approval_boundary"]
         self.assertFalse(approval_boundary["approved_runtime_evidence_present"])
         self.assertFalse(approval_boundary["runtime_work_authorized_by_this_report"])
