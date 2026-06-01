@@ -700,6 +700,18 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("source_summary_sources_not_exactly_one", report["blockers"])
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
 
+    def test_rejects_extra_runtime_summary_source_provenance_fields(self) -> None:
+        payload = manifest()
+        payload["source_summary"]["evidence"]["sources"][0]["original_live_path"] = (
+            "/servidor/ark/ShooterGame/Saved/Logs/Obelisk.log"
+        )
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_source_keys_unexpected", report["blockers"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
     def test_rejects_operational_window_mismatch(self) -> None:
         payload = manifest()
         payload["operational_window"]["copied_log"]["sha256"] = hashlib.sha256(b"other").hexdigest()

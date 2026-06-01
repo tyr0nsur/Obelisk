@@ -119,6 +119,15 @@ REQUIRED_LAYOUT_RUNTIME_SDK_NOT_SUFFICIENT = frozenset(
         "raw ProcessEvent callbacks",
     )
 )
+REQUIRED_RESPONSE_TARGET_NOT_SUFFICIENT = frozenset(
+    (
+        "static thunk orientation",
+        "minimal ChatMessageEvent callback registration",
+        "generic chat routing",
+        "raw ProcessEvent callbacks",
+        "legacy CallProcessEvent debug gate",
+    )
+)
 REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
     (
         "OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH",
@@ -598,13 +607,14 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     if string_set(evidence.get("required_targets")) != TARGETS:
         add(blockers, "decision_response_targets_mismatch", "$.decisions.required_before_public_header", value=evidence.get("required_targets"))
     response_not_sufficient = string_set(evidence.get("not_sufficient"))
-    for required in (
-        "minimal ChatMessageEvent callback registration",
-        "raw ProcessEvent callbacks",
-        "legacy CallProcessEvent debug gate",
-    ):
-        if required not in response_not_sufficient:
-            add(blockers, "response_target_not_sufficient_missing", "$.decisions.required_before_public_header", evidence=required)
+    missing_response_not_sufficient = REQUIRED_RESPONSE_TARGET_NOT_SUFFICIENT - response_not_sufficient
+    if missing_response_not_sufficient:
+        add(
+            blockers,
+            "response_target_not_sufficient_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_response_not_sufficient),
+        )
 
     coverage = by_id.get("evidence.layout_runtime_sdk_coverage", {})
     not_sufficient = string_set(coverage.get("not_sufficient"))

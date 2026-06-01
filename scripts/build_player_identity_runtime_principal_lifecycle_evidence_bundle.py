@@ -27,6 +27,14 @@ OFFLINE_GATE = SCRIPT_DIR / "validate_offline_artifact_gate.py"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
+EXPECTED_RUNTIME_LOG_POSTURE = {
+    "loaded_native_ld_preload": True,
+    "process_event_candidate_count": 1,
+    "process_event_hook_installed": True,
+    "process_event_hook_patch_size": 18,
+    "reflection_scanner_disabled": True,
+    "plugins_disabled": True,
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -160,6 +168,30 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
         raise SystemExit("runtime observer summary gate limit does not match exact first-window log budget")
 
 
+def require_runtime_log_posture(summary: dict[str, Any], window: dict[str, Any]) -> None:
+    runtime = summary.get("runtime")
+    if not isinstance(runtime, dict):
+        raise SystemExit("runtime observer summary missing runtime posture")
+    for key, expected in EXPECTED_RUNTIME_LOG_POSTURE.items():
+        if runtime.get(key) != expected:
+            raise SystemExit(
+                f"runtime observer summary {key} does not match approved copied-log posture"
+            )
+
+    posture = window.get("posture")
+    if not isinstance(posture, dict):
+        raise SystemExit("window manifest check missing posture")
+    posture_pairs = {
+        "plugins_disabled": ("plugins_disabled", True),
+        "scanner_disabled": ("reflection_scanner_disabled", True),
+    }
+    for window_key, (runtime_key, expected) in posture_pairs.items():
+        if posture.get(window_key) != expected or runtime.get(runtime_key) != expected:
+            raise SystemExit(
+                f"window manifest posture {window_key} does not match copied runtime log posture"
+            )
+
+
 def main() -> int:
     args = parse_args()
     copied_log = require_approved_copied_log(args.copied_log)
@@ -207,6 +239,7 @@ def main() -> int:
     window_check = load_json(window_check_path)
     summary = load_json(summary_path)
     require_window_matches_summary(window_check, summary, copied_log)
+    require_runtime_log_posture(summary, window_check)
     require_success(
         run_command(
             [

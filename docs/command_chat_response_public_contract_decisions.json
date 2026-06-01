@@ -229,6 +229,7 @@
         "historical chat FName indices",
         "metadata-only passive chat observations",
         "minimal ChatMessageEvent callback registration",
+        "generic chat routing",
         "raw ProcessEvent callbacks",
         "legacy CallProcessEvent debug gate",
         "ServerSendChatMessage chat-message-intake evidence"

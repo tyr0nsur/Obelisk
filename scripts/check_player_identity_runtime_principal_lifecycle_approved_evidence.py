@@ -56,6 +56,7 @@ WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-wind
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+ALLOWED_SOURCE_KEYS = frozenset(("path", "sha256", "line_count"))
 ALLOWED_APPROVAL_KEYS = frozenset(
     (
         "runtime_evidence_reviewed",
@@ -676,6 +677,14 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
                 if not isinstance(source, dict):
                     add(blockers, "source_summary_source_invalid", label)
                     continue
+                unexpected_source_keys = set(source) - ALLOWED_SOURCE_KEYS
+                if unexpected_source_keys:
+                    add(
+                        blockers,
+                        "source_summary_source_keys_unexpected",
+                        label,
+                        unexpected=sorted(unexpected_source_keys),
+                    )
                 if not source_path_is_copied_or_offline(source.get("path")):
                     add(blockers, "source_summary_source_path_not_copied_or_offline", f"{label}.path")
                 elif not source_path_is_approved_offline_workspace(source.get("path")):

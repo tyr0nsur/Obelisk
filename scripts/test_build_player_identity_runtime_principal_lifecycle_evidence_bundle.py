@@ -427,6 +427,48 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_fails_closed_when_copied_log_does_not_confirm_plugins_disabled(self) -> None:
+        lines = [
+            line for line in runtime_log_lines()
+            if "Plugin loading disabled by OBELISK_DISABLE_PLUGINS=1" not in line
+        ]
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            result = self.run_bundle(copied_log, output_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "runtime observer summary plugins_disabled does not match approved copied-log posture",
+                result.stderr,
+            )
+            self.assertFalse((output_dir / "approved-runtime-principal-lifecycle-evidence.json").exists())
+
+    def test_fails_closed_when_copied_log_does_not_confirm_scanner_disabled(self) -> None:
+        lines = [
+            line for line in runtime_log_lines()
+            if "ReflectionScanner disabled" not in line
+        ]
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            result = self.run_bundle(copied_log, output_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "runtime observer summary reflection_scanner_disabled does not match approved copied-log posture",
+                result.stderr,
+            )
+            self.assertFalse((output_dir / "approved-runtime-principal-lifecycle-evidence.json").exists())
+
     def test_rejects_negative_readiness_report_that_overclaims_public_sdk(self) -> None:
         with self.assertRaises(SystemExit) as raised:
             bundle_builder.require_negative_readiness_report(

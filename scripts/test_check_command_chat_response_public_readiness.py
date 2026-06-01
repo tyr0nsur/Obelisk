@@ -190,6 +190,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 ],
             },
             {"id": "evidence.response_target_set_snapshot_second_source", "status": "unresolved", "required_targets": TARGETS, "not_sufficient": [
+                "static thunk orientation",
                 "minimal ChatMessageEvent callback registration",
                 "generic chat routing",
                 "raw ProcessEvent callbacks",
@@ -543,6 +544,44 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("capability_behavior_missing", report["blockers"])
         self.assertIn("separation_sequence_gate_missing", report["blockers"])
         self.assertIn("separation_exclusion_missing", report["blockers"])
+
+    def test_rejects_response_target_shortcut_evidence_gap(self) -> None:
+        decisions = self.make_decisions()
+        evidence = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "evidence.response_target_set_snapshot_second_source"
+        )
+        evidence["not_sufficient"] = [
+            item
+            for item in evidence["not_sufficient"]
+            if item not in {"generic chat routing", "static thunk orientation"}
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(
+                Path(temp_dir),
+                decisions=decisions,
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_target_not_sufficient_missing", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "response_target_not_sufficient_missing"
+        )
+        self.assertIn("generic chat routing", detail["missing"])
+        self.assertIn("static thunk orientation", detail["missing"])
 
     def test_rejects_missing_call_process_event_and_native_wrapper_forbidden_contracts(self) -> None:
         decisions = self.make_decisions()

@@ -190,6 +190,14 @@ REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT = frozenset(
         "no_ue_internals_in_public_abi",
     )
 )
+REQUIRED_IDENTITY_PUBLIC_CONTRACT = frozenset(
+    (
+        "ObeliskPlayerPrincipalEvent",
+        "RegisterPlayerPrincipalEventWithOwnerTokenHandle",
+        "UnregisterPlayerPrincipalEventWithOwnerToken",
+    )
+)
+REQUIRED_IDENTITY_CAPABILITIES = frozenset(("OBELISK_API_CAPABILITY_PLAYER_IDENTITY",))
 REQUIRED_IDENTITY_PUBLIC_FIELDS = frozenset(
     (
         "principal_handle",
@@ -571,9 +579,9 @@ def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bo
     )
     decision_contract = identity.get("v1_decision_contract")
 
-    if not public_contract:
+    if not REQUIRED_IDENTITY_PUBLIC_CONTRACT.issubset(public_contract):
         return False
-    if not capabilities:
+    if not REQUIRED_IDENTITY_CAPABILITIES.issubset(capabilities):
         return False
     if not REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT.issubset(abi_contract):
         return False
