@@ -358,6 +358,8 @@ namespace
         Require(invocation.Fields[1].Range.Data == fixture.Params.data() + 0x08,
                 "PassengerSeatIndex range mismatch");
         Require(invocation.Fields[1].Range.Size == 4, "PassengerSeatIndex range size mismatch");
+        Require(invocation.ParameterData == fixture.Params.data(), "AddPassenger parameter provenance data mismatch");
+        Require(invocation.ParameterSize == 0x10, "AddPassenger parameter provenance size mismatch");
         Require(invocation.Fields[2].Range.Data == fixture.Params.data() + 0x0c,
                 "bForcePassenger range mismatch");
         Require(invocation.Fields[3].Range.Data == fixture.Params.data() + 0x0d,
@@ -561,6 +563,8 @@ namespace
 
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(!invocation.HasParameterRanges, "metadata-only dino recognition reported parameter ranges");
+        Require(invocation.ParameterData == nullptr, "metadata-only dino recognition retained parameter data");
+        Require(invocation.ParameterSize == 0, "metadata-only dino recognition retained parameter size");
         Require(invocation.Fields[1].Range.Data == nullptr, "metadata-only scalar range should stay empty");
     }
 
@@ -1099,6 +1103,8 @@ namespace
         Require(invocation.FunctionNameIndex == -1, "rejected dino invocation left stale function name");
         Require(invocation.OuterNameIndex == -1, "rejected dino invocation left stale outer name");
         Require(!invocation.HasParameterRanges, "rejected dino invocation left stale range state");
+        Require(invocation.ParameterData == nullptr, "rejected dino invocation left stale parameter data");
+        Require(invocation.ParameterSize == 0, "rejected dino invocation left stale parameter size");
         Require(invocation.Fields.empty(), "rejected dino invocation left stale fields");
     }
 }

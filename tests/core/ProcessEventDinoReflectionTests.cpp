@@ -65,6 +65,8 @@ namespace
         invocation.FunctionNameIndex = kAddPassengerNameIndex;
         invocation.OuterNameIndex = kPrimalDinoCharacterNameIndex;
         invocation.HasParameterRanges = true;
+        invocation.ParameterData = params.data();
+        invocation.ParameterSize = params.size();
         invocation.Fields.push_back(MakeField(DinoField::ACharacter,
                                               kACharacterNameIndex,
                                               0x00,
@@ -113,6 +115,8 @@ namespace
         invocation.FunctionNameIndex = kAllowCarryCharacterNameIndex;
         invocation.OuterNameIndex = kPrimalDinoCharacterNameIndex;
         invocation.HasParameterRanges = true;
+        invocation.ParameterData = params.data();
+        invocation.ParameterSize = params.size();
         invocation.Fields.push_back(MakeField(DinoField::CanCarryPawn,
                                               kCanCarryPawnNameIndex,
                                               0x00,
@@ -350,6 +354,22 @@ namespace
         RequireRejectedAddPassengerMutation(
             [](DinoInvocation& invocation) { invocation.Fields[4].Range.Size = 0; },
             "zero-sized AddPassenger bool range was copied");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.ParameterData = nullptr; },
+            "AddPassenger range without parameter provenance was copied");
+        RequireRejectedAddPassengerMutation(
+            [](DinoInvocation& invocation) { invocation.ParameterSize = 0x0c; },
+            "AddPassenger range beyond parameter provenance was copied");
+        {
+            std::array<uint8_t, 0x10> params = MakeCanonicalAddPassengerParams();
+            DinoInvocation invocation = MakeValidAddPassengerInvocation(params);
+            static const int32_t forgedSeatIndex = 1;
+            invocation.Fields[1].Range = {
+                reinterpret_cast<const uint8_t*>(&forgedSeatIndex),
+                sizeof(forgedSeatIndex),
+            };
+            RequireRejected(invocation, "forged PassengerSeatIndex range provenance was copied");
+        }
         {
             std::array<uint8_t, 0x10> params{};
             params[0x0c] = 1;

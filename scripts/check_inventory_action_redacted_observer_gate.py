@@ -98,6 +98,7 @@ REQUIRED_PROMOTION_BLOCKERS: dict[str, dict[str, Any]] = {
 }
 SUPPORTED_SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 REQUIRED_PROFILE = "observer-debug"
+MAX_OBSERVATION_BUDGET = 10
 REQUIRED_MARKERS = (
     "allow-observer-debug-window",
     "allow-experimental-observers",
@@ -165,7 +166,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--observation-budget",
         type=int,
-        help="Modeled log/observation budget. Must be positive and reserved only after cheap gates pass.",
+        help=(
+            "Modeled log/observation budget. Must be between 1 and "
+            f"{MAX_OBSERVATION_BUDGET}, and reserved only after cheap gates pass."
+        ),
     )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
@@ -498,6 +502,13 @@ def validate_gate_inputs(
         append_blocker(blockers, "missing_observation_budget")
     elif observation_budget <= 0:
         append_blocker(blockers, "observation_budget_not_positive", minimum=1, value=observation_budget)
+    elif observation_budget > MAX_OBSERVATION_BUDGET:
+        append_blocker(
+            blockers,
+            "observation_budget_exceeds_maximum",
+            maximum=MAX_OBSERVATION_BUDGET,
+            value=observation_budget,
+        )
 
     cheap_gate_passed = (
         gate_enabled
@@ -512,6 +523,7 @@ def validate_gate_inputs(
         cheap_gate_passed
         and observation_budget is not None
         and observation_budget > 0
+        and observation_budget <= MAX_OBSERVATION_BUDGET
         and dispatch_budget == 0
         and not blockers
     )

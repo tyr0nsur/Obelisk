@@ -18,6 +18,11 @@ SCRIPT = SCRIPT_DIR / "check_commands_replies_public_readiness.py"
 DECISIONS = REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+RESPONSE_TARGETS = [
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientChatMessage",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage",
+]
 
 
 class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
@@ -293,13 +298,19 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             "schema": "obelisk.command-chat-response-public-readiness-check.v1",
             "valid": True,
             "accepted_for_planning": True,
+            "planning_only": True,
             "surface": "obelisk.command_chat_response_path.v1",
+            "target_set": "command-chat-response-route-planning",
+            "target_filters": RESPONSE_TARGETS,
+            "readiness_status": "compared",
+            "decisions_status": "blocked",
             "public_readiness_ready": False,
             "public_header_allowed": False,
             "promotion_ready": False,
             "public_sdk_ready": False,
             "public_abi_ready": False,
             "runtime_ready": False,
+            "blockers": [],
         }
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -313,18 +324,67 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_readiness_ready"])
         self.assertFalse(report["runtime_ready"])
 
-    def test_rejects_optional_response_path_report_promoted_overclaim(self) -> None:
+    def test_rejects_optional_response_path_minimal_report_schema(self) -> None:
         response_report = {
             "schema": "obelisk.command-chat-response-public-readiness-check.v1",
             "valid": True,
             "accepted_for_planning": True,
             "surface": "obelisk.command_chat_response_path.v1",
+            "public_readiness_ready": False,
+            "public_header_allowed": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_path = Path(temp_dir) / "response.json"
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            result = self.run_checker("--response-path-report", str(report_path), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_not_planning_only", report["blockers"])
+        self.assertIn("response_path_report_target_set_mismatch", report["blockers"])
+        self.assertIn("response_path_report_target_filters_mismatch", report["blockers"])
+        self.assertIn("response_path_report_readiness_status_mismatch", report["blockers"])
+        self.assertIn("response_path_report_decisions_status_mismatch", report["blockers"])
+
+    def test_rejects_optional_response_path_minimal_raw_readiness(self) -> None:
+        response_readiness = {
+            "schema": "obelisk.reflection-snapshot-readiness.v1",
+            "planning_layout_gate": {"ready": True},
+            "promotion_gate": {"ready": False},
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_path = Path(temp_dir) / "response-readiness.json"
+            report_path.write_text(json.dumps(response_readiness), encoding="utf-8")
+            result = self.run_checker("--response-path-report", str(report_path), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("evidence_scope_mismatch", report["blockers"])
+        self.assertIn("target_sets_mismatch", report["blockers"])
+        self.assertIn("totals_missing", report["blockers"])
+
+    def test_rejects_optional_response_path_report_promoted_overclaim(self) -> None:
+        response_report = {
+            "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+            "valid": True,
+            "accepted_for_planning": True,
+            "planning_only": True,
+            "surface": "obelisk.command_chat_response_path.v1",
+            "target_set": "command-chat-response-route-planning",
+            "target_filters": RESPONSE_TARGETS,
+            "readiness_status": "compared",
+            "decisions_status": "blocked",
             "public_readiness_ready": True,
             "public_header_allowed": False,
             "promotion_ready": True,
             "public_sdk_ready": False,
             "public_abi_ready": False,
             "runtime_ready": False,
+            "blockers": [],
         }
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -64,6 +64,30 @@ namespace Obelisk::Hooks::ProcessEventDinoReflection
                 field.ExposesRange == expected.ExposesRange;
         }
 
+        bool MatchesExpectedParamRange(
+            const Obelisk::UE::DinoReflection::DinoInvocation& invocation,
+            const Obelisk::UE::DinoReflection::DinoFieldRange& field,
+            const ExpectedDinoField& expected)
+        {
+            if (!invocation.HasParameterRanges ||
+                !invocation.ParameterData ||
+                expected.Offset < 0 ||
+                expected.Size > invocation.ParameterSize)
+            {
+                return false;
+            }
+
+            const size_t offset = static_cast<size_t>(expected.Offset);
+            if (offset > invocation.ParameterSize ||
+                expected.Size > invocation.ParameterSize - offset)
+            {
+                return false;
+            }
+
+            return field.Range.Data == invocation.ParameterData + offset &&
+                field.Range.Size == expected.Size;
+        }
+
         bool TryCopyInt32(const Obelisk::UE::DinoReflection::DinoFieldRange& field,
                           DinoScalarField scalarField,
                           DinoScalarValue& out)
@@ -161,7 +185,7 @@ namespace Obelisk::Hooks::ProcessEventDinoReflection
                 continue;
             }
 
-            if (!field.Range.Data || field.Range.Size != field.Size)
+            if (!MatchesExpectedParamRange(invocation, field, expectedField))
             {
                 out = {};
                 return false;

@@ -1403,6 +1403,152 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
     }
 
 
+def categorized_v1_report_sections(
+    *,
+    manifest: dict[str, Any],
+    blockers: list[str],
+    promoted_surfaces: set[str],
+    experimental_surfaces: set[str],
+    release_statement_text: str | None,
+    release_statement_missing_blockers: list[str],
+    release_statement_missing_contracts: list[str],
+    release_statement_missing_experimental_outcomes: list[str],
+    release_statement_duplicate_records: list[str],
+    release_statement_forbidden_claims: list[str],
+    completion_blockers_with_post_v1_or_excluded_outcome: list[str],
+    completion_blockers_with_release_statement_post_v1_or_excluded_outcome: list[str],
+    minimum_promoted_demand_family_gaps: list[str],
+    minimum_promoted_demand_family_equivalents: dict[str, str],
+    blocker_outcome_summary: dict[str, Any],
+    unresolved_completion_blockers: list[str],
+    unresolved_experimental: list[str],
+    unresolved_planning_surfaces: list[str],
+    promoted_without_evidence: list[str],
+    promoted_missing_required_evidence_terms: dict[str, list[str]],
+    promoted_dependency_failures: dict[str, list[str]],
+    blocked_contract_header_symbols: dict[str, Any],
+    stable_claim_allowed: bool,
+    manifest_stable_claim_allowed: bool,
+) -> dict[str, Any]:
+    """Group the JSON report by release-accounting concern without changing gates."""
+
+    installed_shape = manifest.get("installed_sdk_package_shape")
+    package_shape_status = None
+    if isinstance(installed_shape, dict):
+        package_shape_status = installed_shape.get("status")
+
+    runtime_blocker_codes = [
+        blocker
+        for blocker in blockers
+        if blocker
+        in {
+            "blocked_public_contract_header_symbols_detected",
+            "canonical_surface_id_missing",
+            "canonical_v1_completion_blocker_missing",
+            "debug_only_surface_promoted",
+            "non_promoted_surface_has_public_abi",
+            "non_promoted_surface_has_public_contract",
+            "planning_surfaces_unresolved_for_v1_claim",
+            "promoted_experimental_surfaces_unresolved",
+            "promoted_surface_dependency_unresolved",
+            "promoted_surface_evidence_missing",
+            "promoted_surface_required_evidence_terms_missing",
+            "required_surface_dependency_declaration_missing",
+            "surface_id_missing",
+            "top_level_planning_surfaces_unresolved_for_v1_claim",
+            "v1_dependency_sequence_mismatch",
+            "v1_sdk_completion_blockers_unresolved",
+        }
+    ]
+
+    return {
+        "no_live_progress": {
+            "live_server_required_for_this_report": False,
+            "promoted_foundation_surfaces": sorted(promoted_surfaces),
+            "experimental_copied_data_seeds": sorted(experimental_surfaces),
+            "package_shape_evidence_status": package_shape_status,
+            "stable_claim_allowed": stable_claim_allowed,
+            "stable_release_contract_claim_allowed": manifest_stable_claim_allowed,
+            "non_claim": (
+                "These are no-live inventory/package-shape progress signals only; they do not "
+                "satisfy runtime gameplay promotion evidence or authorize complete/full/"
+                "production/stable SDK wording."
+            ),
+        },
+        "release_statement_bookkeeping": {
+            "release_statement_present": release_statement_text is not None,
+            "manifest_post_v1_or_excluded_outcomes": (
+                completion_blockers_with_post_v1_or_excluded_outcome
+            ),
+            "release_statement_post_v1_or_excluded_outcomes": (
+                completion_blockers_with_release_statement_post_v1_or_excluded_outcome
+            ),
+            "missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
+            "missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
+            "missing_experimental_outcomes": sorted(
+                set(release_statement_missing_experimental_outcomes)
+            ),
+            "duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
+            "forbidden_broad_claims": release_statement_forbidden_claims,
+            "non_claim": (
+                "Release-statement rows record reviewed promoted/excluded/post-v1 outcomes; "
+                "bookkeeping alone never approves the stable SDK claim."
+            ),
+        },
+        "promoted_demand_gaps": {
+            "minimum_promoted_demand_family_count": len(
+                CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+            ),
+            "minimum_promoted_demand_family_gaps": minimum_promoted_demand_family_gaps,
+            "minimum_promoted_demand_family_equivalents": (
+                minimum_promoted_demand_family_equivalents
+            ),
+            "all_minimum_demand_families_promoted_or_equivalent": not minimum_promoted_demand_family_gaps,
+            "claim_blocker_active": "complete_sdk_claim_requires_promoted_demand_families"
+            in blockers,
+            "non_claim": (
+                "Excluded/post-v1 outcomes do not satisfy promoted-demand requirements; "
+                "demand families need promoted surfaces or explicit promoted equivalents."
+            ),
+        },
+        "runtime_required_blockers": {
+            "blocker_codes": sorted(set(runtime_blocker_codes)),
+            "dependency_chain_remaining": blocker_outcome_summary.get(
+                "dependency_chain_remaining",
+                [],
+            ),
+            "manifest_outcome_missing": blocker_outcome_summary.get(
+                "manifest_outcome_missing",
+                [],
+            ),
+            "unresolved_completion_blockers": sorted(set(unresolved_completion_blockers)),
+            "unresolved_experimental_surfaces": sorted(set(unresolved_experimental)),
+            "unresolved_planning_surfaces": sorted(set(unresolved_planning_surfaces)),
+            "promoted_surfaces_without_evidence": sorted(set(promoted_without_evidence)),
+            "promoted_surfaces_missing_required_evidence_terms": {
+                surface_id: sorted(set(terms))
+                for surface_id, terms in sorted(promoted_missing_required_evidence_terms.items())
+            },
+            "promoted_surfaces_with_unresolved_dependencies": {
+                surface_id: sorted(set(dependencies))
+                for surface_id, dependencies in sorted(promoted_dependency_failures.items())
+            },
+            "blocked_public_contract_header_symbol_surfaces": sorted(
+                {
+                    drift.get("surface")
+                    for drift in blocked_contract_header_symbols.values()
+                    if isinstance(drift, dict) and isinstance(drift.get("surface"), str)
+                }
+            ),
+            "non_claim": (
+                "These are SDK/runtime promotion blockers and header-drift guardrails; they "
+                "must be resolved by promotion evidence or reviewed non-promoted outcomes "
+                "before stable SDK wording is possible."
+            ),
+        },
+    }
+
+
 def build_report(
     manifest_path: Path,
     release_statement_path: Path | None = None,
@@ -1790,6 +1936,36 @@ def build_report(
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
     ready = not blockers
     stable_claim_allowed = manifest_stable_claim_allowed and ready
+    report_sections = categorized_v1_report_sections(
+        manifest=manifest,
+        blockers=blockers,
+        promoted_surfaces=promoted_surfaces,
+        experimental_surfaces=experimental_surfaces,
+        release_statement_text=release_statement_text,
+        release_statement_missing_blockers=release_statement_missing_blockers,
+        release_statement_missing_contracts=release_statement_missing_contracts,
+        release_statement_missing_experimental_outcomes=release_statement_missing_experimental_outcomes,
+        release_statement_duplicate_records=release_statement_duplicate_records,
+        release_statement_forbidden_claims=release_statement_forbidden_claims,
+        completion_blockers_with_post_v1_or_excluded_outcome=(
+            completion_blockers_with_post_v1_or_excluded_outcome
+        ),
+        completion_blockers_with_release_statement_post_v1_or_excluded_outcome=(
+            completion_blockers_with_release_statement_post_v1_or_excluded_outcome
+        ),
+        minimum_promoted_demand_family_gaps=minimum_promoted_demand_family_gaps,
+        minimum_promoted_demand_family_equivalents=minimum_promoted_demand_family_equivalents,
+        blocker_outcome_summary=blocker_outcome_summary,
+        unresolved_completion_blockers=unresolved_completion_blockers,
+        unresolved_experimental=unresolved_experimental,
+        unresolved_planning_surfaces=unresolved_planning_surfaces,
+        promoted_without_evidence=promoted_without_evidence,
+        promoted_missing_required_evidence_terms=promoted_missing_required_evidence_terms,
+        promoted_dependency_failures=promoted_dependency_failures,
+        blocked_contract_header_symbols=blocked_contract_header_symbols,
+        stable_claim_allowed=stable_claim_allowed,
+        manifest_stable_claim_allowed=manifest_stable_claim_allowed,
+    )
 
     return {
         "schema": "obelisk.public-sdk-v1-completion-check.v1",
@@ -1854,6 +2030,7 @@ def build_report(
         "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
         "v1_sdk_blocker_outcomes": blocker_outcome_rows,
         "v1_sdk_blocker_outcome_summary": blocker_outcome_summary,
+        "v1_sdk_report_sections": report_sections,
         "v1_sdk_progress": {
             "completion_blocker_total": completion_blocker_total,
             "completion_blockers_with_promoted_outcome": completion_blockers_with_promoted_outcome,

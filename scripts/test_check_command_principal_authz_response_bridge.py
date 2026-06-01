@@ -245,6 +245,19 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("source_doc_unexpectedly_promoted", report["blockers"])
         self.assertIn("source_doc_missing_shared_principal_vocabulary", report["blockers"])
 
+    def test_rejects_source_doc_schema_mismatch(self) -> None:
+        command_response = self.load_json(COMMAND_RESPONSE)
+        command_response["schema"] = "obelisk.permissions-admin-public-contract-decisions.v1"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), command_response=command_response)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("source_doc_schema_mismatch", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "source_doc_schema_mismatch")
+        self.assertEqual("$.command_response.schema", detail["label"])
+
     def test_rejects_source_doc_public_header_surface_claims(self) -> None:
         permissions_admin = self.load_json(PERMISSIONS_ADMIN)
         permissions_admin.pop("public_header_allowed")

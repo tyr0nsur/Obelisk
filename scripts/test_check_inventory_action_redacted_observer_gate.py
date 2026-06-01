@@ -203,6 +203,19 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertTrue(payload["gate"]["cheap_gate_passed"])
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
 
+    def test_excessive_observation_budget_fails_closed_without_budget_reservation(self) -> None:
+        args = list(REQUIRED_GATE_ARGS)
+        args[args.index("1")] = str(checker.MAX_OBSERVATION_BUDGET + 1)
+
+        result = self.run_checker("--json", *args, check=False)
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("observation_budget_exceeds_maximum", reasons)
+        self.assertTrue(payload["gate"]["cheap_gate_passed"])
+        self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+
     def test_public_contract_leak_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest = Path(temp_dir) / "public_sdk_surfaces.json"

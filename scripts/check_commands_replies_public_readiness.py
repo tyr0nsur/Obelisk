@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import check_command_chat_response_public_readiness as response_path_readiness
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -632,8 +634,59 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
     if schema == RESPONSE_PATH_REPORT_SCHEMA:
         if payload.get("valid") is not True or payload.get("accepted_for_planning") is not True:
             add(blockers, "response_path_report_not_accepted_for_planning", "$.response_path_report")
+        if payload.get("planning_only") is not True:
+            add(
+                blockers,
+                "response_path_report_not_planning_only",
+                "$.response_path_report.planning_only",
+                value=payload.get("planning_only"),
+            )
         if payload.get("surface") not in (RESPONSE_PATH_SURFACE, None):
-            add(blockers, "response_path_report_surface_mismatch", "$.response_path_report.surface", value=payload.get("surface"))
+            add(
+                blockers,
+                "response_path_report_surface_mismatch",
+                "$.response_path_report.surface",
+                value=payload.get("surface"),
+            )
+        if payload.get("target_set") != response_path_readiness.TARGET_SET:
+            add(
+                blockers,
+                "response_path_report_target_set_mismatch",
+                "$.response_path_report.target_set",
+                expected=response_path_readiness.TARGET_SET,
+                value=payload.get("target_set"),
+            )
+        if string_set(payload.get("target_filters")) != response_path_readiness.TARGETS:
+            add(
+                blockers,
+                "response_path_report_target_filters_mismatch",
+                "$.response_path_report.target_filters",
+                expected=sorted(response_path_readiness.TARGETS),
+                value=payload.get("target_filters"),
+            )
+        if payload.get("readiness_status") != "compared":
+            add(
+                blockers,
+                "response_path_report_readiness_status_mismatch",
+                "$.response_path_report.readiness_status",
+                expected="compared",
+                value=payload.get("readiness_status"),
+            )
+        if payload.get("decisions_status") != "blocked":
+            add(
+                blockers,
+                "response_path_report_decisions_status_mismatch",
+                "$.response_path_report.decisions_status",
+                expected="blocked",
+                value=payload.get("decisions_status"),
+            )
+        if payload.get("blockers") != []:
+            add(
+                blockers,
+                "response_path_report_blockers_not_empty",
+                "$.response_path_report.blockers",
+                value=payload.get("blockers"),
+            )
         for key in (
             "public_readiness_ready",
             "public_header_allowed",
@@ -643,17 +696,14 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
             "runtime_ready",
         ):
             if payload.get(key) is not False:
-                add(blockers, f"response_path_report_{key}_not_false", f"$.response_path_report.{key}", value=payload.get(key))
+                add(
+                    blockers,
+                    f"response_path_report_{key}_not_false",
+                    f"$.response_path_report.{key}",
+                    value=payload.get(key),
+                )
     elif schema == RESPONSE_PATH_READINESS_SCHEMA:
-        planning_gate = payload.get("planning_layout_gate")
-        promotion_gate = payload.get("promotion_gate")
-        if not isinstance(planning_gate, dict) or planning_gate.get("ready") is not True:
-            add(blockers, "response_path_planning_gate_not_ready", "$.response_path_report.planning_layout_gate")
-        if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
-            add(blockers, "response_path_promotion_gate_not_false", "$.response_path_report.promotion_gate")
-        for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_readiness_ready"):
-            if payload.get(key) not in (None, False):
-                add(blockers, f"response_path_readiness_{key}_not_false", f"$.response_path_report.{key}", value=payload.get(key))
+        response_path_readiness.validate_readiness(payload, blockers)
     else:
         add(blockers, "response_path_report_schema_mismatch", "$.response_path_report.schema", value=schema)
     collect_overclaims(payload, blockers, "$.response_path_report")

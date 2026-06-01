@@ -71,6 +71,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["public_header_symbols_now"], [])
         self.assertEqual(report["public_capability_bits_now"], [])
         self.assertEqual(report["public_callback_abi_now"], [])
+        self.assertTrue(report["public_header_scan"]["readable"])
+        self.assertEqual(report["public_header_scan"]["detected_player_identity_tokens"], [])
         self.assertEqual(report["required_tests_before_public_header"]["covered_for_contract_review_only"], ["runtime.evidence_intake"])
         self.assertIn("abi.layout", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
@@ -138,6 +140,71 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
         self.assertIn("public_callback_abi_now_not_empty", report["blockers"])
+
+    def test_rejects_unmanifested_player_identity_tokens_in_public_header(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            header = Path(tmp) / "ObeliskApi.h"
+            header.write_text(
+                "\n".join(
+                    [
+                        "#pragma once",
+                        "#define OBELISK_API_CAPABILITY_PLAYER_IDENTITY (1ull << 12)",
+                        "typedef struct ObeliskPlayerPrincipalEvent {",
+                        "    uint64_t principal_handle;",
+                        "} ObeliskPlayerPrincipalEvent;",
+                        "uint64_t (*RegisterPlayerIdentityEventWithOwnerTokenHandle)(uint64_t ownerToken);",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                self.decisions(),
+                approved_manifest(),
+                "--public-header",
+                str(header),
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("public_header_contains_unmanifested_player_identity_tokens", report["blockers"])
+        detail = next(
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "public_header_contains_unmanifested_player_identity_tokens"
+        )
+        detected = {item["token"] for item in detail["detected_tokens"]}
+        self.assertIn("OBELISK_API_CAPABILITY_PLAYER_IDENTITY", detected)
+        self.assertIn("ObeliskPlayerPrincipalEvent", detected)
+        self.assertIn("principal_handle", detected)
+        self.assertIn("RegisterPlayerIdentityEventWithOwnerTokenHandle", detected)
+
+    def test_public_header_scan_ignores_comments_strings_and_existing_no_identity_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            header = Path(tmp) / "ObeliskApi.h"
+            header.write_text(
+                "\n".join(
+                    [
+                        "#pragma once",
+                        "#define OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY (1ull << 1)",
+                        "// ObeliskPlayerPrincipalEvent is not a public symbol here.",
+                        "static const char* label = \"RegisterPlayerIdentityEventWithOwnerTokenHandle\";",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                self.decisions(),
+                approved_manifest(),
+                "--public-header",
+                str(header),
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["blockers"], [])
+        self.assertEqual(report["public_header_scan"]["detected_player_identity_tokens"], [])
 
     def test_rejects_candidate_public_promotion_or_runtime_claims(self) -> None:
         decisions = self.decisions()

@@ -41,6 +41,12 @@ SOURCE_DOCS = {
     "command_response": ("obelisk.command_chat_response_path.v1", DEFAULT_COMMAND_RESPONSE),
     "commands_replies": ("obelisk.commands_replies.v1", DEFAULT_COMMANDS_REPLIES),
 }
+SOURCE_SCHEMAS = {
+    "player_identity": "obelisk.player-identity-public-contract-decisions.v1",
+    "permissions_admin": "obelisk.permissions-admin-public-contract-decisions.v1",
+    "command_response": "obelisk.command-chat-response-public-contract-decisions.v1",
+    "commands_replies": "obelisk.commands-replies-public-contract-decisions.v1",
+}
 SHARED_VOCABULARY = ("principal_handle", "principal_generation", "principal_scope_flags")
 REQUIRED_FAIL_CLOSED = frozenset(
     (
@@ -606,6 +612,15 @@ def validate_bridge_decisions(payload: dict[str, Any], blockers: list[dict[str, 
 
 
 def validate_source_doc(label: str, payload: dict[str, Any], expected_surface: str, blockers: list[dict[str, Any]]) -> None:
+    expected_schema = SOURCE_SCHEMAS.get(label)
+    if expected_schema is not None and payload.get("schema") != expected_schema:
+        add(
+            blockers,
+            "source_doc_schema_mismatch",
+            f"$.{label}.schema",
+            expected=expected_schema,
+            value=payload.get("schema"),
+        )
     if payload.get("surface") != expected_surface:
         add(blockers, "source_doc_surface_mismatch", f"$.{label}.surface", expected=expected_surface, value=payload.get("surface"))
     if payload.get("status") in ("promoted", "ready"):

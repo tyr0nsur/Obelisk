@@ -219,6 +219,56 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(blocker_rows[1]["manifest_outcome"], "post-v1")
         self.assertIsNone(blocker_rows[1]["release_statement_outcome"])
         self.assertFalse(blocker_rows[1]["release_statement_contract_satisfied"])
+        sections = payload["v1_sdk_report_sections"]
+        self.assertEqual(
+            set(sections),
+            {
+                "no_live_progress",
+                "release_statement_bookkeeping",
+                "promoted_demand_gaps",
+                "runtime_required_blockers",
+            },
+        )
+        self.assertFalse(sections["no_live_progress"]["live_server_required_for_this_report"])
+        self.assertFalse(sections["no_live_progress"]["stable_claim_allowed"])
+        self.assertIn("no-live inventory/package-shape progress", sections["no_live_progress"]["non_claim"])
+        self.assertEqual(
+            sections["release_statement_bookkeeping"]["manifest_post_v1_or_excluded_outcomes"],
+            progress["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
+        )
+        self.assertEqual(
+            sections["release_statement_bookkeeping"]["release_statement_post_v1_or_excluded_outcomes"],
+            [],
+        )
+        self.assertEqual(
+            sections["release_statement_bookkeeping"]["missing_blocker_outcomes"],
+            payload["release_statement_missing_blocker_outcomes"],
+        )
+        self.assertIn("bookkeeping alone never approves", sections["release_statement_bookkeeping"]["non_claim"])
+        self.assertEqual(
+            sections["promoted_demand_gaps"]["minimum_promoted_demand_family_gaps"],
+            payload["minimum_promoted_demand_family_gaps"],
+        )
+        self.assertFalse(
+            sections["promoted_demand_gaps"]["all_minimum_demand_families_promoted_or_equivalent"]
+        )
+        self.assertFalse(sections["promoted_demand_gaps"]["claim_blocker_active"])
+        self.assertIn(
+            "Excluded/post-v1 outcomes do not satisfy",
+            sections["promoted_demand_gaps"]["non_claim"],
+        )
+        self.assertEqual(
+            sections["runtime_required_blockers"]["manifest_outcome_missing"],
+            payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing"],
+        )
+        self.assertEqual(
+            sections["runtime_required_blockers"]["dependency_chain_remaining"],
+            payload["v1_sdk_blocker_outcome_summary"]["dependency_chain_remaining"],
+        )
+        self.assertIn(
+            "v1_sdk_completion_blockers_unresolved",
+            sections["runtime_required_blockers"]["blocker_codes"],
+        )
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)
@@ -557,6 +607,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["v1_sdk_progress"]["completion_blockers_with_release_statement_post_v1_or_excluded_outcome"],
             payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
         )
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
+                "release_statement_post_v1_or_excluded_outcomes"
+            ],
+            payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
+                "manifest_post_v1_or_excluded_outcomes"
+            ],
+        )
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["release_statement_bookkeeping"][
+                "missing_blocker_outcomes"
+            ],
+            [],
+        )
+        self.assertFalse(payload["v1_sdk_report_sections"]["no_live_progress"]["stable_claim_allowed"])
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing_count"], 3)
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing_count"], 0)
         outcome_by_surface = {

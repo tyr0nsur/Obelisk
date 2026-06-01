@@ -124,6 +124,14 @@ FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
     "resource_handle": re.compile(r"ResourceHandle|resource[_\s-]*handle", re.IGNORECASE),
 }
 PUBLIC_CLAIM_KEYS = ("public_header_allowed", "promotion_ready", "public_sdk_ready", "runtime_ready")
+PUBLIC_HEADER_IDENTITY_IDENTIFIER_RE = re.compile(
+    r"identity|principal|steam_?id|steamid|player_?data_?id|platform.*id|account.*id",
+    re.IGNORECASE,
+)
+PUBLIC_HEADER_IDENTITY_IDENTIFIER_ALLOWLIST = {
+    "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+}
+IDENTIFIER_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 
 
 def parse_args() -> argparse.Namespace:
@@ -141,6 +149,12 @@ def parse_args() -> argparse.Namespace:
         help="Approved runtime principal lifecycle evidence manifest.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
+    parser.add_argument(
+        "--public-header",
+        type=Path,
+        default=Path("include/obelisk/ObeliskApi.h"),
+        help="Public SDK header to scan for player identity/principal tokens.",
+    )
     parser.add_argument("--promote", action="store_true", help="Fail closed for promotion checks.")
     parser.add_argument("--public-readiness", action="store_true", help="Fail closed for public SDK readiness checks.")
     parser.add_argument("--runtime-readiness", action="store_true", help="Fail closed for runtime readiness checks.")
@@ -219,6 +233,108 @@ def forbidden_candidate_strings(values: list[str]) -> dict[str, list[str]]:
             if pattern.search(value):
                 observed.setdefault(token, []).append(value)
     return observed
+
+
+def strip_c_comments_and_strings(text: str) -> str:
+    output: list[str] = []
+    index = 0
+    state = "code"
+    quote = ""
+    while index < len(text):
+        char = text[index]
+        next_char = text[index + 1] if index + 1 < len(text) else ""
+
+        if state == "code":
+            if char == "/" and next_char == "/":
+                output.extend((" ", " "))
+                index += 2
+                state = "line_comment"
+                continue
+            if char == "/" and next_char == "*":
+                output.extend((" ", " "))
+                index += 2
+                state = "block_comment"
+                continue
+            if char in {"'", '"'}:
+                output.append(" ")
+                quote = char
+                index += 1
+                state = "string"
+                continue
+            output.append(char)
+            index += 1
+            continue
+
+        if state == "line_comment":
+            if char == "\n":
+                output.append("\n")
+                state = "code"
+            else:
+                output.append(" ")
+            index += 1
+            continue
+
+        if state == "block_comment":
+            if char == "*" and next_char == "/":
+                output.extend((" ", " "))
+                index += 2
+                state = "code"
+                continue
+            output.append("\n" if char == "\n" else " ")
+            index += 1
+            continue
+
+        if state == "string":
+            if char == "\\" and next_char:
+                output.extend(("\n" if char == "\n" else " ", "\n" if next_char == "\n" else " "))
+                index += 2
+                continue
+            if char == quote:
+                output.append(" ")
+                index += 1
+                state = "code"
+                continue
+            output.append("\n" if char == "\n" else " ")
+            index += 1
+
+    return "".join(output)
+
+
+def public_header_identity_tokens(path: Path) -> list[dict[str, Any]]:
+    text = path.read_text(encoding="utf-8")
+    stripped = strip_c_comments_and_strings(text)
+    detected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for line_number, line in enumerate(stripped.splitlines(), start=1):
+        for match in IDENTIFIER_RE.finditer(line):
+            token = match.group(0)
+            if token in PUBLIC_HEADER_IDENTITY_IDENTIFIER_ALLOWLIST:
+                continue
+            if not PUBLIC_HEADER_IDENTITY_IDENTIFIER_RE.search(token):
+                continue
+            if token in seen:
+                continue
+            seen.add(token)
+            detected.append({"token": token, "line": line_number})
+    return detected
+
+
+def validate_public_header(decisions: dict[str, Any], path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    try:
+        detected = public_header_identity_tokens(path)
+    except OSError as exc:
+        add(blockers, "public_header_unreadable", "$.public_header", path=str(path), error=str(exc))
+        return {"path": str(path), "readable": False, "detected_player_identity_tokens": []}
+
+    if decisions.get("public_header_symbols_now") == [] and detected:
+        add(
+            blockers,
+            "public_header_contains_unmanifested_player_identity_tokens",
+            "$.public_header_symbols_now",
+            path=str(path),
+            detected_tokens=detected,
+        )
+    return {"path": str(path), "readable": True, "detected_player_identity_tokens": detected}
 
 
 def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any]]) -> None:
@@ -418,7 +534,13 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                 add(blockers, "pre_header_test_marked_ready_without_public_gate", f"$.required_tests_before_public_header[{index}].status", test_id=test_id)
 
 
-def build_report(decisions: dict[str, Any], runtime_report: dict[str, Any], blockers: list[dict[str, Any]], check_mode: str) -> dict[str, Any]:
+def build_report(
+    decisions: dict[str, Any],
+    runtime_report: dict[str, Any],
+    public_header_report: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    check_mode: str,
+) -> dict[str, Any]:
     runtime_ready = (
         runtime_report.get("approved_runtime_evidence_present") is True
         and runtime_report.get("runtime_evidence_ready") is True
@@ -451,6 +573,7 @@ def build_report(decisions: dict[str, Any], runtime_report: dict[str, Any], bloc
         "public_header_symbols_now": decisions.get("public_header_symbols_now"),
         "public_capability_bits_now": decisions.get("public_capability_bits_now"),
         "public_callback_abi_now": decisions.get("public_callback_abi_now"),
+        "public_header_scan": public_header_report,
         "remaining_blockers": [
             blocker["id"]
             for blocker in decisions.get("promotion_blockers", [])
@@ -485,8 +608,9 @@ def main() -> int:
     blockers: list[dict[str, Any]] = []
     decisions = load_json(args.decisions, "decisions")
     validate_decisions(decisions, blockers)
+    public_header_report = validate_public_header(decisions, args.public_header, blockers)
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
-    report = build_report(decisions, runtime_report, blockers, check_mode)
+    report = build_report(decisions, runtime_report, public_header_report, blockers, check_mode)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif blockers:
