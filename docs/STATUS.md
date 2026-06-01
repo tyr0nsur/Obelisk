@@ -40,7 +40,10 @@ Scope terms used here:
   publication;
 - Plugin Hub seed: post-SDK-complete planning only. Plugin Hub examples, packaging, and
   intake tooling do not gain priority, support tier, public SDK scope, or `v1.0`
-  completion weight while complete-SDK blockers remain open;
+  completion weight while complete-SDK blockers remain open. Use
+  `docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` only as
+  archived boundaries; installing a plugin `.so` does not promote public SDK scope; they
+  do not gain new support tier, public SDK scope, or `v1.0` completion weight;
 - planning-only lane: guidance/demand work that is not release evidence or public SDK
   surface.
 
@@ -60,7 +63,7 @@ define or protect runtime behavior.
 
 | Level | Meaning | Required before promotion |
 | --- | --- | --- |
-| Stable baseline | Safe enough for guarded validation-adapter checks in the documented posture. | Reproducible build, documented flags, and observed adapter stability. |
+| Stable baseline | Safe only for guarded validation-adapter checks in the documented posture. | Reproducible build, documented flags, and observed adapter stability. |
 | Experimental | Useful for isolated tests or evidence gathering, but not a default live path. | Isolated validation, bounded logs, rollback notes, and research evidence. |
 | Not ready | Planned API or behavior without enough evidence for runtime use. | Design, implementation, tests, and safe operational gates. |
 

@@ -74,10 +74,9 @@
   routing starts from Foundation/Capability Matrix, and all public ABI version macros are
   covered by versioning guardrails.
 - Hardened SDK/research guardrails so installed CMake ABI variables are derived from
-  `ObeliskApi.h`, production-supported Plugin Hub seeds stay limited to safe core
-  utilities, internal Transfer/Buff/Dino target guidance names its policy blockers, and
-  ResourceHandle serial-scan core paths may be manifest-relative without bypassing
-  protected-root checks.
+  `ObeliskApi.h`, parked Plugin Hub seed wording stays limited to safe core utilities,
+  internal Transfer/Buff/Dino target guidance names its policy blockers, and ResourceHandle
+  serial-scan core paths may be manifest-relative without bypassing protected-root checks.
 - Kept raw `EventManager`, `PluginManager`, and dispatcher test helpers out of production
   shared-library builds while preserving wraparound and capability regression coverage.
 - Hardened timer id allocation and offline artifact validation so timer handles skip zero
@@ -116,7 +115,7 @@
 - Hardened offline artifact gates so JSON manifests, provenance sidecars, and artifact
   checksums are opened without following symlinks after protected-path prechecks.
 - Clarified SDK/plugin-author docs so installed CMake package variables are distinct from
-  public C header macros and current production-supported plugin seeds stay explicit.
+  public C header macros and current release-supported seed scope stays explicit.
 - Hardened timer core registration so repeating timers with zero interval are rejected at
   `TimerManager`, matching the public plugin ABI contract.
 - Hardened SDK consumer guardrails for append-only API slots: consumers must check
@@ -125,7 +124,7 @@
 - Hardened offline evidence gates so plural path-like sidecar fields such as
   `source_artifacts` cannot hide relative protected-root paths.
 - Hardened target guidance so duplicate explicit `--target` filters fail closed.
-- Clarified v1 research routing and Plugin Hub docs so production seeds stay limited to
+- Clarified v1 research routing and Plugin Hub docs so parked seed wording stays limited to
   lifecycle/config/logging, descriptor/catalog, and process-local timers while copied chat
   and copied policy examples remain experimental patterns.
 - Hardened SDK packaging so install layout publishes only the allowlisted public

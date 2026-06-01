@@ -19,6 +19,10 @@ COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
         "internal/test-only copied lifecycle dispatcher; not plugin-facing until a later "
         "promotion wires a public ABI registration path"
     ),
+    "PlayerPrincipalEventDispatcher": (
+        "internal/test-only copied lifecycle dispatcher; not plugin-facing until player "
+        "identity promotion wires a public ABI registration path"
+    ),
 }
 
 INVENTORY_GAMEPLAY_POLICY_EVENT_FAMILIES = {

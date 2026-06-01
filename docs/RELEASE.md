@@ -15,7 +15,11 @@ Read scope labels literally:
   intake tooling, installed plugin `.so` files, or popular plugin-family names do not
   promote public SDK surface or completion. Plugin Hub is not an ArkApi compatibility
   layer, module SDK roadmap, identity/lookup surface, mutation path, or return-override
-  authority while the complete-SDK blockers remain open.
+  authority while the complete-SDK blockers remain open. Start archived Plugin Hub
+  planning from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
+  `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`; adding a first-party example or naming a popular
+  plugin family does not promote public SDK surface. Likewise, naming a popular plugin
+  family does not promote public SDK surface.
 - Planning-only lanes and target sets are guidance or demand signals. They are not release
   evidence, not public SDK surface, and are rejected by the release gate until replaced by
   a separately promoted target set.
@@ -232,8 +236,8 @@ sets to the required RC target sets; they do not replace or omit the public RC g
 
 The accepted default intake is layout-only evidence: reports may show
 `promotion_gate.ready=true` with `promotion_gate.ready_scope=layout_only` and
-`promotion_gate.promotion_ready=false`. That is enough to keep the core-first gate fresh,
-but it does not by itself promote a public Inventory SDK, public StructureEvents SDK,
+`promotion_gate.promotion_ready=false`. That refresh applies only to the documented
+core-first scope, and it does not by itself promote a public Inventory SDK, public StructureEvents SDK,
 `ResourceHandle`, object identity, GObjects lookup, mutation, or return overrides. Optional
 redacted signature manifests accepted in offline-artifact consume mode remain
 candidate-only. It also does not prove resource cross-event correlation.

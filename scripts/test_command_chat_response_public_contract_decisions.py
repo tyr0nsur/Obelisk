@@ -4,14 +4,20 @@
 from __future__ import annotations
 
 import json
+import sys
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = Path(__file__).resolve().parent
 DECISIONS = REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+UFUNCTION_FIXTURES = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+from reflection_target_sets import TARGET_SETS  # noqa: E402
 
 REQUIRED_IDS = {
     "dependency.promoted_player_identity",
@@ -23,6 +29,13 @@ REQUIRED_IDS = {
     "abuse.rate_limit_and_audit",
     "separation.no_commands_router_or_moderation",
     "evidence.layout_runtime_sdk_coverage",
+    "evidence.response_target_set_snapshot_second_source",
+}
+
+RESPONSE_PATH_TARGETS = {
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientChatMessage",
 }
 
 FORBIDDEN_HEADER_TOKENS = {
@@ -42,6 +55,31 @@ FORBIDDEN_HEADER_TOKENS = {
 class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
     def load_decisions(self) -> dict:
         return json.loads(DECISIONS.read_text(encoding="utf-8"))
+
+    def response_target_sets(self) -> list[str]:
+        return [
+            name
+            for name, targets in TARGET_SETS.items()
+            if RESPONSE_PATH_TARGETS.issubset(set(targets))
+        ]
+
+    def committed_response_snapshots(self) -> set[str]:
+        observed: set[str] = set()
+        for target in RESPONSE_PATH_TARGETS:
+            schema, _, qualified_name = target.partition(":")
+            if any(UFUNCTION_FIXTURES.glob(f"**/{qualified_name}.snapshot.json")):
+                observed.add(f"{schema}:{qualified_name}")
+        return observed
+
+    def has_accepted_response_second_source(self, evidence: dict, target_sets: list[str]) -> bool:
+        accepted = evidence.get("accepted_second_source")
+        if evidence.get("status") != "resolved" or not isinstance(accepted, dict):
+            return False
+        return (
+            accepted.get("status") == "accepted"
+            and accepted.get("target_set") in target_sets
+            and set(accepted.get("targets", [])) == RESPONSE_PATH_TARGETS
+        )
 
     def test_decision_manifest_lists_every_pre_header_blocker(self) -> None:
         payload = self.load_decisions()
@@ -171,6 +209,45 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             "raw ProcessEvent callbacks",
         ):
             self.assertIn(insufficient, evidence["not_sufficient"])
+
+    def test_response_path_target_evidence_chain_fails_closed_until_complete(self) -> None:
+        payload = self.load_decisions()
+        requirements = {item["id"]: item for item in payload["required_before_public_header"]}
+        evidence = requirements["evidence.response_target_set_snapshot_second_source"]
+
+        self.assertEqual(evidence["status"], "unresolved")
+        self.assertEqual(set(evidence["required_targets"]), RESPONSE_PATH_TARGETS)
+        self.assertEqual(
+            set(evidence["required_evidence"]),
+            {
+                "named reflection target set covering all required response-path UFunctions",
+                "committed sanitized UFunction snapshots for all required response-path UFunctions",
+                "accepted strict second-source comparison for the same named target set and exact targets",
+            },
+        )
+        for insufficient in (
+            "static thunk orientation",
+            "candidate vtable slots",
+            "historical chat FName indices",
+            "metadata-only passive chat observations",
+            "ServerSendChatMessage chat-message-intake evidence",
+        ):
+            self.assertIn(insufficient, evidence["not_sufficient"])
+
+        missing_evidence = []
+        target_sets = self.response_target_sets()
+        if not target_sets:
+            missing_evidence.append("target-set")
+        if self.committed_response_snapshots() != RESPONSE_PATH_TARGETS:
+            missing_evidence.append("snapshot")
+        if not self.has_accepted_response_second_source(evidence, target_sets):
+            missing_evidence.append("second-source")
+
+        if missing_evidence:
+            self.assertEqual(payload["status"], "blocked", missing_evidence)
+            self.assertFalse(payload["public_header_allowed"], missing_evidence)
+            self.assertEqual(payload["public_header_symbols_now"], [], missing_evidence)
+            self.assertFalse(payload["legacy_call_process_event_public_response_allowed"], missing_evidence)
 
     def test_public_header_and_surface_manifest_stay_blocked(self) -> None:
         payload = self.load_decisions()

@@ -47,6 +47,29 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
     )
 )
 REQUIRED_CONSUMER_CASES = frozenset(("stale_after_logout", "malformed_or_unsupported_evidence"))
+REQUIRED_OBSERVED_EVENT_CASES = (
+    {
+        "target": "ShooterGameMode.HandleNewPlayer",
+        "role": "session_start",
+        "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+        "copied_bool_values": ["1", "1"],
+        "principal_action": "candidate_created",
+    },
+    {
+        "target": "ShooterGameMode.HandleNewPlayer",
+        "role": "session_start_rejected",
+        "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+        "copied_bool_values": ["0", "1"],
+        "principal_action": "none",
+    },
+    {
+        "target": "ShooterGameMode.OnLogout",
+        "role": "session_end",
+        "copied_bool_fields": [],
+        "copied_bool_values": [],
+        "principal_action": "candidate_invalidated",
+    },
+)
 REQUIRED_NON_CLAIMS = frozenset(
     (
         "approved runtime observer evidence only",
@@ -174,6 +197,57 @@ def require_values(
         )
 
 
+def case_without_sequence(case: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "target": case.get("target"),
+        "role": case.get("role"),
+        "copied_bool_fields": case.get("copied_bool_fields"),
+        "copied_bool_values": case.get("copied_bool_values"),
+        "principal_action": case.get("principal_action"),
+    }
+
+
+def validate_observed_event_cases(module: dict[str, Any], blockers: list[dict[str, Any]]) -> list[str]:
+    cases = module.get("observed_event_cases")
+    label = f"$.source_summary.modules.{MODULE}.observed_event_cases"
+    if not isinstance(cases, list):
+        add(blockers, "runtime_summary_observed_event_cases_missing", label)
+        return []
+
+    observed_runtime_cases: list[str] = []
+    previous_sequence = 0
+    remaining_expected = [dict(case) for case in REQUIRED_OBSERVED_EVENT_CASES]
+    case_labels = {
+        "session_start": "session_start_anchor",
+        "session_start_rejected": "session_start_rejected_anchor",
+        "session_end": "session_end_anchor",
+    }
+
+    for index, case in enumerate(cases):
+        case_label = f"{label}[{index}]"
+        if not isinstance(case, dict):
+            add(blockers, "runtime_summary_observed_event_case_invalid", case_label)
+            continue
+        sequence = case.get("sequence")
+        if not isinstance(sequence, int) or sequence <= previous_sequence:
+            add(blockers, "runtime_summary_observed_event_case_sequence_invalid", f"{case_label}.sequence")
+        if isinstance(sequence, int):
+            previous_sequence = sequence
+        compact_case = case_without_sequence(case)
+        if compact_case in remaining_expected:
+            remaining_expected.remove(compact_case)
+            observed_runtime_cases.append(case_labels[str(compact_case["role"])])
+
+    if remaining_expected:
+        add(
+            blockers,
+            "runtime_summary_required_observed_event_cases_missing",
+            label,
+            missing=remaining_expected,
+        )
+    return observed_runtime_cases
+
+
 def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> list[str]:
     if not isinstance(summary, dict):
         add(blockers, "source_summary_missing", "$.source_summary")
@@ -281,7 +355,7 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
     require_values(blockers, functions, "ShooterGameMode.OnLogout", "principal_id_logged", {"false"})
     require_values(blockers, functions, "ShooterGameMode.OnLogout", "principal_generation_logged", {"false"})
     require_values(blockers, functions, "ShooterGameMode.OnLogout", "delivery_claim", {"none"})
-    return ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"]
+    return validate_observed_event_cases(module, blockers)
 
 
 def validate_consumer_boundary(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:

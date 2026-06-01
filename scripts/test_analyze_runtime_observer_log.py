@@ -226,6 +226,27 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(module["accepted_count"], 2)
         self.assertEqual(module["blockers"], ["runtime_observer_evidence_only"])
         self.assertEqual(
+            module["observed_event_cases"],
+            [
+                {
+                    "sequence": 1,
+                    "target": "ShooterGameMode.HandleNewPlayer",
+                    "role": "session_start",
+                    "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                    "copied_bool_values": ["1", "1"],
+                    "principal_action": "candidate_created",
+                },
+                {
+                    "sequence": 2,
+                    "target": "ShooterGameMode.OnLogout",
+                    "role": "session_end",
+                    "copied_bool_fields": [],
+                    "copied_bool_values": [],
+                    "principal_action": "candidate_invalidated",
+                },
+            ],
+        )
+        self.assertEqual(
             module["gate_sha256"],
             ["7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"],
         )

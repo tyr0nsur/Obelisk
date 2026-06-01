@@ -169,6 +169,29 @@
         "legacy CallProcessEvent debug gate",
         "raw ProcessEvent callbacks"
       ]
+    },
+    {
+      "id": "evidence.response_target_set_snapshot_second_source",
+      "category": "evidence",
+      "status": "unresolved",
+      "decision_required": "Keep command/chat response blocked until exact target-set, sanitized snapshot, and accepted second-source evidence exists for every response-path UFunction target.",
+      "required_targets": [
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage",
+        "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientChatMessage"
+      ],
+      "required_evidence": [
+        "named reflection target set covering all required response-path UFunctions",
+        "committed sanitized UFunction snapshots for all required response-path UFunctions",
+        "accepted strict second-source comparison for the same named target set and exact targets"
+      ],
+      "not_sufficient": [
+        "static thunk orientation",
+        "candidate vtable slots",
+        "historical chat FName indices",
+        "metadata-only passive chat observations",
+        "ServerSendChatMessage chat-message-intake evidence"
+      ]
     }
   ]
 }

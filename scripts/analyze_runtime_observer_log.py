@@ -339,6 +339,7 @@ def module_record() -> dict[str, Any]:
         "out_of_order_field_lines": 0,
         "field_count_mismatches": 0,
         "sequence_quality_violations": 0,
+        "observed_event_cases": [],
         "_player_principal_last_sequence": None,
         "_player_principal_seen_sequences": set(),
         "_player_principal_log_limit": None,
@@ -566,6 +567,23 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             seen_sequences.add(sequence)
             record["_player_principal_last_sequence"] = sequence
             record["accepted_count"] += 1
+            record["observed_event_cases"].append(
+                {
+                    "sequence": sequence,
+                    "target": function,
+                    "role": match.group("role"),
+                    "copied_bool_fields": csv_values(
+                        match.group("copied_bool_fields"),
+                        allowed={"bIsFromLogin", "ReturnValue"},
+                    ),
+                    "copied_bool_values": csv_values(
+                        match.group("copied_bool_values"),
+                        allowed={"0", "1"},
+                        allow_duplicates=True,
+                    ),
+                    "principal_action": match.group("principal_action"),
+                }
+            )
             functions = record["functions"]
             functions.setdefault(function, function_record())
             function_data = functions[function]
@@ -771,6 +789,11 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             "field_count_mismatches": record["field_count_mismatches"],
             "sequence_quality_violations": record["sequence_quality_violations"],
         }
+        if module == "player_principal_lifecycle":
+            normalized_modules[module]["observed_event_cases"] = sorted(
+                record["observed_event_cases"],
+                key=lambda item: item["sequence"],
+            )
 
     return {
         "schema": "obelisk.runtime-observer-log-summary.v1",

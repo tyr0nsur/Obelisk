@@ -4,7 +4,8 @@ Status: post-SDK-complete planning only.
 
 This path is parked until Obelisk has a complete SDK contract. Do not start new Plugin
 Hub examples, packaging, or intake work while identity, permissions, commands/responses,
-storage, mutation, and other SDK blockers remain open.
+storage, mutation, and other SDK blockers remain open. The archived workflow is about
+adding a Plugin Hub foundation example without widening the SDK.
 
 ## 1. Decide The Tier
 
@@ -50,8 +51,9 @@ find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(<plugin-target> PRIVATE Obelisk::obelisk_sdk)
 ```
 
-Do not start from `plugins/` when writing the starter external package. The `plugins/`
-tree contains first-party runtime reference plugins and may use repository-local wiring.
+Do not start from `plugins/` when writing the starter external package. Do not start from
+`plugins/` when writing the minimum external package. The `plugins/` tree contains
+first-party runtime reference plugins and may use repository-local wiring.
 
 ## 3. Validate The Installed SDK
 

@@ -58,7 +58,7 @@ v0.1-rc public C ABI slices:
 - Promoted `GameplayPolicyEvent` callback ABI for copied POD structure-backed policy
   signals tied to fresh [`structure-observer-intake` evidence](docs/research/2026-05-29-structure-observer-intake-refresh.md)
   and inventory-backed policy signals through the same generic family.
-- v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
+- Minimal v0.1-rc `ChatMessageEvent` callback ABI for copied UTF-8 chat notifications;
   copied plugin-facing delivery has accepted `enable-chat-events` validation for all four
   known send modes (`0..3`). Historical `enable-chat-reflection` observer output is not
   delivery evidence. This remains a copied notification contract only, not commands,

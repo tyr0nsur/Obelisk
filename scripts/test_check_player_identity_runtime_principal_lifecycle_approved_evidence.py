@@ -170,6 +170,23 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertTrue(report["runtime_evidence_ready"])
 
+    def test_public_and_runtime_readiness_modes_block_even_when_runtime_evidence_is_accepted(self) -> None:
+        for flag, blocker in (
+            ("--public-readiness", "public_readiness_blocked_until_identity_public_contract_gate"),
+            ("--runtime-readiness", "runtime_readiness_blocked_until_identity_public_contract_gate"),
+        ):
+            with self.subTest(flag=flag):
+                result = self.run_checker(manifest(), flag, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(blocker, report["blockers"])
+                self.assertTrue(report["approved_runtime_evidence_present"])
+                self.assertTrue(report["runtime_evidence_ready"])
+                self.assertFalse(report["promotion_ready"])
+                self.assertFalse(report["public_sdk_ready"])
+                self.assertFalse(report["runtime_ready"])
+
     def test_rejects_quality_blockers_from_analyzer_summary(self) -> None:
         payload = manifest()
         module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
@@ -181,6 +198,26 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime_summary_quality_blockers_present", report["blockers"])
         self.assertIn("runtime_summary_quality_counter_nonzero", report["blockers"])
+
+    def test_rejects_aggregated_values_without_complete_observed_event_cases(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        module.pop("observed_event_cases")
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_observed_event_cases_missing", report["blockers"])
+
+    def test_rejects_mismatched_complete_observed_event_case(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        module["observed_event_cases"][1]["copied_bool_values"] = ["1", "0"]
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_required_observed_event_cases_missing", report["blockers"])
 
     def test_rejects_public_readiness_and_identity_leak_overclaims(self) -> None:
         payload = manifest()
