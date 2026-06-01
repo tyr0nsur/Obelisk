@@ -150,6 +150,54 @@
       "supported_invalidation_reason_flags",
       "contract_flags"
     ],
+    "candidate_event_kind_mask": [
+      "session_start",
+      "session_start_rejected",
+      "session_end"
+    ],
+    "candidate_scope_flags": [
+      "callback_local",
+      "process_local",
+      "restart_local_planning_only"
+    ],
+    "candidate_state_flags": [
+      "candidate_created",
+      "candidate_invalidated",
+      "candidate_rejected",
+      "stale_generation",
+      "unsupported_scope"
+    ],
+    "candidate_invalidation_reason_flags": [
+      "logout",
+      "disconnect",
+      "transfer",
+      "reconnect",
+      "duplicate_observation",
+      "server_restart",
+      "stale_controller_or_playerstate",
+      "failed_evidence_validation"
+    ],
+    "candidate_contract_flags": [
+      "copied_payload",
+      "callback_local_payload_lifetime",
+      "process_local_principal_handle",
+      "no_lookup",
+      "no_persistence",
+      "no_permissions_or_commands_authority",
+      "no_mutation",
+      "no_return_override"
+    ],
+    "sequence_policy": [
+      "event_sequence is assigned once per copied source lifecycle event",
+      "all subscribers to the same source lifecycle event observe the same event_sequence",
+      "event_sequence is not a per-plugin delivery counter",
+      "event_sequence is process-local and non-persistent"
+    ],
+    "server_process_epoch_policy": [
+      "server_process_epoch is process-local and changes across server process lifetimes",
+      "server_process_epoch invalidates process-local principal handles after restart",
+      "server_process_epoch is not cluster-stable and not persistent"
+    ],
     "candidate_registration_shape_or_equivalent": [
       "nonzero plugin_owner_token required",
       "event-kind mask required",

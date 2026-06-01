@@ -529,6 +529,8 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
             out = {
                 .Kind = kind,
                 .Action = action,
+                .EventSequence = 0,
+                .ServerProcessEpoch = 0,
                 .Bools = std::span<const Obelisk::Core::PlayerPrincipalBoolValue>(
                     boolStorage.data(),
                     observation.BoolCount),
@@ -550,6 +552,8 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
             out = {
                 .Kind = kind,
                 .Action = action,
+                .EventSequence = 0,
+                .ServerProcessEpoch = 0,
                 .Bools = {},
             };
             return true;

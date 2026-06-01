@@ -312,6 +312,54 @@ REQUIRED_CANDIDATE_DESCRIPTOR_FIELDS = {
     "supported_invalidation_reason_flags",
     "contract_flags",
 }
+REQUIRED_CANDIDATE_EVENT_KIND_MASK = {
+    "session_start",
+    "session_start_rejected",
+    "session_end",
+}
+REQUIRED_CANDIDATE_SCOPE_FLAGS = {
+    "callback_local",
+    "process_local",
+    "restart_local_planning_only",
+}
+REQUIRED_CANDIDATE_STATE_FLAGS = {
+    "candidate_created",
+    "candidate_invalidated",
+    "candidate_rejected",
+    "stale_generation",
+    "unsupported_scope",
+}
+REQUIRED_CANDIDATE_INVALIDATION_REASON_FLAGS = {
+    "logout",
+    "disconnect",
+    "transfer",
+    "reconnect",
+    "duplicate_observation",
+    "server_restart",
+    "stale_controller_or_playerstate",
+    "failed_evidence_validation",
+}
+REQUIRED_CANDIDATE_CONTRACT_FLAGS = {
+    "copied_payload",
+    "callback_local_payload_lifetime",
+    "process_local_principal_handle",
+    "no_lookup",
+    "no_persistence",
+    "no_permissions_or_commands_authority",
+    "no_mutation",
+    "no_return_override",
+}
+REQUIRED_CANDIDATE_SEQUENCE_POLICY = {
+    "event_sequence is assigned once per copied source lifecycle event",
+    "all subscribers to the same source lifecycle event observe the same event_sequence",
+    "event_sequence is not a per-plugin delivery counter",
+    "event_sequence is process-local and non-persistent",
+}
+REQUIRED_CANDIDATE_SERVER_PROCESS_EPOCH_POLICY = {
+    "server_process_epoch is process-local and changes across server process lifetimes",
+    "server_process_epoch invalidates process-local principal handles after restart",
+    "server_process_epoch is not cluster-stable and not persistent",
+}
 REQUIRED_CANDIDATE_PAYLOAD_PROPERTIES = {
     "POD C ABI only",
     "front-loaded abi_version and struct_size",
@@ -723,6 +771,31 @@ def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any
                 f"$.{label}.candidate_descriptor_fields_or_equivalent",
                 forbidden=forbidden,
             )
+
+    for key, required, reason in (
+        ("candidate_event_kind_mask", REQUIRED_CANDIDATE_EVENT_KIND_MASK, "candidate_event_kind_mask_missing"),
+        ("candidate_scope_flags", REQUIRED_CANDIDATE_SCOPE_FLAGS, "candidate_scope_flags_missing"),
+        ("candidate_state_flags", REQUIRED_CANDIDATE_STATE_FLAGS, "candidate_state_flags_missing"),
+        (
+            "candidate_invalidation_reason_flags",
+            REQUIRED_CANDIDATE_INVALIDATION_REASON_FLAGS,
+            "candidate_invalidation_reason_flags_missing",
+        ),
+        ("candidate_contract_flags", REQUIRED_CANDIDATE_CONTRACT_FLAGS, "candidate_contract_flags_missing"),
+        ("sequence_policy", REQUIRED_CANDIDATE_SEQUENCE_POLICY, "candidate_sequence_policy_missing"),
+        (
+            "server_process_epoch_policy",
+            REQUIRED_CANDIDATE_SERVER_PROCESS_EPOCH_POLICY,
+            "candidate_server_process_epoch_policy_missing",
+        ),
+    ):
+        values = string_list(candidate.get(key))
+        if values is None:
+            add(blockers, f"{reason}_not_string_list", f"$.{label}.{key}")
+            continue
+        missing = missing_required(values, required)
+        if missing:
+            add(blockers, reason, f"$.{label}.{key}", missing=missing)
 
     registration = string_list(candidate.get("candidate_registration_shape_or_equivalent"))
     if registration is None:

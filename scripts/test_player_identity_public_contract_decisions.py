@@ -176,6 +176,33 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
                 "reserved",
             },
         )
+        self.assertEqual(
+            set(candidate["candidate_event_kind_mask"]),
+            {"session_start", "session_start_rejected", "session_end"},
+        )
+        self.assertEqual(
+            set(candidate["candidate_scope_flags"]),
+            {"callback_local", "process_local", "restart_local_planning_only"},
+        )
+        self.assertIn("candidate_created", candidate["candidate_state_flags"])
+        self.assertIn("stale_generation", candidate["candidate_state_flags"])
+        self.assertIn("logout", candidate["candidate_invalidation_reason_flags"])
+        self.assertIn("server_restart", candidate["candidate_invalidation_reason_flags"])
+        self.assertIn("copied_payload", candidate["candidate_contract_flags"])
+        self.assertIn("no_lookup", candidate["candidate_contract_flags"])
+        self.assertIn("no_permissions_or_commands_authority", candidate["candidate_contract_flags"])
+        self.assertIn(
+            "event_sequence is assigned once per copied source lifecycle event",
+            candidate["sequence_policy"],
+        )
+        self.assertIn(
+            "event_sequence is not a per-plugin delivery counter",
+            candidate["sequence_policy"],
+        )
+        self.assertIn(
+            "server_process_epoch invalidates process-local principal handles after restart",
+            candidate["server_process_epoch_policy"],
+        )
         for forbidden in (
             "lookup_handle",
             "resolve_player",

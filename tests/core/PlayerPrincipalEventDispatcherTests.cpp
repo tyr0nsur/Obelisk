@@ -42,6 +42,8 @@ namespace
         int Calls = 0;
         PlayerPrincipalEventKind Kind = PlayerPrincipalEventKind::SessionStart;
         PlayerPrincipalAction Action = PlayerPrincipalAction::None;
+        uint64_t EventSequence = 0;
+        uint64_t ServerProcessEpoch = 0;
         std::vector<PlayerPrincipalBoolValue> Bools;
         const PlayerPrincipalBoolValue* BoolPointer = nullptr;
     };
@@ -65,6 +67,8 @@ namespace
         return {
             .Kind = PlayerPrincipalEventKind::SessionStart,
             .Action = PlayerPrincipalAction::CandidateCreated,
+            .EventSequence = 101,
+            .ServerProcessEpoch = 7,
             .Bools = bools,
         };
     }
@@ -74,6 +78,8 @@ namespace
         return {
             .Kind = PlayerPrincipalEventKind::SessionStartRejected,
             .Action = PlayerPrincipalAction::None,
+            .EventSequence = 102,
+            .ServerProcessEpoch = 7,
             .Bools = bools,
         };
     }
@@ -83,6 +89,8 @@ namespace
         return {
             .Kind = PlayerPrincipalEventKind::SessionEnd,
             .Action = PlayerPrincipalAction::CandidateInvalidated,
+            .EventSequence = 103,
+            .ServerProcessEpoch = 7,
             .Bools = {},
         };
     }
@@ -93,6 +101,8 @@ namespace
         ++capture->Calls;
         capture->Kind = event.Kind;
         capture->Action = event.Action;
+        capture->EventSequence = event.EventSequence;
+        capture->ServerProcessEpoch = event.ServerProcessEpoch;
         capture->Bools.assign(event.Bools.begin(), event.Bools.end());
         capture->BoolPointer = event.Bools.data();
     }
@@ -113,10 +123,12 @@ namespace
 
     void TestPlayerPrincipalSurfaceIsInternalObservationOnly()
     {
-        const auto [kind, action, bools] = PlayerPrincipalEventView{};
+        const auto [kind, action, eventSequence, serverProcessEpoch, bools] = PlayerPrincipalEventView{};
         const auto [field, value] = PlayerPrincipalBoolValue{};
         (void)kind;
         (void)action;
+        (void)eventSequence;
+        (void)serverProcessEpoch;
         (void)bools;
         (void)field;
         (void)value;
@@ -150,6 +162,8 @@ namespace
         Require(capture.Calls == 1, "callback did not run");
         Require(capture.Kind == PlayerPrincipalEventKind::SessionStart, "event kind changed");
         Require(capture.Action == PlayerPrincipalAction::CandidateCreated, "action changed");
+        Require(capture.EventSequence == 101, "event sequence changed");
+        Require(capture.ServerProcessEpoch == 7, "server process epoch changed");
         Require(capture.Bools.size() == 2, "bool count mismatch");
         Require(capture.Bools[0].Field == PlayerPrincipalBoolField::BIsFromLogin,
                 "first bool field mismatch");
@@ -158,6 +172,33 @@ namespace
                 "return bool field mismatch");
         Require(capture.Bools[1].Value, "return bool value mismatch");
         Require(capture.BoolPointer != sourcePointer, "dispatcher passed borrowed bool storage");
+    }
+
+    void TestDispatchCopiesSourceEventSequenceForAllSubscribers()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        std::vector<Capture> captures(2);
+        const std::vector<PlayerPrincipalBoolValue> bools = MakeStartBools();
+        PlayerPrincipalEventView event = MakeStartEvent(bools);
+        event.EventSequence = 777;
+        event.ServerProcessEpoch = 44;
+
+        for (Capture& capture : captures)
+        {
+            const uint64_t id = dispatcher.Register(&owner, {CaptureCallback, &capture});
+            Require(id != 0, "source-sequence subscriber registration failed");
+        }
+
+        Require(dispatcher.Dispatch(event) == captures.size(),
+                "source-sequence dispatch count mismatch");
+        for (const Capture& capture : captures)
+        {
+            Require(capture.EventSequence == 777,
+                    "player principal event sequence was not copied from the source event");
+            Require(capture.ServerProcessEpoch == 44,
+                    "player principal server process epoch was not copied from the source event");
+        }
     }
 
     void TestDispatchSnapshotsStackAndHeapSubscribers()
@@ -881,6 +922,7 @@ int main()
         TestPlayerPrincipalSurfaceIsInternalObservationOnly();
         TestNoSubscriberDispatchReturnsBeforePayloadCopy();
         TestDispatchCopiesBoolInputForCallbackDuration();
+        TestDispatchCopiesSourceEventSequenceForAllSubscribers();
         TestDispatchSnapshotsStackAndHeapSubscribers();
         TestRegisterRejectsInvalidInput();
         TestDispatchRejectsUnknownEventShape();

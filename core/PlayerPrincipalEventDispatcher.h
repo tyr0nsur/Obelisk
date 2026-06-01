@@ -40,6 +40,8 @@ namespace Obelisk::Core
     {
         PlayerPrincipalEventKind Kind = PlayerPrincipalEventKind::SessionStart;
         PlayerPrincipalAction Action = PlayerPrincipalAction::None;
+        uint64_t EventSequence = 0;
+        uint64_t ServerProcessEpoch = 0;
         std::span<const PlayerPrincipalBoolValue> Bools;
     };
 

@@ -473,6 +473,8 @@ namespace Obelisk::Core
             PlayerPrincipalEventView copiedEvent{
                 .Kind = event.Kind,
                 .Action = event.Action,
+                .EventSequence = event.EventSequence,
+                .ServerProcessEpoch = event.ServerProcessEpoch,
                 .Bools = std::span<const PlayerPrincipalBoolValue>(boolCopies.data(), event.Bools.size()),
             };
 

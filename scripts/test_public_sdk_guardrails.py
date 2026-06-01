@@ -1670,12 +1670,50 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for field in (
             "abi_version",
             "struct_size",
+            "event_kind",
             "principal_handle",
             "principal_generation",
             "principal_scope_flags",
+            "principal_state_flags",
             "invalidation_reason_flags",
+            "event_sequence",
+            "server_process_epoch",
         ):
             self.assertIn(field, proposal["candidate_event_payload_fields_or_equivalent"])
+        self.assertEqual(
+            set(proposal["candidate_event_kind_mask"]),
+            {"session_start", "session_start_rejected", "session_end"},
+        )
+        self.assertEqual(
+            set(proposal["candidate_scope_flags"]),
+            {"callback_local", "process_local", "restart_local_planning_only"},
+        )
+        self.assertIn("stale_generation", proposal["candidate_state_flags"])
+        self.assertIn("unsupported_scope", proposal["candidate_state_flags"])
+        self.assertIn("server_restart", proposal["candidate_invalidation_reason_flags"])
+        self.assertIn("failed_evidence_validation", proposal["candidate_invalidation_reason_flags"])
+        self.assertIn("copied_payload", proposal["candidate_contract_flags"])
+        self.assertIn("callback_local_payload_lifetime", proposal["candidate_contract_flags"])
+        self.assertIn("process_local_principal_handle", proposal["candidate_contract_flags"])
+        self.assertIn("no_lookup", proposal["candidate_contract_flags"])
+        self.assertIn("no_persistence", proposal["candidate_contract_flags"])
+        self.assertIn("no_permissions_or_commands_authority", proposal["candidate_contract_flags"])
+        self.assertIn(
+            "event_sequence is assigned once per copied source lifecycle event",
+            proposal["sequence_policy"],
+        )
+        self.assertIn(
+            "all subscribers to the same source lifecycle event observe the same event_sequence",
+            proposal["sequence_policy"],
+        )
+        self.assertIn(
+            "event_sequence is not a per-plugin delivery counter",
+            proposal["sequence_policy"],
+        )
+        self.assertIn(
+            "server_process_epoch invalidates process-local principal handles after restart",
+            proposal["server_process_epoch_policy"],
+        )
         for property_name in (
             "POD C ABI only",
             "front-loaded abi_version and struct_size",
@@ -1730,6 +1768,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertFalse(contract["public_sdk_ready"])
         self.assertFalse(contract["runtime_ready"])
         self.assertIn("This artifact does not claim stable principal identity.", contract["non_claims"])
+        self.assertIn(
+            "event_sequence is not a per-plugin delivery counter",
+            contract["sequence_policy"],
+        )
+        self.assertIn("no_lookup", contract["candidate_contract_flags"])
 
     def test_player_principal_dispatcher_stays_internal_until_identity_promotion(self) -> None:
         header = strip_c_comments(PUBLIC_API_HEADER.read_text(encoding="utf-8"))

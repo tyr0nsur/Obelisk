@@ -108,6 +108,26 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "reserved",
             },
         )
+        self.assertEqual(
+            set(candidate["candidate_event_kind_mask"]),
+            {"session_start", "session_start_rejected", "session_end"},
+        )
+        self.assertIn("process_local", candidate["candidate_scope_flags"])
+        self.assertIn("stale_generation", candidate["candidate_state_flags"])
+        self.assertIn("server_restart", candidate["candidate_invalidation_reason_flags"])
+        self.assertIn("no_lookup", candidate["candidate_contract_flags"])
+        self.assertIn(
+            "event_sequence is assigned once per copied source lifecycle event",
+            candidate["sequence_policy"],
+        )
+        self.assertIn(
+            "event_sequence is not a per-plugin delivery counter",
+            candidate["sequence_policy"],
+        )
+        self.assertIn(
+            "server_process_epoch invalidates process-local principal handles after restart",
+            candidate["server_process_epoch_policy"],
+        )
 
         result = self.run_checker(decisions, approved_manifest())
         report = json.loads(result.stdout)
@@ -458,6 +478,37 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             if blocker["reason"] == "candidate_fail_closed_policy_missing"
         )
         self.assertIn("missing or zero owner token fails closed", policy_detail["missing"])
+
+    def test_rejects_candidate_masks_flags_and_sequence_policy_weakened(self) -> None:
+        decisions = self.decisions()
+        candidate = decisions["proposed_public_pod_abi_candidate"]
+        candidate["candidate_event_kind_mask"].remove("session_end")
+        candidate["candidate_scope_flags"].remove("process_local")
+        candidate["candidate_state_flags"].remove("stale_generation")
+        candidate["candidate_invalidation_reason_flags"].remove("server_restart")
+        candidate["candidate_contract_flags"].remove("no_lookup")
+        candidate["sequence_policy"].remove(
+            "event_sequence is not a per-plugin delivery counter"
+        )
+        candidate["server_process_epoch_policy"].remove(
+            "server_process_epoch invalidates process-local principal handles after restart"
+        )
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        for blocker in (
+            "candidate_event_kind_mask_missing",
+            "candidate_scope_flags_missing",
+            "candidate_state_flags_missing",
+            "candidate_invalidation_reason_flags_missing",
+            "candidate_contract_flags_missing",
+            "candidate_sequence_policy_missing",
+            "candidate_server_process_epoch_policy_missing",
+        ):
+            with self.subTest(blocker=blocker):
+                self.assertIn(blocker, report["blockers"])
 
     def test_rejects_missing_runtime_evidence_or_decision_intake(self) -> None:
         decisions = self.decisions()
