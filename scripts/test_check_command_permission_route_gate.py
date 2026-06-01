@@ -284,6 +284,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "public_send_chat_abi_allowed": True,
                     "reply_send_chat_router_claims_allowed": True,
                     "public_abi_allowed": True,
+                    "public-reply-api": True,
+                    "publicSendChatApi": True,
                     "permissions_admin_ready": True,
                     "notes": [
                         "send-chat ABI is public and ready",
@@ -311,6 +313,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.public_send_chat_abi_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.reply_send_chat_router_claims_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.public_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.public-reply-api", result["public_or_runtime_claims"])
+        self.assertIn("nested.publicSendChatApi", result["public_or_runtime_claims"])
         self.assertIn("nested.permissions_admin_ready", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[0]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[1]:positive_text_claim", result["public_or_runtime_claims"])

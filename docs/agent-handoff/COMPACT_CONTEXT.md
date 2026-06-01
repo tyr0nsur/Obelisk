@@ -92,6 +92,10 @@ priorities, and do not use history files as the active source of truth.
   `scripts/check_command_permission_route_gate.py --json` is the canonical offline route
   posture check for this dependency chain; passing it means planning-only alignment, not
   public ABI, runtime readiness, command router, reply/send-chat ABI, or v1 completion.
+  It must scan sub-checker reports recursively for public/runtime aliases and positive
+  text claims; nested public reply/send-chat, command routing, permissions/admin, ABI,
+  runtime, or v1-completion claims block planning alignment even if a leaf report says
+  `valid=true`.
   While identity waits on approved copied runtime principal lifecycle evidence, inventory
   copied signals are the higher-value side lane. Neither side lane displaces identity ->
   permissions/admin -> commands/replies. Prefer inventory copied-signal hygiene over
@@ -213,6 +217,12 @@ priorities, and do not use history files as the active source of truth.
   structure dispatch budget no longer keeps the hook hot path active when there are no
   subscribers. This remains internal infrastructure, not a public StructureEvents SDK or
   structure identity surface.
+- Structure build-policy offline intake has a consume-only artifact-gate schema:
+  `obelisk.structure-build-policy-offline-attestation.v1`. It pins accepted planning
+  readiness, requires distinct base/candidate snapshot identities and redaction
+  boundaries, keeps public/runtime/enforcement flags false, and blocks promote mode. It is
+  not Structure SDK, enforcement, identity/lookup, mutation, return override, runtime
+  readiness, or v1 completion evidence.
 - Public `GameplayPolicyEvent` and `ChatMessageEvent` plugin callbacks are caught at the
   bridge to prevent C++ plugin exceptions from escaping into dispatcher/hook code.
 - Release scope wording separates copied RC plugin events from debug-gated raw

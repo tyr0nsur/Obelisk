@@ -251,20 +251,28 @@ FALSE_ONLY_KEYS = frozenset(
         "commands_replies_ready",
         "parser_allowed",
         "promotion_ready",
+        "public_abi_allowed",
         "public_abi_ready",
         "public_command_parser_allowed",
         "public_command_router_allowed",
         "public_header_allowed",
+        "public_reply_api",
         "public_readiness_ready",
         "public_reply_abi_allowed",
         "public_reply_or_send_chat_abi_allowed",
         "public_response_path_allowed",
         "public_sdk_ready",
+        "public_send_chat_api",
         "reply_send_chat_router_claims_allowed",
+        "reply_api_allowed",
         "public_send_chat_abi_allowed",
         "reply_allowed",
+        "runtime_delivery_allowed",
+        "runtime_readiness_allowed",
         "runtime_ready",
+        "send_chat_api_allowed",
         "send_chat_allowed",
+        "v1_completion_evidence",
     )
 )
 NEGATIVE_CONTEXT_TOKENS = (
@@ -278,14 +286,13 @@ NEGATIVE_CONTEXT_TOKENS = (
     "not_sufficient",
     "non_claim",
     "promotion_requires",
+    "required_evidence",
     "release_guardrails",
-    "required",
-    "required_behavior",
     "required_exclusions",
     "why_blocked",
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(blocked|cannot|does\s+not|fail[s-]?closed|forbidden|must\s+not|no|not|planning|"
+    r"\b(before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|must\s+be|must\s+not|no|not|planning|"
     r"post-v1|require[sd]?|unresolved|until|without)\b",
     re.IGNORECASE,
 )
@@ -360,7 +367,8 @@ def string_set(value: Any) -> set[str]:
 
 
 def normalized_key(key: Any) -> str:
-    return str(key).casefold().replace("-", "_").replace(" ", "_")
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return separated.casefold().replace("-", "_").replace(" ", "_")
 
 
 def is_negative_context(trail: str) -> bool:

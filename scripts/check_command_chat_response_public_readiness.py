@@ -263,9 +263,12 @@ FALSE_ONLY_KEYS = frozenset(
         "public_chat_router",
         "public_chat_routing",
         "public_command_router",
+        "public_readiness_ready",
+        "public_reply_or_send_chat_abi_allowed",
         "public_header_allowed",
         "public_header_ready",
         "public_headers_ready",
+        "public_response_path_allowed",
         "public_reply_api",
         "generic_chat_routing_public_response_allowed",
         "minimal_chat_message_event_public_response_allowed",
@@ -276,10 +279,15 @@ FALSE_ONLY_KEYS = frozenset(
         "public_sdk_ready",
         "public_send_chat_api",
         "reply_api",
+        "reply_api_allowed",
+        "reply_abi_allowed",
         "router_ready",
         "runtime_command_router",
+        "runtime_delivery_allowed",
+        "runtime_readiness_allowed",
         "runtime_ready",
         "send_chat_api",
+        "send_chat_api_allowed",
     )
 )
 NEGATIVE_CONTEXT_TOKENS = (
@@ -290,8 +298,8 @@ NEGATIVE_CONTEXT_TOKENS = (
     "non_claim",
     "not_promoted",
     "not_sufficient",
-    "required",
-    "requires",
+    "promotion_requires",
+    "required_evidence",
     "snapshot_prep_checks",
     "why_blocked",
 )
@@ -305,7 +313,7 @@ POSITIVE_SURFACE_RE = re.compile(
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(blocked|cannot|candidate|does\s+not|fail[s-]?closed|forbidden|not|planning|require[sd]?|until)\b",
+    r"\b(before|blocked|cannot|candidate|does\s+not|fail[s-]?closed|forbidden|must\s+be|not|planning|require[sd]?|until)\b",
     re.IGNORECASE,
 )
 
@@ -381,7 +389,8 @@ def contains_fragment(haystack: str, needle: str) -> bool:
 
 
 def normalized_key(key: Any) -> str:
-    return str(key).casefold().replace("-", "_").replace(" ", "_")
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return separated.casefold().replace("-", "_").replace(" ", "_")
 
 
 def negative_context(trail: str) -> bool:

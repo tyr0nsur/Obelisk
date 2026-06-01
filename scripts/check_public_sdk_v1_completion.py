@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -748,6 +749,8 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
             ["command_permission_route_gate_output_invalid"],
         )
     public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
+    if payload.get("schema") != "obelisk.command-permission-route-gate-check.v1":
+        blockers.append("command_permission_route_gate_schema_mismatch")
     if result.returncode != 0 or payload.get("valid") is not True:
         blockers.append("command_permission_route_gate_invalid")
     if payload.get("accepted_for_planning") is not True or payload.get("planning_only") is not True:
@@ -782,6 +785,10 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
 def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, Any]) -> list[str]:
     claims: list[str] = []
 
+    def normalized_key(key: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+        return separated.casefold().replace("-", "_").replace(" ", "_")
+
     def positive_text_claim(text: str) -> bool:
         if not (
             COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE.search(text)
@@ -806,7 +813,7 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         if isinstance(value, dict):
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
-                if key in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS and item is True:
+                if normalized_key(key) in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS and item is True:
                     claims.append(item_path)
                 if key == "public_or_runtime_claims" and isinstance(item, list):
                     for claim in item:
@@ -2198,7 +2205,13 @@ def build_report(
         if surface.get("status") == "planning"
     }
     completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
-    completion_blocker_set = set(completion_blockers)
+    duplicate_completion_blockers = sorted(
+        surface_id
+        for surface_id, count in Counter(completion_blockers).items()
+        if count > 1
+    )
+    unique_completion_blockers = list(dict.fromkeys(completion_blockers))
+    completion_blocker_set = set(unique_completion_blockers)
     post_v1_or_excluded = set(as_string_list(manifest.get("post_v1_or_excluded_surfaces")))
     status_post_v1_or_excluded_surfaces = {
         surface_id
@@ -2370,6 +2383,8 @@ def build_report(
         blockers.append("surface_id_missing")
     if duplicate_surface_ids:
         blockers.append("duplicate_surface_id")
+    if duplicate_completion_blockers:
+        blockers.append("duplicate_v1_sdk_completion_blocker")
     if missing_canonical_surfaces:
         blockers.append("canonical_surface_id_missing")
     if missing_canonical_completion_blockers:
@@ -2441,7 +2456,7 @@ def build_report(
 
     completion_blocker_statuses = {
         surface_id: surfaces_by_id.get(surface_id, {}).get("status", "missing")
-        for surface_id in completion_blockers
+        for surface_id in unique_completion_blockers
     }
     completion_blockers_with_promoted_outcome = sorted(
         surface_id
@@ -2469,9 +2484,9 @@ def build_report(
         for surface_id, status in completion_blocker_statuses.items()
         if status not in {"promoted", "post-v1", "excluded"}
     )
-    completion_blocker_total = len(completion_blockers)
+    completion_blocker_total = len(unique_completion_blockers)
     blocker_outcome_rows = completion_blocker_outcome_rows(
-        completion_blockers,
+        unique_completion_blockers,
         surfaces_by_id,
         post_v1_or_excluded,
         release_statement_text,
@@ -2563,6 +2578,7 @@ def build_report(
         ),
         "missing_surfaces": sorted(set(missing_surfaces)),
         "duplicate_surface_ids": sorted(set(duplicate_surface_ids)),
+        "duplicate_v1_sdk_completion_blockers": duplicate_completion_blockers,
         "promoted_without_public_contract": sorted(set(promoted_without_contract)),
         "missing_canonical_surfaces": missing_canonical_surfaces,
         "missing_canonical_completion_blockers": missing_canonical_completion_blockers,
@@ -2895,6 +2911,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         ],
         "duplicate_surface_id": [
             f"Duplicate surface IDs: {format_human_list(report.get('duplicate_surface_ids'))}.",
+        ],
+        "duplicate_v1_sdk_completion_blocker": [
+            "v1_sdk_completion_blockers must be a unique canonical blocker list.",
+            f"Duplicate blockers: {format_human_list(report.get('duplicate_v1_sdk_completion_blockers'))}.",
+            "Action: remove duplicates before using SDK progress counters.",
         ],
         "debug_only_surface_promoted": [
             "Debug-only surfaces cannot count as promoted public SDK surfaces.",

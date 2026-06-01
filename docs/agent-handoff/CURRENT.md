@@ -67,6 +67,10 @@ This file is an active routing table only. Durable evidence belongs in
 - Command/permission routing is planning-only. `planning_layout_gate.ready=true` on command
   response layout does not promote reply/send-chat ABI, command router, public header, ABI,
   SDK, runtime readiness, public SDK readiness, or v1 completion.
+  The route gate recursively scans sub-checker reports for public/runtime aliases and
+  positive text claims; a leaf `valid=true` is not enough if it reports public
+  reply/send-chat, command routing, permissions/admin, ABI, runtime, or v1-completion
+  readiness.
 - Player identity is first. The exact 12-target `players-identity-lifecycle-intake` set
   includes `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`; do not replace exact focal targets with a
@@ -111,6 +115,8 @@ This file is an active routing table only. Durable evidence belongs in
   mutation, return override, identity/lookup, `ResourceHandle`, or v1 completion. The
   checker rejects protected/symlink snapshot paths, non-sibling `base/`/`candidate/`
   roots, raw address leaks, and value-bearing keys on redacted/layout-only fields.
+  `obelisk.structure-build-policy-offline-attestation.v1` is a consume-only artifact-gate
+  schema for this planning evidence; promote mode remains blocked.
 - ResourceHandle/public GObjects remain blocked. old flag-policy artifact is obsolete;
   durable rich-provenance refresh is preserved; Consume mode accepts it and promote mode
   stays blocked; post-callback rejection contract is preserved as candidate-only; first

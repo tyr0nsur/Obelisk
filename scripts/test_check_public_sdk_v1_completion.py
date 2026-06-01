@@ -477,6 +477,37 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertFalse(payload["stable_claim_allowed"])
 
+    def test_completion_gate_rejects_route_gate_schema_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = Path(temp_dir) / "fake_route_gate.py"
+            route_gate_path.write_text(
+                "import json\n"
+                "print(json.dumps({\n"
+                "    'schema': 'wrong-schema',\n"
+                "    'valid': True,\n"
+                "    'accepted_for_planning': True,\n"
+                "    'planning_only': True,\n"
+                "    'promotion_ready': False,\n"
+                "    'public_sdk_ready': False,\n"
+                "    'public_abi_ready': False,\n"
+                "    'runtime_ready': False,\n"
+                "    'public_header_allowed': False,\n"
+                "    'blockers': []\n"
+                "} ))\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_schema_mismatch", payload["blockers"])
+
     def test_route_gate_claim_scanner_rejects_public_command_reply_aliases(self) -> None:
         import importlib.util
 
@@ -506,6 +537,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_send_chat_api": True,
                         "public_reply_abi_allowed": True,
                         "public_send_chat_abi_allowed": True,
+                        "public-reply-api": True,
+                        "publicSendChatApi": True,
                         "reply_send_chat_router_claims_allowed": True,
                         "public_abi_allowed": True,
                         "permissions_admin_ready": True,
@@ -530,6 +563,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].public_send_chat_api", claims)
         self.assertIn("checks[0].public_reply_abi_allowed", claims)
         self.assertIn("checks[0].public_send_chat_abi_allowed", claims)
+        self.assertIn("checks[0].public-reply-api", claims)
+        self.assertIn("checks[0].publicSendChatApi", claims)
         self.assertIn("checks[0].reply_send_chat_router_claims_allowed", claims)
         self.assertIn("checks[0].public_abi_allowed", claims)
         self.assertIn("checks[0].permissions_admin_ready", claims)
@@ -3378,6 +3413,32 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("duplicate_surface_id", payload["blockers"])
         self.assertEqual(payload["duplicate_surface_ids"], ["obelisk.player_identity.v1"])
+
+    def test_duplicate_v1_completion_blocker_blocks_progress_accounting(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        manifest["v1_sdk_completion_blockers"].append("obelisk.player_identity.v1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("duplicate_v1_sdk_completion_blocker", payload["blockers"])
+        self.assertEqual(payload["duplicate_v1_sdk_completion_blockers"], ["obelisk.player_identity.v1"])
+        progress = payload["v1_sdk_progress"]
+        self.assertEqual(progress["completion_blocker_total"], 12)
+        self.assertEqual(progress["completion_blockers_promoted_count"], 0)
+        self.assertEqual(progress["p0_chain_promoted_count"], 0)
 
     def test_promoted_experimental_surface_requires_structured_surface_specific_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()

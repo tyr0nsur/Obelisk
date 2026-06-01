@@ -127,6 +127,7 @@ STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.structure-return-only-polic
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
 STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA = "obelisk.structure-build-policy-offline-attestation.v1"
+STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE_CHECK_SCHEMA = "obelisk.structure-build-policy-offline-intake-check.v1"
 PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
 PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA = principal_invalidation_policy.SCHEMA
@@ -179,6 +180,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA,
     STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA,
     STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA,
+    STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE_CHECK_SCHEMA,
     PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
     PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA,
     PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA,
@@ -6201,6 +6203,14 @@ def validate_structure_build_policy_offline_attestation_manifest(payload: dict[s
     if payload.get("consume_only") is not True:
         blockers.append({"reason": "structure_build_policy_attestation_not_consume_only", "label": f"{label}:$.consume_only"})
 
+    checker_report = payload.get("checker_report")
+    if not isinstance(checker_report, dict):
+        blockers.append({"reason": "structure_build_policy_attestation_checker_report_missing", "label": f"{label}:$.checker_report"})
+    else:
+        blockers.extend(validate_structure_build_policy_offline_intake_check_manifest(checker_report, label=f"{label}:$.checker_report", mode="consume"))
+        if checker_report.get("readiness_sha256") != payload.get("readiness_sha256"):
+            blockers.append({"reason": "structure_build_policy_attestation_checker_report_sha256_mismatch", "label": f"{label}:$.checker_report.readiness_sha256"})
+
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
         if payload.get(key) is not False:
             blockers.append({"reason": f"structure_build_policy_attestation_{key}_not_false", "label": f"{label}:$.{key}"})
@@ -6261,6 +6271,57 @@ def validate_structure_build_policy_offline_attestation_manifest(payload: dict[s
         allowed_prefixes=("$.non_claims", "$.promotion_gate.blockers"),
     ):
         blockers.append({"reason": "structure_build_policy_attestation_promotion_status_overclaim", "label": f"{label}:{trail}"})
+    return blockers
+
+
+def validate_structure_build_policy_offline_intake_check_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE_CHECK_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    if payload.get("target_set") != STRUCTURE_BUILD_POLICY_TARGET_SET:
+        blockers.append({"reason": "structure_build_policy_check_target_set_mismatch", "label": f"{label}:$.target_set"})
+    if payload.get("status") != "accepted_planning_only":
+        blockers.append({"reason": "structure_build_policy_check_status_not_accepted_planning_only", "label": f"{label}:$.status"})
+    if payload.get("ready") is not True or payload.get("accepted_for_offline_planning") is not True:
+        blockers.append({"reason": "structure_build_policy_check_not_ready_for_offline_planning", "label": label})
+    if payload.get("planning_only") is not True:
+        blockers.append({"reason": "structure_build_policy_check_not_planning_only", "label": f"{label}:$.planning_only"})
+    if payload.get("readiness_sha256") != STRUCTURE_BUILD_POLICY_READINESS_SHA256:
+        blockers.append({"reason": "structure_build_policy_check_readiness_sha256_mismatch", "label": f"{label}:$.readiness_sha256"})
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
+        if payload.get(key) is not False:
+            blockers.append({"reason": f"structure_build_policy_check_{key}_not_false", "label": f"{label}:$.{key}"})
+    readiness_flags = payload.get("readiness_flags")
+    if not isinstance(readiness_flags, dict):
+        blockers.append({"reason": "structure_build_policy_check_readiness_flags_missing", "label": f"{label}:$.readiness_flags"})
+    else:
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
+            if readiness_flags.get(key) is not False:
+                blockers.append({"reason": f"structure_build_policy_check_readiness_flags_{key}_not_false", "label": f"{label}:$.readiness_flags.{key}"})
+    non_claim_matrix = payload.get("non_claim_matrix")
+    if not isinstance(non_claim_matrix, dict):
+        blockers.append({"reason": "structure_build_policy_check_non_claim_matrix_missing", "label": f"{label}:$.non_claim_matrix"})
+    else:
+        for key in (
+            "public_structure_events_sdk",
+            "structure_sdk",
+            "build_policy_sdk",
+            "enforcement",
+            "identity_lookup",
+            "mutation",
+            "return_override",
+            "runtime_hooks",
+            "v1_completion",
+        ):
+            if non_claim_matrix.get(key) != "not_claimed":
+                blockers.append({"reason": "structure_build_policy_check_non_claim_matrix_claimed", "label": f"{label}:$.non_claim_matrix.{key}"})
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_structure_build_policy_check_planning_only", "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "structure_build_policy_check_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, _, reason in collect_candidate_public_overclaims(payload, allowed_prefixes=("$.non_claim", "$.blockers")):
+        blockers.append({"reason": f"structure_build_policy_check_public_overclaim_{reason}", "label": f"{label}:{trail}"})
     return blockers
 
 
@@ -10383,6 +10444,7 @@ def validate_manifest(
     blockers.extend(validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_aggregate_census_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_build_policy_offline_attestation_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_structure_build_policy_offline_intake_check_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_first_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_lifecycle_anchor_candidates_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_principal_invalidation_policy_manifest(payload, label=str(resolved), mode=mode))

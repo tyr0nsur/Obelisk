@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -186,10 +187,15 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
 
 def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]:
     claims: list[str] = []
+
+    def normalized_key(key: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+        return separated.casefold().replace("-", "_").replace(" ", "_")
+
     if isinstance(value, dict):
         for key, item in value.items():
             item_path = f"{path}.{key}" if path else str(key)
-            if key in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and item is True:
+            if normalized_key(key) in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and item is True:
                 claims.append(item_path)
             if key == "public_or_runtime_claims" and isinstance(item, list):
                 for claim in item:

@@ -1205,11 +1205,42 @@ def structure_aggregate_census_policy_slice_manifest(
 
 
 def structure_build_policy_offline_attestation_manifest() -> dict:
+    checker_report = {
+        "schema": gate.STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE_CHECK_SCHEMA,
+        "target_set": gate.STRUCTURE_BUILD_POLICY_TARGET_SET,
+        "status": "accepted_planning_only",
+        "ready": True,
+        "accepted_for_offline_planning": True,
+        "planning_only": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "enforcement_ready": False,
+        "readiness_sha256": gate.STRUCTURE_BUILD_POLICY_READINESS_SHA256,
+        "readiness_flags": {
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "enforcement_ready": False,
+        },
+        "non_claim_matrix": {
+            "public_structure_events_sdk": "not_claimed",
+            "structure_sdk": "not_claimed",
+            "build_policy_sdk": "not_claimed",
+            "enforcement": "not_claimed",
+            "identity_lookup": "not_claimed",
+            "mutation": "not_claimed",
+            "return_override": "not_claimed",
+            "runtime_hooks": "not_claimed",
+            "v1_completion": "not_claimed",
+        },
+    }
     return {
         "schema": gate.STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA,
         "artifact_status": "evidence-only",
         "target_set": gate.STRUCTURE_BUILD_POLICY_TARGET_SET,
         "readiness_sha256": gate.STRUCTURE_BUILD_POLICY_READINESS_SHA256,
+        "checker_report": checker_report,
         "consume_only": True,
         "promotion_ready": False,
         "public_sdk_ready": False,
@@ -6883,6 +6914,46 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual("accepted", result["status"])
         self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_build_policy_attestation_without_checker_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-attestation.json"
+            payload = structure_build_policy_offline_attestation_manifest()
+            del payload["checker_report"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_build_policy_attestation_checker_report_missing", reasons)
+
+    def test_accepts_structure_build_policy_offline_intake_check_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-check.json"
+            payload = structure_build_policy_offline_attestation_manifest()["checker_report"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_build_policy_offline_intake_check_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-check.json"
+            payload = structure_build_policy_offline_attestation_manifest()["checker_report"]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_structure_build_policy_check_planning_only", reasons)
 
     def test_blocks_structure_build_policy_offline_attestation_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

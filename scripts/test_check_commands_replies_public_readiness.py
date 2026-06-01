@@ -300,6 +300,15 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         decisions = self.load_decisions()
         decisions["claim"] = "command router is public and ready"
         decisions["arkapi_parser_copy_allowed"] = True
+        decisions["public_reply_api"] = True
+        decisions["public_send_chat_api"] = True
+        decisions["reply_api_allowed"] = True
+        decisions["send_chat_api_allowed"] = True
+        decisions["runtime_delivery_allowed"] = True
+        decisions["public_abi_allowed"] = True
+        decisions["runtime_readiness_allowed"] = True
+        decisions["v1_completion_evidence"] = True
+        decisions["required_before_public_header"][0]["required_behavior"] = ["reply API is public and ready"]
         decisions["notes"] = [
             "ArkApi command parser copied and supported",
             "send-chat is available",

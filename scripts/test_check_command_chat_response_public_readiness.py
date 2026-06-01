@@ -345,6 +345,13 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         readiness["planning_layout_gate"]["promotion_ready"] = True
         readiness["promotion_gate"]["ready"] = True
         readiness["target_set_guidance"][0]["reply_api"] = True
+        readiness["target_set_guidance"][0]["public_readiness_ready"] = True
+        readiness["target_set_guidance"][0]["public_response_path_allowed"] = True
+        readiness["target_set_guidance"][0]["public_reply_or_send_chat_abi_allowed"] = True
+        readiness["target_set_guidance"][0]["reply_api_allowed"] = True
+        readiness["target_set_guidance"][0]["send_chat_api_allowed"] = True
+        readiness["target_set_guidance"][0]["runtime_delivery_allowed"] = True
+        readiness["target_set_guidance"][0]["required_behavior"] = ["reply API is public and ready"]
         readiness["claim"] = "reply API is public and ready"
         readiness["generic_chat_claim"] = "generic chat routing is public and ready"
         readiness["send_chat_claim"] = "send-chat is available"
