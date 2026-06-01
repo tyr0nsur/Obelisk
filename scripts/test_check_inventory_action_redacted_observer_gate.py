@@ -61,6 +61,10 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
             text=True,
         )
 
+    def assert_no_runtime_read_or_dispatch_budget(self, payload: dict) -> None:
+        self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
+        self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
+
     def test_candidate_gate_accepts_exact_fixture_shape_without_runtime_promotion(self) -> None:
         for fname_index, expected_target in EXPECTED_TARGET_BY_FNAME_INDEX.items():
             with self.subTest(fname_index=fname_index):
@@ -110,8 +114,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
                 self.assertEqual(1, payload["gate"]["observation_budget"])
                 self.assertTrue(payload["gate"]["cheap_gate_passed"])
                 self.assertTrue(payload["gate"]["observation_budget_reservation_allowed"])
-                self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
-                self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
+                self.assert_no_runtime_read_or_dispatch_budget(payload)
                 self.assertEqual(
                     ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
                     payload["fixture_summary"]["copied_integer_fields"],
@@ -148,8 +151,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("missing_observation_budget", reasons)
         self.assertFalse(payload["gate"]["cheap_gate_passed"])
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
-        self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
-        self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["promotion_ready"])
 
@@ -166,6 +168,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
             {"reason": "missing_marker", "marker": "enable-inventory-action-redacted-observer"},
             payload["blockers"],
         )
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
     def test_unsupported_sha_and_non_target_fname_fail_closed(self) -> None:
         args = list(REQUIRED_GATE_ARGS)
@@ -181,6 +184,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("non_target_fname", reasons)
         self.assertFalse(payload["gate"]["cheap_gate_passed"])
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
     def test_nonzero_dispatch_budget_fails_closed(self) -> None:
         args = list(REQUIRED_GATE_ARGS)
@@ -192,6 +196,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("dispatch_budget_not_zero", reasons)
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
     def test_missing_or_zero_observation_budget_fails_closed_without_budget_reservation(self) -> None:
         args = list(REQUIRED_GATE_ARGS)
@@ -206,6 +211,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("missing_observation_budget", reasons)
         self.assertTrue(payload["gate"]["cheap_gate_passed"])
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
         args = list(REQUIRED_GATE_ARGS)
         args[args.index("1")] = "0"
@@ -218,6 +224,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("observation_budget_not_positive", reasons)
         self.assertTrue(payload["gate"]["cheap_gate_passed"])
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
     def test_excessive_observation_budget_fails_closed_without_budget_reservation(self) -> None:
         args = list(REQUIRED_GATE_ARGS)
@@ -231,6 +238,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("observation_budget_exceeds_maximum", reasons)
         self.assertTrue(payload["gate"]["cheap_gate_passed"])
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
     def test_public_contract_leak_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -438,6 +446,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("scalar_contract_mismatch", reasons)
         self.assertIn("public_or_runtime_flag_promoted", reasons)
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assert_no_runtime_read_or_dispatch_budget(payload)
 
 
 if __name__ == "__main__":

@@ -378,6 +378,10 @@ namespace
                 "dispatch budget should allow inventory observation without log budget");
         Require(!ShouldAttemptNameObservation(kCanUseNameIndex, 0, 0),
                 "zero log and dispatch budgets should skip inventory observation");
+        Require(!ShouldAttemptNameObservation(kServerRequestInventoryUseItemNameIndex, 0, 1),
+                "metadata-only ServerRequestInventoryUseItem dispatch budget should not activate observation");
+        Require(!ShouldAttemptNameObservation(kServerRequestInventoryUseItemWithActorNameIndex, 0, 1),
+                "metadata-only ServerRequestInventoryUseItemWithActor dispatch budget should not activate observation");
 
         std::atomic<uint64_t> counter{0};
         uint64_t observationNumber = 99;
@@ -421,6 +425,19 @@ namespace
                 "metadata-only inventory action consumed copied-bool dispatch budget");
         Require(observationNumber == 0, "metadata-only dispatch attempt did not clear observation number");
         Require(dispatchCounter.load() == 0, "metadata-only inventory action changed dispatch counter");
+
+        metadataOnlyMatchedAttempt.Invocation.Function =
+            InventoryReflection::InventoryFunction::ServerRequestInventoryUseItemWithActor;
+        metadataOnlyMatchedAttempt.Invocation.FunctionNameIndex = kServerRequestInventoryUseItemWithActorNameIndex;
+        Require(!TryReserveDispatchBudgetForMatchedAttempt(metadataOnlyMatchedAttempt,
+                                                          dispatchCounter,
+                                                          1,
+                                                          observationNumber),
+                "metadata-only inventory action with actor consumed copied-bool dispatch budget");
+        Require(observationNumber == 0,
+                "metadata-only with-actor dispatch attempt did not clear observation number");
+        Require(dispatchCounter.load() == 0,
+                "metadata-only inventory action with actor changed dispatch counter");
 
         Attempt wrongOuterMatchedAttempt;
         wrongOuterMatchedAttempt.Status = AttemptStatus::Matched;
