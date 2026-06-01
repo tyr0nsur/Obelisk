@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import importlib.util
 from pathlib import Path
 
 
@@ -16,6 +17,11 @@ REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_command_permission_route_gate.py"
 QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
 IDENTITY_DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
+
+SPEC = importlib.util.spec_from_file_location("check_command_permission_route_gate", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+ROUTE_GATE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(ROUTE_GATE)
 
 
 class CommandPermissionRouteGateTests(unittest.TestCase):
@@ -71,6 +77,17 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             },
             report["critical_path_phase"],
         )
+        self.assertEqual(
+            {
+                "locked": True,
+                "blocked_until": [
+                    "approved_runtime_principal_lifecycle_evidence",
+                    "reviewed_identity_public_contract",
+                ],
+                "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
+            },
+            report["route_lock"],
+        )
         check_names = {check["name"] for check in report["checks"]}
         self.assertIn("player_identity_public_contract_gap", check_names)
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
@@ -120,6 +137,42 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             self.assertTrue(
                 any("player_identity_public_contract_gap" in blocker for blocker in report["blockers"])
             )
+
+    def test_critical_path_phase_accepts_identity_runtime_and_contract_blockers(self) -> None:
+        phase = {
+            "current_surface": "obelisk.player_identity.v1",
+            "current_blocker": "approved_runtime_evidence_missing",
+            "permissions_admin_unlocked": False,
+            "command_response_unlocked": False,
+            "commands_replies_unlocked": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+        }
+        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+
+        phase["current_blocker"] = "identity_public_contract_gate_missing"
+        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+
+        phase["current_blocker"] = "identity_public_contract_gate"
+        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+
+    def test_critical_path_phase_rejects_unlocked_commands_or_unknown_blocker(self) -> None:
+        phase = {
+            "current_surface": "obelisk.player_identity.v1",
+            "current_blocker": "unexpected",
+            "permissions_admin_unlocked": False,
+            "command_response_unlocked": False,
+            "commands_replies_unlocked": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+        }
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
+        self.assertIn("critical_path_commands_replies_unlocked_must_stay_false", blockers)
 
 
 if __name__ == "__main__":

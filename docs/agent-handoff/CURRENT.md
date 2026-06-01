@@ -31,6 +31,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `command_chat_response_path`, and `commands_replies`. Those four surfaces must be
   promoted with evidence for any complete/full/production SDK wording; excluding or
   naming them post-v1 is only scoped non-complete release-statement accounting.
+- Latest copied-surface hardening: Inventory copied-policy recognition now records
+  borrowed params provenance only for targets with copied scalar ranges, rejects forged
+  scalar ranges that do not point to `params + reflected_offset`, keeps metadata-only
+  inventory action targets without hidden params provenance, and preserves no-budget/no-read
+  tests. The command/permission route gate also has an explicit `route_lock` invariant
+  keeping permissions, command response, and replies locked behind player-identity runtime
+  evidence plus the reviewed identity public-contract gate.
 
 ## Hard Overrides
 

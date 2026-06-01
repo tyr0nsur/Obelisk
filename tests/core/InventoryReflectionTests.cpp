@@ -396,6 +396,9 @@ namespace
 
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == InventoryReflection::InventoryFunction::CanUse, "CanUse kind mismatch");
+        Require(invocation.HasParameterRanges, "CanUse should record copied scalar params provenance");
+        Require(invocation.ParamData == fixture.Params.data(), "CanUse params provenance data mismatch");
+        Require(invocation.ParamSize == 0x02, "CanUse params provenance size mismatch");
         Require(invocation.Fields.size() == 2, "CanUse field count mismatch");
         RequireFieldMetadata(invocation.Fields[0],
                              InventoryReflection::InventoryField::BIgnoreCooldown,
@@ -439,6 +442,12 @@ namespace
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == InventoryReflection::InventoryFunction::AllowRemoteAddToInventory,
                 "AllowRemoteAddToInventory kind mismatch");
+        Require(invocation.HasParameterRanges,
+                "AllowRemoteAddToInventory should record copied scalar params provenance");
+        Require(invocation.ParamData == fixture.Params.data(),
+                "AllowRemoteAddToInventory params provenance data mismatch");
+        Require(invocation.ParamSize == 0x12,
+                "AllowRemoteAddToInventory params provenance size mismatch");
         Require(invocation.Fields.size() == 4, "AllowRemoteAddToInventory field count mismatch");
         RequireFieldMetadata(invocation.Fields[0],
                              InventoryReflection::InventoryField::InventoryComponent,
@@ -504,8 +513,12 @@ namespace
             Require(invocation.Function == InventoryReflection::InventoryFunction::ServerRequestInventoryUseItem,
                     "ServerRequestInventoryUseItem kind mismatch");
             Require(invocation.Fields.size() == 2, "ServerRequestInventoryUseItem field count mismatch");
-            Require(invocation.HasParameterRanges,
-                    "ServerRequestInventoryUseItem should record params availability without exposing ranges");
+            Require(!invocation.HasParameterRanges,
+                    "ServerRequestInventoryUseItem should not retain params provenance without copied ranges");
+            Require(invocation.ParamData == nullptr,
+                    "ServerRequestInventoryUseItem retained hidden params pointer");
+            Require(invocation.ParamSize == 0,
+                    "ServerRequestInventoryUseItem retained hidden params size");
             RequireFieldMetadata(invocation.Fields[0],
                                  InventoryReflection::InventoryField::InventoryComponent,
                                  kInventoryCompNameIndex,
@@ -547,6 +560,12 @@ namespace
                     "ServerRequestInventoryUseItemWithActor kind mismatch");
             Require(invocation.Fields.size() == 4,
                     "ServerRequestInventoryUseItemWithActor field count mismatch");
+            Require(!invocation.HasParameterRanges,
+                    "ServerRequestInventoryUseItemWithActor should not retain params provenance without copied ranges");
+            Require(invocation.ParamData == nullptr,
+                    "ServerRequestInventoryUseItemWithActor retained hidden params pointer");
+            Require(invocation.ParamSize == 0,
+                    "ServerRequestInventoryUseItemWithActor retained hidden params size");
             RequireFieldMetadata(invocation.Fields[0],
                                  InventoryReflection::InventoryField::Actor,
                                  kAnActorNameIndex,

@@ -359,6 +359,30 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
             out.BoolValue = value != 0;
             return true;
         }
+
+        bool MatchesExpectedParamRange(
+            const Obelisk::UE::InventoryReflection::InventoryInvocation& invocation,
+            const Obelisk::UE::InventoryReflection::InventoryFieldRange& field,
+            const ExpectedPolicyField& expected)
+        {
+            if (!invocation.HasParameterRanges ||
+                !invocation.ParamData ||
+                expected.Offset < 0 ||
+                expected.Size > invocation.ParamSize)
+            {
+                return false;
+            }
+
+            const size_t offset = static_cast<size_t>(expected.Offset);
+            if (offset > invocation.ParamSize ||
+                expected.Size > invocation.ParamSize - offset)
+            {
+                return false;
+            }
+
+            return field.Range.Data == invocation.ParamData + offset &&
+                   field.Range.Size == expected.Size;
+        }
     }
 
     Attempt TryIdentifyInvocation(const Gate& gate,
@@ -463,6 +487,7 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
 
             Obelisk::Core::InventoryPolicyScalarValue scalar;
             if (out.ScalarCount >= out.ScalarStorage.size() ||
+                !MatchesExpectedParamRange(invocation, field, expectedField) ||
                 !TryCopyScalar(field, expectedField, scalar))
             {
                 out = {};

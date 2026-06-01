@@ -200,6 +200,10 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   event support.
 - Copied `BoolProperty` values must be canonical: copy only bytes `0` or `1`; reject
   bytes greater than `1` instead of normalizing them to `true`.
+- Copied scalar surfaces must validate borrowed parameter provenance before copying:
+  exposed ranges must point exactly to `params + reflected_offset` within the reflected
+  `ParmsSize`. Metadata-only or redacted-recognition targets must not retain hidden params
+  provenance just because `params` is non-null.
 - Observer/helper gates must prove fail-closed behavior before runtime wiring: disabled
   gates, missing profile/window/marker/SHA, unsupported SHA, zero budget, and non-target
   `fname_index` must not read metadata/params or reserve sequence/log budget.

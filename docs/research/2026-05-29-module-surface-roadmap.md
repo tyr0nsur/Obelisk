@@ -213,9 +213,10 @@ No-repeat rules for this round:
 - `ResourceHandle` is not blocked by lack of FName/UFunction discovery. It is blocked by
   `uobject_flags_validity_semantics_unproven`, lack of rejected object samples, and no
   accepted lifetime/revalidation contract across hook callbacks and possible object reuse.
-- Hub foundation blockers: release docs/tests, installed packaging checks, descriptor and
+- SDK foundation blockers: release docs/tests, installed packaging checks, descriptor and
   capability stability, fail-closed config behavior, and plugin lifecycle cleanup remain
-  the only blockers on the next broadly v1-facing lane.
+  contributor-surface hardening work. They are not Plugin Hub production blockers while
+  the complete SDK blocker chain remains open.
 - Gameplay policy backing blockers: every added event kind still needs exact target-set
   membership, copied/redacted POD ownership, fixture and consume-gate coverage, no raw UE
   pointer exposure, no mutation, and no return override.

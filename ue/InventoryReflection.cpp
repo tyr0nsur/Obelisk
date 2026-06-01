@@ -257,6 +257,16 @@ namespace Obelisk::UE::InventoryReflection
             }
         }
 
+        bool HasCopiedParameterRange(const InventoryFunctionSpec& spec)
+        {
+            for (size_t i = 0; i < spec.FieldCount; ++i)
+            {
+                if (spec.Fields[i].ExposesRange)
+                    return true;
+            }
+            return false;
+        }
+
         RuntimeReflection::ReadResult ValidateGate(const RuntimeReflection::ReadOptions& options)
         {
             if (!options.Enabled)
@@ -468,7 +478,12 @@ namespace Obelisk::UE::InventoryReflection
         value.Function = spec->Function;
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
-        value.HasParameterRanges = params != nullptr;
+        value.HasParameterRanges = params != nullptr && HasCopiedParameterRange(*spec);
+        if (value.HasParameterRanges)
+        {
+            value.ParamData = static_cast<const uint8_t*>(params);
+            value.ParamSize = reflectedFunction.ParmsSize;
+        }
         if (spec->FieldCount > value.Fields.capacity())
             return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
                                                        "inventory field count exceeds storage capacity");

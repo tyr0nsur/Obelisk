@@ -30,6 +30,20 @@ COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
     ),
 }
 
+OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS = {
+    "RegisterPreProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
+    "RegisterPostProcessEventWithOwnerTokenHandle": "EventManager::Get().UnregisterCallbacksForOwner(owner)",
+    "RegisterPreProcessEventForNameIndexWithOwnerTokenHandle": (
+        "EventManager::Get().UnregisterCallbacksForOwner(owner)"
+    ),
+    "RegisterPostProcessEventForNameIndexWithOwnerTokenHandle": (
+        "EventManager::Get().UnregisterCallbacksForOwner(owner)"
+    ),
+    "RegisterGameplayPolicyEventWithOwnerTokenHandle": "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
+    "RegisterChatMessageEventWithOwnerTokenHandle": "UnregisterChatMessageRegistrationsForOwner(owner)",
+    "RegisterTimerWithOwnerTokenHandle": "TimerManager::Get().UnregisterCallbacksForOwner(owner)",
+}
+
 BLOCKED_PLUGIN_MANAGER_PUBLIC_WIRING_TOKENS = {
     "inventory-action observer": (
         "InventoryAction",
@@ -451,6 +465,32 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 public_index = body.index(public_token)
                 for direct_token in direct_dispatcher_cleanup_tokens:
                     self.assertLess(public_index, body.index(direct_token))
+
+    def test_public_owner_token_handle_apis_have_owner_cleanup_backstops(self) -> None:
+        api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")
+        plugin_manager_text = PLUGIN_MANAGER.read_text(encoding="utf-8")
+        cleanup_body = extract_function_body(
+            plugin_manager_text,
+            r"bool PluginManager::UnregisterPluginCallbacks\(.*?\)",
+        )
+
+        owner_token_handle_fields = {
+            field
+            for field in obelisk_api_field_names(api_header)
+            if field.startswith("Register") and field.endswith("WithOwnerTokenHandle")
+        }
+        expected_fields = set(OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS)
+        self.assertEqual(
+            sorted(owner_token_handle_fields - expected_fields),
+            [],
+            "New public owner-token handle registration APIs must declare their "
+            "PluginManager owner-cleanup backstop before ABI exposure.",
+        )
+        self.assertEqual(sorted(expected_fields - owner_token_handle_fields), [])
+
+        for api_field, cleanup_token in OWNER_TOKEN_HANDLE_CLEANUP_BACKSTOPS.items():
+            with self.subTest(api_field=api_field):
+                self.assertIn(cleanup_token, cleanup_body)
 
     def test_inventory_gameplay_policy_kinds_are_wired_to_expected_dispatcher_family(self) -> None:
         api_header = OBELISK_API_HEADER.read_text(encoding="utf-8")

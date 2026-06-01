@@ -181,15 +181,16 @@ When a plugin family reveals a promising surface, create an Obelisk-native lane:
 4. Add fixture and second-source comparison.
 5. Design a copied C ABI surface with explicit ownership, redaction, lifecycle cleanup,
    and plugin tests.
-6. Only then expose it to Plugin Hub examples or public docs.
+6. Only after the SDK surface is promoted, consider post-SDK Plugin Hub examples or
+   public docs.
 
 Non-roadmap candidate pressure order from this demand inventory:
 
 This list is not a v1 delivery sequence, compatibility plan, or Plugin Hub roadmap. It is a
 demand-ranked dependency sketch for future design reviews after the promotion gates above.
 
-1. Hub foundation: lifecycle, descriptors, timers, config/logging, reload posture, and
-   multi-instance-safe packaging.
+1. SDK foundation: lifecycle, descriptors, timers, config/logging, reload posture, and
+   multi-instance-safe packaging. Treat any Hub-facing example work as post-SDK-complete.
 2. Passive chat parsing and plugin-local text routing on top of copied `ChatMessageEvent`,
    without claiming a command, moderation, or reply/send-chat SDK.
 3. Permissions/admin only after copied identity and privacy-safe grants/checks; do not use

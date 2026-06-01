@@ -22,6 +22,11 @@ DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE = (
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
+ALLOWED_CRITICAL_PATH_BLOCKERS = {
+    "approved_runtime_evidence_missing",
+    "identity_public_contract_gate",
+    "identity_public_contract_gate_missing",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -235,6 +240,26 @@ def build_critical_path_phase() -> dict[str, Any]:
     }
 
 
+def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    if phase.get("current_surface") != "obelisk.player_identity.v1":
+        blockers.append("critical_path_identity_gate_not_locked")
+    if phase.get("current_blocker") not in ALLOWED_CRITICAL_PATH_BLOCKERS:
+        blockers.append("critical_path_identity_gate_unexpected_blocker")
+    for key in (
+        "permissions_admin_unlocked",
+        "command_response_unlocked",
+        "commands_replies_unlocked",
+        "promotion_ready",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "runtime_ready",
+    ):
+        if phase.get(key) is not False:
+            blockers.append(f"critical_path_{key}_must_stay_false")
+    return blockers
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     checks = [run_check(name, argv) for name, argv in route_checks(args)]
     blockers = []
@@ -248,6 +273,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append(f"{check['name']}: unexpected public/runtime claim: {joined}")
         if not check["valid"]:
             blockers.append(f"{check['name']}: invalid route prerequisite")
+    critical_path_phase = build_critical_path_phase()
+    blockers.extend(validate_critical_path_phase(critical_path_phase))
 
     return {
         "schema": REPORT_SCHEMA,
@@ -265,7 +292,15 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "obelisk.command_chat_response_path.v1",
             "obelisk.commands_replies.v1",
         ],
-        "critical_path_phase": build_critical_path_phase(),
+        "critical_path_phase": critical_path_phase,
+        "route_lock": {
+            "locked": not validate_critical_path_phase(critical_path_phase),
+            "blocked_until": [
+                "approved_runtime_principal_lifecycle_evidence",
+                "reviewed_identity_public_contract",
+            ],
+            "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
+        },
         "checks": checks,
         "blockers": blockers,
     }

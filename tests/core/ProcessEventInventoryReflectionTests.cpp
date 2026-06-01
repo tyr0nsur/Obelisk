@@ -190,6 +190,28 @@ namespace
         }
     }
 
+    template <size_t N>
+    void AttachParameterProvenance(InventoryReflection::InventoryInvocation& invocation,
+                                   const std::array<uint8_t, N>& params)
+    {
+        invocation.HasParameterRanges = true;
+        invocation.ParamData = params.data();
+        invocation.ParamSize = params.size();
+        for (InventoryReflection::InventoryFieldRange& field : invocation.Fields)
+        {
+            if (!field.ExposesRange)
+            {
+                field.Range = {};
+                continue;
+            }
+            Require(field.Offset >= 0, "test inventory field offset is negative");
+            const size_t offset = static_cast<size_t>(field.Offset);
+            Require(offset <= params.size() && field.Size <= params.size() - offset,
+                    "test inventory field is outside params");
+            field.Range = {params.data() + offset, field.Size};
+        }
+    }
+
     struct InventoryFixture
     {
         std::array<uint8_t, 0xb0> Function{};
@@ -452,8 +474,7 @@ namespace
         Require(observationNumber == 0, "wrong-outer dispatch attempt did not clear observation number");
         Require(dispatchCounter.load() == 0, "wrong-outer CanUse changed dispatch counter");
 
-        uint8_t ignoreCooldown = 1;
-        uint8_t returnValue = 1;
+        std::array<uint8_t, 2> canUseParams{{1, 1}};
         auto makeCanUseField = [](InventoryReflection::InventoryField field,
                                   int32_t propertyNameIndex,
                                   int32_t offset,
@@ -479,12 +500,12 @@ namespace
             makeCanUseField(InventoryReflection::InventoryField::BIgnoreCooldown,
                             kBIgnoreCooldownNameIndex,
                             0x00,
-                            &ignoreCooldown));
+                            canUseParams.data()));
         noParameterRangesMatchedAttempt.Invocation.Fields.push_back(
             makeCanUseField(InventoryReflection::InventoryField::ReturnValue,
                             kReturnValueNameIndex,
                             0x01,
-                            &returnValue));
+                            canUseParams.data() + 1));
         Require(!TryReserveDispatchBudgetForMatchedAttempt(noParameterRangesMatchedAttempt,
                                                           dispatchCounter,
                                                           1,
@@ -496,7 +517,7 @@ namespace
                 "CanUse without parameter ranges changed dispatch counter");
 
         Attempt wrongScalarShapeMatchedAttempt = noParameterRangesMatchedAttempt;
-        wrongScalarShapeMatchedAttempt.Invocation.HasParameterRanges = true;
+        AttachParameterProvenance(wrongScalarShapeMatchedAttempt.Invocation, canUseParams);
         wrongScalarShapeMatchedAttempt.Invocation.Fields[0].PropertyNameIndex = kReturnValueNameIndex;
         Require(!TryReserveDispatchBudgetForMatchedAttempt(wrongScalarShapeMatchedAttempt,
                                                           dispatchCounter,
@@ -516,12 +537,13 @@ namespace
             makeCanUseField(InventoryReflection::InventoryField::BIgnoreCooldown,
                             kBIgnoreCooldownNameIndex,
                             0x00,
-                            &ignoreCooldown));
+                            canUseParams.data()));
         matchedAttempt.Invocation.Fields.push_back(
             makeCanUseField(InventoryReflection::InventoryField::ReturnValue,
                              kReturnValueNameIndex,
                              0x01,
-                             &returnValue));
+                             canUseParams.data() + 1));
+        AttachParameterProvenance(matchedAttempt.Invocation, canUseParams);
 
         CopiedInventoryPolicyEvent copiedEvent;
         copiedEvent.ScalarStorage[0] = {
@@ -580,6 +602,37 @@ namespace
 
         Require(attempt.Status == AttemptStatus::Disabled, "disabled gate did not short-circuit");
         Require(context.Calls == 0, "disabled gate touched UFunction memory");
+    }
+
+    void TestClosedInventoryGatesDoNotRead()
+    {
+        const char* supportedSha = kSupportedShooterGameServerSha256.data();
+        const Gate closedGates[] = {
+            EvaluateGate(nullptr, true, true, true, supportedSha),
+            EvaluateGate("0", true, true, true, supportedSha),
+            EvaluateGate("1", false, true, true, supportedSha),
+            EvaluateGate("1", true, false, true, supportedSha),
+            EvaluateGate("1", true, true, false, supportedSha),
+            EvaluateGate("1", true, true, true, nullptr),
+            EvaluateGate("1", true, true, true, ""),
+            EvaluateGate("1", true, true, true, "not-this-binary"),
+        };
+
+        for (const Gate& gate : closedGates)
+        {
+            ReaderContext context;
+            MemoryReader reader{RegionReader, &context};
+            Attempt attempt = TryIdentifyInvocation(
+                gate,
+                kCanUseNameIndex,
+                reader,
+                reinterpret_cast<void*>(0x10000),
+                reinterpret_cast<void*>(0x20000));
+
+            Require(attempt.Status == AttemptStatus::Disabled,
+                    "closed inventory gate did not short-circuit as disabled");
+            Require(context.Calls == 0, "closed inventory gate touched UFunction memory");
+        }
     }
 
     void TestNonInventoryNameDoesNotRead()
@@ -660,6 +713,92 @@ namespace
         }
     }
 
+    void TestDispatchBudgetDoesNotTouchParamsWithoutBudget()
+    {
+        uint8_t ignoreCooldown = 1;
+        uint8_t returnValue = 1;
+        auto makeCanUseField = [](InventoryReflection::InventoryField field,
+                                  int32_t propertyNameIndex,
+                                  int32_t offset,
+                                  const uint8_t* data) {
+            InventoryReflection::InventoryFieldRange value;
+            value.Field = field;
+            value.PropertyNameIndex = propertyNameIndex;
+            value.Offset = offset;
+            value.Size = sizeof(uint8_t);
+            value.ExposesRange = true;
+            value.Range = {data, sizeof(uint8_t)};
+            PopulateFieldMetadata(value);
+            return value;
+        };
+
+        Attempt attempt;
+        attempt.Status = AttemptStatus::Matched;
+        attempt.Invocation.Function = InventoryReflection::InventoryFunction::CanUse;
+        attempt.Invocation.FunctionNameIndex = kCanUseNameIndex;
+        attempt.Invocation.OuterNameIndex = kPrimalItemNameIndex;
+        attempt.Invocation.HasParameterRanges = true;
+        attempt.Invocation.Fields.push_back(makeCanUseField(InventoryReflection::InventoryField::BIgnoreCooldown,
+                                                            kBIgnoreCooldownNameIndex,
+                                                            0x00,
+                                                            &ignoreCooldown));
+        attempt.Invocation.Fields.push_back(makeCanUseField(InventoryReflection::InventoryField::ReturnValue,
+                                                            kReturnValueNameIndex,
+                                                            0x01,
+                                                            &returnValue));
+
+        int owner = 0;
+        std::vector<CapturedInventoryPolicyEvent> captured;
+        const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+            &owner,
+            Obelisk::Core::InventoryPolicyEventSubscription{CaptureInventoryPolicyEvent, &captured});
+        Require(registrationId != 0, "failed to register inventory policy subscriber for no-budget test");
+
+        attempt.Invocation.Fields[0].Range = {reinterpret_cast<const uint8_t*>(0x1), sizeof(uint8_t)};
+        attempt.Invocation.Fields[1].Range = {reinterpret_cast<const uint8_t*>(0x1), sizeof(uint8_t)};
+
+        CopiedInventoryPolicyEvent copiedEvent;
+        copiedEvent.ScalarStorage[0] = {
+            .Field = Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+            .BoolValue = true,
+        };
+        copiedEvent.ScalarCount = 1;
+        copiedEvent.RebindScalarSpan();
+
+        std::atomic<uint64_t> dispatchCounter{0};
+        uint64_t observationNumber = 99;
+        Require(!TryBuildAndReserveDispatchBudgetForMatchedAttempt(attempt,
+                                                                   dispatchCounter,
+                                                                   0,
+                                                                   observationNumber,
+                                                                   copiedEvent),
+                "zero inventory dispatch budget touched params or reserved output");
+        Require(dispatchCounter.load() == 0, "zero inventory dispatch budget changed counter");
+        Require(observationNumber == 0, "zero inventory dispatch budget did not clear observation number");
+        Require(copiedEvent.View.Scalars.empty(), "zero inventory dispatch budget left stale copied output");
+
+        dispatchCounter.store(1);
+        observationNumber = 99;
+        copiedEvent.ScalarStorage[0] = {
+            .Field = Obelisk::Core::InventoryPolicyScalarField::BIgnoreCooldown,
+            .BoolValue = true,
+        };
+        copiedEvent.ScalarCount = 1;
+        copiedEvent.RebindScalarSpan();
+        Require(!TryBuildAndReserveDispatchBudgetForMatchedAttempt(attempt,
+                                                                   dispatchCounter,
+                                                                   1,
+                                                                   observationNumber,
+                                                                   copiedEvent),
+                "exhausted inventory dispatch budget touched params or reserved output");
+        Require(dispatchCounter.load() == 1, "exhausted inventory dispatch budget changed counter");
+        Require(observationNumber == 0, "exhausted inventory dispatch budget did not clear observation number");
+        Require(copiedEvent.View.Scalars.empty(), "exhausted inventory dispatch budget left stale copied output");
+        Require(captured.empty(), "no-budget inventory dispatch reached subscriber");
+
+        Obelisk::Core::InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(&owner);
+    }
+
     void TestIdentifiesCanUse()
     {
         InventoryFixture fixture;
@@ -677,6 +816,9 @@ namespace
         Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
         Require(attempt.Invocation.Function == InventoryReflection::InventoryFunction::CanUse,
                 "CanUse function mismatch");
+        Require(attempt.Invocation.HasParameterRanges, "CanUse did not record parameter range provenance");
+        Require(attempt.Invocation.ParamData == fixture.Params.data(), "CanUse params provenance data mismatch");
+        Require(attempt.Invocation.ParamSize == 0x02, "CanUse params provenance size mismatch");
         Require(attempt.Invocation.Fields.size() == 2, "CanUse field count mismatch");
         Require(attempt.Invocation.Fields[0].Field == InventoryReflection::InventoryField::BIgnoreCooldown,
                 "bIgnoreCooldown field mismatch");
@@ -701,6 +843,12 @@ namespace
         Require(attempt.Status == AttemptStatus::Matched, attempt.Result.Reason.c_str());
         Require(attempt.Invocation.Function == InventoryReflection::InventoryFunction::AllowRemoteAddToInventory,
                 "AllowRemoteAddToInventory function mismatch");
+        Require(attempt.Invocation.HasParameterRanges,
+                "AllowRemoteAddToInventory did not record parameter range provenance");
+        Require(attempt.Invocation.ParamData == fixture.Params.data(),
+                "AllowRemoteAddToInventory params provenance data mismatch");
+        Require(attempt.Invocation.ParamSize == 0x12,
+                "AllowRemoteAddToInventory params provenance size mismatch");
         Require(attempt.Invocation.Fields.size() == 4, "AllowRemoteAddToInventory field count mismatch");
         Require(attempt.Invocation.Fields[0].Range.Data == nullptr, "InventoryComponent range was exposed");
         Require(attempt.Invocation.Fields[1].Range.Data == nullptr, "ByPC range was exposed");
@@ -1020,8 +1168,7 @@ namespace
 
     void TestRejectsDispatchWhenExpectedScalarMetadataDiffers()
     {
-        uint8_t ignoreCooldown = 1;
-        uint8_t returnValue = 1;
+        std::array<uint8_t, 2> canUseParams{{1, 1}};
 
         auto makeBoolField = [](InventoryReflection::InventoryField field,
                                 int32_t propertyNameIndex,
@@ -1048,11 +1195,12 @@ namespace
             invocation.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::BIgnoreCooldown,
                                                      kBIgnoreCooldownNameIndex,
                                                      0x00,
-                                                     &ignoreCooldown));
+                                                     canUseParams.data()));
             invocation.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::ReturnValue,
                                                      kReturnValueNameIndex,
                                                      0x01,
-                                                     &returnValue));
+                                                     canUseParams.data() + 1));
+            AttachParameterProvenance(invocation, canUseParams);
             return invocation;
         };
 
@@ -1077,7 +1225,7 @@ namespace
         missingField.Fields.push_back(makeBoolField(InventoryReflection::InventoryField::BIgnoreCooldown,
                                                     kBIgnoreCooldownNameIndex,
                                                     0x00,
-                                                    &ignoreCooldown));
+                                                    canUseParams.data()));
         Require(!TryBuildCopiedInventoryPolicyEvent(missingField, event),
                 "CanUse policy event built with missing scalar field");
         Require(event.View.Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse &&
@@ -1124,6 +1272,26 @@ namespace
         Require(!TryBuildCopiedInventoryPolicyEvent(wrongRangeSize, event),
                 "CanUse policy event built with wrong scalar range size");
         Require(event.View.Scalars.empty(), "wrong scalar range size left stale copied event output");
+
+        uint8_t forgedCanonical = 1;
+        InventoryReflection::InventoryInvocation forgedScalarRange = makeCanUse();
+        forgedScalarRange.Fields[0].Range.Data = &forgedCanonical;
+        Require(!TryBuildCopiedInventoryPolicyEvent(forgedScalarRange, event),
+                "CanUse policy event built from a canonical bool outside params provenance");
+        Require(event.View.Scalars.empty(), "forged canonical scalar range left stale copied event output");
+
+        InventoryReflection::InventoryInvocation missingProvenance = makeCanUse();
+        missingProvenance.ParamData = nullptr;
+        missingProvenance.ParamSize = 0;
+        Require(!TryBuildCopiedInventoryPolicyEvent(missingProvenance, event),
+                "CanUse policy event built without params provenance");
+        Require(event.View.Scalars.empty(), "missing params provenance left stale copied event output");
+
+        InventoryReflection::InventoryInvocation truncatedProvenance = makeCanUse();
+        truncatedProvenance.ParamSize = 1;
+        Require(!TryBuildCopiedInventoryPolicyEvent(truncatedProvenance, event),
+                "CanUse policy event built with truncated params provenance");
+        Require(event.View.Scalars.empty(), "truncated params provenance left stale copied event output");
 
         uint8_t nonCanonical = 2;
         InventoryReflection::InventoryInvocation nonCanonicalBool = makeCanUse();
@@ -1395,8 +1563,12 @@ namespace
         uint64_t byPc = 0x3333333344444444ULL;
         uint64_t itemId = 0x5555555566666666ULL;
         int32_t additionalData = 0x77777777;
-        uint8_t requestedByPlayer = 1;
-        uint8_t returnValue = 0;
+        std::array<uint8_t, 0x12> remoteAddParams{};
+        remoteAddParams[0x10] = 1;
+        remoteAddParams[0x11] = 0;
+        std::array<uint8_t, 0x02> canUseParams{};
+        canUseParams[0x00] = 1;
+        canUseParams[0x01] = 0;
 
         auto makeField = [](InventoryReflection::InventoryField field,
                             int32_t propertyNameIndex,
@@ -1437,13 +1609,14 @@ namespace
             invocation.Fields.push_back(makeField(InventoryReflection::InventoryField::BRequestedByPlayer,
                                                  kBRequestedByPlayerNameIndex,
                                                  0x10,
-                                                 &requestedByPlayer,
-                                                 sizeof(requestedByPlayer)));
+                                                 remoteAddParams.data() + 0x10,
+                                                 sizeof(uint8_t)));
             invocation.Fields.push_back(makeField(InventoryReflection::InventoryField::ReturnValue,
                                                  kReturnValueNameIndex,
                                                  0x11,
-                                                 &returnValue,
-                                                 sizeof(returnValue)));
+                                                 remoteAddParams.data() + 0x11,
+                                                 sizeof(uint8_t)));
+            AttachParameterProvenance(invocation, remoteAddParams);
             return invocation;
         };
 
@@ -1456,13 +1629,14 @@ namespace
             invocation.Fields.push_back(makeField(InventoryReflection::InventoryField::BIgnoreCooldown,
                                                  kBIgnoreCooldownNameIndex,
                                                  0x00,
-                                                 &requestedByPlayer,
-                                                 sizeof(requestedByPlayer)));
+                                                 canUseParams.data(),
+                                                 sizeof(uint8_t)));
             invocation.Fields.push_back(makeField(InventoryReflection::InventoryField::ReturnValue,
                                                  kReturnValueNameIndex,
                                                  0x01,
-                                                 &returnValue,
-                                                 sizeof(returnValue)));
+                                                 canUseParams.data() + 1,
+                                                 sizeof(uint8_t)));
+            AttachParameterProvenance(invocation, canUseParams);
             return invocation;
         };
 
@@ -1548,13 +1722,14 @@ namespace
         additionalDataInvocation.Fields.push_back(makeField(InventoryReflection::InventoryField::BRequestedByPlayer,
                                                            kBRequestedByPlayerNameIndex,
                                                            0x10,
-                                                           &requestedByPlayer,
-                                                           sizeof(requestedByPlayer)));
+                                                           remoteAddParams.data() + 0x10,
+                                                           sizeof(uint8_t)));
         additionalDataInvocation.Fields.push_back(makeField(InventoryReflection::InventoryField::ReturnValue,
                                                            kReturnValueNameIndex,
                                                            0x11,
-                                                           &returnValue,
-                                                           sizeof(returnValue)));
+                                                           remoteAddParams.data() + 0x11,
+                                                           sizeof(uint8_t)));
+        AttachParameterProvenance(additionalDataInvocation, remoteAddParams);
 
         Require(!TryBuildCopiedInventoryPolicyEvent(additionalDataInvocation, event),
                 "AdditionalData or ItemID1 range built a copied policy event");
@@ -1747,10 +1922,12 @@ int main()
     TestGateEvaluation();
     TestObservationBudgetAndFilter();
     TestDisabledGateDoesNotRead();
+    TestClosedInventoryGatesDoNotRead();
     TestNonInventoryNameDoesNotRead();
     TestIdentifyContainsReaderExceptions();
     TestRejectsPrefilterFunctionNameMismatch();
     TestMetadataOnlyInventoryActionNamesDoNotRead();
+    TestDispatchBudgetDoesNotTouchParamsWithoutBudget();
     TestIdentifiesCanUse();
     TestIdentifiesAllowRemoteAddWithoutObjectRanges();
     TestBuildsCopiedInventoryPolicyEventWithoutObjectFields();
