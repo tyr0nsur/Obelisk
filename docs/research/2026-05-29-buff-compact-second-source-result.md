@@ -156,3 +156,44 @@ python3 scripts/compare_reflection_snapshots.py \
 The old documented `--evidence-pack-manifest .../gobjects-sampling/manifest.json` route
 now fails current schema validation; direct `--gobjects`, `--fname-root-slot`, and
 artifact identity arguments are the shortest working path.
+
+## 2026-06-01 Bool-Tail Repair Result
+
+The fast repair route was executed offline against the copied vanilla-gdb core. Artifact
+root:
+
+```text
+/servidor/ark/workspace-offline/buff-compact-bool-tail-repair-20260601T064450Z
+```
+
+Generated snapshots:
+
+- `PrimalBuff.AllowPostProcessEffect.snapshot.json`
+- `PrimalBuff.BPBuffPreventUploading.snapshot.json`
+- `PrimalBuff.BP_OnBuffLifetimeUpdated.snapshot.json`
+
+Readiness report:
+
+```text
+/servidor/ark/workspace-offline/buff-compact-bool-tail-repair-20260601T064450Z/pack/snapshot-comparison/readiness-report.json
+```
+
+Result:
+
+```text
+targets=3
+comparable=3
+second_source_accepted=3
+second_source_missing=0
+second_source_inconclusive=0
+second_source_rejected=0
+promotion_gate.layout_ready=true
+promotion_gate.ready=false
+ready_scope=internal_layout_only
+blocker=target_set_not_release_readiness
+```
+
+`--fail-on-readiness-gaps` still exits nonzero by design because `buff-compact-intake` is
+internal-layout-only, not a release-readiness target set. The layout repair is accepted
+`3/3`; it does not promote public Buff SDK, runtime observation, callbacks, mutation,
+return override, raw params, object identity/lookup, or `ResourceHandle`.

@@ -8708,6 +8708,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "build_resource_handle_serial_policy.py",
             "obelisk.internal-uobject-revalidation-serial-policy.v1",
             "allow_candidate_frame_local_only",
+            "build_resource_handle_zero_serial_negative_samples.py",
+            "obelisk.resource-handle-zero-serial-negative-samples.v1",
+            "internal_offline_zero_serial_negative_samples",
+            "zero-serial negative cohort",
+            "zero_serial_negative_samples",
         )
         offenders: list[str] = []
         for path in (

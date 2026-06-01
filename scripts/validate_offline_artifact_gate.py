@@ -7194,10 +7194,31 @@ def validate_runtime_serial_policy_source_artifact(
         return [{"reason": f"{reason_prefix}_source_artifacts_invalid", "label": f"{label}:$.source_artifacts"}]
 
     source = source_artifacts[0]
+    expected_keys = {
+        "schema",
+        "artifact_sha256",
+        "capture_id",
+        "evidence_pack_id",
+        "consume_gate_status",
+        "path_redacted",
+    }
+    unexpected_keys = sorted(str(key) for key in source if key not in expected_keys)
+    if unexpected_keys:
+        blockers.append(
+            {
+                "reason": f"{reason_prefix}_source_unexpected_fields",
+                "label": f"{label}:$.source_artifacts[0]",
+                "fields": unexpected_keys,
+            }
+        )
     if source.get("schema") != INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA:
         blockers.append({"reason": f"{reason_prefix}_source_schema_mismatch", "label": f"{label}:$.source_artifacts[0].schema"})
     if not isinstance(source.get("artifact_sha256"), str) or SHA256_RE.fullmatch(source["artifact_sha256"]) is None:
         blockers.append({"reason": f"{reason_prefix}_source_artifact_sha_invalid", "label": f"{label}:$.source_artifacts[0].artifact_sha256"})
+    if not is_safe_artifact_id(source.get("capture_id")):
+        blockers.append({"reason": f"{reason_prefix}_source_capture_id_invalid", "label": f"{label}:$.source_artifacts[0].capture_id"})
+    if not is_safe_artifact_id(source.get("evidence_pack_id")):
+        blockers.append({"reason": f"{reason_prefix}_source_evidence_pack_id_invalid", "label": f"{label}:$.source_artifacts[0].evidence_pack_id"})
     if source.get("consume_gate_status") != "accepted":
         blockers.append({"reason": f"{reason_prefix}_source_consume_gate_not_accepted", "label": f"{label}:$.source_artifacts[0].consume_gate_status"})
     if source.get("path_redacted") is not True:

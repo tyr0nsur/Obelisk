@@ -310,8 +310,8 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
     except ValueError:
         add(blockers, "log_budget_not_integer", "log_budget")
     else:
-        if log_budget < 1 or log_budget > 10:
-            add(blockers, "log_budget_out_of_range", "log_budget", minimum=1, maximum=10)
+        if log_budget != 10:
+            add(blockers, "log_budget_not_exact_first_window_limit", "log_budget", expected=10)
 
     if fields.get("dispatch_limit") != "0":
         add(blockers, "dispatch_limit_not_zero", "dispatch_limit", expected="0")
@@ -377,7 +377,7 @@ def build_template_fields() -> dict[str, str]:
         "observer_marker_survived": "false",
         "user_policy": "no_regular_users",
         "notice_sent": "not_applicable",
-        "log_budget": "5",
+        "log_budget": "10",
         "plugins_disabled": "true",
         "scanner_disabled": "true",
         "dispatch_limit": "0",

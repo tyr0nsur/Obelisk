@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""Tests for check_command_principal_authz_response_bridge.py."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+SCRIPT = SCRIPT_DIR / "check_command_principal_authz_response_bridge.py"
+DECISIONS = REPO_ROOT / "docs" / "command_principal_authz_response_bridge_decisions.json"
+PLAYER_IDENTITY = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
+PERMISSIONS_ADMIN = REPO_ROOT / "docs" / "permissions_admin_public_contract_decisions.json"
+COMMAND_RESPONSE = REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+COMMANDS_REPLIES = REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
+HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+
+
+class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
+    def run_checker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
+            cwd=REPO_ROOT,
+            check=check,
+            capture_output=True,
+            text=True,
+        )
+
+    def load_json(self, path: Path) -> dict:
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def write_inputs(
+        self,
+        root: Path,
+        *,
+        decisions: dict | None = None,
+        player_identity: dict | None = None,
+        permissions_admin: dict | None = None,
+        command_response: dict | None = None,
+        commands_replies: dict | None = None,
+        header: str | None = None,
+    ) -> dict[str, Path]:
+        paths = {
+            "decisions": root / "command_principal_authz_response_bridge_decisions.json",
+            "player_identity": root / "player_identity_public_contract_decisions.json",
+            "permissions_admin": root / "permissions_admin_public_contract_decisions.json",
+            "command_response": root / "command_chat_response_public_contract_decisions.json",
+            "commands_replies": root / "commands_replies_public_contract_decisions.json",
+            "header": root / "ObeliskApi.h",
+        }
+        paths["decisions"].write_text(json.dumps(decisions if decisions is not None else self.load_json(DECISIONS)), encoding="utf-8")
+        paths["player_identity"].write_text(
+            json.dumps(player_identity if player_identity is not None else self.load_json(PLAYER_IDENTITY)),
+            encoding="utf-8",
+        )
+        paths["permissions_admin"].write_text(
+            json.dumps(permissions_admin if permissions_admin is not None else self.load_json(PERMISSIONS_ADMIN)),
+            encoding="utf-8",
+        )
+        paths["command_response"].write_text(
+            json.dumps(command_response if command_response is not None else self.load_json(COMMAND_RESPONSE)),
+            encoding="utf-8",
+        )
+        paths["commands_replies"].write_text(
+            json.dumps(commands_replies if commands_replies is not None else self.load_json(COMMANDS_REPLIES)),
+            encoding="utf-8",
+        )
+        paths["header"].write_text(header if header is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
+        return paths
+
+    def checker_args(self, paths: dict[str, Path]) -> list[str]:
+        return [
+            "--decisions",
+            str(paths["decisions"]),
+            "--player-identity",
+            str(paths["player_identity"]),
+            "--permissions-admin",
+            str(paths["permissions_admin"]),
+            "--command-response",
+            str(paths["command_response"]),
+            "--commands-replies",
+            str(paths["commands_replies"]),
+            "--public-header",
+            str(paths["header"]),
+        ]
+
+    def replace_string_values(self, value: object, old: str, new: str) -> object:
+        if isinstance(value, dict):
+            return {key: self.replace_string_values(child, old, new) for key, child in value.items()}
+        if isinstance(value, list):
+            return [self.replace_string_values(child, old, new) for child in value]
+        if isinstance(value, str):
+            return value.replace(old, new)
+        return value
+
+    def test_accepts_current_bridge_as_planning_only(self) -> None:
+        result = self.run_checker("--json")
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertEqual([], report["public_capability_bits_now"])
+        self.assertEqual([], report["public_response_abi_now"])
+        self.assertEqual(
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+            report["dependency_chain"],
+        )
+        self.assertEqual([], report["blockers"])
+
+    def test_manifest_ties_the_shared_principal_vocabulary_to_fail_closed_conditions(self) -> None:
+        payload = self.load_json(DECISIONS)
+        self.assertEqual(payload["schema"], "obelisk.command-principal-authz-response-bridge-decisions.v1")
+        self.assertEqual(payload["status"], "blocked")
+        self.assertTrue(payload["planning_only"])
+        self.assertFalse(payload["public_header_allowed"])
+        self.assertEqual(payload["public_header_symbols_now"], [])
+        self.assertEqual(payload["public_capability_bits_now"], [])
+        self.assertEqual(payload["public_response_abi_now"], [])
+
+        vocabulary = {item["field"]: item for item in payload["shared_principal_vocabulary"]}
+        self.assertEqual(set(vocabulary), {"principal_handle", "principal_generation", "principal_scope_flags"})
+        for item in vocabulary.values():
+            self.assertTrue(item["fail_closed_when_missing"])
+
+        for condition in (
+            "missing principal_handle",
+            "missing principal_generation",
+            "missing principal_scope_flags",
+            "command text principal claim",
+            "operator config permission claim",
+            "permission deny result",
+            "permission unknown result",
+            "missing command_chat_response_path promotion",
+            "missing commands_replies promotion",
+        ):
+            self.assertIn(condition, payload["required_fail_closed_conditions"])
+
+    def test_rejects_bridge_public_runtime_and_abi_overclaims(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        decisions["public_header_allowed"] = True
+        decisions["promotion_ready"] = True
+        decisions["runtime_ready"] = True
+        decisions["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE"]
+        decisions["public_response_abi_now"] = ["ObeliskCommandChatResponse"]
+        decisions["claim"] = "bridge response capability is public and ready"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("public_header_allowed_not_false", report["blockers"])
+        self.assertIn("promotion_ready_not_false", report["blockers"])
+        self.assertIn("runtime_ready_not_false", report["blockers"])
+        self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
+        self.assertIn("public_response_abi_now_not_empty", report["blockers"])
+        self.assertIn("positive_public_or_runtime_claim", report["blockers"])
+
+    def test_rejects_missing_shared_principal_vocabulary(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        decisions["shared_principal_vocabulary"] = [
+            item for item in decisions["shared_principal_vocabulary"] if item["field"] != "principal_generation"
+        ]
+        decisions["required_fail_closed_conditions"].remove("missing principal_generation")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("shared_principal_vocabulary_fields_mismatch", report["blockers"])
+        self.assertIn("required_fail_closed_conditions_missing", report["blockers"])
+
+    def test_rejects_source_doc_missing_principal_scope_flags_or_promoted_claim(self) -> None:
+        commands_replies = self.load_json(COMMANDS_REPLIES)
+        commands_replies["status"] = "promoted"
+        commands_replies = self.replace_string_values(commands_replies, "principal_scope_flags", "principal_scope_marker")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), commands_replies=commands_replies)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("source_doc_unexpectedly_promoted", report["blockers"])
+        self.assertIn("source_doc_missing_shared_principal_vocabulary", report["blockers"])
+
+    def test_rejects_public_header_forbidden_tokens(self) -> None:
+        header = (
+            HEADER.read_text(encoding="utf-8")
+            + "\n#define OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE (1ull << 55)\n"
+            + "typedef struct ObeliskCommandPrincipalAuthzResponseBridge { uint32_t struct_size; } ObeliskCommandPrincipalAuthzResponseBridge;\n"
+            + "typedef void (*SendChatWithOwnerToken)(uint64_t owner_token);\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), header=header)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("public_header_forbidden_symbols_present", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
+        self.assertIn("OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE", detail["symbols"])
+        self.assertIn("ObeliskCommandPrincipalAuthzResponseBridge", detail["symbols"])
+        self.assertIn("SendChatWithOwnerToken", detail["symbols"])
+
+
+if __name__ == "__main__":
+    unittest.main()

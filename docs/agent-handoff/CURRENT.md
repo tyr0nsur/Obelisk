@@ -169,15 +169,17 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` is accounting-only:
   the umbrella blocker must name mission, transfer, dino policy, tribe policy, and
   buff/status leaf outcomes, but the checker does not promote any module SDK.
-- Buff copied-scalar work is viable but not ready for a green readiness checker over both
-  target sets. Current `buff-breadth-intake` second-source is accepted `3/3`, while a
-  fresh `buff-compact-intake` comparison is `1/3` because two compact candidate snapshots
-  lack current `BoolProperty` tail metadata. Do not mark Buff scalar readiness ready until
-  compact evidence is regenerated or independently repaired.
-- Product-planning lane: Structure aggregate/census is planning/consume-only with no
-  runtime observer, public StructureEvents SDK, enforcement, return override, or v1 claim.
-  Build-policy intake has a planning-only target set; details live in the 2026-06-01
-  research note and it remains outside release/public/runtime surfaces.
+- Buff copied-scalar evidence is repaired at the layout layer: `buff-breadth-intake` and
+  refreshed `buff-compact-intake` both compare `3/3`, but compact remains
+  internal-layout-only with `target_set_not_release_readiness`. Do not mark Buff scalar
+  public/runtime readiness ready until copied payload policy, redaction, dispatcher
+  lifecycle, and promotion gates exist.
+- Structure aggregate/census remains planning/consume-only, and build-policy intake now
+  has accepted planning-only `3/3` second-source layout evidence; no runtime observer,
+  public StructureEvents SDK, enforcement, return override, or v1 claim is promoted.
+- Command/principal/authz/response bridge is planning-only over
+  `principal_handle + principal_generation + principal_scope_flags`; it adds no public
+  header, capability bit, response ABI, runtime wiring, or server validation.
 - Command/chat response static orientation is complete for the reviewed binary but remains
   orientation-only until identity, permissions/admin, and a copied response contract exist.
 - Permissions/admin pre-ABI contracts remain candidate-only. Public symbols stay empty
@@ -210,11 +212,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Assign scoped objective, safety baseline, allowed paths, required skills, expert role,
   expected decision, and edit permission. Pass only the skills needed for that task. The lead retains server-safety decisions.
 ## Agent Protocol
-- The lead owns integration. Sub-agents must not commit, amend, rebase, tag, push, update
-  GitHub state, touch servers, send Discord updates, or broaden live-ops scope.
-- Use expert roles with disjoint ownership: ABI/API, build/SDK, UE4 reflection, static
-  binary analysis, live-ops, release audit, or docs/skills.
-- Tell workers they are not alone in the codebase. They must not revert unrelated changes
-  and must leave changes unstaged/uncommitted with touched paths and tests run.
+- The lead owns integration. Sub-agents must not commit, amend, rebase, tag, push, update GitHub state, touch servers, send Discord updates, or broaden live-ops scope.
+- Use expert roles with disjoint ownership: ABI/API, build/SDK, UE4 reflection, static binary analysis, live-ops, release audit, or docs/skills.
+- Tell workers they are not alone in the codebase. They must not revert unrelated changes and must leave changes unstaged/uncommitted with touched paths and tests run.
 - Read-only explorers answer concrete questions with file/line evidence and no edits.
 - Close old agents after integrating findings; do not leave active agents without a plan.

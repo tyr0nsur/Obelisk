@@ -43,7 +43,7 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "observer_marker_survived": "false",
         "user_policy": "no_regular_users",
         "notice_sent": "not_applicable",
-        "log_budget": "5",
+        "log_budget": "10",
         "plugins_disabled": "true",
         "scanner_disabled": "true",
         "dispatch_limit": "0",
@@ -134,7 +134,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
     def test_rejects_claims_dispatch_and_budget_that_would_enable_delivery(self) -> None:
         result = self.run_checker(
             manifest_lines(
-                log_budget="11",
+                log_budget="5",
                 dispatch_limit="1",
                 delivery_claim="plugin_delivery",
                 principal_claim="principal_promoted",
@@ -144,7 +144,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("log_budget_out_of_range", report["blockers"])
+        self.assertIn("log_budget_not_exact_first_window_limit", report["blockers"])
         self.assertIn("dispatch_limit_not_zero", report["blockers"])
         self.assertIn("delivery_claim_not_none", report["blockers"])
         self.assertIn("principal_claim_not_none", report["blockers"])

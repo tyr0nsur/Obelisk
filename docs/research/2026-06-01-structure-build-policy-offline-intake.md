@@ -86,3 +86,49 @@ python3 scripts/compare_reflection_snapshots.py \
 Expected success remains planning-only: `targets=3`, `comparable=3`,
 `second_source_accepted=3`, `planning_layout_gate.ready=true`, while
 `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`.
+
+## 2026-06-01 Fast Offline Snapshot Execution
+
+Artifact root:
+`/home/flowcommunity-ark/obelisk-artifacts/structure-build-policy-offline-intake-20260601T064502Z`.
+
+The fast path was executed against the two existing offline inventory packs above at
+Obelisk commit `981dcf2fff9d9b5a274609c13210fa2df8efa08a`. Both focal plans reported
+`planned_command_count=3` and `blocked_count=0`; all three exact targets were present
+once in each inventory pack.
+
+Generated snapshots:
+
+- `base/PrimalStructure.IsAllowedToBuild.snapshot.json`
+- `base/PrimalStructure.BPIsAllowedToBuild.snapshot.json`
+- `base/PrimalStructure.BPIsAllowedToBuildEx.snapshot.json`
+- `candidate/PrimalStructure.IsAllowedToBuild.snapshot.json`
+- `candidate/PrimalStructure.BPIsAllowedToBuild.snapshot.json`
+- `candidate/PrimalStructure.BPIsAllowedToBuildEx.snapshot.json`
+
+Readiness report:
+`/home/flowcommunity-ark/obelisk-artifacts/structure-build-policy-offline-intake-20260601T064502Z/readiness.json`.
+
+Planning-only readiness result:
+
+```text
+targets=3
+comparable=3
+blocked=0
+second_source_accepted=3
+second_source_rejected=0
+second_source_inconclusive=0
+second_source_missing=0
+planning_layout_gate.ready=true
+planning_layout_gate.ready_scope=planning_only
+planning_layout_gate.promotion_ready=false
+planning_layout_gate.public_sdk_ready=false
+planning_layout_gate.runtime_ready=false
+promotion_gate.ready=false
+promotion_gate.blockers=planning_layout_intake_not_promotion_gate:1
+```
+
+This accepts `structure-build-policy-offline-intake` only as planning-layout evidence.
+It does not promote runtime observation, public SDK surface, StructureEvents, mutation,
+enforcement, return override, object identity, lookup, raw params, or `ResourceHandle`
+lifetime.

@@ -87,6 +87,14 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
     evidence_commit = evidence.get("obelisk_commit") if isinstance(evidence, dict) else None
     if window.get("obelisk_commit") != evidence_commit:
         raise SystemExit("window manifest obelisk_commit does not match runtime observer summary")
+    modules = summary.get("modules")
+    principal = modules.get("player_principal_lifecycle") if isinstance(modules, dict) else None
+    functions = principal.get("functions") if isinstance(principal, dict) else None
+    gate = functions.get("observer_gate") if isinstance(functions, dict) else None
+    details = gate.get("details") if isinstance(gate, dict) else None
+    gate_limits = details.get("limit") if isinstance(details, dict) else None
+    if gate_limits != [10]:
+        raise SystemExit("runtime observer summary gate limit does not match exact first-window log budget")
 
 
 def main() -> int:

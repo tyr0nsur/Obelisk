@@ -82,7 +82,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "observer_marker_survived=false",
                     "user_policy=no_regular_users",
                     "notice_sent=not_applicable",
-                    "log_budget=5",
+                    "log_budget=10",
                     "plugins_disabled=true",
                     "scanner_disabled=true",
                     "dispatch_limit=0",
@@ -276,6 +276,25 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("window manifest obelisk_commit does not match runtime observer summary", result.stderr)
+
+    def test_fails_closed_when_runtime_gate_limit_does_not_match_first_window_budget(self) -> None:
+        lines = [
+            line.replace("limit=10 dispatch_limit=0", "limit=9 dispatch_limit=0")
+            for line in runtime_log_lines()
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            copied_log = temp_dir / "Obelisk.log"
+            output_dir = temp_dir / "bundle"
+            copied_log.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            result = self.run_bundle(copied_log, output_dir)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "runtime observer summary gate limit does not match exact first-window log budget",
+                result.stderr,
+            )
 
 
 if __name__ == "__main__":

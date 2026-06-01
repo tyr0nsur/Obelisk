@@ -7547,6 +7547,24 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         blocker = next(blocker for blocker in blockers if blocker["reason"] == "runtime_rejection_samples_unexpected_top_level_field")
         self.assertEqual(blocker["fields"], ["canonical_gap_note"])
 
+    def test_blocks_runtime_rejection_samples_incomplete_source_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
+            payload = runtime_rejection_samples_manifest()
+            payload["source_artifacts"][0].pop("capture_id")
+            payload["source_artifacts"][0]["evidence_pack_id"] = "../unsafe"
+            payload["source_artifacts"][0]["operator_note"] = "not allowed"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_rejection_samples_source_capture_id_invalid", reasons)
+        self.assertIn("runtime_rejection_samples_source_evidence_pack_id_invalid", reasons)
+        self.assertIn("runtime_rejection_samples_source_unexpected_fields", reasons)
+
     def test_accepts_runtime_serial_semantics_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -7636,6 +7654,24 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("runtime_serial_semantics_unexpected_top_level_field", {blocker["reason"] for blocker in blockers})
         blocker = next(blocker for blocker in blockers if blocker["reason"] == "runtime_serial_semantics_unexpected_top_level_field")
         self.assertEqual(blocker["fields"], ["canonical_gap_note"])
+
+    def test_blocks_runtime_serial_semantics_incomplete_source_artifact_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-serial-semantics.json"
+            payload = runtime_serial_semantics_manifest()
+            payload["source_artifacts"][0]["capture_id"] = "unsafe/path"
+            payload["source_artifacts"][0].pop("evidence_pack_id")
+            payload["source_artifacts"][0]["debug_path"] = "/tmp/source.json"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("runtime_serial_semantics_source_capture_id_invalid", reasons)
+        self.assertIn("runtime_serial_semantics_source_evidence_pack_id_invalid", reasons)
+        self.assertIn("runtime_serial_semantics_source_unexpected_fields", reasons)
 
     def test_blocks_runtime_serial_semantics_summary_negative_reject_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -249,7 +249,8 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-29-dino-compact-second-source-readiness.md`,
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md` for exact target counts and
-  blockers.
+  blockers. Buff compact was refreshed on 2026-06-01 and now compares `3/3` again, but
+  remains internal-layout-only and not release/public/runtime readiness.
   Dino now has `scripts/check_dino_scalar_readiness.py --json` as a read-only internal
   candidate gate over the redacted UFunction descriptor preflight for `dino-compact-intake`.
   It accepts the four `AddPassenger` pre-call copied scalars only, keeps
@@ -269,9 +270,9 @@ priorities, and do not use history files as the active source of truth.
 - `structure-build-policy-offline-intake` now exists as a planning-only target set for
   `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
   `PrimalStructure.BPIsAllowedToBuildEx`. It is in the `structures` lane and is not in
-  release readiness. No sanitized snapshots are accepted yet; placement/location/player/
-  controller redaction policy, distinct-source compare, public/runtime/promotion gates,
-  mutation, enforcement, and return override all remain blocked.
+  release readiness. Planning-only second-source layout now accepts `3/3`; public/runtime/
+  promotion gates, mutation, enforcement, return override, identity/lookup, and
+  `ResourceHandle` all remain blocked.
 - Focal UFunction snapshot planning helpers live in
   `scripts/ufunction_focal_snapshot_plan.py`; `build_reflection_inventory_pack.py` uses
   them for candidate-only exact snapshot command plans. Target-set bridge coverage proves
