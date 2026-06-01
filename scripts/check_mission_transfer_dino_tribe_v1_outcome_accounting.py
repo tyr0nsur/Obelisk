@@ -260,6 +260,10 @@ AFTER_NEGATOR_RE = re.compile(
     r"\b(?:blocked|excluded|not\s+included|post-v1|post v1)\b",
     re.IGNORECASE,
 )
+NEGATED_EXCLUSION_RE = re.compile(
+    r"\b(?:not|no\s+longer)\s+(?:blocked|excluded|omitted|out\s+of\s+scope|post[- ]v1|post\s+v1)\b",
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -380,6 +384,8 @@ def claim_is_negated(text: str, start: int, end: int) -> bool:
         return True
     before = text[max(0, start - 40) : start]
     after = text[end : min(len(text), end + 80)]
+    if NEGATED_EXCLUSION_RE.search(after):
+        return False
     return bool(NEGATOR_RE.search(before) or AFTER_NEGATOR_RE.search(after))
 
 
@@ -390,6 +396,23 @@ def forbidden_claims(text: str) -> list[str]:
             continue
         claims.append(match.group(0))
     return claims
+
+
+def outcome_is_negated(text: str, start: int) -> bool:
+    clause_start = max(text.rfind(".", 0, start), text.rfind("\n", 0, start), text.rfind(";", 0, start)) + 1
+    before = text[clause_start:start]
+    return bool(NEGATOR_RE.search(before))
+
+
+def has_unnegated_alias_outcome(text: str, alias: str, outcome: str) -> bool:
+    pattern = re.compile(
+        rf"\b{re.escape(alias)}\b.{{0,100}}?\b({re.escape(outcome)})\b",
+        re.IGNORECASE,
+    )
+    for match in pattern.finditer(text):
+        if not outcome_is_negated(text, match.start(1)):
+            return True
+    return False
 
 
 def validate_split_note(text: str, blockers: list[dict[str, Any]]) -> None:
@@ -431,21 +454,13 @@ def release_statement_outcome(text: str) -> dict[str, Any]:
         alias_excluded = False
         alias_promoted = False
         for alias in aliases:
-            pattern_excluded = re.compile(
-                rf"\b{re.escape(alias)}\b.{{0,100}}\bexcluded\b",
-                re.IGNORECASE,
-            )
-            pattern_promoted = re.compile(
-                rf"\b{re.escape(alias)}\b.{{0,100}}\bpromoted\b",
-                re.IGNORECASE,
-            )
-            alias_excluded = alias_excluded or bool(pattern_excluded.search(text))
-            alias_promoted = alias_promoted or bool(pattern_promoted.search(text))
+            alias_excluded = alias_excluded or has_unnegated_alias_outcome(text, alias, "excluded")
+            alias_promoted = alias_promoted or has_unnegated_alias_outcome(text, alias, "promoted")
         leaf_exclusions[leaf] = alias_excluded
         leaf_promotions[leaf] = alias_promoted
     return {
         "present": True,
-        "umbrella_excluded": SURFACE_ID in text and bool(re.search(r"\bexcluded\b", surface_line, re.IGNORECASE)),
+        "umbrella_excluded": bool(surface_line) and has_unnegated_alias_outcome(surface_line, SURFACE_ID, "excluded"),
         "leaf_exclusions": leaf_exclusions,
         "leaf_promotions": leaf_promotions,
         "forbidden_claims": sorted(set(forbidden_claims(text))),
@@ -541,10 +556,20 @@ def build_mission_leaf_blocker_accounting(
         "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
         "accounting_scope": "candidate-only internal blocker accounting",
         "accepted_for_internal_planning": not missing_required_evidence and leaf.get("status") == "planning",
+        "consume_only": True,
+        "internal_reusable_evidence_only": True,
         "v1_accounted": bool(mission_gap.get("v1_accounted")),
+        "mission_sdk_ready": False,
+        "public_abi_ready": False,
         "public_sdk_ready": False,
+        "runtime_observer_approved": False,
         "runtime_ready": False,
+        "identity_ready": False,
+        "lookup_ready": False,
+        "mutation_ready": False,
         "promotion_ready": False,
+        "return_override_ready": False,
+        "v1_completion": False,
         "focused_checker": "scripts/check_mission_copied_bool_readiness.py",
         "input_target_set": "mission-compact-intake",
         "output_target_set": "mission-copied-bool-policy-slice",
@@ -578,6 +603,7 @@ def build_mission_leaf_blocker_accounting(
             else "blocked_accounting"
         ),
         "non_claims": [
+            "mission leaf accounting is exactly consume-only internal reusable evidence",
             "mission leaf accounting does not promote a public Mission SDK, ABI, callback, or descriptor",
             "mission leaf accounting does not promote runtime hooks, dispatcher wiring, mutation, return override, identity, lookup, arrays, or ResourceHandle",
             "mission leaf accounting does not expand beyond the frozen copied-bool policy slice",

@@ -79,6 +79,20 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   promoted with evidence and cannot be satisfied by excluded/post-v1 accounting. These are
   guardrails only and do not promote Inventory SDK, Items SDK, command replies, runtime
   readiness, or v1 completion.
+- Latest route/module/docs hardening: `check_command_permission_route_gate.py` now freezes
+  the expected schema of all eight composed P0 subchecks and rejects schema drift even when
+  a subcheck otherwise reports `valid=true`. Mission copied-bool readiness/accounting now
+  declares `consume_only` and `internal_reusable_evidence_only`, keeps Mission SDK/public
+  ABI/runtime/identity/lookup/mutation/return-override/v1 flags false, and rejects
+  release-statement wording such as "mission is not excluded" as a safe exclusion.
+  Structure build-policy offline intake now validates the readiness envelope, exact
+  `base/` and sibling `candidate/` snapshot paths, complete distinct offline-core artifact
+  identity, and redacted/layout-only fields against raw address/range leaks. Plugin Hub and
+  AseApi docs were tightened so Plugin Hub resumes only after complete SDK blockers are
+  complete, and ArkApi/AseApi/NextGen inputs remain demand vocabulary only, not porting,
+  workflow-shape, ergonomics, architecture, or implementation guidance. These remain
+  offline guardrails and do not promote Structure SDK, Mission SDK, commands/replies,
+  runtime readiness, public SDK readiness, or v1 completion.
 
 ## Hard Overrides
 

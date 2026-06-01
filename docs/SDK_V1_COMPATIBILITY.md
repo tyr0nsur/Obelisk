@@ -55,9 +55,9 @@ tests, and named second-source promotion gates.
 No Foundation seed, Plugin Hub seed, descriptor/timer example, installed SDK package shape, or
 copied event example is an ArkApi/AseApi/ArkServerApi compatibility layer, API parity
 claim, portable plugin path, or evidence that ArkApi plugin families can be ported.
-This does not prevent Obelisk from using familiar capability grouping or
-migration-oriented documentation, provided no source/API/ABI/behavior compatibility is
-claimed.
+This does not prevent Obelisk from using familiar capability grouping as demand
+vocabulary, provided no source/API/ABI/behavior compatibility, porting guidance,
+workflow-shape guidance, or AseApi-derived ergonomics are claimed.
 
 ## Global Rules
 

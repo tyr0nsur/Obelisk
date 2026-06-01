@@ -17,6 +17,20 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_structure_build_policy_offline_intake.py"
 TARGET_SET = "structure-build-policy-offline-intake"
+ARK_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+SNAPSHOT_ADDRESS_POLICY = "absolute core paths and addresses omitted; use full inspector JSON for local evidence review"
+BASE_IDENTITY = {
+    "artifact_kind": "offline_core",
+    "artifact_sha256": "1" * 64,
+    "capture_id": "base-capture",
+    "evidence_pack_id": "base-pack",
+}
+CANDIDATE_IDENTITY = {
+    "artifact_kind": "offline_core",
+    "artifact_sha256": "2" * 64,
+    "capture_id": "candidate-capture",
+    "evidence_pack_id": "candidate-pack",
+}
 NON_CLAIM = (
     "planning-layout evidence only; does not promote StructureEvents, Structure SDK, "
     "build-policy SDK, enforcement, identity, lookup, mutation, return override, "
@@ -80,8 +94,23 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
     def readiness_payload(self) -> dict[str, Any]:
         return {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
+            "evidence_scope": "second_source_layout_evidence_only",
             "gate_mode": "planning_layout_intake",
+            "strict_identity_indices": False,
             "second_source_status": "compared",
+            "not_promoted_surfaces": [
+                "class_identity",
+                "cross_binary_portability",
+                "lookup",
+                "mutation",
+                "object_identity",
+                "public_sdk",
+                "raw_params",
+                "resource_handle",
+                "return_override",
+                "runtime_hooks",
+            ],
+            "target_set_guidance": [],
             "target_sets": [TARGET_SET],
             "target_filters": [
                 "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
@@ -123,7 +152,7 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             ],
         }
 
-    def snapshot_payload(self, qualified_target: str) -> dict[str, Any]:
+    def snapshot_payload(self, qualified_target: str, identity: dict[str, str] | None = None) -> dict[str, Any]:
         outer_name, function_name = qualified_target.split(".", 1)
         shape = TARGET_SHAPES[qualified_target]
         properties = []
@@ -164,8 +193,15 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
                 )
             properties.append(prop)
         return {
+            "address_policy": SNAPSHOT_ADDRESS_POLICY,
             "schema": "obelisk.ufunction-chain.snapshot.v1",
-            "evidence": {"status": "candidate-only"},
+            "evidence": {
+                **(identity if identity is not None else BASE_IDENTITY),
+                "ark_binary_sha256": ARK_BINARY_SHA256,
+                "generated_by": "scripts/inspect_core_ufunctions.py --snapshot-json",
+                "source": "offline_core",
+                "status": "candidate-only",
+            },
             "interpretation": {"status": "candidate-only"},
             "targets": [
                 {
@@ -195,12 +231,22 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
     def add_snapshot_details(self, root: Path, readiness_payload: dict[str, Any]) -> None:
         if "modules" in readiness_payload:
             return
-        snapshot_root = root / "snapshots"
-        snapshot_root.mkdir()
+        base_root = root / "base"
+        candidate_root = root / "candidate"
+        base_root.mkdir()
+        candidate_root.mkdir()
         details = []
         for qualified_target in TARGET_SHAPES:
-            snapshot_path = snapshot_root / f"{qualified_target}.snapshot.json"
-            snapshot_path.write_text(json.dumps(self.snapshot_payload(qualified_target), sort_keys=True), encoding="utf-8")
+            snapshot_path = base_root / f"{qualified_target}.snapshot.json"
+            candidate_path = candidate_root / f"{qualified_target}.snapshot.json"
+            snapshot_path.write_text(
+                json.dumps(self.snapshot_payload(qualified_target, BASE_IDENTITY), sort_keys=True),
+                encoding="utf-8",
+            )
+            candidate_path.write_text(
+                json.dumps(self.snapshot_payload(qualified_target, CANDIDATE_IDENTITY), sort_keys=True),
+                encoding="utf-8",
+            )
             details.append(
                 {
                     "block_reasons": [],
@@ -426,7 +472,7 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             root = Path(temp_dir)
             readiness_payload = self.readiness_payload()
             manifest, _ = self.write_case(root, readiness_payload)
-            snapshot_path = root / "snapshots" / "PrimalStructure.BPIsAllowedToBuildEx.snapshot.json"
+            snapshot_path = root / "base" / "PrimalStructure.BPIsAllowedToBuildEx.snapshot.json"
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
             snapshot["targets"][0]["property_chain"]["properties"][5]["class_name"] = "BoolProperty"
             snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
@@ -445,7 +491,7 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             root = Path(temp_dir)
             readiness_payload = self.readiness_payload()
             manifest, _ = self.write_case(root, readiness_payload)
-            snapshot_path = root / "snapshots" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            snapshot_path = root / "base" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
             snapshot["targets"][0]["property_chain"]["properties"][3]["exposes_public_payload"] = True
             snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
@@ -504,6 +550,130 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         blockers = {item["path"] for item in payload["blockers"] if item["reason"] == "forbidden_true_claim"}
         self.assertTrue(any(path.endswith(".public_payload") for path in blockers))
+
+    def test_readiness_envelope_drift_fails_closed(self) -> None:
+        cases = [
+            ("evidence_scope", "runtime_evidence", "readiness_evidence_scope_mismatch"),
+            ("strict_identity_indices", True, "readiness_strict_identity_indices_mismatch"),
+            ("target_set_guidance", [{"promote": "now"}], "readiness_target_set_guidance_mismatch"),
+            (
+                "not_promoted_surfaces",
+                ["public_sdk", "runtime_hooks"],
+                "readiness_not_promoted_surfaces_missing_values",
+            ),
+        ]
+        for key, value, blocker in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    readiness_payload = self.readiness_payload()
+                    readiness_payload[key] = value
+                    manifest, _ = self.write_case(Path(temp_dir), readiness_payload)
+                    result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertFalse(payload["ready"])
+                self.assertIn(blocker, {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_path_must_be_base_sibling_of_readiness(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            self.add_snapshot_details(root, readiness_payload)
+            detail = readiness_payload["modules"][0]["target_details"][0]
+            wrong_dir = root / "other"
+            wrong_dir.mkdir()
+            wrong_path = wrong_dir / Path(detail["path"]).name
+            wrong_path.write_text(Path(detail["path"]).read_text(encoding="utf-8"), encoding="utf-8")
+            detail["path"] = str(wrong_path)
+            manifest, _ = self.write_case(root, readiness_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("readiness_target_detail_path_mismatch", {item["reason"] for item in payload["blockers"]})
+
+    def test_missing_candidate_snapshot_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            (root / "candidate" / "PrimalStructure.IsAllowedToBuild.snapshot.json").unlink()
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_unreadable", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_identity_must_be_complete_and_distinct(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            candidate_path = root / "candidate" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            candidate["evidence"].update(BASE_IDENTITY)
+            candidate_path.write_text(json.dumps(candidate, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        reasons = {item["reason"] for item in payload["blockers"]}
+        self.assertIn("snapshot_same_evidence_artifact_identity", reasons)
+        self.assertIn("snapshot_same_evidence_artifact_sha256", reasons)
+        self.assertIn("snapshot_same_evidence_capture_id", reasons)
+        self.assertIn("snapshot_same_evidence_evidence_pack_id", reasons)
+
+    def test_snapshot_missing_identity_field_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "base" / "PrimalStructure.BPIsAllowedToBuild.snapshot.json"
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            del snapshot["evidence"]["capture_id"]
+            snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_artifact_identity_invalid", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_raw_address_redaction_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "base" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            snapshot["targets"][0]["property_chain"]["properties"][0]["debug_address"] = "0x123456789abcdef0"
+            snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_raw_sanitization_mismatch", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_redacted_field_exposure_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "base" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            snapshot["targets"][0]["property_chain"]["properties"][1]["exposes_range"] = True
+            snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_redacted_field_exposes_range", {item["reason"] for item in payload["blockers"]})
 
 
 if __name__ == "__main__":

@@ -26,12 +26,10 @@ Use AseApi for:
 - ARK/UE name vocabulary such as `AShooterPlayerController.ServerSendChatMessage`,
   `AShooterGameState.bAllowCaveBuildingPvP`, item/inventory/structure/tribe class names,
   and broad plugin-facing capability areas.
-- Demand taxonomy for future Obelisk design discussions: chat commands, console/RCON
-  commands, tick callbacks, timers, plugin lifecycle commands, logging/config helpers,
-  permissions, and common ArkApi-style plugin expectations.
-- Migration-oriented product design: familiar capability grouping, command/plugin
-  administration expectations, config/logging conventions, and migration priorities that
-  reduce friction for AseApi plugin authors moving to Linux.
+- Demand-oriented vocabulary notes only: familiar capability grouping and priority labels
+  can be recorded as demand signals, but AseApi command/admin workflows, config/logging
+  conventions, ergonomics, migration priorities, and porting expectations must not drive
+  Obelisk design.
 - Candidate name discovery only, before running Obelisk's own snapshot/second-source
   checks.
 

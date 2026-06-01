@@ -10,6 +10,7 @@ import tempfile
 import unittest
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -95,6 +96,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)
             self.assertEqual([], check["public_or_runtime_claims"], check)
+            self.assertEqual(check["expected_schema"], check["report_schema"], check)
 
     def test_rejects_broken_query_contract_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -197,6 +199,41 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertIn("critical_path_identity_readiness_schema_mismatch", blockers)
         self.assertIn("critical_path_identity_readiness_output_invalid", blockers)
+
+    def test_route_check_rejects_schema_drift_even_when_otherwise_valid(self) -> None:
+        original = ROUTE_GATE.run_check
+
+        def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+            result = original(name, argv)
+            if name == "permissions_query_failclosed":
+                result["report_schema"] = "obelisk.permissions-admin-query-failclosed-contract-check.v999"
+                result["valid"] = True
+            return result
+
+        args = SimpleNamespace(
+            query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+            player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+            public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            json=True,
+        )
+        try:
+            ROUTE_GATE.run_check = fake_run_check
+            report = ROUTE_GATE.build_report(args)
+        finally:
+            ROUTE_GATE.run_check = original
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn(
+            "permissions_query_failclosed: schema mismatch "
+            "'obelisk.permissions-admin-query-failclosed-contract-check.v999' != "
+            "'obelisk.permissions-admin-query-failclosed-contract-check.v1'",
+            report["blockers"],
+        )
 
 
 if __name__ == "__main__":

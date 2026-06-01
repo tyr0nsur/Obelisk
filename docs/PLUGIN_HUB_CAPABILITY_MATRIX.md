@@ -279,8 +279,8 @@ templates now and parked Plugin Hub seed lanes after SDK completion; specificall
 are archived examples and planning references, not active Plugin Hub modules, not
 production Hub work, and not promises that copied chat/policy auditing is generally
 available.
-Before any new first-party Plugin Hub work resumes, the SDK blocker chain must be handled
-or explicitly scoped. Existing copied-data examples may still be useful as guardrail
+Before any new first-party Plugin Hub work resumes, the SDK blocker chain must be
+complete. Until then, existing copied-data examples may still be useful as guardrail
 fixtures, but they are not a graduation path and no additional public category is
 supported by the current ABI.
 If only default release examples are counted, passive copied chat auditing/parsing is a

@@ -10,14 +10,22 @@ import re
 from pathlib import Path
 from typing import Any
 
+from artifact_identity import ARTIFACT_IDENTITY_KEYS, complete_artifact_identity, is_sha256
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 REPORT_SCHEMA = "obelisk.structure-build-policy-offline-intake-check.v1"
 READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
+SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 SURFACE_ID = "obelisk.structure_census.v1"
 TARGET_SET = "structure-build-policy-offline-intake"
 EXPECTED_STATUS = "planning-layout-second-source-accepted"
+EXPECTED_READINESS_ENVELOPE = {
+    "evidence_scope": "second_source_layout_evidence_only",
+    "strict_identity_indices": False,
+    "target_set_guidance": [],
+}
 EXPECTED_TOTALS = {
     "targets": 3,
     "comparable": 3,
@@ -193,6 +201,21 @@ REQUIRED_BOUNDARIES = (
     "no mutation or return override",
     "public_sdk_ready=false",
 )
+REQUIRED_NOT_PROMOTED_SURFACES = {
+    "lookup",
+    "mutation",
+    "object_identity",
+    "public_sdk",
+    "raw_params",
+    "resource_handle",
+    "return_override",
+    "runtime_hooks",
+}
+EXPECTED_SNAPSHOT_ADDRESS_POLICY = "absolute core paths and addresses omitted; use full inspector JSON for local evidence review"
+EXPECTED_SNAPSHOT_SOURCE = "offline_core"
+EXPECTED_SNAPSHOT_GENERATOR = "scripts/inspect_core_ufunctions.py --snapshot-json"
+SNAPSHOT_BASE_DIR = "base"
+SNAPSHOT_CANDIDATE_DIR = "candidate"
 FORBIDDEN_TRUE_READY_KEYS = {
     "build_policy_ready",
     "build_policy_sdk_ready",
@@ -287,6 +310,21 @@ PUBLIC_EXPOSURE_KEY_TOKENS = {
     "exposes",
     "public",
 }
+FORBIDDEN_SNAPSHOT_KEYS = {
+    "address",
+    "chunks",
+    "first_property",
+    "fname_table",
+    "gobjects",
+    "integer_window",
+    "native_func_candidate",
+    "next_field",
+    "next_property",
+    "object",
+    "pointer_window",
+}
+ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
+HEX_METADATA_KEYS = {"function_flags", "property_flags", "return_value_offset"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -381,6 +419,22 @@ def compact_key_text(value: str) -> str:
     return "".join(token for token in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if token)
 
 
+def raw_sanitization_reasons(value: Any, *, key: str | None = None, path: str = "") -> list[str]:
+    reasons: list[str] = []
+    if key in FORBIDDEN_SNAPSHOT_KEYS:
+        reasons.append(f"forbidden_key:{path or key}")
+    if isinstance(value, dict):
+        for child_key, child in value.items():
+            child_path = f"{path}.{child_key}" if path else str(child_key)
+            reasons.extend(raw_sanitization_reasons(child, key=str(child_key), path=child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            reasons.extend(raw_sanitization_reasons(child, path=f"{path}[{index}]"))
+    elif isinstance(value, str) and key not in HEX_METADATA_KEYS and ADDRESS_RE.search(value):
+        reasons.append(f"raw_address:{path}")
+    return reasons
+
+
 def has_forbidden_ready_claim(key: str, path: str) -> bool:
     if key.startswith(NEGATED_TRUE_KEY_PREFIXES):
         return False
@@ -465,15 +519,124 @@ def validate_bool_shape(prop: dict[str, Any], expected: dict[str, Any], blockers
         add(blockers, "snapshot_bool_semantics_status_mismatch", path=path, expected="candidate", value=semantics.get("status"))
 
 
-def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: list[dict[str, Any]]) -> None:
+def target_snapshot_filename(target_filter: str) -> str:
+    _, _, qualified = target_filter.partition(":")
+    return f"{qualified}.snapshot.json"
+
+
+def validate_snapshot_path(
+    target_filter: str,
+    snapshot_path: Path,
+    readiness_path: Path,
+    blockers: list[dict[str, Any]],
+) -> Path | None:
+    expected_path = readiness_path.parent / SNAPSHOT_BASE_DIR / target_snapshot_filename(target_filter)
+    if not snapshot_path.is_absolute():
+        add(blockers, "readiness_target_detail_path_not_absolute", target=target_filter, value=str(snapshot_path))
+        return None
+    try:
+        resolved_path = snapshot_path.resolve(strict=False)
+        resolved_expected = expected_path.resolve(strict=False)
+    except OSError as exc:
+        add(blockers, "readiness_target_detail_path_unresolvable", target=target_filter, value=str(snapshot_path), detail=str(exc))
+        return None
+    if resolved_path != resolved_expected:
+        add(
+            blockers,
+            "readiness_target_detail_path_mismatch",
+            target=target_filter,
+            expected=str(resolved_expected),
+            value=str(resolved_path),
+        )
+        return None
+    return resolved_path
+
+
+def candidate_snapshot_path(base_snapshot_path: Path) -> Path:
+    return base_snapshot_path.parent.parent / SNAPSHOT_CANDIDATE_DIR / base_snapshot_path.name
+
+
+def snapshot_artifact_identity(snapshot: dict[str, Any], blockers: list[dict[str, Any]], path: str) -> dict[str, str] | None:
+    evidence = snapshot.get("evidence")
+    if not isinstance(evidence, dict):
+        add(blockers, "snapshot_evidence_missing", path=path)
+        return None
+    identity_payload = {"artifact_identity": {key: evidence.get(key) for key in ARTIFACT_IDENTITY_KEYS}}
+    identity, errors = complete_artifact_identity(
+        identity_payload, container_key="artifact_identity", expected_artifact_kind=EXPECTED_SNAPSHOT_SOURCE
+    )
+    for error in errors:
+        add(blockers, "snapshot_artifact_identity_invalid", path=path, detail=error)
+    return identity
+
+
+def validate_snapshot_envelope(snapshot: dict[str, Any], blockers: list[dict[str, Any]], path: str) -> dict[str, str] | None:
+    if snapshot.get("address_policy") != EXPECTED_SNAPSHOT_ADDRESS_POLICY:
+        add(
+            blockers,
+            "snapshot_address_policy_mismatch",
+            path=path,
+            expected=EXPECTED_SNAPSHOT_ADDRESS_POLICY,
+            value=snapshot.get("address_policy"),
+        )
+    sanitization_reasons = raw_sanitization_reasons(snapshot)
+    for reason in sanitization_reasons:
+        add(blockers, "snapshot_raw_sanitization_mismatch", path=path, detail=reason)
+
+    evidence = snapshot.get("evidence")
+    if not isinstance(evidence, dict):
+        add(blockers, "snapshot_evidence_missing", path=path)
+        return None
+    if evidence.get("source") != EXPECTED_SNAPSHOT_SOURCE:
+        add(blockers, "snapshot_evidence_source_mismatch", path=path, expected=EXPECTED_SNAPSHOT_SOURCE, value=evidence.get("source"))
+    if evidence.get("status") != "candidate-only":
+        add(blockers, "snapshot_evidence_status_mismatch", path=path, expected="candidate-only", value=evidence.get("status"))
+    if evidence.get("generated_by") != EXPECTED_SNAPSHOT_GENERATOR:
+        add(blockers, "snapshot_evidence_generator_mismatch", path=path, expected=EXPECTED_SNAPSHOT_GENERATOR, value=evidence.get("generated_by"))
+    if not is_sha256(evidence.get("ark_binary_sha256")):
+        add(blockers, "snapshot_ark_binary_sha256_invalid", path=path, value=evidence.get("ark_binary_sha256"))
+    return snapshot_artifact_identity(snapshot, blockers, path)
+
+
+def validate_distinct_snapshot_identity(
+    target_filter: str,
+    base_identity: dict[str, str] | None,
+    candidate_identity: dict[str, str] | None,
+    base_snapshot: dict[str, Any],
+    candidate_snapshot: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    base_evidence = base_snapshot.get("evidence") if isinstance(base_snapshot.get("evidence"), dict) else {}
+    candidate_evidence = candidate_snapshot.get("evidence") if isinstance(candidate_snapshot.get("evidence"), dict) else {}
+    if base_evidence.get("ark_binary_sha256") != candidate_evidence.get("ark_binary_sha256"):
+        add(
+            blockers,
+            "snapshot_ark_binary_sha256_mismatch",
+            target=target_filter,
+            base=base_evidence.get("ark_binary_sha256"),
+            candidate=candidate_evidence.get("ark_binary_sha256"),
+        )
+    if base_identity is None or candidate_identity is None:
+        return
+    if tuple(base_identity[key] for key in ARTIFACT_IDENTITY_KEYS) == tuple(
+        candidate_identity[key] for key in ARTIFACT_IDENTITY_KEYS
+    ):
+        add(blockers, "snapshot_same_evidence_artifact_identity", target=target_filter)
+    for key in ("artifact_sha256", "capture_id", "evidence_pack_id"):
+        if base_identity[key] == candidate_identity[key]:
+            add(blockers, f"snapshot_same_evidence_{key}", target=target_filter, value=base_identity[key])
+
+
+def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
     expected = EXPECTED_FIELD_SHAPES[target_filter]
     snapshot = read_json(snapshot_path, blockers, "snapshot")
     if snapshot is None:
-        return
+        return None
     scan_for_forbidden_true_ready(snapshot, blockers, f"$.snapshot[{target_filter}]")
     scan_for_forbidden_true_claims(snapshot, blockers, f"$.snapshot[{target_filter}]")
-    if snapshot.get("schema") != "obelisk.ufunction-chain.snapshot.v1":
-        add(blockers, "snapshot_schema_mismatch", path=str(snapshot_path), expected="obelisk.ufunction-chain.snapshot.v1", value=snapshot.get("schema"))
+    validate_snapshot_envelope(snapshot, blockers, str(snapshot_path))
+    if snapshot.get("schema") != SNAPSHOT_SCHEMA:
+        add(blockers, "snapshot_schema_mismatch", path=str(snapshot_path), expected=SNAPSHOT_SCHEMA, value=snapshot.get("schema"))
     for section in ("evidence", "interpretation"):
         value = snapshot.get(section)
         if not isinstance(value, dict) or value.get("status") != "candidate-only":
@@ -482,12 +645,12 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
     targets = snapshot.get("targets")
     if not isinstance(targets, list) or len(targets) != 1 or not isinstance(targets[0], dict):
         add(blockers, "snapshot_target_count_mismatch", path=str(snapshot_path), expected=1, value=len(targets) if isinstance(targets, list) else None)
-        return
+        return snapshot
     target = targets[0]
     target_meta = target.get("target")
     if not isinstance(target_meta, dict):
         add(blockers, "snapshot_target_metadata_missing", path=str(snapshot_path))
-        return
+        return snapshot
 
     target_checks = {
         "outer_name": expected["outer_name"],
@@ -514,7 +677,7 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
     property_chain = target.get("property_chain")
     if not isinstance(property_chain, dict):
         add(blockers, "snapshot_property_chain_missing", path=str(snapshot_path))
-        return
+        return snapshot
     expected_properties = expected["properties"]
     chain_checks = {
         "status": "candidate",
@@ -534,7 +697,7 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
             expected=len(expected_properties),
             value=len(properties) if isinstance(properties, list) else None,
         )
-        return
+        return snapshot
 
     for index, (prop, expected_prop) in enumerate(zip(properties, expected_properties, strict=True)):
         prop_path = f"{snapshot_path}#properties[{index}]"
@@ -563,9 +726,17 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
             validate_bool_shape(prop, expected_prop, blockers, prop_path)
         if prop.get("name") not in FIELD_REDACTION_POLICY:
             add(blockers, "snapshot_field_redaction_policy_missing", path=prop_path, field=prop.get("name"))
+        redaction = FIELD_REDACTION_POLICY.get(str(prop.get("name")))
+        if redaction is None:
+            continue
+        if redaction.startswith("redacted_") and prop.get("exposes_range") is True:
+            add(blockers, "snapshot_redacted_field_exposes_range", path=prop_path, field=prop.get("name"))
+        if redaction.startswith("layout_only_") and prop.get("exposes_public_payload") is True:
+            add(blockers, "snapshot_layout_only_field_public_payload", path=prop_path, field=prop.get("name"))
+    return snapshot
 
 
-def validate_readiness_snapshot_shapes(readiness: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_readiness_snapshot_shapes(readiness: dict[str, Any], readiness_path: Path, blockers: list[dict[str, Any]]) -> None:
     modules = readiness.get("modules")
     if not isinstance(modules, list):
         add(blockers, "readiness_modules_missing")
@@ -617,7 +788,24 @@ def validate_readiness_snapshot_shapes(readiness: dict[str, Any], blockers: list
         if not isinstance(path_value, str) or not path_value:
             add(blockers, "readiness_target_detail_path_missing", target=target_filter, value=path_value)
             continue
-        validate_snapshot_shape(target_filter, Path(path_value), blockers)
+        base_path = validate_snapshot_path(target_filter, Path(path_value), readiness_path, blockers)
+        if base_path is None:
+            continue
+        candidate_path = candidate_snapshot_path(base_path)
+        base_snapshot = validate_snapshot_shape(target_filter, base_path, blockers)
+        candidate_snapshot = validate_snapshot_shape(target_filter, candidate_path, blockers)
+        if base_snapshot is None or candidate_snapshot is None:
+            continue
+        base_identity = snapshot_artifact_identity(base_snapshot, blockers, str(base_path))
+        candidate_identity = snapshot_artifact_identity(candidate_snapshot, blockers, str(candidate_path))
+        validate_distinct_snapshot_identity(
+            target_filter,
+            base_identity,
+            candidate_identity,
+            base_snapshot,
+            candidate_snapshot,
+            blockers,
+        )
 
 
 def validate_manifest_entry(entry: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -691,10 +879,20 @@ def validate_referenced_sha(entry: dict[str, Any], readiness_path: Path, blocker
 def validate_readiness(readiness: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     if readiness.get("schema") != READINESS_SCHEMA:
         add(blockers, "readiness_schema_mismatch", expected=READINESS_SCHEMA, value=readiness.get("schema"))
+    for key, expected in EXPECTED_READINESS_ENVELOPE.items():
+        if readiness.get(key) != expected:
+            add(blockers, f"readiness_{key}_mismatch", expected=expected, value=readiness.get(key))
     if readiness.get("gate_mode") != "planning_layout_intake":
         add(blockers, "readiness_gate_mode_mismatch", expected="planning_layout_intake", value=readiness.get("gate_mode"))
     if readiness.get("second_source_status") != "compared":
         add(blockers, "readiness_second_source_status_mismatch", expected="compared", value=readiness.get("second_source_status"))
+    not_promoted = readiness.get("not_promoted_surfaces")
+    if not isinstance(not_promoted, list) or not all(isinstance(item, str) for item in not_promoted):
+        add(blockers, "readiness_not_promoted_surfaces_missing")
+    else:
+        missing_not_promoted = sorted(REQUIRED_NOT_PROMOTED_SURFACES - set(not_promoted))
+        if missing_not_promoted:
+            add(blockers, "readiness_not_promoted_surfaces_missing_values", missing=missing_not_promoted)
 
     target_sets = readiness.get("target_sets")
     if target_sets != [TARGET_SET]:
@@ -897,7 +1095,7 @@ def main() -> int:
         readiness = read_json(readiness_path, blockers, "readiness")
     if readiness is not None:
         validate_readiness(readiness, blockers)
-        validate_readiness_snapshot_shapes(readiness, blockers)
+        validate_readiness_snapshot_shapes(readiness, readiness_path, blockers)
         scan_for_forbidden_true_ready(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_claims(readiness, blockers, "$.readiness")
     if manifest is not None:

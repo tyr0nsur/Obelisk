@@ -194,3 +194,14 @@ context/placement fields; scalar bools and `CurrentAllowedReason` remain layout-
 `ReturnValue` remains a layout-only return candidate with no override authority. Any
 truthy claim of public payload exposure, runtime, enforcement, or return override fails
 closed.
+
+Follow-up hardening keeps the checker consume-only but no longer trusts aggregate totals
+alone. The readiness envelope must remain `second_source_layout_evidence_only`,
+`strict_identity_indices=false`, planning-only, and must list the blocked promoted
+surfaces. Each target detail path must point to the exact `base/<target>.snapshot.json`
+beside the readiness report; the checker then consumes the sibling
+`candidate/<target>.snapshot.json`, verifies complete offline-core artifact identity,
+requires the base and candidate identities to be distinct, and rejects raw address/path
+leaks or exposed ranges on redacted placement/player/location fields. This is still not
+runtime approval, Structure SDK promotion, enforcement, mutation, return override, public
+ABI, or v1 completion.

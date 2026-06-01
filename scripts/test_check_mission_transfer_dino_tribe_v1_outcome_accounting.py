@@ -123,10 +123,20 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertEqual(mission["lane"], "mission_copied_bool_policy_slice")
         self.assertEqual(mission["outcome"], "internal_planning_only")
         self.assertTrue(mission["accepted_for_internal_planning"])
+        self.assertTrue(mission["consume_only"])
+        self.assertTrue(mission["internal_reusable_evidence_only"])
         self.assertFalse(mission["v1_accounted"])
+        self.assertFalse(mission["mission_sdk_ready"])
+        self.assertFalse(mission["public_abi_ready"])
         self.assertFalse(mission["public_sdk_ready"])
+        self.assertFalse(mission["runtime_observer_approved"])
         self.assertFalse(mission["runtime_ready"])
+        self.assertFalse(mission["identity_ready"])
+        self.assertFalse(mission["lookup_ready"])
+        self.assertFalse(mission["mutation_ready"])
         self.assertFalse(mission["promotion_ready"])
+        self.assertFalse(mission["return_override_ready"])
+        self.assertFalse(mission["v1_completion"])
         self.assertEqual(mission["missing_required_evidence"], [])
         self.assertEqual(mission["copied_bool_boundary"]["copied_bool_count"], 5)
         self.assertEqual(
@@ -150,6 +160,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             mission["redaction_boundary"]["redacted_recognition_fields"],
         )
         self.assertIn("public_mission_sdk_abi", mission["remaining_public_gates"])
+        self.assertIn("mission leaf accounting is exactly consume-only internal reusable evidence", mission["non_claims"])
 
         priority = report["leaf_priority"]
         self.assertEqual(priority["schema"], "obelisk.mission-transfer-dino-tribe-v1-leaf-priority.v1")
@@ -214,6 +225,25 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("ResourceHandle", claims)
         self.assertIn("runtime hook", claims)
         self.assertIn("cross-map correlation", claims)
+
+    def test_release_statement_rejects_negated_exclusion_as_affirmative_claim(self) -> None:
+        statement = (
+            f"{SURFACE_ID}: excluded - mission is not excluded; transfer excluded; "
+            "dino_policy excluded; tribe_policy excluded; buff_status excluded. "
+            "Mission SDK is not excluded from v1. Runtime hook is not blocked.\n"
+        )
+        result = self.run_checker(statement=statement, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_leaf_exclusions_missing", report["blockers"])
+        self.assertIn("release_statement_forbidden_claims", report["blockers"])
+        details = [item for item in report["blocker_details"] if item["reason"] == "release_statement_leaf_exclusions_missing"]
+        self.assertEqual(details[0]["missing"], ["mission"])
+        claims = report["release_statement"]["forbidden_claims"]
+        self.assertIn("Mission SDK", claims)
+        self.assertIn("Runtime hook", claims)
+        self.assertFalse(report["release_statement"]["leaf_exclusions"]["mission"])
 
     def test_excluded_manifest_route_rejects_public_contract(self) -> None:
         manifest = load_manifest()

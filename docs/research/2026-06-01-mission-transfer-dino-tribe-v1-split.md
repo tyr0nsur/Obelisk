@@ -95,3 +95,9 @@ hardening pass edited only the accounting checker, its corresponding test, and
 this note. No servers, live logs, debuggers, Discord, Git commands, runtime
 probes, manifest edits, ABI/runtime code edits, or `/servidor/ark` writes were
 used.
+
+The later Mission copied-bool readiness/accounting hardening pass kept the same
+offline-only boundary while making the reports explicitly `consume_only` and
+`internal_reusable_evidence_only`, with public Mission SDK, ABI, runtime
+observer, identity, lookup, mutation, return override, and v1 completion flags
+remaining false.

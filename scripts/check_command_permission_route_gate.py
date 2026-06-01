@@ -23,6 +23,18 @@ DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
 PLAYER_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
+EXPECTED_ROUTE_CHECK_SCHEMAS = {
+    "player_identity_public_contract_gap": "obelisk.player-identity-public-contract-gap-report.v1",
+    "permissions_query_failclosed": "obelisk.permissions-admin-query-failclosed-contract-check.v1",
+    "permissions_admin_public_readiness": "obelisk.permissions-admin-public-readiness-check.v1",
+    "command_copied_response_intent_planning": "obelisk.command-copied-response-intent-planning-check.v1",
+    "command_copied_response_intent_lifecycle_planning": (
+        "obelisk.command-copied-response-intent-lifecycle-planning-check.v1"
+    ),
+    "command_principal_authz_response_bridge": "obelisk.command-principal-authz-response-bridge-check.v1",
+    "command_chat_response_public_readiness": "obelisk.command-chat-response-public-readiness-check.v1",
+    "commands_replies_public_readiness": "obelisk.commands-replies-public-readiness-check.v1",
+}
 ALLOWED_CRITICAL_PATH_BLOCKERS = {
     "approved_runtime_evidence_missing",
     "identity_public_contract_gate",
@@ -171,9 +183,14 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
             if report.get(key) is True:
                 public_or_runtime_claims.append(key)
 
+    report_schema = report.get("schema") if report is not None else None
+    expected_schema = EXPECTED_ROUTE_CHECK_SCHEMAS.get(name)
+    schema_valid = report_schema == expected_schema
+
     check_valid = (
         result.returncode == 0
         and report is not None
+        and schema_valid
         and report.get("valid", True) is True
         and not public_or_runtime_claims
     )
@@ -183,7 +200,8 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         "argv": argv,
         "exit_code": result.returncode,
         "valid": check_valid,
-        "report_schema": report.get("schema") if report is not None else None,
+        "report_schema": report_schema,
+        "expected_schema": expected_schema,
         "planning_only": report.get("planning_only") if report is not None else None,
         "accepted_for_planning": report.get("accepted_for_planning") if report is not None else None,
         "public_or_runtime_claims": public_or_runtime_claims,
@@ -273,6 +291,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append(f"{check['name']}: checker exited {check['exit_code']}")
         if check["parse_error"] is not None:
             blockers.append(f"{check['name']}: {check['parse_error']}")
+        if check["report_schema"] != check["expected_schema"]:
+            blockers.append(
+                f"{check['name']}: schema mismatch "
+                f"{check['report_schema']!r} != {check['expected_schema']!r}"
+            )
         if check["public_or_runtime_claims"]:
             joined = ", ".join(check["public_or_runtime_claims"])
             blockers.append(f"{check['name']}: unexpected public/runtime claim: {joined}")

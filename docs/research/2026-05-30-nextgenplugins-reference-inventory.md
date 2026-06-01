@@ -134,9 +134,9 @@ public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 
 ## v1 Planning Clarification
 
-Plugin Hub work is parked until the complete SDK blocker chain is handled or explicitly
-scoped. For v1 planning, treat the existing example/plugin notes only as archived
-reference material:
+Plugin Hub work is parked until the complete SDK blocker chain is complete. While
+blockers remain open, explicitly scoped work may inspect archived planning only. For v1
+planning, treat the existing example/plugin notes only as archived reference material:
 
 - Archived SDK example lane: lifecycle/config/logging, descriptor readers, and
   process-local timers can remain useful as guardrail fixtures, but they are not active
