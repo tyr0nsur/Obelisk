@@ -128,7 +128,7 @@ cluster coordination.
 
 Long term, Obelisk should avoid raw memory scanning in plugins.
 
-Preferred core-first direction:
+Preferred copied-SDK direction:
 
 1. Validate reflection primitives with second-source evidence.
 2. Keep runtime observation exact, bounded, gated, and non-mutating.

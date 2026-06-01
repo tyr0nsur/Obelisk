@@ -21,7 +21,8 @@ new binary hash or contradictory evidence changes the current research priority.
 
 ## Start Here
 
-Use these notes as the current curated core-first path for new work. This README is a
+Use these notes as the current curated evidence path for the complete-SDK route and the
+historical core-first RC baseline. This README is a
 navigation aid, not an exhaustive inventory of every evidence note; unlisted notes may
 still preserve durable evidence and should not be deleted only because they are absent
 from this index.

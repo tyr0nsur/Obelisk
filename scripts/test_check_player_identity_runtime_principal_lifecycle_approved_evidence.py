@@ -89,6 +89,7 @@ def manifest() -> dict:
             "ready": True,
             "operational_window_manifest_ready": True,
             "run_id": "20260601T120000Z-player-principal-lifecycle",
+            "obelisk_commit": summary["evidence"]["obelisk_commit"],
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             "copied_log": {"path": source["path"], "path_status": "unprotected_offline", "sha256": source["sha256"]},
             "posture": {
@@ -293,12 +294,14 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
     def test_rejects_operational_window_mismatch(self) -> None:
         payload = manifest()
         payload["operational_window"]["copied_log"]["sha256"] = hashlib.sha256(b"other").hexdigest()
+        payload["operational_window"]["obelisk_commit"] = "other-commit"
         payload["operational_window"]["posture"]["dispatch_limit"] = "1"
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operational_window_copied_log_sha256_mismatch", report["blockers"])
+        self.assertIn("operational_window_obelisk_commit_mismatch", report["blockers"])
         self.assertIn("operational_window_posture_mismatch", report["blockers"])
 
     def test_rejects_identity_or_ue_leakage_inside_operational_window(self) -> None:

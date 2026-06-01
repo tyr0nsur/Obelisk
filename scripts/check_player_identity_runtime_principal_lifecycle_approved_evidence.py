@@ -396,6 +396,8 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         add(blockers, "operational_window_copied_log_path_mismatch", f"{label}.copied_log.path")
     if copied.get("sha256") != source.get("sha256"):
         add(blockers, "operational_window_copied_log_sha256_mismatch", f"{label}.copied_log.sha256")
+    if window.get("obelisk_commit") != evidence.get("obelisk_commit"):
+        add(blockers, "operational_window_obelisk_commit_mismatch", f"{label}.obelisk_commit")
 
     posture = window.get("posture")
     if not isinstance(posture, dict):

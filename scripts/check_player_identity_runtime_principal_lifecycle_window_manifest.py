@@ -40,6 +40,7 @@ REQUIRED_TIMESTAMP_FIELDS = (
 )
 REQUIRED_SIMPLE_FIELDS = (
     "run_id",
+    "obelisk_commit",
     "approval",
     "copied_log_path",
     "copied_log_sha256",
@@ -236,6 +237,9 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
     run_id = fields.get("run_id")
     if run_id is not None and RUN_ID_RE.fullmatch(run_id) is None:
         add(blockers, "run_id_invalid", "run_id")
+    obelisk_commit = fields.get("obelisk_commit")
+    if obelisk_commit is not None and not SAFE_COMPONENT_RE.fullmatch(obelisk_commit):
+        add(blockers, "obelisk_commit_invalid", "obelisk_commit")
 
     copied_log_sha256 = fields.get("copied_log_sha256")
     if copied_log_sha256 is not None and SHA256_RE.fullmatch(copied_log_sha256) is None:
@@ -324,6 +328,7 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
 def build_template_fields() -> dict[str, str]:
     return {
         "run_id": "20260601T120000Z-player-principal-lifecycle",
+        "obelisk_commit": "reviewed-obelisk-commit",
         "target": "arkserver2/TheIsland",
         "approval": EXPECTED_APPROVAL,
         "approved_window_start_utc": "2026-06-01T12:00:00Z",
@@ -391,6 +396,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
         "runtime_ready": False,
         "remaining_blockers": [] if accepted else ["window_manifest_not_accepted"],
         "run_id": fields.get("run_id"),
+        "obelisk_commit": fields.get("obelisk_commit"),
         "target": {
             "instance": validation.target.instance,
             "map": validation.target.map_name,

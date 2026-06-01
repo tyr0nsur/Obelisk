@@ -22,7 +22,7 @@
       "runtime/core-first RC readiness",
       "internal runtime stability",
       "Foundation/Plugin Hub seed package shape",
-      "GameplayPolicyEvent and ChatMessageEvent copied-data seeds"
+      "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds"
     ]
   },
   "installed_sdk_package_shape": {
@@ -127,11 +127,11 @@
     "obelisk.permissions-admin-query-failclosed-contract.v1 is a candidate-only pre-ABI permissions/admin artifact; consume-mode acceptance is not public permissions/admin ABI, public SDK readiness, runtime readiness, or v1 SDK completion evidence.",
     "While player identity waits on copied core/reflection evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
-    "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
+    "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied signals are copied-data seeds only; individually or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required.",
     "No surface may be listed as promoted unless its status is promoted.",
     "post_v1_or_excluded_surfaces must exactly match surfaces whose status is post-v1 or excluded.",
     "No excluded, debug-only, planning, or post-v1 surface may declare a non-empty public_contract.",
-    "docs/public_gameplay_events.json remains the detailed evidence source for GameplayPolicyEvent and ChatMessageEvent backing target sets."
+    "docs/public_gameplay_events.json remains the detailed evidence source for GameplayPolicyEvent, ChatMessageEvent, and inventory-backed GameplayPolicyEvent target sets."
   ],
   "surfaces": [
     {
@@ -348,7 +348,7 @@
       "id": "obelisk.gameplay_policy_event.v1",
       "category": "copied gameplay notification",
       "status": "promoted-experimental-only",
-      "support_tier": "experimental Plugin Hub seed",
+      "support_tier": "promoted-experimental-only copied-data seed",
       "public_name": "GameplayPolicyEvent",
       "capabilities": [
         "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS"

@@ -43,6 +43,50 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         shutil.copytree(DEFAULT_ROOT, root, dirs_exist_ok=True)
         return root / "structure-aggregate-census-policy-slice.json"
 
+    def write_second_source_readiness(self, path: Path) -> Path:
+        payload = {
+            "schema": "obelisk.reflection-snapshot-readiness.v1",
+            "gate_mode": "planning_layout_intake",
+            "second_source_status": "compared",
+            "target_sets": ["structure-aggregate-census-planning"],
+            "totals": {
+                "targets": 6,
+                "comparable": 6,
+                "blocked": 0,
+                "second_source_accepted": 6,
+                "second_source_rejected": 0,
+                "second_source_inconclusive": 0,
+                "second_source_missing": 0,
+            },
+            "planning_layout_gate": {
+                "ready": True,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+            },
+            "promotion_gate": {
+                "ready": False,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "blockers": [
+                    {"reason": "planning_layout_intake_not_promotion_gate", "count": 1}
+                ],
+            },
+            "target_set_reports": [
+                {
+                    "name": "structure-aggregate-census-planning",
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                }
+            ],
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
     def test_default_pack_is_candidate_ready_but_not_public_or_runtime_ready(self) -> None:
         result = self.run_checker("--json")
         payload = json.loads(result.stdout)
@@ -64,9 +108,10 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-missing": 6})
         self.assertEqual(
             payload["target_readiness"]["allowed_statuses"],
-            ["candidate", "fixture-backed", "second-source-missing", "blocked"],
+            ["candidate", "fixture-backed", "second-source-missing", "second-source-accepted", "blocked"],
         )
         self.assertEqual(payload["target_readiness"]["second_source"]["status"], "missing")
+        self.assertEqual(payload["second_source_readiness"]["status"], "missing")
         for target in payload["target_readiness"]["targets"]:
             self.assertEqual(target["status"], "second-source-missing")
             self.assertTrue(target["candidate"])
@@ -96,6 +141,104 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertEqual(payload["non_claim_matrix"]["public_structure_events"], "not_claimed")
         self.assertEqual(payload["non_claim_matrix"]["identity_lookup"], "not_claimed")
         self.assertEqual(payload["non_claim_matrix"]["enforcement"], "not_claimed")
+
+    def test_second_source_readiness_accepts_planning_accounting_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+
+            result = self.run_checker(
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--second-source-readiness",
+                str(readiness),
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "candidate_ready")
+        self.assertTrue(payload["ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["promotion_ready"])
+        self.assertEqual(payload["second_source_readiness"]["status"], "accepted")
+        self.assertFalse(payload["second_source_readiness"]["promotion_ready"])
+        self.assertFalse(payload["second_source_readiness"]["public_sdk_ready"])
+        self.assertFalse(payload["second_source_readiness"]["runtime_ready"])
+        self.assertEqual(payload["target_readiness"]["status"], "second-source-accepted")
+        self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-accepted": 6})
+        self.assertEqual(payload["target_readiness"]["second_source"]["status"], "accepted")
+        self.assertEqual(payload["target_readiness"]["second_source"]["ready_scope"], "planning_only")
+        self.assertFalse(payload["target_readiness"]["second_source"]["promotion_ready"])
+        self.assertFalse(payload["target_readiness"]["second_source"]["public_sdk_ready"])
+        self.assertFalse(payload["target_readiness"]["second_source"]["runtime_ready"])
+        for target in payload["target_readiness"]["targets"]:
+            self.assertEqual(target["status"], "second-source-accepted")
+            self.assertTrue(target["second_source_backed"])
+            self.assertEqual(target["second_source_status"], "second-source-accepted")
+            self.assertEqual(target["blockers"], [])
+
+    def test_second_source_readiness_totals_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+            payload = json.loads(readiness.read_text(encoding="utf-8"))
+            payload["totals"]["second_source_accepted"] = 5
+            payload["totals"]["second_source_missing"] = 1
+            payload["planning_layout_gate"]["ready"] = False
+            readiness.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker(
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--second-source-readiness",
+                str(readiness),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("second_source_readiness_total_mismatch", reasons)
+        self.assertIn("second_source_readiness_planning_layout_gate_not_ready", reasons)
+        self.assertEqual(report["second_source_readiness"]["status"], "blocked")
+        self.assertEqual(report["target_readiness"]["second_source"]["status"], "missing")
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
+    def test_second_source_readiness_overclaim_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+            payload = json.loads(readiness.read_text(encoding="utf-8"))
+            payload["planning_layout_gate"]["public_sdk_ready"] = True
+            readiness.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker(
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--second-source-readiness",
+                str(readiness),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("second_source_readiness_planning_readiness_flag_not_false", reasons)
+        self.assertIn("second_source_readiness_readiness_flag_not_false", reasons)
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
 
     def test_source_isolation_blocks_runtime_or_public_wiring(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -247,6 +390,26 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
             link = Path(temp_dir) / "manifest-link.json"
             link.symlink_to(manifest)
             result = self.run_checker("--root", str(root), "--manifest", str(link), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("path_rejected", {blocker["reason"] for blocker in report["blockers"]})
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+            link = Path(temp_dir) / "second-source-link.json"
+            link.symlink_to(readiness)
+            result = self.run_checker(
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--second-source-readiness",
+                str(link),
+                check=False,
+            )
 
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)

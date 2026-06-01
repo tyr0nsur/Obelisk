@@ -22,12 +22,14 @@ DEFAULT_ROOT = Path(
 DEFAULT_MANIFEST_NAME = "structure-aggregate-census-policy-slice.json"
 REPORT_SCHEMA = "obelisk.structure-census-readiness-check.v1"
 POLICY_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
+SECOND_SOURCE_READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 INPUT_TARGET_SET = "structure-aggregate-census-planning"
 OUTPUT_TARGET_SET = "structure-aggregate-census-policy-slice"
 TARGET_READINESS_STATUSES = (
     "candidate",
     "fixture-backed",
     "second-source-missing",
+    "second-source-accepted",
     "blocked",
 )
 EXPECTED_INPUT_TARGETS = {
@@ -172,6 +174,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Structure aggregate/census policy-slice manifest. Defaults to --root/structure-aggregate-census-policy-slice.json.",
     )
+    parser.add_argument(
+        "--second-source-readiness",
+        type=Path,
+        help="Offline reflection snapshot readiness JSON for structure-aggregate-census-planning.",
+    )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
 
@@ -268,20 +275,167 @@ def records_by_target(records: object, field_key: str) -> dict[str, list[dict[st
     return grouped
 
 
-def target_status(candidate: bool, fixture_backed: bool, blocked: bool) -> str:
+def target_status(candidate: bool, fixture_backed: bool, second_source_backed: bool, blocked: bool) -> str:
     if blocked:
         return "blocked"
     if not candidate:
         return "blocked"
     if not fixture_backed:
         return "candidate"
+    if second_source_backed:
+        return "second-source-accepted"
     return "second-source-missing"
+
+
+def read_second_source_readiness(
+    path: Path,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        append_blocker(blockers, "second_source_readiness_unreadable", path=str(path), detail=str(exc))
+        return None
+    except json.JSONDecodeError as exc:
+        append_blocker(blockers, "second_source_readiness_malformed", path=str(path), detail=str(exc))
+        return None
+    if not isinstance(parsed, dict):
+        append_blocker(blockers, "second_source_readiness_not_object", path=str(path))
+        return None
+    return parsed
+
+
+def iter_named_values(value: object, key_name: str, *, trail: str = "$") -> list[tuple[str, object]]:
+    found: list[tuple[str, object]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if key == key_name:
+                found.append((child_trail, child))
+            if isinstance(child, (dict, list)):
+                found.extend(iter_named_values(child, key_name, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                found.extend(iter_named_values(child, key_name, trail=f"{trail}[{index}]"))
+    return found
+
+
+def validate_second_source_readiness(
+    readiness: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    path: Path,
+) -> dict[str, Any]:
+    local_blocker_start = len(blockers)
+    if readiness.get("schema") != SECOND_SOURCE_READINESS_SCHEMA:
+        append_blocker(
+            blockers,
+            "second_source_readiness_schema_mismatch",
+            expected=SECOND_SOURCE_READINESS_SCHEMA,
+            value=readiness.get("schema"),
+        )
+    if readiness.get("gate_mode") != "planning_layout_intake":
+        append_blocker(
+            blockers,
+            "second_source_readiness_gate_mode_mismatch",
+            expected="planning_layout_intake",
+            value=readiness.get("gate_mode"),
+        )
+
+    target_sets = readiness.get("target_sets")
+    if target_sets != [INPUT_TARGET_SET]:
+        append_blocker(
+            blockers,
+            "second_source_readiness_target_set_mismatch",
+            expected=[INPUT_TARGET_SET],
+            value=target_sets,
+        )
+
+    totals = readiness.get("totals")
+    if not isinstance(totals, dict):
+        append_blocker(blockers, "second_source_readiness_totals_missing")
+        totals = {}
+    expected_totals = {
+        "targets": 6,
+        "second_source_accepted": 6,
+        "second_source_missing": 0,
+        "second_source_rejected": 0,
+        "second_source_inconclusive": 0,
+    }
+    for field, expected in expected_totals.items():
+        if totals.get(field) != expected:
+            append_blocker(
+                blockers,
+                "second_source_readiness_total_mismatch",
+                field=field,
+                expected=expected,
+                value=totals.get(field),
+            )
+
+    planning_gate = readiness.get("planning_layout_gate")
+    if not isinstance(planning_gate, dict):
+        append_blocker(blockers, "second_source_readiness_planning_layout_gate_missing")
+        planning_gate = {}
+    if planning_gate.get("ready") is not True:
+        append_blocker(
+            blockers,
+            "second_source_readiness_planning_layout_gate_not_ready",
+            value=planning_gate.get("ready"),
+        )
+    if planning_gate.get("ready_scope") != "planning_only":
+        append_blocker(
+            blockers,
+            "second_source_readiness_planning_scope_mismatch",
+            expected="planning_only",
+            value=planning_gate.get("ready_scope"),
+        )
+
+    for field in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        planning_value = planning_gate.get(field)
+        if planning_value is not False:
+            append_blocker(
+                blockers,
+                "second_source_readiness_planning_readiness_flag_not_false",
+                field=f"planning_layout_gate.{field}",
+                value=planning_value,
+            )
+        for trail, value in iter_named_values(readiness, field):
+            if value is not False:
+                append_blocker(
+                    blockers,
+                    "second_source_readiness_readiness_flag_not_false",
+                    field=field,
+                    path=trail,
+                    value=value,
+                )
+
+    accepted = len(blockers) == local_blocker_start
+    return {
+        "path": str(path),
+        "status": "accepted" if accepted else "blocked",
+        "schema": readiness.get("schema"),
+        "gate_mode": readiness.get("gate_mode"),
+        "target_sets": target_sets if isinstance(target_sets, list) else [],
+        "totals": totals,
+        "planning_layout_gate": {
+            "ready": planning_gate.get("ready"),
+            "ready_scope": planning_gate.get("ready_scope"),
+            "promotion_ready": planning_gate.get("promotion_ready"),
+            "public_sdk_ready": planning_gate.get("public_sdk_ready"),
+            "runtime_ready": planning_gate.get("runtime_ready"),
+        },
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+    }
 
 
 def build_target_readiness(
     policy: dict[str, Any],
     summary: dict[str, Any],
     blockers: list[dict[str, Any]],
+    second_source_summary: dict[str, Any],
 ) -> dict[str, Any]:
     input_targets = set(summary.get("input_targets", []))
     copied_fields = set(summary.get("copied_fields", []))
@@ -290,6 +444,7 @@ def build_target_readiness(
     copied_records = records_by_target(policy.get("copied_fields_permitted"), "copied_field")
     excluded_records = records_by_target(policy.get("explicitly_excluded_fields"), "excluded_field")
     redacted_records = records_by_target(policy.get("redacted_structure_fields"), "redacted_field")
+    second_source_backed = second_source_summary.get("status") == "accepted"
 
     report_blocked = any(blocker.get("reason") in {"input_target_coverage_mismatch"} for blocker in blockers)
     targets: list[dict[str, Any]] = []
@@ -307,7 +462,7 @@ def build_target_readiness(
         if report_blocked:
             target_blockers.append("input_target_coverage_blocked")
 
-        status = target_status(candidate, fixture_backed, bool(target_blockers))
+        status = target_status(candidate, fixture_backed, second_source_backed, bool(target_blockers))
         status_counts[status] += 1
         targets.append(
             {
@@ -317,8 +472,8 @@ def build_target_readiness(
                 "candidate_status": "candidate" if candidate else "blocked",
                 "fixture_status": "fixture-backed" if fixture_backed else "missing",
                 "fixture_backed": fixture_backed,
-                "second_source_status": "second-source-missing",
-                "second_source_backed": False,
+                "second_source_status": "second-source-accepted" if second_source_backed else "second-source-missing",
+                "second_source_backed": second_source_backed,
                 "copied_fields": target_copied_fields,
                 "redacted_fields": target_redacted_fields,
                 "explicitly_excluded_fields": target_excluded_fields,
@@ -345,20 +500,41 @@ def build_target_readiness(
         readiness_status = "candidate"
     elif status_counts["fixture-backed"]:
         readiness_status = "fixture-backed"
+    elif status_counts["second-source-accepted"]:
+        readiness_status = "second-source-accepted"
 
     return {
         "status": readiness_status,
         "allowed_statuses": list(TARGET_READINESS_STATUSES),
         "status_counts": {key: value for key, value in status_counts.items() if value},
         "second_source": {
-            "status": "missing",
-            "required_before": [
-                "runtime_observation",
-                "internal_event_promotion",
-                "public_sdk",
-                "enforcement",
-            ],
-            "reason": "this policy slice contains first-source fixture evidence only; no distinct sanitized artifact identity or strict second-source comparison is present",
+            "status": "accepted" if second_source_backed else "missing",
+            "path": second_source_summary.get("path") if second_source_backed else None,
+            "gate_mode": second_source_summary.get("gate_mode") if second_source_backed else None,
+            "ready_scope": (
+                second_source_summary.get("planning_layout_gate", {}).get("ready_scope")
+                if second_source_backed
+                else None
+            ),
+            "totals": second_source_summary.get("totals") if second_source_backed else None,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "required_before": (
+                []
+                if second_source_backed
+                else [
+                    "runtime_observation",
+                    "internal_event_promotion",
+                    "public_sdk",
+                    "enforcement",
+                ]
+            ),
+            "reason": (
+                "accepted planning-layout second-source accounting only; no runtime, public SDK, mutation, identity, lookup, return override, enforcement, or promotion readiness is implied"
+                if second_source_backed
+                else "this policy slice contains first-source fixture evidence only; no distinct sanitized artifact identity or strict second-source comparison is present"
+            ),
         },
         "targets": targets,
     }
@@ -543,11 +719,16 @@ def validate_source_isolation(repo_root: Path, blockers: list[dict[str, Any]]) -
     }
 
 
-def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
+def build_report(root_arg: Path, manifest_arg: Path | None, second_source_arg: Path | None = None) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     root = safe_path(root_arg, "--root", blockers)
     manifest_path = manifest_arg if manifest_arg is not None else root_arg / DEFAULT_MANIFEST_NAME
     manifest = safe_path(manifest_path, "--manifest", blockers)
+    second_source_path = (
+        safe_path(second_source_arg, "--second-source-readiness", blockers)
+        if second_source_arg is not None
+        else None
+    )
 
     summary: dict[str, Any] = {}
     target_readiness: dict[str, Any] = {
@@ -557,6 +738,21 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         "second_source": {"status": "missing"},
         "targets": [],
     }
+    second_source_summary: dict[str, Any] = {
+        "status": "missing",
+        "path": str(second_source_arg) if second_source_arg is not None else None,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+    }
+    if second_source_path is not None:
+        second_source_payload = read_second_source_readiness(second_source_path, blockers)
+        if second_source_payload is not None:
+            second_source_summary = validate_second_source_readiness(
+                second_source_payload,
+                blockers,
+                path=second_source_path,
+            )
     source_isolation = validate_source_isolation(REPO_ROOT, blockers)
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
@@ -564,7 +760,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         policy = read_policy(manifest, blockers)
         if policy is not None:
             summary = validate_policy(policy, blockers)
-            target_readiness = build_target_readiness(policy, summary, blockers)
+            target_readiness = build_target_readiness(policy, summary, blockers, second_source_summary)
         consume_rc, consume_payload, consume_stderr = run_gate(root, manifest, "consume")
         consume_gate = {
             "returncode": consume_rc,
@@ -621,6 +817,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
         "promote_gate": promote_gate,
         "source_isolation": source_isolation,
         "target_readiness": target_readiness,
+        "second_source_readiness": second_source_summary,
         "summary": summary,
         "blockers": blockers,
         "non_claim_matrix": {
@@ -638,7 +835,7 @@ def build_report(root_arg: Path, manifest_arg: Path | None) -> dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.root, args.manifest)
+    report = build_report(args.root, args.manifest, args.second_source_readiness)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["ready"] else 1
 

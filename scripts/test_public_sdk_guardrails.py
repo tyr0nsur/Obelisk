@@ -1799,7 +1799,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "runtime/core-first RC readiness",
             "internal runtime stability",
             "Foundation/Plugin Hub seed package shape",
-            "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
+            "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds",
         ):
             self.assertIn(non_signal, stable_contract["not_sufficient"])
 
@@ -2079,7 +2079,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Installed-SDK foundation examples before identity/principal are limited to lifecycle/config/logging, descriptors, and process-local timers",
             "Plugin Hub seed/package publication remains post-SDK-complete, and neither these examples nor passive chat routing are enough for v1 completion",
             "passive chat parsing and plugin-local routing remain promoted-experimental-only",
-            "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required",
+            "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied signals are copied-data seeds only; individually or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required",
         ):
             self.assertIn(normalized(term), release_guardrails)
 
@@ -2561,7 +2561,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertFalse(manifest["v1_completion_required"])
         self.assertEqual(copied_signals["status"], "promoted-experimental-only")
-        self.assertEqual(copied_signals["support_tier"], "experimental Plugin Hub seed")
+        self.assertEqual(copied_signals["support_tier"], "promoted-experimental-only copied-data seed")
         self.assertIn(copied_signals["id"], manifest["experimental_surfaces"])
         self.assertNotIn(copied_signals["id"], manifest["promoted_surfaces"])
         self.assertNotIn(copied_signals["id"], manifest["v1_sdk_completion_blockers"])
@@ -7937,7 +7937,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "it does not promise ArkApi plugin compatibility",
             "Neither tier means the corresponding ArkApi plugin family can be ported",
             "not as portable behavior, source, ABI, constants, schemas, command parsers, or implementation patterns",
-            "v0.1 copied-data ABI surface; experimental Plugin Hub seed, not v1-complete",
+            "v0.1 copied-data ABI surface; promoted-experimental copied-data seed, not v1-complete",
             "it does not turn copied chat/policy examples into production Plugin Hub modules",
             "Dependency-order note only, not an immediate next public slice",
             "groups, grants, admin actions, storage, RCON, and operator reload stay excluded",

@@ -72,7 +72,7 @@ CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT = (
     "runtime/core-first RC readiness",
     "internal runtime stability",
     "Foundation/Plugin Hub seed package shape",
-    "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
+    "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds",
 )
 SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "complete_sdk_claim_requires_promoted_demand_families",

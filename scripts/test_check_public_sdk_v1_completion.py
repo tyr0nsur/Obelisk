@@ -113,7 +113,25 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertEqual(missing[surface_id], filename)
 
                 (decisions_dir / filename).write_text(
-                    json.dumps({"surface": surface_id}),
+                    json.dumps(
+                        {
+                            "surface": surface_id,
+                            "decision": "copied_signal_only",
+                            "public_header_allowed": True,
+                            "blocked_public_contract": {
+                                "standalone_inventory_sdk_allowed": False,
+                                "standalone_items_sdk_allowed": False,
+                                "forbidden_terms": [
+                                    "lookup",
+                                    "mutation",
+                                    "return override",
+                                ],
+                            },
+                            "v1_completion_contract": {
+                                "claim_effect": "does_not_complete_v1_sdk",
+                            },
+                        }
+                    ),
                     encoding="utf-8",
                 )
                 missing = module.missing_required_contract_decision_manifests(decisions_dir)
@@ -1707,7 +1725,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
                         "terms": [
                             "runtime/core-first RC readiness",
-                            "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
+                            "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds",
                             "obelisk.core-dump-evidence-pack.v1",
                             "obelisk.reflection-inventory-pack.v1",
                             "ServerListPlayers",

@@ -75,6 +75,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             "\n".join(
                 [
                     "run_id=20260601T120000Z-player-principal-lifecycle",
+                    f"obelisk_commit={summary['evidence']['obelisk_commit']}",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",
                     "approved_window_start_utc=2026-06-01T12:00:00Z",

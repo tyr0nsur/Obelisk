@@ -61,6 +61,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             "\n".join(
                 [
                     "run_id=20260601T120000Z-player-principal-lifecycle",
+                    "obelisk_commit=test-commit",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",
                     "approved_window_start_utc=2026-06-01T12:00:00Z",
@@ -168,6 +169,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.consume-gate.json").is_file())
             self.assertTrue((output_dir / "evidence-bundle-report.json").is_file())
             self.assertTrue(report["operational_window"]["manifest_ready"])
+            self.assertEqual(report["operational_window"]["obelisk_commit"], "test-commit")
 
     def test_fails_closed_for_live_server_log_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -178,6 +180,40 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("check player principal lifecycle window manifest failed", result.stderr)
+
+    def test_rejects_protected_output_dir_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            copied_log = temp_dir / "Obelisk.log"
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+
+            result = self.run_bundle(
+                copied_log,
+                Path("/servidor/ark/obelisk/player-principal-bundle"),
+                window_manifest=window_manifest,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--output-dir must not write under protected server root", result.stderr)
+            self.assertFalse((temp_dir / "runtime-observer-summary.json").exists())
+
+    def test_rejects_symlinked_output_dir_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            copied_log = temp_dir / "Obelisk.log"
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            target = temp_dir / "real-output-root"
+            target.mkdir()
+            link = temp_dir / "linked-output-root"
+            link.symlink_to(target, target_is_directory=True)
+
+            result = self.run_bundle(copied_log, link / "bundle", window_manifest=window_manifest)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--output-dir must not be a symlink", result.stderr)
+            self.assertFalse((target / "bundle" / "runtime-observer-summary.json").exists())
 
     def test_fails_closed_for_events_before_safe_gate(self) -> None:
         lines = runtime_log_lines()
@@ -222,6 +258,24 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("window manifest copied_log.sha256 does not match runtime observer summary", result.stderr)
+
+    def test_fails_closed_when_window_manifest_commit_does_not_match_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            copied_log = temp_dir / "Obelisk.log"
+            output_dir = temp_dir / "bundle"
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            text = window_manifest.read_text(encoding="utf-8")
+            window_manifest.write_text(
+                text.replace("obelisk_commit=test-commit", "obelisk_commit=other-commit"),
+                encoding="utf-8",
+            )
+
+            result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("window manifest obelisk_commit does not match runtime observer summary", result.stderr)
 
 
 if __name__ == "__main__":

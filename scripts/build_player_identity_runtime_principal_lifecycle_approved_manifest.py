@@ -214,6 +214,9 @@ def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> No
         raise SystemExit("--window-manifest-check copied_log.path must match source summary path")
     if copied.get("sha256") != source.get("sha256"):
         raise SystemExit("--window-manifest-check copied_log.sha256 must match source summary sha256")
+    evidence_commit = evidence.get("obelisk_commit") if isinstance(evidence, dict) else None
+    if window.get("obelisk_commit") != evidence_commit:
+        raise SystemExit("--window-manifest-check obelisk_commit must match source summary obelisk_commit")
 
 
 def build_manifest(
@@ -246,6 +249,7 @@ def build_manifest(
             "ready": window.get("ready"),
             "operational_window_manifest_ready": window.get("operational_window_manifest_ready"),
             "run_id": window.get("run_id"),
+            "obelisk_commit": window.get("obelisk_commit"),
             "target": window.get("target"),
             "copied_log": window.get("copied_log"),
             "posture": window.get("posture"),

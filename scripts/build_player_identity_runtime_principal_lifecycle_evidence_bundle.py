@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from snapshot_evidence_pack import reject_protected_output_path, reject_symlink_component
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
@@ -82,11 +84,16 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
         raise SystemExit("runtime observer summary source path does not match --copied-log")
     if copied.get("sha256") != source.get("sha256"):
         raise SystemExit("window manifest copied_log.sha256 does not match runtime observer summary")
+    evidence_commit = evidence.get("obelisk_commit") if isinstance(evidence, dict) else None
+    if window.get("obelisk_commit") != evidence_commit:
+        raise SystemExit("window manifest obelisk_commit does not match runtime observer summary")
 
 
 def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.expanduser()
+    reject_symlink_component(output_dir, "--output-dir")
+    output_dir = reject_protected_output_path(output_dir, "--output-dir")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     summary_path = output_dir / "runtime-observer-summary.json"
@@ -212,6 +219,7 @@ def main() -> int:
             "check": str(window_check_path),
             "copied_log_sha256": window_check.get("copied_log", {}).get("sha256"),
             "manifest_ready": window_check.get("operational_window_manifest_ready"),
+            "obelisk_commit": window_check.get("obelisk_commit"),
             "run_id": window_check.get("run_id"),
             "target": window_check.get("target"),
         },

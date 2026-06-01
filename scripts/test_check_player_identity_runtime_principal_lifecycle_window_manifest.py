@@ -19,6 +19,7 @@ GOOD_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 def manifest_lines(**overrides: str | None) -> list[str]:
     fields = {
         "run_id": "20260601T120000Z-player-principal-lifecycle",
+        "obelisk_commit": "test-commit",
         "target": "arkserver2/TheIsland",
         "approval": "current-turn operator-approved runtime window, not standing approval",
         "approved_window_start_utc": "2026-06-01T12:00:00Z",
@@ -83,6 +84,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertTrue(report["ready"])
         self.assertTrue(report["operational_window_manifest_ready"])
+        self.assertEqual(report["obelisk_commit"], "test-commit")
         self.assertEqual(report["copied_log"]["path_status"], "approved_offline_workspace")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertFalse(report["promotion_ready"])
@@ -129,6 +131,17 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("delivery_claim_not_none", report["blockers"])
         self.assertIn("principal_claim_not_none", report["blockers"])
         self.assertFalse(report["promotion_ready"])
+
+    def test_rejects_missing_or_unsafe_obelisk_commit(self) -> None:
+        missing = self.run_checker(manifest_lines(obelisk_commit=None), check=False)
+        missing_report = json.loads(missing.stdout)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn("required_field_missing", missing_report["blockers"])
+
+        unsafe = self.run_checker(manifest_lines(obelisk_commit="../main"), check=False)
+        unsafe_report = json.loads(unsafe.stdout)
+        self.assertNotEqual(unsafe.returncode, 0)
+        self.assertIn("obelisk_commit_invalid", unsafe_report["blockers"])
 
     def test_rejects_non_exclusive_observer_window_escape_gates(self) -> None:
         result = self.run_checker(
