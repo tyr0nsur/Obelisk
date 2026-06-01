@@ -1316,6 +1316,78 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
 
+    def test_release_statement_rejects_identity_permissions_command_mission_buff_claims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Player identity SDK is ready in v1.\n"
+            "Permissions/admin SDK is supported in v1.\n"
+            "Command response API is available in v1.\n"
+            "Commands/replies API is included in v1.\n"
+            "Mission SDK is ready in v1.\n"
+            "Buff SDK is supported in v1.\n"
+            "Buff/status SDK is included in v1.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "Player identity SDK is ready in v1.",
+            "Permissions/admin SDK is supported in v1.",
+            "Command response API is available in v1.",
+            "Commands/replies API is included in v1.",
+            "Mission SDK is ready in v1.",
+            "Buff SDK is supported in v1.",
+            "Buff/status SDK is included in v1.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
+    def test_release_statement_allows_negated_identity_permissions_command_mission_buff_boundaries(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Player identity SDK is not ready in v1.\n"
+            "Permissions/admin SDK remains blocked in v1.\n"
+            "Command response API is not available in v1.\n"
+            "Commands/replies API is not included in v1.\n"
+            "Mission SDK is not ready in v1.\n"
+            "Buff SDK is not supported in v1.\n"
+            "Buff/status SDK is not included in v1.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
+        self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+
     def test_release_statement_rejects_non_promotional_evidence_as_v1_claim_basis(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement += (

@@ -1190,6 +1190,67 @@ namespace
         }
     }
 
+    void TestCopiedObservationRejectsForgedPropertyMetadata()
+    {
+        auto requireReject = [](MissionReflection::MissionInvocation invocation, const char* message) {
+            CopiedMissionObservation observation;
+            observation.Function = MissionReflection::MissionFunction::BPOnPlayerRemovedFromMission;
+            observation.FunctionNameIndex = 123456;
+            observation.OuterNameIndex = 654321;
+            observation.BoolStorage[0].Field = MissionReflection::MissionField::BLastPhaseSuccess;
+            observation.BoolStorage[0].Value = true;
+            observation.BoolStorage[1].Field = MissionReflection::MissionField::BFromMissionCompleteEvent;
+            observation.BoolStorage[1].Value = true;
+            observation.BoolCount = observation.BoolStorage.size();
+
+            Require(!TryBuildCopiedMissionObservation(invocation, observation), message);
+            Require(observation.Function == MissionReflection::MissionFunction::GetPlayerUsableItems,
+                    "forged mission property metadata did not clear function");
+            Require(observation.FunctionNameIndex == -1,
+                    "forged mission property metadata did not clear function name");
+            Require(observation.OuterNameIndex == -1,
+                    "forged mission property metadata did not clear outer name");
+            Require(observation.BoolCount == 0,
+                    "forged mission property metadata did not clear bool count");
+            Require(!observation.BoolStorage[0].Value && !observation.BoolStorage[1].Value,
+                    "forged mission property metadata did not clear bool storage");
+        };
+
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 0;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+            attempt.Invocation.Fields[1].PropertyClassNameIndex = kObjectPropertyClassNameIndex;
+
+            requireReject(attempt.Invocation,
+                          "mission copied bool accepted forged property class FName index");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 0;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+            attempt.Invocation.Fields[1].PropertyClassObjectIndex = kObjectPropertyClassObjectIndex;
+
+            requireReject(attempt.Invocation,
+                          "mission copied bool accepted forged property class object index");
+        }
+        {
+            MissionFixture fixture;
+            BuildAddPlayerToMission(fixture);
+            fixture.Params[0x08] = 1;
+            fixture.Params[0x09] = 0;
+            Attempt attempt = Identify(fixture, kAddPlayerToMissionNameIndex);
+            attempt.Invocation.Fields[1].PropertyFlags ^= 0x400;
+
+            requireReject(attempt.Invocation,
+                          "mission copied bool accepted forged property flags");
+        }
+    }
+
     void PoisonObservation(CopiedMissionObservation& observation)
     {
         observation.Function = MissionReflection::MissionFunction::BPOnPlayerRemovedFromMission;
@@ -2111,6 +2172,7 @@ int main()
     TestCopiedObservationPayloadShape();
     TestBuildsMetadataAndCopiedBoolObservationOnly();
     TestCopiedObservationRejectsForgedObjectAndArrayRanges();
+    TestCopiedObservationRejectsForgedPropertyMetadata();
     TestMatchedAttemptBoolObservationFence();
     TestPostOriginalBoolObservationHelper();
     TestMissionCopiedBoolObserverDispatcherEndToEnd();

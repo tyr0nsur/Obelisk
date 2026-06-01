@@ -35,6 +35,9 @@ namespace Obelisk::UE::MissionReflection
         // Internal SHA-scoped metadata guardrail only. This is not public identity
         // and must not be logged or exposed as a Mission SDK payload field.
         int32_t PropertyNameIndex = -1;
+        int32_t PropertyClassNameIndex = -1;
+        int32_t PropertyClassObjectIndex = -1;
+        uint64_t PropertyFlags = 0;
         int32_t Offset = -1;
         size_t Size = 0;
         bool ExposesRange = false;

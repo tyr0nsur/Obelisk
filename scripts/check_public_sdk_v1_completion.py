@@ -246,6 +246,22 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:this|statement|release)\s+"
     r"(?:is|declares?|approves?|allows?|authorizes?)\s+"
     r"(?:a\s+)?v1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim))?\b",
+    r"\b(?:player[-_ ]?identity|player[-_ ]?principal|playeridentity|"
+    r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
+    r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
+    r"commands?/replies|commands?[-_ ]?replies|command[-_ ]?router|"
+    r"missions?|buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
+    r"(?:sdk|api|surface|support)\b.{0,80}"
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|"
+    r"shipped|stable|supported|promoted)\b",
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|"
+    r"shipped|stable|supported|promoted)\b.{0,80}"
+    r"\b(?:player[-_ ]?identity|player[-_ ]?principal|playeridentity|"
+    r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
+    r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
+    r"commands?/replies|commands?[-_ ]?replies|command[-_ ]?router|"
+    r"missions?|buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
+    r"(?:sdk|api|surface|support)\b",
     r"\b(?:inventory\s+sdk|items\s+sdk)\b.{0,80}"
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b",
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b"

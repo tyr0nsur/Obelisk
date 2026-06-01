@@ -645,6 +645,9 @@ namespace Obelisk::UE::MissionReflection
             MissionFieldRange field;
             field.Field = fieldSpec.Field;
             field.PropertyNameIndex = fieldSpec.NameIndex;
+            field.PropertyClassNameIndex = fieldSpec.ClassNameIndex;
+            field.PropertyClassObjectIndex = fieldSpec.ClassObjectIndex;
+            field.PropertyFlags = fieldSpec.PropertyFlags;
             field.Offset = fieldSpec.Offset;
             field.Size = fieldSpec.Size;
             field.ExposesRange = fieldSpec.ExposesRange;

@@ -127,6 +127,13 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         constexpr int32_t kMissionTypeNameIndex = 7646;
         constexpr int32_t kGetPlayerUsableItemsNameIndex = 7702;
 
+        constexpr int32_t kBoolPropertyClassNameIndex = 3;
+        constexpr int32_t kObjectPropertyClassNameIndex = 5;
+        constexpr int32_t kArrayPropertyClassNameIndex = 9;
+        constexpr int32_t kArrayPropertyClassObjectIndex = 528;
+        constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+
         constexpr int32_t kControllerNameIndex = 5908;
         constexpr int32_t kCharacterNameIndex = 7990;
         constexpr int32_t kPlayerNameIndex = 9972;
@@ -138,10 +145,18 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         constexpr int32_t kBFromMissionCompleteEventNameIndex = 22980;
         constexpr int32_t kOutItemIDsNameIndex = 23031;
 
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr uint64_t kArrayOutPropertyFlags = 0x380;
+
         struct ExpectedMissionField
         {
             Obelisk::UE::MissionReflection::MissionField Field;
             int32_t PropertyNameIndex = -1;
+            int32_t PropertyClassNameIndex = -1;
+            int32_t PropertyClassObjectIndex = -1;
+            uint64_t PropertyFlags = 0;
             int32_t Offset = -1;
             size_t Size = 0;
             bool ExposesRange = false;
@@ -160,11 +175,17 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         constexpr std::array<ExpectedMissionField, 2> kGetPlayerUsableItemsFields{{
             {Obelisk::UE::MissionReflection::MissionField::Character,
              kCharacterNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              0x00,
              0x08,
              false},
             {Obelisk::UE::MissionReflection::MissionField::OutItemIDs,
              kOutItemIDsNameIndex,
+             kArrayPropertyClassNameIndex,
+             kArrayPropertyClassObjectIndex,
+             kArrayOutPropertyFlags,
              0x08,
              0x10,
              false},
@@ -173,16 +194,25 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         constexpr std::array<ExpectedMissionField, 3> kAddPlayerToMissionFields{{
             {Obelisk::UE::MissionReflection::MissionField::PlayerCharacter,
              kPlayerCharacterNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              0x00,
              0x08,
              false},
             {Obelisk::UE::MissionReflection::MissionField::BForceAdd,
              kBForceAddNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              0x08,
              0x01,
              true},
             {Obelisk::UE::MissionReflection::MissionField::ReturnValue,
              kReturnValueNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              0x09,
              0x01,
              true},
@@ -191,11 +221,17 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         constexpr std::array<ExpectedMissionField, 2> kBPAllowPlayerToLeaveMissionFields{{
             {Obelisk::UE::MissionReflection::MissionField::PlayerPawn,
              kPlayerPawnNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              0x00,
              0x08,
              false},
             {Obelisk::UE::MissionReflection::MissionField::ReturnValue,
              kReturnValueNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
              0x08,
              0x01,
              true},
@@ -204,21 +240,33 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         constexpr std::array<ExpectedMissionField, 4> kBPOnPlayerRemovedFromMissionFields{{
             {Obelisk::UE::MissionReflection::MissionField::Player,
              kPlayerNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              0x00,
              0x08,
              false},
             {Obelisk::UE::MissionReflection::MissionField::Controller,
              kControllerNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              0x08,
              0x08,
              false},
             {Obelisk::UE::MissionReflection::MissionField::BFromMissionCompleteEvent,
              kBFromMissionCompleteEventNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              0x10,
              0x01,
              true},
             {Obelisk::UE::MissionReflection::MissionField::BLastPhaseSuccess,
              kBLastPhaseSuccessNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              0x11,
              0x01,
              true},
@@ -273,6 +321,9 @@ namespace Obelisk::Hooks::ProcessEventMissionReflection
         {
             return field.Field == expected.Field &&
                    field.PropertyNameIndex == expected.PropertyNameIndex &&
+                   field.PropertyClassNameIndex == expected.PropertyClassNameIndex &&
+                   field.PropertyClassObjectIndex == expected.PropertyClassObjectIndex &&
+                   field.PropertyFlags == expected.PropertyFlags &&
                    field.Offset == expected.Offset &&
                    field.Size == expected.Size &&
                    field.ExposesRange == expected.ExposesRange;
