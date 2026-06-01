@@ -27,6 +27,7 @@ REPORT_SCHEMA = "obelisk.inventory-action-fixture-boundary-check.v1"
 TARGET_SET = "inventory-action-compact-intake"
 DEFAULT_SNAPSHOT_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 PUBLIC_SDK_SURFACES_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+PUBLIC_GAMEPLAY_EVENTS_MANIFEST = REPO_ROOT / "docs" / "public_gameplay_events.json"
 EXPECTED_TARGETS = (
     "ShooterPlayerController.ServerRequestInventoryUseItem",
     "ShooterPlayerController.ServerRequestInventoryUseItemWithActor",
@@ -84,6 +85,26 @@ FORBIDDEN_PUBLIC_CONTRACT_TOKENS = (
 )
 INVENTORY_COPIED_SIGNALS_SURFACE = "obelisk.inventory_item_copied_signals.v1"
 INVENTORY_MUTATION_SURFACE = "obelisk.inventory_items_mutation.v1"
+EXPECTED_INVENTORY_COPIED_STABLE_NAMES = (
+    "inventory.remote_add_check",
+    "inventory.use_check",
+    "inventory_item.allow_equip_check",
+    "inventory_item.can_repair_check",
+    "inventory_item.use_onto_item_check",
+)
+EXPECTED_INVENTORY_COPIED_FIELD_MASKS = {
+    "inventory.remote_add_check": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+    ],
+    "inventory.use_check": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+    ],
+    "inventory_item.allow_equip_check": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+    "inventory_item.can_repair_check": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+    "inventory_item.use_onto_item_check": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+}
 EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT = [
     "GameplayPolicyEvent inventory.remote_add_check",
     "GameplayPolicyEvent inventory.use_check",
@@ -156,12 +177,100 @@ def parse_args() -> argparse.Namespace:
         default=PUBLIC_SDK_SURFACES_MANIFEST,
         help="Public SDK surfaces manifest to scan for action parameter contract leaks.",
     )
+    parser.add_argument(
+        "--public-gameplay-events",
+        type=Path,
+        default=PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+        help="Public gameplay events source-of-truth manifest.",
+    )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
 
 
 def append_blocker(blockers: list[dict[str, Any]], reason: str, **details: Any) -> None:
     blockers.append({"reason": reason, **details})
+
+
+def load_json_file(path: Path, blockers: list[dict[str, Any]], label: str) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        append_blocker(blockers, f"{label}_unreadable", path=str(path), detail=str(exc))
+        return None
+    except json.JSONDecodeError as exc:
+        append_blocker(blockers, f"{label}_malformed", path=str(path), detail=str(exc))
+        return None
+    if not isinstance(payload, dict):
+        append_blocker(blockers, f"{label}_not_object", path=str(path))
+        return None
+    return payload
+
+
+def derive_inventory_copied_signals(
+    public_gameplay_events: Path,
+    blockers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    manifest = load_json_file(public_gameplay_events, blockers, "public_gameplay_events")
+    if manifest is None:
+        return []
+    promoted_events = manifest.get("promoted_events")
+    if not isinstance(promoted_events, list):
+        append_blocker(blockers, "public_gameplay_events_promoted_events_missing")
+        return []
+    gameplay_policy = next(
+        (
+            event
+            for event in promoted_events
+            if isinstance(event, dict) and event.get("event_id") == "obelisk.gameplay_policy.v1"
+        ),
+        None,
+    )
+    if not isinstance(gameplay_policy, dict):
+        append_blocker(blockers, "public_gameplay_events_gameplay_policy_missing")
+        return []
+    event_kinds = gameplay_policy.get("event_kinds")
+    if not isinstance(event_kinds, list):
+        append_blocker(blockers, "public_gameplay_events_event_kinds_missing")
+        return []
+
+    derived_by_name: dict[str, dict[str, Any]] = {}
+    for event in event_kinds:
+        if not isinstance(event, dict):
+            continue
+        if event.get("resource_kind") != "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM":
+            continue
+        stable_name = event.get("stable_name")
+        if not isinstance(stable_name, str):
+            append_blocker(blockers, "public_gameplay_events_inventory_signal_without_stable_name")
+            continue
+        if stable_name not in EXPECTED_INVENTORY_COPIED_STABLE_NAMES:
+            append_blocker(blockers, "inventory_copied_signals_source_widened", stable_name=stable_name)
+            continue
+        signal = {
+            "stable_name": stable_name,
+            "kind": event.get("kind"),
+            "event_kind_mask": event.get("event_kind_mask"),
+            "field_mask": event.get("field_mask"),
+        }
+        expected_field_mask = EXPECTED_INVENTORY_COPIED_FIELD_MASKS[stable_name]
+        if signal["field_mask"] != expected_field_mask:
+            append_blocker(
+                blockers,
+                "inventory_copied_signal_field_mask_mismatch",
+                stable_name=stable_name,
+                expected=expected_field_mask,
+                value=signal["field_mask"],
+            )
+        derived_by_name[stable_name] = signal
+
+    missing = [name for name in EXPECTED_INVENTORY_COPIED_STABLE_NAMES if name not in derived_by_name]
+    if missing:
+        append_blocker(blockers, "inventory_copied_signals_source_missing_expected", missing=missing)
+    return [derived_by_name[name] for name in EXPECTED_INVENTORY_COPIED_STABLE_NAMES if name in derived_by_name]
+
+
+def inventory_copied_public_contract_from_signals(signals: list[dict[str, Any]]) -> list[str]:
+    return [f"GameplayPolicyEvent {signal['stable_name']}" for signal in signals if isinstance(signal.get("stable_name"), str)]
 
 
 def build_fixture_report(snapshot_root: Path = DEFAULT_SNAPSHOT_ROOT) -> dict[str, Any]:
@@ -365,15 +474,16 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     }
 
 
-def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
-    try:
-        manifest = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        append_blocker(blockers, "public_sdk_surfaces_unreadable", path=str(path), detail=str(exc))
+def scan_public_contract_manifest(
+    path: Path,
+    blockers: list[dict[str, Any]],
+    public_gameplay_events: Path = PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+) -> dict[str, Any]:
+    manifest = load_json_file(path, blockers, "public_sdk_surfaces")
+    if manifest is None:
         return {"path": str(path), "offenders": []}
-    except json.JSONDecodeError as exc:
-        append_blocker(blockers, "public_sdk_surfaces_malformed", path=str(path), detail=str(exc))
-        return {"path": str(path), "offenders": []}
+    derived_signals = derive_inventory_copied_signals(public_gameplay_events, blockers)
+    expected_inventory_contract = inventory_copied_public_contract_from_signals(derived_signals)
 
     surfaces = manifest.get("surfaces")
     if not isinstance(surfaces, list):
@@ -420,12 +530,20 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
                 expected="promoted-experimental-only",
                 value=copied_status,
             )
-        if copied_contract != EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT:
+        if copied_contract != expected_inventory_contract:
             append_blocker(
                 blockers,
                 "inventory_copied_signals_public_contract_mismatch",
-                expected=EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
+                expected=expected_inventory_contract,
                 value=copied_contract,
+            )
+        evidence = inventory_copied.get("evidence")
+        if not isinstance(evidence, dict) or evidence.get("manifest") != "docs/public_gameplay_events.json":
+            append_blocker(
+                blockers,
+                "inventory_copied_signals_source_manifest_mismatch",
+                expected="docs/public_gameplay_events.json",
+                value=evidence.get("manifest") if isinstance(evidence, dict) else None,
             )
         if copied_payload_contract != EXPECTED_INVENTORY_COPIED_PAYLOAD_CONTRACT:
             append_blocker(
@@ -531,10 +649,19 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
                         missing=missing_required,
                     )
 
-    return {"path": str(path), "offenders": offenders, "surface_summary": surface_summary}
+    return {
+        "path": str(path),
+        "offenders": offenders,
+        "surface_summary": surface_summary,
+        "derived_inventory_copied_public_contract": expected_inventory_contract,
+    }
 
 
-def build_check(snapshot_root: Path, public_sdk_surfaces: Path) -> dict[str, Any]:
+def build_check(
+    snapshot_root: Path,
+    public_sdk_surfaces: Path,
+    public_gameplay_events: Path = PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     try:
         source_report = build_fixture_report(snapshot_root)
@@ -543,7 +670,7 @@ def build_check(snapshot_root: Path, public_sdk_surfaces: Path) -> dict[str, Any
         source_report = {}
 
     summary = validate_report(source_report, blockers) if source_report else {}
-    public_contract_scan = scan_public_contract_manifest(public_sdk_surfaces, blockers)
+    public_contract_scan = scan_public_contract_manifest(public_sdk_surfaces, blockers, public_gameplay_events)
     ready = not blockers
     return {
         "schema": REPORT_SCHEMA,
@@ -573,7 +700,7 @@ def build_check(snapshot_root: Path, public_sdk_surfaces: Path) -> dict[str, Any
 
 def main() -> int:
     args = parse_args()
-    report = build_check(args.snapshot_root, args.public_sdk_surfaces)
+    report = build_check(args.snapshot_root, args.public_sdk_surfaces, args.public_gameplay_events)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["ready"] else 1
 

@@ -174,6 +174,18 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   tuples fail closed; missing provenance, server-process epoch mismatch, and permission
   allow without policy provenance fail closed. This remains planning-only and adds no
   public command, reply, send-chat, permissions, or identity ABI.
+- 2026-06-01T17:15Z offline SDK drift checkpoint:
+  `scripts/check_player_identity_public_contract_gap_report.py` reports the current
+  blocked player-identity public contract posture without requiring approved runtime
+  evidence. It preserves `primary_offline_gap=privacy.identifier_redaction`, keeps all
+  readiness/public-header flags false, scans the public header for accidental
+  identity/principal symbols, and treats private candidate identifiers/lookup/persistence/
+  mutation/return-override exposure as blockers. Inventory copied-signal guardrails now
+  derive the five allowed `GameplayPolicyEvent` inventory/item contracts from
+  `docs/public_gameplay_events.json` while keeping an explicit five-signal cap; manifest
+  widening, field-mask drift, public SDK surface drift, or source-of-truth path drift fail
+  closed. Neither checker promotes identity, Inventory SDK, mutation, runtime readiness,
+  or v1 completion.
 - Primary v1 route: player identity has accepted offline/core/reflection inventory,
   12/12 candidate fixtures for the exact 12-target `players-identity-lifecycle-intake`
   set, distinct second-source layout evidence, consume-only lifecycle/principal manifests,

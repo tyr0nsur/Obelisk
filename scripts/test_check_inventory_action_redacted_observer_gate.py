@@ -362,6 +362,65 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("decision_manifest_allowed_signals_mismatch", reasons)
 
+    def test_public_gameplay_events_inventory_signal_drift_fails_closed(self) -> None:
+        public_events = json.loads(fixture_boundary.PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        gameplay_policy = next(
+            event for event in public_events["promoted_events"] if event["event_id"] == "obelisk.gameplay_policy.v1"
+        )
+        inventory_signal = next(
+            event for event in gameplay_policy["event_kinds"] if event["stable_name"] == "inventory_item.can_repair_check"
+        )
+        inventory_signal["field_mask"].append("OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN")
+        gameplay_policy["event_kinds"].append(
+            {
+                "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CRAFT_BLUEPRINT",
+                "stable_name": "inventory_item.craft_blueprint",
+                "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CRAFT_BLUEPRINT",
+                "field_mask": ["OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            public_events_path = Path(temp_dir) / "public_gameplay_events.json"
+            public_events_path.write_text(json.dumps(public_events), encoding="utf-8")
+            result = self.run_checker(
+                "--json",
+                "--public-gameplay-events",
+                str(public_events_path),
+                *REQUIRED_GATE_ARGS,
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("inventory_copied_signal_field_mask_mismatch", reasons)
+        self.assertIn("inventory_copied_signals_source_widened", reasons)
+        self.assertIn("decision_manifest_allowed_signals_mismatch", reasons)
+
+    def test_decision_manifest_source_of_truth_drift_fails_closed(self) -> None:
+        decision_manifest = json.loads(checker.DECISION_MANIFEST.read_text(encoding="utf-8"))
+        decision_manifest["source_of_truth"]["public_gameplay_events_manifest"] = "docs/other_events.json"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "inventory_item_copied_signals_public_contract_decisions.json"
+            manifest.write_text(json.dumps(decision_manifest), encoding="utf-8")
+            result = self.run_checker(
+                "--json",
+                "--decision-manifest",
+                str(manifest),
+                *REQUIRED_GATE_ARGS,
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decision_manifest_source_of_truth_public_gameplay_events_mismatch", reasons)
+
     def test_decision_manifest_public_contract_identity_drift_fails_closed(self) -> None:
         decision_manifest = json.loads(checker.DECISION_MANIFEST.read_text(encoding="utf-8"))
         decision_manifest["public_contract"]["public_fields"].append("ItemId")

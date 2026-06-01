@@ -251,6 +251,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--snapshot-root", type=Path, default=fixture_boundary.DEFAULT_SNAPSHOT_ROOT)
     parser.add_argument("--public-sdk-surfaces", type=Path, default=fixture_boundary.PUBLIC_SDK_SURFACES_MANIFEST)
+    parser.add_argument("--public-gameplay-events", type=Path, default=fixture_boundary.PUBLIC_GAMEPLAY_EVENTS_MANIFEST)
     parser.add_argument("--decision-manifest", type=Path, default=DECISION_MANIFEST)
     parser.add_argument(
         "--gate-enabled",
@@ -475,11 +476,16 @@ def validate_fixture_boundary_report(report: dict[str, Any], blockers: list[dict
     return summary
 
 
-def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+def validate_decision_manifest(
+    path: Path,
+    blockers: list[dict[str, Any]],
+    public_gameplay_events: Path = fixture_boundary.PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
+) -> dict[str, Any]:
     manifest = load_json(path)
     if manifest is None:
         append_blocker(blockers, "decision_manifest_unreadable", path=str(path))
         return {"path": str(path), "promotion_blockers": []}
+    derived_signals = fixture_boundary.derive_inventory_copied_signals(public_gameplay_events, blockers)
     if manifest.get("schema") != DECISION_MANIFEST_SCHEMA:
         append_blocker(
             blockers,
@@ -503,6 +509,16 @@ def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> di
         )
     if manifest.get("decision") != "copied_signal_only":
         append_blocker(blockers, "decision_manifest_decision_mismatch", value=manifest.get("decision"))
+    source_of_truth = manifest.get("source_of_truth")
+    if not isinstance(source_of_truth, dict):
+        append_blocker(blockers, "decision_manifest_source_of_truth_missing")
+    elif source_of_truth.get("public_gameplay_events_manifest") != "docs/public_gameplay_events.json":
+        append_blocker(
+            blockers,
+            "decision_manifest_source_of_truth_public_gameplay_events_mismatch",
+            expected="docs/public_gameplay_events.json",
+            value=source_of_truth.get("public_gameplay_events_manifest"),
+        )
 
     public_contract = manifest.get("public_contract")
     if public_contract != EXPECTED_PUBLIC_CONTRACT:
@@ -532,11 +548,11 @@ def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> di
     allowed_signals = manifest.get("allowed_signals")
     if not isinstance(allowed_signals, list):
         append_blocker(blockers, "decision_manifest_allowed_signals_missing")
-    elif allowed_signals != list(EXPECTED_ALLOWED_SIGNALS):
+    elif allowed_signals != derived_signals:
         append_blocker(
             blockers,
             "decision_manifest_allowed_signals_mismatch",
-            expected=list(EXPECTED_ALLOWED_SIGNALS),
+            expected=derived_signals,
             value=allowed_signals,
         )
 
@@ -745,6 +761,7 @@ def build_check(
     snapshot_root: Path = fixture_boundary.DEFAULT_SNAPSHOT_ROOT,
     public_sdk_surfaces: Path = fixture_boundary.PUBLIC_SDK_SURFACES_MANIFEST,
     decision_manifest: Path = DECISION_MANIFEST,
+    public_gameplay_events: Path = fixture_boundary.PUBLIC_GAMEPLAY_EVENTS_MANIFEST,
     gate_enabled: bool = False,
     observer_profile: str = "stable",
     markers: list[str] | None = None,
@@ -757,9 +774,9 @@ def build_check(
     blockers: list[dict[str, Any]] = []
     snapshot_identity = read_supported_snapshot_identity(snapshot_root, blockers)
     if fixture_report is None:
-        fixture_report = fixture_boundary.build_check(snapshot_root, public_sdk_surfaces)
+        fixture_report = fixture_boundary.build_check(snapshot_root, public_sdk_surfaces, public_gameplay_events)
     fixture_summary = validate_fixture_boundary_report(fixture_report, blockers)
-    decision_manifest_summary = validate_decision_manifest(decision_manifest, blockers)
+    decision_manifest_summary = validate_decision_manifest(decision_manifest, blockers, public_gameplay_events)
     gate = validate_gate_inputs(
         gate_enabled=gate_enabled,
         observer_profile=observer_profile,
@@ -806,6 +823,7 @@ def main() -> int:
     report = build_check(
         snapshot_root=args.snapshot_root,
         public_sdk_surfaces=args.public_sdk_surfaces,
+        public_gameplay_events=args.public_gameplay_events,
         decision_manifest=args.decision_manifest,
         gate_enabled=args.gate_enabled,
         observer_profile=args.observer_profile,

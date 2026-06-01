@@ -197,6 +197,47 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         self.assertIn("inventory_mutation_v1_decision_public_contract_guard_missing", reasons)
         self.assertIn("inventory_mutation_v1_decision_exclusion_requires_incomplete", reasons)
 
+    def test_public_inventory_contract_tracks_public_gameplay_events_source(self) -> None:
+        public_events = json.loads(checker.PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8"))
+        gameplay_policy = next(
+            event for event in public_events["promoted_events"] if event["event_id"] == "obelisk.gameplay_policy.v1"
+        )
+        gameplay_policy["event_kinds"] = [
+            event
+            for event in gameplay_policy["event_kinds"]
+            if event.get("stable_name") != "inventory_item.use_onto_item_check"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            public_events_path = Path(temp_dir) / "public_gameplay_events.json"
+            public_events_path.write_text(json.dumps(public_events), encoding="utf-8")
+            result = self.run_checker(
+                "--public-gameplay-events",
+                str(public_events_path),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("inventory_copied_signals_source_missing_expected", reasons)
+        self.assertIn("inventory_copied_signals_public_contract_mismatch", reasons)
+
+    def test_public_inventory_surface_evidence_manifest_drift_fails_closed(self) -> None:
+        surfaces = json.loads(checker.PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
+        copied = next(surface for surface in surfaces["surfaces"] if surface["id"] == checker.INVENTORY_COPIED_SIGNALS_SURFACE)
+        copied["evidence"]["manifest"] = "docs/other_events.json"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest.write_text(json.dumps(surfaces), encoding="utf-8")
+            result = self.run_checker("--public-sdk-surfaces", str(manifest), check=False)
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("inventory_copied_signals_source_manifest_mismatch", reasons)
+
     def test_inventory_mutation_v1_decision_contract_mutations_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest = Path(temp_dir) / "public_sdk_surfaces.json"
