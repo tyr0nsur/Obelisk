@@ -78,6 +78,11 @@ priorities, and do not use history files as the active source of truth.
   blocked pre-ABI checklist for that future response path; static thunk orientation,
   passive copied chat parsing, candidate vtable slots, raw ProcessEvent callbacks, and
   legacy `CallProcessEvent` are not sufficient response-path evidence.
+  `obelisk.command_copied_response_intent_lifecycle.planning.v1` is a planning-only
+  lifecycle guardrail for owner-scoped create/cancel/drain/expire/unload-cleanup response
+  intent vocabulary. It is integrated into the route gate but adds no public ABI, runtime
+  delivery, reply/send-chat API, command router, public SDK readiness, or v1 completion
+  evidence.
   `command-chat-response-route-planning` exists only as a planning-only focal snapshot
   target set for `ClientServerChatDirectMessage`, `ClientServerChatMessage`, and
   `ClientChatMessage`; it is not a release-readiness target set, public reply/send-chat

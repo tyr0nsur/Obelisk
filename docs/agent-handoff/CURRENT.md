@@ -17,7 +17,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   before walking, blocks symlink-component roots, and keeps raw/protected-path metadata as
   candidate-only. Timer registration now rejects unsupported `steady_clock` durations in
   both `PluginManager` and `TimerManager`; this is runtime safety only, not a new public
-  gameplay timer surface.
+  gameplay timer surface. Command response planning now includes
+  `obelisk.command_copied_response_intent_lifecycle.planning.v1` as a route guardrail for
+  owner-scoped create/cancel/drain/expire/unload-cleanup vocabulary; it remains planning
+  only and does not promote command response, replies, send-chat, runtime delivery, public
+  ABI, public SDK readiness, or v1 completion.
 
 ## Hard Overrides
 
@@ -50,9 +54,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   planning gate for the principal -> permissions/admin -> command response ->
   commands/replies route. It composes the permissions query fail-closed contract,
   permissions/admin public-readiness, command copied-response intent, command/principal/
-  authz bridge, command/chat response public-readiness, and commands/replies readiness
-  checks. A pass is planning-only; promotion/public ABI/public SDK/runtime/public-header
-  claims must stay false.
+  authz bridge, command copied-response intent lifecycle, command/chat response
+  public-readiness, and commands/replies readiness checks. A pass is planning-only;
+  promotion/public ABI/public SDK/runtime/public-header claims must stay false.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
