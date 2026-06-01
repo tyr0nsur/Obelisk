@@ -5775,6 +5775,7 @@ namespace
             .registerChatCallback = true,
             .registerInventoryPolicyCallback = true,
             .registerItemReturnCallback = true,
+            .registerPlayerPrincipalCallback = true,
             .registerStructureCallback = true,
             .throwOnShutdown = true,
         };
@@ -5797,6 +5798,8 @@ namespace
                 "shutdown-throw plugin inventory policy callback was not registered");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
                 "shutdown-throw plugin item-return callback was not registered");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "shutdown-throw plugin player-principal callback was not registered");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
                 "shutdown-throw plugin structure callback was not registered");
 
@@ -5812,6 +5815,8 @@ namespace
                 "shutdown-throw plugin inventory policy callback was not present during shutdown");
         Require(plugin.itemReturnSubscriptionsAtShutdown == 1,
                 "shutdown-throw plugin item-return callback was not present during shutdown");
+        Require(plugin.playerPrincipalSubscriptionsAtShutdown == 1,
+                "shutdown-throw plugin player-principal callback was not present during shutdown");
         Require(plugin.structureSubscriptionsAtShutdown == 1,
                 "shutdown-throw plugin structure callback was not present during shutdown");
         Require(plugin.closeCalls == 1, "shutdown-throw plugin was not closed once");
@@ -5821,6 +5826,8 @@ namespace
                 "shutdown-throw plugin inventory policy callback was still registered at dlclose");
         Require(plugin.itemReturnSubscriptionsAtClose == 0,
                 "shutdown-throw plugin item-return callback was still registered at dlclose");
+        Require(plugin.playerPrincipalSubscriptionsAtClose == 0,
+                "shutdown-throw plugin player-principal callback was still registered at dlclose");
         Require(plugin.structureSubscriptionsAtClose == 0,
                 "shutdown-throw plugin structure callback was still registered at dlclose");
         Require(!Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
@@ -5831,6 +5838,8 @@ namespace
                 "shutdown-throw plugin inventory policy callback survived unload");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-throw plugin item-return callback survived unload");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "shutdown-throw plugin player-principal callback survived unload");
         Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
                 "shutdown-throw plugin structure callback survived unload");
 
