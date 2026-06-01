@@ -31,30 +31,30 @@ namespace obelisk::permissions_admin
 
     struct Principal
     {
-        bool Copied = true;
-        uint64_t Handle = 17;
-        bool HasGeneration = true;
-        uint64_t Generation = 42;
-        uint64_t CurrentGeneration = 42;
+        bool Copied = false;
+        uint64_t Handle = 0;
+        bool HasGeneration = false;
+        uint64_t Generation = 0;
+        uint64_t CurrentGeneration = 0;
         PrincipalScope Scope = PrincipalScope::CallbackLocal;
-        bool SameProcess = true;
+        bool SameProcess = false;
     };
 
     struct OwnerContext
     {
-        bool HasOwnerToken = true;
-        bool HasCapability = true;
+        bool HasOwnerToken = false;
+        bool HasCapability = false;
     };
 
     struct PolicyProvenance
     {
-        bool HasSourceId = true;
-        bool HasSourceGeneration = true;
-        bool SourceGenerationMatches = true;
-        bool HasAuthorityGeneration = true;
-        bool AuthorityGenerationMatches = true;
-        bool HasPolicyEpoch = true;
-        PolicyAuthority Authority = PolicyAuthority::RuntimeOwned;
+        bool HasSourceId = false;
+        bool HasSourceGeneration = false;
+        bool SourceGenerationMatches = false;
+        bool HasAuthorityGeneration = false;
+        bool AuthorityGenerationMatches = false;
+        bool HasPolicyEpoch = false;
+        PolicyAuthority Authority = PolicyAuthority::Unknown;
         bool SuppliedByPlugin = false;
     };
 

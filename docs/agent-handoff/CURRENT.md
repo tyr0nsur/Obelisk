@@ -79,8 +79,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   remain false. The checker now also requires explicit redaction guidance for
   `ClientChatMessage.Chat`, raw FString message text, sender identity, directed recipient
   identity, and future targeting through promoted copied principal handle/generation only.
-  The existing offline readiness artifact is now expected to fail until regenerated or
-  patched with that guidance; this is a privacy blocker, not runtime/public readiness.
+  The offline readiness artifact under
+  `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
+  has been regenerated with that guidance and its `SHA256SUMS` updated; this restores
+  planning-layout acceptance only, not runtime/public readiness.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
@@ -117,6 +119,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   readiness, public SDK readiness, or v1 SDK completion.
 - Player-principal runtime evidence must use the exact single-module, plugins-disabled,
   dispatch-limit-`0`, no-sibling-observer/debug marker window.
+  The approved evidence bundle path now requires the copied log to be bound to a checked
+  operational window manifest via `--window-manifest`; the window report must match the
+  analyzer source path/SHA and preserve stable posture, rollback, no-claim, and
+  no-public-readiness semantics.
 - Player-principal lifecycle observer semantics are strict: `session_start` and
   `candidate_created` require copied `bIsFromLogin=1` and `ReturnValue=1`; other
   canonical bool combinations remain `session_start_rejected` with no principal action.

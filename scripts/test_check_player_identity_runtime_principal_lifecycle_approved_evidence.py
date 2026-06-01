@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -65,6 +66,8 @@ def analyzer_summary() -> dict:
 
 
 def manifest() -> dict:
+    summary = analyzer_summary()
+    source = summary["evidence"]["sources"][0]
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
         "artifact_status": "approved_runtime_observer_summary",
@@ -81,7 +84,41 @@ def manifest() -> dict:
             "publication_authorized_by_this_manifest": False,
             "discord_authorized_by_this_manifest": False,
         },
-        "source_summary": analyzer_summary(),
+        "operational_window": {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1",
+            "ready": True,
+            "operational_window_manifest_ready": True,
+            "run_id": "20260601T120000Z-player-principal-lifecycle",
+            "target": {"instance": "arkserver2", "map": "TheIsland"},
+            "copied_log": {"path": source["path"], "path_status": "unprotected_offline", "sha256": source["sha256"]},
+            "posture": {
+                "pre_check": "passed",
+                "post_check": "passed",
+                "pre_posture": "stable",
+                "post_posture": "stable",
+                "plugins_disabled": True,
+                "scanner_disabled": True,
+                "dispatch_limit": "0",
+                "wrapper_profile": "observer-debug",
+                "observer_exclusivity": "player_principal_lifecycle_only",
+                "debug_escape_markers": "absent",
+                "callback_escape_markers": "absent",
+                "native_exec_disabled": True,
+                "ptrace_disabled": True,
+                "single_module_summary": "player_principal_lifecycle",
+            },
+            "rollback": {
+                "completed": True,
+                "observer_env_survived": False,
+                "observer_marker_survived": False,
+            },
+            "claims": {"delivery_claim": "none", "principal_claim": "none"},
+            "user_policy": "no_regular_users",
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+        },
+        "source_summary": summary,
         "consumer_boundary_cases": [
             {
                 "case": "stale_after_logout",
@@ -252,6 +289,17 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("source_summary_source_path_not_copied_or_offline", report["blockers"])
+
+    def test_rejects_operational_window_mismatch(self) -> None:
+        payload = manifest()
+        payload["operational_window"]["copied_log"]["sha256"] = hashlib.sha256(b"other").hexdigest()
+        payload["operational_window"]["posture"]["dispatch_limit"] = "1"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_copied_log_sha256_mismatch", report["blockers"])
+        self.assertIn("operational_window_posture_mismatch", report["blockers"])
 
     def test_rejects_mixed_observer_modules(self) -> None:
         payload = manifest()

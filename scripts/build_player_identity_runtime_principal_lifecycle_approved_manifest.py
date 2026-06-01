@@ -19,6 +19,7 @@ from typing import Any
 
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
+WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_MODULE = "player_principal_lifecycle"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
@@ -50,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         required=True,
         type=Path,
         help="Copied/offline JSON summary produced by analyze_runtime_observer_log.py.",
+    )
+    parser.add_argument(
+        "--window-manifest-check",
+        required=True,
+        type=Path,
+        help="JSON report produced by check_player_identity_runtime_principal_lifecycle_window_manifest.py.",
     )
     parser.add_argument("--output", required=True, type=Path, help="Manifest JSON output path.")
     parser.add_argument(
@@ -128,6 +135,20 @@ def load_summary(path: Path) -> dict[str, Any]:
     return payload
 
 
+def load_window_check(path: Path) -> dict[str, Any]:
+    reject_symlink_component(path, "--window-manifest-check")
+    resolved = reject_protected_path(path, "--window-manifest-check")
+    try:
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SystemExit(f"{resolved}: window manifest check does not exist") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{resolved}: invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{resolved}: window manifest check top-level JSON must be an object")
+    return payload
+
+
 def reject_if_forbidden_review_text(value: str, label: str) -> None:
     if not value.strip():
         raise SystemExit(f"{label} must not be empty")
@@ -173,7 +194,35 @@ def validate_source_summary(summary: dict[str, Any]) -> None:
         )
 
 
-def build_manifest(summary: dict[str, Any], *, reviewed_by: str, review_note: str) -> dict[str, Any]:
+def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> None:
+    if window.get("schema") != WINDOW_CHECK_SCHEMA:
+        raise SystemExit(f"--window-manifest-check schema must be {WINDOW_CHECK_SCHEMA}")
+    if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
+        raise SystemExit("--window-manifest-check must be ready")
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if window.get(key) is not False:
+            raise SystemExit(f"--window-manifest-check {key} must remain false")
+    copied = window.get("copied_log")
+    if not isinstance(copied, dict):
+        raise SystemExit("--window-manifest-check must include copied_log object")
+    evidence = summary.get("evidence")
+    sources = evidence.get("sources") if isinstance(evidence, dict) else None
+    if not isinstance(sources, list) or not sources or not isinstance(sources[0], dict):
+        raise SystemExit("--source-summary must include evidence.sources[0]")
+    source = sources[0]
+    if Path(str(copied.get("path", ""))).expanduser().resolve() != Path(str(source.get("path", ""))).expanduser().resolve():
+        raise SystemExit("--window-manifest-check copied_log.path must match source summary path")
+    if copied.get("sha256") != source.get("sha256"):
+        raise SystemExit("--window-manifest-check copied_log.sha256 must match source summary sha256")
+
+
+def build_manifest(
+    summary: dict[str, Any],
+    window: dict[str, Any],
+    *,
+    reviewed_by: str,
+    review_note: str,
+) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "artifact_status": "approved_runtime_observer_summary",
@@ -191,6 +240,21 @@ def build_manifest(summary: dict[str, Any], *, reviewed_by: str, review_note: st
             "server_operations_authorized_by_this_manifest": False,
             "publication_authorized_by_this_manifest": False,
             "discord_authorized_by_this_manifest": False,
+        },
+        "operational_window": {
+            "schema": window.get("schema"),
+            "ready": window.get("ready"),
+            "operational_window_manifest_ready": window.get("operational_window_manifest_ready"),
+            "run_id": window.get("run_id"),
+            "target": window.get("target"),
+            "copied_log": window.get("copied_log"),
+            "posture": window.get("posture"),
+            "rollback": window.get("rollback"),
+            "claims": window.get("claims"),
+            "user_policy": window.get("user_policy"),
+            "promotion_ready": window.get("promotion_ready"),
+            "public_sdk_ready": window.get("public_sdk_ready"),
+            "runtime_ready": window.get("runtime_ready"),
         },
         "source_summary": summary,
         "consumer_boundary_cases": [
@@ -264,9 +328,12 @@ def main() -> int:
     reject_if_forbidden_review_text(args.reviewed_by, "--reviewed-by")
     reject_if_forbidden_review_text(args.review_note, "--review-note")
     summary = load_summary(args.source_summary)
+    window = load_window_check(args.window_manifest_check)
     validate_source_summary(summary)
+    validate_window_check(window, summary)
     manifest = build_manifest(
         summary,
+        window,
         reviewed_by=args.reviewed_by.strip(),
         review_note=args.review_note.strip(),
     )

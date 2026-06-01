@@ -25,6 +25,10 @@ namespace
 
     void TestAllowsOnlyCompleteRuntimeOwnedCopiedPrincipal()
     {
+        RequireDecision(EvaluatePermissionQuery(PermissionQuery{}),
+                        Decision::Deny,
+                        "default query returned allow");
+
         RequireDecision(EvaluatePermissionQuery(CompleteRuntimeOwnedQuery()),
                         Decision::Allow,
                         "complete runtime-owned query was not allowed");

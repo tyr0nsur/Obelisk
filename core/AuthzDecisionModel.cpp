@@ -62,6 +62,29 @@ namespace obelisk::permissions_admin
 
     PermissionQuery CompleteRuntimeOwnedQuery()
     {
-        return {};
+        PermissionQuery query;
+        query.PrincipalValue.Copied = true;
+        query.PrincipalValue.Handle = 17;
+        query.PrincipalValue.HasGeneration = true;
+        query.PrincipalValue.Generation = 42;
+        query.PrincipalValue.CurrentGeneration = 42;
+        query.PrincipalValue.Scope = PrincipalScope::CallbackLocal;
+        query.PrincipalValue.SameProcess = true;
+
+        query.Owner.HasOwnerToken = true;
+        query.Owner.HasCapability = true;
+
+        query.Provenance.HasSourceId = true;
+        query.Provenance.HasSourceGeneration = true;
+        query.Provenance.SourceGenerationMatches = true;
+        query.Provenance.HasAuthorityGeneration = true;
+        query.Provenance.AuthorityGenerationMatches = true;
+        query.Provenance.HasPolicyEpoch = true;
+        query.Provenance.Authority = PolicyAuthority::RuntimeOwned;
+        query.Provenance.SuppliedByPlugin = false;
+
+        query.Abuse.RateLimitOk = true;
+        query.Abuse.AuditOk = true;
+        return query;
     }
 }

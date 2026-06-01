@@ -210,6 +210,7 @@ Analyze only the copied or sanitized log:
 ```bash
 python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py \
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
   --obelisk-commit <reviewed-obelisk-commit> \
   --reviewed-by <reviewer> \

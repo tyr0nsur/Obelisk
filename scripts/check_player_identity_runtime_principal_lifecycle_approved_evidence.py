@@ -39,6 +39,7 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
         "public_sdk_ready",
         "runtime_ready",
         "approval",
+        "operational_window",
         "source_summary",
         "consumer_boundary_cases",
         "privacy_boundary",
@@ -46,6 +47,7 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
         "non_claims",
     )
 )
+WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 REQUIRED_CONSUMER_CASES = frozenset(("stale_after_logout", "malformed_or_unsupported_evidence"))
 REQUIRED_OBSERVED_EVENT_CASES = (
     {
@@ -92,6 +94,8 @@ ALLOWED_FORBIDDEN_KEY_PATHS = (
 )
 ALLOWED_FORBIDDEN_LEAF_PATHS = (
     "$.schema",
+    "$.operational_window.schema",
+    "$.operational_window.run_id",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.HandleNewPlayer.details.principal_id_logged",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.OnLogout.details.principal_id_logged",
 )
@@ -359,6 +363,78 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
     return validate_observed_event_cases(module, blockers)
 
 
+def validate_operational_window(window: Any, summary: Any, blockers: list[dict[str, Any]]) -> None:
+    label = "$.operational_window"
+    if not isinstance(window, dict):
+        add(blockers, "operational_window_missing", label)
+        return
+    if window.get("schema") != WINDOW_CHECK_SCHEMA:
+        add(blockers, "operational_window_schema_mismatch", f"{label}.schema")
+    if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
+        add(blockers, "operational_window_not_ready", label)
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if window.get(key) is not False:
+            add(blockers, f"operational_window_{key}_not_false", f"{label}.{key}")
+    target = window.get("target")
+    if not isinstance(target, dict) or not target.get("instance") or not target.get("map"):
+        add(blockers, "operational_window_target_missing", f"{label}.target")
+    copied = window.get("copied_log")
+    if not isinstance(copied, dict):
+        add(blockers, "operational_window_copied_log_missing", f"{label}.copied_log")
+        return
+    if not source_path_is_copied_or_offline(copied.get("path")):
+        add(blockers, "operational_window_copied_log_path_not_copied_or_offline", f"{label}.copied_log.path")
+    evidence = summary.get("evidence") if isinstance(summary, dict) else None
+    sources = evidence.get("sources") if isinstance(evidence, dict) else None
+    if not isinstance(sources, list) or not sources or not isinstance(sources[0], dict):
+        add(blockers, "operational_window_source_summary_source_missing", "$.source_summary.evidence.sources")
+        return
+    source = sources[0]
+    if Path(str(copied.get("path", ""))).expanduser().resolve() != Path(str(source.get("path", ""))).expanduser().resolve():
+        add(blockers, "operational_window_copied_log_path_mismatch", f"{label}.copied_log.path")
+    if copied.get("sha256") != source.get("sha256"):
+        add(blockers, "operational_window_copied_log_sha256_mismatch", f"{label}.copied_log.sha256")
+
+    posture = window.get("posture")
+    if not isinstance(posture, dict):
+        add(blockers, "operational_window_posture_missing", f"{label}.posture")
+    else:
+        expected_posture = {
+            "pre_check": "passed",
+            "post_check": "passed",
+            "pre_posture": "stable",
+            "post_posture": "stable",
+            "plugins_disabled": True,
+            "scanner_disabled": True,
+            "dispatch_limit": "0",
+            "wrapper_profile": "observer-debug",
+            "observer_exclusivity": "player_principal_lifecycle_only",
+            "debug_escape_markers": "absent",
+            "callback_escape_markers": "absent",
+            "native_exec_disabled": True,
+            "ptrace_disabled": True,
+            "single_module_summary": MODULE,
+        }
+        for key, expected in expected_posture.items():
+            if posture.get(key) != expected:
+                add(blockers, "operational_window_posture_mismatch", f"{label}.posture.{key}", expected=expected)
+    rollback = window.get("rollback")
+    if not isinstance(rollback, dict):
+        add(blockers, "operational_window_rollback_missing", f"{label}.rollback")
+    else:
+        for key in ("completed",):
+            if rollback.get(key) is not True:
+                add(blockers, "operational_window_rollback_not_complete", f"{label}.rollback.{key}")
+        for key in ("observer_env_survived", "observer_marker_survived"):
+            if rollback.get(key) is not False:
+                add(blockers, "operational_window_rollback_marker_survived", f"{label}.rollback.{key}")
+    claims = window.get("claims")
+    if not isinstance(claims, dict) or claims.get("delivery_claim") != "none" or claims.get("principal_claim") != "none":
+        add(blockers, "operational_window_claims_not_none", f"{label}.claims")
+    if window.get("user_policy") not in {"no_regular_users", "operator_approved_beta_users"}:
+        add(blockers, "operational_window_user_policy_unapproved", f"{label}.user_policy")
+
+
 def validate_consumer_boundary(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:
     if not isinstance(cases, list):
         add(blockers, "consumer_boundary_cases_not_list", "$.consumer_boundary_cases")
@@ -430,6 +506,8 @@ def validate_promotion_gate(gate: Any, blockers: list[dict[str, Any]]) -> None:
 def find_forbidden_key(value: Any, trail: str = "$") -> tuple[str, str] | None:
     if any(token in trail for token in NEGATIVE_CONTEXT_TOKENS):
         return None
+    if trail == "$.operational_window" or trail.startswith("$.operational_window."):
+        return None
     if trail in ALLOWED_FORBIDDEN_LEAF_PATHS:
         return None
     if isinstance(value, dict):
@@ -479,6 +557,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
             add(blockers, f"{key}_not_false", f"$.{key}")
     validate_approval(payload.get("approval"), blockers)
     observed_runtime_cases = validate_runtime_summary(payload.get("source_summary"), blockers)
+    validate_operational_window(payload.get("operational_window"), payload.get("source_summary"), blockers)
     consumer_cases = validate_consumer_boundary(payload.get("consumer_boundary_cases"), blockers)
     validate_privacy(payload.get("privacy_boundary"), blockers)
     validate_promotion_gate(payload.get("promotion_gate"), blockers)
