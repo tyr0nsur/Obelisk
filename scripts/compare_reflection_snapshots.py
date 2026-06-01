@@ -129,10 +129,10 @@ TARGET_BLOCKER_GUIDANCE = {
     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": {
         "classification": "second_wave_structure_build_policy_candidate",
         "why_blocked": [
-            "missing_committed_sanitized_snapshot",
-            "missing_distinct_second_source_layout",
-            "target_set_coverage_blocked",
+            "planning_layout_only_not_promotion_gate",
             "placement_struct_redaction_policy_unproven",
+            "copied_payload_policy_unproven",
+            "runtime_observation_requires_separate_approval",
             "build_denial_return_override_policy_blocked",
         ],
         "next_offline_input": (
@@ -144,7 +144,7 @@ TARGET_BLOCKER_GUIDANCE = {
         ),
         "snapshot_prep_checks": [
             "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
-            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            "reuse the accepted planning-layout second-source artifact before starting new extraction work",
             "never pass an evidence-pack manifest path to inspect_core_ufunctions.py --core",
             "record distinct offline artifact identity fields: artifact_sha256, capture_id, evidence_pack_id",
             "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
@@ -153,7 +153,7 @@ TARGET_BLOCKER_GUIDANCE = {
         ],
         "non_claim": (
             "does not promote StructureEvents, build-policy SDK, identity, lookup, mutation, "
-            "return override, runtime hooks, or target-set coverage"
+            "return override, runtime hooks, release readiness, or public SDK readiness"
         ),
     },
     "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild": {

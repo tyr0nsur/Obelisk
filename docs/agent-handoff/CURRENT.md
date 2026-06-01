@@ -135,7 +135,11 @@ This file is an active routing table only. Durable evidence belongs in
   strict serial reuse/wraparound policy artifact is preserved; manifest consume mode
   accepts it and promote mode blocks it as candidate-only. This does not unlock runtime
   negative samples, public lookup, object identity, mutation, or fail-closed semantic
-  helper promotion. Do not rerun broad FName, GObjects, or core scans for ResourceHandle.
+  helper promotion. The dedicated
+  `scripts/check_object_identity_resource_handle_public_contract_readiness.py` guardrail
+  now enforces that copied events and category-only `resource_kind` metadata cannot imply
+  public ResourceHandle, object identity, lookup, post-callback correlation, mutation, or
+  runtime/public SDK readiness. Do not rerun broad FName, GObjects, or core scans for ResourceHandle.
   Do not replace this with another broad offline FName/GObjects scan. The next strict
   ResourceHandle blocker is rejected runtime object samples plus runtime serial
   reuse/wraparound semantics with a future-runtime-observation-plan only after an

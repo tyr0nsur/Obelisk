@@ -502,16 +502,16 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild"
         ]["guidance"]
         self.assertEqual(primal_guidance["classification"], "second_wave_structure_build_policy_candidate")
-        self.assertIn("missing_committed_sanitized_snapshot", primal_guidance["why_blocked"])
-        self.assertIn("missing_distinct_second_source_layout", primal_guidance["why_blocked"])
-        self.assertIn("target_set_coverage_blocked", primal_guidance["why_blocked"])
+        self.assertIn("planning_layout_only_not_promotion_gate", primal_guidance["why_blocked"])
+        self.assertIn("copied_payload_policy_unproven", primal_guidance["why_blocked"])
+        self.assertIn("runtime_observation_requires_separate_approval", primal_guidance["why_blocked"])
         self.assertIn("approved non-protected copied/offline core", primal_guidance["next_offline_input"])
         self.assertIn(
             "emit exact schema-qualified target obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
             primal_guidance["snapshot_prep_checks"],
         )
         self.assertIn(
-            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            "reuse the accepted planning-layout second-source artifact before starting new extraction work",
             primal_guidance["snapshot_prep_checks"],
         )
         self.assertIn(
@@ -523,6 +523,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             primal_guidance["snapshot_prep_checks"],
         )
         self.assertIn("does not promote StructureEvents", primal_guidance["non_claim"])
+        self.assertIn("public SDK readiness", primal_guidance["non_claim"])
         self.assertIn(
             "reflected_owner_unproven",
             details["obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild"]["guidance"]["why_blocked"],
@@ -554,7 +555,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
         self.assertIn("guidance=second_wave_structure_build_policy_candidate", text_result.stdout)
         self.assertIn(
-            "why_blocked=missing_committed_sanitized_snapshot,missing_distinct_second_source_layout",
+            "why_blocked=planning_layout_only_not_promotion_gate,placement_struct_redaction_policy_unproven",
             text_result.stdout,
         )
         self.assertIn("next_offline_input=approved non-protected copied/offline core", text_result.stdout)
@@ -584,11 +585,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
         )
         self.assertEqual(guidance["classification"], "second_wave_structure_build_policy_candidate")
-        self.assertIn("missing_committed_sanitized_snapshot", guidance["why_blocked"])
+        self.assertIn("planning_layout_only_not_promotion_gate", guidance["why_blocked"])
+        self.assertIn("runtime_observation_requires_separate_approval", guidance["why_blocked"])
         self.assertIn("approved non-protected copied/offline core", guidance["next_offline_input"])
         self.assertEqual(len(guidance["snapshot_prep_checks"]), 7)
         self.assertIn(
-            "generate one sanitized candidate snapshot for this exact target only before adding any target set",
+            "reuse the accepted planning-layout second-source artifact before starting new extraction work",
             guidance["snapshot_prep_checks"],
         )
         self.assertIn(

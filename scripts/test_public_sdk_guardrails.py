@@ -9770,8 +9770,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIn(
             normalized(
-                "The `structure-build-policy-offline-intake` target set has no accepted "
-                "artifact pack in this snapshot and remains planning-only"
+                "The `structure-build-policy-offline-intake` target set has accepted "
+                "planning-layout second-source accounting through the pinned offline intake "
+                "checker, but remains planning-only"
             ),
             compact,
         )

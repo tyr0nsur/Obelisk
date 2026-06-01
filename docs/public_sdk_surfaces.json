@@ -1205,7 +1205,7 @@
         "No callback-scope versus post-callback validity rule.",
         "No promoted UObject flag semantics for safe public handle validity.",
         "No owner-token scoped lookup, cleanup, privacy, or redaction policy.",
-        "No dedicated tested checker enforcing that copied events, category-only resource_kind metadata, raw UObject pointers, lookup paths, persistence, and mutation surfaces cannot imply ResourceHandle or post-callback object identity.",
+        "Dedicated checker must keep enforcing that copied events, category-only resource_kind metadata, raw UObject pointers, lookup paths, persistence, and mutation surfaces cannot imply ResourceHandle or post-callback object identity.",
         "No append-only public POD C ABI, capability policy, ABI layout tests, or installed-SDK consumer coverage."
       ],
       "audit_units": [

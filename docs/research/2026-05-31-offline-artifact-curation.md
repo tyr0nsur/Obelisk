@@ -32,9 +32,9 @@ evidence must not be cited as release-readiness roots, public SDK promotion evid
 `v1.0` completion signals. The
 `players-lifecycle-anchor-candidates` target set is layout-planning only and carries no
 runtime lifecycle ordering claim. The `structure-build-policy-offline-intake` target set
-has no accepted artifact pack in this snapshot and remains planning-only until sanitized
-snapshots, redaction policy, distinct-source evidence, and runtime safety gates are
-reviewed.
+has accepted planning-layout second-source accounting through the pinned offline intake
+checker, but remains planning-only: no public SDK, runtime hook, mutation, enforcement,
+return override, identity, lookup, release readiness, or v1 completion claim.
 
 Primary current planning inputs:
 
