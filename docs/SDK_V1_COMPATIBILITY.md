@@ -9,7 +9,7 @@ The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfac
 That manifest's `stable_release_contract.claim_allowed` field is the explicit
 machine-readable release switch for the stable SDK claim. It must remain `false` while
 `v1_completion_required` is `false`; a runtime/core-first gate, internal runtime
-stability, installed SDK package shape, Foundation/Plugin Hub seed, or any
+stability, installed SDK package shape, Foundation seed, Plugin Hub seed, or any
 promoted-experimental copied-data seed cannot flip it.
 The completion checker reports that raw switch as
 `stable_release_contract_claim_allowed` and reserves `stable_claim_allowed` for the final
@@ -41,7 +41,7 @@ described as a complete `v1.0` SDK, `v1.0 stable`, or sufficient to turn on
 Higher-level ArkApi-style categories remain outside the current promoted scope until each
 has its own copied C ABI design, privacy/ownership rules, lifecycle cleanup, SDK consumer
 tests, and named second-source promotion gates.
-No Foundation/Plugin Hub seed, descriptor/timer example, installed SDK package shape, or
+No Foundation seed, Plugin Hub seed, descriptor/timer example, installed SDK package shape, or
 copied event example is an ArkApi/AseApi/ArkServerApi compatibility layer, API parity
 claim, portable plugin path, or evidence that ArkApi plugin families can be ported.
 This does not prevent Obelisk from using familiar capability grouping or

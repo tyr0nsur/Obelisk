@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import protected_paths
+import analyze_runtime_observer_log as runtime_observer_analyzer
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
@@ -438,6 +439,70 @@ def validate_copied_source_file(source: dict[str, Any], label: str, blockers: li
         )
 
 
+def expected_summary_from_copied_source(
+    evidence: dict[str, Any],
+    source: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    path_text = source.get("path")
+    if not isinstance(path_text, str) or not path_text:
+        return None
+    status = protected_paths.protected_path_status(
+        Path(path_text).expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected or not status.approved_offline_workspace:
+        return None
+    try:
+        text = status.resolved.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        add(
+            blockers,
+            "source_summary_source_file_unreadable",
+            "$.source_summary.evidence.sources[0].path",
+            error=str(exc),
+        )
+        return None
+
+    lines = text.splitlines()
+    summary = runtime_observer_analyzer.analyze_source_lines([lines])
+    summary["evidence"] = {
+        "kind": "runtime-observer-log",
+        "obelisk_commit": evidence.get("obelisk_commit"),
+        "sources": [
+            {
+                "path": str(status.resolved),
+                "sha256": sha256_file(status.resolved),
+                "line_count": len(lines),
+            }
+        ],
+        "server_paths_allowed": False,
+    }
+    return summary
+
+
+def validate_source_summary_matches_copied_log(summary: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    evidence = summary.get("evidence")
+    sources = evidence.get("sources") if isinstance(evidence, dict) else None
+    if not isinstance(evidence, dict) or not isinstance(sources, list) or len(sources) != 1:
+        return
+    source = sources[0]
+    if not isinstance(source, dict):
+        return
+    expected = expected_summary_from_copied_source(evidence, source, blockers)
+    if expected is None:
+        return
+    if canonical_json_bytes(summary) != canonical_json_bytes(expected):
+        add(
+            blockers,
+            "source_summary_not_derived_from_copied_log",
+            "$.source_summary",
+        )
+
+
 def detail_values(functions: dict[str, Any], function: str, key: str) -> list[Any]:
     details = functions.get(function, {}).get("details", {})
     value = details.get(key, [])
@@ -617,6 +682,7 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
                     add(blockers, "source_summary_source_path_not_approved_offline_workspace", f"{label}.path")
                 else:
                     validate_copied_source_file(source, label, blockers)
+        validate_source_summary_matches_copied_log(summary, blockers)
 
     runtime = summary.get("runtime")
     if not isinstance(runtime, dict):

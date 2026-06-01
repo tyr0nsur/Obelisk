@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -21,6 +22,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import manifest as approved_manifest
+import check_player_identity_public_contract_readiness as checker
 
 
 class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
@@ -152,6 +154,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                         "typedef struct ObeliskPlayerPrincipalEvent {",
                         "    uint64_t principal_handle;",
                         "} ObeliskPlayerPrincipalEvent;",
+                        "typedef uint64_t ObeliskPlayerId;",
+                        "typedef uint64_t ObeliskPlayerHandle;",
                         "uint64_t (*RegisterPlayerIdentityEventWithOwnerTokenHandle)(uint64_t ownerToken);",
                     ]
                 ),
@@ -178,6 +182,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("OBELISK_API_CAPABILITY_PLAYER_IDENTITY", detected)
         self.assertIn("ObeliskPlayerPrincipalEvent", detected)
         self.assertIn("principal_handle", detected)
+        self.assertIn("ObeliskPlayerId", detected)
+        self.assertIn("ObeliskPlayerHandle", detected)
         self.assertIn("RegisterPlayerIdentityEventWithOwnerTokenHandle", detected)
 
     def test_public_header_scan_ignores_comments_strings_and_existing_no_identity_flag(self) -> None:
@@ -335,6 +341,46 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_not_accepted", report["blockers"])
         self.assertIn("approved_runtime_evidence_missing_or_not_ready", report["blockers"])
 
+    def test_approved_runtime_report_must_route_to_identity_public_contract_gate(self) -> None:
+        original_build_report = checker.approved_evidence.build_report
+
+        def wrong_next_blocker(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["next_blocker"] = "runtime_ready"
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.object(checker.approved_evidence, "build_report", side_effect=wrong_next_blocker):
+                checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertEqual(
+            [blocker["reason"] for blocker in blockers],
+            ["approved_runtime_evidence_next_blocker_mismatch"],
+        )
+
+    def test_approved_runtime_report_must_not_overclaim_public_readiness(self) -> None:
+        original_build_report = checker.approved_evidence.build_report
+
+        def overclaiming_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["public_sdk_ready"] = True
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.object(checker.approved_evidence, "build_report", side_effect=overclaiming_report):
+                checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertEqual(
+            [blocker["reason"] for blocker in blockers],
+            ["approved_runtime_evidence_public_sdk_ready_not_false"],
+        )
+
     def test_missing_runtime_evidence_path_reports_json_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -372,6 +418,52 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+
+    def test_rejects_required_before_public_header_contract_weakened(self) -> None:
+        decisions = self.decisions()
+        requirements = {
+            item["id"]: item
+            for item in decisions["required_before_public_header"]
+        }
+        requirements["privacy.public_identifier_form"]["must_not_expose"].remove("SteamID")
+        requirements["privacy.public_identifier_form"]["required_properties"].remove(
+            "generation-bearing or otherwise invalidation-aware"
+        )
+        requirements["privacy.redacted_identifier_fields"]["must_redact"].remove("platform account ids")
+        requirements["privacy.logging_and_storage_policy"]["default_policy"] = "log opaque identity for audit"
+        requirements["lifetime.principal_scope"]["allowed_scopes"].append("cluster-stable")
+        requirements["lifetime.principal_scope"]["forbidden_until_separate_promotion"].remove("cluster-stable")
+        requirements["lifetime.principal_scope"]["required_fields"].remove("principal_generation")
+        requirements["lifetime.invalidation_events"]["required_behavior"].remove("stale principal fails closed")
+        requirements["lifetime.reconnect_duplicate_stale_policy"]["required_policy"].remove(
+            "stale handles never resolve to a different player"
+        )
+        requirements["abi.capability_bits"]["required_behavior"].remove("missing capability fails closed")
+        requirements["abi.owner_token_registration"]["required_behavior"].remove("nonzero plugin_owner_token required")
+        requirements["separation.no_commands_permissions_persistence"]["forbidden_in_identity_contract"].remove(
+            "storage/persistence"
+        )
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        for blocker in (
+            "privacy_public_identifier_form_missing_forbidden_terms",
+            "privacy_public_identifier_form_missing_required_properties",
+            "privacy_redacted_identifier_fields_missing_redactions",
+            "privacy_logging_storage_default_policy_mismatch",
+            "lifetime_principal_scope_forbidden_scope_allowed",
+            "lifetime_principal_scope_missing_forbidden_scopes",
+            "lifetime_principal_scope_missing_required_fields",
+            "lifetime_invalidation_behavior_missing",
+            "lifetime_reconnect_duplicate_stale_policy_missing",
+            "abi_capability_bits_missing_fail_closed_behavior",
+            "abi_owner_token_registration_missing_fail_closed_behavior",
+            "separation_forbidden_downstream_surfaces_missing",
+        ):
+            with self.subTest(blocker=blocker):
+                self.assertIn(blocker, report["blockers"])
 
     def test_rejects_pre_header_test_overclaims(self) -> None:
         decisions = self.decisions()

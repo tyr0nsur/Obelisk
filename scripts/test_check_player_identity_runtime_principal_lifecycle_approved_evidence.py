@@ -391,6 +391,19 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             {blocker["reason"] for blocker in rejected.blockers},
         )
 
+    def test_rejects_fabricated_summary_even_when_source_log_sha_matches(self) -> None:
+        with temp_offline_workspace() as temp:
+            copied_log = Path(temp) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("unrelated copied log without lifecycle observer evidence\n", encoding="utf-8")
+            payload = manifest_for_copied_log(copied_log)
+            result = self.run_checker(payload, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_not_derived_from_copied_log", report["blockers"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
     def test_requires_complete_output_artifact_identity(self) -> None:
         payload = manifest()
         payload.pop("output_artifact_identity")

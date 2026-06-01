@@ -105,6 +105,43 @@ REQUIRED_FAIL_CLOSED_DENY_OR_UNKNOWN = frozenset(
 REQUIRED_ALLOWED_PUBLIC_SURFACE_AFTER_IDENTITY = (
     "query-only fail-closed permission decision checks over copied principals"
 )
+REQUIRED_DEPENDENCY_BEHAVIOR = frozenset(
+    (
+        "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
+        "player identity planning evidence alone cannot enable permissions/admin",
+        "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
+        "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
+        "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
+        "runtime observation must establish principal identity before permissions/admin can consume it",
+        "operator config enables surfaces or policy inputs only and cannot establish principal identity",
+        "command text cannot establish principal identity",
+        "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded",
+    )
+)
+REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT = frozenset(
+    (
+        "capability_gated",
+        "append_only_abi",
+        "owner_token_handle_registration",
+        "owner_scoped_unregister",
+        "plugin_owner_cleanup",
+        "no_ue_internals_in_public_abi",
+    )
+)
+REQUIRED_IDENTITY_PUBLIC_FIELDS = frozenset(
+    (
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+    )
+)
+IDENTITY_PROMOTED_DECISION_VALUES = frozenset(
+    (
+        "promoted",
+        "promoted_public_contract",
+        "public_contract_promoted",
+    )
+)
 REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
     (
         "OBELISK_API_CAPABILITY_ADMIN",
@@ -205,6 +242,23 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     missing_ids = REQUIRED_DECISION_IDS - ids
     if missing_ids:
         add(blockers, "required_decision_ids_missing", "$.required_before_public_header", missing=sorted(missing_ids))
+    dependency = next(
+        (
+            item
+            for item in required
+            if isinstance(item, dict) and item.get("id") == "dependency.promoted_player_identity"
+        ),
+        None,
+    )
+    dependency_behavior = dependency.get("required_behavior") if isinstance(dependency, dict) else None
+    if not isinstance(dependency_behavior, list) or not REQUIRED_DEPENDENCY_BEHAVIOR.issubset(
+        set(dependency_behavior)
+    ):
+        add(
+            blockers,
+            "dependency_player_identity_public_contract_requirements_missing",
+            "$.required_before_public_header[dependency.promoted_player_identity].required_behavior",
+        )
     abi = next(
         (
             item
@@ -275,12 +329,19 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
             add(blockers, "permissions_admin_public_contract_gate_missing", "$.surfaces[permissions_admin].v1_decision_contract")
     if permissions.get("status") == "promoted" and not (isinstance(identity, dict) and identity.get("status") == "promoted"):
         add(blockers, "permissions_admin_promoted_before_player_identity", "$.surfaces[permissions_admin].status")
-    if isinstance(identity, dict) and identity.get("status") == "promoted" and not player_identity_has_approved_runtime_evidence(identity):
-        add(
-            blockers,
-            "player_identity_evidence_not_approved",
-            "$.surfaces[player_identity].status",
-        )
+    if isinstance(identity, dict) and identity.get("status") == "promoted":
+        if not player_identity_has_approved_runtime_evidence(identity):
+            add(
+                blockers,
+                "player_identity_evidence_not_approved",
+                "$.surfaces[player_identity].status",
+            )
+        if not player_identity_has_promoted_public_contract(identity):
+            add(
+                blockers,
+                "player_identity_public_contract_not_promoted",
+                "$.surfaces[player_identity]",
+            )
 
 
 def iter_strings(value: Any) -> list[str]:
@@ -316,6 +377,51 @@ def player_identity_has_approved_runtime_evidence(identity: dict[str, Any]) -> b
     )
     text = "\n".join(iter_strings(identity)).lower()
     return not any(term in text for term in forbidden_terms)
+
+
+def string_set(value: Any) -> set[str]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return set()
+    return set(value)
+
+
+def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bool:
+    """Require identity's public contract, not just its consume-mode runtime evidence."""
+
+    if not player_identity_has_approved_runtime_evidence(identity):
+        return False
+
+    public_contract = string_set(identity.get("public_contract"))
+    capabilities = string_set(identity.get("capabilities"))
+    abi_contract = string_set(identity.get("abi_contract"))
+    lifecycle_contract = string_set(identity.get("lifecycle_contract"))
+    public_fields = string_set(identity.get("public_fields"))
+    evidence = identity.get("evidence")
+    evidence_tests = string_set(evidence.get("tests")) if isinstance(evidence, dict) else set()
+    evidence_sdk_consumer_tests = (
+        string_set(evidence.get("sdk_consumer_tests")) if isinstance(evidence, dict) else set()
+    )
+    decision_contract = identity.get("v1_decision_contract")
+
+    if not public_contract:
+        return False
+    if not capabilities:
+        return False
+    if not REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT.issubset(abi_contract):
+        return False
+    if "plugin-owner cleanup" not in lifecycle_contract and "plugin_owner_cleanup" not in lifecycle_contract:
+        return False
+    if not REQUIRED_IDENTITY_PUBLIC_FIELDS.issubset(public_fields):
+        return False
+    if not evidence_tests and not evidence_sdk_consumer_tests:
+        return False
+    if not isinstance(decision_contract, dict):
+        return False
+    if decision_contract.get("current_decision") not in IDENTITY_PROMOTED_DECISION_VALUES:
+        return False
+    if decision_contract.get("must_remain_without_public_contract_until_promotion") is True:
+        return False
+    return True
 
 
 def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:
