@@ -178,3 +178,46 @@ zero-serial offline non-substitution acknowledgement. It must also keep
 This is still offline validation only. It does not approve a server window, does not run
 runtime probes, and does not promote `ResourceHandle`; it prevents an incomplete future
 runtime artifact from looking like complete promotion evidence.
+
+## 2026-06-01 Post Player-Identity Route Audit
+
+The ResourceHandle blocker does have a narrow route after player identity, but it is not
+another FName/GObjects/core/serial scan. The preceding player-identity lane must first
+produce approved copied runtime principal lifecycle evidence for the exact
+`ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` observer window. That
+evidence may only establish an opaque, process-local principal lifecycle boundary; it does
+not promote object identity, lookup, `ResourceHandle`, mutation, return override, or
+GObjects.
+
+After that player-principal boundary is accepted, the next ResourceHandle package should
+be a separate operator-approved runtime window with a bounded allowlist and copied,
+redacted outputs only. It should reuse the existing offline inputs as source policy:
+accepted serial-policy evidence, zero-serial non-substitution evidence, static
+`FUObjectItem+0x8` serial-candidate evidence, and the current `0x595b7e0` GObjects
+research candidate only as offline context. Do not repeat broad FName, GObjects, core, or
+serial rediscovery for the current binary hash unless existing evidence is contradicted.
+
+The minimum runtime evidence pair is:
+
+- `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1`: at least one
+  object-present row where the candidate slot is in bounds, `FUObjectItem` is readable,
+  `FUObjectItem+0x8` is a nonzero match, `FUObjectItem+0xC` remains
+  `observed_unknown_dword_present`, a candidate `UObject+0x8` reject bit
+  (`0x100` or `0x4000`) is present, the decision is `reject`, and copied output is only a
+  reason category. Summary must keep `accepted_rows=0`.
+- `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1`: at least one
+  fresh same-frame nonzero-match row accepted only as
+  `allow_candidate_frame_local_only`, plus at least one negative reject row such as
+  `zero_serial`, `serial_mismatch`, `wraparound_unknown`,
+  `slot_reuse_without_fresh_serial`, or `post_callback_or_cross_frame`. The manifest must
+  keep `unknown_wraparound_reject=true`, `cross_frame_lookup=reject`, and
+  `FUObjectItem+0xC` as `unknown_not_serial_evidence`.
+
+Both runtime manifests must carry `runtime_evidence_preflight`, name each other as the
+paired runtime schema, keep `promotion_evidence_complete=false`,
+`authorizes_runtime_work=false`, and `public_resource_handle_ready=false`, and pass the
+offline artifact gate in consume mode only. Even if both manifests pass, they are still
+candidate runtime semantics, not public lookup or a promoted `ResourceHandle` API; public
+promotion would still require a fail-closed lookup/owner-token contract, ABI and
+installed-SDK consumer coverage, privacy review, and lifecycle/restart/plugin-reload
+cleanup rules.

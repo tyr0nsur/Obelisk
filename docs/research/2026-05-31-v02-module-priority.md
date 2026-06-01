@@ -225,3 +225,51 @@ actions were used.
 
 The later offline refresh above wrote only temporary files under `/tmp` and did not touch
 servers, protected paths, runtime processes, GitHub, or Discord.
+
+## 2026-06-01 Internal Reuse Gate Audit
+
+Mission remains the preferred reusable internal evidence lane, not a public module. The
+current `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` report keeps
+`recommended_leaf=mission` and `recommended_scope=internal_reusable_evidence_only`, with
+all five leaf families still non-promoted and missing public gates. Its useful output is
+ranking and accounting: it does not make mission a v1 public surface.
+
+The offline artifact gate already has a mission-specific
+`mission-copied-bool-policy-slice` validator. In consume mode it accepts only the frozen
+four Mission targets, the three copied targets, and the five canonical one-byte
+`BoolProperty` fields. It keeps `MissionType.GetPlayerUsableItems` copied count at zero
+and requires player/controller/character refs plus `OutItemIDs` to stay
+recognition-only/redacted. Promote mode remains blocked as evidence-only.
+
+`scripts/check_mission_copied_bool_readiness.py` is the focused checker for this internal
+lane. A small fail-closed regression test now covers priority wording drift: adding a
+`priority` payload that tries to describe the lane as a public Mission SDK or runtime hook
+claim blocks readiness while the report still returns `public_sdk_ready=false`,
+`runtime_ready=false`, and `promotion_ready=false`.
+
+Non-claims preserved by this audit:
+
+- no public Mission SDK, descriptor, callback ABI, or installed SDK consumer exposure;
+- no runtime observer, runtime hook wiring, dispatcher wiring, server window, or marker;
+- no mission/player/object identity, lookup, `ResourceHandle`, arrays, raw params, or
+  reward/state authority;
+- no mutation, blocking, enforcement, return override, or original-call replay.
+
+Validation commands used for this audit:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_copied_bool_readiness.py --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py \
+  --root /home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z \
+  --manifest /home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/mission-copied-bool-policy-slice.json \
+  --mode consume \
+  --json
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest \
+  scripts.test_check_mission_copied_bool_readiness \
+  scripts.test_check_mission_transfer_dino_tribe_v1_outcome_accounting
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_validate_offline_artifact_gate
+```
+
+No servers, protected runtime paths, scanners, ptrace, `gcore`, Discord, commits, pushes,
+tags, runtime observers, mutation, or return override were used.

@@ -13,6 +13,8 @@
   "public_permission_cache_contract": "none",
   "public_command_reply_contract": "none",
   "public_admin_mutation_contract": "none",
+  "allow_capable_authority_ownership": "runtime-local/runtime-owned-only",
+  "operator_config_allow_capable": false,
   "forbidden_public_contract": [
     "permission groups",
     "admin groups",
@@ -156,6 +158,9 @@
         "operator-config",
         "runtime-local"
       ],
+      "allow_capable_authority_ownership": "runtime-owned",
+      "operator_config_allow_capable": false,
+      "runtime_local_authority_must_be_runtime_owned": true,
       "forbidden_until_separate_promotion": [
         "plugin-supplied-authority",
         "remote-service-authority",
@@ -170,6 +175,9 @@
         "missing authority generation fails closed",
         "authority generation mismatch fails closed",
         "operator-config authority is recognized but not allow-capable until separately promoted",
+        "operator-config authority can provide runtime-owned policy inputs only and cannot produce allow",
+        "runtime-local authority must be runtime-owned before it can produce allow",
+        "runtime-local authority without runtime-owned provenance fails closed",
         "operator-config cannot establish principal identity or permission claims before runtime principal observation",
         "command text cannot establish principal identity, permission authority, or policy provenance",
         "permission authority derives only from an established runtime principal plus runtime-owned provenance",
@@ -215,6 +223,8 @@
         "policy source generation mismatch",
         "missing_authority_generation",
         "authority_generation_mismatch",
+        "runtime-local authority without runtime-owned provenance",
+        "operator-config authority before separate allow-capable promotion",
         "missing plugin owner token",
         "missing capability",
         "rate limit exceeded"
@@ -234,6 +244,7 @@
         "missing policy source provenance",
         "allow without policy_epoch provenance",
         "operator-config authority before separate allow-capable promotion",
+        "runtime-local authority without runtime-owned provenance",
         "plugin-supplied provenance",
         "rate limit exceeded"
       ]

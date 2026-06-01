@@ -286,6 +286,131 @@ def readiness_report_manifest(
     return payload
 
 
+def command_chat_response_route_readiness(root: Path) -> dict:
+    target_details = [
+        {
+            "target": target,
+            "path": str(root / "base-snapshots" / gate.COMMAND_CHAT_RESPONSE_ROUTE_SNAPSHOT_FILENAMES[target.rsplit(":", 1)[1]]),
+            "comparable": True,
+            "second_source_status": "accepted",
+            "block_reasons": [],
+        }
+        for target in sorted(gate.COMMAND_CHAT_RESPONSE_ROUTE_TARGETS)
+    ]
+    return {
+        "schema": gate.READINESS_REPORT_SCHEMA,
+        "evidence_scope": "second_source_layout_evidence_only",
+        "gate_mode": "planning_layout_intake",
+        "second_source_status": "compared",
+        "strict_identity_indices": False,
+        "target_sets": [gate.COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET],
+        "target_filters": sorted(gate.COMMAND_CHAT_RESPONSE_ROUTE_TARGETS),
+        "totals": {
+            "targets": 3,
+            "comparable": 3,
+            "blocked": 0,
+            "second_source_accepted": 3,
+            "second_source_inconclusive": 0,
+            "second_source_missing": 0,
+            "second_source_rejected": 0,
+        },
+        "modules": [
+            {
+                "module": "base-snapshots",
+                "schema": "ufunction",
+                "targets": 3,
+                "comparable": 3,
+                "blocked": 0,
+                "block_reasons": {},
+                "second_source": {"accepted": 3, "inconclusive": 0, "missing": 0, "rejected": 0},
+                "target_details": target_details,
+            }
+        ],
+        "planning_layout_gate": {
+            "ready": True,
+            "ready_scope": "planning_only",
+            "layout_ready": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": [],
+        },
+        "promotion_gate": {
+            "ready": False,
+            "ready_scope": "planning_only",
+            "layout_ready": True,
+            "promotion_ready": False,
+            "blockers": [{"reason": "planning_layout_intake_not_promotion_gate", "count": 1}],
+        },
+        "target_set_guidance": [
+            {
+                "target_set": gate.COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET,
+                "classification": "command_chat_response_route_guidance_only_candidate",
+                "why_blocked": sorted(gate.command_chat_response_public_readiness.REQUIRED_GUIDANCE_BLOCKERS),
+                "snapshot_prep_checks": list(gate.command_chat_response_public_readiness.REQUIRED_REDACTION_GUIDANCE_FRAGMENTS),
+                "non_claim": "does not promote command/chat response path, public reply/send-chat ABI, command router, permissions, player identity, raw FString access, mutation, return override, runtime hooks, or release readiness",
+            }
+        ],
+        "non_claims": ["accepted second-source readiness is layout evidence only"],
+        "not_promoted_surfaces": sorted(gate.REQUIRED_READINESS_NON_PROMOTED_SURFACES),
+    }
+
+
+def command_chat_response_route_manifest(*, binary_sha256: str = BINARY_SHA) -> dict:
+    return {
+        "schema": gate.COMMAND_CHAT_RESPONSE_ROUTE_PLANNING_SECOND_SOURCE_SCHEMA,
+        "status": "candidate-only",
+        "target_set": gate.COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET,
+        "target_count": 3,
+        "created_date": "2026-06-01",
+        "obelisk_commit": "test",
+        "ark_binary_sha256": binary_sha256,
+        "gobjects": "0x595b7e0",
+        "fname_root_slot": "0x5956f30",
+        "base": {
+            "root": "base-snapshots",
+            "core_artifact_sha256": "b" * 64,
+            "capture_id": "base-capture",
+            "evidence_pack_id": "base-pack",
+        },
+        "candidate": {
+            "root": "vanilla-gdb-snapshots",
+            "core_artifact_sha256": "c" * 64,
+            "capture_id": "candidate-capture",
+            "evidence_pack_id": "candidate-pack",
+        },
+        "readiness_report": gate.command_chat_response_public_readiness.DEFAULT_READINESS_NAME,
+        "readiness_summary": {
+            "second_source_accepted": 3,
+            "second_source_inconclusive": 0,
+            "planning_layout_gate_ready": True,
+            "ready_scope": "planning_only",
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+        },
+        "non_claims": sorted(gate.REQUIRED_COMMAND_CHAT_RESPONSE_ROUTE_NON_CLAIMS),
+    }
+
+
+def write_command_chat_response_route_fixture(
+    workspace: Path,
+    *,
+    manifest_payload: dict | None = None,
+    readiness_payload: dict | None = None,
+) -> Path:
+    root = workspace / "command-chat-response-route-planning-distinct-second-source-20260601"
+    for snapshot_root in ("base-snapshots", "vanilla-gdb-snapshots"):
+        for filename in gate.COMMAND_CHAT_RESPONSE_ROUTE_SNAPSHOT_FILENAMES.values():
+            write_json(root / snapshot_root / filename, {"schema": SNAPSHOT_SCHEMA})
+    write_json(
+        root / gate.command_chat_response_public_readiness.DEFAULT_READINESS_NAME,
+        readiness_payload if readiness_payload is not None else command_chat_response_route_readiness(root),
+    )
+    write_json(root / "manifest.json", manifest_payload if manifest_payload is not None else command_chat_response_route_manifest())
+    return root / "manifest.json"
+
+
 def item_return_only_policy_slice_manifest(
     *,
     policy_status: str = "evidence-only",
@@ -4089,6 +4214,57 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("unsupported_manifest_schema", reasons)
+
+    def test_accepts_command_chat_response_route_planning_manifest_for_consume_mode(self) -> None:
+        self.assertIn(gate.COMMAND_CHAT_RESPONSE_ROUTE_PLANNING_SECOND_SOURCE_SCHEMA, gate.SUPPORTED_MANIFEST_SCHEMAS)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = write_command_chat_response_route_fixture(workspace)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+        self.assertEqual(gate.COMMAND_CHAT_RESPONSE_ROUTE_PLANNING_SECOND_SOURCE_SCHEMA, result["manifests"][0]["schema"])
+
+    def test_blocks_command_chat_response_route_planning_manifest_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = write_command_chat_response_route_fixture(workspace)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("promote_mode_command_chat_response_route_planning_candidate_only", reasons)
+
+    def test_command_chat_response_route_manifest_fails_closed_on_overclaims_and_bad_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            root = workspace / "command-chat-response-route-planning-distinct-second-source-20260601"
+            manifest_payload = command_chat_response_route_manifest()
+            manifest_payload["candidate"]["core_artifact_sha256"] = manifest_payload["base"]["core_artifact_sha256"]
+            manifest_payload["readiness_summary"]["public_sdk_ready"] = True
+            readiness_payload = command_chat_response_route_readiness(root)
+            readiness_payload["target_filters"] = readiness_payload["target_filters"][:-1]
+            manifest = write_command_chat_response_route_fixture(
+                workspace,
+                manifest_payload=manifest_payload,
+                readiness_payload=readiness_payload,
+            )
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("command_chat_response_route_identity_not_distinct_core_artifact_sha256", reasons)
+        self.assertIn("command_chat_response_route_readiness_summary_public_sdk_ready_mismatch", reasons)
+        self.assertIn("command_chat_response_route_readiness_overclaim", reasons)
+        self.assertIn("command_chat_response_route_target_filters_mismatch", reasons)
 
     def test_command_chat_response_static_orientation_is_not_an_artifact_gate_schema(self) -> None:
         orientation_schema = "obelisk.command-chat-response-static-orientation-check.v1"

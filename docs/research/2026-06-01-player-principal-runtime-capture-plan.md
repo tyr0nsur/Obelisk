@@ -531,6 +531,7 @@ Remaining gaps after this plan:
 
 ## Related Notes
 
+- [2026-06-01-player-principal-runtime-window-brief-template.md](2026-06-01-player-principal-runtime-window-brief-template.md)
 - [2026-06-01-player-principal-runtime-observer-brief.md](2026-06-01-player-principal-runtime-observer-brief.md)
 - [2026-06-01-player-principal-policy-route.md](2026-06-01-player-principal-policy-route.md)
 - [2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md](2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md)

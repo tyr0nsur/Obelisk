@@ -448,6 +448,30 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertIn("mission_candidate_claim_overclaim", reasons)
         self.assertTrue({"mutation", "return_override", "runtime_hooks", "public_abi", "v1_completion"} <= claims)
 
+    def test_priority_lane_stays_internal_reuse_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["priority"] = {
+                "lane": "mission",
+                "recommended_scope": "public Mission SDK",
+                "runtime": "runtime hook ready",
+            }
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        claims = {blocker.get("claim") for blocker in report["blockers"]}
+        self.assertIn("runtime_public_claim_overclaim", reasons)
+        self.assertIn("mission_candidate_claim_overclaim", reasons)
+        self.assertTrue({"public_sdk", "runtime_hooks"} <= claims)
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(
             "--root",

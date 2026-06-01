@@ -73,6 +73,8 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(payload["public_permission_cache_contract"], "none")
         self.assertEqual(payload["public_command_reply_contract"], "none")
         self.assertEqual(payload["public_admin_mutation_contract"], "none")
+        self.assertEqual(payload["allow_capable_authority_ownership"], "runtime-local/runtime-owned-only")
+        self.assertFalse(payload["operator_config_allow_capable"])
         for forbidden in (
             "permission groups",
             "admin groups",
@@ -179,6 +181,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             },
         )
         self.assertEqual(set(provenance["allowed_initial_authority_kinds"]), {"operator-config", "runtime-local"})
+        self.assertEqual(provenance["allow_capable_authority_ownership"], "runtime-owned")
+        self.assertFalse(provenance["operator_config_allow_capable"])
+        self.assertTrue(provenance["runtime_local_authority_must_be_runtime_owned"])
         for authority in (
             "plugin-supplied-authority",
             "remote-service-authority",
@@ -193,6 +198,9 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "authority generation mismatch fails closed",
             "allow decisions must carry policy_epoch provenance",
             "allow without policy provenance is forbidden",
+            "operator-config authority can provide runtime-owned policy inputs only and cannot produce allow",
+            "runtime-local authority must be runtime-owned before it can produce allow",
+            "runtime-local authority without runtime-owned provenance fails closed",
             "operator-config cannot establish principal identity or permission claims before runtime principal observation",
             "command text cannot establish principal identity, permission authority, or policy provenance",
             "permission authority derives only from an established runtime principal plus runtime-owned provenance",
@@ -232,6 +240,8 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
             "missing policy source provenance",
             "missing policy_epoch provenance",
             "policy source generation mismatch",
+            "runtime-local authority without runtime-owned provenance",
+            "operator-config authority before separate allow-capable promotion",
             "missing plugin owner token",
             "missing capability",
             "rate limit exceeded",
@@ -243,6 +253,14 @@ class PermissionsAdminPublicContractDecisionTests(unittest.TestCase):
         self.assertIn("command text principal claim", fail_closed["must_never_return_allow_for"])
         self.assertIn("operator config principal claim", fail_closed["must_never_return_allow_for"])
         self.assertIn("allow without policy_epoch provenance", fail_closed["must_never_return_allow_for"])
+        self.assertIn(
+            "operator-config authority before separate allow-capable promotion",
+            fail_closed["must_never_return_allow_for"],
+        )
+        self.assertIn(
+            "runtime-local authority without runtime-owned provenance",
+            fail_closed["must_never_return_allow_for"],
+        )
         self.assertIn("plugin-supplied provenance", fail_closed["must_never_return_allow_for"])
         self.assertIn("rate limit exceeded", fail_closed["must_never_return_allow_for"])
 

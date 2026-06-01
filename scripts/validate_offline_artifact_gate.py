@@ -32,6 +32,7 @@ import check_player_identity_principal_invalidation_policy as principal_invalida
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence  # noqa: E402
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence  # noqa: E402
 import check_permissions_admin_query_failclosed_contract as permissions_admin_query_failclosed  # noqa: E402
+import check_command_chat_response_public_readiness as command_chat_response_public_readiness  # noqa: E402
 
 
 SCHEMA = "obelisk.offline-artifact-gate-result.v1"
@@ -131,6 +132,9 @@ PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA = principal_invalidation_p
 PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_APPROVED_EVIDENCE_SCHEMA = approved_runtime_principal_lifecycle_evidence.SCHEMA
 PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_EVIDENCE_SCHEMA = runtime_principal_lifecycle_evidence.SCHEMA
 PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA = permissions_admin_query_failclosed.SCHEMA
+COMMAND_CHAT_RESPONSE_ROUTE_PLANNING_SECOND_SOURCE_SCHEMA = (
+    "obelisk.command-chat-response-route-planning-distinct-second-source.v1"
+)
 STATIC_ORIENTATION_REPORT_SCHEMAS = {
     "obelisk.command-chat-response-static-orientation-check.v1",
     "obelisk.radare2-static-orientation-windows.v1",
@@ -179,6 +183,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_APPROVED_EVIDENCE_SCHEMA,
     PLAYERS_IDENTITY_RUNTIME_PRINCIPAL_LIFECYCLE_EVIDENCE_SCHEMA,
     PERMISSIONS_ADMIN_QUERY_FAILCLOSED_CONTRACT_SCHEMA,
+    COMMAND_CHAT_RESPONSE_ROUTE_PLANNING_SECOND_SOURCE_SCHEMA,
 }
 UOBJECT_FLAG_TRANSITION_PROVENANCE_SCHEMAS = {
     "obelisk.offline-artifact-provenance.v1",
@@ -1351,6 +1356,28 @@ REQUIRED_GOBJECTS_TWO_CORE_BLOCKED_CONTRACTS = {
     "mutation",
     "return override",
     "serial reuse/invalidation semantics",
+}
+COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET = command_chat_response_public_readiness.TARGET_SET
+COMMAND_CHAT_RESPONSE_ROUTE_TARGETS = command_chat_response_public_readiness.TARGETS
+COMMAND_CHAT_RESPONSE_ROUTE_SNAPSHOT_FILENAMES = {
+    target.rsplit(":", 1)[1]: f"{target.rsplit(':', 1)[1]}.snapshot.json"
+    for target in COMMAND_CHAT_RESPONSE_ROUTE_TARGETS
+}
+REQUIRED_COMMAND_CHAT_RESPONSE_ROUTE_NON_CLAIMS = {
+    "planning-only response-path layout evidence",
+    "does not promote command/chat response path",
+    (
+        "does not promote replies, send-chat, broadcast, moderation, command router, identity, "
+        "permissions, raw FString access, mutation, return override, runtime hooks, public SDK "
+        "readiness, or v1 completion"
+    ),
+}
+COMMAND_CHAT_RESPONSE_ROUTE_FALSE_READY_KEYS = {
+    "promotion_ready",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "public_header_allowed",
+    "runtime_ready",
 }
 
 
@@ -4165,6 +4192,280 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
             blockers.append({"reason": "readiness_report_missing_non_promoted_surfaces", "label": label})
         if mode == "promote":
             blockers.append({"reason": "promote_mode_readiness_report_layout_only", "label": label})
+    return blockers
+
+
+def collect_command_chat_response_ready_overclaims(value: object, *, trail: str = "$") -> list[str]:
+    found: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            normalized = str(key).casefold().replace("-", "_").replace(" ", "_")
+            if (
+                isinstance(child, bool)
+                and child is True
+                and (
+                    normalized in COMMAND_CHAT_RESPONSE_ROUTE_FALSE_READY_KEYS
+                    or normalized.startswith("public_")
+                    or normalized.startswith("runtime_")
+                    or normalized.startswith("promotion_")
+                    or normalized.startswith("promote_")
+                )
+            ):
+                found.append(child_trail)
+            elif isinstance(child, (dict, list)):
+                found.extend(collect_command_chat_response_ready_overclaims(child, trail=child_trail))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            if isinstance(child, (dict, list)):
+                found.extend(collect_command_chat_response_ready_overclaims(child, trail=f"{trail}[{index}]"))
+    return found
+
+
+def validate_command_chat_response_route_identity(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    side: str,
+    expected_root: str,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    blockers: list[dict[str, Any]] = []
+    identity = payload.get(side)
+    identity_label = f"{label}:$.{side}"
+    if not isinstance(identity, dict):
+        return None, [{"reason": f"command_chat_response_route_{side}_identity_missing", "label": identity_label}]
+
+    root = identity.get("root")
+    if root != expected_root:
+        blockers.append(
+            {
+                "reason": f"command_chat_response_route_{side}_root_mismatch",
+                "label": f"{identity_label}.root",
+                "expected": expected_root,
+                "recorded": root,
+            }
+        )
+    for key in ("capture_id", "evidence_pack_id"):
+        value = identity.get(key)
+        if not isinstance(value, str) or not value:
+            blockers.append({"reason": f"command_chat_response_route_{side}_{key}_missing", "label": f"{identity_label}.{key}"})
+    core_sha = identity.get("core_artifact_sha256")
+    if not isinstance(core_sha, str) or SHA256_RE.fullmatch(core_sha) is None:
+        blockers.append(
+            {
+                "reason": f"command_chat_response_route_{side}_core_artifact_sha256_invalid",
+                "label": f"{identity_label}.core_artifact_sha256",
+            }
+        )
+    return identity, blockers
+
+
+def validate_command_chat_response_route_planning_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    manifest_path: Path,
+    workspace_root: Path,
+    protected_root: Path,
+    mode: str,
+    expected_binary_sha256: str | None,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != COMMAND_CHAT_RESPONSE_ROUTE_PLANNING_SECOND_SOURCE_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_command_chat_response_route_planning_candidate_only", "label": label})
+
+    if payload.get("status") != "candidate-only":
+        blockers.append({"reason": "command_chat_response_route_status_not_candidate_only", "label": f"{label}:$.status"})
+    if payload.get("target_set") != COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET:
+        blockers.append(
+            {
+                "reason": "command_chat_response_route_target_set_mismatch",
+                "label": f"{label}:$.target_set",
+                "expected": COMMAND_CHAT_RESPONSE_ROUTE_TARGET_SET,
+                "recorded": payload.get("target_set"),
+            }
+        )
+    if payload.get("target_count") != len(COMMAND_CHAT_RESPONSE_ROUTE_TARGETS):
+        blockers.append(
+            {
+                "reason": "command_chat_response_route_target_count_mismatch",
+                "label": f"{label}:$.target_count",
+                "expected": len(COMMAND_CHAT_RESPONSE_ROUTE_TARGETS),
+                "recorded": payload.get("target_count"),
+            }
+        )
+
+    binary_sha = payload.get("ark_binary_sha256")
+    if not isinstance(binary_sha, str) or SHA256_RE.fullmatch(binary_sha) is None:
+        blockers.append({"reason": "command_chat_response_route_binary_sha256_invalid", "label": f"{label}:$.ark_binary_sha256"})
+    elif expected_binary_sha256 is not None and binary_sha != expected_binary_sha256:
+        blockers.append(
+            {
+                "reason": "command_chat_response_route_binary_sha256_mismatch",
+                "label": f"{label}:$.ark_binary_sha256",
+                "expected_binary_sha256": expected_binary_sha256,
+                "recorded_binary_sha256": binary_sha,
+            }
+        )
+
+    base, base_blockers = validate_command_chat_response_route_identity(
+        payload,
+        label=label,
+        side="base",
+        expected_root="base-snapshots",
+    )
+    candidate, candidate_blockers = validate_command_chat_response_route_identity(
+        payload,
+        label=label,
+        side="candidate",
+        expected_root="vanilla-gdb-snapshots",
+    )
+    blockers.extend(base_blockers)
+    blockers.extend(candidate_blockers)
+    if isinstance(base, dict) and isinstance(candidate, dict):
+        for key in ("core_artifact_sha256", "capture_id", "evidence_pack_id"):
+            if base.get(key) == candidate.get(key):
+                blockers.append({"reason": f"command_chat_response_route_identity_not_distinct_{key}", "label": label})
+
+    manifest_dir = manifest_path.parent
+    for root_key, root_name in (("base", "base-snapshots"), ("candidate", "vanilla-gdb-snapshots")):
+        root = payload.get(root_key)
+        recorded_root = root.get("root") if isinstance(root, dict) else None
+        if recorded_root != root_name:
+            continue
+        for target, filename in sorted(COMMAND_CHAT_RESPONSE_ROUTE_SNAPSHOT_FILENAMES.items()):
+            snapshot_path = manifest_dir / root_name / filename
+            snapshot_blockers = path_blockers(
+                snapshot_path,
+                label=f"{label}:$.{root_key}.root[{target}]",
+                workspace_root=workspace_root,
+                protected_root=protected_root,
+                require_workspace=True,
+            )
+            if snapshot_blockers:
+                blockers.extend(snapshot_blockers)
+                continue
+            try:
+                checked_sha256_file(snapshot_path)
+            except SymlinkPathError as exc:
+                blockers.append(
+                    {
+                        "reason": "command_chat_response_route_snapshot_path_is_symlink",
+                        "label": f"{label}:$.{root_key}.root[{target}]",
+                        "symlink_component": str(exc.component),
+                    }
+                )
+            except OSError as exc:
+                blockers.append(
+                    {
+                        "reason": "command_chat_response_route_snapshot_missing",
+                        "label": f"{label}:$.{root_key}.root[{target}]",
+                        "path": str(snapshot_path),
+                        "detail": str(exc),
+                    }
+                )
+
+    readiness_report = payload.get("readiness_report")
+    readiness_payload: dict[str, Any] | None = None
+    if readiness_report != command_chat_response_public_readiness.DEFAULT_READINESS_NAME:
+        blockers.append(
+            {
+                "reason": "command_chat_response_route_readiness_report_mismatch",
+                "label": f"{label}:$.readiness_report",
+                "expected": command_chat_response_public_readiness.DEFAULT_READINESS_NAME,
+                "recorded": readiness_report,
+            }
+        )
+    elif not isinstance(readiness_report, str) or not is_safe_semantic_input_name(readiness_report):
+        blockers.append({"reason": "command_chat_response_route_readiness_report_path_unsafe", "label": f"{label}:$.readiness_report"})
+    else:
+        readiness_path = manifest_dir / readiness_report
+        blockers.extend(
+            path_blockers(
+                readiness_path,
+                label=f"{label}:$.readiness_report",
+                workspace_root=workspace_root,
+                protected_root=protected_root,
+                require_workspace=True,
+            )
+        )
+        readiness_payload, readiness_load_blockers = load_json(readiness_path)
+        blockers.extend(readiness_load_blockers)
+        if readiness_payload is not None:
+            blockers.extend(
+                validate_json_path_fields(
+                    readiness_payload,
+                    source_label=str(readiness_path),
+                    workspace_root=workspace_root,
+                    protected_root=protected_root,
+                )
+            )
+            blockers.extend(
+                validate_json_protected_root_strings(
+                    readiness_payload,
+                    source_label=str(readiness_path),
+                    workspace_root=workspace_root,
+                    protected_root=protected_root,
+                )
+            )
+            readiness_blockers: list[dict[str, Any]] = []
+            command_chat_response_public_readiness.validate_readiness(readiness_payload, readiness_blockers)
+            blockers.extend(
+                {
+                    "reason": f"command_chat_response_route_{blocker['reason']}",
+                    "label": f"{readiness_path}:{blocker.get('label', '$.readiness')}",
+                    **{key: value for key, value in blocker.items() if key not in {"reason", "label"}},
+                }
+                for blocker in readiness_blockers
+            )
+
+    summary = payload.get("readiness_summary")
+    if not isinstance(summary, dict):
+        blockers.append({"reason": "command_chat_response_route_readiness_summary_missing", "label": f"{label}:$.readiness_summary"})
+    else:
+        expected_summary = {
+            "second_source_accepted": 3,
+            "second_source_inconclusive": 0,
+            "planning_layout_gate_ready": True,
+            "ready_scope": "planning_only",
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+        }
+        for key, expected in expected_summary.items():
+            if summary.get(key) != expected:
+                blockers.append(
+                    {
+                        "reason": f"command_chat_response_route_readiness_summary_{key}_mismatch",
+                        "label": f"{label}:$.readiness_summary.{key}",
+                        "expected": expected,
+                        "recorded": summary.get(key),
+                    }
+                )
+        if readiness_payload is not None:
+            planning_gate = readiness_payload.get("planning_layout_gate")
+            promotion_gate = readiness_payload.get("promotion_gate")
+            if isinstance(planning_gate, dict) and summary.get("planning_layout_gate_ready") != planning_gate.get("ready"):
+                blockers.append({"reason": "command_chat_response_route_readiness_summary_planning_gate_disagrees", "label": f"{label}:$.readiness_summary"})
+            if isinstance(promotion_gate, dict) and summary.get("promotion_ready") != promotion_gate.get("promotion_ready"):
+                blockers.append({"reason": "command_chat_response_route_readiness_summary_promotion_gate_disagrees", "label": f"{label}:$.readiness_summary"})
+
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not REQUIRED_COMMAND_CHAT_RESPONSE_ROUTE_NON_CLAIMS.issubset(set(non_claims)):
+        blockers.append(
+            {
+                "reason": "command_chat_response_route_non_claims_missing",
+                "label": f"{label}:$.non_claims",
+                "missing": sorted(REQUIRED_COMMAND_CHAT_RESPONSE_ROUTE_NON_CLAIMS - set(non_claims or [])),
+            }
+        )
+
+    for trail in collect_command_chat_response_ready_overclaims(payload):
+        blockers.append({"reason": "command_chat_response_route_readiness_overclaim", "label": f"{label}:{trail}"})
+
     return blockers
 
 
@@ -9788,6 +10089,17 @@ def validate_manifest(
     blockers.extend(validate_players_identity_runtime_principal_lifecycle_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_runtime_principal_lifecycle_approved_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_permissions_admin_query_failclosed_contract_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(
+        validate_command_chat_response_route_planning_manifest(
+            payload,
+            label=str(resolved),
+            manifest_path=resolved,
+            workspace_root=workspace_root,
+            protected_root=protected_root,
+            mode=mode,
+            expected_binary_sha256=expected_binary_sha256,
+        )
+    )
     blockers.extend(validate_gobjects_two_core_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_static_global_promotion_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(

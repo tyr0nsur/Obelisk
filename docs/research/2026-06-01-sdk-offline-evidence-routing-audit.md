@@ -101,21 +101,24 @@ repeat work:
 - `scripts/validate_offline_artifact_gate.py` consume-mode support for the candidate
   identity manifests.
 
-Command/chat response has useful guards, but the durable route is less strongly covered:
+Command/chat response has useful guards. The route-level gap identified in this audit has
+now been hardened in the offline artifact gate:
 
 - `scripts/check_command_chat_response_static_orientation.py` covers bounded static
   orientation;
 - `scripts/check_command_chat_response_public_readiness.py` covers the existing
   second-source readiness report plus blocked public contract decisions;
-- `validate_offline_artifact_gate.py` recognizes the static orientation check schema, but
-  not the route-level
-  `obelisk.command-chat-response-route-planning-distinct-second-source.v1` manifest.
+- `validate_offline_artifact_gate.py` still rejects static orientation reports as artifact
+  gate schemas, and now recognizes
+  `obelisk.command-chat-response-route-planning-distinct-second-source.v1` in consume mode.
 
-If this lane is resumed, the smallest useful hardening is a route-level checker or artifact
-gate schema for the distinct second-source command/chat response manifest. It should verify
-the three exact targets, distinct artifact identities, the existing readiness report path,
-`planning_layout_gate.ready=true`, and all public/runtime/promotion flags false. This is a
-documentation/checker hardening item only; it should not rerun discovery or promote the
+The route-level consume gate verifies the three exact response targets through the existing
+readiness report, requires distinct base/candidate artifact identities, checks the
+referenced `command-chat-response-route-planning-readiness.json`, requires
+`planning_layout_gate.ready=true`, and fails closed on public/runtime/promotion overclaims.
+Promote mode remains blocked for this schema, and `promotion_ready=false`,
+`public_sdk_ready=false`, and `runtime_ready=false` remain the required posture. This is a
+documentation/checker hardening item only; it did not rerun discovery or promote the
 response path.
 
 ## Read-Only Commands Used
@@ -133,4 +136,3 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_principal_invali
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_offline_artifact_gate.py --mode consume --json ...
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_chat_response_public_readiness.py --json
 ```
-
