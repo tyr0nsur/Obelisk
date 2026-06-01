@@ -5664,6 +5664,44 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllStopsWhenCloseRetentionTrackingFails()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_unload_retention_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false};
+        FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .throwOnClose = true};
+        FakeLoader loader;
+        loader.Add(pluginA);
+        loader.Add(pluginB);
+        TouchPlugin(root, pluginA.filename);
+        TouchPlugin(root, pluginB.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPluginRetentionFailureForTesting(true);
+        manager.UnloadAll();
+
+        Require(pluginA.closeCalls == 0,
+                "unload continued to an earlier plugin after close-retention tracking failed");
+        Require(pluginB.closeCalls == 1,
+                "close-retention tracking failure did not leave the throwing plugin mapped for retry");
+
+        Obelisk::Core::SetPluginRetentionFailureForTesting(false);
+        pluginB.throwOnClose = false;
+        manager.UnloadAll();
+
+        Require(pluginA.closeCalls == 1, "retention-fail retry did not close the earlier plugin");
+        Require(pluginB.closeCalls == 2, "retention-fail retry did not reattempt the retained plugin close");
+
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllCleansAfterShutdownException()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_shutdown_throw");
@@ -6113,6 +6151,7 @@ int main()
     TestMultiplePluginsLoadSortedAndUnloadReverse();
     TestPluginApiMutationDoesNotPoisonLaterPlugins();
     TestUnloadAllContinuesAfterCloseException();
+    TestUnloadAllStopsWhenCloseRetentionTrackingFails();
     TestUnloadAllCleansAfterShutdownException();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();

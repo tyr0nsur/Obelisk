@@ -77,15 +77,18 @@ Own these areas:
   `allow-experimental-observers` on the same instance; stable posture must reject those
   observer/debug-window markers and observer env.
 - Treat callback ownership as runtime-critical: callbacks registered by a plugin must be
-  unregistered if init fails, before unload, and before `dlclose`.
+  unregistered if init fails and before `dlclose`. If cleanup cannot be proven complete,
+  skip `dlclose`, keep owner/token/unloading state intact, and retain the mapped plugin
+  for a later retry.
 - Owner cleanup must fail visibly. Dispatcher `UnregisterCallbacksForOwner(owner)` methods
   must propagate internal cleanup exceptions to `PluginManager`; a `0` return is reserved
-  for "nothing removed" and must not hide a cleanup failure before `dlclose`.
+  for "nothing removed" and must not hide a cleanup failure. PluginManager must not remove
+  plugin ownership or close the library after a cleanup failure.
 - `TimerManager` is a process-lifetime runtime service for plugin-owned delayed/repeating
   callbacks. Keep it owner-token scoped through `PluginManager`, zero-failure handle
   based, process-local only, and independent of UE4/server state. Plugin unload/init
   failure must remove owner timers before `dlclose` and wait for in-flight callbacks from
-  other threads.
+  other threads; if timer cleanup fails, retain the plugin mapped for retry.
 - Reject plugin callback registrations that cannot be attributed to the currently
   initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
   through the public plugin API.
@@ -148,7 +151,8 @@ Own these areas:
   no-subscriber, disabled gate, unsupported binary/window, zero budget, nonmatching FName,
   and invalid shape as no-copy/no-retain paths.
 - Preserve optional plugin shutdown ordering: call `ObeliskPlugin_Shutdown()` before
-  plugin-owned callback cleanup and before `dlclose`.
+  plugin-owned callback cleanup and before `dlclose`. Retained retry paths must not call
+  shutdown more than once for the same mapped plugin.
 - Follow `docs/PLUGIN_ARCHITECTURE.md` before adding plugin examples or promoting
   experimental plugins. Plugins that start HTTP servers, threads, or file readers need a
   shutdown design before stability.

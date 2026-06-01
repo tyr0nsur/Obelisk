@@ -53,8 +53,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   evidence from the vanilla-gdb core, including committed candidates
   `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`. The lane depends on a non-protected
-  evidence root; lifecycle-anchor schema/target-set and principal invalidation policy
-  still need a reviewed gate. Promotion remains false.
+  evidence root; lifecycle-anchor and principal-invalidation manifests are accepted for
+  consume-only planning. Promotion remains false.
 - Current identity next blocker is approved copied runtime principal lifecycle evidence
   for the accepted login/logout anchor route. Lifecycle-anchor and principal-invalidation
   manifests are consume-only; no public identity, permissions, commands, runtime lookup,

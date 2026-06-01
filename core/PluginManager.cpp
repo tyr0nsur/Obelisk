@@ -2751,6 +2751,40 @@ namespace Obelisk::Core
     void PluginManager::UnloadAll()
     {
         std::vector<PluginInfo> retainedPlugins;
+        try
+        {
+            retainedPlugins.reserve(m_LoadedPlugins.size());
+        }
+        catch (const std::exception& e)
+        {
+            SafeLogErrorNoThrow("Plugin unload retention reserve failed; aborting unload pass", e.what());
+            return;
+        }
+        catch (...)
+        {
+            SafeLogErrorNoThrow("Plugin unload retention reserve failed with unknown exception; aborting unload pass");
+            return;
+        }
+
+        auto retainPluginForUnloadRetry = [&](const PluginInfo& plugin, const char* failureMessage) noexcept -> bool
+        {
+            try
+            {
+                if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
+                    throw std::runtime_error("injected plugin retention failure");
+                retainedPlugins.push_back(plugin);
+                return true;
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow(failureMessage, e.what());
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow(failureMessage, "unknown exception");
+            }
+            return false;
+        };
 
         for (auto it = m_LoadedPlugins.rbegin(); it != m_LoadedPlugins.rend(); ++it)
         {
@@ -2807,7 +2841,10 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow(
                     "Plugin callback cleanup failed during unload; skipping dlclose and retaining plugin for retry",
                     plugin.name.c_str());
-                retainedPlugins.push_back(plugin);
+                if (!retainPluginForUnloadRetry(
+                        plugin,
+                        "Plugin retention tracking failed after callback cleanup failure; aborting unload pass"))
+                    return;
                 continue;
             }
 
@@ -2816,7 +2853,10 @@ namespace Obelisk::Core
                 SafeLogErrorNoThrow(
                     "Plugin library close failed during unload; retaining plugin for retry",
                     plugin.name.c_str());
-                retainedPlugins.push_back(plugin);
+                if (!retainPluginForUnloadRetry(
+                        plugin,
+                        "Plugin retention tracking failed after library close failure; aborting unload pass"))
+                    return;
                 continue;
             }
 

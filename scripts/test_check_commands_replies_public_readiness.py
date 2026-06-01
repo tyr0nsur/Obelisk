@@ -160,6 +160,85 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
         self.assertIn("response_path_planning_evidence_treated_as_promoted", report["blockers"])
+        self.assertIn("command_chat_response_evidence_not_approved", report["blockers"])
+
+    def test_rejects_manifest_only_upstream_dependency_promotion(self) -> None:
+        cases = (
+            ("obelisk.player_identity.v1", "player_identity_evidence_not_approved"),
+            ("obelisk.permissions_admin.v1", "permissions_admin_evidence_not_approved"),
+            ("obelisk.command_chat_response_path.v1", "command_chat_response_evidence_not_approved"),
+        )
+        for surface_id, blocker in cases:
+            with self.subTest(surface_id=surface_id):
+                surfaces = self.load_surfaces()
+                by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
+                by_id[surface_id]["status"] = "promoted"
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), surfaces=surfaces)
+                    result = self.run_checker(
+                        "--decisions",
+                        str(decisions_path),
+                        "--surfaces",
+                        str(surfaces_path),
+                        "--public-header",
+                        str(header_path),
+                        check=False,
+                    )
+
+                report = json.loads(result.stdout)
+                self.assertEqual(1, result.returncode)
+                self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_promoted_surfaces_manifest_only_upstream_dependencies(self) -> None:
+        surfaces = self.load_surfaces()
+        surfaces["promoted_surfaces"].extend(
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), surfaces=surfaces)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("player_identity_manifest_promotion_without_evidence", report["blockers"])
+        self.assertIn("permissions_admin_manifest_promotion_without_evidence", report["blockers"])
+        self.assertIn("command_chat_response_manifest_promotion_without_evidence", report["blockers"])
+
+    def test_rejects_promoted_experimental_upstream_dependency_statuses(self) -> None:
+        surfaces = self.load_surfaces()
+        by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}
+        by_id["obelisk.player_identity.v1"]["status"] = "promoted-experimental-only"
+        by_id["obelisk.permissions_admin.v1"]["status"] = "promoted-experimental-only"
+        by_id["obelisk.command_chat_response_path.v1"]["status"] = "promoted-experimental-only"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), surfaces=surfaces)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("player_identity_evidence_not_approved", report["blockers"])
+        self.assertIn("permissions_admin_evidence_not_approved", report["blockers"])
+        self.assertIn("command_chat_response_evidence_not_approved", report["blockers"])
 
     def test_rejects_dependency_sequence_and_post_v1_surface_drift(self) -> None:
         surfaces = self.load_surfaces()

@@ -9188,7 +9188,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     self.assertIn(normalized(term), text)
 
         for term in (
-            "lifecycle-anchor schema/target-set and principal\n  invalidation policy still need a reviewed gate",
+            "lifecycle-anchor and principal-invalidation manifests are accepted for consume-only planning",
             "complete `obelisk.core-dump-evidence-pack.v1`",
             "accepted `obelisk.reflection-inventory-pack.v1`",
             "12/12 candidate fixtures",

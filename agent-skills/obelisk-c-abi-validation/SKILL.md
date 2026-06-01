@@ -131,10 +131,14 @@ Validation rules:
 - If `Plugin_Load` or `Plugin_Init` fails, all callbacks registered by that plugin must be
   removed before the library is closed.
 - Before `dlclose`, runtime must call optional plugin shutdown, remove plugin-owned
-  callbacks, and stop dispatching into that address range.
+  callbacks, and stop dispatching into that address range. If plugin-owned cleanup or
+  library close fails, retain the mapped plugin and owner/token/unloading state for retry
+  instead of pretending the unload completed.
 - Dispatcher owner-cleanup failures must propagate to `PluginManager`. Returning `0` from
   `UnregisterCallbacksForOwner(owner)` means no callbacks were removed, not cleanup
   failure; swallowed exceptions can let `PluginManager` incorrectly proceed to `dlclose`.
+- Retained retry paths must not call `ObeliskPlugin_Shutdown()` again. Shutdown is a
+  one-time transition; retries are for cleanup and library close only.
 - Shutdown exports must be idempotent, stop external ingress before releasing state, and
   catch all exceptions before returning across the C ABI boundary.
 - Prefer copied Obelisk-level events over raw ProcessEvent callbacks. Filtered and global

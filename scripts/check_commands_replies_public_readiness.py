@@ -33,6 +33,7 @@ DEPENDENCY_CHAIN = (
     SURFACE,
 )
 REQUIRED_DEPENDS_ON = list(DEPENDENCY_CHAIN[:-1])
+MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 REQUIRED_DECISION_IDS = frozenset(
     (
         "dependency.promoted_player_identity",
@@ -559,6 +560,11 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
         add(blockers, "commands_replies_listed_as_promoted", "$.surfaces.promoted_surfaces")
     if RESPONSE_PATH_SURFACE in promoted:
         add(blockers, "response_path_planning_evidence_treated_as_promoted", "$.surfaces.promoted_surfaces")
+        add(blockers, "command_chat_response_manifest_promotion_without_evidence", "$.surfaces.promoted_surfaces")
+    if DEPENDENCY_CHAIN[0] in promoted:
+        add(blockers, "player_identity_manifest_promotion_without_evidence", "$.surfaces.promoted_surfaces")
+    if DEPENDENCY_CHAIN[1] in promoted:
+        add(blockers, "permissions_admin_manifest_promotion_without_evidence", "$.surfaces.promoted_surfaces")
 
     post_v1_or_excluded = string_set(payload.get("post_v1_or_excluded_surfaces"))
     if SURFACE not in post_v1_or_excluded:
@@ -579,6 +585,19 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     by_id = {item.get("id"): item for item in surfaces if isinstance(item, dict) and isinstance(item.get("id"), str)}
     commands = by_id.get(SURFACE)
     response_path = by_id.get(RESPONSE_PATH_SURFACE)
+    identity = by_id.get(DEPENDENCY_CHAIN[0])
+    permissions = by_id.get(DEPENDENCY_CHAIN[1])
+    if isinstance(identity, dict) and identity.get("status") in MANIFEST_PROMOTION_STATUSES:
+        add(blockers, "player_identity_evidence_not_approved", "$.surfaces.surfaces[player_identity].status", status=identity.get("status"))
+    if isinstance(permissions, dict) and permissions.get("status") in MANIFEST_PROMOTION_STATUSES:
+        add(blockers, "permissions_admin_evidence_not_approved", "$.surfaces.surfaces[permissions_admin].status", status=permissions.get("status"))
+    if isinstance(response_path, dict) and response_path.get("status") in MANIFEST_PROMOTION_STATUSES:
+        add(
+            blockers,
+            "command_chat_response_evidence_not_approved",
+            "$.surfaces.surfaces[command_chat_response_path].status",
+            status=response_path.get("status"),
+        )
     if not isinstance(commands, dict):
         add(blockers, "commands_replies_surface_missing", "$.surfaces.surfaces")
     else:

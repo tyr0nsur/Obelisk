@@ -363,8 +363,9 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertNotEqual(close_index, -1)
         self.assertIn("if (!", body[max(0, close_index - 16):close_index])
         self.assertLess(close_index, body.index("RemoveLoadedPluginOwner(plugin.owner)"))
-        close_following = body[close_index:close_index + 360]
-        self.assertIn("retainedPlugins.push_back(plugin)", close_following)
+        close_following = body[close_index:close_index + 520]
+        self.assertIn("retainPluginForUnloadRetry", close_following)
+        self.assertIn("return", close_following)
         self.assertIn("continue", close_following)
 
     def test_unload_cleanup_failure_retains_plugin_without_dlclose(self) -> None:
@@ -379,7 +380,8 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         failure_body = failure_match.group("body")
 
         self.assertIn("retaining plugin for retry", failure_body)
-        self.assertIn("retainedPlugins.push_back(plugin)", failure_body)
+        self.assertIn("retainPluginForUnloadRetry", failure_body)
+        self.assertIn("return", failure_body)
         self.assertIn("continue", failure_body)
         for forbidden in (
             "RemovePluginOwnerToken(plugin.ownerToken)",

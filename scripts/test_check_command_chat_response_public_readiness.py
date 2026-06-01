@@ -471,6 +471,95 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("command_chat_response_surface_public_contract_not_empty", report["blockers"])
         self.assertIn("command_chat_response_surface_dependencies_mismatch", report["blockers"])
 
+    def test_rejects_manifest_only_upstream_dependency_promotion(self) -> None:
+        cases = (
+            ("obelisk.player_identity.v1", "player_identity_evidence_not_approved"),
+            ("obelisk.permissions_admin.v1", "permissions_admin_evidence_not_approved"),
+        )
+        for surface_id, blocker in cases:
+            with self.subTest(surface_id=surface_id):
+                surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+                for surface in surfaces["surfaces"]:
+                    if surface["id"] == surface_id:
+                        surface["status"] = "promoted"
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+                    surfaces_path = root / "public_sdk_surfaces.json"
+                    surfaces_path.write_text(json.dumps(surfaces), encoding="utf-8")
+                    result = self.run_checker(
+                        "--readiness",
+                        str(readiness_path),
+                        "--decisions",
+                        str(decisions_path),
+                        "--public-header",
+                        str(public_header_path),
+                        "--surfaces",
+                        str(surfaces_path),
+                        check=False,
+                    )
+
+                report = json.loads(result.stdout)
+                self.assertEqual(1, result.returncode)
+                self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_promoted_surfaces_manifest_only_upstream_dependencies(self) -> None:
+        surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+        surfaces["promoted_surfaces"].extend(
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            surfaces_path = root / "public_sdk_surfaces.json"
+            surfaces_path.write_text(json.dumps(surfaces), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--surfaces",
+                str(surfaces_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("player_identity_manifest_promotion_without_evidence", report["blockers"])
+        self.assertIn("permissions_admin_manifest_promotion_without_evidence", report["blockers"])
+
+    def test_rejects_promoted_experimental_upstream_dependency_statuses(self) -> None:
+        surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+        for surface in surfaces["surfaces"]:
+            if surface["id"] in {"obelisk.player_identity.v1", "obelisk.permissions_admin.v1"}:
+                surface["status"] = "promoted-experimental-only"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            surfaces_path = root / "public_sdk_surfaces.json"
+            surfaces_path.write_text(json.dumps(surfaces), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--surfaces",
+                str(surfaces_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("player_identity_evidence_not_approved", report["blockers"])
+        self.assertIn("permissions_admin_evidence_not_approved", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,6 +31,7 @@ SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 SURFACE = "obelisk.command_chat_response_path.v1"
 IDENTITY_SURFACE = "obelisk.player_identity.v1"
 PERMISSIONS_SURFACE = "obelisk.permissions_admin.v1"
+MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 TARGET_SET = "command-chat-response-route-planning"
 TARGETS = frozenset(
     (
@@ -543,6 +544,8 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
         return
     by_id = {item.get("id"): item for item in surfaces if isinstance(item, dict)}
     response = by_id.get(SURFACE)
+    identity = by_id.get(IDENTITY_SURFACE)
+    permissions = by_id.get(PERMISSIONS_SURFACE)
     if not isinstance(response, dict):
         add(blockers, "command_chat_response_surface_missing", "$.surfaces")
         return
@@ -564,6 +567,15 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
             "$.surfaces.command_chat_response_path.depends_on",
             value=response.get("depends_on"),
         )
+    promoted = string_set(payload.get("promoted_surfaces"))
+    if IDENTITY_SURFACE in promoted:
+        add(blockers, "player_identity_manifest_promotion_without_evidence", "$.surfaces.promoted_surfaces")
+    if PERMISSIONS_SURFACE in promoted:
+        add(blockers, "permissions_admin_manifest_promotion_without_evidence", "$.surfaces.promoted_surfaces")
+    if isinstance(identity, dict) and identity.get("status") in MANIFEST_PROMOTION_STATUSES:
+        add(blockers, "player_identity_evidence_not_approved", "$.surfaces.player_identity.status", status=identity.get("status"))
+    if isinstance(permissions, dict) and permissions.get("status") in MANIFEST_PROMOTION_STATUSES:
+        add(blockers, "permissions_admin_evidence_not_approved", "$.surfaces.permissions_admin.status", status=permissions.get("status"))
     contract = response.get("v1_decision_contract")
     if not isinstance(contract, dict):
         add(blockers, "command_chat_response_surface_decision_contract_missing", "$.surfaces.command_chat_response_path.v1_decision_contract")
