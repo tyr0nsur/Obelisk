@@ -30,6 +30,9 @@ POLICY_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
 INPUT_TARGET_SET = "mission-compact-intake"
 OUTPUT_TARGET_SET = "mission-copied-bool-policy-slice"
 FIXTURE_SNAPSHOT_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+MISSION_HOOK_SOURCE = "hooks/ProcessEventMissionReflection.cpp"
+PUBLIC_API_HEADER = Path("include/obelisk/ObeliskApi.h")
+PUBLIC_GAMEPLAY_EVENTS_DOC = Path("docs/public_gameplay_events.json")
 EXPECTED_INPUT_TARGETS = {
     "MissionType.AddPlayerToMission",
     "MissionType.BPAllowPlayerToLeaveMission",
@@ -120,6 +123,27 @@ MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
     "v1 ready": "v1_completion",
     "version 1 complete": "v1_completion",
 }
+PUBLIC_MISSION_C_API_RE = re.compile(
+    r"\b(?:OBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*|"
+    r"Obelisk[A-Za-z0-9_]*Mission[A-Za-z0-9_]*|"
+    r"Mission[A-Za-z0-9_]*(?:Event|Descriptor|Callback|Resource|Policy)[A-Za-z0-9_]*)\b"
+)
+PUBLIC_MISSION_DOC_RE = re.compile(
+    r"\bmission\b|\bMission[A-Za-z0-9_]*\b|\bOBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*\b"
+)
+RUNTIME_SHARED_CMAKE_TARGETS = {
+    "obelisk",
+    "obelisk_runtime",
+    "obelisk_shared",
+    "runtime",
+    "shared",
+}
+REPORT_FORBIDDEN_TRUE_READY_KEYS = FORBIDDEN_TRUE_READY_KEYS | {
+    "identity_ready",
+    "lookup_ready",
+    "promotion_ready",
+    "runtime_observer_approved",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -148,6 +172,216 @@ def parse_args() -> argparse.Namespace:
 
 def append_blocker(blockers: list[dict[str, Any]], reason: str, **details: Any) -> None:
     blockers.append({"reason": reason, **details})
+
+
+def read_text_file(path: Path, blockers: list[dict[str, Any]], label: str) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as exc:
+        append_blocker(blockers, "frontier_file_unreadable", label=label, path=str(path), detail=str(exc))
+        return None
+
+
+def strip_cmake_comments(text: str) -> str:
+    stripped_lines: list[str] = []
+    for line in text.splitlines():
+        in_quote = False
+        escaped = False
+        kept: list[str] = []
+        for char in line:
+            if escaped:
+                kept.append(char)
+                escaped = False
+                continue
+            if char == "\\":
+                kept.append(char)
+                escaped = True
+                continue
+            if char == '"':
+                in_quote = not in_quote
+                kept.append(char)
+                continue
+            if char == "#" and not in_quote:
+                break
+            kept.append(char)
+        stripped_lines.append("".join(kept))
+    return "\n".join(stripped_lines)
+
+
+def iter_cmake_commands(text: str) -> list[tuple[str, str]]:
+    commands: list[tuple[str, str]] = []
+    cleaned = strip_cmake_comments(text)
+    index = 0
+    while index < len(cleaned):
+        match = re.search(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", cleaned[index:])
+        if not match:
+            break
+        name = match.group(1)
+        body_start = index + match.end()
+        cursor = body_start
+        depth = 1
+        in_quote = False
+        escaped = False
+        while cursor < len(cleaned):
+            char = cleaned[cursor]
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_quote = not in_quote
+            elif not in_quote and char == "(":
+                depth += 1
+            elif not in_quote and char == ")":
+                depth -= 1
+                if depth == 0:
+                    commands.append((name.casefold(), cleaned[body_start:cursor]))
+                    cursor += 1
+                    break
+            cursor += 1
+        index = cursor
+    return commands
+
+
+def split_cmake_args(body: str) -> list[str]:
+    return [arg.strip('"') for arg in re.findall(r'"[^"]*"|\S+', body)]
+
+
+def cmake_arg_matches_source(arg: str, source: str) -> bool:
+    normalized = arg.replace("\\", "/").strip('"')
+    return normalized == source or normalized.endswith(f"/{source}")
+
+
+def is_runtime_or_shared_target(command: str, args: list[str]) -> bool:
+    if not args:
+        return False
+    target = args[0].casefold()
+    if target in RUNTIME_SHARED_CMAKE_TARGETS:
+        return True
+    if target.endswith("_runtime") or target.endswith("_shared"):
+        return True
+    if command == "add_library" and len(args) > 1 and args[1].upper() == "SHARED":
+        return True
+    return False
+
+
+def validate_cmake_mission_hook_boundary(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    cmake_path = repo_root / "CMakeLists.txt"
+    blocker_count_before = len(blockers)
+    text = read_text_file(cmake_path, blockers, "CMakeLists.txt")
+    if text is None:
+        return {"status": "blocked", "path": str(cmake_path)}
+
+    checked_targets: list[str] = []
+    for command, body in iter_cmake_commands(text):
+        if command not in {"add_library", "add_executable", "target_sources"}:
+            continue
+        args = split_cmake_args(body)
+        if not args or not any(cmake_arg_matches_source(arg, MISSION_HOOK_SOURCE) for arg in args[1:]):
+            continue
+        target = args[0]
+        checked_targets.append(target)
+        if is_runtime_or_shared_target(command, args):
+            append_blocker(
+                blockers,
+                "mission_hook_in_runtime_or_shared_target",
+                path=str(cmake_path),
+                command=command,
+                target=target,
+                source=MISSION_HOOK_SOURCE,
+            )
+    return {
+        "status": "accepted" if len(blockers) == blocker_count_before else "blocked",
+        "path": str(cmake_path),
+        "mission_hook_targets": sorted(set(checked_targets)),
+    }
+
+
+def strip_c_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"//.*", "", text)
+
+
+def validate_public_api_header_mission_boundary(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    header_path = repo_root / PUBLIC_API_HEADER
+    text = read_text_file(header_path, blockers, str(PUBLIC_API_HEADER))
+    if text is None:
+        return {"status": "blocked", "path": str(header_path)}
+
+    matches = sorted(set(PUBLIC_MISSION_C_API_RE.findall(strip_c_comments(text))))
+    for symbol in matches:
+        append_blocker(
+            blockers,
+            "public_mission_sdk_symbol_in_api_header",
+            path=str(header_path),
+            symbol=symbol,
+        )
+    return {"status": "accepted" if not matches else "blocked", "path": str(header_path), "matches": matches}
+
+
+def collect_json_mission_doc_matches(value: Any, path: str = "$") -> list[dict[str, str]]:
+    matches: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}"
+            if isinstance(key, str) and PUBLIC_MISSION_DOC_RE.search(key):
+                matches.append({"path": child_path, "value": key})
+            matches.extend(collect_json_mission_doc_matches(child, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            matches.extend(collect_json_mission_doc_matches(child, f"{path}[{index}]"))
+    elif isinstance(value, str) and PUBLIC_MISSION_DOC_RE.search(value):
+        matches.append({"path": path, "value": value})
+    return matches
+
+
+def validate_public_gameplay_events_mission_boundary(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    doc_path = repo_root / PUBLIC_GAMEPLAY_EVENTS_DOC
+    text = read_text_file(doc_path, blockers, str(PUBLIC_GAMEPLAY_EVENTS_DOC))
+    if text is None:
+        return {"status": "blocked", "path": str(doc_path)}
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        append_blocker(blockers, "public_gameplay_events_json_malformed", path=str(doc_path), detail=str(exc))
+        return {"status": "blocked", "path": str(doc_path)}
+
+    matches = collect_json_mission_doc_matches(parsed)
+    for match in matches:
+        append_blocker(
+            blockers,
+            "public_mission_gameplay_event_or_descriptor",
+            path=str(doc_path),
+            field=match["path"],
+            value=match["value"],
+        )
+    return {"status": "accepted" if not matches else "blocked", "path": str(doc_path), "matches": matches}
+
+
+def validate_offline_repo_frontier(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    frontier_blockers_before = len(blockers)
+    cmake = validate_cmake_mission_hook_boundary(repo_root, blockers)
+    api_header = validate_public_api_header_mission_boundary(repo_root, blockers)
+    public_gameplay_events = validate_public_gameplay_events_mission_boundary(repo_root, blockers)
+    return {
+        "status": "accepted" if len(blockers) == frontier_blockers_before else "blocked",
+        "mission_internal_test_only": len(blockers) == frontier_blockers_before,
+        "cmake": cmake,
+        "api_header": api_header,
+        "public_gameplay_events": public_gameplay_events,
+    }
+
+
+def validate_report_readiness_frontier(value: Any, blockers: list[dict[str, Any]], path: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}"
+            if child is True and key in REPORT_FORBIDDEN_TRUE_READY_KEYS:
+                append_blocker(blockers, "report_public_runtime_readiness_overclaim", field=child_path)
+            validate_report_readiness_frontier(child, blockers, child_path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            validate_report_readiness_frontier(child, blockers, f"{path}[{index}]")
 
 
 def safe_path(path: Path, label: str, blockers: list[dict[str, Any]]) -> Path | None:
@@ -602,6 +836,7 @@ def build_attestation(
     consume_gate: dict[str, Any],
     promote_gate: dict[str, Any],
     fixture_regeneration: dict[str, Any],
+    repo_frontier: dict[str, Any],
 ) -> dict[str, Any]:
     promote_reasons = set(promote_gate.get("blocker_reasons") or [])
     consume_proven = consume_gate.get("status") == "accepted" and consume_gate.get("returncode") == 0
@@ -614,6 +849,7 @@ def build_attestation(
         }.issubset(promote_reasons)
     )
     fixture_proven = fixture_regeneration.get("status") == "accepted"
+    repo_frontier_proven = repo_frontier.get("status") == "accepted"
     actual_manifest_sha256 = policy.get("_obelisk_manifest_sha256") if isinstance(policy, dict) else None
     reviewed_hash_pinned = (
         expected_manifest_sha256 == EXPECTED_MANIFEST_SHA256
@@ -633,6 +869,7 @@ def build_attestation(
         and consume_proven
         and promote_block_proven
         and fixture_proven
+        and repo_frontier_proven
         and frontier_proven
     )
     return {
@@ -648,6 +885,7 @@ def build_attestation(
         "consume_gate_proven": consume_proven,
         "promote_block_proven": promote_block_proven,
         "fixture_policy_regeneration_proven": fixture_proven,
+        "repo_public_runtime_frontier_proven": repo_frontier_proven,
         "frontier_proven": frontier_proven,
         "frontier": {
             "input_target_count": len(summary.get("input_targets", [])),
@@ -735,6 +973,7 @@ def build_report(
                 )
 
     fixture_regeneration = validate_regenerated_fixture_policy(blockers)
+    repo_frontier = validate_offline_repo_frontier(REPO_ROOT, blockers)
     ready = not blockers
     attestation = build_attestation(
         ready=ready,
@@ -744,8 +983,9 @@ def build_report(
         consume_gate=consume_gate,
         promote_gate=promote_gate,
         fixture_regeneration=fixture_regeneration,
+        repo_frontier=repo_frontier,
     )
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
         "status": "candidate_ready" if ready else "blocked",
         "ready": ready,
@@ -770,6 +1010,7 @@ def build_report(
         "consume_gate": consume_gate,
         "promote_gate": promote_gate,
         "fixture_policy_regeneration": fixture_regeneration,
+        "repo_public_runtime_frontier": repo_frontier,
         "attestation": attestation,
         "summary": summary,
         "blockers": blockers,
@@ -780,6 +1021,18 @@ def build_report(
             "does not replace owner-token API, plugin cleanup, SDK consumer, public ABI, lifecycle, privacy, or live-ops promotion gates",
         ],
     }
+    report_readiness_blockers: list[dict[str, Any]] = []
+    validate_report_readiness_frontier(report, report_readiness_blockers)
+    if report_readiness_blockers:
+        blockers.extend(report_readiness_blockers)
+        report["status"] = "blocked"
+        report["ready"] = False
+        report["accepted_for_internal_planning"] = False
+        if isinstance(report.get("attestation"), dict):
+            report["attestation"]["status"] = "not_attested"
+            report["attestation"]["attestation_ready"] = False
+        report["blockers"] = blockers
+    return report
 
 
 def main() -> int:

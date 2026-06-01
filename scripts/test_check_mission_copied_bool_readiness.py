@@ -280,6 +280,54 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
             "--skip-artifact-gates",
         ]
 
+    def write_minimal_public_frontier_repo(
+        self,
+        root: Path,
+        *,
+        cmake: str | None = None,
+        api_header: str | None = None,
+        public_gameplay_events: dict | None = None,
+    ) -> None:
+        (root / "include" / "obelisk").mkdir(parents=True, exist_ok=True)
+        (root / "docs").mkdir(parents=True, exist_ok=True)
+        (root / "CMakeLists.txt").write_text(
+            cmake
+            if cmake is not None
+            else """
+add_library(obelisk SHARED
+    hooks/ProcessEventStructureReflection.cpp
+)
+add_executable(process_event_mission_reflection_tests
+    tests/core/ProcessEventMissionReflectionTests.cpp
+    hooks/ProcessEventMissionReflection.cpp
+)
+""",
+            encoding="utf-8",
+        )
+        (root / "include" / "obelisk" / "ObeliskApi.h").write_text(
+            api_header
+            if api_header is not None
+            else """
+#pragma once
+#define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS (1ull << 6)
+typedef struct ObeliskGameplayPolicyEvent ObeliskGameplayPolicyEvent;
+""",
+            encoding="utf-8",
+        )
+        (root / "docs" / "public_gameplay_events.json").write_text(
+            json.dumps(
+                public_gameplay_events
+                if public_gameplay_events is not None
+                else {
+                    "schema": "obelisk.public-gameplay-events.v1",
+                    "metadata_surfaces": [],
+                    "promoted_events": [],
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+
     def test_default_pack_is_candidate_ready_but_not_public_or_runtime_ready(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
@@ -309,12 +357,15 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertEqual(payload["promote_gate"]["status"], "skipped")
         self.assertEqual(payload["fixture_policy_regeneration"]["status"], "accepted")
         self.assertTrue(payload["fixture_policy_regeneration"]["summary"]["get_player_usable_items_recognition_only"])
+        self.assertEqual(payload["repo_public_runtime_frontier"]["status"], "accepted")
+        self.assertTrue(payload["repo_public_runtime_frontier"]["mission_internal_test_only"])
         self.assertEqual(payload["attestation"]["schema"], "obelisk.mission-copied-bool-offline-attestation.v1")
         self.assertEqual(payload["attestation"]["status"], "not_attested")
         self.assertFalse(payload["attestation"]["attestation_ready"])
         self.assertFalse(payload["attestation"]["consume_gate_proven"])
         self.assertFalse(payload["attestation"]["promote_block_proven"])
         self.assertTrue(payload["attestation"]["fixture_policy_regeneration_proven"])
+        self.assertTrue(payload["attestation"]["repo_public_runtime_frontier_proven"])
         self.assertTrue(payload["attestation"]["frontier_proven"])
         self.assertFalse(payload["attestation"]["mission_sdk_ready"])
         self.assertFalse(payload["attestation"]["public_abi_ready"])
@@ -354,6 +405,7 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertTrue(attestation["consume_gate_proven"])
         self.assertTrue(attestation["promote_block_proven"])
         self.assertTrue(attestation["fixture_policy_regeneration_proven"])
+        self.assertTrue(attestation["repo_public_runtime_frontier_proven"])
         self.assertTrue(attestation["frontier_proven"])
         self.assertEqual(attestation["actual_manifest_sha256"], sha256)
         self.assertEqual(attestation["reviewed_direct_policy_manifest_sha256"], sha256)
@@ -604,6 +656,88 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
+
+    def test_repo_frontier_blocks_mission_hook_in_runtime_or_shared_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                cmake="""
+add_library(obelisk SHARED
+    loader/Bootstrap.cpp
+    hooks/ProcessEventMissionReflection.cpp
+)
+target_sources(obelisk_runtime PRIVATE hooks/ProcessEventMissionReflection.cpp)
+""",
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        self.assertEqual(frontier["status"], "blocked")
+        self.assertFalse(frontier["mission_internal_test_only"])
+        self.assertIn("mission_hook_in_runtime_or_shared_target", {blocker["reason"] for blocker in blockers})
+        self.assertIn("obelisk", {blocker.get("target") for blocker in blockers})
+        self.assertIn("obelisk_runtime", {blocker.get("target") for blocker in blockers})
+
+    def test_repo_frontier_blocks_public_mission_api_and_docs_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                api_header="""
+#pragma once
+#define OBELISK_API_CAPABILITY_MISSION_EVENTS (1ull << 12)
+typedef struct ObeliskMissionEvent ObeliskMissionEvent;
+""",
+                public_gameplay_events={
+                    "schema": "obelisk.public-gameplay-events.v1",
+                    "metadata_surfaces": [
+                        {
+                            "surface_id": "obelisk.mission_event_descriptors.v1",
+                            "public_name": "DescribeMissionEventKind",
+                        }
+                    ],
+                    "promoted_events": [
+                        {
+                            "event_id": "obelisk.mission.v1",
+                            "event_kinds": ["OBELISK_GAMEPLAY_POLICY_EVENT_KIND_MISSION_ADD_PLAYER"],
+                        }
+                    ],
+                },
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertEqual(frontier["status"], "blocked")
+        self.assertIn("public_mission_sdk_symbol_in_api_header", reasons)
+        self.assertIn("public_mission_gameplay_event_or_descriptor", reasons)
+
+    def test_report_readiness_frontier_blocks_public_runtime_identity_mutation_and_return_override(self) -> None:
+        report = {
+            "ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "identity_ready": True,
+            "mutation_ready": True,
+            "return_override_ready": True,
+            "attestation": {
+                "public_abi_ready": True,
+                "runtime_observer_approved": True,
+            },
+        }
+        blockers: list[dict] = []
+
+        checker.validate_report_readiness_frontier(report, blockers)
+
+        fields = {blocker.get("field") for blocker in blockers}
+        self.assertIn("$.public_sdk_ready", fields)
+        self.assertIn("$.runtime_ready", fields)
+        self.assertIn("$.identity_ready", fields)
+        self.assertIn("$.mutation_ready", fields)
+        self.assertIn("$.return_override_ready", fields)
+        self.assertIn("$.attestation.public_abi_ready", fields)
+        self.assertIn("$.attestation.runtime_observer_approved", fields)
 
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(
