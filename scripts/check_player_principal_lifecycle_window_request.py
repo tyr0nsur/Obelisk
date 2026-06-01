@@ -33,6 +33,7 @@ from prepare_player_principal_lifecycle_window_request import (
     UTC_RE,
     WINDOW_MARKERS,
     env_lines,
+    run_id_for_window_start,
 )
 
 
@@ -365,6 +366,20 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
     run_id = string_at(payload, "run_id", blockers)
     if run_id is not None and not RUN_ID_RE.fullmatch(run_id):
         add(blockers, "run_id_invalid", "run_id")
+    if run_id is not None and RUN_ID_RE.fullmatch(run_id) and window:
+        start = window.get("start_utc")
+        start_dt = parse_utc(start) if isinstance(start, str) else None
+        if start_dt is not None:
+            expected_run_id = run_id_for_window_start(start_dt)
+            if run_id != expected_run_id:
+                add(
+                    blockers,
+                    "run_id_window_start_mismatch",
+                    "run_id",
+                    expected=expected_run_id,
+                    actual=run_id,
+                    approved_window_start_utc=start,
+                )
     sha = string_at(payload, "ark_binary_sha256", blockers)
     if sha is not None and (not SHA256_RE.fullmatch(sha) or sha != EXPECTED_BINARY_SHA256):
         add(blockers, "ark_binary_sha256_not_reviewed", "ark_binary_sha256", expected=EXPECTED_BINARY_SHA256)

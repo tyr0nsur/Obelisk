@@ -141,6 +141,15 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(bad_window_result.returncode, 0)
         self.assertIn("must be before", bad_window_result.stderr)
 
+    def test_rejects_run_id_window_start_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = base_args(Path(tmp) / "request")
+            args[args.index("--run-id") + 1] = "20260601T120001Z-player-principal-lifecycle"
+            result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must match --approved-window-start-utc exactly", result.stderr)
+
     def test_rejects_wrong_binary_sha_and_live_output_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             wrong_sha = base_args(Path(tmp) / "wrong-sha")

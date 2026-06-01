@@ -551,6 +551,53 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         blockers = {item["path"] for item in payload["blockers"] if item["reason"] == "forbidden_true_claim"}
         self.assertTrue(any(path.endswith(".public_payload") for path in blockers))
 
+    def test_runtime_input_keys_fail_closed_even_when_not_ready_claims(self) -> None:
+        cases = [
+            ("readiness", "runtime_name_indices", {"PrimalStructure": 123}),
+            ("readiness", "fname_indices", [123, 456]),
+            ("manifest", "dispatch_budget", 1),
+            ("manifest", "observation_budget", 1),
+            ("snapshot", "hook_enabled", False),
+            ("snapshot", "copied_payload", {"ReturnValue": 1}),
+            ("snapshot", "return_override", "not_claimed"),
+            ("snapshot", "runtimeNameIndices", {"PrimalStructure": 123}),
+            ("manifest", "dispatch-budget", 1),
+            ("readiness", "observation budget", 1),
+        ]
+        for location, key, value in cases:
+            with self.subTest(location=location, key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    readiness_payload = self.readiness_payload()
+                    manifest, _ = self.write_case(root, readiness_payload)
+                    if location == "readiness":
+                        readiness_payload[key] = value
+                        manifest, _ = self.write_case(root, readiness_payload)
+                    elif location == "manifest":
+                        readiness = root / "readiness.json"
+                        manifest_payload = self.manifest_payload(
+                            readiness,
+                            hashlib.sha256(readiness.read_bytes()).hexdigest(),
+                        )
+                        manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"][key] = value
+                        manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
+                    else:
+                        snapshot_path = root / "base" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+                        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+                        snapshot["targets"][0][key] = value
+                        snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+                    result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertFalse(payload["ready"])
+                blockers = {item["key"] for item in payload["blockers"] if item["reason"] == "forbidden_runtime_input_key"}
+                self.assertIn(key, blockers)
+                self.assertFalse(payload["promotion_ready"])
+                self.assertFalse(payload["public_sdk_ready"])
+                self.assertFalse(payload["runtime_ready"])
+                self.assertFalse(payload["enforcement_ready"])
+
     def test_readiness_envelope_drift_fails_closed(self) -> None:
         cases = [
             ("evidence_scope", "runtime_evidence", "readiness_evidence_scope_mismatch"),

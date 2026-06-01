@@ -294,6 +294,15 @@ FORBIDDEN_TRUE_CLAIM_KEYS = {
     "runtime_claim",
     "runtime_ready",
 }
+FORBIDDEN_RUNTIME_INPUT_KEYS = {
+    "copied_payload",
+    "dispatch_budget",
+    "fname_indices",
+    "hook_enabled",
+    "observation_budget",
+    "return_override",
+    "runtime_name_indices",
+}
 PUBLIC_PAYLOAD_KEY_TOKENS = {
     "field",
     "fields",
@@ -657,6 +666,7 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
     snapshot = read_json(snapshot_path, blockers, "snapshot")
     if snapshot is None:
         return None
+    scan_for_forbidden_runtime_inputs(snapshot, blockers, f"$.snapshot[{target_filter}]")
     scan_for_forbidden_true_ready(snapshot, blockers, f"$.snapshot[{target_filter}]")
     scan_for_forbidden_true_claims(snapshot, blockers, f"$.snapshot[{target_filter}]")
     validate_snapshot_envelope(snapshot, blockers, str(snapshot_path))
@@ -1042,6 +1052,23 @@ def scan_for_forbidden_true_claims(payload: Any, blockers: list[dict[str, Any]],
             scan_for_forbidden_true_claims(value, blockers, f"{path}[{index}]")
 
 
+def normalized_key(key: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return separated.casefold().replace("-", "_").replace(" ", "_")
+
+
+def scan_for_forbidden_runtime_inputs(payload: Any, blockers: list[dict[str, Any]], path: str) -> None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            child_path = f"{path}.{key}"
+            if normalized_key(key) in FORBIDDEN_RUNTIME_INPUT_KEYS:
+                add(blockers, "forbidden_runtime_input_key", path=child_path, key=key)
+            scan_for_forbidden_runtime_inputs(value, blockers, child_path)
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload):
+            scan_for_forbidden_runtime_inputs(value, blockers, f"{path}[{index}]")
+
+
 def build_report(
     blockers: list[dict[str, Any]],
     *,
@@ -1140,9 +1167,11 @@ def main() -> int:
     if readiness is not None:
         validate_readiness(readiness, blockers)
         validate_readiness_snapshot_shapes(readiness, readiness_path, blockers)
+        scan_for_forbidden_runtime_inputs(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_ready(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_claims(readiness, blockers, "$.readiness")
     if manifest is not None:
+        scan_for_forbidden_runtime_inputs(manifest, blockers, "$.manifest")
         scan_for_forbidden_true_ready(manifest, blockers, "$.manifest")
         scan_for_forbidden_true_claims(manifest, blockers, "$.manifest")
 

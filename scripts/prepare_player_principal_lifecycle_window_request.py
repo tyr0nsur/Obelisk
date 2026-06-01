@@ -24,6 +24,7 @@ from snapshot_evidence_pack import reject_symlink_component
 SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
+RUN_ID_SUFFIX = "-player-principal-lifecycle"
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 APPROVAL_TEXT = "current-turn operator-approved runtime window, not standing approval"
@@ -111,6 +112,10 @@ def parse_utc(value: str, label: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
+def run_id_for_window_start(start: datetime) -> str:
+    return start.strftime("%Y%m%dT%H%M%SZ") + RUN_ID_SUFFIX
+
+
 def require_safe_token(value: str, label: str) -> None:
     if not SAFE_TOKEN_RE.fullmatch(value):
         raise SystemExit(f"{label} contains unsafe characters: {value}")
@@ -131,6 +136,9 @@ def validate_args(args: argparse.Namespace) -> None:
     end = parse_utc(args.approved_window_end_utc, "--approved-window-end-utc")
     if not start < end:
         raise SystemExit("--approved-window-start-utc must be before --approved-window-end-utc")
+    expected_run_id = run_id_for_window_start(start)
+    if args.run_id != expected_run_id:
+        raise SystemExit(f"--run-id timestamp must match --approved-window-start-utc exactly: {expected_run_id}")
     if args.user_policy == "operator_approved_beta_users" and args.notice_path == "not_applicable":
         raise SystemExit("--notice-path must name the approved notice path for beta-user windows")
     if args.notice_path != "not_applicable" and not re.fullmatch(r"[A-Za-z0-9_.:/ -]+", args.notice_path):

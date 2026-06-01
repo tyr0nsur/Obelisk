@@ -16,13 +16,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PREPARE = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 CHECK = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 def prepare_args(output_dir: Path) -> list[str]:
     start = datetime.now(timezone.utc) + timedelta(hours=1)
     end = start + timedelta(minutes=10)
+    run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
     return [
         sys.executable,
         str(PREPARE),
@@ -31,7 +31,7 @@ def prepare_args(output_dir: Path) -> list[str]:
         "--map",
         "TheIsland",
         "--run-id",
-        RUN_ID,
+        run_id,
         "--obelisk-commit",
         TEST_COMMIT,
         "--approved-window-start-utc",
@@ -123,7 +123,8 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request_path = output_dir / "window-request.json"
             request = json.loads(request_path.read_text(encoding="utf-8"))
             request["copied_log_path"] = (
-                f"/servidor/ark/workspace-offline/tmp/live-validation-logs/{RUN_ID}/Obelisk.log"
+                "/servidor/ark/workspace-offline/tmp/live-validation-logs/"
+                f"{request['run_id']}/Obelisk.log"
             )
             request_path.write_text(json.dumps(request), encoding="utf-8")
             result = self.run_checker(output_dir, check=False)
@@ -131,6 +132,26 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("copied_log_path_not_exact_expected_path", report["blockers"])
+
+    def test_rejects_run_id_window_start_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            start = datetime.strptime(
+                request["approved_window"]["start_utc"],
+                "%Y-%m-%dT%H:%M:%SZ",
+            ).replace(tzinfo=timezone.utc)
+            request["approved_window"]["start_utc"] = (start + timedelta(minutes=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("run_id_window_start_mismatch", report["blockers"])
 
     def test_rejects_expired_approved_window(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
