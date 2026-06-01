@@ -323,6 +323,36 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             report["non_claims"],
         )
 
+    def test_preflight_rejects_bad_request_pack_even_with_log_and_manifest_inputs(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            manifest = self.write_window_manifest(temp_dir, copied_log)
+            fields = dict(
+                line.split("=", 1)
+                for line in manifest.read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#")
+            )
+            request_pack = Path(fields["request_pack_path"])
+            request_pack.write_text("{}", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            manifest.write_text(
+                "\n".join(f"{key}={value}" for key, value in fields.items()) + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["ready"])
+        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertFalse(report["request_pack_ready"])
+        self.assertIn("request_pack_check_failed", report["blockers"])
+        self.assertIn("window_manifest_check_failed", report["blockers"])
+
     def test_builds_complete_consume_only_bundle(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

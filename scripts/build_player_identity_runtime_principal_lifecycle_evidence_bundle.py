@@ -250,6 +250,82 @@ def request_pack_check_state(
     return state
 
 
+def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "checked": False,
+        "ready": False,
+        "exit_code": None,
+        "schema": None,
+        "stderr": "",
+    }
+    if not window_manifest["exists"]:
+        return state
+    state["checked"] = True
+    exit_code, payload, stderr = run_json_check(
+        [
+            sys.executable,
+            str(WINDOW_MANIFEST_CHECKER),
+            "--json",
+            str(window_manifest["path"]),
+        ]
+    )
+    state["exit_code"] = exit_code
+    state["stderr"] = stderr
+    if isinstance(payload, dict):
+        state["schema"] = payload.get("schema")
+        state["ready"] = (
+            payload.get("ready") is True
+            and payload.get("operational_window_manifest_ready") is True
+        )
+        state["blockers"] = payload.get("blockers", [])
+        state["next_blocker"] = payload.get("next_blocker")
+    if not state["ready"]:
+        add_blocker(
+            blockers,
+            "window_manifest_check_failed",
+            "window_manifest",
+            exit_code=exit_code,
+            window_manifest_check_blockers=state.get("blockers", []),
+        )
+    return state
+
+
+def read_manifest_fields(path: Path, blockers: list[dict[str, Any]]) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        add_blocker(blockers, "window_manifest_unreadable", "window_manifest", detail=str(exc))
+        return fields
+    for line_number, raw in enumerate(lines, start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            add_blocker(blockers, "window_manifest_line_not_key_value", "window_manifest", line=line_number)
+            continue
+        key, value = line.split("=", 1)
+        fields[key.strip()] = value.strip()
+    return fields
+
+
+def path_from_manifest(
+    fields: dict[str, str],
+    manifest_path: Path,
+    key: str,
+    fallback: Path,
+    blockers: list[dict[str, Any]],
+) -> Path:
+    value = fields.get(key)
+    if not value:
+        add_blocker(blockers, f"{key}_missing", key)
+        return fallback
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return manifest_path.parent / path
+
+
 def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     reject_symlink_component(evidence_dir, "--evidence-dir")
@@ -279,15 +355,53 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
 
     copied_log = file_state(resolved / "Obelisk.log", "copied_log", blockers)
     window_manifest = file_state(resolved / "window-manifest.env", "window_manifest", blockers)
-    request_pack = file_state(resolved / "sidecars" / run_id / "window-request.json", "request_pack", blockers)
-    observer_env = file_state(resolved / "sidecars" / run_id / "observer-window.env", "observer_env", blockers)
-    preflight_pre = file_state(resolved / "sidecars" / run_id / "preflight-pre.txt", "preflight_pre", blockers)
-    preflight_post = file_state(resolved / "sidecars" / run_id / "preflight-post.txt", "preflight_post", blockers)
+    manifest_fields: dict[str, str] = {}
+    window_manifest_path = Path(window_manifest["path"])
+    if window_manifest["exists"]:
+        manifest_fields = read_manifest_fields(window_manifest_path, blockers)
+    def sidecar_path(key: str, fallback: Path) -> Path:
+        if window_manifest["exists"]:
+            return path_from_manifest(manifest_fields, window_manifest_path, key, fallback, blockers)
+        return fallback
+
+    request_pack = file_state(
+        sidecar_path(
+            "request_pack_path",
+            resolved / "sidecars" / run_id / "window-request.json",
+        ),
+        "request_pack",
+        blockers,
+    )
+    observer_env = file_state(
+        sidecar_path(
+            "observer_env_path",
+            resolved / "sidecars" / run_id / "observer-window.env",
+        ),
+        "observer_env",
+        blockers,
+    )
+    preflight_pre = file_state(
+        sidecar_path(
+            "preflight_pre_path",
+            resolved / "sidecars" / run_id / "preflight-pre.txt",
+        ),
+        "preflight_pre",
+        blockers,
+    )
+    preflight_post = file_state(
+        sidecar_path(
+            "preflight_post_path",
+            resolved / "sidecars" / run_id / "preflight-post.txt",
+        ),
+        "preflight_post",
+        blockers,
+    )
     request_check = request_pack_check_state(request_pack, observer_env, blockers)
+    window_check = window_manifest_check_state(window_manifest, blockers)
 
     bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
     approved_bundle = file_state(bundle_manifest, "approved_runtime_manifest", blockers)
-    input_ready = (
+    bundle_inputs_ready = (
         copied_log["exists"]
         and window_manifest["exists"]
         and copied_log["approved_offline_workspace"]
@@ -295,6 +409,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         and not copied_log["protected"]
         and not window_manifest["protected"]
     )
+    input_ready = bundle_inputs_ready and window_check["ready"]
     request_pack_ready = (
         request_pack["exists"]
         and observer_env["exists"]
@@ -305,7 +420,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
         "ready": bool(input_ready),
-        "bundle_inputs_ready": bool(input_ready),
+        "bundle_inputs_ready": bool(bundle_inputs_ready),
         "request_pack_ready": bool(request_pack_ready),
         "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
         "next_blocker": (
@@ -318,6 +433,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "inputs": {
             "copied_log": copied_log,
             "window_manifest": window_manifest,
+            "window_manifest_check": window_check,
             "request_pack": request_pack,
             "observer_env": observer_env,
             "request_pack_check": request_check,

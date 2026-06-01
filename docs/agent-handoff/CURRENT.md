@@ -45,6 +45,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   closed until copied `Obelisk.log`, `window-manifest.env`, and an approved evidence bundle
   exist. Inventory copied-policy dispatch also requires exact reflected `ParmsSize`
   provenance before scalar copy.
+- Latest pre-runtime hardening: player-principal bundle preflight now also reuses the
+  window-manifest checker and validates preflight sidecar content, not only existence or
+  SHA. Command/chat response readiness has a structured runtime-owned principal plus
+  runtime-owned permission gate before any future reply/send-chat/router/public ABI claim.
+  Structure build-policy offline intake now freezes exact target shapes and redaction
+  policy while continuing to fail closed on public payload, runtime, enforcement, return
+  override, Structure SDK, or v1-completion claims.
 
 ## Hard Overrides
 
@@ -197,11 +204,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `window-manifest.env`; this is not runtime approval or approved evidence. If this
   directory is rechecked, `scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py --preflight-only`
   should report `request_pack_ready=true`, `bundle_inputs_ready=false`, and blockers only
-  for copied log/window manifest/approved manifest.
+  for copied log/window manifest/approved manifest. Sidecar SHA matches alone are
+  insufficient; preflight sidecars, request pack, observer env, and window manifest are
+  semantically checked before any bundle input can be treated as ready.
 - `command_chat_response_public_readiness`, `commands_replies_public_readiness`, and
   `check_command_permission_route_gate.py` preserve runtime-owned principal provenance and
-  keep public header, ABI, SDK, runtime, reply/send-chat, command-router, and permissions
-  claims false.
+  runtime-owned permission provenance, and keep public header, ABI, SDK, runtime,
+  reply/send-chat, command-router, and permissions claims false.
 - `check_player_identity_public_contract_gap_report.py` keeps player identity blocked on
   `privacy.identifier_redaction`, scans the public header for accidental identity/principal
   symbols, and does not require or replace approved runtime principal lifecycle evidence.
@@ -214,9 +223,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   consume-only until their own copied ABI, redaction, lifecycle, and promotion gates exist.
 - Structure build-policy offline intake is already accepted as planning layout for
   `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
-  `PrimalStructure.BPIsAllowedToBuildEx`; the useful next side-lane is a fixture/policy
-  guardrail that freezes field shape/redaction and prevents public payload, runtime-ready,
-  enforcement-ready, or return-override claims.
+  `PrimalStructure.BPIsAllowedToBuildEx`; its checker now freezes field shape/redaction and
+  prevents public payload, runtime-ready, enforcement-ready, or return-override claims.
 - ResourceHandle remains blocked on rejected runtime object samples plus runtime serial
   reuse/wraparound semantics; do not restart broad FName/GObjects/core scans for it.
 - Demand-map priority from NextGenPlugins names is P0 principal -> permissions/admin ->

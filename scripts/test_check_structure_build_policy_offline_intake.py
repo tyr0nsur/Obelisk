@@ -22,6 +22,46 @@ NON_CLAIM = (
     "build-policy SDK, enforcement, identity, lookup, mutation, return override, "
     "runtime hooks, or v1 completion"
 )
+TARGET_SHAPES: dict[str, dict[str, Any]] = {
+    "PrimalStructure.IsAllowedToBuild": {
+        "function_flags": "0x4c20400",
+        "num_parms": 8,
+        "parms_size": 152,
+        "properties": [
+            ("PC", "ObjectProperty", 0, 8, None),
+            ("AtLocation", "StructProperty", 8, 12, "Vector"),
+            ("AtRotation", "StructProperty", 20, 12, "Rotator"),
+            ("OutPlacementData", "StructProperty", 32, 96, "PlacementData"),
+            ("bDontAdjustForMaxRange", "BoolProperty", 128, 1, None),
+            ("PlayerViewRotation", "StructProperty", 132, 12, "Rotator"),
+            ("bFinalPlacement", "BoolProperty", 144, 1, None),
+            ("ReturnValue", "IntProperty", 148, 4, None),
+        ],
+    },
+    "PrimalStructure.BPIsAllowedToBuild": {
+        "function_flags": "0xc420c00",
+        "num_parms": 3,
+        "parms_size": 104,
+        "properties": [
+            ("OutPlacementData", "StructProperty", 0, 96, "PlacementData"),
+            ("CurrentAllowedReason", "IntProperty", 96, 4, None),
+            ("ReturnValue", "IntProperty", 100, 4, None),
+        ],
+    },
+    "PrimalStructure.BPIsAllowedToBuildEx": {
+        "function_flags": "0xc420c00",
+        "num_parms": 6,
+        "parms_size": 120,
+        "properties": [
+            ("OutPlacementData", "StructProperty", 0, 96, "PlacementData"),
+            ("CurrentAllowedReason", "IntProperty", 96, 4, None),
+            ("PC", "ObjectProperty", 104, 8, None),
+            ("bFinalPlacement", "BoolProperty", 112, 1, None),
+            ("bChoosingRotation", "BoolProperty", 113, 1, None),
+            ("ReturnValue", "IntProperty", 116, 4, None),
+        ],
+    },
+}
 
 
 class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
@@ -83,6 +123,106 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             ],
         }
 
+    def snapshot_payload(self, qualified_target: str) -> dict[str, Any]:
+        outer_name, function_name = qualified_target.split(".", 1)
+        shape = TARGET_SHAPES[qualified_target]
+        properties = []
+        for depth, (name, class_name, offset, element_size, struct_type) in enumerate(shape["properties"]):
+            prop: dict[str, Any] = {
+                "array_dim": 1,
+                "class_membership_status": "candidate-uobject",
+                "class_name": class_name,
+                "depth": depth,
+                "element_size": element_size,
+                "membership_status": "candidate-uobject",
+                "name": name,
+                "offset_internal": offset,
+                "outer_membership_status": "candidate-uobject",
+                "reject_reasons": [],
+                "status": "candidate",
+            }
+            if class_name == "StructProperty":
+                prop["struct_type_candidate"] = {
+                    "membership_status": "candidate-uobject",
+                    "reject_reasons": [],
+                    "status": "candidate",
+                    "struct_type": {"class_name": "ScriptStruct", "name": struct_type},
+                }
+            if class_name == "BoolProperty":
+                prop.update(
+                    {
+                        "bool_byte_offset": 0,
+                        "bool_field_size": 1,
+                        "bool_property_semantics": {
+                            "bool_byte_offset": 0,
+                            "bool_field_size": 1,
+                            "reject_reasons": [],
+                            "status": "candidate",
+                        },
+                        "native_bool": False,
+                    }
+                )
+            properties.append(prop)
+        return {
+            "schema": "obelisk.ufunction-chain.snapshot.v1",
+            "evidence": {"status": "candidate-only"},
+            "interpretation": {"status": "candidate-only"},
+            "targets": [
+                {
+                    "function_flags": shape["function_flags"],
+                    "num_parms": shape["num_parms"],
+                    "parms_size": shape["parms_size"],
+                    "property_chain": {
+                        "expected_count": len(properties),
+                        "observed_count": len(properties),
+                        "parms_size": shape["parms_size"],
+                        "properties": properties,
+                        "reject_reasons": [],
+                        "status": "candidate",
+                    },
+                    "reject_reasons": [],
+                    "status": "candidate",
+                    "target": {
+                        "class_name": "Function",
+                        "name": function_name,
+                        "outer_class_name": "Class",
+                        "outer_name": outer_name,
+                    },
+                }
+            ],
+        }
+
+    def add_snapshot_details(self, root: Path, readiness_payload: dict[str, Any]) -> None:
+        if "modules" in readiness_payload:
+            return
+        snapshot_root = root / "snapshots"
+        snapshot_root.mkdir()
+        details = []
+        for qualified_target in TARGET_SHAPES:
+            snapshot_path = snapshot_root / f"{qualified_target}.snapshot.json"
+            snapshot_path.write_text(json.dumps(self.snapshot_payload(qualified_target), sort_keys=True), encoding="utf-8")
+            details.append(
+                {
+                    "block_reasons": [],
+                    "comparable": True,
+                    "path": str(snapshot_path),
+                    "second_source_status": "accepted",
+                    "target": f"obelisk.ufunction-chain.snapshot.v1:{qualified_target}",
+                }
+            )
+        readiness_payload["modules"] = [
+            {
+                "block_reasons": {},
+                "blocked": 0,
+                "comparable": 3,
+                "module": "base",
+                "schema": "ufunction",
+                "second_source": {"accepted": 3, "inconclusive": 0, "missing": 0, "rejected": 0},
+                "target_details": details,
+                "targets": 3,
+            }
+        ]
+
     def manifest_payload(self, readiness: Path, sha256: str) -> dict[str, Any]:
         return {
             "surfaces": [
@@ -140,6 +280,7 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         }
 
     def write_case(self, root: Path, readiness_payload: dict[str, Any], manifest_payload: dict[str, Any] | None = None) -> tuple[Path, Path]:
+        self.add_snapshot_details(root, readiness_payload)
         readiness = root / "readiness.json"
         readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
         sha256 = hashlib.sha256(readiness.read_bytes()).hexdigest()
@@ -279,6 +420,90 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["enforcement_ready"])
+
+    def test_snapshot_field_shape_drift_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "snapshots" / "PrimalStructure.BPIsAllowedToBuildEx.snapshot.json"
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            snapshot["targets"][0]["property_chain"]["properties"][5]["class_name"] = "BoolProperty"
+            snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_property_shape_mismatch", {item["reason"] for item in payload["blockers"]})
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+
+    def test_snapshot_public_payload_claim_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "snapshots" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            snapshot["targets"][0]["property_chain"]["properties"][3]["exposes_public_payload"] = True
+            snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("forbidden_true_claim", {item["reason"] for item in payload["blockers"]})
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+
+    def test_readiness_missing_snapshot_detail_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            readiness_payload["modules"] = [
+                {
+                    "target_details": [
+                        {
+                            "block_reasons": [],
+                            "comparable": True,
+                            "path": str(root / "missing.snapshot.json"),
+                            "second_source_status": "accepted",
+                            "target": "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+                        }
+                    ]
+                }
+            ]
+            manifest, _ = self.write_case(root, readiness_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("readiness_target_details_mismatch", {item["reason"] for item in payload["blockers"]})
+
+    def test_manifest_public_payload_claim_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            self.add_snapshot_details(root, readiness_payload)
+            readiness = root / "readiness.json"
+            readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+            manifest_payload = self.manifest_payload(
+                readiness,
+                hashlib.sha256(readiness.read_bytes()).hexdigest(),
+            )
+            manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"]["public_payload"] = True
+            manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        blockers = {item["path"] for item in payload["blockers"] if item["reason"] == "forbidden_true_claim"}
+        self.assertTrue(any(path.endswith(".public_payload") for path in blockers))
 
 
 if __name__ == "__main__":

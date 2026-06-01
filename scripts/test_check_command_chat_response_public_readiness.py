@@ -226,6 +226,40 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "raw_process_event_public_response_allowed": False,
             "static_thunk_orientation_public_response_allowed": False,
             "commands_replies_shortcut_public_response_allowed": False,
+            "runtime_owned_principal_permissions_gate": {
+                "planning_only": True,
+                "runtime_owned_principal_required": True,
+                "runtime_owned_permission_allow_required": True,
+                "same_principal_tuple_required": True,
+                "permission_policy_provenance_required": True,
+                "reply_send_chat_router_claims_allowed": False,
+                "public_abi_allowed": False,
+                "runtime_delivery_allowed": False,
+                "required_runtime_owned_inputs": [
+                    "principal_handle",
+                    "principal_generation",
+                    "principal_scope_flags",
+                    "server_process_epoch",
+                    "permission_decision",
+                    "permission_policy_epoch",
+                    "policy_source_id",
+                    "policy_source_generation",
+                    "authority_kind",
+                    "authority_generation",
+                ],
+                "forbidden_authority_sources": [
+                    "plugin input",
+                    "command text",
+                    "operator config",
+                    "reply request",
+                    "send-chat request",
+                    "router metadata",
+                    "passive ChatMessageEvent",
+                    "raw ProcessEvent",
+                    "legacy CallProcessEvent",
+                    "static thunk orientation",
+                ],
+            },
             "forbidden_public_contract": [
                 "public CallProcessEvent response path",
                 "public minimal ChatMessageEvent response path",
@@ -504,6 +538,36 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "runtime-owned principal tuple must be paired with runtime-owned permission provenance before reply/send-chat/router planning can become public",
             detail["missing"],
         )
+
+    def test_rejects_missing_runtime_owned_principal_permissions_gate(self) -> None:
+        decisions = self.make_decisions()
+        gate = decisions["runtime_owned_principal_permissions_gate"]
+        gate["runtime_owned_permission_allow_required"] = False
+        gate["reply_send_chat_router_claims_allowed"] = True
+        gate["required_runtime_owned_inputs"] = [
+            item for item in gate["required_runtime_owned_inputs"] if item != "permission_decision"
+        ]
+        gate["forbidden_authority_sources"] = [
+            item for item in gate["forbidden_authority_sources"] if item != "router metadata"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("runtime_owned_principal_permissions_gate_required_true_missing", report["blockers"])
+        self.assertIn("runtime_owned_principal_permissions_gate_required_false_missing", report["blockers"])
+        self.assertIn("runtime_owned_principal_permissions_gate_inputs_missing", report["blockers"])
+        self.assertIn("runtime_owned_principal_permissions_gate_forbidden_sources_missing", report["blockers"])
 
     def test_rejects_missing_not_sufficient_shortcut_evidence(self) -> None:
         decisions = self.make_decisions()

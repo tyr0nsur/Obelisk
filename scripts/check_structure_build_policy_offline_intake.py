@@ -39,6 +39,132 @@ EXPECTED_TARGET_FILTERS = {
     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild",
     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx",
 }
+EXPECTED_FIELD_SHAPES = {
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": {
+        "outer_name": "PrimalStructure",
+        "function_name": "IsAllowedToBuild",
+        "function_flags": "0x4c20400",
+        "num_parms": 8,
+        "parms_size": 152,
+        "properties": (
+            {"name": "PC", "class_name": "ObjectProperty", "offset_internal": 0, "element_size": 8},
+            {
+                "name": "AtLocation",
+                "class_name": "StructProperty",
+                "offset_internal": 8,
+                "element_size": 12,
+                "struct_type": "Vector",
+            },
+            {
+                "name": "AtRotation",
+                "class_name": "StructProperty",
+                "offset_internal": 20,
+                "element_size": 12,
+                "struct_type": "Rotator",
+            },
+            {
+                "name": "OutPlacementData",
+                "class_name": "StructProperty",
+                "offset_internal": 32,
+                "element_size": 96,
+                "struct_type": "PlacementData",
+            },
+            {
+                "name": "bDontAdjustForMaxRange",
+                "class_name": "BoolProperty",
+                "offset_internal": 128,
+                "element_size": 1,
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "native_bool": False,
+            },
+            {
+                "name": "PlayerViewRotation",
+                "class_name": "StructProperty",
+                "offset_internal": 132,
+                "element_size": 12,
+                "struct_type": "Rotator",
+            },
+            {
+                "name": "bFinalPlacement",
+                "class_name": "BoolProperty",
+                "offset_internal": 144,
+                "element_size": 1,
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "native_bool": False,
+            },
+            {"name": "ReturnValue", "class_name": "IntProperty", "offset_internal": 148, "element_size": 4},
+        ),
+    },
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild": {
+        "outer_name": "PrimalStructure",
+        "function_name": "BPIsAllowedToBuild",
+        "function_flags": "0xc420c00",
+        "num_parms": 3,
+        "parms_size": 104,
+        "properties": (
+            {
+                "name": "OutPlacementData",
+                "class_name": "StructProperty",
+                "offset_internal": 0,
+                "element_size": 96,
+                "struct_type": "PlacementData",
+            },
+            {"name": "CurrentAllowedReason", "class_name": "IntProperty", "offset_internal": 96, "element_size": 4},
+            {"name": "ReturnValue", "class_name": "IntProperty", "offset_internal": 100, "element_size": 4},
+        ),
+    },
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx": {
+        "outer_name": "PrimalStructure",
+        "function_name": "BPIsAllowedToBuildEx",
+        "function_flags": "0xc420c00",
+        "num_parms": 6,
+        "parms_size": 120,
+        "properties": (
+            {
+                "name": "OutPlacementData",
+                "class_name": "StructProperty",
+                "offset_internal": 0,
+                "element_size": 96,
+                "struct_type": "PlacementData",
+            },
+            {"name": "CurrentAllowedReason", "class_name": "IntProperty", "offset_internal": 96, "element_size": 4},
+            {"name": "PC", "class_name": "ObjectProperty", "offset_internal": 104, "element_size": 8},
+            {
+                "name": "bFinalPlacement",
+                "class_name": "BoolProperty",
+                "offset_internal": 112,
+                "element_size": 1,
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "native_bool": False,
+            },
+            {
+                "name": "bChoosingRotation",
+                "class_name": "BoolProperty",
+                "offset_internal": 113,
+                "element_size": 1,
+                "bool_field_size": 1,
+                "bool_byte_offset": 0,
+                "native_bool": False,
+            },
+            {"name": "ReturnValue", "class_name": "IntProperty", "offset_internal": 116, "element_size": 4},
+        ),
+    },
+}
+FIELD_REDACTION_POLICY = {
+    "PC": "redacted_player_controller_context",
+    "AtLocation": "redacted_location_context",
+    "AtRotation": "redacted_rotation_context",
+    "OutPlacementData": "redacted_placement_struct",
+    "PlayerViewRotation": "redacted_player_view_context",
+    "CurrentAllowedReason": "layout_only_reason_code_not_public_payload",
+    "bDontAdjustForMaxRange": "layout_only_bool_not_public_payload",
+    "bFinalPlacement": "layout_only_bool_not_public_payload",
+    "bChoosingRotation": "layout_only_bool_not_public_payload",
+    "ReturnValue": "layout_only_return_candidate_no_override",
+}
 EXPECTED_NON_CLAIM = (
     "planning-layout evidence only; does not promote StructureEvents, Structure SDK, "
     "build-policy SDK, enforcement, identity, lookup, mutation, return override, "
@@ -128,6 +254,39 @@ NEGATED_TRUE_KEY_PREFIXES = (
     "no_",
     "not_",
 )
+FORBIDDEN_TRUE_CLAIM_KEYS = {
+    "enforcement",
+    "enforcement_claim",
+    "enforcement_ready",
+    "exposed_payload",
+    "exposes_payload",
+    "exposes_public_payload",
+    "public_payload",
+    "public_payload_ready",
+    "return_override",
+    "return_override_claim",
+    "return_override_ready",
+    "runtime",
+    "runtime_claim",
+    "runtime_ready",
+}
+PUBLIC_PAYLOAD_KEY_TOKENS = {
+    "field",
+    "fields",
+    "param",
+    "params",
+    "parameter",
+    "parameters",
+    "payload",
+    "range",
+    "ranges",
+}
+PUBLIC_EXPOSURE_KEY_TOKENS = {
+    "expose",
+    "exposed",
+    "exposes",
+    "public",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -246,6 +405,219 @@ def has_forbidden_ready_claim(key: str, path: str) -> bool:
     if "ready" in key_token_set and domain_in_path:
         return True
     return False
+
+
+def has_forbidden_true_claim(key: str) -> bool:
+    if key.startswith(NEGATED_TRUE_KEY_PREFIXES):
+        return False
+    key_token_set = key_tokens(key)
+    compact_key = compact_key_text(key)
+    if key in FORBIDDEN_TRUE_CLAIM_KEYS:
+        return True
+    if "override" in key_token_set and "return" in key_token_set:
+        return True
+    if "runtime" in key_token_set or "enforcement" in key_token_set:
+        return True
+    has_public_exposure = bool(key_token_set & PUBLIC_EXPOSURE_KEY_TOKENS)
+    has_payload = bool(key_token_set & PUBLIC_PAYLOAD_KEY_TOKENS)
+    if has_public_exposure and has_payload:
+        return True
+    if any(term in compact_key for term in ("publicpayload", "exposedpayload", "exposespayload")):
+        return True
+    return False
+
+
+def expected_struct_type(expected: dict[str, Any]) -> str | None:
+    value = expected.get("struct_type")
+    return value if isinstance(value, str) else None
+
+
+def actual_struct_type(prop: dict[str, Any]) -> str | None:
+    candidate = prop.get("struct_type_candidate")
+    if not isinstance(candidate, dict):
+        return None
+    struct_type = candidate.get("struct_type")
+    if not isinstance(struct_type, dict):
+        return None
+    value = struct_type.get("name")
+    return value if isinstance(value, str) else None
+
+
+def validate_bool_shape(prop: dict[str, Any], expected: dict[str, Any], blockers: list[dict[str, Any]], path: str) -> None:
+    for key in ("bool_field_size", "bool_byte_offset", "native_bool"):
+        if key in expected and prop.get(key) != expected[key]:
+            add(blockers, "snapshot_bool_shape_mismatch", path=path, key=key, expected=expected[key], value=prop.get(key))
+    semantics = prop.get("bool_property_semantics")
+    if not isinstance(semantics, dict):
+        add(blockers, "snapshot_bool_semantics_missing", path=path)
+        return
+    for key in ("bool_field_size", "bool_byte_offset"):
+        if key in expected and semantics.get(key) != expected[key]:
+            add(
+                blockers,
+                "snapshot_bool_semantics_mismatch",
+                path=path,
+                key=key,
+                expected=expected[key],
+                value=semantics.get(key),
+            )
+    if semantics.get("status") != "candidate":
+        add(blockers, "snapshot_bool_semantics_status_mismatch", path=path, expected="candidate", value=semantics.get("status"))
+
+
+def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: list[dict[str, Any]]) -> None:
+    expected = EXPECTED_FIELD_SHAPES[target_filter]
+    snapshot = read_json(snapshot_path, blockers, "snapshot")
+    if snapshot is None:
+        return
+    scan_for_forbidden_true_ready(snapshot, blockers, f"$.snapshot[{target_filter}]")
+    scan_for_forbidden_true_claims(snapshot, blockers, f"$.snapshot[{target_filter}]")
+    if snapshot.get("schema") != "obelisk.ufunction-chain.snapshot.v1":
+        add(blockers, "snapshot_schema_mismatch", path=str(snapshot_path), expected="obelisk.ufunction-chain.snapshot.v1", value=snapshot.get("schema"))
+    for section in ("evidence", "interpretation"):
+        value = snapshot.get(section)
+        if not isinstance(value, dict) or value.get("status") != "candidate-only":
+            add(blockers, "snapshot_candidate_only_status_mismatch", path=str(snapshot_path), section=section)
+
+    targets = snapshot.get("targets")
+    if not isinstance(targets, list) or len(targets) != 1 or not isinstance(targets[0], dict):
+        add(blockers, "snapshot_target_count_mismatch", path=str(snapshot_path), expected=1, value=len(targets) if isinstance(targets, list) else None)
+        return
+    target = targets[0]
+    target_meta = target.get("target")
+    if not isinstance(target_meta, dict):
+        add(blockers, "snapshot_target_metadata_missing", path=str(snapshot_path))
+        return
+
+    target_checks = {
+        "outer_name": expected["outer_name"],
+        "name": expected["function_name"],
+        "class_name": "Function",
+        "outer_class_name": "Class",
+    }
+    for key, expected_value in target_checks.items():
+        if target_meta.get(key) != expected_value:
+            add(
+                blockers,
+                "snapshot_target_metadata_mismatch",
+                path=str(snapshot_path),
+                key=key,
+                expected=expected_value,
+                value=target_meta.get(key),
+            )
+    for key in ("function_flags", "num_parms", "parms_size"):
+        if target.get(key) != expected[key]:
+            add(blockers, "snapshot_function_shape_mismatch", path=str(snapshot_path), key=key, expected=expected[key], value=target.get(key))
+    if target.get("status") != "candidate":
+        add(blockers, "snapshot_target_status_mismatch", path=str(snapshot_path), expected="candidate", value=target.get("status"))
+
+    property_chain = target.get("property_chain")
+    if not isinstance(property_chain, dict):
+        add(blockers, "snapshot_property_chain_missing", path=str(snapshot_path))
+        return
+    expected_properties = expected["properties"]
+    chain_checks = {
+        "status": "candidate",
+        "expected_count": len(expected_properties),
+        "observed_count": len(expected_properties),
+        "parms_size": expected["parms_size"],
+    }
+    for key, expected_value in chain_checks.items():
+        if property_chain.get(key) != expected_value:
+            add(blockers, "snapshot_property_chain_mismatch", path=str(snapshot_path), key=key, expected=expected_value, value=property_chain.get(key))
+    properties = property_chain.get("properties")
+    if not isinstance(properties, list) or len(properties) != len(expected_properties):
+        add(
+            blockers,
+            "snapshot_property_count_mismatch",
+            path=str(snapshot_path),
+            expected=len(expected_properties),
+            value=len(properties) if isinstance(properties, list) else None,
+        )
+        return
+
+    for index, (prop, expected_prop) in enumerate(zip(properties, expected_properties, strict=True)):
+        prop_path = f"{snapshot_path}#properties[{index}]"
+        if not isinstance(prop, dict):
+            add(blockers, "snapshot_property_not_object", path=prop_path)
+            continue
+        expected_base = {
+            "depth": index,
+            "array_dim": 1,
+            "name": expected_prop["name"],
+            "class_name": expected_prop["class_name"],
+            "offset_internal": expected_prop["offset_internal"],
+            "element_size": expected_prop["element_size"],
+            "membership_status": "candidate-uobject",
+            "class_membership_status": "candidate-uobject",
+            "outer_membership_status": "candidate-uobject",
+            "status": "candidate",
+        }
+        for key, expected_value in expected_base.items():
+            if prop.get(key) != expected_value:
+                add(blockers, "snapshot_property_shape_mismatch", path=prop_path, key=key, expected=expected_value, value=prop.get(key))
+        struct_type = expected_struct_type(expected_prop)
+        if struct_type is not None and actual_struct_type(prop) != struct_type:
+            add(blockers, "snapshot_struct_type_mismatch", path=prop_path, expected=struct_type, value=actual_struct_type(prop))
+        if expected_prop["class_name"] == "BoolProperty":
+            validate_bool_shape(prop, expected_prop, blockers, prop_path)
+        if prop.get("name") not in FIELD_REDACTION_POLICY:
+            add(blockers, "snapshot_field_redaction_policy_missing", path=prop_path, field=prop.get("name"))
+
+
+def validate_readiness_snapshot_shapes(readiness: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    modules = readiness.get("modules")
+    if not isinstance(modules, list):
+        add(blockers, "readiness_modules_missing")
+        return
+    target_details: dict[str, dict[str, Any]] = {}
+    for module_index, module in enumerate(modules):
+        if not isinstance(module, dict):
+            add(blockers, "readiness_module_not_object", path=f"$.modules[{module_index}]")
+            continue
+        details = module.get("target_details")
+        if not isinstance(details, list):
+            add(blockers, "readiness_module_target_details_missing", path=f"$.modules[{module_index}]")
+            continue
+        for detail_index, detail in enumerate(details):
+            if not isinstance(detail, dict):
+                add(blockers, "readiness_target_detail_not_object", path=f"$.modules[{module_index}].target_details[{detail_index}]")
+                continue
+            target = detail.get("target")
+            if target in EXPECTED_TARGET_FILTERS:
+                if target in target_details:
+                    add(blockers, "readiness_target_detail_duplicate", target=target)
+                target_details[target] = detail
+
+    actual_targets = set(target_details)
+    if actual_targets != EXPECTED_TARGET_FILTERS:
+        add(
+            blockers,
+            "readiness_target_details_mismatch",
+            missing=sorted(EXPECTED_TARGET_FILTERS - actual_targets),
+            unexpected=sorted(actual_targets - EXPECTED_TARGET_FILTERS),
+        )
+        return
+
+    for target_filter in sorted(EXPECTED_TARGET_FILTERS):
+        detail = target_details[target_filter]
+        if detail.get("comparable") is not True:
+            add(blockers, "readiness_target_detail_comparable_mismatch", target=target_filter, expected=True, value=detail.get("comparable"))
+        if detail.get("second_source_status") != "accepted":
+            add(
+                blockers,
+                "readiness_target_detail_second_source_status_mismatch",
+                target=target_filter,
+                expected="accepted",
+                value=detail.get("second_source_status"),
+            )
+        if detail.get("block_reasons") != []:
+            add(blockers, "readiness_target_detail_block_reasons_mismatch", target=target_filter, expected=[], value=detail.get("block_reasons"))
+        path_value = detail.get("path")
+        if not isinstance(path_value, str) or not path_value:
+            add(blockers, "readiness_target_detail_path_missing", target=target_filter, value=path_value)
+            continue
+        validate_snapshot_shape(target_filter, Path(path_value), blockers)
 
 
 def validate_manifest_entry(entry: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -416,6 +788,18 @@ def scan_for_forbidden_true_ready(payload: Any, blockers: list[dict[str, Any]], 
             scan_for_forbidden_true_ready(value, blockers, f"{path}[{index}]")
 
 
+def scan_for_forbidden_true_claims(payload: Any, blockers: list[dict[str, Any]], path: str) -> None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            child_path = f"{path}.{key}"
+            if value is True and has_forbidden_true_claim(key):
+                add(blockers, "forbidden_true_claim", path=child_path, key=key)
+            scan_for_forbidden_true_claims(value, blockers, child_path)
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload):
+            scan_for_forbidden_true_claims(value, blockers, f"{path}[{index}]")
+
+
 def build_report(
     blockers: list[dict[str, Any]],
     *,
@@ -456,6 +840,31 @@ def build_report(
             "runtime_hooks": "not_claimed",
             "v1_completion": "not_claimed",
         },
+        "field_shape_contract": {
+            target: {
+                "num_parms": shape["num_parms"],
+                "parms_size": shape["parms_size"],
+                "properties": [
+                    {
+                        "name": prop["name"],
+                        "class_name": prop["class_name"],
+                        "offset_internal": prop["offset_internal"],
+                        "element_size": prop["element_size"],
+                        "struct_type": prop.get("struct_type"),
+                        "redaction": FIELD_REDACTION_POLICY[prop["name"]],
+                    }
+                    for prop in shape["properties"]
+                ],
+            }
+            for target, shape in sorted(EXPECTED_FIELD_SHAPES.items())
+        },
+        "field_redaction": {
+            "public_payload": "not_claimed",
+            "payload_exposure": "none",
+            "runtime_param_read": "not_claimed",
+            "return_override": "not_claimed",
+            "policy": FIELD_REDACTION_POLICY,
+        },
         "blockers": blockers,
     }
 
@@ -488,9 +897,12 @@ def main() -> int:
         readiness = read_json(readiness_path, blockers, "readiness")
     if readiness is not None:
         validate_readiness(readiness, blockers)
+        validate_readiness_snapshot_shapes(readiness, blockers)
         scan_for_forbidden_true_ready(readiness, blockers, "$.readiness")
+        scan_for_forbidden_true_claims(readiness, blockers, "$.readiness")
     if manifest is not None:
         scan_for_forbidden_true_ready(manifest, blockers, "$.manifest")
+        scan_for_forbidden_true_claims(manifest, blockers, "$.manifest")
 
     report = build_report(blockers, readiness_path=readiness_path, readiness_sha256=readiness_sha256)
     print(json.dumps(report, indent=2, sort_keys=True))

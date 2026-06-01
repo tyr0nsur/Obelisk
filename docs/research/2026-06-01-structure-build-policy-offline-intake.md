@@ -179,3 +179,18 @@ approval for any observation, SDK consumer ABI design, and a separate decision o
 build denial/enforcement or return override can ever be exposed. Until those are resolved,
 `structure-build-policy-offline-intake` must stay out of release readiness, public SDK,
 runtime hook, enforcement, mutation, and return-override paths.
+
+## 2026-06-01 Offline Fixture Guardrail
+
+`scripts/check_structure_build_policy_offline_intake.py` now treats the referenced
+snapshot paths in the readiness report as part of the offline fixture contract. It freezes
+the three accepted targets, their `NumParms`/`ParmsSize`, property order, reflected
+property class, offset, element size, struct type where present, and candidate-only
+membership status.
+
+The checker also reports the redaction posture for every observed field. `PC`,
+`AtLocation`, `AtRotation`, `OutPlacementData`, and `PlayerViewRotation` remain redacted
+context/placement fields; scalar bools and `CurrentAllowedReason` remain layout-only; and
+`ReturnValue` remains a layout-only return candidate with no override authority. Any
+truthy claim of public payload exposure, runtime, enforcement, or return override fails
+closed.

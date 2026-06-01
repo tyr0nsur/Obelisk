@@ -201,6 +201,27 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             report["blockers"],
         )
 
+    def test_rejects_positive_reply_router_public_abi_runtime_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["public_abi_ready"] = True
+            decisions["reply_send_chat_router_claims_allowed"] = True
+            decisions["notes"] = [
+                "reply API is public and ready",
+                "send-chat is available",
+                "command router is enabled",
+                "runtime delivery is supported",
+            ]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_surface_overclaim", report["blockers"])
+        self.assertIn("positive_public_surface_claim", report["blockers"])
+
     def test_rejects_surface_promoted_before_player_identity_or_public_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

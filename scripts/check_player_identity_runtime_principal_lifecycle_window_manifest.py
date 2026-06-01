@@ -410,6 +410,41 @@ def validate_sidecar_file(
     return "approved_offline_workspace" if status.approved_offline_workspace else "unprotected_offline"
 
 
+def validate_preflight_content(
+    fields: dict[str, str],
+    manifest_path: Path,
+    blockers: list[dict[str, Any]],
+    *,
+    path_key: str,
+    expected_mode: str,
+    target: Target,
+) -> None:
+    path_text = fields.get(path_key)
+    if not path_text or not target.instance:
+        return
+    path = manifest_relative_path(path_text, manifest_path)
+    status = protected_paths.protected_path_status(
+        path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
+        return
+    expected = f"player_principal_lifecycle_preflight=ok mode={expected_mode} instance={target.instance}\n"
+    try:
+        actual = status.resolved.read_text(encoding="utf-8")
+    except OSError as exc:
+        add(blockers, f"{path_key}_unreadable", path_key, detail=str(exc))
+        return
+    if actual != expected:
+        add(
+            blockers,
+            f"{path_key}_content_mismatch",
+            path_key,
+            expected=expected.strip(),
+        )
+
+
 def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers: list[dict[str, Any]]) -> None:
     path_text = fields.get("request_pack_path")
     if not path_text:
@@ -575,12 +610,28 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
         path_key="preflight_pre_path",
         sha_key="preflight_pre_sha256",
     )
+    validate_preflight_content(
+        fields,
+        manifest_path,
+        blockers,
+        path_key="preflight_pre_path",
+        expected_mode="observer-window",
+        target=target,
+    )
     validate_sidecar_file(
         fields,
         manifest_path,
         blockers,
         path_key="preflight_post_path",
         sha_key="preflight_post_sha256",
+    )
+    validate_preflight_content(
+        fields,
+        manifest_path,
+        blockers,
+        path_key="preflight_post_path",
+        expected_mode="stable",
+        target=target,
     )
     validate_request_pack(fields, manifest_path, blockers)
     user_policy = validate_user_policy(fields, blockers)

@@ -11,6 +11,40 @@
   "raw_process_event_public_response_allowed": false,
   "static_thunk_orientation_public_response_allowed": false,
   "commands_replies_shortcut_public_response_allowed": false,
+  "runtime_owned_principal_permissions_gate": {
+    "planning_only": true,
+    "runtime_owned_principal_required": true,
+    "runtime_owned_permission_allow_required": true,
+    "same_principal_tuple_required": true,
+    "permission_policy_provenance_required": true,
+    "reply_send_chat_router_claims_allowed": false,
+    "public_abi_allowed": false,
+    "runtime_delivery_allowed": false,
+    "required_runtime_owned_inputs": [
+      "principal_handle",
+      "principal_generation",
+      "principal_scope_flags",
+      "server_process_epoch",
+      "permission_decision",
+      "permission_policy_epoch",
+      "policy_source_id",
+      "policy_source_generation",
+      "authority_kind",
+      "authority_generation"
+    ],
+    "forbidden_authority_sources": [
+      "plugin input",
+      "command text",
+      "operator config",
+      "reply request",
+      "send-chat request",
+      "router metadata",
+      "passive ChatMessageEvent",
+      "raw ProcessEvent",
+      "legacy CallProcessEvent",
+      "static thunk orientation"
+    ]
+  },
   "forbidden_public_contract": [
     "public CallProcessEvent response path",
     "public minimal ChatMessageEvent response path",

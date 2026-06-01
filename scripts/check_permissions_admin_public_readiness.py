@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -313,6 +314,73 @@ QUERY_READY_FALSE_KEYS = (
     "public_sdk_ready",
     "runtime_ready",
 )
+FALSE_ONLY_KEYS = frozenset(
+    (
+        "command_router_allowed",
+        "permission_cache_abi_allowed",
+        "public_abi_allowed",
+        "public_abi_ready",
+        "public_admin_mutation_allowed",
+        "public_cache_abi_allowed",
+        "public_command_reply_allowed",
+        "public_command_router_allowed",
+        "public_header_allowed",
+        "public_header_ready",
+        "public_permission_cache_allowed",
+        "public_reply_or_send_chat_abi_allowed",
+        "public_response_path_allowed",
+        "public_sdk_ready",
+        "replies_send_chat_allowed",
+        "reply_send_chat_router_claims_allowed",
+        "runtime_delivery_allowed",
+        "runtime_ready",
+        "send_chat_allowed",
+    )
+)
+NEGATIVE_CONTEXT_TOKENS = (
+    "blocker",
+    "blockers",
+    "blocked",
+    "decision_required",
+    "deny_or_unknown",
+    "exclusion",
+    "exclusions",
+    "fail_closed",
+    "forbidden",
+    "must_never_return_allow",
+    "non_claim",
+    "not_sufficient",
+    "required",
+    "required_behavior",
+    "required_exclusions",
+    "required_properties",
+    "release_guardrails",
+    "v1_sequence_gate",
+)
+NEGATED_CLAIM_RE = re.compile(
+    r"\b(blocked|cannot|deny|does\s+not|fail[s-]?closed|forbidden|must\s+not|no|not|planning|"
+    r"post-v1|require[sd]?|unresolved|until|without)\b",
+    re.IGNORECASE,
+)
+POSITIVE_CLAIM_RE = re.compile(
+    r"\b("
+    r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
+    r"permission[_ -]?cache|public\s+(?:abi|headers?|sdk)|"
+    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
+    r"runtime(?:[_ -]?delivery)?"
+    r")\b.{0,100}\b(allowed|available|delivered|enabled|established|promoted|public|ready|supported)\b",
+    re.IGNORECASE,
+)
+POSITIVE_CLAIM_REVERSED_RE = re.compile(
+    r"\b(allowed|available|delivered|enabled|established|promoted|public|ready|supported)\b"
+    r".{0,100}\b("
+    r"admin\s+mutation|command\s*/\s*chat\s+response|command[_ -]?rout(?:e|er|ing)|"
+    r"permission[_ -]?cache|public\s+(?:abi|headers?|sdk)|"
+    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
+    r"runtime(?:[_ -]?delivery)?"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -340,6 +408,39 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SystemExit(f"{path}: expected JSON object")
     return payload
+
+
+def normalized_key(key: Any) -> str:
+    return str(key).casefold().replace("-", "_").replace(" ", "_")
+
+
+def is_negative_context(trail: str) -> bool:
+    lowered = trail.casefold()
+    return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
+
+
+def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if normalized_key(key) in FALSE_ONLY_KEYS and child is not False:
+                add(blockers, "public_surface_overclaim", child_trail, field=str(key), value=child)
+            collect_overclaims(child, blockers, child_trail)
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            collect_overclaims(child, blockers, f"{trail}[{index}]")
+        return
+    if (
+        not isinstance(value, str)
+        or is_negative_context(trail)
+        or trail.endswith(".schema")
+        or trail.endswith(".surface")
+        or trail.endswith(".id")
+    ):
+        return
+    if (POSITIVE_CLAIM_RE.search(value) or POSITIVE_CLAIM_REVERSED_RE.search(value)) and not NEGATED_CLAIM_RE.search(value):
+        add(blockers, "positive_public_surface_claim", trail, value=value)
 
 
 def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -384,6 +485,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     required = payload.get("required_before_public_header")
     if not isinstance(required, list):
         add(blockers, "required_before_public_header_not_list", "$.required_before_public_header")
+        collect_overclaims(payload, blockers, "$.decisions")
         return
     ids = {item.get("id") for item in required if isinstance(item, dict)}
     missing_ids = REQUIRED_DECISION_IDS - ids
@@ -556,6 +658,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         None,
     )
     if not isinstance(fail_closed, dict):
+        collect_overclaims(payload, blockers, "$.decisions")
         return
     never_allow = fail_closed.get("must_never_return_allow_for")
     if not isinstance(never_allow, list) or not REQUIRED_FAIL_CLOSED_NEVER_ALLOW.issubset(set(never_allow)):
@@ -573,6 +676,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
             "fail_closed_deny_or_unknown_cases_missing",
             "$.required_before_public_header[fail_closed.stale_or_scope_mismatch].deny_or_unknown_conditions",
         )
+    collect_overclaims(payload, blockers, "$.decisions")
 
 
 def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -581,12 +685,14 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     surfaces = payload.get("surfaces")
     if not isinstance(surfaces, list):
         add(blockers, "surfaces_not_list", "$.surfaces")
+        collect_overclaims(payload, blockers, "$.surfaces")
         return
     by_id = {item.get("id"): item for item in surfaces if isinstance(item, dict)}
     permissions = by_id.get(SURFACE)
     identity = by_id.get(IDENTITY_SURFACE)
     if not isinstance(permissions, dict):
         add(blockers, "permissions_admin_surface_missing", "$.surfaces")
+        collect_overclaims(payload, blockers, "$.surfaces")
         return
     if not isinstance(identity, dict):
         add(blockers, "player_identity_surface_missing", "$.surfaces")
@@ -619,6 +725,7 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
                 "player_identity_public_contract_not_promoted",
                 "$.surfaces[player_identity]",
             )
+    collect_overclaims(payload, blockers, "$.surfaces")
 
 
 def iter_strings(value: Any) -> list[str]:

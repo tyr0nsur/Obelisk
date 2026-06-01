@@ -77,8 +77,12 @@ def manifest_lines(**overrides: str | None) -> list[str]:
     return [f"{key}={value}" for key, value in fields.items()]
 
 
-def request_pack_payload(fields: dict[str, str]) -> dict:
+def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     target = fields.get("target", "arkserver2/TheIsland").split("/", 1)
+    copied_log_path = Path(fields["copied_log_path"])
+    if not copied_log_path.is_absolute():
+        copied_log_path = base / copied_log_path
+    window_manifest_path = base / "window-manifest.env"
     return {
         "schema": "obelisk.player-principal-lifecycle-window-request.v1",
         "status": "candidate_only_request_pack",
@@ -95,9 +99,9 @@ def request_pack_payload(fields: dict[str, str]) -> dict:
         "final_posture": "stable",
         "user_policy": fields.get("user_policy", "no_regular_users"),
         "notice_path": "not_applicable",
-        "copied_evidence_dir": f"/servidor/ark/workspace-offline/live-validation-logs/{fields['run_id']}",
-        "copied_log_path": f"/servidor/ark/workspace-offline/live-validation-logs/{fields['run_id']}/Obelisk.log",
-        "window_manifest_path": f"/servidor/ark/workspace-offline/live-validation-logs/{fields['run_id']}/window-manifest.env",
+        "copied_evidence_dir": str(copied_log_path.parent),
+        "copied_log_path": str(copied_log_path),
+        "window_manifest_path": str(window_manifest_path),
         "observer_env_file": "observer-window.env",
         "marker_set": [
             "enable-process-event-hook",
@@ -143,7 +147,7 @@ def request_pack_payload(fields: dict[str, str]) -> dict:
 
 def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
     contents = {
-        "request_pack": json.dumps(request_pack_payload(fields), sort_keys=True) + "\n",
+        "request_pack": json.dumps(request_pack_payload(fields, base), sort_keys=True) + "\n",
         "observer_env": "\n".join(
             [
                 "OBELISK_INSTANCE_ID=arkserver2",
@@ -220,17 +224,18 @@ class WindowManifestCheckerTests(unittest.TestCase):
         workspace = Path("/servidor/ark/workspace-offline")
         if not workspace.is_dir() or not os.access(workspace, os.W_OK):
             self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
-        exact_dir = workspace / "live-validation-logs" / RUN_ID
-        exact_log = exact_dir / "Obelisk.log"
-        exact_manifest = exact_dir / "window-manifest.env"
-        exact_dir.mkdir(parents=True, exist_ok=True)
-        rewritten_lines = []
-        for line in lines:
-            if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
-                rewritten_lines.append(f"copied_log_path={exact_log}")
-            else:
-                rewritten_lines.append(line)
-        try:
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
+            root = Path(tmp)
+            exact_dir = root / "live-validation-logs" / RUN_ID
+            exact_log = exact_dir / "Obelisk.log"
+            exact_manifest = exact_dir / "window-manifest.env"
+            exact_dir.mkdir(parents=True, exist_ok=True)
+            rewritten_lines = []
+            for line in lines:
+                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                    rewritten_lines.append(f"copied_log_path={exact_log}")
+                else:
+                    rewritten_lines.append(line)
             path = exact_manifest
             fields = dict(line.split("=", 1) for line in rewritten_lines if "=" in line)
             fields = write_sidecars(path.parent, fields)
@@ -248,17 +253,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
             )
-        finally:
-            try:
-                exact_manifest.unlink()
-            except FileNotFoundError:
-                pass
-            if create_copied_log:
-                try:
-                    exact_log.unlink()
-                except FileNotFoundError:
-                    pass
 
     def test_accepts_approved_workspace_window_manifest_without_promoting_identity(self) -> None:
         result = self.run_checker_in_approved_workspace(manifest_lines())
@@ -434,25 +430,24 @@ class WindowManifestCheckerTests(unittest.TestCase):
         if not workspace.is_dir() or not os.access(workspace, os.W_OK):
             self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
         with tempfile.TemporaryDirectory(dir=workspace) as tmp:
-            alias_log = Path(tmp) / "tmp" / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            root = Path(tmp)
+            alias_log = root / "tmp" / "live-validation-logs" / RUN_ID / "Obelisk.log"
             alias_log.parent.mkdir(parents=True, exist_ok=True)
             alias_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
-            exact_manifest = workspace / "live-validation-logs" / RUN_ID / "window-manifest.env"
+            exact_manifest = root / "live-validation-logs" / RUN_ID / "window-manifest.env"
             exact_manifest.parent.mkdir(parents=True, exist_ok=True)
             exact_manifest.write_text(
                 "\n".join(manifest_lines(copied_log_path=str(alias_log))) + "\n",
                 encoding="utf-8",
             )
-            try:
-                result = subprocess.run(
-                    [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
-                    check=False,
-                    text=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-            finally:
-                exact_manifest.unlink(missing_ok=True)
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            )
 
         report = json.loads(result.stdout)
         self.assertNotEqual(result.returncode, 0)
@@ -647,6 +642,51 @@ class WindowManifestCheckerTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("request_pack_window_request_check_failed", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_preflight_sidecar_content_drift_even_with_matching_sha(self) -> None:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
+            root = Path(tmp)
+            exact_dir = root / "live-validation-logs" / RUN_ID
+            exact_log = exact_dir / "Obelisk.log"
+            exact_manifest = exact_dir / "window-manifest.env"
+            exact_dir.mkdir(parents=True, exist_ok=True)
+            lines = []
+            for line in manifest_lines():
+                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                    lines.append(f"copied_log_path={exact_log}")
+                else:
+                    lines.append(line)
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            fields = write_sidecars(exact_manifest.parent, fields)
+            preflight_pre = Path(fields["preflight_pre_path"])
+            if not preflight_pre.is_absolute():
+                preflight_pre = exact_manifest.parent / preflight_pre
+            preflight_pre.write_text(
+                "player_principal_lifecycle_preflight=ok mode=observer-window instance=other\n",
+                encoding="utf-8",
+            )
+            fields["preflight_pre_sha256"] = hashlib.sha256(preflight_pre.read_bytes()).hexdigest()
+            exact_manifest.write_text(
+                "\n".join(f"{key}={value}" for key, value in fields.items()) + "\n",
+                encoding="utf-8",
+            )
+            exact_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_content_mismatch", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_capture_outside_approved_window_and_bad_rollback_order(self) -> None:

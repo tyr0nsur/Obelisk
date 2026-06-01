@@ -117,6 +117,34 @@ REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
         "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
     )
 )
+REQUIRED_RUNTIME_OWNED_GATE_INPUTS = frozenset(
+    (
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "server_process_epoch",
+        "permission_decision",
+        "permission_policy_epoch",
+        "policy_source_id",
+        "policy_source_generation",
+        "authority_kind",
+        "authority_generation",
+    )
+)
+REQUIRED_RUNTIME_OWNED_FORBIDDEN_SOURCES = frozenset(
+    (
+        "plugin input",
+        "command text",
+        "operator config",
+        "reply request",
+        "send-chat request",
+        "router metadata",
+        "passive ChatMessageEvent",
+        "raw ProcessEvent",
+        "legacy CallProcessEvent",
+        "static thunk orientation",
+    )
+)
 REQUIRED_LAYOUT_RUNTIME_SDK_NOT_SUFFICIENT = frozenset(
     (
         "static thunk orientation",
@@ -509,6 +537,51 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     require_false(payload, "commands_replies_shortcut_public_response_allowed", "$.decisions", blockers)
     if payload.get("public_header_symbols_now") != []:
         add(blockers, "public_header_symbols_now_not_empty", "$.decisions.public_header_symbols_now", value=payload.get("public_header_symbols_now"))
+
+    gate = payload.get("runtime_owned_principal_permissions_gate")
+    if not isinstance(gate, dict):
+        add(blockers, "runtime_owned_principal_permissions_gate_missing", "$.decisions.runtime_owned_principal_permissions_gate")
+    else:
+        for key in (
+            "planning_only",
+            "runtime_owned_principal_required",
+            "runtime_owned_permission_allow_required",
+            "same_principal_tuple_required",
+            "permission_policy_provenance_required",
+        ):
+            if gate.get(key) is not True:
+                add(
+                    blockers,
+                    "runtime_owned_principal_permissions_gate_required_true_missing",
+                    f"$.decisions.runtime_owned_principal_permissions_gate.{key}",
+                    field=key,
+                    value=gate.get(key),
+                )
+        for key in ("reply_send_chat_router_claims_allowed", "public_abi_allowed", "runtime_delivery_allowed"):
+            if gate.get(key) is not False:
+                add(
+                    blockers,
+                    "runtime_owned_principal_permissions_gate_required_false_missing",
+                    f"$.decisions.runtime_owned_principal_permissions_gate.{key}",
+                    field=key,
+                    value=gate.get(key),
+                )
+        missing_inputs = REQUIRED_RUNTIME_OWNED_GATE_INPUTS - string_set(gate.get("required_runtime_owned_inputs"))
+        if missing_inputs:
+            add(
+                blockers,
+                "runtime_owned_principal_permissions_gate_inputs_missing",
+                "$.decisions.runtime_owned_principal_permissions_gate.required_runtime_owned_inputs",
+                missing=sorted(missing_inputs),
+            )
+        missing_sources = REQUIRED_RUNTIME_OWNED_FORBIDDEN_SOURCES - string_set(gate.get("forbidden_authority_sources"))
+        if missing_sources:
+            add(
+                blockers,
+                "runtime_owned_principal_permissions_gate_forbidden_sources_missing",
+                "$.decisions.runtime_owned_principal_permissions_gate.forbidden_authority_sources",
+                missing=sorted(missing_sources),
+            )
 
     forbidden = string_set(payload.get("forbidden_public_contract"))
     if not REQUIRED_FORBIDDEN_PUBLIC_CONTRACT.issubset(forbidden):
