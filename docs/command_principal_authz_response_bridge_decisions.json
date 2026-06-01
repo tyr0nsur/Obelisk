@@ -219,6 +219,9 @@
     "OBELISK_COMMAND_CHAT_RESPONSE_ABI_VERSION",
     "OBELISK_PERMISSION_CACHE_ABI_VERSION",
     "OBELISK_PERMISSION_QUERY_ABI_VERSION",
+    "OBELISK_PERMISSION_REASON_FLAGS",
+    "OBELISK_PERMISSION_REASON_",
+    "OBELISK_ADMIN_REASON_",
     "ObeliskCommandPrincipalAuthzResponseBridge",
     "ObeliskCommand",
     "ObeliskCommandContext",
@@ -233,6 +236,9 @@
     "ObeliskPermissionCache",
     "ObeliskPermissionQuery",
     "ObeliskPermissionDecision",
+    "ObeliskPermissionReasonFlags",
+    "ReasonFlags",
+    "reason_flags",
     "ObeliskCommandChatResponse",
     "ObeliskCommandReply",
     "ObeliskChatResponse",
@@ -258,11 +264,34 @@
     "SendChat",
     "SendChatWithOwnerToken"
   ],
+  "candidate_only_diagnostics": {
+    "authz_reason_flags": {
+      "source_surface": "obelisk.permissions_admin.v1",
+      "source_artifact": "docs/permissions_admin_query_failclosed_contract.json",
+      "diagnostic_only": true,
+      "candidate_only": true,
+      "public_header_allowed": false,
+      "public_capability_bit_allowed": false,
+      "public_abi_allowed": false,
+      "response_abi_allowed": false,
+      "command_payload_allowed": false,
+      "response_payload_allowed": false,
+      "server_validation_allowed": false,
+      "authorization_decision_source": false,
+      "changes_allow_deny_unknown": false,
+      "replaces_policy_provenance": false,
+      "permits_dispatch_or_response": false,
+      "plugin_supplied_allowed": false,
+      "command_text_supplied_allowed": false,
+      "operator_config_supplied_allowed": false
+    }
+  },
   "non_claims": [
     "This bridge does not add public header symbols.",
     "This bridge does not reserve public capability bits.",
     "This bridge does not define a response ABI.",
     "This bridge does not promote player identity, permissions/admin, command/chat response path, or commands/replies.",
+    "Candidate-only permissions/admin reason_flags are internal diagnostics only and never bridge payload, public ABI, response ABI, dispatch authority, or policy provenance.",
     "This bridge does not authorize runtime wiring, server validation, live probes, public command routing, replies, send-chat, moderation, admin mutation, storage, lookup, mutation, or return override.",
     "This bridge is a planning-only fail-closed vocabulary guardrail."
   ]

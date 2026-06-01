@@ -187,6 +187,34 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("promoted permissions/admin", flow["response request"])
         self.assertIn("command_chat_response_path are separately promoted", flow["response request"])
 
+    def test_manifest_contains_authz_reason_flags_diagnostic_containment(self) -> None:
+        payload = self.load_json(DECISIONS)
+        diagnostic = payload["candidate_only_diagnostics"]["authz_reason_flags"]
+
+        self.assertEqual("obelisk.permissions_admin.v1", diagnostic["source_surface"])
+        self.assertEqual("docs/permissions_admin_query_failclosed_contract.json", diagnostic["source_artifact"])
+        self.assertTrue(diagnostic["diagnostic_only"])
+        self.assertTrue(diagnostic["candidate_only"])
+        for key in (
+            "public_header_allowed",
+            "public_capability_bit_allowed",
+            "public_abi_allowed",
+            "response_abi_allowed",
+            "command_payload_allowed",
+            "response_payload_allowed",
+            "server_validation_allowed",
+            "authorization_decision_source",
+            "changes_allow_deny_unknown",
+            "replaces_policy_provenance",
+            "permits_dispatch_or_response",
+            "plugin_supplied_allowed",
+            "command_text_supplied_allowed",
+            "operator_config_supplied_allowed",
+        ):
+            self.assertFalse(diagnostic[key])
+        self.assertIn("reason_flags", "\n".join(payload["non_claims"]))
+        self.assertIn("dispatch authority", "\n".join(payload["non_claims"]))
+
     def test_rejects_missing_or_incomplete_bridge_ergonomics_flow(self) -> None:
         decisions = self.load_json(DECISIONS)
         decisions["bridge_ergonomics_flow"] = [
@@ -204,6 +232,34 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("bridge_ergonomics_flow_order_mismatch", report["blockers"])
         self.assertIn("bridge_ergonomics_flow_step_missing", report["blockers"])
         self.assertIn("bridge_ergonomics_flow_boundary_incomplete", report["blockers"])
+
+    def test_rejects_authz_reason_flags_as_bridge_payload_or_authority(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        diagnostic = decisions["candidate_only_diagnostics"]["authz_reason_flags"]
+        diagnostic["command_payload_allowed"] = True
+        diagnostic["authorization_decision_source"] = True
+        diagnostic["permits_dispatch_or_response"] = True
+        decisions["required_bridge_behaviors"].append("future command payload includes reason_flags for plugin diagnostics")
+        decisions["bridge_ergonomics_flow"][2]["required_boundary"] += " and reason_flags"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("authz_reason_flags_containment_field_mismatch", report["blockers"])
+        self.assertIn("authz_reason_flags_leaked_outside_diagnostic_containment", report["blockers"])
+
+    def test_rejects_missing_authz_reason_flags_diagnostic_containment(self) -> None:
+        decisions = self.load_json(DECISIONS)
+        decisions["candidate_only_diagnostics"].pop("authz_reason_flags")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("authz_reason_flags_diagnostic_containment_missing", report["blockers"])
 
     def test_rejects_bridge_public_runtime_and_abi_overclaims(self) -> None:
         decisions = self.load_json(DECISIONS)
@@ -305,6 +361,9 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
             + "#define OBELISK_API_CAPABILITY_COMMANDS (1ull << 56)\n"
             + "typedef struct ObeliskCommandPrincipalAuthzResponseBridge { uint32_t struct_size; } ObeliskCommandPrincipalAuthzResponseBridge;\n"
             + "typedef struct ObeliskPermissionCache { uint32_t struct_size; } ObeliskPermissionCache;\n"
+            + "typedef uint64_t ObeliskPermissionReasonFlags;\n"
+            + "#define OBELISK_PERMISSION_REASON_DENY 1u\n"
+            + "uint64_t reason_flags;\n"
             + "typedef void (*RegisterCommand)(uint64_t owner_token);\n"
             + "typedef void (*ReplyToCommand)(uint64_t owner_token);\n"
             + "typedef void (*GrantPermission)(uint64_t owner_token);\n"
@@ -322,6 +381,9 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("OBELISK_API_CAPABILITY_COMMANDS", detail["symbols"])
         self.assertIn("ObeliskCommandPrincipalAuthzResponseBridge", detail["symbols"])
         self.assertIn("ObeliskPermissionCache", detail["symbols"])
+        self.assertIn("ObeliskPermissionReasonFlags", detail["symbols"])
+        self.assertIn("OBELISK_PERMISSION_REASON_", detail["symbols"])
+        self.assertIn("reason_flags", detail["symbols"])
         self.assertIn("RegisterCommand", detail["symbols"])
         self.assertIn("ReplyToCommand", detail["symbols"])
         self.assertIn("GrantPermission", detail["symbols"])

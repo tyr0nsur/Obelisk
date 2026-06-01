@@ -262,6 +262,9 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "OBELISK_COMMAND_CHAT_RESPONSE_ABI_VERSION",
         "OBELISK_PERMISSION_CACHE_ABI_VERSION",
         "OBELISK_PERMISSION_QUERY_ABI_VERSION",
+        "OBELISK_PERMISSION_REASON_FLAGS",
+        "OBELISK_PERMISSION_REASON_",
+        "OBELISK_ADMIN_REASON_",
         "ObeliskCommandPrincipalAuthzResponseBridge",
         "ObeliskCommand",
         "ObeliskCommandContext",
@@ -276,6 +279,9 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "ObeliskPermissionCache",
         "ObeliskPermissionQuery",
         "ObeliskPermissionDecision",
+        "ObeliskPermissionReasonFlags",
+        "ReasonFlags",
+        "reason_flags",
         "ObeliskCommandChatResponse",
         "ObeliskCommandReply",
         "ObeliskChatResponse",
@@ -301,6 +307,41 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "SendChat",
         "SendChatWithOwnerToken",
     )
+)
+REQUIRED_AUTHZ_REASON_FLAGS_DIAGNOSTIC = {
+    "source_surface": "obelisk.permissions_admin.v1",
+    "source_artifact": "docs/permissions_admin_query_failclosed_contract.json",
+    "diagnostic_only": True,
+    "candidate_only": True,
+    "public_header_allowed": False,
+    "public_capability_bit_allowed": False,
+    "public_abi_allowed": False,
+    "response_abi_allowed": False,
+    "command_payload_allowed": False,
+    "response_payload_allowed": False,
+    "server_validation_allowed": False,
+    "authorization_decision_source": False,
+    "changes_allow_deny_unknown": False,
+    "replaces_policy_provenance": False,
+    "permits_dispatch_or_response": False,
+    "plugin_supplied_allowed": False,
+    "command_text_supplied_allowed": False,
+    "operator_config_supplied_allowed": False,
+}
+REASON_FLAG_TERMS = (
+    "authz_reason_flags",
+    "fail_closed_reason_flags",
+    "reason_flags",
+    "ReasonFlags",
+    "ObeliskPermissionReasonFlags",
+    "OBELISK_PERMISSION_REASON_FLAGS",
+    "OBELISK_PERMISSION_REASON_",
+    "OBELISK_ADMIN_REASON_",
+)
+REASON_FLAG_ALLOWED_PATH_FRAGMENTS = (
+    ".candidate_only_diagnostics.authz_reason_flags",
+    ".non_claims[",
+    ".public_header_forbidden_tokens[",
 )
 REQUIRED_SOURCE_SEMANTICS = {
     "player_identity": frozenset(
@@ -496,6 +537,26 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         add(blockers, "positive_public_or_runtime_claim", trail, value=value)
 
 
+def collect_reason_flag_terms(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if any(term in str(key) for term in REASON_FLAG_TERMS) and not is_reason_flag_allowed_path(child_trail):
+                add(blockers, "authz_reason_flags_leaked_outside_diagnostic_containment", child_trail, value=str(key))
+            collect_reason_flag_terms(child, blockers, child_trail)
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            collect_reason_flag_terms(child, blockers, f"{trail}[{index}]")
+        return
+    if isinstance(value, str) and any(term in value for term in REASON_FLAG_TERMS) and not is_reason_flag_allowed_path(trail):
+        add(blockers, "authz_reason_flags_leaked_outside_diagnostic_containment", trail, value=value)
+
+
+def is_reason_flag_allowed_path(trail: str) -> bool:
+    return any(fragment in trail for fragment in REASON_FLAG_ALLOWED_PATH_FRAGMENTS)
+
+
 def require_equal(
     mapping: dict[str, Any],
     key: str,
@@ -510,6 +571,26 @@ def require_equal(
 def require_false(mapping: dict[str, Any], key: str, label: str, blockers: list[dict[str, Any]]) -> None:
     if mapping.get(key) is not False:
         add(blockers, f"{key}_not_false", f"{label}.{key}", value=mapping.get(key))
+
+
+def validate_candidate_only_diagnostics(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    diagnostics = payload.get("candidate_only_diagnostics")
+    if not isinstance(diagnostics, dict):
+        add(blockers, "candidate_only_diagnostics_missing", "$.decisions.candidate_only_diagnostics")
+        return
+    authz = diagnostics.get("authz_reason_flags")
+    if not isinstance(authz, dict):
+        add(blockers, "authz_reason_flags_diagnostic_containment_missing", "$.decisions.candidate_only_diagnostics.authz_reason_flags")
+        return
+    for key, expected in REQUIRED_AUTHZ_REASON_FLAGS_DIAGNOSTIC.items():
+        if authz.get(key) != expected:
+            add(
+                blockers,
+                "authz_reason_flags_containment_field_mismatch",
+                f"$.decisions.candidate_only_diagnostics.authz_reason_flags.{key}",
+                expected=expected,
+                value=authz.get(key),
+            )
 
 
 def validate_bridge_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -628,6 +709,8 @@ def validate_bridge_decisions(payload: dict[str, Any], blockers: list[dict[str, 
             "$.decisions.public_header_forbidden_tokens",
             missing=sorted(missing_tokens),
         )
+    validate_candidate_only_diagnostics(payload, blockers)
+    collect_reason_flag_terms(payload, blockers, "$.decisions")
 
     collect_overclaims(payload, blockers, "$.decisions")
 
@@ -693,9 +776,15 @@ def validate_public_header(path: Path, forbidden_tokens: set[str], blockers: lis
     except OSError as exc:
         add(blockers, "public_header_unreadable", "$.public_header", path=str(path), detail=str(exc))
         return
-    observed = sorted(token for token in forbidden_tokens if re.search(rf"\b{re.escape(token)}\b", header))
+    observed = sorted(token for token in forbidden_tokens if public_header_has_token(header, token))
     if observed:
         add(blockers, "public_header_forbidden_symbols_present", "$.public_header", symbols=observed)
+
+
+def public_header_has_token(header: str, token: str) -> bool:
+    if token.endswith("_"):
+        return re.search(rf"\b{re.escape(token)}", header) is not None
+    return re.search(rf"\b{re.escape(token)}\b", header) is not None
 
 
 def build_report(
