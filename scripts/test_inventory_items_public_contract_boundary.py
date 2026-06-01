@@ -51,12 +51,16 @@ PUBLIC_JSON_ALLOW_NEGATIVE_KEYS = {
     "v1_decision_contract",
 }
 RAW_INVENTORY_ITEM_IDENTIFIERS = {
+    "InventoryComp",
     "ItemId",
     "ItemID1",
     "AdditionalData",
     "ItemNetID",
     "ObeliskItemId",
     "ObeliskInventoryId",
+    "anActor",
+    "inventory_comp",
+    "an_actor",
     "item_id",
     "inventory_id",
     "additional_data",

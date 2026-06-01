@@ -55,8 +55,10 @@ EXPECTED_PARAM_BOUNDARY = {
 }
 PUBLIC_CONTRACT_KEYS = ("public_contract", "payload_contract")
 FORBIDDEN_PUBLIC_CONTRACT_TOKENS = (
+    "InventoryComp",
     "ItemId",
     "ItemID1",
+    "anActor",
     "AdditionalData",
     "ServerRequestInventoryUseItem",
     "ServerRequestInventoryUseItemWithActor",
@@ -511,7 +513,7 @@ def build_check(snapshot_root: Path, public_sdk_surfaces: Path) -> dict[str, Any
         "non_claims": [
             "fixture-only redacted signature boundary; no core, runtime, or server path evidence",
             "does not promote Inventory SDK, mutation, lookup, ResourceHandle, or return override",
-            "ItemId, ItemID1, and AdditionalData do not cross public_contract or payload_contract",
+            "InventoryComp, anActor, ItemId, ItemID1, and AdditionalData do not cross public_contract or payload_contract",
         ],
     }
 

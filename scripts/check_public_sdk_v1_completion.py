@@ -419,20 +419,20 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
             r"RemoveItem|GrantItem|InventoryMutation|ItemMutation|Kit|Kits|Reward|Rewards|"
             r"Engram|Progression|ResourceHandle|InventoryComp|InventoryID|InventoryId|"
             r"ItemID|ItemId|ItemNetId|ItemNetID|ItemStack|ItemStackID|ItemStackId|"
-            r"CraftBlueprint|AdditionalData)"
+            r"CraftBlueprint|AdditionalData|AnActor|anActor)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:INVENTORY_SDK|ITEMS_SDK|INVENTORY_LOOKUP|"
             r"ITEM_LOOKUP|ITEM_HANDLE|GIVE_ITEM|REMOVE_ITEM|GRANT_ITEM|INVENTORY_MUTATION|"
             r"ITEM_MUTATION|KIT|KITS|REWARD|REWARDS|ENGRAM|PROGRESSION|"
             r"RESOURCE_HANDLE|INVENTORY_COMP|INVENTORY_ID|ITEM_ID|ITEM_NET_ID|"
-            r"ITEM_STACK|ITEM_STACK_ID|CRAFT_BLUEPRINT|ADDITIONAL_DATA)[A-Z0-9_]*$"
+            r"ITEM_STACK|ITEM_STACK_ID|CRAFT_BLUEPRINT|ADDITIONAL_DATA|AN_ACTOR)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:inventory_sdk|items_sdk|inventory_lookup|item_lookup|item_handle|"
             r"give_item|remove_item|grant_item|inventory_mutation|item_mutation|kits?|"
             r"rewards?|engram|progression|resource_handle|inventory_comp|item_net_id|"
-            r"inventory_id|item_id|item_stack|item_stack_id|craft_blueprint|additional_data)(?:_|$)"
+            r"inventory_id|item_id|item_stack|item_stack_id|craft_blueprint|additional_data|an_actor)(?:_|$)"
         ),
     ),
     "obelisk.object_identity_resource_handle.v1": (
