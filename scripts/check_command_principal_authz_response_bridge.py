@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -476,7 +478,12 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **details: Any)
 
 def load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        reject_symlink_component(path, label)
+        resolved = reject_protected_input_path(path, label)
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", f"$.{label}", path=str(path), detail=str(exc))
+        return None
     except OSError as exc:
         add(blockers, f"{label}_unreadable", f"$.{label}", path=str(path), detail=str(exc))
         return None

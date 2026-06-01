@@ -629,6 +629,29 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("response_path_report_promotion_ready_not_false", report["blockers"])
         self.assertIn("public_surface_overclaim", report["blockers"])
 
+    def test_rejects_json_input_under_protected_server_root(self) -> None:
+        result = self.run_checker(
+            "--decisions",
+            "/servidor/ark/commands_replies_public_contract_decisions.json",
+            check=False,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
+    def test_rejects_json_input_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path = Path(temp_dir) / "decisions.json"
+            decisions_path.write_text(json.dumps(self.load_decisions()), encoding="utf-8")
+            link_path = Path(temp_dir) / "decisions-link.json"
+            link_path.symlink_to(decisions_path)
+            result = self.run_checker("--decisions", str(link_path), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

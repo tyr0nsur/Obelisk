@@ -440,6 +440,29 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("missing policy_epoch provenance fails closed", detail["missing"])
         self.assertIn("rate limit exceeded", detail["missing"])
 
+    def test_rejects_json_input_under_protected_server_root(self) -> None:
+        result = self.run_checker(
+            "--decisions",
+            "/servidor/ark/command_principal_authz_response_bridge_decisions.json",
+            check=False,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
+    def test_rejects_json_input_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path = Path(temp_dir) / "decisions.json"
+            decisions_path.write_text(json.dumps(self.load_json(DECISIONS)), encoding="utf-8")
+            link_path = Path(temp_dir) / "decisions-link.json"
+            link_path.symlink_to(decisions_path)
+            result = self.run_checker("--decisions", str(link_path), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()
