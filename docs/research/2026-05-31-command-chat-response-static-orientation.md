@@ -122,3 +122,52 @@ same three target snapshots with distinct `artifact_sha256`, but comparison stil
 blocker, not a layout blocker. The next extraction should use distinct capture/pack ids or
 a manifest path whose generated snapshots carry distinct evidence identity before it is
 cited as second-source planning evidence.
+
+## Distinct Second-Source Planning Evidence
+
+On 2026-06-01 the three focal response-path snapshots were regenerated from two durable
+offline core roots with distinct evidence identities:
+
+- root:
+  `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
+- base snapshots:
+  `base-snapshots/*.snapshot.json`
+- candidate snapshots:
+  `vanilla-gdb-snapshots/*.snapshot.json`
+- manifest:
+  `manifest.json`
+- checksums:
+  `SHA256SUMS`
+- readiness report:
+  `command-chat-response-route-planning-readiness.json`
+
+The base evidence uses core artifact SHA256
+`62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78` with
+`capture_id=second-source-arkserver2-TheIsland-20260529T011227Z` and
+`evidence_pack_id=command-chat-response-second-source-evidence-pack`.
+The candidate evidence uses core artifact SHA256
+`56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb` with
+`capture_id=vanilla-gdb-arkserver2-TheIsland-20260529T012853Z` and
+`evidence_pack_id=command-chat-response-vanilla-gdb-evidence-pack`.
+
+Validation:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root /servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601/base-snapshots \
+  --candidate-root /servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601/vanilla-gdb-snapshots \
+  --target-set command-chat-response-route-planning \
+  --readiness-report \
+  --planning-layout-intake \
+  --json
+```
+
+The report has `targets=3`, `second_source_accepted=3`,
+`second_source_inconclusive=0`, `planning_layout_gate.ready=true`,
+`ready_scope=planning_only`, `promotion_ready=false`, `public_sdk_ready=false`, and
+`runtime_ready=false`.
+
+This closes the evidence-identity blocker for command/chat response route planning. It
+still does not promote command/chat response path, replies, send-chat, broadcast,
+moderation, command router, identity, permissions, raw `FString` access, mutation, return
+override, runtime hooks, public SDK readiness, or v1 completion.

@@ -359,12 +359,15 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-31-command-chat-response-static-orientation.md` and
   `docs/research/2026-05-31-command-chat-response-thunk-orientation.md`.
   The repo fixture root still reports `missing_base_snapshot=3` for
-  `command-chat-response-route-planning`. A 2026-06-01 `/tmp` focal extraction from the
-  reviewed offline inventory produced comparable candidate snapshots, but self-comparison
-  remains `second_source_inconclusive=3`. A vanilla-gdb `/tmp` extraction has distinct
-  `artifact_sha256` but still collides on generic `capture_id=core` and
-  `evidence_pack_id=core-evidence-pack`; the next offline step is distinct evidence
-  identity plus a non-protected second-source root, not ABI/runtime wiring.
+  `command-chat-response-route-planning`. The durable offline root
+  `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
+  now preserves base and vanilla-gdb focal snapshots with distinct evidence identity,
+  `manifest.json`, `SHA256SUMS`, and
+  `command-chat-response-route-planning-readiness.json`. Planning-layout comparison
+  reports `targets=3`, `second_source_accepted=3`, `second_source_inconclusive=0`,
+  `planning_layout_gate.ready=true`, `promotion_ready=false`, `public_sdk_ready=false`,
+  and `runtime_ready=false`. This closes response-route planning evidence identity only;
+  it is not ABI/runtime wiring.
 - Mission copied-bool is the selected v0.2 internal hardening lane only. Keep it
   internal/test-only and default-off; it does not promote a Mission SDK, runtime observer,
   public callback ABI, authority, identity, mutation, return override, or v1 completion.
