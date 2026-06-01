@@ -269,6 +269,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_header_ready",
         "public_headers_ready",
         "public_response_path_allowed",
+        "public_reply_abi_allowed",
         "public_reply_api",
         "generic_chat_routing_public_response_allowed",
         "minimal_chat_message_event_public_response_allowed",
@@ -277,7 +278,9 @@ FALSE_ONLY_KEYS = frozenset(
         "commands_replies_shortcut_public_response_allowed",
         "public_response_path_ready",
         "public_sdk_ready",
+        "public_send_chat_abi_allowed",
         "public_send_chat_api",
+        "reply_allowed",
         "reply_api",
         "reply_api_allowed",
         "reply_abi_allowed",
@@ -286,6 +289,7 @@ FALSE_ONLY_KEYS = frozenset(
         "runtime_delivery_allowed",
         "runtime_readiness_allowed",
         "runtime_ready",
+        "send_chat_allowed",
         "send_chat_api",
         "send_chat_api_allowed",
     )
@@ -306,10 +310,10 @@ NEGATIVE_CONTEXT_TOKENS = (
 POSITIVE_SURFACE_RE = re.compile(
     r"\b("
     r"public\s+headers?|"
-    r"repl(?:y|ies)(?:\s+(?:api|path|request))?|send[- ]?chat(?:\s+(?:api|path|request))?|"
-    r"command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
+    r"repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
+    r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
-    r")\b.{0,80}\b(allowed|available|enabled|established|promoted|public|ready)\b",
+    r")\b.{0,80}\b(allowed|available|enabled|established|live|operational|promoted|public|ready)\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(

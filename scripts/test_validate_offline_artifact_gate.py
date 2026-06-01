@@ -1216,7 +1216,11 @@ def structure_build_policy_offline_attestation_manifest() -> dict:
         "public_sdk_ready": False,
         "runtime_ready": False,
         "enforcement_ready": False,
+        "expected_status": gate.STRUCTURE_BUILD_POLICY_EXPECTED_STATUS,
+        "expected_totals": dict(gate.STRUCTURE_BUILD_POLICY_EXPECTED_TOTALS),
+        "readiness_path": "/tmp/obelisk-structure-build-policy-readiness.json",
         "readiness_sha256": gate.STRUCTURE_BUILD_POLICY_READINESS_SHA256,
+        "non_claim": gate.STRUCTURE_BUILD_POLICY_EXPECTED_NON_CLAIM,
         "readiness_flags": {
             "promotion_ready": False,
             "public_sdk_ready": False,
@@ -1234,6 +1238,32 @@ def structure_build_policy_offline_attestation_manifest() -> dict:
             "runtime_hooks": "not_claimed",
             "v1_completion": "not_claimed",
         },
+        "field_shape_contract": {
+            target: {
+                "num_parms": len(fields),
+                "parms_size": 1,
+                "properties": [
+                    {
+                        "name": field,
+                        "class_name": "ObjectProperty" if field == "PC" else "IntProperty",
+                        "offset_internal": index,
+                        "element_size": 1,
+                        "struct_type": None,
+                        "redaction": gate.STRUCTURE_BUILD_POLICY_FIELD_REDACTION_POLICY[field],
+                    }
+                    for index, field in enumerate(fields)
+                ],
+            }
+            for target, fields in gate.STRUCTURE_BUILD_POLICY_EXPECTED_TARGETS.items()
+        },
+        "field_redaction": {
+            "public_payload": "not_claimed",
+            "payload_exposure": "none",
+            "runtime_param_read": "not_claimed",
+            "return_override": "not_claimed",
+            "policy": dict(gate.STRUCTURE_BUILD_POLICY_FIELD_REDACTION_POLICY),
+        },
+        "blockers": [],
     }
     return {
         "schema": gate.STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA,
@@ -6941,6 +6971,35 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual("accepted", result["status"])
         self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_build_policy_check_missing_real_checker_output_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-check.json"
+            payload = structure_build_policy_offline_attestation_manifest()["checker_report"]
+            for key in (
+                "blockers",
+                "field_shape_contract",
+                "field_redaction",
+                "expected_totals",
+                "expected_status",
+                "readiness_path",
+                "non_claim",
+            ):
+                del payload[key]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_build_policy_check_blockers_not_empty", reasons)
+        self.assertIn("structure_build_policy_check_field_shape_contract_missing", reasons)
+        self.assertIn("structure_build_policy_check_field_redaction_missing", reasons)
+        self.assertIn("structure_build_policy_check_expected_totals_mismatch", reasons)
+        self.assertIn("structure_build_policy_check_expected_status_mismatch", reasons)
+        self.assertIn("structure_build_policy_check_readiness_path_missing", reasons)
+        self.assertIn("structure_build_policy_check_non_claim_mismatch", reasons)
 
     def test_blocks_structure_build_policy_offline_intake_check_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

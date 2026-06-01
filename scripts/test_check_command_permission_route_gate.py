@@ -281,9 +281,11 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "valid": True,
                 "nested": {
                     "public_reply_abi_allowed": True,
-                    "public_send_chat_abi_allowed": True,
+                    "public_send_chat_abi_allowed": "ready",
+                    "reply_allowed": 1,
+                    "send_chat_allowed": "true",
                     "reply_send_chat_router_claims_allowed": True,
-                    "public_abi_allowed": True,
+                    "public_abi_allowed": "ready",
                     "public-reply-api": True,
                     "publicSendChatApi": True,
                     "permissions_admin_ready": True,
@@ -292,6 +294,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "command routing is public and ready",
                         "permissions/admin is public and ready",
                         "replies API is public and ready",
+                        "command response path is live",
+                        "reply endpoint is live",
+                        "send chat API is operational",
                     ],
                 },
             }
@@ -311,6 +316,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertIn("nested.public_reply_abi_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.public_send_chat_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.reply_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.send_chat_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.reply_send_chat_router_claims_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.public_abi_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.public-reply-api", result["public_or_runtime_claims"])
@@ -320,6 +327,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.notes[1]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[2]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[3]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[4]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[5]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[6]:positive_text_claim", result["public_or_runtime_claims"])
 
 
 if __name__ == "__main__":

@@ -664,6 +664,55 @@ STRUCTURE_AGGREGATE_FORBIDDEN_CLAIM_PHRASES = {
 }
 STRUCTURE_BUILD_POLICY_TARGET_SET = "structure-build-policy-offline-intake"
 STRUCTURE_BUILD_POLICY_READINESS_SHA256 = "d9742e5ea97dbd1d6f12e40154c5891c72184126e90a29a2c57b43a507a38072"
+STRUCTURE_BUILD_POLICY_EXPECTED_STATUS = "planning-layout-second-source-accepted"
+STRUCTURE_BUILD_POLICY_EXPECTED_TOTALS = {
+    "targets": 3,
+    "comparable": 3,
+    "second_source_accepted": 3,
+    "blocked": 0,
+}
+STRUCTURE_BUILD_POLICY_EXPECTED_NON_CLAIM = (
+    "planning-layout evidence only; does not promote StructureEvents, Structure SDK, "
+    "build-policy SDK, enforcement, identity, lookup, mutation, return override, "
+    "runtime hooks, or v1 completion"
+)
+STRUCTURE_BUILD_POLICY_EXPECTED_TARGETS = {
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": (
+        "PC",
+        "AtLocation",
+        "AtRotation",
+        "OutPlacementData",
+        "bDontAdjustForMaxRange",
+        "PlayerViewRotation",
+        "bFinalPlacement",
+        "ReturnValue",
+    ),
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild": (
+        "OutPlacementData",
+        "CurrentAllowedReason",
+        "ReturnValue",
+    ),
+    "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx": (
+        "OutPlacementData",
+        "CurrentAllowedReason",
+        "PC",
+        "bFinalPlacement",
+        "bChoosingRotation",
+        "ReturnValue",
+    ),
+}
+STRUCTURE_BUILD_POLICY_FIELD_REDACTION_POLICY = {
+    "PC": "redacted_player_controller_context",
+    "AtLocation": "redacted_location_context",
+    "AtRotation": "redacted_rotation_context",
+    "OutPlacementData": "redacted_placement_struct",
+    "PlayerViewRotation": "redacted_player_view_context",
+    "CurrentAllowedReason": "layout_only_reason_code_not_public_payload",
+    "bDontAdjustForMaxRange": "layout_only_bool_not_public_payload",
+    "bFinalPlacement": "layout_only_bool_not_public_payload",
+    "bChoosingRotation": "layout_only_bool_not_public_payload",
+    "ReturnValue": "layout_only_return_candidate_no_override",
+}
 REQUIRED_STRUCTURE_BUILD_POLICY_REDACTED_FIELDS = {
     "PC",
     "OutPlacementData",
@@ -6289,6 +6338,16 @@ def validate_structure_build_policy_offline_intake_check_manifest(payload: dict[
         blockers.append({"reason": "structure_build_policy_check_not_planning_only", "label": f"{label}:$.planning_only"})
     if payload.get("readiness_sha256") != STRUCTURE_BUILD_POLICY_READINESS_SHA256:
         blockers.append({"reason": "structure_build_policy_check_readiness_sha256_mismatch", "label": f"{label}:$.readiness_sha256"})
+    if payload.get("expected_status") != STRUCTURE_BUILD_POLICY_EXPECTED_STATUS:
+        blockers.append({"reason": "structure_build_policy_check_expected_status_mismatch", "label": f"{label}:$.expected_status"})
+    if payload.get("expected_totals") != STRUCTURE_BUILD_POLICY_EXPECTED_TOTALS:
+        blockers.append({"reason": "structure_build_policy_check_expected_totals_mismatch", "label": f"{label}:$.expected_totals"})
+    if not isinstance(payload.get("readiness_path"), str) or not payload["readiness_path"]:
+        blockers.append({"reason": "structure_build_policy_check_readiness_path_missing", "label": f"{label}:$.readiness_path"})
+    if payload.get("non_claim") != STRUCTURE_BUILD_POLICY_EXPECTED_NON_CLAIM:
+        blockers.append({"reason": "structure_build_policy_check_non_claim_mismatch", "label": f"{label}:$.non_claim"})
+    if payload.get("blockers") != []:
+        blockers.append({"reason": "structure_build_policy_check_blockers_not_empty", "label": f"{label}:$.blockers"})
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
         if payload.get(key) is not False:
             blockers.append({"reason": f"structure_build_policy_check_{key}_not_false", "label": f"{label}:$.{key}"})
@@ -6316,6 +6375,47 @@ def validate_structure_build_policy_offline_intake_check_manifest(payload: dict[
         ):
             if non_claim_matrix.get(key) != "not_claimed":
                 blockers.append({"reason": "structure_build_policy_check_non_claim_matrix_claimed", "label": f"{label}:$.non_claim_matrix.{key}"})
+    field_shape_contract = payload.get("field_shape_contract")
+    if not isinstance(field_shape_contract, dict):
+        blockers.append({"reason": "structure_build_policy_check_field_shape_contract_missing", "label": f"{label}:$.field_shape_contract"})
+    else:
+        if set(field_shape_contract) != set(STRUCTURE_BUILD_POLICY_EXPECTED_TARGETS):
+            blockers.append({"reason": "structure_build_policy_check_field_shape_contract_targets_mismatch", "label": f"{label}:$.field_shape_contract"})
+        for target, expected_fields in STRUCTURE_BUILD_POLICY_EXPECTED_TARGETS.items():
+            target_contract = field_shape_contract.get(target)
+            if not isinstance(target_contract, dict):
+                blockers.append({"reason": "structure_build_policy_check_field_shape_target_missing", "label": f"{label}:$.field_shape_contract.{target}"})
+                continue
+            properties = target_contract.get("properties")
+            if not isinstance(properties, list):
+                blockers.append({"reason": "structure_build_policy_check_field_shape_properties_missing", "label": f"{label}:$.field_shape_contract.{target}.properties"})
+                continue
+            actual_fields = []
+            for index, prop in enumerate(properties):
+                prop_label = f"{label}:$.field_shape_contract.{target}.properties[{index}]"
+                if not isinstance(prop, dict):
+                    blockers.append({"reason": "structure_build_policy_check_field_shape_property_invalid", "label": prop_label})
+                    continue
+                actual_fields.append(prop.get("name"))
+                expected_redaction = STRUCTURE_BUILD_POLICY_FIELD_REDACTION_POLICY.get(str(prop.get("name")))
+                if prop.get("redaction") != expected_redaction:
+                    blockers.append({"reason": "structure_build_policy_check_field_shape_redaction_mismatch", "label": f"{prop_label}.redaction"})
+            if tuple(actual_fields) != expected_fields:
+                blockers.append({"reason": "structure_build_policy_check_field_shape_fields_mismatch", "label": f"{label}:$.field_shape_contract.{target}.properties"})
+    field_redaction = payload.get("field_redaction")
+    if not isinstance(field_redaction, dict):
+        blockers.append({"reason": "structure_build_policy_check_field_redaction_missing", "label": f"{label}:$.field_redaction"})
+    else:
+        for key, expected_value in {
+            "public_payload": "not_claimed",
+            "payload_exposure": "none",
+            "runtime_param_read": "not_claimed",
+            "return_override": "not_claimed",
+        }.items():
+            if field_redaction.get(key) != expected_value:
+                blockers.append({"reason": f"structure_build_policy_check_field_redaction_{key}_mismatch", "label": f"{label}:$.field_redaction.{key}"})
+        if field_redaction.get("policy") != STRUCTURE_BUILD_POLICY_FIELD_REDACTION_POLICY:
+            blockers.append({"reason": "structure_build_policy_check_field_redaction_policy_mismatch", "label": f"{label}:$.field_redaction.policy"})
     if mode == "promote":
         blockers.append({"reason": "promote_mode_structure_build_policy_check_planning_only", "label": label})
     for trail, _ in collect_ready_overclaims(payload):

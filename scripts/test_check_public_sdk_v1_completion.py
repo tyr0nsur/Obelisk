@@ -405,7 +405,41 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["v1_dependency_sequence"], p0_chain)
         self.assertEqual(payload["v1_sdk_progress"]["p0_chain_total"], 4)
         self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["dependency_chain_remaining_count"], 4)
+        self.assertIn(
+            "obelisk.command_chat_response_path.v1",
+            payload["v1_sdk_blocker_outcome_summary"]["dependency_chain_remaining"],
+        )
+        self.assertIn(
+            "obelisk.command_chat_response_path.v1",
+            payload["v1_sdk_report_sections"]["next_v1_work"]["critical_path"],
+        )
+        self.assertIn(
+            "obelisk.command_chat_response_path.v1",
+            payload["unpromoted_required_dependency_chain"],
+        )
         self.assertFalse(payload["v1_sdk_progress"]["stable_claim_allowed"])
+
+    def test_missing_canonical_non_p0_completion_blocker_still_counts_in_accounting(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        omitted = "obelisk.operator_ingress_storage.v1"
+        manifest["v1_sdk_completion_blockers"] = [
+            surface_id
+            for surface_id in manifest["v1_sdk_completion_blockers"]
+            if surface_id != omitted
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("canonical_v1_completion_blocker_missing", payload["blockers"])
+        self.assertIn(omitted, payload["missing_canonical_completion_blockers"])
+        self.assertEqual(payload["v1_sdk_progress"]["completion_blocker_total"], 12)
+        self.assertIn(omitted, [row["surface"] for row in payload["v1_sdk_blocker_outcomes"]])
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)
@@ -536,21 +570,24 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_reply_api": True,
                         "public_send_chat_api": True,
                         "public_reply_abi_allowed": True,
-                        "public_send_chat_abi_allowed": True,
+                        "public_send_chat_abi_allowed": "ready",
                         "public-reply-api": True,
                         "publicSendChatApi": True,
                         "reply_send_chat_router_claims_allowed": True,
-                        "public_abi_allowed": True,
+                        "public_abi_allowed": "ready",
                         "permissions_admin_ready": True,
                         "permissions_ready": True,
                         "permission_ready": True,
-                        "reply_allowed": True,
-                        "send_chat_allowed": True,
+                        "reply_allowed": 1,
+                        "send_chat_allowed": "true",
                         "notes": [
                             "send-chat ABI is public and ready",
                             "command routing is public and ready",
                             "permissions/admin is public and ready",
                             "replies API is public and ready",
+                            "command response path is live",
+                            "reply endpoint is live",
+                            "send chat API is operational",
                         ],
                     }
                 ],
@@ -576,6 +613,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[1]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[2]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[3]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[4]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[5]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[6]:positive_text_claim", claims)
 
     def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -596,10 +636,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "        'name': 'commands_replies_public_readiness',\n"
                 "        'public_command_router_allowed': True,\n"
                 "        'public_reply_or_send_chat_abi_allowed': True,\n"
-                "        'public_reply_api': True,\n"
-                "        'public_send_chat_api': True,\n"
-                "        'reply_allowed': True,\n"
-                "        'send_chat_allowed': True\n"
+                "        'public_reply_api': 'ready',\n"
+                "        'public_send_chat_api': 'ready',\n"
+                "        'reply_allowed': 1,\n"
+                "        'send_chat_allowed': 'true'\n"
                 "    }],\n"
                 "    'blockers': []\n"
                 "} ))\n",

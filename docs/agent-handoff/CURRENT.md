@@ -116,7 +116,9 @@ This file is an active routing table only. Durable evidence belongs in
   checker rejects protected/symlink snapshot paths, non-sibling `base/`/`candidate/`
   roots, raw address leaks, and value-bearing keys on redacted/layout-only fields.
   `obelisk.structure-build-policy-offline-attestation.v1` is a consume-only artifact-gate
-  schema for this planning evidence; promote mode remains blocked.
+  schema for this planning evidence; it must include the checker report schema
+  `obelisk.structure-build-policy-offline-intake-check.v1` and promote mode remains
+  blocked.
 - ResourceHandle/public GObjects remain blocked. old flag-policy artifact is obsolete;
   durable rich-provenance refresh is preserved; Consume mode accepts it and promote mode
   stays blocked; post-callback rejection contract is preserved as candidate-only; first

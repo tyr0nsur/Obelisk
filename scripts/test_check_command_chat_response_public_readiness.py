@@ -356,6 +356,9 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         readiness["generic_chat_claim"] = "generic chat routing is public and ready"
         readiness["send_chat_claim"] = "send-chat is available"
         readiness["router_claim"] = "router is supported"
+        readiness["live_claim"] = "command response path is live"
+        readiness["endpoint_claim"] = "reply endpoint is live"
+        readiness["operational_claim"] = "send chat API is operational"
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
             result = self.run_checker(
@@ -476,6 +479,10 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "player_identity_ready",
             "permissions_ready",
             "public_header_ready",
+            "public_reply_abi_allowed",
+            "public_send_chat_abi_allowed",
+            "reply_allowed",
+            "send_chat_allowed",
         ):
             with self.subTest(field=field):
                 readiness = self.make_readiness()

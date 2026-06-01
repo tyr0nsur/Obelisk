@@ -219,10 +219,11 @@ priorities, and do not use history files as the active source of truth.
   structure identity surface.
 - Structure build-policy offline intake has a consume-only artifact-gate schema:
   `obelisk.structure-build-policy-offline-attestation.v1`. It pins accepted planning
-  readiness, requires distinct base/candidate snapshot identities and redaction
-  boundaries, keeps public/runtime/enforcement flags false, and blocks promote mode. It is
-  not Structure SDK, enforcement, identity/lookup, mutation, return override, runtime
-  readiness, or v1 completion evidence.
+  readiness, requires the embedded `obelisk.structure-build-policy-offline-intake-check.v1`
+  checker report, distinct base/candidate snapshot identities, and redaction boundaries,
+  keeps public/runtime/enforcement flags false, and blocks promote mode. It is not
+  Structure SDK, enforcement, identity/lookup, mutation, return override, runtime readiness,
+  or v1 completion evidence.
 - Public `GameplayPolicyEvent` and `ChatMessageEvent` plugin callbacks are caught at the
   bridge to prevent C++ plugin exceptions from escaping into dispatcher/hook code.
 - Release scope wording separates copied RC plugin events from debug-gated raw

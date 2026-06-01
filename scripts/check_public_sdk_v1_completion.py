@@ -59,6 +59,20 @@ CANONICAL_V1_COMPLETION_BLOCKERS = {
     "obelisk.operator_ingress_storage.v1",
     "obelisk.gameplay_tick_callbacks.v1",
 }
+CANONICAL_V1_COMPLETION_BLOCKER_ORDER = (
+    "obelisk.player_identity.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1",
+    "obelisk.commands_replies.v1",
+    "obelisk.inventory_items_mutation.v1",
+    "obelisk.lifecycle_ops_recovery.v1",
+    "obelisk.structure_census.v1",
+    "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.object_identity_resource_handle.v1",
+    "obelisk.player_services_economy_mobility.v1",
+    "obelisk.operator_ingress_storage.v1",
+    "obelisk.gameplay_tick_callbacks.v1",
+)
 CANONICAL_V1_DEPENDENCY_SEQUENCE = (
     "obelisk.player_identity.v1",
     "obelisk.permissions_admin.v1",
@@ -154,17 +168,17 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"\b(?:"
     r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
-    r"send[-\s]?chat\s+abi|command\s+routing|permissions/admin|replies\s+api|"
+    r"send[-\s]?chat\s+abi|reply\s+endpoint|command\s+routing|permissions/admin|replies\s+api|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
     r")\b.{0,80}\b(?:is|are|now|becomes?|became)?\s*"
-    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked)\b",
+    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b",
     re.IGNORECASE,
 )
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
-    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked)\b"
+    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b"
     r".{0,80}\b(?:"
-    r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
+    r"reply\s+api|reply\s+abi|reply\s+endpoint|send[-\s]?chat\s+api|command\s+router|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
     r")\b",
@@ -789,6 +803,28 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
         return separated.casefold().replace("-", "_").replace(" ", "_")
 
+    def is_positive_claim_value(value: Any) -> bool:
+        if value is True:
+            return True
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return value != 0
+        if isinstance(value, str):
+            return normalized_key(value) in {
+                "allowed",
+                "available",
+                "enabled",
+                "live",
+                "operational",
+                "promoted",
+                "public",
+                "ready",
+                "supported",
+                "true",
+                "unlocked",
+                "yes",
+            }
+        return False
+
     def positive_text_claim(text: str) -> bool:
         if not (
             COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE.search(text)
@@ -813,7 +849,7 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         if isinstance(value, dict):
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
-                if normalized_key(key) in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS and item is True:
+                if normalized_key(key) in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS and is_positive_claim_value(item):
                     claims.append(item_path)
                 if key == "public_or_runtime_claims" and isinstance(item, list):
                     for claim in item:
@@ -2484,9 +2520,17 @@ def build_report(
         for surface_id, status in completion_blocker_statuses.items()
         if status not in {"promoted", "post-v1", "excluded"}
     )
-    completion_blocker_total = len(unique_completion_blockers)
+    canonical_completion_blockers = [
+        surface_id
+        for surface_id in CANONICAL_V1_COMPLETION_BLOCKER_ORDER
+        if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS
+    ]
+    completion_blockers_for_accounting = list(
+        dict.fromkeys([*unique_completion_blockers, *canonical_completion_blockers])
+    )
+    completion_blocker_total = len(completion_blockers_for_accounting)
     blocker_outcome_rows = completion_blocker_outcome_rows(
-        unique_completion_blockers,
+        completion_blockers_for_accounting,
         surfaces_by_id,
         post_v1_or_excluded,
         release_statement_text,

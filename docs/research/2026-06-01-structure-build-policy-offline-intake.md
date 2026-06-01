@@ -180,6 +180,14 @@ build denial/enforcement or return override can ever be exposed. Until those are
 `structure-build-policy-offline-intake` must stay out of release readiness, public SDK,
 runtime hook, enforcement, mutation, and return-override paths.
 
+The consume-only artifact gate now also accepts
+`obelisk.structure-build-policy-offline-attestation.v1`, but that attestation is not
+self-sufficient. It must include the embedded
+`obelisk.structure-build-policy-offline-intake-check.v1` checker report with the pinned
+readiness SHA and non-promotional flags. A standalone attestation without the checker
+report is blocked so the planning evidence cannot be fabricated by copying only the hash
+and boundary fields.
+
 ## 2026-06-01 Offline Fixture Guardrail
 
 `scripts/check_structure_build_policy_offline_intake.py` now treats the referenced

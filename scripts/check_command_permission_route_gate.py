@@ -72,12 +72,38 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
 }
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_TERMS = (
     "command routing is public and ready",
+    "command response path is live",
     "permissions/admin is public and ready",
+    "reply endpoint is live",
     "replies api is public and ready",
     "reply api is public and ready",
+    "send chat api is operational",
     "send-chat abi is public and ready",
     "send chat abi is public and ready",
 )
+
+
+def is_positive_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        return value.casefold().replace("-", "_").replace(" ", "_") in {
+            "allowed",
+            "available",
+            "enabled",
+            "live",
+            "operational",
+            "promoted",
+            "public",
+            "ready",
+            "supported",
+            "true",
+            "unlocked",
+            "yes",
+        }
+    return False
 
 
 def parse_args() -> argparse.Namespace:
@@ -195,7 +221,7 @@ def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]
     if isinstance(value, dict):
         for key, item in value.items():
             item_path = f"{path}.{key}" if path else str(key)
-            if normalized_key(key) in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and item is True:
+            if normalized_key(key) in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and is_positive_claim_value(item):
                 claims.append(item_path)
             if key == "public_or_runtime_claims" and isinstance(item, list):
                 for claim in item:
