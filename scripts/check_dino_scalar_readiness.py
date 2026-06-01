@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import build_redacted_ufunction_signatures as signature_builder
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -64,6 +65,7 @@ BLOCKED_PUBLIC_PATHS = {
 }
 SOURCE_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"}
 PUBLIC_DINO_TOKEN_RE = re.compile(r"\b(?:DinoScalar|CopiedDino|DinoReflection|DinoEvent|DinoSdk|DinoSDK)\b")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,6 +86,15 @@ def parse_args() -> argparse.Namespace:
 
 def append_blocker(blockers: list[dict[str, Any]], reason: str, **details: Any) -> None:
     blockers.append({"reason": reason, **details})
+
+
+def safe_path(path: Path, label: str, blockers: list[dict[str, Any]]) -> Path | None:
+    try:
+        reject_symlink_component(path, label)
+        return reject_protected_input_path(path, label)
+    except SystemExit as exc:
+        append_blocker(blockers, "path_rejected", label=label, path=str(path), detail=str(exc))
+        return None
 
 
 def read_text(repo_root: Path, relative: str, blockers: list[dict[str, Any]]) -> str:
@@ -277,6 +288,8 @@ def validate_signature_report(report: dict[str, Any], blockers: list[dict[str, A
         if entry.get("property_class") != "ObjectProperty" or entry.get("evidence_status") != "recognition-only-object-ref-excluded":
             append_blocker(blockers, "redacted_object_ref_shape_mismatch", excluded_field=entry.get("excluded_field"))
 
+    validate_source_snapshots(report, copied_scalars, excluded_refs, blockers)
+
     safety = preflight.get("safety_summary")
     if not isinstance(safety, dict):
         append_blocker(blockers, "safety_summary_missing")
@@ -293,6 +306,105 @@ def validate_signature_report(report: dict[str, Any], blockers: list[dict[str, A
         "pre_call_only": True,
         "return_values_excluded": True,
     }
+
+
+def validate_source_snapshots(
+    report: dict[str, Any],
+    copied_scalars: list[Any],
+    excluded_refs: list[Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    generated_from = report.get("generated_from")
+    if not isinstance(generated_from, dict):
+        append_blocker(blockers, "generated_from_missing")
+        return
+    if generated_from.get("snapshot_schema") != "obelisk.ufunction-chain.snapshot.v1":
+        append_blocker(blockers, "snapshot_schema_mismatch", value=generated_from.get("snapshot_schema"))
+
+    snapshots = generated_from.get("input_snapshots")
+    if not isinstance(snapshots, list) or len(snapshots) != len(EXPECTED_INPUT_TARGETS):
+        append_blocker(
+            blockers,
+            "input_snapshot_count_mismatch",
+            expected=len(EXPECTED_INPUT_TARGETS),
+            value=len(snapshots) if isinstance(snapshots, list) else None,
+        )
+        snapshots = [] if not isinstance(snapshots, list) else snapshots
+
+    snapshot_by_id: dict[str, dict[str, Any]] = {}
+    for index, snapshot in enumerate(snapshots):
+        if not isinstance(snapshot, dict):
+            append_blocker(blockers, "input_snapshot_not_object", index=index)
+            continue
+        snapshot_id = snapshot.get("id")
+        snapshot_sha256 = snapshot.get("sha256")
+        if not isinstance(snapshot_id, str) or not snapshot_id:
+            append_blocker(blockers, "input_snapshot_id_missing", index=index)
+            continue
+        if snapshot_id in snapshot_by_id:
+            append_blocker(blockers, "input_snapshot_duplicate_id", source_snapshot=snapshot_id)
+        snapshot_by_id[snapshot_id] = snapshot
+        if not isinstance(snapshot_sha256, str) or SHA256_RE.fullmatch(snapshot_sha256) is None:
+            append_blocker(blockers, "input_snapshot_sha256_malformed", source_snapshot=snapshot_id, value=snapshot_sha256)
+
+    target_sources: dict[str, str] = {}
+    for collection, field_key_name, label in (
+        (copied_scalars, "copied_field", "copied_scalar"),
+        (excluded_refs, "excluded_field", "excluded_object_ref"),
+    ):
+        for index, entry in enumerate(collection):
+            if not isinstance(entry, dict):
+                continue
+            field_key = entry.get(field_key_name)
+            target = entry.get("target")
+            source_snapshot = entry.get("source_snapshot")
+            source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+            if not isinstance(source_snapshot, str) or source_snapshot not in snapshot_by_id:
+                append_blocker(
+                    blockers,
+                    f"{label}_source_snapshot_unknown",
+                    field=field_key,
+                    index=index,
+                    source_snapshot=source_snapshot,
+                )
+                continue
+            if not isinstance(source_snapshot_sha256, str) or SHA256_RE.fullmatch(source_snapshot_sha256) is None:
+                append_blocker(
+                    blockers,
+                    f"{label}_source_snapshot_sha256_malformed",
+                    field=field_key,
+                    source_snapshot=source_snapshot,
+                    value=source_snapshot_sha256,
+                )
+            elif source_snapshot_sha256 != snapshot_by_id[source_snapshot].get("sha256"):
+                append_blocker(
+                    blockers,
+                    f"{label}_source_snapshot_sha256_mismatch",
+                    field=field_key,
+                    source_snapshot=source_snapshot,
+                    expected=snapshot_by_id[source_snapshot].get("sha256"),
+                    value=source_snapshot_sha256,
+                )
+            if not isinstance(target, str) or target not in EXPECTED_INPUT_TARGETS:
+                append_blocker(blockers, f"{label}_source_target_mismatch", field=field_key, target=target)
+                continue
+            prior_source = target_sources.setdefault(target, source_snapshot)
+            if prior_source != source_snapshot:
+                append_blocker(
+                    blockers,
+                    "target_source_snapshot_inconsistent",
+                    target=target,
+                    expected=prior_source,
+                    value=source_snapshot,
+                )
+
+    if set(target_sources) != EXPECTED_INPUT_TARGETS:
+        append_blocker(
+            blockers,
+            "target_source_coverage_mismatch",
+            missing=sorted(EXPECTED_INPUT_TARGETS - set(target_sources)),
+            unexpected=sorted(set(target_sources) - EXPECTED_INPUT_TARGETS),
+        )
 
 
 def blocked_public_path(relative: str) -> bool:
@@ -343,7 +455,12 @@ def build_report(repo_root_arg: Path, report_path: Path | None = None, snapshot_
     for relative in REQUIRED_SOURCE_FILES:
         if not (repo_root / relative).is_file():
             append_blocker(blockers, "required_file_missing", path=relative)
-    signature_report = load_signature_report(report_path, snapshot_root, blockers)
+    safe_report = safe_path(report_path, "--report", blockers) if report_path is not None else None
+    safe_snapshot_root = safe_path(snapshot_root, "--snapshot-root", blockers) if report_path is None else snapshot_root
+    if (report_path is not None and safe_report is None) or (report_path is None and safe_snapshot_root is None):
+        signature_report: dict[str, Any] = {}
+    else:
+        signature_report = load_signature_report(safe_report, safe_snapshot_root, blockers)
     summary = validate_signature_report(signature_report, blockers)
     source_isolation = validate_source_isolation(repo_root, blockers)
     ready = not blockers

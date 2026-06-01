@@ -197,6 +197,77 @@ class CheckDinoScalarReadinessTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in payload["blockers"]}
         self.assertIn("redacted_object_ref_coverage_mismatch", reasons)
 
+    def test_copied_scalar_source_snapshot_must_be_known(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = self.make_report()
+            report["descriptor_preflight"]["copied_scalars"][0]["source_snapshot"] = "snapshot-9999"
+            report_path = self.write_report(root, report)
+            result = self.run_checker("--report", str(report_path), check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("copied_scalar_source_snapshot_unknown", reasons)
+
+    def test_report_path_must_not_use_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_report(root, self.make_report())
+            symlink = root / "linked-report.json"
+            symlink.symlink_to(report_path)
+            result = self.run_checker("--report", str(symlink), check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("path_rejected", reasons)
+
+    def test_copied_scalar_source_snapshot_sha_must_match_generated_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = self.make_report()
+            report["descriptor_preflight"]["copied_scalars"][0]["source_snapshot_sha256"] = "0" * 64
+            report_path = self.write_report(root, report)
+            result = self.run_checker("--report", str(report_path), check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("copied_scalar_source_snapshot_sha256_mismatch", reasons)
+
+    def test_excluded_object_ref_source_snapshot_sha_must_be_well_formed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = self.make_report()
+            report["descriptor_preflight"]["excluded_object_refs"][0]["source_snapshot_sha256"] = "not-a-sha"
+            report_path = self.write_report(root, report)
+            result = self.run_checker("--report", str(report_path), check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("excluded_object_ref_source_snapshot_sha256_malformed", reasons)
+
+    def test_same_target_cannot_mix_source_snapshots(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = self.make_report()
+            snapshots = report["generated_from"]["input_snapshots"]
+            second_snapshot = snapshots[1]
+            for entry in report["descriptor_preflight"]["copied_scalars"]:
+                if entry["copied_field"] == "PrimalDinoCharacter.AddPassenger.bForcePassenger":
+                    entry["source_snapshot"] = second_snapshot["id"]
+                    entry["source_snapshot_sha256"] = second_snapshot["sha256"]
+                    break
+            report_path = self.write_report(root, report)
+            result = self.run_checker("--report", str(report_path), check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("target_source_snapshot_inconsistent", reasons)
+
     def test_detects_missing_target_set_coverage(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = self.copy_minimal_repo(Path(temp_dir))
