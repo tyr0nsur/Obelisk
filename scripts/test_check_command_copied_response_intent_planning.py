@@ -247,6 +247,31 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("permission_query_dependency_crosswalk_decision_policy_field_mismatch", report["blockers"])
 
+    def test_rejects_permission_query_crosswalk_principal_provenance_policy_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            payload["permission_query_dependency_crosswalk"]["principal_provenance_policy"][
+                "plugin_supplied_principal_tuple_allowed"
+            ] = True
+            payload["permission_query_dependency_crosswalk"]["principal_provenance_policy"][
+                "server_process_epoch_mismatch_result"
+            ] = "allow"
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker(
+                "--decisions",
+                str(decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("permission_query_dependency_crosswalk_principal_provenance_policy_mismatch", report["blockers"])
+
     def test_rejects_query_artifact_missing_crosswalk_source_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

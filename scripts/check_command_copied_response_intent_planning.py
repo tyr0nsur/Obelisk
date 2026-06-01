@@ -128,7 +128,10 @@ REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT = frozenset(
         "missing_principal_handle",
         "missing_principal_generation",
         "missing_principal_scope_flags",
+        "missing_principal_provenance",
         "principal_generation_mismatch",
+        "plugin_supplied_principal_tuple",
+        "server_process_epoch_mismatch",
         "unsupported_principal_scope_flags",
         "stale_principal",
         "scope_mismatch",
@@ -151,6 +154,7 @@ REQUIRED_INTENT_PROPERTIES = frozenset(
         "message_utf8 is not FString storage, not raw UE text, not ChatMessageEvent storage, and not a delivery request",
         "principal_handle, principal_generation, and principal_scope_flags must appear together",
         "permission allow requires policy_source_id, policy_source_generation, authority_kind, authority_generation, and permission_policy_epoch provenance",
+        "principal tuple must come from runtime-owned player identity observation, not plugin, command, or operator-config input",
         "plugin_owner_token must be nonzero and owner-scoped",
         "response_intent_handle is process-local and owner-scoped",
         "redaction_flags and audit_correlation_id are required before any future delivery contract",
@@ -164,10 +168,15 @@ REQUIRED_FAIL_CLOSED = frozenset(
         "missing principal_handle",
         "missing principal_generation",
         "missing principal_scope_flags",
+        "missing principal provenance",
         "stale principal",
         "principal_generation mismatch",
         "principal_scope_flags mismatch",
         "process mismatch",
+        "server process epoch mismatch",
+        "principal tuple supplied by plugin",
+        "principal tuple supplied by command text",
+        "principal tuple supplied by operator config",
         "identity inferred from command text",
         "identity inferred from operator config",
         "identity inferred from passive chat",
@@ -357,6 +366,29 @@ def validate_permission_query_crosswalk(payload: dict[str, Any], blockers: list[
             "permission_query_dependency_crosswalk_fail_closed_cases_missing_required",
             f"{label}.required_source_fail_closed_cases",
             missing=sorted(REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT - fail_closed),
+        )
+    principal_provenance_policy = crosswalk.get("principal_provenance_policy")
+    required_principal_provenance_policy = {
+        "principal_tuple_source": "runtime_owned_player_identity_observation",
+        "plugin_supplied_principal_tuple_allowed": False,
+        "command_supplied_principal_tuple_allowed": False,
+        "operator_config_supplied_principal_tuple_allowed": False,
+        "principal_generation_provenance_required_before_response_intent": True,
+        "principal_scope_provenance_required_before_response_intent": True,
+        "server_process_epoch_required_before_response_intent": True,
+        "server_process_epoch_mismatch_result": "deny",
+        "public_abi_field_allowed": False,
+        "runtime_delivery_allowed": False,
+    }
+    if not isinstance(principal_provenance_policy, dict):
+        add(blockers, "permission_query_dependency_crosswalk_principal_provenance_policy_missing", f"{label}.principal_provenance_policy")
+    elif principal_provenance_policy != required_principal_provenance_policy:
+        add(
+            blockers,
+            "permission_query_dependency_crosswalk_principal_provenance_policy_mismatch",
+            f"{label}.principal_provenance_policy",
+            expected=required_principal_provenance_policy,
+            value=principal_provenance_policy,
         )
     non_claim = crosswalk.get("non_claim")
     if not isinstance(non_claim, str) or not all(

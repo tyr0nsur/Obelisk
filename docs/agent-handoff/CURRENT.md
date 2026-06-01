@@ -67,6 +67,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   fail-closed, and `missing_principal_provenance`, `plugin_supplied_principal_tuple`, and
   `server_process_epoch_mismatch` are internal candidate reason flags. This is not a
   public ABI field or permissions/admin promotion.
+- `docs/command_copied_response_intent_planning_decisions.json` mirrors the same
+  principal-provenance boundary in the permission-query crosswalk before command response:
+  response-intent planning requires runtime-owned principal tuple provenance and fails
+  closed on missing principal provenance, plugin/command/operator-config supplied tuples,
+  and server-process epoch mismatch. This remains planning-only and does not create a
+  public response ABI, reply/send-chat API, runtime delivery, or command router.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
