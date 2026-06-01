@@ -160,6 +160,9 @@ scripts/check_release_readiness.sh \
 It intentionally fails on the current post-RC tree; passing the core-first release gate
 alone is not enough to claim `v1.0 stable`. The release statement is part of the gate
 because every non-promoted blocker must be named as excluded or post-v1.
+Current complete-SDK blocker promotion is 0/12, the P0 dependency chain promotion is 0/4,
+and the stable SDK claim switch is disabled. Excluded/post-v1 accounting does not count
+as completion progress for a complete SDK claim.
 
 ## Current Game Interaction Boundary
 

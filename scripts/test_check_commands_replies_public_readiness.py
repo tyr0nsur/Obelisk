@@ -417,6 +417,56 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             detail["missing"],
         )
 
+    def test_rejects_missing_lifecycle_and_abuse_contract_guards(self) -> None:
+        decisions = self.load_decisions()
+        decisions["forbidden_public_contract"] = [
+            item
+            for item in decisions["forbidden_public_contract"]
+            if item != "raw ProcessEvent or legacy CallProcessEvent fallback"
+        ]
+        lifecycle = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "lifecycle.owner_scoped_registration_cleanup"
+        )
+        lifecycle["required_behavior"] = [
+            item
+            for item in lifecycle["required_behavior"]
+            if item
+            not in {
+                "future command router, reply/send path, and response shortcuts require owner-scoped lifecycle and unregister cleanup before public ABI",
+                "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy command lifecycle cleanup or dispatch drain",
+            }
+        ]
+        abuse = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "abuse.rate_limit_audit_moderation_boundary"
+        )
+        abuse["required_behavior"] = [
+            item
+            for item in abuse["required_behavior"]
+            if item
+            != "command router, reply request, send-chat request, raw ProcessEvent, and legacy CallProcessEvent paths cannot bypass rate-limit, abuse, or sanitized audit gates"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+        self.assertIn("lifecycle_owner_cleanup_behavior_missing", report["blockers"])
+        self.assertIn("abuse_rate_limit_audit_behavior_missing", report["blockers"])
+
     def test_rejects_missing_migration_vocabulary_guardrail(self) -> None:
         decisions = self.load_decisions()
         decisions.pop("migration_vocabulary_not_compatibility", None)

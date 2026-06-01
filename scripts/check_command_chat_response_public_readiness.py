@@ -60,6 +60,7 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
         "public minimal ChatMessageEvent response path",
         "public generic chat routing response path",
         "public raw ProcessEvent response path",
+        "raw ProcessEvent or legacy CallProcessEvent fallback",
         "public static thunk orientation response path",
         "public commands/replies response shortcut before promoted identity and permissions/admin",
         "raw UE pointers",
@@ -115,6 +116,28 @@ REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
         "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
         "directed recipient identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
         "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
+    )
+)
+REQUIRED_LIFECYCLE_DECISION_BEHAVIORS = frozenset(
+    (
+        "owner unregister cancels pending responses for that plugin owner",
+        "plugin init failure cleans up registered response handles before dlclose",
+        "plugin unload waits for in-flight response callbacks or fails closed without dlclose",
+        "future reply/send-chat/router response paths require owner-scoped lifecycle and unregister cleanup before public ABI",
+        "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy response unregister cleanup or drain",
+        "response callbacks cannot outlive copied payload storage",
+        "server shutdown does not call into unmapped plugin code",
+    )
+)
+REQUIRED_ABUSE_DECISION_BEHAVIORS = frozenset(
+    (
+        "response attempts are rate-limited per plugin owner token",
+        "reply/send-chat/router response attempts require rate-limit and sanitized audit checks per plugin owner token before delivery",
+        "burst exhaustion drops or rejects the response, never bypasses permission checks",
+        "raw ProcessEvent and legacy CallProcessEvent fallback cannot bypass response abuse or audit gates",
+        "malformed UTF-8 or oversize messages fail closed",
+        "audit records are sanitized and do not expose raw UE internals",
+        "operator controls can disable response delivery without disabling passive chat intake",
     )
 )
 REQUIRED_RUNTIME_OWNED_GATE_INPUTS = frozenset(
@@ -655,6 +678,26 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     ):
         if required not in capability_behaviors:
             add(blockers, "capability_behavior_missing", "$.decisions.required_before_public_header", behavior=required)
+
+    lifecycle = by_id.get("lifecycle.owner_scoped_unregister_and_drain", {})
+    missing_lifecycle = REQUIRED_LIFECYCLE_DECISION_BEHAVIORS - string_set(lifecycle.get("required_behavior"))
+    if missing_lifecycle:
+        add(
+            blockers,
+            "lifecycle_owner_unregister_behavior_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_lifecycle),
+        )
+
+    abuse = by_id.get("abuse.rate_limit_and_audit", {})
+    missing_abuse = REQUIRED_ABUSE_DECISION_BEHAVIORS - string_set(abuse.get("required_behavior"))
+    if missing_abuse:
+        add(
+            blockers,
+            "abuse_rate_limit_audit_behavior_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_abuse),
+        )
 
     separation = by_id.get("separation.no_commands_router_or_moderation", {})
     sequence_gate = string_set(separation.get("v1_sequence_gate"))

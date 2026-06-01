@@ -98,6 +98,7 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         for forbidden in (
             "principal or permission claims from command text",
             "principal or permission claims from operator config",
+            "raw ProcessEvent or legacy CallProcessEvent fallback",
         ):
             self.assertIn(forbidden, payload["forbidden_public_contract"])
 
@@ -180,6 +181,8 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             "owner unregister cancels pending responses for that plugin owner",
             "plugin init failure cleans up registered response handles before dlclose",
             "plugin unload waits for in-flight response callbacks or fails closed without dlclose",
+            "future reply/send-chat/router response paths require owner-scoped lifecycle and unregister cleanup before public ABI",
+            "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy response unregister cleanup or drain",
             "response callbacks cannot outlive copied payload storage",
         ):
             self.assertIn(behavior, lifecycle["required_behavior"])
@@ -200,7 +203,9 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         abuse = requirements["abuse.rate_limit_and_audit"]
         for behavior in (
             "response attempts are rate-limited per plugin owner token",
+            "reply/send-chat/router response attempts require rate-limit and sanitized audit checks per plugin owner token before delivery",
             "burst exhaustion drops or rejects the response, never bypasses permission checks",
+            "raw ProcessEvent and legacy CallProcessEvent fallback cannot bypass response abuse or audit gates",
             "malformed UTF-8 or oversize messages fail closed",
             "operator controls can disable response delivery without disabling passive chat intake",
         ):

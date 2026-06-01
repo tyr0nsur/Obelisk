@@ -143,6 +143,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
 
         for forbidden in (
             "public CallProcessEvent command or reply path",
+            "raw ProcessEvent or legacy CallProcessEvent fallback",
             "public command_chat_response_path ABI",
             "reply ABI",
             "send-chat ABI",
@@ -188,6 +189,8 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
             "command registrations are owner-token scoped",
             "plugin init failure removes all command registrations before dlclose",
             "plugin unload unregisters commands and waits for in-flight callbacks or fails closed without dlclose",
+            "future command router, reply/send path, and response shortcuts require owner-scoped lifecycle and unregister cleanup before public ABI",
+            "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy command lifecycle cleanup or dispatch drain",
             "self-unregister from a command callback is safe",
             "command callbacks cannot outlive copied payload storage",
         ):
@@ -205,6 +208,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         abuse = requirements["abuse.rate_limit_audit_moderation_boundary"]
         for behavior in (
             "command dispatch attempts are rate-limited per plugin owner token and source scope",
+            "command router, reply request, send-chat request, raw ProcessEvent, and legacy CallProcessEvent paths cannot bypass rate-limit, abuse, or sanitized audit gates",
             "malformed UTF-8, oversize commands, and unsupported source kinds fail closed",
             "operator controls can disable command dispatch without disabling passive chat intake",
             "moderation, ban, kick, mute, broadcast, scheduled notice, and admin mutation APIs remain separate promotions",

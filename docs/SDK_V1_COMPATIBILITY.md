@@ -358,6 +358,8 @@ Post-v1 or excluded records are support-statement accounting only. They do not a
 complete, full, production, or stable SDK wording unless
 `scripts/check_public_sdk_v1_completion.py --json` reports that the stable claim is
 allowed.
+Excluded/post-v1 outcomes permit only scoped non-complete release wording; they never
+contribute percentage toward a complete, full, production, or stable SDK claim.
 The checker's `v1_sdk_blocker_outcomes` rows are an accounting ledger for prioritizing
 the 12 blocker outcomes: each row reports the manifest outcome, release-statement
 outcome, exclusion-contract satisfaction, and next action. Those rows are not a release

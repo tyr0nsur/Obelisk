@@ -50,6 +50,7 @@
     "public minimal ChatMessageEvent response path",
     "public generic chat routing response path",
     "public raw ProcessEvent response path",
+    "raw ProcessEvent or legacy CallProcessEvent fallback",
     "public static thunk orientation response path",
     "public commands/replies response shortcut before promoted identity and permissions/admin",
     "raw UE pointers",
@@ -155,6 +156,8 @@
         "owner unregister cancels pending responses for that plugin owner",
         "plugin init failure cleans up registered response handles before dlclose",
         "plugin unload waits for in-flight response callbacks or fails closed without dlclose",
+        "future reply/send-chat/router response paths require owner-scoped lifecycle and unregister cleanup before public ABI",
+        "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy response unregister cleanup or drain",
         "response callbacks cannot outlive copied payload storage",
         "server shutdown does not call into unmapped plugin code"
       ]
@@ -197,7 +200,9 @@
       "decision_required": "Define owner-scoped abuse controls before plugins can send text through Obelisk.",
       "required_behavior": [
         "response attempts are rate-limited per plugin owner token",
+        "reply/send-chat/router response attempts require rate-limit and sanitized audit checks per plugin owner token before delivery",
         "burst exhaustion drops or rejects the response, never bypasses permission checks",
+        "raw ProcessEvent and legacy CallProcessEvent fallback cannot bypass response abuse or audit gates",
         "malformed UTF-8 or oversize messages fail closed",
         "audit records are sanitized and do not expose raw UE internals",
         "operator controls can disable response delivery without disabling passive chat intake"

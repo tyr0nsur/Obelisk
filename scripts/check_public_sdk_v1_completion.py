@@ -2124,11 +2124,7 @@ def build_report(
         blockers.append("canonical_surface_id_missing")
     if missing_canonical_completion_blockers:
         blockers.append("canonical_v1_completion_blocker_missing")
-    if (
-        manifest_stable_claim_allowed
-        and manifest.get("v1_completion_required") is True
-        and minimum_promoted_demand_family_gaps
-    ):
+    if minimum_promoted_demand_family_gaps:
         blockers.append("complete_sdk_claim_requires_promoted_demand_families")
     if unresolved_experimental:
         blockers.append("promoted_experimental_surfaces_unresolved")
@@ -2335,9 +2331,23 @@ def build_report(
         "v1_sdk_report_sections": report_sections,
         "v1_sdk_progress": {
             "completion_blocker_total": completion_blocker_total,
+            "completion_blockers_promoted_count": len(completion_blockers_with_promoted_outcome),
+            "p0_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
+            "p0_chain_promoted_count": (
+                len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN) - len(unpromoted_required_dependency_chain)
+            ),
+            "complete_sdk_claim_progress_percent": (
+                int((len(completion_blockers_with_promoted_outcome) / completion_blocker_total) * 100)
+                if completion_blocker_total
+                else 0
+            ),
             "completion_blockers_with_promoted_outcome": completion_blockers_with_promoted_outcome,
             "completion_blockers_with_post_v1_or_excluded_outcome": (
                 completion_blockers_with_post_v1_or_excluded_outcome
+            ),
+            "completion_blockers_with_post_v1_or_excluded_outcome_note": (
+                "bookkeeping only; excluded/post-v1 outcomes do not contribute to complete SDK "
+                "claim progress or promoted demand-family coverage"
             ),
             "completion_blockers_with_manifest_post_v1_or_excluded_outcome": (
                 completion_blockers_with_post_v1_or_excluded_outcome
@@ -2368,7 +2378,7 @@ def build_report(
             "outcome_accounting_note": (
                 "Manifest post-v1/excluded outcomes are only status accounting; release statement "
                 "outcomes are counted separately after exact statement wording and exclusion-contract "
-                "validation."
+                "validation. They never contribute percentage toward complete/full/production SDK."
             ),
             "non_claim": (
                 "This is accounting only; it does not authorize broad stable SDK release wording."

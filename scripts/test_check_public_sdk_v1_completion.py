@@ -201,9 +201,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
         progress = payload["v1_sdk_progress"]
         self.assertEqual(progress["completion_blocker_total"], 12)
+        self.assertEqual(progress["completion_blockers_promoted_count"], 0)
+        self.assertEqual(progress["p0_chain_total"], 4)
+        self.assertEqual(progress["p0_chain_promoted_count"], 0)
+        self.assertEqual(progress["complete_sdk_claim_progress_percent"], 0)
         self.assertNotIn(
             "obelisk.permissions_admin.v1",
             progress["completion_blockers_with_post_v1_or_excluded_outcome"],
+        )
+        self.assertIn(
+            "bookkeeping only",
+            progress["completion_blockers_with_post_v1_or_excluded_outcome_note"],
         )
         self.assertEqual(
             progress["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
@@ -222,6 +230,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 6)
         self.assertFalse(progress["stable_claim_allowed"])
         self.assertIn("status accounting", progress["outcome_accounting_note"])
+        self.assertIn("never contribute percentage", progress["outcome_accounting_note"])
         self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
         self.assertEqual(progress["manifest_outcome_missing_count"], 6)
@@ -295,7 +304,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(
             sections["promoted_demand_gaps"]["all_minimum_demand_families_promoted_or_equivalent"]
         )
-        self.assertFalse(sections["promoted_demand_gaps"]["claim_blocker_active"])
+        self.assertTrue(sections["promoted_demand_gaps"]["claim_blocker_active"])
         self.assertIn(
             "Excluded/post-v1 outcomes do not satisfy",
             sections["promoted_demand_gaps"]["non_claim"],
@@ -920,6 +929,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 str(release_statement_path),
                 "--validate-release-statement-scope",
                 "--json",
+                check=False,
             )
 
         payload = json.loads(result.stdout)
@@ -935,6 +945,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertFalse(payload["v1_sdk_progress"]["stable_claim_allowed"])
         self.assertTrue(payload["v1_sdk_progress"]["stable_release_contract_claim_allowed"])
+        self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["complete_sdk_claim_progress_percent"], 0)
         scoped_payload = json.loads(scoped_result.stdout)
         self.assertFalse(scoped_payload["ready"])
         self.assertTrue(scoped_payload["scoped_release_statement"]["ready"])
@@ -942,6 +955,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "complete_sdk_claim_requires_promoted_demand_families",
             scoped_payload["scoped_release_statement"]["allowed_remaining_blockers"],
         )
+        self.assertEqual(scoped_payload["scoped_release_statement"]["blocking_report_blockers"], [])
 
     def test_minimum_promoted_demand_family_accepts_explicit_promoted_equivalent(self) -> None:
         import importlib.util
@@ -3685,6 +3699,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("completion_blocker_exclusion_contract_missing", payload["blockers"])
         self.assertIn("v1_sdk_completion_blockers_unresolved", payload["blockers"])
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
         self.assertEqual(payload["missing_completion_blocker_exclusion_contracts"], ["obelisk.player_identity.v1"])
         self.assertEqual(payload["unresolved_completion_blockers"], ["obelisk.player_identity.v1"])
 

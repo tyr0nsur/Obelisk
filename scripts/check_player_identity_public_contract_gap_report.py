@@ -21,11 +21,151 @@ PRIMARY_OFFLINE_GAP = "privacy.identifier_redaction"
 REQUIRED_PROMOTION_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
+    "lifetime.generation_scope_invalidation",
+    "abi.public_pod_contract",
+    "lifecycle.owner_cleanup",
+    "separation.downstream_surfaces",
 }
 REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS = {
+    "evidence.complete_non_protected_pack",
+    "evidence.accepted_session_start_anchor",
+    "evidence.accepted_session_end_anchor",
+    "evidence.second_source_anchor_layout",
     "privacy.public_identifier_form",
     "privacy.redacted_identifier_fields",
     "privacy.logging_and_storage_policy",
+    "lifetime.principal_scope",
+    "lifetime.invalidation_events",
+    "lifetime.reconnect_duplicate_stale_policy",
+    "abi.payload_shape",
+    "abi.capability_bits",
+    "abi.owner_token_registration",
+    "abi.append_only_layout_tests",
+    "separation.no_commands_permissions_persistence",
+}
+REQUIRED_DECISION_GATE_CURRENT_DECISION = (
+    "no public header, no public capability bit, no plugin callback, no lookup, "
+    "no downstream permission or command dependency may consume identity yet"
+)
+REQUIRED_DECISION_GATE_FORBIDDEN_NOW = {
+    "C++ ABI edits",
+    "public header symbols",
+    "runtime plugin callback exposure",
+    "player lookup API",
+    "permission/admin API",
+    "command/chat response API",
+    "storage or persistence API",
+}
+REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = {
+    "UE pointers",
+    "raw params",
+    "FName/GObjects indices",
+    "ResourceHandle",
+    "pointer-derived identity",
+    "lookup",
+    "mutation",
+    "return override",
+}
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_NOT_SUFFICIENT_WHY = {
+    "runtime evidence does not prove process-local scope, cross-instance isolation, or cluster identity semantics",
+    "runtime evidence does not authorize permissions/admin, command/chat response, player lookup, persistence, mutation, return override, or cross-process identity claims",
+}
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
+    "privacy and redaction decision resolved",
+    "principal lifetime and invalidation decision resolved",
+    "cross-instance/process-local scope decision resolved",
+    "public docs state exact non-claims and downstream dependency order",
+}
+REQUIRED_PUBLIC_IDENTIFIER_FORBIDDEN = {
+    "SteamID",
+    "EOS ID",
+    "UniqueNetId",
+    "PlayerDataID",
+    "tribe ID",
+    "player name",
+    "IP address",
+    "UE pointer",
+    "FName/GObjects index",
+    "ResourceHandle",
+}
+REQUIRED_PUBLIC_IDENTIFIER_PROPERTIES = {
+    "process-local by default",
+    "not persistent unless a future storage/ingress contract promotes persistence",
+    "generation-bearing or otherwise invalidation-aware",
+    "safe to copy across the C ABI as POD",
+}
+REQUIRED_REDACTION_CLASSES = {
+    "copied opaque principal",
+    "recognition-only",
+    "private-redacted",
+    "forbidden",
+}
+REQUIRED_REDACTED_FIELDS = {
+    "platform account ids",
+    "player names",
+    "tribe identifiers",
+    "network addresses",
+    "raw chat text used as identity",
+    "controller/playerstate object references",
+}
+REQUIRED_ALLOWED_SCOPES = {"callback-local", "process-local", "restart-local"}
+REQUIRED_FORBIDDEN_SCOPES = {"cluster-stable", "persistent", "cross-map shared"}
+REQUIRED_SCOPE_FIELDS = {"principal_handle", "principal_generation", "scope_flags"}
+REQUIRED_INVALIDATION_EVENTS = {
+    "disconnect",
+    "logout",
+    "transfer",
+    "reconnect",
+    "duplicate principal observation",
+    "server restart",
+    "stale controller/playerstate",
+    "failed evidence validation",
+}
+REQUIRED_INVALIDATION_BEHAVIOR = {
+    "stale principal fails closed",
+    "permission decisions include generation or are callback-local only",
+    "commands/replies reject stale principal handles",
+}
+REQUIRED_STALE_POLICY = {
+    "new generation on reconnect unless evidence proves continuity",
+    "duplicate observations invalidate or quarantine both principals",
+    "stale handles never resolve to a different player",
+    "lookup-by-public-handle remains unavailable unless separately promoted",
+}
+REQUIRED_ABI_PAYLOAD_SHAPE_PROPERTIES = {
+    "POD C ABI",
+    "append-only after promotion",
+    "copied Obelisk-owned storage",
+    "callback-local payload lifetime",
+    "no UE pointers or raw params",
+    "no platform account ids, player names, tribe ids, or network addresses",
+    "no lookup, persistence, mutation, or return override",
+}
+REQUIRED_CAPABILITY_BEHAVIOR = {
+    "capability is absent while this gate is blocked/planning",
+    "missing capability fails closed",
+    "later env or marker changes cannot widen a loaded plugin's captured capability",
+}
+REQUIRED_OWNER_TOKEN_BEHAVIOR = {
+    "nonzero plugin_owner_token required",
+    "registration handles are not persisted or shared across server processes",
+    "init failure and plugin unload remove all owner registrations",
+}
+REQUIRED_SEQUENCE_GATE = [
+    "identity principal contract first",
+    "permission query contract only after identity promotion",
+    "command response contract only after permission result provenance is promoted",
+    "commands/replies only after command response privacy, generation, and scope gates are promoted",
+]
+REQUIRED_SEPARATION_FORBIDDEN = {
+    "permission query API",
+    "permission cache API",
+    "command response API",
+    "command router",
+    "replies/send-chat",
+    "admin mutation",
+    "storage/persistence",
+    "operator ingress",
 }
 
 READINESS_FALSE_KEYS = {
@@ -160,6 +300,32 @@ def validate_empty_public_lists(value: Any, blockers: list[dict[str, Any]], labe
             add(blockers, f"{key}_not_empty", f"$.{key}", input=label, value=value.get(key))
 
 
+def string_list(value: Any) -> list[str] | None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return None
+    return value
+
+
+def missing_required(observed: Any, required: set[str]) -> list[str]:
+    values = string_list(observed)
+    if values is None:
+        return sorted(required)
+    return sorted(required - set(values))
+
+
+def require_string_list_contains(
+    value: dict[str, Any],
+    key: str,
+    required: set[str],
+    blockers: list[dict[str, Any]],
+    reason: str,
+    label: str,
+) -> None:
+    missing = missing_required(value.get(key), required)
+    if missing:
+        add(blockers, reason, label, missing=missing, value=value.get(key))
+
+
 def strip_c_comments_and_strings(text: str) -> str:
     output: list[str] = []
     index = 0
@@ -257,6 +423,177 @@ def find_surface(surfaces: dict[str, Any], blockers: list[dict[str, Any]]) -> di
     return matches[0]
 
 
+def validate_required_before_public_header_contract(
+    by_id: dict[str, dict[str, Any]],
+    blockers: list[dict[str, Any]],
+) -> None:
+    public_form = by_id.get("privacy.public_identifier_form")
+    if public_form is not None:
+        require_string_list_contains(
+            public_form,
+            "must_not_expose",
+            REQUIRED_PUBLIC_IDENTIFIER_FORBIDDEN,
+            blockers,
+            "decisions_privacy_public_identifier_form_missing_forbidden_terms",
+            "$.required_before_public_header[privacy.public_identifier_form].must_not_expose",
+        )
+        require_string_list_contains(
+            public_form,
+            "required_properties",
+            REQUIRED_PUBLIC_IDENTIFIER_PROPERTIES,
+            blockers,
+            "decisions_privacy_public_identifier_form_missing_required_properties",
+            "$.required_before_public_header[privacy.public_identifier_form].required_properties",
+        )
+
+    redaction = by_id.get("privacy.redacted_identifier_fields")
+    if redaction is not None:
+        require_string_list_contains(
+            redaction,
+            "allowed_field_classes",
+            REQUIRED_REDACTION_CLASSES,
+            blockers,
+            "decisions_privacy_redacted_identifier_fields_missing_allowed_classes",
+            "$.required_before_public_header[privacy.redacted_identifier_fields].allowed_field_classes",
+        )
+        require_string_list_contains(
+            redaction,
+            "must_redact",
+            REQUIRED_REDACTED_FIELDS,
+            blockers,
+            "decisions_privacy_redacted_identifier_fields_missing_redactions",
+            "$.required_before_public_header[privacy.redacted_identifier_fields].must_redact",
+        )
+
+    logging_policy = by_id.get("privacy.logging_and_storage_policy")
+    if logging_policy is not None and logging_policy.get("default_policy") != "no identity persistence and no raw identity logging":
+        add(
+            blockers,
+            "decisions_privacy_logging_storage_default_policy_mismatch",
+            "$.required_before_public_header[privacy.logging_and_storage_policy].default_policy",
+            value=logging_policy.get("default_policy"),
+        )
+
+    scope = by_id.get("lifetime.principal_scope")
+    if scope is not None:
+        require_string_list_contains(
+            scope,
+            "allowed_scopes",
+            REQUIRED_ALLOWED_SCOPES,
+            blockers,
+            "decisions_lifetime_principal_scope_missing_allowed_scopes",
+            "$.required_before_public_header[lifetime.principal_scope].allowed_scopes",
+        )
+        require_string_list_contains(
+            scope,
+            "forbidden_until_separate_promotion",
+            REQUIRED_FORBIDDEN_SCOPES,
+            blockers,
+            "decisions_lifetime_principal_scope_missing_forbidden_scopes",
+            "$.required_before_public_header[lifetime.principal_scope].forbidden_until_separate_promotion",
+        )
+        require_string_list_contains(
+            scope,
+            "required_fields",
+            REQUIRED_SCOPE_FIELDS,
+            blockers,
+            "decisions_lifetime_principal_scope_missing_required_fields",
+            "$.required_before_public_header[lifetime.principal_scope].required_fields",
+        )
+        allowed_scopes = string_list(scope.get("allowed_scopes"))
+        if allowed_scopes is not None:
+            forbidden_allowed = sorted(REQUIRED_FORBIDDEN_SCOPES & set(allowed_scopes))
+            if forbidden_allowed:
+                add(
+                    blockers,
+                    "decisions_lifetime_principal_scope_forbidden_scope_allowed",
+                    "$.required_before_public_header[lifetime.principal_scope].allowed_scopes",
+                    forbidden=forbidden_allowed,
+                )
+
+    invalidation = by_id.get("lifetime.invalidation_events")
+    if invalidation is not None:
+        require_string_list_contains(
+            invalidation,
+            "required_invalidation_events",
+            REQUIRED_INVALIDATION_EVENTS,
+            blockers,
+            "decisions_lifetime_invalidation_events_missing",
+            "$.required_before_public_header[lifetime.invalidation_events].required_invalidation_events",
+        )
+        require_string_list_contains(
+            invalidation,
+            "required_behavior",
+            REQUIRED_INVALIDATION_BEHAVIOR,
+            blockers,
+            "decisions_lifetime_invalidation_behavior_missing",
+            "$.required_before_public_header[lifetime.invalidation_events].required_behavior",
+        )
+
+    stale_policy = by_id.get("lifetime.reconnect_duplicate_stale_policy")
+    if stale_policy is not None:
+        require_string_list_contains(
+            stale_policy,
+            "required_policy",
+            REQUIRED_STALE_POLICY,
+            blockers,
+            "decisions_lifetime_reconnect_duplicate_stale_policy_missing",
+            "$.required_before_public_header[lifetime.reconnect_duplicate_stale_policy].required_policy",
+        )
+
+    payload_shape = by_id.get("abi.payload_shape")
+    if payload_shape is not None:
+        require_string_list_contains(
+            payload_shape,
+            "required_properties",
+            REQUIRED_ABI_PAYLOAD_SHAPE_PROPERTIES,
+            blockers,
+            "decisions_abi_payload_shape_missing_required_properties",
+            "$.required_before_public_header[abi.payload_shape].required_properties",
+        )
+
+    capability = by_id.get("abi.capability_bits")
+    if capability is not None:
+        require_string_list_contains(
+            capability,
+            "required_behavior",
+            REQUIRED_CAPABILITY_BEHAVIOR,
+            blockers,
+            "decisions_abi_capability_bits_missing_fail_closed_behavior",
+            "$.required_before_public_header[abi.capability_bits].required_behavior",
+        )
+
+    owner_token = by_id.get("abi.owner_token_registration")
+    if owner_token is not None:
+        require_string_list_contains(
+            owner_token,
+            "required_behavior",
+            REQUIRED_OWNER_TOKEN_BEHAVIOR,
+            blockers,
+            "decisions_abi_owner_token_registration_missing_fail_closed_behavior",
+            "$.required_before_public_header[abi.owner_token_registration].required_behavior",
+        )
+
+    separation = by_id.get("separation.no_commands_permissions_persistence")
+    if separation is not None:
+        sequence_gate = string_list(separation.get("v1_sequence_gate"))
+        if sequence_gate != REQUIRED_SEQUENCE_GATE:
+            add(
+                blockers,
+                "decisions_separation_sequence_gate_mismatch",
+                "$.required_before_public_header[separation.no_commands_permissions_persistence].v1_sequence_gate",
+                value=separation.get("v1_sequence_gate"),
+            )
+        require_string_list_contains(
+            separation,
+            "forbidden_in_identity_contract",
+            REQUIRED_SEPARATION_FORBIDDEN,
+            blockers,
+            "decisions_separation_forbidden_downstream_surfaces_missing",
+            "$.required_before_public_header[separation.no_commands_permissions_persistence].forbidden_in_identity_contract",
+        )
+
+
 def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     if decisions.get("schema") != DECISIONS_SCHEMA:
         add(blockers, "decisions_schema_mismatch", "$.schema", value=decisions.get("schema"))
@@ -264,8 +601,60 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         add(blockers, "decisions_surface_mismatch", "$.surface", value=decisions.get("surface"))
     if decisions.get("status") != "blocked":
         add(blockers, "decisions_status_not_blocked", "$.status", value=decisions.get("status"))
+    if decisions.get("planning_stage") != "identity_public_contract_gate":
+        add(blockers, "decisions_planning_stage_mismatch", "$.planning_stage", value=decisions.get("planning_stage"))
+    decision_gate = decisions.get("decision_gate")
+    if not isinstance(decision_gate, dict):
+        add(blockers, "decisions_decision_gate_missing", "$.decision_gate")
+    else:
+        if decision_gate.get("id") != "identity_public_contract_gate":
+            add(blockers, "decisions_decision_gate_id_mismatch", "$.decision_gate.id", value=decision_gate.get("id"))
+        if decision_gate.get("status") != "blocked/planning":
+            add(blockers, "decisions_decision_gate_status_mismatch", "$.decision_gate.status", value=decision_gate.get("status"))
+        if decision_gate.get("current_decision") != REQUIRED_DECISION_GATE_CURRENT_DECISION:
+            add(
+                blockers,
+                "decisions_decision_gate_current_decision_mismatch",
+                "$.decision_gate.current_decision",
+                value=decision_gate.get("current_decision"),
+            )
+        forbidden_now = string_list(decision_gate.get("forbidden_now"))
+        if forbidden_now is None or not REQUIRED_DECISION_GATE_FORBIDDEN_NOW.issubset(set(forbidden_now)):
+            add(
+                blockers,
+                "decisions_decision_gate_forbidden_now_missing_required",
+                "$.decision_gate.forbidden_now",
+                missing=missing_required(decision_gate.get("forbidden_now"), REQUIRED_DECISION_GATE_FORBIDDEN_NOW),
+            )
     if decisions.get("public_header_allowed") is not False:
         add(blockers, "decisions_public_header_allowed_not_false", "$.public_header_allowed")
+    if missing_required(decisions.get("forbidden_public_contract"), REQUIRED_FORBIDDEN_PUBLIC_CONTRACT):
+        add(
+            blockers,
+            "decisions_forbidden_public_contract_missing_required",
+            "$.forbidden_public_contract",
+            missing=missing_required(decisions.get("forbidden_public_contract"), REQUIRED_FORBIDDEN_PUBLIC_CONTRACT),
+        )
+    not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
+    if not isinstance(not_sufficient, dict):
+        add(blockers, "decisions_approved_runtime_evidence_not_sufficient_missing", "$.approved_runtime_evidence_not_sufficient")
+    else:
+        require_string_list_contains(
+            not_sufficient,
+            "why",
+            REQUIRED_APPROVED_RUNTIME_EVIDENCE_NOT_SUFFICIENT_WHY,
+            blockers,
+            "decisions_approved_runtime_evidence_not_sufficient_why_missing",
+            "$.approved_runtime_evidence_not_sufficient.why",
+        )
+        require_string_list_contains(
+            not_sufficient,
+            "minimum_additional_gates",
+            REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES,
+            blockers,
+            "decisions_approved_runtime_evidence_not_sufficient_minimum_gates_missing",
+            "$.approved_runtime_evidence_not_sufficient.minimum_additional_gates",
+        )
     promotion_blockers = decisions.get("promotion_blockers")
     if not isinstance(promotion_blockers, list):
         add(blockers, "decisions_promotion_blockers_not_list", "$.promotion_blockers")
@@ -278,6 +667,14 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         missing = sorted(REQUIRED_PROMOTION_BLOCKERS - set(by_id))
         if missing:
             add(blockers, "decisions_required_promotion_blockers_missing", "$.promotion_blockers", missing=missing)
+        if set(by_id) != REQUIRED_PROMOTION_BLOCKERS:
+            add(
+                blockers,
+                "decisions_promotion_blockers_mismatch",
+                "$.promotion_blockers",
+                expected=sorted(REQUIRED_PROMOTION_BLOCKERS),
+                observed=sorted(by_id),
+            )
         for blocker_id in sorted(REQUIRED_PROMOTION_BLOCKERS & set(by_id)):
             if by_id[blocker_id].get("status") != "unresolved":
                 add(
@@ -304,6 +701,14 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                 "$.required_before_public_header",
                 missing=missing,
             )
+        if set(by_id) != REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS:
+            add(
+                blockers,
+                "decisions_required_before_public_header_mismatch",
+                "$.required_before_public_header",
+                expected=sorted(REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS),
+                observed=sorted(by_id),
+            )
         for blocker_id in sorted(REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS & set(by_id)):
             if by_id[blocker_id].get("status") != "unresolved":
                 add(
@@ -313,6 +718,7 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                     id=blocker_id,
                     value=by_id[blocker_id].get("status"),
                 )
+        validate_required_before_public_header_contract(by_id, blockers)
     validate_empty_public_lists(decisions, blockers, "decisions")
     validate_false_flags(decisions, blockers, "decisions")
 

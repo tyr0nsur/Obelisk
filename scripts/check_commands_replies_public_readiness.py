@@ -93,6 +93,7 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
         "public command parser",
         "command parser copied from ArkApi or AseApi",
         "public CallProcessEvent command or reply path",
+        "raw ProcessEvent or legacy CallProcessEvent fallback",
         "public command_chat_response_path ABI",
         "reply ABI",
         "send-chat ABI",
@@ -137,6 +138,29 @@ REQUIRED_AUTH_BEHAVIORS = frozenset(
         "command text remains copied request data only and cannot establish identity, permission authority, or policy provenance",
         "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
         "command callbacks cannot self-attest permission authority",
+    )
+)
+REQUIRED_LIFECYCLE_BEHAVIORS = frozenset(
+    (
+        "command registrations are owner-token scoped",
+        "duplicate command names have deterministic owner-scoped conflict handling",
+        "plugin init failure removes all command registrations before dlclose",
+        "plugin unload unregisters commands and waits for in-flight callbacks or fails closed without dlclose",
+        "future command router, reply/send path, and response shortcuts require owner-scoped lifecycle and unregister cleanup before public ABI",
+        "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy command lifecycle cleanup or dispatch drain",
+        "self-unregister from a command callback is safe",
+        "command callbacks cannot outlive copied payload storage",
+        "server shutdown does not call into unmapped plugin code",
+    )
+)
+REQUIRED_ABUSE_BEHAVIORS = frozenset(
+    (
+        "command dispatch attempts are rate-limited per plugin owner token and source scope",
+        "command router, reply request, send-chat request, raw ProcessEvent, and legacy CallProcessEvent paths cannot bypass rate-limit, abuse, or sanitized audit gates",
+        "malformed UTF-8, oversize commands, and unsupported source kinds fail closed",
+        "audit records are sanitized and do not expose raw UE internals, platform IDs, raw player names, or secret policy contents",
+        "operator controls can disable command dispatch without disabling passive chat intake",
+        "moderation, ban, kick, mute, broadcast, scheduled notice, and admin mutation APIs remain separate promotions",
     )
 )
 REQUIRED_RUNTIME_OWNED_GATE_INPUTS = frozenset(
@@ -596,6 +620,16 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
             missing=sorted(missing_auth_behaviors),
         )
 
+    lifecycle = by_id.get("lifecycle.owner_scoped_registration_cleanup", {})
+    missing_lifecycle_behaviors = REQUIRED_LIFECYCLE_BEHAVIORS - string_set(lifecycle.get("required_behavior"))
+    if missing_lifecycle_behaviors:
+        add(
+            blockers,
+            "lifecycle_owner_cleanup_behavior_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_lifecycle_behaviors),
+        )
+
     parser = by_id.get("parser.no_arkapi_copy", {})
     parser_behaviors = string_set(parser.get("required_behavior"))
     for required in (
@@ -606,6 +640,16 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     ):
         if required not in parser_behaviors:
             add(blockers, "arkapi_parser_copy_guard_missing", "$.decisions.required_before_public_header", behavior=required)
+
+    abuse = by_id.get("abuse.rate_limit_audit_moderation_boundary", {})
+    missing_abuse_behaviors = REQUIRED_ABUSE_BEHAVIORS - string_set(abuse.get("required_behavior"))
+    if missing_abuse_behaviors:
+        add(
+            blockers,
+            "abuse_rate_limit_audit_behavior_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_abuse_behaviors),
+        )
 
     separation = by_id.get("separation.no_response_send_reply_moderation", {})
     exclusions = string_set(separation.get("required_exclusions"))

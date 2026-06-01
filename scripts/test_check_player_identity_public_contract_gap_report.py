@@ -166,6 +166,86 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         )
         self.assertEqual(["privacy.logging_and_storage_policy"], detail["missing"])
 
+    def test_rejects_public_contract_gate_or_runtime_evidence_limit_weakened(self) -> None:
+        decisions = self.load_decisions()
+        decisions["decision_gate"]["current_decision"] = "runtime evidence accepted; identity can unlock permissions"
+        decisions["decision_gate"]["forbidden_now"].remove("permission/admin API")
+        decisions["forbidden_public_contract"].remove("UE pointers")
+        decisions["approved_runtime_evidence_not_sufficient"]["why"].remove(
+            "runtime evidence does not authorize permissions/admin, command/chat response, player lookup, persistence, mutation, return override, or cross-process identity claims"
+        )
+        decisions["approved_runtime_evidence_not_sufficient"]["minimum_additional_gates"].remove(
+            "cross-instance/process-local scope decision resolved"
+        )
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        for blocker in (
+            "decisions_decision_gate_current_decision_mismatch",
+            "decisions_decision_gate_forbidden_now_missing_required",
+            "decisions_forbidden_public_contract_missing_required",
+            "decisions_approved_runtime_evidence_not_sufficient_why_missing",
+            "decisions_approved_runtime_evidence_not_sufficient_minimum_gates_missing",
+        ):
+            with self.subTest(blocker=blocker):
+                self.assertIn(blocker, report["blockers"])
+
+    def test_rejects_privacy_lifecycle_scope_or_downstream_policy_weakened(self) -> None:
+        decisions = self.load_decisions()
+        requirements = {
+            item["id"]: item
+            for item in decisions["required_before_public_header"]
+        }
+        requirements["privacy.public_identifier_form"]["must_not_expose"].remove("SteamID")
+        requirements["privacy.public_identifier_form"]["required_properties"].remove(
+            "generation-bearing or otherwise invalidation-aware"
+        )
+        requirements["privacy.redacted_identifier_fields"]["must_redact"].remove("player names")
+        requirements["privacy.logging_and_storage_policy"]["default_policy"] = "log player names for moderation"
+        requirements["lifetime.principal_scope"]["allowed_scopes"].append("cluster-stable")
+        requirements["lifetime.principal_scope"]["forbidden_until_separate_promotion"].remove("cluster-stable")
+        requirements["lifetime.principal_scope"]["required_fields"].remove("principal_generation")
+        requirements["lifetime.invalidation_events"]["required_behavior"].remove("stale principal fails closed")
+        requirements["lifetime.reconnect_duplicate_stale_policy"]["required_policy"].remove(
+            "stale handles never resolve to a different player"
+        )
+        requirements["abi.payload_shape"]["required_properties"].remove("no UE pointers or raw params")
+        requirements["abi.capability_bits"]["required_behavior"].remove("missing capability fails closed")
+        requirements["abi.owner_token_registration"]["required_behavior"].remove(
+            "registration handles are not persisted or shared across server processes"
+        )
+        requirements["separation.no_commands_permissions_persistence"]["v1_sequence_gate"][1] = (
+            "permission query contract may use runtime evidence directly"
+        )
+        requirements["separation.no_commands_permissions_persistence"]["forbidden_in_identity_contract"].remove(
+            "command response API"
+        )
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        for blocker in (
+            "decisions_privacy_public_identifier_form_missing_forbidden_terms",
+            "decisions_privacy_public_identifier_form_missing_required_properties",
+            "decisions_privacy_redacted_identifier_fields_missing_redactions",
+            "decisions_privacy_logging_storage_default_policy_mismatch",
+            "decisions_lifetime_principal_scope_forbidden_scope_allowed",
+            "decisions_lifetime_principal_scope_missing_forbidden_scopes",
+            "decisions_lifetime_principal_scope_missing_required_fields",
+            "decisions_lifetime_invalidation_behavior_missing",
+            "decisions_lifetime_reconnect_duplicate_stale_policy_missing",
+            "decisions_abi_payload_shape_missing_required_properties",
+            "decisions_abi_capability_bits_missing_fail_closed_behavior",
+            "decisions_abi_owner_token_registration_missing_fail_closed_behavior",
+            "decisions_separation_sequence_gate_mismatch",
+            "decisions_separation_forbidden_downstream_surfaces_missing",
+        ):
+            with self.subTest(blocker=blocker):
+                self.assertIn(blocker, report["blockers"])
+
     def test_rejects_privacy_required_before_public_header_marked_resolved(self) -> None:
         decisions = self.load_decisions()
         for item in decisions["required_before_public_header"]:

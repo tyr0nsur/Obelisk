@@ -156,7 +156,15 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "raw ProcessEvent callbacks do not authorize response delivery",
                 "static thunk orientation does not authorize response delivery",
             ]},
-            {"id": "lifecycle.owner_scoped_unregister_and_drain", "status": "unresolved"},
+            {"id": "lifecycle.owner_scoped_unregister_and_drain", "status": "unresolved", "required_behavior": [
+                "owner unregister cancels pending responses for that plugin owner",
+                "plugin init failure cleans up registered response handles before dlclose",
+                "plugin unload waits for in-flight response callbacks or fails closed without dlclose",
+                "future reply/send-chat/router response paths require owner-scoped lifecycle and unregister cleanup before public ABI",
+                "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy response unregister cleanup or drain",
+                "response callbacks cannot outlive copied payload storage",
+                "server shutdown does not call into unmapped plugin code",
+            ]},
             {"id": "privacy.redaction_and_targeting", "status": "unresolved", "required_behavior": [
                 "principal tuple source must be runtime-owned player identity observation before any directed response target is public",
                 "principal_handle, principal_generation, and principal_scope_flags must appear together before response targeting can consume player identity",
@@ -173,7 +181,15 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "directed recipient identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
                 "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
             ]},
-            {"id": "abuse.rate_limit_and_audit", "status": "unresolved"},
+            {"id": "abuse.rate_limit_and_audit", "status": "unresolved", "required_behavior": [
+                "response attempts are rate-limited per plugin owner token",
+                "reply/send-chat/router response attempts require rate-limit and sanitized audit checks per plugin owner token before delivery",
+                "burst exhaustion drops or rejects the response, never bypasses permission checks",
+                "raw ProcessEvent and legacy CallProcessEvent fallback cannot bypass response abuse or audit gates",
+                "malformed UTF-8 or oversize messages fail closed",
+                "audit records are sanitized and do not expose raw UE internals",
+                "operator controls can disable response delivery without disabling passive chat intake",
+            ]},
             {"id": "separation.no_commands_router_or_moderation", "status": "unresolved", "required_exclusions": [
                 "command router",
                 "command registration API",
@@ -265,6 +281,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "public minimal ChatMessageEvent response path",
                 "public generic chat routing response path",
                 "public raw ProcessEvent response path",
+                "raw ProcessEvent or legacy CallProcessEvent fallback",
                 "public static thunk orientation response path",
                 "public commands/replies response shortcut before promoted identity and permissions/admin",
                 "reply API",
@@ -568,6 +585,57 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("runtime_owned_principal_permissions_gate_required_false_missing", report["blockers"])
         self.assertIn("runtime_owned_principal_permissions_gate_inputs_missing", report["blockers"])
         self.assertIn("runtime_owned_principal_permissions_gate_forbidden_sources_missing", report["blockers"])
+
+    def test_rejects_missing_response_lifecycle_and_abuse_guards(self) -> None:
+        decisions = self.make_decisions()
+        decisions["forbidden_public_contract"] = [
+            item
+            for item in decisions["forbidden_public_contract"]
+            if item != "raw ProcessEvent or legacy CallProcessEvent fallback"
+        ]
+        lifecycle = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "lifecycle.owner_scoped_unregister_and_drain"
+        )
+        lifecycle["required_behavior"] = [
+            item
+            for item in lifecycle["required_behavior"]
+            if item
+            not in {
+                "future reply/send-chat/router response paths require owner-scoped lifecycle and unregister cleanup before public ABI",
+                "raw ProcessEvent and legacy CallProcessEvent fallback do not satisfy response unregister cleanup or drain",
+            }
+        ]
+        abuse = next(
+            item for item in decisions["required_before_public_header"] if item["id"] == "abuse.rate_limit_and_audit"
+        )
+        abuse["required_behavior"] = [
+            item
+            for item in abuse["required_behavior"]
+            if item
+            not in {
+                "reply/send-chat/router response attempts require rate-limit and sanitized audit checks per plugin owner token before delivery",
+                "raw ProcessEvent and legacy CallProcessEvent fallback cannot bypass response abuse or audit gates",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+        self.assertIn("lifecycle_owner_unregister_behavior_missing", report["blockers"])
+        self.assertIn("abuse_rate_limit_audit_behavior_missing", report["blockers"])
 
     def test_rejects_missing_not_sufficient_shortcut_evidence(self) -> None:
         decisions = self.make_decisions()

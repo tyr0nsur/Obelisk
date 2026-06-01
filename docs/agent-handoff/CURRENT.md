@@ -52,6 +52,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Structure build-policy offline intake now freezes exact target shapes and redaction
   policy while continuing to fail closed on public payload, runtime, enforcement, return
   override, Structure SDK, or v1-completion claims.
+- Latest SDK accounting hardening: `check_public_sdk_v1_completion.py` now reports
+  complete-SDK progress as 0/12 completion blockers promoted and 0/4 P0 dependency-chain
+  surfaces promoted, with `complete_sdk_claim_progress_percent=0`. Post-v1/excluded
+  outcomes are bookkeeping only and do not contribute toward complete/full/production SDK
+  progress. Inventory copied-signal stability now has a standalone offline checker for the
+  exact five allowed copied signals, category-only `resource_kind`, and no Inventory SDK,
+  Items SDK, lookup, mutation, `AdditionalData`, or `ResourceHandle` claims.
 
 ## Hard Overrides
 
@@ -209,15 +216,22 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   semantically checked before any bundle input can be treated as ready.
 - `command_chat_response_public_readiness`, `commands_replies_public_readiness`, and
   `check_command_permission_route_gate.py` preserve runtime-owned principal provenance and
-  runtime-owned permission provenance, and keep public header, ABI, SDK, runtime,
-  reply/send-chat, command-router, and permissions claims false.
+  runtime-owned permission provenance; they also require owner-scoped lifecycle,
+  unregister cleanup, drain, rate-limit, abuse controls, and sanitized audit before any
+  future reply/send-chat/router path. Raw `ProcessEvent` and legacy `CallProcessEvent`
+  fallback must not satisfy those gates. Public header, ABI, SDK, runtime, reply/send-chat,
+  command-router, and permissions claims remain false.
 - `check_player_identity_public_contract_gap_report.py` keeps player identity blocked on
   `privacy.identifier_redaction`, scans the public header for accidental identity/principal
-  symbols, and does not require or replace approved runtime principal lifecycle evidence.
+  symbols, freezes the post-runtime public-contract privacy/lifecycle/invalidation/
+  multi-instance separation expectations, and does not require or replace approved runtime
+  principal lifecycle evidence.
 - Inventory copied signals are the current no-core side lane with the best return; item
-  return-only policy signals and metadata hardening stay copied-signal-only and do not
-  promote Inventory SDK, Items SDK, identity, mutation, return override, runtime readiness,
-  or v1 completion.
+  return-only policy signals and metadata hardening stay copied-signal-only. Use
+  `scripts/check_inventory_item_copied_signals_stability.py --json` to verify the exact
+  five copied signals remain aligned across decisions, public gameplay events, and the
+  public header. This does not promote Inventory SDK, Items SDK, identity, mutation, return
+  override, runtime readiness, or v1 completion.
 - Mission copied-bool, buff scalar, structure census/build-policy, operator ingress/storage,
   and mission/transfer/dino/tribe/buff-status accounting stay internal, planning-only, or
   consume-only until their own copied ABI, redaction, lifecycle, and promotion gates exist.

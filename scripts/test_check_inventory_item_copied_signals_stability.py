@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""Tests for check_inventory_item_copied_signals_stability.py."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+SCRIPT = SCRIPT_DIR / "check_inventory_item_copied_signals_stability.py"
+sys.path.insert(0, str(SCRIPT_DIR))
+import check_inventory_item_copied_signals_stability as stability  # noqa: E402
+
+
+class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
+    def run_checker(self, root: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--decisions",
+                str(root / "inventory_item_copied_signals_public_contract_decisions.json"),
+                "--public-sdk-surfaces",
+                str(root / "public_sdk_surfaces.json"),
+                "--public-gameplay-events",
+                str(root / "public_gameplay_events.json"),
+                "--public-header",
+                str(root / "ObeliskApi.h"),
+                "--json",
+            ],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if check and result.returncode != 0:
+            self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
+        return result
+
+    def make_decisions(self) -> dict:
+        return {
+            "schema": stability.DECISIONS_SCHEMA,
+            "surface": stability.SURFACE,
+            "status": "promoted-experimental-only",
+            "decision": "copied_signal_only",
+            "support_tier": "promoted-experimental-only copied-data seed",
+            "depends_on": [stability.GAMEPLAY_POLICY_EVENT_SURFACE],
+            "public_header_allowed": True,
+            "public_header": "include/obelisk/ObeliskApi.h",
+            "public_header_symbols_now": sorted(stability.EXPECTED_HEADER_SYMBOLS),
+            "public_contract": {
+                "event_family": "GameplayPolicyEvent",
+                "resource_kind": stability.RESOURCE_KIND,
+                "resource_contract": "category-only metadata; no identity, no lookup, no handle, persistence, or cross-event correlation",
+                "payload_contract": "copied POD scalar observation only",
+                "public_fields": [
+                    "abi_version",
+                    "struct_size",
+                    "event_kind",
+                    "resource_kind",
+                    "flags",
+                    "field_mask",
+                    "bool_values",
+                    "int32_values",
+                ],
+            },
+            "allowed_signals": [dict(signal) for signal in stability.EXPECTED_ALLOWED_SIGNALS],
+            "blocked_public_contract": {
+                "standalone_inventory_sdk_allowed": False,
+                "standalone_items_sdk_allowed": False,
+                "forbidden_terms": sorted(stability.REQUIRED_FORBIDDEN_TERMS),
+            },
+            "v1_completion_contract": {
+                "claim_effect": "does_not_complete_v1_sdk",
+                "required_before_stable_sdk_claim": [
+                    "release wording stays scoped to the five allowed_signals",
+                ],
+            },
+        }
+
+    def make_public_gameplay_events(self) -> dict:
+        return {
+            "schema": stability.PUBLIC_GAMEPLAY_EVENTS_SCHEMA,
+            "metadata_surfaces": [
+                {
+                    "surface_id": "obelisk.resource_kind_descriptors.v1",
+                    "scope": (
+                        "metadata-only resource category descriptors for routing/config; no identity, "
+                        "no lookup, no handle, no cross-event correlation, no mutation, and no UE object access"
+                    ),
+                    "flags": [
+                        "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
+                        "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
+                        "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP",
+                    ],
+                    "resource_kinds": [
+                        {
+                            "kind": stability.RESOURCE_KIND,
+                            "stable_name": "inventory_item",
+                            "supported_gameplay_policy_event_mask": stability.ALL_INVENTORY_MASK,
+                            "supported_gameplay_policy_field_mask": sorted(stability.EXPECTED_SIGNAL_FIELDS),
+                        }
+                    ],
+                }
+            ],
+            "promoted_events": [
+                {
+                    "event_id": stability.GAMEPLAY_POLICY_EVENT,
+                    "v1_sdk_status": "promoted-experimental-only",
+                    "v1_completion_evidence": False,
+                    "resource_contract": "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
+                    "payload": "copied POD scalar fields only",
+                    "event_kinds": [
+                        {**dict(signal), "resource_kind": stability.RESOURCE_KIND}
+                        for signal in stability.EXPECTED_ALLOWED_SIGNALS
+                    ],
+                }
+            ],
+        }
+
+    def make_public_sdk_surfaces(self) -> dict:
+        return {
+            "schema": stability.PUBLIC_SDK_SURFACES_SCHEMA,
+            "v1_completion_required": False,
+            "stable_release_contract": {"claim_allowed": False},
+            "promoted_surfaces": [],
+            "experimental_surfaces": [stability.SURFACE],
+            "surfaces": [
+                {
+                    "id": stability.SURFACE,
+                    "status": "promoted-experimental-only",
+                    "support_tier": "promoted-experimental-only copied-data seed",
+                    "public_contract": list(stability.EXPECTED_PUBLIC_CONTRACT),
+                    "payload_contract": [
+                        "copied bool ReturnValue signals only where declared by docs/public_gameplay_events.json",
+                        "copied bRequestedByPlayer for inventory.remote_add_check",
+                        "copied bIgnoreCooldown for inventory.use_check",
+                        "resource_kind remains INVENTORY_ITEM metadata only",
+                        "post-original observation only; no authority",
+                    ],
+                    "exclusions": sorted(stability.REQUIRED_FORBIDDEN_TERMS),
+                },
+                {
+                    "id": stability.INVENTORY_MUTATION_SURFACE,
+                    "status": "post-v1",
+                    "public_contract": [],
+                },
+                {
+                    "id": stability.RESOURCE_HANDLE_SURFACE,
+                    "status": "post-v1",
+                    "public_contract": [],
+                },
+            ],
+        }
+
+    def make_header(self) -> str:
+        define_lines = [
+            "#define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS (1ull << 6)",
+            "#define OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS (1ull << 8)",
+            "#define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD (1ull << 0)",
+            "#define OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED (1ull << 2)",
+            "#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE (1ull << 0)",
+            "#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER (1ull << 4)",
+            "#define OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN (1ull << 5)",
+        ]
+        for index, signal in enumerate(stability.EXPECTED_ALLOWED_SIGNALS, start=6):
+            define_lines.append(f"#define {signal['event_kind_mask']} (1ull << {index})")
+        define_lines.append("#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY \\")
+        for index, signal in enumerate(stability.EXPECTED_ALLOWED_SIGNALS):
+            suffix = " | \\" if index < len(stability.EXPECTED_ALLOWED_SIGNALS) - 1 else ""
+            define_lines.append(f"    ({signal['event_kind_mask']}){suffix}")
+
+        enum_values = "\n".join(
+            f"    {signal['kind']} = {index},"
+            for index, signal in enumerate(stability.EXPECTED_ALLOWED_SIGNALS, start=7)
+        )
+        return (
+            "#pragma once\n"
+            "#include <stdint.h>\n"
+            + "\n".join(define_lines)
+            + "\n"
+            "typedef enum ObeliskGameplayPolicyResourceKind {\n"
+            "    OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM = 2,\n"
+            "} ObeliskGameplayPolicyResourceKind;\n"
+            "typedef enum ObeliskGameplayPolicyEventKind {\n"
+            f"{enum_values}\n"
+            "} ObeliskGameplayPolicyEventKind;\n"
+            "typedef struct ObeliskGameplayPolicyEvent { uint32_t event_kind; } ObeliskGameplayPolicyEvent;\n"
+            "typedef struct ObeliskGameplayPolicyEventDescriptor { uint32_t event_kind; } ObeliskGameplayPolicyEventDescriptor;\n"
+            "typedef void (*ObeliskGameplayPolicyEventCallback)(const ObeliskGameplayPolicyEvent* event, void* user_data);\n"
+            "typedef struct ObeliskApi {\n"
+            "    uint64_t (*RegisterGameplayPolicyEventWithOwnerTokenHandle)(uint64_t ownerToken, uint64_t eventKindMask, ObeliskGameplayPolicyEventCallback callback, void* userData);\n"
+            "    bool (*UnregisterGameplayPolicyEventWithOwnerToken)(uint64_t ownerToken, uint64_t registrationId);\n"
+            "    bool (*DescribeGameplayPolicyEventKind)(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out);\n"
+            "} ObeliskApi;\n"
+        )
+
+    def write_fixture(self, root: Path, fixtures: dict[str, Any]) -> None:
+        (root / "inventory_item_copied_signals_public_contract_decisions.json").write_text(
+            json.dumps(fixtures["decisions"], indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        (root / "public_sdk_surfaces.json").write_text(
+            json.dumps(fixtures["public_sdk_surfaces"], indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        (root / "public_gameplay_events.json").write_text(
+            json.dumps(fixtures["public_gameplay_events"], indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        (root / "ObeliskApi.h").write_text(fixtures["header"], encoding="utf-8")
+
+    def make_fixture(self) -> dict[str, Any]:
+        return {
+            "decisions": self.make_decisions(),
+            "public_sdk_surfaces": self.make_public_sdk_surfaces(),
+            "public_gameplay_events": self.make_public_gameplay_events(),
+            "header": self.make_header(),
+        }
+
+    def run_fixture(self, fixtures: dict[str, Any], check: bool = True) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root, fixtures)
+            return self.run_checker(root, check=check)
+
+    def test_valid_fixture_passes_as_experimental_copied_signal_only(self) -> None:
+        result = self.run_fixture(self.make_fixture())
+        payload = json.loads(result.stdout)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["surface"], stability.SURFACE)
+        self.assertEqual(payload["summary"]["allowed_signal_count"], 5)
+        self.assertFalse(payload["summary"]["public_sdk_ready"])
+        self.assertFalse(payload["summary"]["v1_completion_ready"])
+        self.assertEqual(payload["blockers"], [])
+
+    def test_extra_inventory_signal_fails_closed_across_manifests_and_header(self) -> None:
+        fixtures = self.make_fixture()
+        extra = {
+            "stable_name": "inventory_item.craft_blueprint_check",
+            "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CRAFT_BLUEPRINT_CHECK",
+            "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CRAFT_BLUEPRINT_CHECK",
+            "field_mask": [stability.RETURN_VALUE],
+        }
+        fixtures["decisions"]["allowed_signals"].append(extra)
+        fixtures["public_gameplay_events"]["promoted_events"][0]["event_kinds"].append(
+            {**extra, "resource_kind": stability.RESOURCE_KIND}
+        )
+        fixtures["header"] += (
+            "\n#define OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CRAFT_BLUEPRINT_CHECK (1ull << 11)\n"
+            "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CRAFT_BLUEPRINT_CHECK\n"
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        reasons = set(payload["blockers"])
+        self.assertIn("decisions_allowed_signals_mismatch", reasons)
+        self.assertIn("public_gameplay_inventory_event_kinds_mismatch", reasons)
+        self.assertIn("public_header_inventory_event_kinds_mismatch", reasons)
+        self.assertIn("public_header_inventory_event_masks_mismatch", reasons)
+
+    def test_resource_kind_must_remain_category_only_metadata(self) -> None:
+        fixtures = self.make_fixture()
+        descriptor = fixtures["public_gameplay_events"]["metadata_surfaces"][0]
+        descriptor["flags"] = ["OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_LOOKUP"]
+        descriptor["scope"] = "resource descriptors provide identity and lookup"
+        fixtures["decisions"]["public_contract"]["resource_contract"] = "identity-capable lookup metadata"
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("decisions_resource_contract_guardrail_missing", reasons)
+        self.assertIn("resource_descriptor_scope_guardrail_missing", reasons)
+        self.assertIn("resource_descriptor_category_only_flags_missing", reasons)
+
+    def test_public_inventory_items_sdk_and_authority_claims_are_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        surface = fixtures["public_sdk_surfaces"]["surfaces"][0]
+        surface["public_contract"].append(
+            "Inventory SDK exposes lookup mutation ResourceHandle AdditionalData API"
+        )
+        fixtures["public_gameplay_events"]["promoted_events"][0]["resource_contract"] = (
+            "kind metadata provides ResourceHandle lookup"
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("inventory_copied_surface_public_contract_mismatch", reasons)
+        self.assertIn("public_claim_forbidden_term", reasons)
+        self.assertIn("gameplay_policy_resource_contract_guardrail_missing", reasons)
+
+    def test_public_sdk_and_v1_readiness_cannot_be_activated_by_this_surface(self) -> None:
+        fixtures = self.make_fixture()
+        surfaces = fixtures["public_sdk_surfaces"]
+        surfaces["v1_completion_required"] = True
+        surfaces["stable_release_contract"]["claim_allowed"] = True
+        surfaces["promoted_surfaces"] = [stability.SURFACE]
+        surface = surfaces["surfaces"][0]
+        surface["status"] = "promoted"
+        surface["public_sdk_ready"] = True
+        fixtures["public_gameplay_events"]["promoted_events"][0]["v1_completion_evidence"] = True
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("v1_completion_required_not_false", reasons)
+        self.assertIn("claim_allowed_not_false", reasons)
+        self.assertIn("inventory_copied_surface_in_promoted_surfaces", reasons)
+        self.assertIn("status_mismatch", reasons)
+        self.assertIn("readiness_claim_enabled", reasons)
+        self.assertIn("v1_completion_evidence_not_false", reasons)
+
+
+if __name__ == "__main__":
+    unittest.main()
