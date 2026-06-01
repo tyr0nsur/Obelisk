@@ -109,15 +109,15 @@ operator approves a specific maintenance window. Server-backed validation should
 operator-approved debug/development target with explicit gates, rollback checks, and
 shutdown expectations.
 
-## Core-First SDK Direction
+## SDK Completion Direction
 
 The SDK currently exposes the C ABI header and CMake `obelisk_sdk` interface target.
-The first-stable line is core-first: bootstrap, hook safety, plugin lifecycle,
-callback ownership, install layout, release readiness, and ABI compatibility.
-Higher-level runtime-backed APIs for common modding tasks are module surfaces after
-gates, not the baseline SDK. They require explicit evidence, copied-data ABI design,
-lifecycle tests, documentation, and operator-safe runtime validation before they can
-be described as public.
+Those foundation pieces are necessary, but they are not the stable production target by
+themselves. The `v1.0` planning direction covers the ARK plugin-author SDK surface:
+bootstrap, hook safety, plugin lifecycle, callback ownership, install layout, ABI
+compatibility, and promoted module surfaces for common modding tasks. Each module surface
+requires explicit evidence, copied-data ABI design, lifecycle tests, documentation, and
+operator-safe runtime validation before it can be described as public.
 
 Process-local core timer callbacks belong to this layer only as owner-token runtime
 utilities with explicit unregister and plugin lifecycle cleanup. They do not define

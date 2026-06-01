@@ -151,6 +151,7 @@ for marker in \
     allow-filtered-process-event-callbacks \
     allow-call-process-event \
     allow-process-event-blocking \
+    request-static-fname-probe \
     enable-chat-events \
     enable-chat-reflection \
     enable-chat-route-observer \

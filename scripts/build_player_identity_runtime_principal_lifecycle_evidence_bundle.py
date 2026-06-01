@@ -46,6 +46,11 @@ def require_success(result: subprocess.CompletedProcess[str], label: str) -> Non
         raise SystemExit(f"{label} failed with exit {result.returncode}: {stderr}")
 
 
+def require_expected_failure(result: subprocess.CompletedProcess[str], label: str) -> None:
+    if result.returncode == 0:
+        raise SystemExit(f"{label} unexpectedly passed; evidence bundle overclaims readiness")
+
+
 def load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -61,6 +66,9 @@ def main() -> int:
     summary_path = output_dir / "runtime-observer-summary.json"
     manifest_path = output_dir / "approved-runtime-principal-lifecycle-evidence.json"
     check_path = output_dir / "approved-runtime-principal-lifecycle-evidence.check.json"
+    promote_check_path = output_dir / "approved-runtime-principal-lifecycle-evidence.promote-check.json"
+    public_check_path = output_dir / "approved-runtime-principal-lifecycle-evidence.public-readiness-check.json"
+    runtime_check_path = output_dir / "approved-runtime-principal-lifecycle-evidence.runtime-readiness-check.json"
     gate_path = output_dir / "approved-runtime-principal-lifecycle-evidence.consume-gate.json"
     report_path = output_dir / "evidence-bundle-report.json"
 
@@ -107,6 +115,25 @@ def main() -> int:
         ),
         "check approved runtime principal lifecycle evidence",
     )
+    negative_checks = (
+        ("promote", "--promote", promote_check_path),
+        ("public-readiness", "--public-readiness", public_check_path),
+        ("runtime-readiness", "--runtime-readiness", runtime_check_path),
+    )
+    for label, flag, path in negative_checks:
+        require_expected_failure(
+            run_command(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--json",
+                    flag,
+                    str(manifest_path),
+                ],
+                stdout_path=path,
+            ),
+            f"check approved runtime principal lifecycle evidence {label}",
+        )
     require_success(
         run_command(
             [
@@ -127,6 +154,9 @@ def main() -> int:
 
     summary = load_json(summary_path)
     check = load_json(check_path)
+    promote_check = load_json(promote_check_path)
+    public_check = load_json(public_check_path)
+    runtime_check = load_json(runtime_check_path)
     gate = load_json(gate_path)
     report = {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle.v1",
@@ -139,10 +169,18 @@ def main() -> int:
             "summary": str(summary_path),
             "manifest": str(manifest_path),
             "check": str(check_path),
+            "promote_check": str(promote_check_path),
+            "public_readiness_check": str(public_check_path),
+            "runtime_readiness_check": str(runtime_check_path),
             "consume_gate": str(gate_path),
         },
         "summary_modules": sorted(summary.get("modules", {}).keys()),
         "observed_runtime_cases": check.get("observed_runtime_cases", []),
+        "negative_readiness_checks": {
+            "promote_ready": promote_check.get("ready"),
+            "public_readiness_ready": public_check.get("ready"),
+            "runtime_readiness_ready": runtime_check.get("ready"),
+        },
         "consume_gate_status": gate.get("status"),
         "non_claim": (
             "offline consume bundle only; does not authorize server operations, Discord, "

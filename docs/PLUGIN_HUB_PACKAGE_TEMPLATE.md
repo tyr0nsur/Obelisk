@@ -1,7 +1,8 @@
 # Plugin Hub Package Template
 
-Use this template for Plugin Hub RC candidate packages. Keep the package README and
-metadata scoped to one support tier and one supported surface.
+Plugin Hub package work is post-SDK-complete. Use this template only when archived
+planning is explicitly requested or after the complete SDK blocker chain is resolved. Keep
+the package README and metadata scoped to one support tier and one supported surface.
 
 ## Package Metadata
 

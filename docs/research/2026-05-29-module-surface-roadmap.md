@@ -91,9 +91,11 @@ only; they do not turn target-set labels into public SDK names.
 
 Roadmap-to-Plugin-Hub alignment for contributors:
 
-- `hub foundation` is the only release-supported seed lane now, and it means current-ABI
-  lifecycle/config/logging, descriptor/catalog, timer, packaging, and fail-closed
-  capability work only.
+- `hub foundation` is the only release-supported seed lane now, but only as archived
+  post-SDK-complete planning while the complete SDK blocker chain remains open.
+- Active rounds are SDK-complete-first: identity/principal evidence, permissions/admin
+  query-only groundwork, command response, and then commands/replies. Plugin Hub
+  foundation is parked until the SDK blocker chain is resolved.
 - `gameplay policy backing` protects the existing copied/redacted `GameplayPolicyEvent`
   surface; it does not authorize new Inventory, Items, StructureEvents, enforcement,
   identity, lookup, mutation, return-override, or ArkApi compatibility claims.
@@ -144,18 +146,19 @@ Roadmap-to-Plugin-Hub alignment for contributors:
 
 ## Next v1 Round Recommendation
 
-Run the next v1 planning round as a narrow core-first/doc-and-fixture pass, not a new
-module promotion pass:
+Run the next v1 planning round as a narrow complete-SDK blocker pass, not a new Plugin Hub
+or module promotion pass:
 
-1. `hub foundation`: harden lifecycle/descriptors/capability docs, release checks,
-   packaging, and fail-closed configuration. This is the only broadly v1-facing lane in
-   the next round because it does not require UE object identity, return override, or
-   borrowed pointer contracts.
-2. `gameplay policy backing`: preserve the already-public copied/redacted
+1. `player identity/principal`: finish approved runtime principal lifecycle evidence and
+   keep it consume-only until promotion gates pass.
+2. `permissions/admin`: prepare query-only fail-closed internal groundwork on top of
+   promoted principal semantics; do not add public ABI yet.
+3. `command response/commands`: keep blocked until identity and permissions are promoted.
+4. `gameplay policy backing`: preserve the already-public copied/redacted
    `GameplayPolicyEvent` path by tightening inventory/structure/item return-only
    evidence and tests. Treat every accepted target set here as backing evidence for
    existing copied POD fields, not as a new Inventory, Structure, or Items SDK.
-3. `internal recognizer planning`: keep mission as the first post-RC internal copied-bool
+5. `internal recognizer planning`: keep mission as the first post-RC internal copied-bool
    planning thread after item return-only evidence is preserved. Buff, dino, tribe, and
    transfer remain lane-specific backlog until their blockers below are narrowed by named
    offline artifacts.

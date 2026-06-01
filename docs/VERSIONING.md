@@ -81,7 +81,7 @@ Use these labels consistently:
 | `0.1.0-dev` | Active development toward the first minor baseline. APIs can break. | No |
 | `0.1.0-alpha.N` | A named preview for contributors when a specific checkpoint is useful to test. | Optional |
 | `0.1.0-rc.N` | A release candidate after scope freeze and validation checklist pass. | Yes |
-| `0.1.0` | First stable baseline for the documented runtime/SDK scope only. | Yes |
+| `0.1.0` | Scoped foundation baseline for the documented runtime/SDK subset only; not complete `v1.0` SDK stability. | Yes |
 | `0.2.0-dev` | Development after `0.1.0`, likely reflection/event API work. | No |
 
 Do not tag every useful commit. Prefer commits, research notes, and status updates until
@@ -116,8 +116,8 @@ tag exists. Include:
 Public ABI rules:
 
 - Removing, retyping, or reordering public C ABI fields is an ABI break.
-- `v0.1.0` freezes the current append-only `ObeliskApi` ABI v1 layout as the first stable
-  compatibility contract.
+- `v0.1.0` freezes the current append-only `ObeliskApi` ABI v1 layout only for its scoped
+  foundation surface. It is not the complete `v1.0` SDK compatibility contract.
 - Appending fields behind `abi_version` and `struct_size` can be compatible only when old
   plugins are rejected or handled deliberately.
 - A future ABI-major redesign should be documented before implementation, not discovered

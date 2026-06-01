@@ -87,10 +87,21 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertFalse(report["promotion_ready"])
             self.assertFalse(report["public_sdk_ready"])
             self.assertFalse(report["runtime_ready"])
+            self.assertEqual(
+                report["negative_readiness_checks"],
+                {
+                    "promote_ready": False,
+                    "public_readiness_ready": False,
+                    "runtime_readiness_ready": False,
+                },
+            )
             self.assertEqual(report["consume_gate_status"], "accepted")
             self.assertTrue((output_dir / "runtime-observer-summary.json").is_file())
             self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.json").is_file())
             self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.check.json").is_file())
+            self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.promote-check.json").is_file())
+            self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.public-readiness-check.json").is_file())
+            self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.runtime-readiness-check.json").is_file())
             self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.consume-gate.json").is_file())
             self.assertTrue((output_dir / "evidence-bundle-report.json").is_file())
 

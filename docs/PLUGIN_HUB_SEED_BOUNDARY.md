@@ -1,6 +1,8 @@
 # Plugin Hub Seed Boundary
 
-Read this before proposing Plugin Hub examples or module categories.
+Plugin Hub work is parked until the complete Obelisk SDK blocker chain is resolved.
+Read this file only as archived boundary guidance for future Plugin Hub examples or module
+categories; it is not an active work queue before SDK completion.
 
 Plugin Hub seeds are not the Obelisk v1 SDK. A seed can teach a narrow, reviewed pattern
 without promoting the blocked gameplay/API surface that a full plugin ecosystem will
@@ -21,9 +23,10 @@ with `Support tier: <tier>`. Review must fail if that text claims v1 readiness,
 ArkApi/AseApi compatibility, commands, permissions, identity, send-chat/replies, mutation,
 storage, inventory, or structure support outside the declared tier.
 
-## Release-Supported Seeds Today
+## Parked Release-Supported Seed Classes
 
-Release-supported seeds are limited to:
+When Plugin Hub work resumes after SDK completion, release-supported seeds remain limited
+to:
 
 - lifecycle, config, logging, metadata, and shutdown hygiene;
 - descriptor/catalog consumers;

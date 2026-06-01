@@ -96,14 +96,13 @@ missing positional root, ignores inherited `OBELISK_ROOT` as an install target, 
 a symlinked `plugins` directory. Do not copy plugins directly into the active directory
 while ARK instances may restart.
 
-For contributor Plugin Hub seed work, keep support-tier classification separate from
-installation. The plugin installer only publishes an already-built `.so`; it does not
-validate Plugin Hub scope, ArkApi compatibility, public SDK promotion, or release
-readiness. Before installing or documenting a new seed example, start from
-`docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md`, keep
-ArkServerApi/AseApi/NextGen inputs as conceptual architecture, naming, demand, and
-migration-ergonomics references only, and run the
-plugin installer with `--dry-run` before copying into a shared `plugins/` root.
+Plugin Hub seed work is parked until the complete SDK blocker chain is resolved. The
+plugin installer only publishes an already-built `.so`; it does not validate Plugin Hub
+scope, ArkApi compatibility, public SDK promotion, or release readiness. If archived
+Plugin Hub planning is explicitly requested, read the parked Plugin Hub docs as boundaries
+only, keep ArkServerApi/AseApi/NextGen inputs as conceptual architecture, naming, demand,
+and migration-ergonomics references, and run the plugin installer with `--dry-run` before
+copying into a shared `plugins/` root.
 
 Useful installer flags:
 

@@ -86,9 +86,12 @@ template using `scripts/check_linuxgsm_wrapper_drift.sh --installed <path>/Obeli
 
 ## Release Gate Discipline
 
-- `scripts/check_release_readiness.sh` is the canonical local and CI gate for first-stable
-  runtime/SDK/install readiness. It owns build, CTest, script tests, install layout, SDK
-  consumer validation, read-only CLI status, installer dry-runs, and clean-tree checks.
+- `scripts/check_release_readiness.sh` is the canonical local and CI gate for scoped
+  runtime/SDK/install readiness checkpoints. It owns build, CTest, script tests, install
+  layout, SDK consumer validation, read-only CLI status, installer dry-runs, and
+  clean-tree checks. Passing this gate is not sufficient for a complete `v1.0` SDK claim;
+  v1 completion also requires `scripts/check_public_sdk_v1_completion.py --json` to allow
+  the stable SDK claim.
 - Do not add parallel installer or SDK layout checks to CI with different defaults. Extend
   the release gate or its tests instead so release readiness remains one reproducible path.
 - Second-source report dirs inside the repo must be Git-ignored, such as `local/...`.

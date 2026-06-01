@@ -10,7 +10,7 @@ runtime injection, UE event hooks, a stable plugin ABI, reflection-driven
 research tooling, and promoted gameplay APIs with explicit ownership, privacy,
 and lifecycle gates. ArkServerApi/AseApi and popular plugin families are product
 architecture references for migration ergonomics: naming, capability grouping,
-operator workflows, Plugin Hub priorities, and the shape server owners expect.
+operator workflows, post-SDK Plugin Hub planning, and the shape server owners expect.
 They are not a behavior map, not a porting target, and not copying sources,
 runtime evidence, or implementation guides for offsets, layouts, ABI assumptions,
 wrappers, raw UE pointer APIs, command parsers, return semantics, or

@@ -76,6 +76,19 @@ assert_fail residual-marker "${CHECK}" \
     --allow-stopped
 grep -F 'Forbidden marker exists' "${TMP_DIR}/residual-marker.err" >/dev/null
 
+root_debug_request="${TMP_DIR}/root-debug-request"
+prepare_root "${root_debug_request}"
+: > "${root_debug_request}/state/instances/arkserver2/request-static-fname-probe"
+assert_fail debug-request-marker "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --obelisk-root "${root_debug_request}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F 'Forbidden marker exists' "${TMP_DIR}/debug-request-marker.err" >/dev/null
+
 root_symlink="${TMP_DIR}/root-symlink"
 prepare_root "${root_symlink}"
 : > "${TMP_DIR}/external-marker"

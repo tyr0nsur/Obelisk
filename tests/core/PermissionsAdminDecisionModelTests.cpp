@@ -240,6 +240,39 @@ namespace
                         "missing capability returned allow");
     }
 
+    void TestOwnerProvenanceAndScopeMustAllBeValidForAllow()
+    {
+        PermissionQuery processLocal = CompleteRuntimeOwnedQuery();
+        processLocal.PrincipalValue.Scope = PrincipalScope::ProcessLocal;
+        RequireDecision(EvaluatePermissionQuery(processLocal),
+                        Decision::Allow,
+                        "complete process-local runtime-owned query was not allowed");
+
+        PermissionQuery missingOwnerWithValidScopeAndProvenance = processLocal;
+        missingOwnerWithValidScopeAndProvenance.Owner.HasOwnerToken = false;
+        RequireDecision(EvaluatePermissionQuery(missingOwnerWithValidScopeAndProvenance),
+                        Decision::Deny,
+                        "valid scope and provenance authorized without owner token");
+
+        PermissionQuery unsupportedScopeWithValidOwnerAndProvenance = processLocal;
+        unsupportedScopeWithValidOwnerAndProvenance.PrincipalValue.Scope = PrincipalScope::ClusterStable;
+        RequireDecision(EvaluatePermissionQuery(unsupportedScopeWithValidOwnerAndProvenance),
+                        Decision::Unknown,
+                        "valid owner token and provenance authorized unsupported scope");
+
+        PermissionQuery missingProvenanceWithValidOwnerAndScope = processLocal;
+        missingProvenanceWithValidOwnerAndScope.Provenance.HasPolicyEpoch = false;
+        RequireDecision(EvaluatePermissionQuery(missingProvenanceWithValidOwnerAndScope),
+                        Decision::Unknown,
+                        "valid owner token and scope authorized missing provenance");
+
+        PermissionQuery selfAttestedWithValidOwnerAndScope = processLocal;
+        selfAttestedWithValidOwnerAndScope.Provenance.SuppliedByPlugin = true;
+        RequireDecision(EvaluatePermissionQuery(selfAttestedWithValidOwnerAndScope),
+                        Decision::Deny,
+                        "valid owner token and scope authorized plugin-supplied provenance");
+    }
+
     void TestPolicyProvenanceFailsClosed()
     {
         PermissionQuery missingSource = CompleteRuntimeOwnedQuery();
@@ -316,6 +349,7 @@ int main()
     TestPrincipalGenerationFailsClosed();
     TestUnsupportedScopeFailsClosed();
     TestOwnerAndCapabilityFailClosed();
+    TestOwnerProvenanceAndScopeMustAllBeValidForAllow();
     TestPolicyProvenanceFailsClosed();
     TestPluginSuppliedProvenanceFailsClosed();
     TestRateLimitAndAuditFailuresFailClosed();

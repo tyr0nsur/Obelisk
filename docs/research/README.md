@@ -175,9 +175,11 @@ internal/test-only copied-bool planning. Neither lane is a public Inventory SDK,
 Mission SDK, new capability family, identity/lookup contract, mutation path, return
 override, or server-observation approval.
 
-Next v1 research round remains broad; the next post-RC/internal module research pass keeps
-hub foundation first, then `GameplayPolicyEvent` backing evidence, then mission
-copied-bool internal planning only.
+Next v1 research round remains broad, but the active order is complete-SDK-first:
+player identity/principal evidence, permissions/admin query-only groundwork, then command
+response/commands. Hub foundation notes are archived Plugin Hub planning, not the active
+priority before SDK completion. `GameplayPolicyEvent` backing evidence and mission
+copied-bool internal planning remain side lanes only.
 Use [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md) for the
 selected Mission copied-bool internal lane,
 [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)
@@ -197,11 +199,13 @@ binary, do not promote new SDK modules, and do not recenter the roadmap on chat.
 SDK, Items SDK, `StructureEvents`, build-policy API, identity/lookup, `ResourceHandle`,
 mutation, return override, runtime observation, or raw UE parameter access.
 
-Plugin Hub contributor intake uses the same three buckets as the public matrix:
-release-supported seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging,
-and fail-closed capability work; experimental pattern only for passive copied chat or
-copied policy examples; blocked backlog for commands, identity, persistence, operator
-ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or cross-instance state.
+Plugin Hub contributor intake uses the same three buckets as the public matrix, but it is
+parked until SDK completion. Its archived buckets remain: release-supported seed now for
+lifecycle/config/logging, descriptor/catalog, timer, packaging, and fail-closed
+capability work as post-SDK-complete planning only; experimental pattern only for passive
+copied chat or copied policy examples; blocked backlog for commands, identity,
+persistence, operator ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or
+cross-instance state.
 ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change
 the support tier without a named promotion gate.
 
@@ -209,7 +213,8 @@ Current v1 research lane snapshot from the current notes:
 
 | Lane | Current state | Use next |
 | --- | --- | --- |
-| Hub foundation: lifecycle, descriptors, timers, config/logging, packaging | Fact: current ABI-safe seed class with first-party examples and no UE identity dependency. | Release-supported Plugin Hub seed lane; harden docs, tests, packaging, and fail-closed configuration before adding new module promises. |
+| hub foundation first | Archived Plugin Hub planning phrase only, not active engineering priority while complete-SDK blockers remain open. | Keep it parked until identity/principal, permissions/admin, command response, and commands/replies have a stronger SDK path. |
+| Complete-SDK route: identity -> permissions/admin -> command response | Fact: current blocker chain requires player identity before permissions and commands. | Keep active rounds on SDK blockers; Plugin Hub seed work stays parked. |
 | Passive copied chat notification/parsing | Fact: minimal copied `ChatMessageEvent` exists; hypothesis: passive parser/auditor is a narrow release-facing seed if only release-scope examples are counted. | Treat chat as one small copied notification lane, not the v1 module center. Keep sender identity, permissions, replies/send-chat, moderation, and command SDK blocked until copied identity and authority are promoted. |
 | Inventory lane | Fact: current inventory evidence is promoted publicly only through copied/redacted `GameplayPolicyEvent` fields. | Preserve copied scalar observation and fixture gates without publishing a public Inventory SDK, item identity, lookup, mutation, return override, or `ResourceHandle`. |
 | Structures lane | Fact: structure access/demolish/variant/activation/PIN/seat policy slices back current copied gameplay policy. Build placement remains second-wave. | Keep structure target sets layout-only unless a strict readiness note promotes a named copied surface; do not publish StructureEvents, build-policy SDKs, return override, identity, lookup, or raw params. |

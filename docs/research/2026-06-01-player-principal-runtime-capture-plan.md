@@ -150,8 +150,8 @@ The future approved run should capture only the smallest signal set:
 - at least one post-original `HandleNewPlayer` accepted `session_start` event with
   copied bool values `1,1`, redacted object fields, and no principal id/generation logged;
 - at least one post-original `HandleNewPlayer` `session_start_rejected` event with a
-  canonical rejected bool combination, `principal_action=none`, and no principal
-  id/generation logged;
+  copied bool values `0,1`, `principal_action=none`, and no principal id/generation
+  logged;
 - at least one exact `OnLogout` `session_end` event with `Exiting` redacted and
   `principal_action=candidate_invalidated`.
 

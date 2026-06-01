@@ -78,9 +78,11 @@ server modding framework.
 
 ## Contributor Triage Rule
 
-Start with `PLUGIN_HUB_SEED_BOUNDARY.md` before classifying a proposal.
+Plugin Hub work is parked until the complete SDK blocker chain is resolved. Start with
+`PLUGIN_HUB_SEED_BOUNDARY.md` only when archived planning is explicitly requested or when
+post-SDK-complete Plugin Hub work resumes.
 
-When selecting a Plugin Hub seed, start only from rows marked `release-supported seed available`.
+When that future work resumes, start only from rows marked `release-supported seed available`.
 Rows marked `experimental seed only` may be used for clearly labeled pattern examples, not
 production modules. Rows marked `blocked` or `blocked except experimental auditing` should
 produce design notes, evidence plans, or guardrail tests only; do not start first-party
@@ -233,8 +235,9 @@ event data is callback-scope only.
 
 ## Post-v0.1 Creator Ladder
 
-For the first Plugin Hub seeds after `v0.1`, prefer plugins that stay inside the current
-ABI and keep the support tier explicit:
+This ladder is archived post-SDK-complete planning. It must not be used as an active work
+queue before the complete SDK blocker chain is resolved. When Plugin Hub work resumes,
+prefer plugins that stay inside the current ABI and keep the support tier explicit:
 
 Installed-SDK consumer seed:
 
@@ -288,8 +291,9 @@ evidence gates are satisfied.
 
 ## Plugin Hub Direction
 
-The first useful Plugin Hub seed examples should be built from surfaces that already
-exist. The installed-SDK starter consumers are `examples/sdk_minimal_plugin`,
+Plugin Hub direction is parked until SDK completion. The first useful Plugin Hub seed
+examples should be built from surfaces that already exist. The installed-SDK starter
+consumers are `examples/sdk_minimal_plugin`,
 `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin`; `plugins/*` contains
 in-tree runtime reference plugins.
 
