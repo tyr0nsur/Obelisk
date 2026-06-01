@@ -202,6 +202,27 @@ namespace
                         "valid owner token and scope authorized plugin-supplied provenance");
     }
 
+    void TestOperatorConfigAllowCapabilityRequiresRuntimePrincipalAndAuthorityPromotion()
+    {
+        PermissionQuery operatorConfigWithValidPrincipal = CompleteRuntimeOwnedQuery();
+        operatorConfigWithValidPrincipal.Provenance.Authority = PolicyAuthority::OperatorConfig;
+        RequireDecision(EvaluatePermissionQuery(operatorConfigWithValidPrincipal),
+                        Decision::Unknown,
+                        "operator-config authority authorized with valid principal generation, scope, and capability");
+
+        PermissionQuery operatorConfigMissingGeneration = operatorConfigWithValidPrincipal;
+        operatorConfigMissingGeneration.PrincipalValue.HasGeneration = false;
+        RequireDecision(EvaluatePermissionQuery(operatorConfigMissingGeneration),
+                        Decision::Unknown,
+                        "operator-config authority authorized without principal generation");
+
+        PermissionQuery operatorConfigUnsupportedScope = operatorConfigWithValidPrincipal;
+        operatorConfigUnsupportedScope.PrincipalValue.Scope = PrincipalScope::ClusterStable;
+        RequireDecision(EvaluatePermissionQuery(operatorConfigUnsupportedScope),
+                        Decision::Unknown,
+                        "operator-config authority authorized unsupported principal scope");
+    }
+
     void TestPolicyProvenanceFailsClosed()
     {
         PermissionQuery missingSource = CompleteRuntimeOwnedQuery();
@@ -280,6 +301,7 @@ int main()
     TestOwnerAndCapabilityFailClosed();
     TestActionAndResourceScopeFailClosed();
     TestOwnerProvenanceAndScopeMustAllBeValidForAllow();
+    TestOperatorConfigAllowCapabilityRequiresRuntimePrincipalAndAuthorityPromotion();
     TestPolicyProvenanceFailsClosed();
     TestPluginSuppliedProvenanceFailsClosed();
     TestRateLimitAndAuditFailuresFailClosed();

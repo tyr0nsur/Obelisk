@@ -9,12 +9,15 @@ servers, and does not promote public player identity or SDK readiness.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import tempfile
 from pathlib import Path
 from typing import Any
+
+from artifact_identity import canonical_json_bytes
 
 
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
@@ -43,6 +46,22 @@ REQUIRED_NON_CLAIMS = [
     ),
     "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
 ]
+
+
+def output_artifact_identity(payload: dict[str, Any], *, capture_id: str, evidence_pack_id: str) -> dict[str, str]:
+    identity_without_hash = {
+        "artifact_kind": SCHEMA,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": payload,
+    }
+    return {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -250,7 +269,7 @@ def build_manifest(
     reviewed_by: str,
     review_note: str,
 ) -> dict[str, Any]:
-    return {
+    manifest = {
         "schema": SCHEMA,
         "artifact_status": "approved_runtime_observer_summary",
         "readiness_classification": "runtime_evidence_only",
@@ -321,6 +340,13 @@ def build_manifest(
         },
         "non_claims": REQUIRED_NON_CLAIMS,
     }
+    run_id = str(window.get("run_id"))
+    manifest["output_artifact_identity"] = output_artifact_identity(
+        manifest,
+        capture_id=run_id,
+        evidence_pack_id=f"player-principal-lifecycle-{run_id}",
+    )
+    return manifest
 
 
 def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:

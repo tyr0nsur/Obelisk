@@ -21,6 +21,28 @@ SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
+APPROVED_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
+
+
+def add_output_artifact_identity(payload: dict) -> dict:
+    run_id = payload["operational_window"]["run_id"]
+    evidence_pack_id = f"player-principal-lifecycle-{run_id}"
+    identity_without_hash = {
+        "artifact_kind": APPROVED_SCHEMA,
+        "capture_id": run_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": payload,
+    }
+    payload["output_artifact_identity"] = {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(
+            json.dumps(material, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest(),
+    }
+    return payload
 
 
 def load_script_module(path: Path, name: str):
@@ -93,8 +115,8 @@ def analyzer_summary() -> dict:
 def manifest() -> dict:
     summary = analyzer_summary()
     source = summary["evidence"]["sources"][0]
-    return {
-        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+    return add_output_artifact_identity({
+        "schema": APPROVED_SCHEMA,
         "artifact_status": "approved_runtime_observer_summary",
         "readiness_classification": "runtime_evidence_only",
         "approved_runtime_evidence_present": True,
@@ -185,7 +207,7 @@ def manifest() -> dict:
             "does not expose Steam/EOS ids, player names, IPs, tribe ids, UE pointers, FNames, GObjects, raw params, or persistent lookup keys",
             "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
         ],
-    }
+    })
 
 
 def manifest_for_copied_log(copied_log: Path) -> dict:
@@ -204,8 +226,8 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
         ],
         "server_paths_allowed": False,
     }
-    return {
-        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+    return add_output_artifact_identity({
+        "schema": APPROVED_SCHEMA,
         "artifact_status": "approved_runtime_observer_summary",
         "readiness_classification": "runtime_evidence_only",
         "approved_runtime_evidence_present": True,
@@ -296,7 +318,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             "does not expose Steam/EOS ids, player names, IPs, tribe ids, UE pointers, FNames, GObjects, raw params, or persistent lookup keys",
             "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
         ],
-    }
+    })
 
 
 class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
@@ -360,6 +382,42 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             "source_summary_source_sha256_mismatch",
             {blocker["reason"] for blocker in rejected.blockers},
         )
+
+    def test_requires_complete_output_artifact_identity(self) -> None:
+        payload = manifest()
+        payload.pop("output_artifact_identity")
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("top_level_fields_missing_required", report["blockers"])
+        self.assertIn("output_artifact_identity_invalid", report["blockers"])
+
+    def test_rejects_wrong_or_stale_output_artifact_identity(self) -> None:
+        payload = manifest()
+        payload["output_artifact_identity"]["artifact_kind"] = "obelisk.wrong-kind.v1"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("output_artifact_identity_invalid", report["blockers"])
+
+        payload = manifest()
+        payload["output_artifact_identity"]["capture_id"] = "other-run"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("output_artifact_identity_capture_id_mismatch", report["blockers"])
+        self.assertIn("output_artifact_identity_hash_mismatch", report["blockers"])
+
+        payload = manifest()
+        payload["approval"]["review_note"] = "changed after identity hash"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("output_artifact_identity_hash_mismatch", report["blockers"])
 
     def test_promote_mode_blocks_even_when_runtime_evidence_is_accepted(self) -> None:
         result = self.run_checker(manifest(), "--promote", check=False)

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import protected_paths
+from artifact_identity import canonical_json_bytes, complete_artifact_identity
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -40,6 +41,7 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
         "promotion_ready",
         "public_sdk_ready",
         "runtime_ready",
+        "output_artifact_identity",
         "approval",
         "operational_window",
         "source_summary",
@@ -246,6 +248,9 @@ ALLOWED_FORBIDDEN_KEY_PATHS = (
 ALLOWED_FORBIDDEN_LEAF_PATHS = (
     "$.schema",
     "$.operational_window.schema",
+    "$.output_artifact_identity.artifact_kind",
+    "$.output_artifact_identity.capture_id",
+    "$.output_artifact_identity.evidence_pack_id",
     "$.operational_window.run_id",
     "$.operational_window.copied_log.path",
     "$.operational_window.posture.observer_exclusivity",
@@ -327,6 +332,58 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def expected_output_artifact_sha256(payload: dict[str, Any], identity: dict[str, str]) -> str:
+    identity_without_hash = {
+        "artifact_kind": identity["artifact_kind"],
+        "capture_id": identity["capture_id"],
+        "evidence_pack_id": identity["evidence_pack_id"],
+    }
+    manifest_without_identity = {
+        key: value
+        for key, value in payload.items()
+        if key != "output_artifact_identity"
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": manifest_without_identity,
+    }
+    return hashlib.sha256(canonical_json_bytes(material)).hexdigest()
+
+
+def validate_output_artifact_identity(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    identity, errors = complete_artifact_identity(
+        payload,
+        container_key="output_artifact_identity",
+        expected_artifact_kind=SCHEMA,
+    )
+    if errors or identity is None:
+        add(
+            blockers,
+            "output_artifact_identity_invalid",
+            "$.output_artifact_identity",
+            errors=errors,
+        )
+        return
+    run_id = payload.get("operational_window", {}).get("run_id")
+    if identity["capture_id"] != run_id:
+        add(
+            blockers,
+            "output_artifact_identity_capture_id_mismatch",
+            "$.output_artifact_identity.capture_id",
+            expected=run_id,
+            observed=identity["capture_id"],
+        )
+    expected_sha256 = expected_output_artifact_sha256(payload, identity)
+    if identity["artifact_sha256"] != expected_sha256:
+        add(
+            blockers,
+            "output_artifact_identity_hash_mismatch",
+            "$.output_artifact_identity.artifact_sha256",
+            expected=expected_sha256,
+            observed=identity["artifact_sha256"],
+        )
 
 
 def source_path_is_copied_or_offline(path_text: Any) -> bool:
@@ -930,6 +987,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         if payload.get(key) is not False:
             add(blockers, f"{key}_not_false", f"$.{key}")
     validate_approval(payload.get("approval"), blockers)
+    validate_output_artifact_identity(payload, blockers)
     observed_runtime_cases = validate_runtime_summary(payload.get("source_summary"), blockers)
     validate_operational_window(payload.get("operational_window"), payload.get("source_summary"), blockers)
     consumer_cases = validate_consumer_boundary(payload.get("consumer_boundary_cases"), blockers)
