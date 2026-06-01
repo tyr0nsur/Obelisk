@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
+import hashlib
 import sys
 import unittest
 from pathlib import Path
@@ -84,6 +86,10 @@ class BuildResourceHandleZeroSerialNegativeSamplesTests(unittest.TestCase):
             negative_limit=1,
             max_scan_index=8,
             skip_name_resolution=True,
+            capture_id=None,
+            evidence_pack_id=None,
+            require_output_artifact_identity=False,
+            output=None,
         )
         source = {
             "source_label": "fixture",
@@ -98,6 +104,10 @@ class BuildResourceHandleZeroSerialNegativeSamplesTests(unittest.TestCase):
 
         self.assertEqual(report["status"], "candidate_blocked")
         self.assertTrue(report["deterministic_negative_cohort"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_resource_handle_ready"])
+        self.assertFalse(report["post_callback_resource_handle_ready"])
+        self.assertEqual(report["promotion_gate"]["ready"], False)
         self.assertIn("does not prove runtime reuse", report["non_claims"][1])
 
     def test_rejects_bad_labeled_args(self) -> None:
@@ -135,6 +145,77 @@ class BuildResourceHandleZeroSerialNegativeSamplesTests(unittest.TestCase):
 
         self.assertFalse(report["deterministic_negative_cohort"])
         self.assertEqual(report["blockers"], ["core_sha256_not_provided"])
+        self.assertNotIn("core_path", report)
+        self.assertTrue(report["core_path_redacted"])
+
+    def test_output_artifact_identity_binds_canonical_report(self) -> None:
+        args = argparse.Namespace(
+            core=["fixture=/tmp/core"],
+            core_sha256=[],
+            gobjects=0x595B7E0,
+            fname_root_slot=0x5956F30,
+            anchor_index=8,
+            negative_limit=1,
+            max_scan_index=8,
+            skip_name_resolution=True,
+            capture_id="zero-serial-test",
+            evidence_pack_id="zero-serial-pack",
+            require_output_artifact_identity=True,
+            output=None,
+        )
+        source = {
+            "source_label": "fixture",
+            "core_path_redacted": True,
+            "core_sha256": "a" * 64,
+            "core_sha256_verified": True,
+            "deterministic_negative_cohort": True,
+            "blockers": [],
+            "metadata": {},
+            "scan_totals": {},
+            "zero_serial_negative_samples": [{"index": 0}],
+            "positive_anchor": {"index": 8, "item_dword_0x8": 1001},
+        }
+
+        with mock.patch.object(samples, "build_source_report", return_value=source):
+            report = samples.build_report(args)
+
+        identity = report["output_artifact_identity"]
+        self.assertEqual(identity["artifact_kind"], samples.REPORT_SCHEMA)
+        self.assertEqual(identity["capture_id"], "zero-serial-test")
+        self.assertEqual(identity["evidence_pack_id"], "zero-serial-pack")
+        expected_hash = hashlib.sha256(
+            samples.canonical_json_bytes(
+                {
+                    "artifact_identity": {
+                        "artifact_kind": samples.REPORT_SCHEMA,
+                        "capture_id": "zero-serial-test",
+                        "evidence_pack_id": "zero-serial-pack",
+                    },
+                    "report": samples.canonical_report(report),
+                }
+            )
+        ).hexdigest()
+        self.assertEqual(identity["artifact_sha256"], expected_hash)
+        serialized = json.dumps(report)
+        self.assertNotIn("/tmp/core", serialized)
+
+    def test_rejects_partial_or_unsafe_output_identity_args(self) -> None:
+        with self.assertRaises(SystemExit):
+            samples.validate_output_identity_args(
+                argparse.Namespace(
+                    capture_id="zero-serial-test",
+                    evidence_pack_id=None,
+                    require_output_artifact_identity=False,
+                )
+            )
+        with self.assertRaises(SystemExit):
+            samples.validate_output_identity_args(
+                argparse.Namespace(
+                    capture_id="../bad",
+                    evidence_pack_id="zero-serial-pack",
+                    require_output_artifact_identity=False,
+                )
+            )
 
 
 if __name__ == "__main__":

@@ -71,9 +71,10 @@ owner-token callback lifetime, process-local timers, and descriptor metadata:
 - process-local `RegisterTimerWithOwnerTokenHandle` and `UnregisterTimerWithOwnerToken`;
 - `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`.
 
-These are release-supported seed surfaces. They do not imply hot reload of Obelisk itself,
-background ingress without shutdown proof, cluster scheduler state, gameplay timers,
-resource identity, lookup, mutation, or return override.
+These are release-supported foundation surfaces for the SDK package, not Plugin Hub seed
+priority. They do not imply hot reload of Obelisk itself, background ingress without
+shutdown proof, cluster scheduler state, gameplay timers, resource identity, lookup,
+mutation, or return override.
 
 The installed SDK package is part of this foundation contract. Creator-facing external
 plugins should consume it with:

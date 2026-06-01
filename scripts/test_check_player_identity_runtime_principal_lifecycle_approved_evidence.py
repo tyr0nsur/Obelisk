@@ -190,6 +190,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["remaining_blockers"], [])
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(
             report["observed_runtime_cases"],
             ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
@@ -205,6 +206,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("promote_blocked_until_identity_public_contract_gate", report["blockers"])
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertFalse(report["promotion_ready"])
         self.assertTrue(report["runtime_evidence_ready"])
 
@@ -221,6 +223,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertIn(blocker, report["blockers"])
                 self.assertTrue(report["approved_runtime_evidence_present"])
                 self.assertTrue(report["runtime_evidence_ready"])
+                self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
                 self.assertFalse(report["promotion_ready"])
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
@@ -235,6 +238,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime_summary_quality_blockers_present", report["blockers"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
         self.assertIn("runtime_summary_quality_counter_nonzero", report["blockers"])
 
     def test_rejects_events_before_safe_gate_counter_from_analyzer_summary(self) -> None:

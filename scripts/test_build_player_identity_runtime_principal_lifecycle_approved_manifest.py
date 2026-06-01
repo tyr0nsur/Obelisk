@@ -96,7 +96,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     "observer_marker_survived=false",
                     "user_policy=no_regular_users",
                     "notice_sent=not_applicable",
-                    "log_budget=5",
+                    "log_budget=10",
                     "plugins_disabled=true",
                     "scanner_disabled=true",
                     "dispatch_limit=0",

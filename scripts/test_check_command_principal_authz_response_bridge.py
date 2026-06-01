@@ -141,12 +141,17 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
 
         for condition in (
             "missing principal_handle",
+            "missing principal",
             "missing principal_generation",
             "missing principal_scope_flags",
             "command text principal claim",
             "operator config permission claim",
+            "missing policy_epoch provenance",
+            "plugin-supplied provenance",
             "permission deny result",
             "permission unknown result",
+            "rate limit exceeded",
+            "malformed UTF-8",
             "missing command_chat_response_path promotion",
             "missing commands_replies promotion",
         ):
@@ -201,11 +206,47 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("source_doc_unexpectedly_promoted", report["blockers"])
         self.assertIn("source_doc_missing_shared_principal_vocabulary", report["blockers"])
 
+    def test_rejects_source_doc_public_header_surface_claims(self) -> None:
+        permissions_admin = self.load_json(PERMISSIONS_ADMIN)
+        permissions_admin.pop("public_header_allowed")
+        permissions_admin["public_header_symbols_now"] = ["ObeliskPermissionQuery"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), permissions_admin=permissions_admin)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("source_doc_public_header_allowed_not_false", report["blockers"])
+        self.assertIn("source_doc_public_header_symbols_now_not_empty", report["blockers"])
+
+    def test_rejects_source_doc_public_capability_or_response_abi_claims(self) -> None:
+        player_identity = self.load_json(PLAYER_IDENTITY)
+        player_identity["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+        command_response = self.load_json(COMMAND_RESPONSE)
+        command_response["public_response_abi_now"] = ["ObeliskCommandChatResponse"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(
+                Path(temp_dir),
+                player_identity=player_identity,
+                command_response=command_response,
+            )
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("source_doc_public_capability_bits_now_not_empty", report["blockers"])
+        self.assertIn("source_doc_public_response_abi_now_not_empty", report["blockers"])
+
     def test_rejects_public_header_forbidden_tokens(self) -> None:
         header = (
             HEADER.read_text(encoding="utf-8")
             + "\n#define OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE (1ull << 55)\n"
+            + "#define OBELISK_API_CAPABILITY_COMMANDS (1ull << 56)\n"
             + "typedef struct ObeliskCommandPrincipalAuthzResponseBridge { uint32_t struct_size; } ObeliskCommandPrincipalAuthzResponseBridge;\n"
+            + "typedef struct ObeliskPermissionCache { uint32_t struct_size; } ObeliskPermissionCache;\n"
+            + "typedef void (*RegisterCommand)(uint64_t owner_token);\n"
+            + "typedef void (*ReplyToCommand)(uint64_t owner_token);\n"
+            + "typedef void (*GrantPermission)(uint64_t owner_token);\n"
             + "typedef void (*SendChatWithOwnerToken)(uint64_t owner_token);\n"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -217,8 +258,33 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("public_header_forbidden_symbols_present", report["blockers"])
         detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
         self.assertIn("OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE", detail["symbols"])
+        self.assertIn("OBELISK_API_CAPABILITY_COMMANDS", detail["symbols"])
         self.assertIn("ObeliskCommandPrincipalAuthzResponseBridge", detail["symbols"])
+        self.assertIn("ObeliskPermissionCache", detail["symbols"])
+        self.assertIn("RegisterCommand", detail["symbols"])
+        self.assertIn("ReplyToCommand", detail["symbols"])
+        self.assertIn("GrantPermission", detail["symbols"])
         self.assertIn("SendChatWithOwnerToken", detail["symbols"])
+
+    def test_rejects_source_doc_missing_bridge_specific_fail_closed_semantics(self) -> None:
+        permissions_admin = self.load_json(PERMISSIONS_ADMIN)
+        permissions_admin = self.replace_string_values(permissions_admin, "policy_epoch", "policy_marker")
+        permissions_admin = self.replace_string_values(permissions_admin, "rate limit exceeded", "burst limit tripped")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = self.write_inputs(Path(temp_dir), permissions_admin=permissions_admin)
+            result = self.run_checker(*self.checker_args(paths), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("source_doc_missing_bridge_semantics", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "source_doc_missing_bridge_semantics" and item["label"] == "$.permissions_admin"
+        )
+        self.assertIn("policy_epoch", detail["missing"])
+        self.assertIn("missing policy_epoch provenance fails closed", detail["missing"])
+        self.assertIn("rate limit exceeded", detail["missing"])
 
 
 if __name__ == "__main__":

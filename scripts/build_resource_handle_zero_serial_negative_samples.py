@@ -18,8 +18,9 @@ from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
+from artifact_identity import canonical_json_bytes, is_safe_artifact_id  # noqa: E402
 import enumerate_core_uobjects as uobjects  # noqa: E402
-from snapshot_evidence_pack import SHA256_RE, reject_protected_input_path  # noqa: E402
+from snapshot_evidence_pack import SHA256_RE, reject_protected_input_path, reject_protected_output_path  # noqa: E402
 
 
 REPORT_SCHEMA = "obelisk.resource-handle-zero-serial-negative-samples.v1"
@@ -246,13 +247,65 @@ def build_source_report(
 
     return {
         "source_label": label,
-        "core_path": str(core),
+        "core_path_redacted": True,
         "core_sha256": observed_core_sha256,
         "core_sha256_verified": expected_core_sha256 is not None,
         **sample_report,
         "deterministic_negative_cohort": not blockers,
         "blockers": blockers,
     }
+
+
+def canonical_report(report: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": report.get("schema"),
+        "status": report.get("status"),
+        "evidence_kind": report.get("evidence_kind"),
+        "deterministic_negative_cohort": report.get("deterministic_negative_cohort"),
+        "sources": report.get("sources"),
+        "serial_candidate_field": report.get("serial_candidate_field"),
+        "non_claims": report.get("non_claims"),
+        "promotion_ready": report.get("promotion_ready"),
+        "public_resource_handle_ready": report.get("public_resource_handle_ready"),
+        "post_callback_resource_handle_ready": report.get("post_callback_resource_handle_ready"),
+        "promotion_gate": report.get("promotion_gate"),
+    }
+
+
+def add_output_artifact_identity(
+    report: dict[str, Any],
+    *,
+    capture_id: str,
+    evidence_pack_id: str,
+) -> None:
+    identity_without_hash = {
+        "artifact_kind": REPORT_SCHEMA,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": canonical_report(report),
+    }
+    report["output_artifact_identity"] = {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(canonical_json_bytes(material)).hexdigest(),
+    }
+
+
+def validate_output_identity_args(args: argparse.Namespace) -> tuple[str, str] | None:
+    supplied = [args.capture_id is not None, args.evidence_pack_id is not None]
+    if args.require_output_artifact_identity and not all(supplied):
+        raise SystemExit("--require-output-artifact-identity requires --capture-id and --evidence-pack-id")
+    if any(supplied) and not all(supplied):
+        raise SystemExit("output artifact identity requires --capture-id and --evidence-pack-id together")
+    if not all(supplied):
+        return None
+    if not is_safe_artifact_id(args.capture_id):
+        raise SystemExit("--capture-id must be a safe artifact id")
+    if not is_safe_artifact_id(args.evidence_pack_id):
+        raise SystemExit("--evidence-pack-id must be a safe artifact id")
+    return args.capture_id, args.evidence_pack_id
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
@@ -282,7 +335,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         for label, path in cores
     ]
     deterministic = all(source["deterministic_negative_cohort"] for source in sources)
-    return {
+    report = {
         "schema": REPORT_SCHEMA,
         "status": "candidate_blocked",
         "evidence_kind": "internal_offline_zero_serial_negative_samples",
@@ -297,7 +350,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "candidate-only offline evidence",
             "does not prove runtime reuse, wraparound, UObject flag validity, lookup, mutation, or public ResourceHandle",
         ],
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
+        "post_callback_resource_handle_ready": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["candidate_only_zero_serial_negative_samples"],
+        },
     }
+    identity = validate_output_identity_args(args)
+    if identity is not None:
+        add_output_artifact_identity(report, capture_id=identity[0], evidence_pack_id=identity[1])
+    return report
 
 
 def parse_args() -> argparse.Namespace:
@@ -316,6 +380,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip class/name resolution while preserving serial, flag, and membership evidence.",
     )
+    parser.add_argument("--capture-id", help="Safe capture id for output_artifact_identity.")
+    parser.add_argument("--evidence-pack-id", help="Safe evidence pack id for output_artifact_identity.")
+    parser.add_argument(
+        "--require-output-artifact-identity",
+        action="store_true",
+        help="Require --capture-id and --evidence-pack-id and emit output_artifact_identity.",
+    )
+    parser.add_argument("--output", type=Path, help="Optional output JSON path.")
     return parser.parse_args()
 
 
@@ -328,7 +400,13 @@ def main() -> int:
     if args.max_scan_index is not None and args.max_scan_index < args.anchor_index:
         raise SystemExit("--max-scan-index must be >= --anchor-index")
 
-    print(json.dumps(build_report(args), indent=2, sort_keys=True))
+    output_path = reject_protected_output_path(args.output, "--output") if args.output else None
+    text = json.dumps(build_report(args), indent=2, sort_keys=True)
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text + "\n", encoding="utf-8")
+    else:
+        print(text)
     return 0
 
 

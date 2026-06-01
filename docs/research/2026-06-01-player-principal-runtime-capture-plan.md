@@ -475,6 +475,33 @@ No-go for any future runtime window if any item is true:
 - Rollback cannot be completed inside the approved window or stable posture cannot be
   verified afterward.
 
+## 2026-06-01 Offline Blocker Audit
+
+Existing offline evidence is sufficient to avoid another broad FName, GObjects, admin
+snapshot, second-source layout, or lifecycle-layout pass for the current binary hash. The
+shortest remaining blocker is:
+
+```text
+approved_runtime_evidence_missing
+```
+
+That means a future current-turn approved, bounded, consume-only
+`PlayerPrincipalLifecycleObserver` window must produce a copied/offline observer log,
+accepted window-manifest check, built approved-evidence manifest, and passing consume
+check. The exact first-window budget remains `log_budget=10`; a `5`-line manifest is a
+checker/test mismatch, not accepted runtime evidence.
+
+The local checker reports now expose the next gate explicitly:
+
+- shape-only fixture report: `next_blocker=approved_runtime_evidence_missing`;
+- accepted window manifest report:
+  `next_blocker=approved_runtime_observer_log_summary_and_manifest_missing`;
+- accepted approved runtime evidence report:
+  `next_blocker=identity_public_contract_gate_missing`.
+
+These are diagnostic labels only. They do not authorize server work, promotion, public
+readiness, plugin delivery, identity lookup, mutation, return override, or SDK claims.
+
 ## Gaps
 
 Remaining gaps after this plan:

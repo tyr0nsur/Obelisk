@@ -2020,6 +2020,108 @@ def runtime_serial_semantics_manifest() -> dict:
     return payload
 
 
+def attach_zero_serial_output_identity(payload: dict, *, capture_id: str, evidence_pack_id: str) -> None:
+    identity_without_hash = {
+        "artifact_kind": gate.RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+        "capture_id": capture_id,
+        "evidence_pack_id": evidence_pack_id,
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": gate.resource_handle_zero_serial_negative_samples_canonical_report(payload),
+    }
+    payload["output_artifact_identity"] = {
+        **identity_without_hash,
+        "artifact_sha256": hashlib.sha256(gate.canonical_json_bytes(material)).hexdigest(),
+    }
+
+
+def zero_serial_negative_samples_manifest() -> dict:
+    payload = {
+        "schema": gate.RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+        "status": "candidate_blocked",
+        "evidence_kind": "internal_offline_zero_serial_negative_samples",
+        "deterministic_negative_cohort": True,
+        "sources": [
+            {
+                "source_label": "primary",
+                "core_path_redacted": True,
+                "core_sha256": "a" * 64,
+                "core_sha256_verified": True,
+                "metadata": {
+                    "gobjects": "0x595b7e0",
+                    "fname_root_slot": "0x5956f30",
+                    "fname_table": "0x5a94660",
+                    "chunks": "0x600000",
+                    "object_count": 50835,
+                    "anchor_index": 50834,
+                    "max_scan_index": 50834,
+                    "name_resolution": "enabled",
+                },
+                "scan_totals": {
+                    "indices_scanned": 50835,
+                    "nonnull_items_seen": 50835,
+                    "candidate_uobjects_seen": 50835,
+                },
+                "zero_serial_negative_samples": [
+                    {
+                        "index": 0,
+                        "address": "0x100000",
+                        "class_name": "Package",
+                        "name": "CoreUObject",
+                        "flags": 129,
+                        "fuobject_item": "0x200000",
+                        "item_dword_0x8": 0,
+                        "item_dword_0xC": 1,
+                        "internal_index": 0,
+                        "internal_index_matches": True,
+                        "membership": "candidate-uobject",
+                        "membership_pass": True,
+                    }
+                ],
+                "positive_anchor": {
+                    "index": 50834,
+                    "address": "0x110000",
+                    "class_name": "LinkerLoad",
+                    "name": "LinkerLoad",
+                    "flags": 129,
+                    "fuobject_item": "0x210000",
+                    "item_dword_0x8": 1001,
+                    "item_dword_0xC": 116,
+                    "internal_index": 50834,
+                    "internal_index_matches": True,
+                    "membership": "candidate-uobject",
+                    "membership_pass": True,
+                },
+                "deterministic_negative_cohort": True,
+                "blockers": [],
+            }
+        ],
+        "serial_candidate_field": {
+            "offset": "FUObjectItem+0x8",
+            "width": "uint32",
+            "accepted_positive_anchor": "index 50834 nonzero serial",
+        },
+        "non_claims": [
+            "candidate-only offline evidence",
+            "does not prove runtime reuse, wraparound, UObject flag validity, lookup, mutation, or public ResourceHandle",
+        ],
+        "promotion_ready": False,
+        "public_resource_handle_ready": False,
+        "post_callback_resource_handle_ready": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["candidate_only_zero_serial_negative_samples"],
+        },
+    }
+    attach_zero_serial_output_identity(
+        payload,
+        capture_id="zero-serial-test",
+        evidence_pack_id="zero-serial-pack",
+    )
+    return payload
+
+
 def resource_handle_serial_scan_manifest(
     *,
     include_candidate: bool = True,
@@ -7692,6 +7794,70 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertIn(
             "runtime_serial_semantics_summary_negative_reject_rows_mismatch",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_accepts_zero_serial_negative_samples_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "zero-serial-negative-samples.json"
+            write_json(manifest, zero_serial_negative_samples_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_zero_serial_negative_samples_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "zero-serial-negative-samples.json"
+            write_json(manifest, zero_serial_negative_samples_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        self.assertIn(
+            "promote_mode_zero_serial_negative_samples_candidate_only",
+            {blocker["reason"] for blocker in result["blockers"]},
+        )
+
+    def test_blocks_zero_serial_negative_samples_path_leak_and_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "zero-serial-negative-samples.json"
+            payload = zero_serial_negative_samples_manifest()
+            payload["public_resource_handle_ready"] = True
+            payload["sources"][0]["core_path_redacted"] = False
+            payload["sources"][0]["core_path"] = "/servidor/ark/workspace-offline/core"
+            payload["sources"][0]["zero_serial_negative_samples"][0]["item_dword_0x8"] = 17
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("zero_serial_negative_samples_public_resourcehandle_overclaim", reasons)
+        self.assertIn("zero_serial_negative_samples_core_path_not_redacted", reasons)
+        self.assertIn("zero_serial_negative_samples_source_unexpected_field", reasons)
+        self.assertIn("zero_serial_negative_samples_core_path_field_present", reasons)
+        self.assertIn("zero_serial_negative_samples_protected_path_string", reasons)
+        self.assertIn("zero_serial_negative_samples_row_serial_not_zero", reasons)
+        self.assertIn("zero_serial_negative_samples_output_artifact_identity_hash_mismatch", reasons)
+
+    def test_blocks_zero_serial_negative_samples_missing_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "zero-serial-negative-samples.json"
+            payload = zero_serial_negative_samples_manifest()
+            payload.pop("output_artifact_identity")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn(
+            "zero_serial_negative_samples_output_artifact_identity_invalid",
             {blocker["reason"] for blocker in result["blockers"]},
         )
 

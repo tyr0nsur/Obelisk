@@ -68,6 +68,9 @@ files in `/tmp`, `/servidor/ark/workspace-offline`, or another documented non-pr
 artifact root; do not cite direct or symlink-resolved protected `/servidor/ark` paths.
 If an optional tool is absent, record the absence and continue with baseline
 `readelf`/`objdump` or existing provenance-gated artifacts instead of weakening tests.
+If an optional tool is present, use it for bounded known-root/window confirmation; do not
+use availability alone to rerun broad scans where the current evidence lane already says
+to reuse canonical no-scan inputs.
 
 Current post-RC research evidence lane (side-lane inventory for research reuse; follow
 `docs/agent-handoff/CURRENT.md` for the active assignment):

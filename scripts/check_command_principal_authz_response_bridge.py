@@ -45,6 +45,7 @@ SHARED_VOCABULARY = ("principal_handle", "principal_generation", "principal_scop
 REQUIRED_FAIL_CLOSED = frozenset(
     (
         "missing principal_handle",
+        "missing principal",
         "missing principal_generation",
         "missing principal_scope_flags",
         "stale principal",
@@ -61,9 +62,28 @@ REQUIRED_FAIL_CLOSED = frozenset(
         "zero plugin_owner_token",
         "missing capability",
         "missing permission policy provenance",
+        "missing permission policy source",
+        "unknown policy source",
+        "missing policy source provenance",
+        "missing policy source generation",
+        "policy source generation mismatch",
+        "missing policy_epoch provenance",
+        "allow without policy_epoch provenance",
         "unknown permission authority",
+        "missing authority kind",
+        "missing authority generation",
+        "authority generation mismatch",
+        "plugin-supplied provenance",
+        "plugin-supplied authority provenance",
         "permission deny result",
         "permission unknown result",
+        "missing action",
+        "malformed action_size",
+        "rate limit exceeded",
+        "malformed UTF-8",
+        "oversize response message",
+        "oversize command",
+        "unsupported source kind",
         "missing command_chat_response_path promotion",
         "missing commands_replies promotion",
     )
@@ -73,9 +93,16 @@ REQUIRED_BEHAVIORS = frozenset(
         "principal_handle, principal_generation, and principal_scope_flags must appear together in any future command, permission, or response payload that consumes player identity",
         "principal_handle alone never authorizes",
         "permissions/admin cannot return allow from command text, operator config, plugin input, or missing runtime principal observation",
+        "permission allow requires policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+        "operator-config authority is recognized but not allow-capable until separately promoted",
+        "plugin input and command callbacks cannot self-attest permission authority or policy provenance",
         "command/chat response targeting cannot create principal or permission claims",
+        "command/chat response path requires copied response payload, nonzero plugin_owner_token, owner-scoped handles, and promoted identity/permissions before any directed response",
         "commands/replies cannot dispatch when permission result is deny or unknown",
+        "commands/replies cannot dispatch from missing permission policy_epoch or missing command_chat_response_path promotion",
         "commands/replies cannot imply replies, send-chat, broadcast, moderation, storage, or admin mutation",
+        "permission or command rate-limit exhaustion fails closed",
+        "malformed UTF-8, oversize messages or commands, and unsupported command source kinds fail closed",
         "missing or zero plugin_owner_token fails closed for every future owner-token bridge operation",
         "missing capability fails closed and no capability bit is reserved by this bridge",
         "legacy CallProcessEvent debug access is not a command, reply, response, permission, or principal bridge",
@@ -87,25 +114,171 @@ REQUIRED_FORBIDDEN = frozenset(
         "public bridge ABI",
         "public header symbols",
         "public capability bits",
+        "public command SDK/router",
+        "public command_chat_response_path ABI",
+        "public CallProcessEvent response path",
+        "public CallProcessEvent command or reply path",
         "response ABI",
         "reply ABI",
         "send-chat ABI",
+        "broadcast/notices API",
         "command router",
         "command parser",
+        "command registration API",
+        "console command API",
+        "RCON command API",
+        "admin command API",
+        "player command API",
         "permission cache ABI",
+        "permission groups",
+        "admin groups",
+        "grant/revoke API",
         "admin mutation",
+        "admin actions",
         "principal or permission claims from command text",
         "principal or permission claims from operator config",
         "raw UE pointers",
         "raw ProcessEvent params",
         "raw FString storage",
+        "direct native-call wrappers",
+        "public UFunction or vtable details",
         "FName/GObjects indices",
         "ResourceHandle",
+        "pointer-derived identity",
+        "platform account ids",
+        "player names",
+        "tribe ids",
+        "network addresses",
         "player lookup",
         "mutation",
         "return override",
     )
 )
+REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
+    (
+        "OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE",
+        "OBELISK_API_CAPABILITY_ADMIN",
+        "OBELISK_API_CAPABILITY_AUTHORIZATION",
+        "OBELISK_API_CAPABILITY_COMMANDS",
+        "OBELISK_API_CAPABILITY_COMMANDS_REPLIES",
+        "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
+        "OBELISK_API_CAPABILITY_COMMAND_ROUTER",
+        "OBELISK_API_CAPABILITY_CHAT_RESPONSES",
+        "OBELISK_API_CAPABILITY_CHAT_REPLIES",
+        "OBELISK_API_CAPABILITY_SEND_CHAT",
+        "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT_RESPONSE",
+        "OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH",
+        "OBELISK_API_CAPABILITY_PERMISSIONS_ADMIN",
+        "OBELISK_API_CAPABILITY_PERMISSION_CHECKS",
+        "OBELISK_API_CAPABILITY_PERMISSION_EVENTS",
+        "OBELISK_API_CAPABILITY_IDENTITY",
+        "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+        "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_LIFECYCLE",
+        "OBELISK_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE_ABI_VERSION",
+        "OBELISK_COMMANDS_REPLIES_ABI_VERSION",
+        "OBELISK_COMMAND_ROUTER_ABI_VERSION",
+        "OBELISK_COMMAND_CHAT_RESPONSE_ABI_VERSION",
+        "OBELISK_PERMISSION_CACHE_ABI_VERSION",
+        "OBELISK_PERMISSION_QUERY_ABI_VERSION",
+        "ObeliskCommandPrincipalAuthzResponseBridge",
+        "ObeliskCommand",
+        "ObeliskCommandContext",
+        "ObeliskCommandRegistration",
+        "ObeliskCommandCallback",
+        "ObeliskCommandPayload",
+        "ObeliskCommandParser",
+        "ObeliskArkApiCommandParser",
+        "ObeliskAseApiCommandParser",
+        "ObeliskAdminAction",
+        "ObeliskAuthorizationDecision",
+        "ObeliskPermissionCache",
+        "ObeliskPermissionQuery",
+        "ObeliskPermissionDecision",
+        "ObeliskCommandChatResponse",
+        "ObeliskCommandReply",
+        "ObeliskChatResponse",
+        "ObeliskChatReply",
+        "ObeliskSendChat",
+        "ObeliskPlayerPrincipalLifecycleEvent",
+        "RegisterCommand",
+        "RegisterCommandWithOwnerToken",
+        "UnregisterCommand",
+        "UnregisterCommandWithOwnerToken",
+        "RegisterPlayerPrincipalLifecycleEvent",
+        "UnregisterPlayerPrincipalLifecycleEvent",
+        "AuthorizePermission",
+        "CheckPermissionWithOwnerToken",
+        "CheckPermissionCachedWithOwnerToken",
+        "RegisterPermission",
+        "GrantPermission",
+        "RevokePermission",
+        "BanPlayer",
+        "KickPlayer",
+        "ReplyToCommand",
+        "ReplyToCommandWithOwnerToken",
+        "SendChat",
+        "SendChatWithOwnerToken",
+    )
+)
+REQUIRED_SOURCE_SEMANTICS = {
+    "player_identity": frozenset(
+        (
+            "principal_handle",
+            "principal_generation",
+            "principal_scope_flags",
+            "stale generation fails closed",
+            "unsupported scope fails closed",
+            "no lookup handle",
+            "no mutation or return override authority",
+        )
+    ),
+    "permissions_admin": frozenset(
+        (
+            "principal_handle alone never authorizes",
+            "missing principal_generation",
+            "principal_generation_mismatch",
+            "unsupported principal_scope_flags",
+            "policy_source_id",
+            "policy_source_generation",
+            "authority_kind",
+            "authority_generation",
+            "policy_epoch",
+            "missing policy_epoch provenance fails closed",
+            "operator-config authority is recognized but not allow-capable until separately promoted",
+            "plugin input cannot self-attest authority provenance",
+            "rate limit exceeded",
+            "permission cache ABI",
+        )
+    ),
+    "command_response": frozenset(
+        (
+            "response_handle",
+            "plugin_owner_token",
+            "principal_handle",
+            "principal_generation",
+            "principal_scope_flags",
+            "missing or zero plugin_owner_token fails closed",
+            "captured post-init debug CallProcessEvent tables do not authorize response delivery",
+            "malformed UTF-8 or oversize messages fail closed",
+            "response delivery never creates identity or permission claims",
+            "future targeting must use only a promoted copied principal handle/generation",
+        )
+    ),
+    "commands_replies": frozenset(
+        (
+            "permission_policy_epoch",
+            "principal_handle",
+            "principal_generation",
+            "principal_scope_flags",
+            "missing permission policy provenance fails closed",
+            "permission denial or unknown result never dispatches a command",
+            "malformed UTF-8, oversize commands, and unsupported source kinds fail closed",
+            "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
+            "commands/replies remains blocked while command_chat_response_path is unpromoted or unresolved",
+            "command callbacks cannot self-attest permission authority",
+        )
+    ),
+}
 FALSE_ONLY_KEYS = frozenset(
     (
         "promotion_ready",
@@ -318,8 +491,17 @@ def validate_bridge_decisions(payload: dict[str, Any], blockers: list[dict[str, 
     missing_forbidden = REQUIRED_FORBIDDEN - string_set(payload.get("forbidden_public_contract"))
     if missing_forbidden:
         add(blockers, "forbidden_public_contract_missing", "$.decisions.forbidden_public_contract", missing=sorted(missing_forbidden))
-    if not string_set(payload.get("public_header_forbidden_tokens")):
+    forbidden_tokens = string_set(payload.get("public_header_forbidden_tokens"))
+    if not forbidden_tokens:
         add(blockers, "public_header_forbidden_tokens_missing", "$.decisions.public_header_forbidden_tokens")
+    missing_tokens = REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS - forbidden_tokens
+    if missing_tokens:
+        add(
+            blockers,
+            "public_header_forbidden_tokens_incomplete",
+            "$.decisions.public_header_forbidden_tokens",
+            missing=sorted(missing_tokens),
+        )
 
     collect_overclaims(payload, blockers, "$.decisions")
 
@@ -332,11 +514,36 @@ def validate_source_doc(label: str, payload: dict[str, Any], expected_surface: s
     for key in ("public_header_allowed", "promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready"):
         if key in payload and payload.get(key) is not False:
             add(blockers, "source_doc_public_or_runtime_overclaim", f"$.{label}.{key}", value=payload.get(key))
+    if payload.get("public_header_allowed") is not False:
+        add(blockers, "source_doc_public_header_allowed_not_false", f"$.{label}.public_header_allowed", value=payload.get("public_header_allowed"))
+    if payload.get("public_header_symbols_now") != []:
+        add(
+            blockers,
+            "source_doc_public_header_symbols_now_not_empty",
+            f"$.{label}.public_header_symbols_now",
+            value=payload.get("public_header_symbols_now"),
+        )
+    for key in ("public_capability_bits_now", "public_callback_abi_now", "public_response_abi_now"):
+        if key in payload and payload.get(key) != []:
+            add(blockers, f"source_doc_{key}_not_empty", f"$.{label}.{key}", value=payload.get(key))
 
     flattened = "\n".join(collect_strings(payload))
+    normalized_flattened = " ".join(flattened.split())
     for field in SHARED_VOCABULARY:
         if field not in flattened:
             add(blockers, "source_doc_missing_shared_principal_vocabulary", f"$.{label}", field=field)
+    missing_semantics = sorted(
+        fragment
+        for fragment in REQUIRED_SOURCE_SEMANTICS.get(label, frozenset())
+        if fragment not in normalized_flattened
+    )
+    if missing_semantics:
+        add(
+            blockers,
+            "source_doc_missing_bridge_semantics",
+            f"$.{label}",
+            missing=missing_semantics,
+        )
     collect_overclaims(payload, blockers, f"$.{label}")
 
 
@@ -376,7 +583,9 @@ def build_report(
         if payload is not None:
             validate_source_doc(label, payload, expected_surface, blockers)
 
-    forbidden_tokens = set(strings(decisions.get("public_header_forbidden_tokens"))) if isinstance(decisions, dict) else set()
+    forbidden_tokens = REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS | (
+        set(strings(decisions.get("public_header_forbidden_tokens"))) if isinstance(decisions, dict) else set()
+    )
     validate_public_header(public_header_path, forbidden_tokens, blockers)
 
     valid = not blockers

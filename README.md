@@ -561,7 +561,7 @@ Near-term engineering:
   validates the current field layout.
 - Keep Plugin Hub planning parked until the complete SDK contract is done. Do not spend
   current engineering rounds on Plugin Hub packaging, examples, or intake tooling unless
-  the SDK blocker chain has already been closed.
+  a future SDK-complete release decision explicitly reopens that post-SDK track.
 
 Later:
 

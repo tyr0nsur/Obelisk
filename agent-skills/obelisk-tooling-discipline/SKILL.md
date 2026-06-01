@@ -72,6 +72,9 @@ Forbidden on live/shared instances:
 - Prefer offline static analysis before runtime probes.
 - Prefer copied logs over live attach.
 - Prefer deterministic scripts over manual UI-only conclusions.
+- Treat local Ghidra/rizin/radare2 availability as optional enrichment, not permission to
+  rerun broad FName/GObjects/core/serial discovery. Reuse accepted roots and no-scan
+  artifacts for the current binary hash unless new evidence contradicts them.
 - For UFunction redacted-signature fixture work, list target sets and guidance first, then
   generate from `tests/fixtures/ufunction_snapshots` and validate with
   `validate_offline_artifact_gate.py --root <scratch-root> --mode consume

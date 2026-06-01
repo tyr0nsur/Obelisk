@@ -22,6 +22,7 @@ from snapshot_evidence_pack import reject_symlink_component
 
 
 REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
+NEXT_BLOCKER_AFTER_WINDOW_MANIFEST = "approved_runtime_observer_log_summary_and_manifest_missing"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 
@@ -420,6 +421,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
         "public_sdk_ready": False,
         "runtime_ready": False,
         "remaining_blockers": [] if accepted else ["window_manifest_not_accepted"],
+        "next_blocker": NEXT_BLOCKER_AFTER_WINDOW_MANIFEST if accepted else "window_manifest_not_accepted",
         "run_id": fields.get("run_id"),
         "obelisk_commit": fields.get("obelisk_commit"),
         "target": {

@@ -20,6 +20,7 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_c
 
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
 REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence-check.v1"
+NEXT_BLOCKER = "approved_runtime_evidence_missing"
 
 REQUIRED_CASES = frozenset(
     (
@@ -607,7 +608,8 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
-        "remaining_blockers": ["approved_runtime_evidence_missing"],
+        "remaining_blockers": [NEXT_BLOCKER],
+        "next_blocker": NEXT_BLOCKER,
         "observed_cases": validation.observed_cases,
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,

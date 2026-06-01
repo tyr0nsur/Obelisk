@@ -91,6 +91,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["remaining_blockers"], [])
+        self.assertEqual(report["next_blocker"], "approved_runtime_observer_log_summary_and_manifest_missing")
 
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)
@@ -111,6 +112,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("copied_log_path_under_protected_server_root", report["blockers"])
+        self.assertEqual(report["next_blocker"], "window_manifest_not_accepted")
         self.assertFalse(report["ready"])
 
     def test_rejects_unexpected_identity_or_ue_internal_fields(self) -> None:

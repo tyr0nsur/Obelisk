@@ -108,6 +108,7 @@ INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA = "obelisk.internal-uobject-reval
 INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA = "obelisk.internal-uobject-revalidation-serial-policy.v1"
 INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1"
 INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1"
+RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA = "obelisk.resource-handle-zero-serial-negative-samples.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA = "obelisk.resource-handle-serial-scan.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_PROVENANCE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.provenance.v1"
 RESOURCE_HANDLE_SERIAL_SCAN_CONSUME_GATE_SCHEMA = "obelisk.resource-handle-serial-scan.v1.consume-gate-expectation.v1"
@@ -157,6 +158,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     INTERNAL_UOBJECT_REVALIDATION_SERIAL_POLICY_SCHEMA,
     INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
     INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+    RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
     RESOURCE_HANDLE_SERIAL_SCAN_SCHEMA,
     READINESS_REPORT_SCHEMA,
     UOBJECT_FLAG_POLICY_REPORT_SCHEMA,
@@ -1134,6 +1136,10 @@ REQUIRED_UOBJECT_FLAG_SAMPLE_BLOCKERS = {
 REQUIRED_RESOURCE_HANDLE_SERIAL_SCAN_NON_CLAIMS = {
     "internal offline scan only",
     "does not promote ResourceHandle, object identity, lookup, mutation, or return override",
+}
+REQUIRED_ZERO_SERIAL_NEGATIVE_SAMPLE_NON_CLAIMS = {
+    "candidate-only offline evidence",
+    "does not prove runtime reuse, wraparound, UObject flag validity, lookup, mutation, or public ResourceHandle",
 }
 REQUIRED_RUNTIME_REJECTION_SAMPLE_NON_CLAIMS = {
     "does_not_unlock_resource_handle",
@@ -7542,6 +7548,217 @@ def validate_internal_uobject_runtime_serial_semantics_manifest(
     return blockers
 
 
+def resource_handle_zero_serial_negative_samples_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": payload.get("schema"),
+        "status": payload.get("status"),
+        "evidence_kind": payload.get("evidence_kind"),
+        "deterministic_negative_cohort": payload.get("deterministic_negative_cohort"),
+        "sources": payload.get("sources"),
+        "serial_candidate_field": payload.get("serial_candidate_field"),
+        "non_claims": payload.get("non_claims"),
+        "promotion_ready": payload.get("promotion_ready"),
+        "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
+        "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+        "promotion_gate": payload.get("promotion_gate"),
+    }
+
+
+def validate_zero_serial_sample_row(
+    row: object,
+    *,
+    label: str,
+    source_prefix: str,
+) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    if not isinstance(row, dict):
+        return [{"reason": f"{source_prefix}_row_not_object", "label": label}]
+    allowed_keys = {
+        "index",
+        "address",
+        "class_name",
+        "name",
+        "flags",
+        "fuobject_item",
+        "item_dword_0x8",
+        "item_dword_0xC",
+        "internal_index",
+        "internal_index_matches",
+        "membership",
+        "membership_pass",
+    }
+    unexpected = sorted(set(row) - allowed_keys)
+    if unexpected:
+        blockers.append({"reason": f"{source_prefix}_row_unexpected_field", "label": label, "fields": unexpected})
+    if not is_json_int(row.get("index")) or row["index"] < 0:
+        blockers.append({"reason": f"{source_prefix}_row_index_invalid", "label": f"{label}.index"})
+    if row.get("item_dword_0x8") != 0:
+        blockers.append({"reason": f"{source_prefix}_row_serial_not_zero", "label": f"{label}.item_dword_0x8"})
+    if row.get("membership") != "candidate-uobject" or row.get("membership_pass") is not True:
+        blockers.append({"reason": f"{source_prefix}_row_membership_not_candidate", "label": label})
+    if row.get("internal_index_matches") is not True:
+        blockers.append({"reason": f"{source_prefix}_row_internal_index_mismatch", "label": f"{label}.internal_index_matches"})
+    return blockers
+
+
+def validate_resource_handle_zero_serial_negative_samples_manifest(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if payload.get("schema") != RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    allowed_top_level = {
+        "schema",
+        "status",
+        "evidence_kind",
+        "deterministic_negative_cohort",
+        "sources",
+        "serial_candidate_field",
+        "non_claims",
+        "promotion_ready",
+        "public_resource_handle_ready",
+        "post_callback_resource_handle_ready",
+        "promotion_gate",
+        "output_artifact_identity",
+    }
+    unexpected_top_level = sorted(set(payload) - allowed_top_level)
+    if unexpected_top_level:
+        blockers.append(
+            {
+                "reason": "zero_serial_negative_samples_unexpected_top_level_field",
+                "label": label,
+                "fields": unexpected_top_level,
+            }
+        )
+
+    blockers.extend(
+        validate_output_artifact_identity_for_canonical_report(
+            payload,
+            label=label,
+            reason_prefix="zero_serial_negative_samples",
+            expected_artifact_kind=RESOURCE_HANDLE_ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+            report=resource_handle_zero_serial_negative_samples_canonical_report(payload),
+        )
+    )
+
+    if payload.get("status") != "candidate_blocked":
+        blockers.append({"reason": "zero_serial_negative_samples_status_mismatch", "label": f"{label}:$.status"})
+    if payload.get("evidence_kind") != "internal_offline_zero_serial_negative_samples":
+        blockers.append({"reason": "zero_serial_negative_samples_evidence_kind_mismatch", "label": f"{label}:$.evidence_kind"})
+    if payload.get("deterministic_negative_cohort") is not True:
+        blockers.append({"reason": "zero_serial_negative_samples_not_deterministic", "label": f"{label}:$.deterministic_negative_cohort"})
+
+    field = payload.get("serial_candidate_field")
+    if not isinstance(field, dict):
+        blockers.append({"reason": "zero_serial_negative_samples_serial_field_missing", "label": f"{label}:$.serial_candidate_field"})
+    else:
+        if field.get("offset") != "FUObjectItem+0x8":
+            blockers.append({"reason": "zero_serial_negative_samples_serial_field_offset_mismatch", "label": f"{label}:$.serial_candidate_field.offset"})
+        if field.get("width") != "uint32":
+            blockers.append({"reason": "zero_serial_negative_samples_serial_field_width_mismatch", "label": f"{label}:$.serial_candidate_field.width"})
+
+    sources = payload.get("sources")
+    if not isinstance(sources, list) or not sources:
+        blockers.append({"reason": "zero_serial_negative_samples_sources_missing", "label": f"{label}:$.sources"})
+    else:
+        labels: set[str] = set()
+        for source_index, source in enumerate(sources):
+            source_label = f"{label}:$.sources[{source_index}]"
+            if not isinstance(source, dict):
+                blockers.append({"reason": "zero_serial_negative_samples_source_not_object", "label": source_label})
+                continue
+            allowed_source_keys = {
+                "source_label",
+                "core_path_redacted",
+                "core_sha256",
+                "core_sha256_verified",
+                "metadata",
+                "scan_totals",
+                "zero_serial_negative_samples",
+                "positive_anchor",
+                "deterministic_negative_cohort",
+                "blockers",
+            }
+            unexpected_source = sorted(set(source) - allowed_source_keys)
+            if unexpected_source:
+                blockers.append(
+                    {
+                        "reason": "zero_serial_negative_samples_source_unexpected_field",
+                        "label": source_label,
+                        "fields": unexpected_source,
+                    }
+                )
+            if not is_safe_semantic_input_name(source.get("source_label")):
+                blockers.append({"reason": "zero_serial_negative_samples_source_label_invalid", "label": f"{source_label}.source_label"})
+            elif str(source["source_label"]) in labels:
+                blockers.append({"reason": "zero_serial_negative_samples_source_label_duplicate", "label": f"{source_label}.source_label"})
+            else:
+                labels.add(str(source["source_label"]))
+            if source.get("core_path_redacted") is not True:
+                blockers.append({"reason": "zero_serial_negative_samples_core_path_not_redacted", "label": f"{source_label}.core_path_redacted"})
+            if not isinstance(source.get("core_sha256"), str) or SHA256_RE.fullmatch(source["core_sha256"]) is None:
+                blockers.append({"reason": "zero_serial_negative_samples_core_sha256_invalid", "label": f"{source_label}.core_sha256"})
+            if source.get("core_sha256_verified") is not True:
+                blockers.append({"reason": "zero_serial_negative_samples_core_sha256_not_verified", "label": f"{source_label}.core_sha256_verified"})
+            if source.get("deterministic_negative_cohort") is not True:
+                blockers.append({"reason": "zero_serial_negative_samples_source_not_deterministic", "label": f"{source_label}.deterministic_negative_cohort"})
+            if source.get("blockers") not in ([], None):
+                blockers.append({"reason": "zero_serial_negative_samples_source_has_blockers", "label": f"{source_label}.blockers"})
+
+            rows = source.get("zero_serial_negative_samples")
+            if not isinstance(rows, list) or not rows:
+                blockers.append({"reason": "zero_serial_negative_samples_rows_missing", "label": f"{source_label}.zero_serial_negative_samples"})
+            else:
+                for row_index, row in enumerate(rows):
+                    blockers.extend(
+                        validate_zero_serial_sample_row(
+                            row,
+                            label=f"{source_label}.zero_serial_negative_samples[{row_index}]",
+                            source_prefix="zero_serial_negative_samples",
+                        )
+                    )
+
+            anchor = source.get("positive_anchor")
+            if not isinstance(anchor, dict):
+                blockers.append({"reason": "zero_serial_negative_samples_positive_anchor_missing", "label": f"{source_label}.positive_anchor"})
+            else:
+                if not is_json_int(anchor.get("item_dword_0x8")) or anchor["item_dword_0x8"] <= 0:
+                    blockers.append({"reason": "zero_serial_negative_samples_positive_anchor_serial_not_nonzero", "label": f"{source_label}.positive_anchor.item_dword_0x8"})
+                if anchor.get("membership_pass") is not True:
+                    blockers.append({"reason": "zero_serial_negative_samples_positive_anchor_membership_not_candidate", "label": f"{source_label}.positive_anchor"})
+
+    if payload.get("promotion_ready") is not False:
+        blockers.append({"reason": "zero_serial_negative_samples_promotion_ready_overclaim", "label": f"{label}:$.promotion_ready"})
+    if payload.get("public_resource_handle_ready") is not False:
+        blockers.append({"reason": "zero_serial_negative_samples_public_resourcehandle_overclaim", "label": f"{label}:$.public_resource_handle_ready"})
+    if payload.get("post_callback_resource_handle_ready") is not False:
+        blockers.append({"reason": "zero_serial_negative_samples_post_callback_resourcehandle_overclaim", "label": f"{label}:$.post_callback_resource_handle_ready"})
+
+    non_claims = payload.get("non_claims")
+    if not isinstance(non_claims, list) or not REQUIRED_ZERO_SERIAL_NEGATIVE_SAMPLE_NON_CLAIMS.issubset(set(non_claims)):
+        blockers.append({"reason": "zero_serial_negative_samples_non_claims_missing", "label": f"{label}:$.non_claims"})
+    promotion_gate = payload.get("promotion_gate")
+    if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
+        blockers.append({"reason": "zero_serial_negative_samples_promotion_gate_not_false", "label": f"{label}:$.promotion_gate.ready"})
+    elif "candidate_only_zero_serial_negative_samples" not in set(promotion_gate.get("blockers") or []):
+        blockers.append({"reason": "zero_serial_negative_samples_promotion_gate_blocker_missing", "label": f"{label}:$.promotion_gate.blockers"})
+
+    for trail, value in collect_string_fields(payload):
+        if str(SERVER_ROOT) in value:
+            blockers.append({"reason": "zero_serial_negative_samples_protected_path_string", "label": f"{label}:{trail}"})
+    for trail, key in collect_key_names(payload):
+        if str(key).casefold() == "core_path":
+            blockers.append({"reason": "zero_serial_negative_samples_core_path_field_present", "label": f"{label}:{trail}"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_zero_serial_negative_samples_candidate_only", "label": label})
+    return blockers
+
+
 def validate_resource_handle_serial_scan_manifest(
     payload: dict[str, Any],
     *,
@@ -9518,6 +9735,7 @@ def validate_manifest(
     blockers.extend(validate_internal_uobject_serial_policy_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_internal_uobject_runtime_rejection_samples_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_internal_uobject_runtime_serial_semantics_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_resource_handle_zero_serial_negative_samples_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(
         validate_resource_handle_serial_scan_manifest(
             payload,

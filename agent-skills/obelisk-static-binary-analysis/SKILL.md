@@ -186,6 +186,9 @@ record `command -v`, version output when available, the exact command, and the c
 offline input path. Keep Ghidra projects and radare/rizin outputs under `/tmp`, an
 approved offline workspace, or the local artifact root, never direct or symlink-resolved
 protected server paths.
+Analyzer availability is not a reason to restart broad discovery. For current-binary
+lanes with accepted roots, reuse the documented no-scan inputs and run bounded
+known-address/window checks only when they answer a new evidence question.
 
 Use Ghidra for manual decompilation/xref confirmation when command-line evidence is
 ambiguous. Save conclusions in `docs/research/`, not screenshots.

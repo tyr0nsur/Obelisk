@@ -103,3 +103,28 @@ Remaining blockers are unchanged: this cohort is useful negative evidence for a
 fail-closed serial contract, but it does not prove stale-object lifecycle behavior,
 serial reuse or wraparound, UObject flag validity semantics, callback-scope validity,
 owner-token cleanup, public lookup, or ABI-safe `ResourceHandle` promotion.
+
+## 2026-06-01 Offline Gate Hardening Audit
+
+Audit after `e9cf787` found that runtime rejection/serial-semantics schemas already
+validate source serial-policy artifact identity, redacted run identity, non-claims, and
+candidate-only promote blocking. The remaining repo-local gap was the zero-serial cohort:
+the builder emitted a useful candidate JSON, but it was not a first-class consume-gate
+schema and still carried a raw `core_path` field.
+
+The next offline hardening is now in place:
+
+- `scripts/build_resource_handle_zero_serial_negative_samples.py` emits
+  `promotion_ready=false`, `public_resource_handle_ready=false`,
+  `post_callback_resource_handle_ready=false`, `promotion_gate.ready=false`, redacts core
+  paths, and can bind output to `output_artifact_identity`.
+- `scripts/validate_offline_artifact_gate.py` supports
+  `obelisk.resource-handle-zero-serial-negative-samples.v1` in consume mode, verifies the
+  canonical output identity, requires verified core hashes, deterministic zero-serial
+  rows, a nonzero positive anchor, no raw `core_path` field, required non-claims, and
+  blocks promote mode as candidate-only.
+
+This does not supply runtime rejected-object samples or runtime serial reuse/wraparound
+semantics. It only makes the existing offline zero-serial cohort reproducible and
+gate-checkable without turning it into object identity or public `ResourceHandle`
+evidence.

@@ -197,6 +197,7 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(
             set(report["observed_cases"]),
             {
@@ -225,6 +226,7 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertTrue(report["shape_accepted_by_this_checker"])
         self.assertFalse(report["approved_runtime_evidence_present"])
         self.assertEqual(report["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
 
     def test_promote_mode_blocks_shape_fixture(self) -> None:
         result = self.run_checker(manifest(), "--promote", check=False)

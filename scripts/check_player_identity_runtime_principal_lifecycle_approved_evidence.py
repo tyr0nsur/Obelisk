@@ -26,6 +26,7 @@ REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-e
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 MODULE = "player_principal_lifecycle"
+NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 REQUIRED_TOP_LEVEL_KEYS = frozenset(
@@ -715,6 +716,11 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "public_sdk_ready": False,
         "runtime_ready": False,
         "remaining_blockers": [] if accepted else ["approved_runtime_evidence_not_accepted"],
+        "next_blocker": (
+            NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE
+            if evidence_accepted
+            else "approved_runtime_evidence_not_accepted"
+        ),
         "observed_runtime_cases": validation.observed_runtime_cases,
         "consumer_cases": validation.consumer_cases,
         "blockers": [blocker["reason"] for blocker in validation.blockers],

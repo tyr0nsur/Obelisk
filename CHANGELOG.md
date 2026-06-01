@@ -70,9 +70,9 @@
   sets carry explicit non-claims, and local webhook/log/dump artifacts stay ignored.
 - Hardened release and evidence gates so release readiness rejects production
   `libobelisk.so` builds exposing test-only symbols, snapshot JSON verifies offline core
-  artifact SHA256, readiness reports carry target-set guidance, Plugin Hub contributor
-  routing starts from Foundation/Capability Matrix, and all public ABI version macros are
-  covered by versioning guardrails.
+  artifact SHA256, readiness reports carry target-set guidance, archived Plugin Hub
+  contributor routing stays bounded by Foundation/Capability Matrix, and all public ABI
+  version macros are covered by versioning guardrails.
 - Hardened SDK/research guardrails so installed CMake ABI variables are derived from
   `ObeliskApi.h`, parked Plugin Hub seed wording stays limited to safe core utilities,
   internal Transfer/Buff/Dino target guidance names its policy blockers, and ResourceHandle
@@ -106,8 +106,8 @@
 - Clarified UFunction target-set listing and Structure build-policy guidance so
   release-readiness target sets, internal/layout-only sets, and planning-only sets are
   machine-readable and exact snapshot inputs stay separate from evidence-pack manifests.
-- Clarified Plugin Hub support tiers so release-supported seeds, experimental examples,
-  and blocked/backlog lanes are explicit for plugin authors.
+- Clarified archived Plugin Hub support tiers so foundation examples, experimental
+  examples, and blocked/backlog lanes stay explicit without promoting Plugin Hub priority.
 - Hardened `EventManager` owned callback registration so null raw ProcessEvent callbacks
   fail closed without creating inert handles or owner-cleanup state.
 - Hardened UFunction reflection promotion gates so internal/layout-only target sets cannot
