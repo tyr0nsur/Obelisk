@@ -698,11 +698,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertFalse(payload["ready"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertTrue(payload["stable_release_contract_claim_allowed"])
         self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
         self.assertEqual(
             payload["minimum_promoted_demand_family_gaps"],
             payload["minimum_promoted_demand_families"],
         )
+        self.assertFalse(payload["v1_sdk_progress"]["stable_claim_allowed"])
+        self.assertTrue(payload["v1_sdk_progress"]["stable_release_contract_claim_allowed"])
         scoped_payload = json.loads(scoped_result.stdout)
         self.assertFalse(scoped_payload["ready"])
         self.assertTrue(scoped_payload["scoped_release_statement"]["ready"])

@@ -6,6 +6,20 @@ This scoped statement records reviewed post-v1 outcomes for surfaces that are al
 marked post-v1 in docs/public_sdk_surfaces.json. It is not a v1.0 stable, complete SDK,
 full SDK, or production SDK claim while top-level blockers remain planning.
 
+Remaining full-gate blockers not resolved by this scoped statement:
+
+- obelisk.player_identity.v1 remains planning; promote it with approved runtime
+  principal lifecycle evidence and a copied POD ABI, or explicitly exclude it.
+- obelisk.structure_census.v1 remains planning; promote a narrow copied structure ABI or
+  explicitly exclude StructureEvents, census, identity, lookup, build policy, no-collision
+  policy, and ownership lookup.
+- obelisk.mission_transfer_dino_tribe.v1 remains planning; promote or explicitly exclude
+  mission, transfer, dino policy/cosmetics/carry rules, tribe identity/notices/policy, and
+  buff/status.
+- GameplayPolicyEvent, ChatMessageEvent, plugin-local chat routing, and inventory copied
+  signals remain promoted-experimental-only copied-data seeds; each still needs a promoted,
+  excluded, or post-v1 outcome before any full SDK claim.
+
 obelisk.lifecycle_ops_recovery.v1: post-v1 - no plugin watchdog API, plugin crash recovery API, hot plugin reload API, Obelisk hot reload API, process restart orchestration API, server recovery API, operator reload command API, detached-worker ingress API, or restart-state recovery API is included in v1
 obelisk.command_chat_response_path.v1: post-v1 - no command/chat response path, public CallProcessEvent path, chat reply API, send-chat API, broadcast/notices API, moderation API, raw UE pointer response API, raw ProcessEvent response API, or raw FString response API is included in v1
 obelisk.commands_replies.v1: post-v1 - no public command SDK/router, console command API, RCON command API, admin command API, player command API, chat replies, send-chat, broadcast/notices API, or moderation API is included in v1

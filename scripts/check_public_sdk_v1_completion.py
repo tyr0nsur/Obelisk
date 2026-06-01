@@ -1471,12 +1471,12 @@ def build_report(
     stable_contract = manifest.get("stable_release_contract")
     if not isinstance(stable_contract, dict):
         blockers.append("stable_release_contract_missing")
-        stable_claim_allowed = False
+        manifest_stable_claim_allowed = False
         missing_stable_claim_requires = list(CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES)
         missing_stable_not_sufficient = list(CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT)
     else:
-        stable_claim_allowed = stable_contract.get("claim_allowed") is True
-        if not stable_claim_allowed:
+        manifest_stable_claim_allowed = stable_contract.get("claim_allowed") is True
+        if not manifest_stable_claim_allowed:
             blockers.append("stable_release_contract_claim_not_allowed")
         stable_claim_requires = set(as_string_list(stable_contract.get("claim_requires")))
         missing_stable_claim_requires = [
@@ -1555,7 +1555,7 @@ def build_report(
     promoted_missing_required_evidence_terms: dict[str, list[str]] = {}
     non_promoted_with_public_abi: list[str] = []
 
-    if stable_claim_allowed and manifest.get("v1_completion_required") is True and release_statement_text is None:
+    if manifest_stable_claim_allowed and manifest.get("v1_completion_required") is True and release_statement_text is None:
         blockers.append("release_statement_required_for_v1_completion")
 
     if not canonical_debug_only_present.issubset(debug_only_surfaces):
@@ -1688,7 +1688,7 @@ def build_report(
     if missing_canonical_completion_blockers:
         blockers.append("canonical_v1_completion_blocker_missing")
     if (
-        stable_claim_allowed
+        manifest_stable_claim_allowed
         and manifest.get("v1_completion_required") is True
         and minimum_promoted_demand_family_gaps
     ):
@@ -1788,11 +1788,13 @@ def build_report(
         release_statement_text,
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
+    ready = not blockers
+    stable_claim_allowed = manifest_stable_claim_allowed and ready
 
     return {
         "schema": "obelisk.public-sdk-v1-completion-check.v1",
-        "status": "ready" if not blockers else "blocked",
-        "ready": not blockers,
+        "status": "ready" if ready else "blocked",
+        "ready": ready,
         "manifest": str(manifest_path),
         "release_statement": str(release_statement_path) if release_statement_path else None,
         "public_header": str(public_header_path),
@@ -1801,6 +1803,7 @@ def build_report(
         "sdk_version": manifest.get("sdk_version"),
         "v1_completion_required": manifest.get("v1_completion_required"),
         "stable_claim_allowed": stable_claim_allowed,
+        "stable_release_contract_claim_allowed": manifest_stable_claim_allowed,
         "stable_release_contract_missing_claim_requires": missing_stable_claim_requires,
         "stable_release_contract_missing_not_sufficient": missing_stable_not_sufficient,
         "minimum_promoted_demand_families": sorted(CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES),
@@ -1882,6 +1885,7 @@ def build_report(
             ],
             "release_statement_required_for_completion_claim": release_statement_text is None,
             "stable_claim_allowed": stable_claim_allowed,
+            "stable_release_contract_claim_allowed": manifest_stable_claim_allowed,
             "outcome_accounting_note": (
                 "Manifest post-v1/excluded outcomes are only status accounting; release statement "
                 "outcomes are counted separately after exact statement wording and exclusion-contract "

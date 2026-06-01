@@ -17,6 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 
 
 def runtime_log_lines() -> list[str]:
@@ -53,7 +54,8 @@ def runtime_log_lines() -> list[str]:
 
 def analyzer_summary() -> dict:
     with tempfile.TemporaryDirectory() as tmp:
-        log_path = Path(tmp) / "Obelisk.log"
+        log_path = Path(tmp) / "live-validation-logs" / RUN_ID / "Obelisk.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
         result = subprocess.run(
             [sys.executable, str(ANALYZER), "--obelisk-commit", "test-commit", str(log_path)],
@@ -88,7 +90,7 @@ def manifest() -> dict:
             "schema": "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1",
             "ready": True,
             "operational_window_manifest_ready": True,
-            "run_id": "20260601T120000Z-player-principal-lifecycle",
+            "run_id": RUN_ID,
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             "copied_log": {"path": source["path"], "path_status": "unprotected_offline", "sha256": source["sha256"]},
@@ -410,6 +412,39 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("operational_window_copied_log_sha256_mismatch", report["blockers"])
         self.assertIn("operational_window_obelisk_commit_mismatch", report["blockers"])
         self.assertIn("operational_window_posture_mismatch", report["blockers"])
+
+    def test_rejects_operational_window_log_path_outside_live_validation_run_shape(self) -> None:
+        payload = manifest()
+        source_path = Path(payload["source_summary"]["evidence"]["sources"][0]["path"])
+        wrong_path = source_path.parent.parent.parent / RUN_ID / "Obelisk.log"
+        payload["source_summary"]["evidence"]["sources"][0]["path"] = str(wrong_path)
+        payload["operational_window"]["copied_log"]["path"] = str(wrong_path)
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_copied_log_path_not_live_validation_run_log", report["blockers"])
+
+    def test_rejects_nested_operational_window_and_approval_overclaim_keys(self) -> None:
+        payload = manifest()
+        payload["approval"]["server_restart_authorized_by_this_manifest"] = True
+        payload["operational_window"]["runtime_work_authorized"] = True
+        payload["operational_window"]["posture"]["plugin_delivery_ready"] = True
+        payload["operational_window"]["rollback"]["manual_followup_required"] = True
+        payload["operational_window"]["claims"]["runtime_ready_claim"] = "ready"
+        payload["consumer_boundary_cases"][0]["lookup_token_usable"] = True
+        payload["promotion_gate"]["public_contract_ready"] = True
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approval_keys_unexpected", report["blockers"])
+        self.assertIn("operational_window_keys_unexpected", report["blockers"])
+        self.assertIn("operational_window_posture_keys_unexpected", report["blockers"])
+        self.assertIn("operational_window_rollback_keys_unexpected", report["blockers"])
+        self.assertIn("operational_window_claims_keys_unexpected", report["blockers"])
+        self.assertIn("consumer_boundary_case_keys_unexpected", report["blockers"])
+        self.assertIn("promotion_gate_keys_unexpected", report["blockers"])
 
     def test_rejects_identity_or_ue_leakage_inside_operational_window(self) -> None:
         payload = manifest()

@@ -109,3 +109,50 @@ appended ABI fields.
   `Obelisk::obelisk_sdk`.
 - ABI boundary types in `include/obelisk/ObeliskApi.h` are C-compatible POD/function-pointer
   surfaces; no STL or C++ ownership types cross the public header boundary.
+
+## 2026-06-01 Follow-Up: ABI/Package Consumer Guardrail
+
+Scope: audit whether ABI/package debt could block future complete-SDK surfaces, limited to
+versioning append-only behavior, public header guardrails, installed SDK consumer tests,
+and examples. No public header, runtime code, Plugin Hub claim, commit, tag, push, Discord,
+or server action was used.
+
+Decision: package-shape risk remains low for the current core SDK package, with one
+guardrail improvement adopted.
+
+Evidence checked:
+
+- `include/obelisk/ObeliskApi.h` keeps public ABI structs POD/C-compatible, ABI version
+  and `struct_size` metadata on public payload/context structs, and append-only
+  `ObeliskApi` fields after the original function table.
+- `tests/abi/AbiLayoutTests.cpp` and `tests/abi/CAbiLayoutTests.c` freeze x86_64 sizes,
+  alignments, offsets, capability bits, enum values, and the current appended terminal
+  slot.
+- `scripts/test_public_sdk_guardrails.py` keeps the public header on the reviewed v0.1
+  allowlist and blocks unpromoted identity, ResourceHandle, command, permission,
+  mutation, return-override, and broad v1-complete wording.
+- `scripts/test_install_obelisk_layout.sh` installs to a temporary root, confirms only
+  `include/obelisk/ObeliskApi.h` is public, rejects source-tree include leakage, builds
+  installed C/C++ consumers, and builds the release-supported installed-SDK examples from
+  `examples/`.
+- `cmake/ObeliskConfig.cmake.in` exports public ABI version variables derived from the
+  header macros.
+
+Adopted guardrail: `scripts/test_versioning_guardrails.py` now requires every public
+`OBELISK_*ABI_VERSION` macro to be exported through the installed CMake package, passed as
+an `OBELISK_CMAKE_*` compile definition in `tests/sdk_installed_consumer/CMakeLists.txt`,
+and compared against the installed header in both C and C++ installed consumers. This
+prevents future ABI-version macros from being package-visible but unvalidated by external
+consumer fixtures.
+
+Residual prioritized debt:
+
+1. Future SDK surfaces still need promotion-specific ABI tests and installed-consumer
+   fixtures before public header exposure; the current package scaffolding cannot replace
+   copied-payload, ownership, privacy, and lifecycle gates.
+2. `ObeliskApi` v1 keeps `abi_version` and `struct_size` appended for original table
+   compatibility. That is guarded, but a later ABI-breaking v2 should use a front-loaded
+   header after an explicit major-version design.
+3. Example coverage intentionally validates release-supported installed-SDK seeds only.
+   Experimental copied-data examples must remain clearly labeled and should not become
+   release-supported package evidence without their own installed-consumer checks.

@@ -117,6 +117,15 @@ class VersioningGuardrailTests(unittest.TestCase):
         header = (REPO_ROOT / "include/obelisk/ObeliskApi.h").read_text(encoding="utf-8")
         config_template = (REPO_ROOT / "cmake/ObeliskConfig.cmake.in").read_text(encoding="utf-8")
         versioning = (REPO_ROOT / "docs/VERSIONING.md").read_text(encoding="utf-8")
+        installed_consumer_cmake = (
+            REPO_ROOT / "tests/sdk_installed_consumer/CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+        installed_consumer_cpp = (
+            REPO_ROOT / "tests/sdk_installed_consumer/consumer_plugin.cpp"
+        ).read_text(encoding="utf-8")
+        installed_consumer_c = (
+            REPO_ROOT / "tests/sdk_installed_consumer/c_abi_plugin.c"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("freezes the current append-only `ObeliskApi` ABI v1", versioning)
 
@@ -125,11 +134,19 @@ class VersioningGuardrailTests(unittest.TestCase):
 
         for macro, _version in header_abi_macros:
             exported = macro.replace("OBELISK_", "Obelisk_", 1)
+            cmake_macro = f"OBELISK_CMAKE_{macro.removeprefix('OBELISK_')}"
+            cmake_definition = f"{cmake_macro}=${{{exported}}}"
+            comparison_pattern = re.compile(
+                rf"\b{re.escape(cmake_macro)}\s*==\s*{re.escape(macro)}\b"
+            )
             with self.subTest(variable=macro):
                 self.assertTrue(cmake_derives_abi_version(cmake, macro))
                 self.assertIsNotNone(header_define_value(header, macro))
                 self.assertIn(f"set({exported} @{macro}@)", config_template)
                 self.assertIn(exported, versioning)
+                self.assertIn(cmake_definition, installed_consumer_cmake)
+                self.assertRegex(installed_consumer_cpp, comparison_pattern)
+                self.assertRegex(installed_consumer_c, comparison_pattern)
 
     def test_release_doc_does_not_claim_current_stable_release(self) -> None:
         text = (REPO_ROOT / "docs/RELEASE.md").read_text(encoding="utf-8")

@@ -10225,6 +10225,24 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
         manifests.append(record)
         all_blockers.extend(blockers)
 
+    runtime_pair_schemas = {
+        INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+        INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+    }
+    present_runtime_pair_schemas = {record.get("schema") for record in manifests} & runtime_pair_schemas
+    if present_runtime_pair_schemas and present_runtime_pair_schemas != runtime_pair_schemas:
+        missing_runtime_pair_schemas = sorted(runtime_pair_schemas - present_runtime_pair_schemas)
+        for record in manifests:
+            if record.get("schema") in present_runtime_pair_schemas:
+                all_blockers.append(
+                    {
+                        "reason": "runtime_evidence_pair_missing",
+                        "label": record.get("resolved_path") or record.get("path"),
+                        "schema": record.get("schema"),
+                        "missing_schemas": missing_runtime_pair_schemas,
+                    }
+                )
+
     for label, path in args.artifact:
         record, blockers = validate_artifact(
             label,

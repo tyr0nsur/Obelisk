@@ -26,6 +26,7 @@ REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-man
 NEXT_BLOCKER_AFTER_WINDOW_MANIFEST = "approved_runtime_observer_log_summary_and_manifest_missing"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
+EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -33,6 +34,12 @@ SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 FORBIDDEN_KEY_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
+    r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
+    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace)|object[_-]?address)",
+    re.IGNORECASE,
+)
+FORBIDDEN_VALUE_RE = re.compile(
+    r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|\bip(?:v4|v6)?\b|tribe[_-]?id|"
     r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
     r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace)|object[_-]?address)",
     re.IGNORECASE,
@@ -222,6 +229,15 @@ def validate_copied_log_path(fields: dict[str, str], manifest_path: Path, blocke
     run_id = fields.get("run_id")
     if run_id and run_id not in copied_log_path.parts:
         add(blockers, "copied_log_path_run_id_mismatch", "copied_log_path", run_id=run_id)
+    if run_id:
+        expected_tail = (EXPECTED_COPIED_LOG_PARENT, run_id, "Obelisk.log")
+        if copied_log_path.parts[-3:] != expected_tail:
+            add(
+                blockers,
+                "copied_log_path_not_live_validation_run_log",
+                "copied_log_path",
+                expected="/".join(expected_tail),
+            )
 
     expected_sha256 = fields.get("copied_log_sha256")
     if expected_sha256 == "0" * 64:
@@ -268,6 +284,8 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
             add(blockers, "unexpected_field", key)
         if key not in ALLOWED_FIELDS and FORBIDDEN_KEY_RE.search(key):
             add(blockers, "forbidden_identity_or_ue_field", key)
+        if FORBIDDEN_VALUE_RE.search(fields[key]):
+            add(blockers, "forbidden_identity_or_ue_value", key)
     for key in REQUIRED_SIMPLE_FIELDS:
         if key not in fields:
             add(blockers, "required_field_missing", key)

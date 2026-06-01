@@ -29,7 +29,7 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "approved_window_end_utc": "2026-06-01T12:10:00Z",
         "actual_capture_start_utc": "2026-06-01T12:01:00Z",
         "actual_capture_end_utc": "2026-06-01T12:09:00Z",
-        "copied_log_path": f"{RUN_ID}/Obelisk.log",
+        "copied_log_path": f"live-validation-logs/{RUN_ID}/Obelisk.log",
         "copied_log_sha256": GOOD_SHA,
         "pre_posture": "stable",
         "post_posture": "stable",
@@ -166,6 +166,17 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("copied_log_path_run_id_mismatch", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_copied_log_path_outside_live_validation_run_shape(self) -> None:
+        result = self.run_checker(
+            manifest_lines(copied_log_path=f"{RUN_ID}/Obelisk.log"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("copied_log_path_not_live_validation_run_log", report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_unexpected_identity_or_ue_internal_fields(self) -> None:
         lines = manifest_lines()
         lines.extend(
@@ -182,6 +193,17 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unexpected_field", report["blockers"])
         self.assertIn("forbidden_identity_or_ue_field", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_identity_or_ue_internal_values_in_allowed_fields(self) -> None:
+        result = self.run_checker(
+            manifest_lines(rollback_delta="removed_observer_env_after_steamid_redaction"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden_identity_or_ue_value", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_claims_dispatch_and_budget_that_would_enable_delivery(self) -> None:

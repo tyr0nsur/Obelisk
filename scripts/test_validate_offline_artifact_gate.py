@@ -7769,11 +7769,30 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "runtime-rejection-samples.json"
+            paired_manifest = workspace / "runtime-serial-semantics.json"
+            write_json(manifest, runtime_rejection_samples_manifest())
+            write_json(paired_manifest, runtime_serial_semantics_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest, paired_manifest]))
+
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_runtime_evidence_pair_half_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "runtime-rejection-samples.json"
             write_json(manifest, runtime_rejection_samples_manifest())
 
             result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
 
-        self.assertEqual(result["blockers"], [])
+        blockers = result["blockers"]
+        self.assertIn("runtime_evidence_pair_missing", {blocker["reason"] for blocker in blockers})
+        pair_blocker = next(blocker for blocker in blockers if blocker["reason"] == "runtime_evidence_pair_missing")
+        self.assertEqual(
+            pair_blocker["missing_schemas"],
+            [gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA],
+        )
 
     def test_blocks_runtime_rejection_samples_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -7922,10 +7941,12 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
+            paired_manifest = workspace / "runtime-rejection-samples.json"
             manifest = workspace / "runtime-serial-semantics.json"
+            write_json(paired_manifest, runtime_rejection_samples_manifest())
             write_json(manifest, runtime_serial_semantics_manifest())
 
-            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[paired_manifest, manifest]))
 
         self.assertEqual(result["blockers"], [])
 

@@ -11,6 +11,9 @@ machine-readable release switch for the stable SDK claim. It must remain `false`
 `v1_completion_required` is `false`; a runtime/core-first gate, internal runtime
 stability, installed SDK package shape, Foundation/Plugin Hub seed, or any
 promoted-experimental copied-data seed cannot flip it.
+The completion checker reports that raw switch as
+`stable_release_contract_claim_allowed` and reserves `stable_claim_allowed` for the final
+computed gate result after all blockers are applied.
 `v1.0` must not be used for a runtime-only release. A stable SDK release must either
 promote each important modding category through copied ABI contracts and evidence, or
 explicitly exclude that category from the `v1.0` support statement.

@@ -51,7 +51,7 @@ def runtime_log_lines() -> list[str]:
 
 
 def copied_log_path(root: Path) -> Path:
-    return root / RUN_ID / "Obelisk.log"
+    return root / "live-validation-logs" / RUN_ID / "Obelisk.log"
 
 
 class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):

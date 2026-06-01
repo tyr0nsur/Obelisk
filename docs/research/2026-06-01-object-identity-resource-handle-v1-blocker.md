@@ -221,3 +221,19 @@ candidate runtime semantics, not public lookup or a promoted `ResourceHandle` AP
 promotion would still require a fail-closed lookup/owner-token contract, ABI and
 installed-SDK consumer coverage, privacy review, and lifecycle/restart/plugin-reload
 cleanup rules.
+
+## 2026-06-01 Runtime Pair Gate Audit
+
+Audit of the minimum runtime evidence pair found one repo-local hardening gap: each
+runtime schema could already validate as candidate-only with `promotion_ready=false` and
+the paired schema named in `runtime_evidence_preflight`, but the artifact gate did not
+require both manifests to appear in the same validation run. That made the checklist
+machine-readable but not fully machine-enforced.
+
+`scripts/validate_offline_artifact_gate.py` now adds an aggregate pair-presence check for
+`obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` and
+`obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1`. A half-pair now
+blocks with `runtime_evidence_pair_missing`; the accepted consume-mode path must provide
+both manifests together. This still does not promote `ResourceHandle`, authorize runtime
+work, or make the pair public evidence. It only prevents a single candidate runtime
+artifact from passing as if the minimum runtime package were complete.

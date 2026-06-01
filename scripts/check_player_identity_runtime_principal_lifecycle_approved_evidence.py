@@ -49,6 +49,71 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
     )
 )
 WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
+EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
+ALLOWED_APPROVAL_KEYS = frozenset(
+    (
+        "runtime_evidence_reviewed",
+        "reviewed_by",
+        "review_note",
+        "runtime_work_authorized_by_this_manifest",
+        "server_operations_authorized_by_this_manifest",
+        "publication_authorized_by_this_manifest",
+        "discord_authorized_by_this_manifest",
+    )
+)
+ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
+    (
+        "schema",
+        "ready",
+        "operational_window_manifest_ready",
+        "run_id",
+        "obelisk_commit",
+        "target",
+        "copied_log",
+        "posture",
+        "rollback",
+        "claims",
+        "user_policy",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+    )
+)
+ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
+    (
+        "pre_check",
+        "post_check",
+        "pre_posture",
+        "post_posture",
+        "plugins_disabled",
+        "scanner_disabled",
+        "dispatch_limit",
+        "wrapper_profile",
+        "observer_exclusivity",
+        "debug_escape_markers",
+        "callback_escape_markers",
+        "native_exec_disabled",
+        "ptrace_disabled",
+        "single_module_summary",
+    )
+)
+ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS = frozenset(
+    ("completed", "observer_env_survived", "observer_marker_survived")
+)
+ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS = frozenset(("delivery_claim", "principal_claim"))
+ALLOWED_CONSUMER_CASE_KEYS = frozenset(
+    (
+        "case",
+        "result",
+        "lookup_allowed",
+        "mutation_allowed",
+        "return_override_allowed",
+        "public_sdk_surface",
+    )
+)
+ALLOWED_PROMOTION_GATE_KEYS = frozenset(
+    ("runtime_evidence_ready", "ready", "promotion_ready", "public_sdk_ready", "runtime_ready")
+)
 REQUIRED_CONSUMER_CASES = frozenset(("stale_after_logout", "malformed_or_unsupported_evidence"))
 REQUIRED_OBSERVED_EVENT_CASES = (
     {
@@ -486,6 +551,14 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     if not isinstance(window, dict):
         add(blockers, "operational_window_missing", label)
         return
+    unexpected_window_keys = set(window) - ALLOWED_OPERATIONAL_WINDOW_KEYS
+    if unexpected_window_keys:
+        add(
+            blockers,
+            "operational_window_keys_unexpected",
+            label,
+            unexpected=sorted(unexpected_window_keys),
+        )
     if window.get("schema") != WINDOW_CHECK_SCHEMA:
         add(blockers, "operational_window_schema_mismatch", f"{label}.schema")
     if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
@@ -508,8 +581,20 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         add(blockers, "operational_window_source_summary_source_missing", "$.source_summary.evidence.sources")
         return
     source = sources[0]
-    if Path(str(copied.get("path", ""))).expanduser().resolve() != Path(str(source.get("path", ""))).expanduser().resolve():
+    copied_path = Path(str(copied.get("path", ""))).expanduser()
+    source_path = Path(str(source.get("path", ""))).expanduser()
+    if copied_path.resolve() != source_path.resolve():
         add(blockers, "operational_window_copied_log_path_mismatch", f"{label}.copied_log.path")
+    run_id = window.get("run_id")
+    if isinstance(run_id, str):
+        expected_tail = (EXPECTED_COPIED_LOG_PARENT, run_id, "Obelisk.log")
+        if copied_path.parts[-3:] != expected_tail:
+            add(
+                blockers,
+                "operational_window_copied_log_path_not_live_validation_run_log",
+                f"{label}.copied_log.path",
+                expected="/".join(expected_tail),
+            )
     if copied.get("sha256") != source.get("sha256"):
         add(blockers, "operational_window_copied_log_sha256_mismatch", f"{label}.copied_log.sha256")
     if window.get("obelisk_commit") != evidence.get("obelisk_commit"):
@@ -519,6 +604,14 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     if not isinstance(posture, dict):
         add(blockers, "operational_window_posture_missing", f"{label}.posture")
     else:
+        unexpected_posture_keys = set(posture) - ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS
+        if unexpected_posture_keys:
+            add(
+                blockers,
+                "operational_window_posture_keys_unexpected",
+                f"{label}.posture",
+                unexpected=sorted(unexpected_posture_keys),
+            )
         expected_posture = {
             "pre_check": "passed",
             "post_check": "passed",
@@ -542,6 +635,14 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     if not isinstance(rollback, dict):
         add(blockers, "operational_window_rollback_missing", f"{label}.rollback")
     else:
+        unexpected_rollback_keys = set(rollback) - ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS
+        if unexpected_rollback_keys:
+            add(
+                blockers,
+                "operational_window_rollback_keys_unexpected",
+                f"{label}.rollback",
+                unexpected=sorted(unexpected_rollback_keys),
+            )
         for key in ("completed",):
             if rollback.get(key) is not True:
                 add(blockers, "operational_window_rollback_not_complete", f"{label}.rollback.{key}")
@@ -551,6 +652,13 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     claims = window.get("claims")
     if not isinstance(claims, dict) or claims.get("delivery_claim") != "none" or claims.get("principal_claim") != "none":
         add(blockers, "operational_window_claims_not_none", f"{label}.claims")
+    elif set(claims) - ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS:
+        add(
+            blockers,
+            "operational_window_claims_keys_unexpected",
+            f"{label}.claims",
+            unexpected=sorted(set(claims) - ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS),
+        )
     if window.get("user_policy") not in {"no_regular_users", "operator_approved_beta_users"}:
         add(blockers, "operational_window_user_policy_unapproved", f"{label}.user_policy")
 
@@ -565,6 +673,14 @@ def validate_consumer_boundary(cases: Any, blockers: list[dict[str, Any]]) -> li
         if not isinstance(case, dict):
             add(blockers, "consumer_boundary_case_invalid", label)
             continue
+        unexpected_case_keys = set(case) - ALLOWED_CONSUMER_CASE_KEYS
+        if unexpected_case_keys:
+            add(
+                blockers,
+                "consumer_boundary_case_keys_unexpected",
+                label,
+                unexpected=sorted(unexpected_case_keys),
+            )
         name = case.get("case")
         if not isinstance(name, str):
             add(blockers, "consumer_boundary_case_missing", f"{label}.case")
@@ -608,6 +724,9 @@ def validate_approval(approval: Any, blockers: list[dict[str, Any]]) -> None:
     if not isinstance(approval, dict):
         add(blockers, "approval_missing", "$.approval")
         return
+    unexpected_keys = set(approval) - ALLOWED_APPROVAL_KEYS
+    if unexpected_keys:
+        add(blockers, "approval_keys_unexpected", "$.approval", unexpected=sorted(unexpected_keys))
     if approval.get("runtime_evidence_reviewed") is not True:
         add(blockers, "approval_runtime_evidence_reviewed_not_true", "$.approval.runtime_evidence_reviewed")
     for key in (
@@ -624,6 +743,9 @@ def validate_promotion_gate(gate: Any, blockers: list[dict[str, Any]]) -> None:
     if not isinstance(gate, dict):
         add(blockers, "promotion_gate_missing", "$.promotion_gate")
         return
+    unexpected_keys = set(gate) - ALLOWED_PROMOTION_GATE_KEYS
+    if unexpected_keys:
+        add(blockers, "promotion_gate_keys_unexpected", "$.promotion_gate", unexpected=sorted(unexpected_keys))
     if gate.get("runtime_evidence_ready") is not True:
         add(blockers, "promotion_gate_runtime_evidence_ready_not_true", "$.promotion_gate.runtime_evidence_ready")
     for key in ("ready", "promotion_ready", "public_sdk_ready", "runtime_ready"):

@@ -132,3 +132,50 @@ This accepts `structure-build-policy-offline-intake` only as planning-layout evi
 It does not promote runtime observation, public SDK surface, StructureEvents, mutation,
 enforcement, return override, object identity, lookup, raw params, or `ResourceHandle`
 lifetime.
+
+## 2026-06-01 HEAD Audit
+
+Rechecked at local HEAD `a1ad030` without server access, restarts, ptrace/gcore,
+ReflectionScanner, commits, pushes, tags, Discord, or runtime observation.
+
+Command:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root /home/flowcommunity-ark/obelisk-artifacts/structure-build-policy-offline-intake-20260601T064502Z/base \
+  --candidate-root /home/flowcommunity-ark/obelisk-artifacts/structure-build-policy-offline-intake-20260601T064502Z/candidate \
+  --readiness-report \
+  --target-set structure-build-policy-offline-intake \
+  --planning-layout-intake \
+  --json
+```
+
+Observed result:
+
+```text
+readiness_sha256=d9742e5ea97dbd1d6f12e40154c5891c72184126e90a29a2c57b43a507a38072
+targets=3
+comparable=3
+blocked=0
+second_source_accepted=3
+second_source_rejected=0
+second_source_inconclusive=0
+second_source_missing=0
+planning_layout_gate.ready=true
+planning_layout_gate.ready_scope=planning_only
+planning_layout_gate.promotion_ready=false
+planning_layout_gate.public_sdk_ready=false
+planning_layout_gate.runtime_ready=false
+promotion_gate.ready=false
+promotion_gate.blockers=planning_layout_intake_not_promotion_gate:1
+```
+
+This is the small offline blocker reduction available now: the three build-policy
+targets have accepted sanitized second-source layout accounting in planning-layout mode.
+The remaining blocker is no longer "missing exact snapshots"; it is unresolved promotion
+policy: redaction for placement/location/player context, copied payload design,
+identity/ownership/privacy semantics, no-read/no-budget runtime guard tests, live-ops
+approval for any observation, SDK consumer ABI design, and a separate decision on whether
+build denial/enforcement or return override can ever be exposed. Until those are resolved,
+`structure-build-policy-offline-intake` must stay out of release readiness, public SDK,
+runtime hook, enforcement, mutation, and return-override paths.
