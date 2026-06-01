@@ -191,6 +191,22 @@ REQUIRED_QUERY_TEXT_POLICY = {
     "utf8_decoding_required_before_allow": False,
     "command_parser_claim_allowed": False,
 }
+REQUIRED_ARTIFACT_IDENTITY = {
+    "artifact_kind": SCHEMA,
+    "artifact_status": "candidate_only_pre_abi_contract",
+    "dependency_surface": "obelisk.player_identity.v1",
+}
+REQUIRED_DEPENDENCY_CONTEXT = {
+    "upstream_surface": "obelisk.player_identity.v1",
+    "upstream_surface_status": "planning_only",
+    "required_lifecycle_anchor_schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
+    "required_principal_invalidation_schema": "obelisk.players-identity-principal-invalidation-policy.v1",
+    "required_runtime_evidence_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+    "public_identity_required_before_promotion": True,
+    "public_identity_promoted": False,
+    "permissions_admin_public_abi_promoted": False,
+    "command_response_dependency_promoted": False,
+}
 
 FORBIDDEN_COORDINATE_KEYS = frozenset(
     (
@@ -336,6 +352,7 @@ def load_json(path: Path) -> dict[str, Any]:
 def build_template_manifest() -> dict[str, Any]:
     return {
         "schema": SCHEMA,
+        "artifact_identity": dict(REQUIRED_ARTIFACT_IDENTITY),
         "artifact_status": "candidate_only",
         "readiness_classification": "planning_only",
         "pre_abi": True,
@@ -386,6 +403,7 @@ def build_template_manifest() -> dict[str, Any]:
             "unknown_authority_fails_closed": True,
         },
         "principal_runtime_identity_policy": dict(REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY),
+        "dependency_context": dict(REQUIRED_DEPENDENCY_CONTEXT),
         "query_text_policy": dict(REQUIRED_QUERY_TEXT_POLICY),
         "fail_closed_cases": [
             {
@@ -763,6 +781,38 @@ def validate_query_text_policy(policy: Any, blockers: list[dict[str, Any]]) -> N
             )
 
 
+def validate_exact_mapping(
+    value: Any,
+    *,
+    label: str,
+    required: dict[str, Any],
+    missing_reason: str,
+    fields_reason: str,
+    invalid_prefix: str,
+    blockers: list[dict[str, Any]],
+) -> None:
+    if not isinstance(value, dict):
+        add(blockers, missing_reason, label)
+        return
+    if set(value) != set(required):
+        add(
+            blockers,
+            fields_reason,
+            label,
+            missing=sorted(set(required) - set(value)),
+            unexpected=sorted(set(value) - set(required)),
+        )
+    for key, expected in required.items():
+        if value.get(key) != expected:
+            add(
+                blockers,
+                f"{invalid_prefix}_{key}_invalid",
+                f"{label}.{key}",
+                expected=expected,
+                value=value.get(key),
+            )
+
+
 def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:
     if not isinstance(cases, list):
         add(blockers, "fail_closed_cases_not_list", "$.fail_closed_cases")
@@ -839,6 +889,24 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         if payload.get(key) is not False:
             add(blockers, f"{key}_not_false", f"$.{key}")
 
+    validate_exact_mapping(
+        payload.get("artifact_identity"),
+        label="$.artifact_identity",
+        required=REQUIRED_ARTIFACT_IDENTITY,
+        missing_reason="artifact_identity_missing",
+        fields_reason="artifact_identity_fields_mismatch",
+        invalid_prefix="artifact_identity",
+        blockers=blockers,
+    )
+    validate_exact_mapping(
+        payload.get("dependency_context"),
+        label="$.dependency_context",
+        required=REQUIRED_DEPENDENCY_CONTEXT,
+        missing_reason="dependency_context_missing",
+        fields_reason="dependency_context_fields_mismatch",
+        invalid_prefix="dependency_context",
+        blockers=blockers,
+    )
     query_fields = validate_query_contract(payload.get("query_contract"), blockers)
     decisions, decision_fields, provenance_fields = validate_decision_contract(payload.get("decision_contract"), blockers)
     recognized_authority_kinds, allow_capable_authority_kinds = validate_authority_policy(

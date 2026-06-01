@@ -36,7 +36,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   process-local owner-token timers with explicit unregister; this is not a gameplay/module timer API, shared scheduler state, UE identity, or persistent handles. It is not a production-stable `v1.0` claim.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim; all blocker rows remain unresolved unless promoted or explicitly excluded in a reviewed v1 release statement.
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or `production SDK` in public sinks unless that gate allows the stable SDK claim. The checker also enforces canonical `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data seeds cannot become sufficient evidence by manifest drift.
-- Plugin Hub foundation work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 only.
+- Plugin Hub work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 only.
 - `obelisk.command_chat_response_path.v1` and `obelisk.commands_replies.v1` remain
   blocked/planning-only until promoted player identity and permissions/admin exist. Their
   checkers must keep public header, ABI, runtime, SDK, reply/send/broadcast/moderation, and

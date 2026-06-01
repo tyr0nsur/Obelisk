@@ -15,6 +15,11 @@ This artifact should validate the shape of a future query-only permission decisi
 copied opaque principal. It must not add `ObeliskApi.h` symbols, public callbacks,
 permission groups, grants, admin mutation, command routing, replies/send-chat, storage,
 operator ingress, `ResourceHandle`, UE pointers, lookup, mutation, or return override.
+The artifact must also carry its own candidate-only `artifact_identity` plus a
+`dependency_context` that binds it to `obelisk.player_identity.v1`, the accepted
+lifecycle/principal planning schemas, and the future approved runtime principal lifecycle
+evidence schema. That dependency context is accounting only; it does not promote player
+identity or permissions/admin.
 
 The active v1 dependency route remains:
 

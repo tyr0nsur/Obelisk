@@ -5892,6 +5892,7 @@ namespace
             .filename = "init_cleanup_fail.so",
             .initResult = false,
             .registerFilteredCallback = true,
+            .registerOwnerTokenFromInitThread = true,
             .registerChatCallback = true,
             .registerInventoryPolicyCallback = true,
             .registerItemReturnCallback = true,
@@ -5914,6 +5915,8 @@ namespace
         Require(plugin.initCalls == 1, "init-cleanup-fail plugin was not initialized");
         Require(plugin.shutdownCalls == 1, "init-cleanup-fail plugin shutdown was not called after init failure");
         Require(plugin.closeCalls == 0, "init-cleanup-fail plugin was closed despite failed callback cleanup");
+        Require(plugin.initThreadRegistrationId != 0,
+                "init-cleanup-fail owner-token ProcessEvent callback was not registered before failure");
         Require(Obelisk::Core::EventManager::Get().HasPreProcessEventCallbacks(),
                 "init-cleanup-fail plugin ProcessEvent callback was removed despite injected cleanup failure");
         Require(chatDispatcher.SubscriptionCount() == 1,
@@ -5939,6 +5942,11 @@ namespace
                 "init-cleanup-fail inventory callbacks were removed during failed retry");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 2,
                 "init-cleanup-fail item-return callbacks were removed during failed retry");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "init-cleanup-fail retained plugin accepted a new owner-token ProcessEvent callback while unloading");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     1000,
@@ -5975,6 +5983,11 @@ namespace
                     FakeTimerCallback,
                     &plugin) == 0,
                 "init-cleanup-fail owner token remained valid after retained cleanup retry");
+        Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    42,
+                    FakeCallback) == 0,
+                "init-cleanup-fail owner token remained valid for ProcessEvent after retained cleanup retry");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);

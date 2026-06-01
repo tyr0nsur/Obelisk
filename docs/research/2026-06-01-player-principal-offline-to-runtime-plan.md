@@ -147,7 +147,7 @@ The runtime evidence must be consume-only and private:
 - target set: `players-lifecycle-anchor-candidates`;
 - exact targets: `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
 - dispatch limit: `0`;
-- first-window log budget: at most `10`;
+- first-window log budget: exactly `10` for the current approved-evidence bundle;
 - copied fields: only canonical bools from `HandleNewPlayer`;
 - redacted fields: all object references;
 - no principal id or generation values logged;
@@ -164,7 +164,7 @@ export OBELISK_DISABLE_PLUGINS=1
 export OBELISK_PE_TRACE_LIMIT=0
 export OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1
 export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=<reviewed-ark-binary-sha256>
-export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=<1-to-10>
+export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10
 export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0
 unset OBELISK_ENABLE_REFLECTION_SCANNER
 unset OBELISK_ENABLE_NATIVE_EXEC_PROBES
@@ -213,7 +213,8 @@ Stop and do not consume the evidence if any of these occur:
   contradictory evidence;
 - plugins are enabled during the first runtime observer window;
 - dispatch limit is non-zero;
-- observer log budget is missing, zero, malformed, overflowing, or greater than `10`;
+- observer log budget is missing, zero, malformed, overflowing, or not exactly `10`
+  for the current approved-evidence bundle;
 - a log line contains a private identifier, object coordinate, raw param, pointer, FName
   index, GObjects index, chat text, command text, or hashed private identifier;
 - copied bool bytes are not canonical `0` or `1`;

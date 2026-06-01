@@ -69,7 +69,8 @@ Environment:
 
 - `OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1`
 - `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=<64hex>`
-- `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=<positive uint64>`
+- `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10` for the current approved
+  player-principal evidence bundle
 - `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0`
 - `OBELISK_WRAPPER_PROFILE=observer-debug`
 - `OBELISK_PE_TRACE_LIMIT=0`
@@ -97,8 +98,11 @@ Default budget is zero. Missing, malformed, zero, or overflowing log budget disa
 observer and must avoid metadata reads, parameter reads, sequence reservation, and copied
 output.
 
-For the first approved runtime window, use a maximum log budget of `10`. Do not increase
-the budget in place. Copy logs and analyze the bounded window first.
+For the first approved runtime window, use log budget `10` exactly. The lower-level
+observer may reject unsafe values independently, but the current window preflight and
+approved-evidence checker require the observer enable line to report `limit=10`. Do not
+change the budget in place; change the checker before the runtime window if a different
+approved exact limit is selected. Copy logs and analyze the bounded window first.
 
 Budget reservation order:
 

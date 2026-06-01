@@ -9,6 +9,9 @@ Windows/MSVC assumptions into the Linux runtime.
 
 - Source: `https://github.com/ArkServerApi/AseApi`
 - Local inspection clone: `/tmp/aseapi-inspect`
+- Local path alias: `/tmp/AseApi` is treated as the same reference-only AseApi
+  checkout when present; use it only under the no-copy/no-offset/no-layout/no-MSVC
+  policy below.
 - Inspected commit: `f13b85979254b6b19c8d9255a0fc11c128978b8b`
 - Obelisk scope: research/reference only; no server or runtime experiment performed.
 

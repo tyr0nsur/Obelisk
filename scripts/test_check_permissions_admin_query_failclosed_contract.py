@@ -39,6 +39,11 @@ def fail_closed_case(name: str) -> dict:
 def manifest() -> dict:
     return {
         "schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
+        "artifact_identity": {
+            "artifact_kind": "obelisk.permissions-admin-query-failclosed-contract.v1",
+            "artifact_status": "candidate_only_pre_abi_contract",
+            "dependency_surface": "obelisk.player_identity.v1",
+        },
         "artifact_status": "candidate_only",
         "readiness_classification": "planning_only",
         "pre_abi": True,
@@ -100,6 +105,17 @@ def manifest() -> dict:
             "operator_config_principal_claim_allowed": False,
             "command_text_permission_claim_allowed": False,
             "operator_config_permission_claim_allowed": False,
+        },
+        "dependency_context": {
+            "upstream_surface": "obelisk.player_identity.v1",
+            "upstream_surface_status": "planning_only",
+            "required_lifecycle_anchor_schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
+            "required_principal_invalidation_schema": "obelisk.players-identity-principal-invalidation-policy.v1",
+            "required_runtime_evidence_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+            "public_identity_required_before_promotion": True,
+            "public_identity_promoted": False,
+            "permissions_admin_public_abi_promoted": False,
+            "command_response_dependency_promoted": False,
         },
         "query_text_policy": {
             "action_required": True,
@@ -340,6 +356,22 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("public_sdk_ready_not_false", report["blockers"])
         self.assertIn("runtime_ready_not_false", report["blockers"])
         self.assertIn("runtime_promotion_allowed_not_false", report["blockers"])
+
+    def test_rejects_missing_or_weakened_artifact_identity_dependency_context(self) -> None:
+        payload = manifest()
+        payload.pop("artifact_identity")
+        payload["dependency_context"]["public_identity_promoted"] = True
+        payload["dependency_context"]["required_runtime_evidence_schema"] = (
+            "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("artifact_identity_missing", report["blockers"])
+        self.assertIn("dependency_context_public_identity_promoted_invalid", report["blockers"])
+        self.assertIn("dependency_context_required_runtime_evidence_schema_invalid", report["blockers"])
 
     def test_rejects_missing_required_query_fields(self) -> None:
         for field_name in ("plugin_owner_token", "principal_generation", "action", "action_size", "request_flags"):
