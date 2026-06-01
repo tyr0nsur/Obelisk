@@ -424,6 +424,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_current_manifest_reports_exact_unresolved_v1_surface_groups(self) -> None:
         result = self.run_checker("--json", check=False)
         payload = json.loads(result.stdout)
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
+        gameplay = surfaces["obelisk.mission_transfer_dino_tribe.v1"]
 
         self.assertEqual(
             payload["unresolved_completion_blockers"],
@@ -433,6 +436,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.structure_census.v1",
             ],
         )
+        self.assertEqual(
+            [leaf["id"] for leaf in gameplay["leaf_decision_units"]],
+            ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+        )
+        self.assertTrue(gameplay["v1_decision_contract"]["leaf_split_reviewed"])
+        self.assertEqual({leaf["status"] for leaf in gameplay["leaf_decision_units"]}, {"planning"})
         self.assertEqual(
             payload["unresolved_experimental_surfaces"],
             [

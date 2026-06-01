@@ -739,6 +739,8 @@
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "must_remain_without_public_contract_until_promotion": true,
+        "leaf_split_reviewed": true,
+        "leaf_split_note": "docs/research/2026-06-01-mission-transfer-dino-tribe-v1-split.md",
         "promotion_requires": [
           "each mission, transfer, dino, tribe, and buff/status audit unit promoted as its own narrow copied C ABI surface",
           "reviewed evidence for exposed gameplay data and explicit privacy/redaction boundaries",
@@ -762,6 +764,55 @@
         "dino policy/cosmetics/carry restrictions",
         "tribe identity/notices/policy",
         "buff/status policy"
+      ],
+      "leaf_decision_units": [
+        {
+          "id": "mission",
+          "status": "planning",
+          "current_evidence": [
+            "mission-compact-intake",
+            "mission-copied-bool-policy-slice"
+          ],
+          "current_blocker": "no public Mission SDK ABI, no runtime observer approval, no mission identity/state/reward authority, and no installed SDK consumer coverage",
+          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+        },
+        {
+          "id": "transfer",
+          "status": "planning",
+          "current_evidence": [
+            "transfer-ufunction-intake",
+            "transfer-baccept-only-policy-slice"
+          ],
+          "current_blocker": "no public Transfer SDK ABI, no transfer identity, no cross-map correlation, no teleport/spawn authority, and no return override",
+          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+        },
+        {
+          "id": "dino_policy",
+          "status": "planning",
+          "current_evidence": [
+            "dino-compact-intake"
+          ],
+          "current_blocker": "no public Dino SDK ABI, no dino identity/lookup, no mutation/cosmetics/carry-rule authority, and no runtime lifecycle/privacy contract",
+          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+        },
+        {
+          "id": "tribe_policy",
+          "status": "planning",
+          "current_evidence": [
+            "tribe-compact-intake"
+          ],
+          "current_blocker": "no public Tribe SDK ABI, no tribe identity/lookup, no tribe MOTD/notices/policy authority, and no privacy/redaction contract",
+          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+        },
+        {
+          "id": "buff_status",
+          "status": "planning",
+          "current_evidence": [
+            "buff-compact-intake"
+          ],
+          "current_blocker": "no public Buff/status SDK ABI, no class/object redaction contract, no lifecycle/stacking/invalidation semantics, and no aggregate/count/proximity or mutation API",
+          "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"
+        }
       ],
       "buff_audit_requirements": [
         "buff class/object redaction contract",

@@ -2631,13 +2631,30 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         timers = surfaces["obelisk.process_local_timers.v1"]
 
         for audit_unit in (
+            "mission",
+            "transfer",
             "dino policy/cosmetics/carry restrictions",
             "tribe identity/notices/policy",
             "buff/status policy",
         ):
             self.assertIn(audit_unit, gameplay["audit_units"])
 
-        for exclusion in ("Dino SDK", "Tribe SDK", "Buff/status SDK"):
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        self.assertEqual(
+            set(leaf_units),
+            {"mission", "transfer", "dino_policy", "tribe_policy", "buff_status"},
+        )
+        self.assertEqual(gameplay["v1_decision_contract"]["leaf_split_reviewed"], True)
+        self.assertEqual(
+            gameplay["v1_decision_contract"]["leaf_split_note"],
+            "docs/research/2026-06-01-mission-transfer-dino-tribe-v1-split.md",
+        )
+        for leaf in leaf_units.values():
+            self.assertIn("allowed_v1_outcome", leaf)
+            self.assertIn("explicitly excluded by name from v1", leaf["allowed_v1_outcome"])
+            self.assertIn("current_blocker", leaf)
+
+        for exclusion in ("Mission SDK", "Transfer SDK", "Dino SDK", "Tribe SDK", "Buff/status SDK"):
             self.assertIn(exclusion, gameplay["exclusions"])
 
         for audit_unit in (
@@ -3525,6 +3542,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "buff/status policy",
             ],
         )
+        self.assertEqual(
+            [leaf["id"] for leaf in modules["leaf_decision_units"]],
+            ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+        )
+        self.assertEqual(modules["leaf_decision_units"][4]["status"], "planning")
         for requirement in (
             "buff class/object redaction contract",
             "buff lifecycle, stacking, and invalidation semantics",

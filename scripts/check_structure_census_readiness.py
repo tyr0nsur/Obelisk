@@ -342,6 +342,13 @@ def validate_second_source_readiness(
             expected="planning_layout_intake",
             value=readiness.get("gate_mode"),
         )
+    if readiness.get("second_source_status") != "compared":
+        append_blocker(
+            blockers,
+            "second_source_readiness_status_mismatch",
+            expected="compared",
+            value=readiness.get("second_source_status"),
+        )
 
     target_sets = readiness.get("target_sets")
     if target_sets != [INPUT_TARGET_SET]:
@@ -358,6 +365,8 @@ def validate_second_source_readiness(
         totals = {}
     expected_totals = {
         "targets": 6,
+        "comparable": 6,
+        "blocked": 0,
         "second_source_accepted": 6,
         "second_source_missing": 0,
         "second_source_rejected": 0,
@@ -372,6 +381,17 @@ def validate_second_source_readiness(
                 expected=expected,
                 value=totals.get(field),
             )
+
+    expected_filters = sorted(f"obelisk.ufunction-chain.snapshot.v1:{target}" for target in EXPECTED_INPUT_TARGETS)
+    target_filters = readiness.get("target_filters")
+    observed_filters = sorted(target_filters) if isinstance(target_filters, list) else []
+    if observed_filters != expected_filters:
+        append_blocker(
+            blockers,
+            "second_source_readiness_target_filters_mismatch",
+            expected=expected_filters,
+            value=target_filters,
+        )
 
     planning_gate = readiness.get("planning_layout_gate")
     if not isinstance(planning_gate, dict):
@@ -389,6 +409,29 @@ def validate_second_source_readiness(
             "second_source_readiness_planning_scope_mismatch",
             expected="planning_only",
             value=planning_gate.get("ready_scope"),
+        )
+    if planning_gate.get("layout_ready") is not True:
+        append_blocker(
+            blockers,
+            "second_source_readiness_planning_layout_not_ready",
+            value=planning_gate.get("layout_ready"),
+        )
+    if planning_gate.get("blockers") != []:
+        append_blocker(
+            blockers,
+            "second_source_readiness_planning_blockers_not_empty",
+            value=planning_gate.get("blockers"),
+        )
+
+    promotion_gate = readiness.get("promotion_gate")
+    if not isinstance(promotion_gate, dict):
+        append_blocker(blockers, "second_source_readiness_promotion_gate_missing")
+        promotion_gate = {}
+    if promotion_gate.get("ready") is not False:
+        append_blocker(
+            blockers,
+            "second_source_readiness_promotion_gate_ready_not_false",
+            value=promotion_gate.get("ready"),
         )
 
     for field in ("promotion_ready", "public_sdk_ready", "runtime_ready"):

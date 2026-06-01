@@ -243,12 +243,15 @@ The shortest useful route toward a complete v1 SDK is:
    `GameplayPolicyEvent` evidence. Keep that work experimental and non-completion; keep
    structure census offline planning/consume-only unless a future promotion gate accepts
    it. Promote or explicitly exclude each surface in the first v1 support statement.
-5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID; for the
-   umbrella `obelisk.mission_transfer_dino_tribe.v1` blocker, the v1 release outcome is
-   promoted or explicitly excluded from v1 unless the manifest/checker model is reviewed
-   to allow post-v1 wording for that surface:
-   mission/transfer/dino/tribe/buff modules, player services/economy/mobility/areas,
-   operator ingress/storage, and gameplay/server tick callbacks.
+5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID. The
+   `obelisk.mission_transfer_dino_tribe.v1` umbrella is split for accounting into
+   mission, transfer, dino policy, tribe policy, and buff/status leaf decisions; the v1
+   release outcome must name each leaf as promoted through its own narrow copied ABI or
+   explicitly excluded by name. This split does not create new public surfaces or resolve
+   the umbrella blocker; `obelisk.mission_transfer_dino_tribe.v1` remains unresolved until
+   promoted or explicitly excluded in a reviewed v1 release statement. Player
+   services/economy/mobility/areas, operator ingress/storage, and gameplay/server tick
+   callbacks remain separate blockers.
 6. Keep gameplay/server tick callbacks separate from process-local timers unless a future
    promoted copied ABI defines cadence, budget, lifecycle, shutdown, and hitch/backpressure
    behavior.

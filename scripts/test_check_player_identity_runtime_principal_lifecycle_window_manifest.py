@@ -113,6 +113,24 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("copied_log_path_under_protected_server_root", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_unexpected_identity_or_ue_internal_fields(self) -> None:
+        lines = manifest_lines()
+        lines.extend(
+            [
+                "steamid=76561198000000000",
+                "raw_params=0x1234",
+                "uobject_address=0x5678",
+                "unexpected_safe_key=value",
+            ]
+        )
+        result = self.run_checker(lines, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unexpected_field", report["blockers"])
+        self.assertIn("forbidden_identity_or_ue_field", report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_claims_dispatch_and_budget_that_would_enable_delivery(self) -> None:
         result = self.run_checker(
             manifest_lines(

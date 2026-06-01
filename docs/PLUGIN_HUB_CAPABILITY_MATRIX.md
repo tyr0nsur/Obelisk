@@ -160,7 +160,7 @@ future promotion gate changes the support tier.
 | Inventory mutation | `obelisk.inventory_items_mutation.v1`; experimental copied signal evidence may use `obelisk.inventory_item_copied_signals.v1` only as observation | No Inventory SDK, Items SDK, item identity, lookup, give/remove, mutation, rollback, or return override |
 | Structure/build policy | `obelisk.structure_census.v1`; copied `GameplayPolicyEvent` policy observation remains experimental only | No StructureEvents SDK, structure identity, ownership lookup, placement denial, no-collision control, mutation, enforcement, or return override |
 | Player mobility | `obelisk.player_services_economy_mobility.v1` | No homes, teleport, safe-zone, area-policy, persistent mobility state, or gameplay timer API |
-| Dinos/tribes | `obelisk.mission_transfer_dino_tribe.v1` | No Dino SDK, Tribe SDK, dino mutation/cosmetics/carry rules, tribe MOTD/notices, ownership lookup, teleport/spawn API, or cross-map correlation |
+| Mission/transfer/dino/tribe/buff | `obelisk.mission_transfer_dino_tribe.v1` leaf decisions | Backlog/design only; no Mission SDK, Transfer SDK, Dino SDK, Tribe SDK, Buff/status SDK, dino mutation/cosmetics/carry rules, tribe MOTD/notices, ownership lookup, teleport/spawn API, or cross-map correlation |
 
 `parked release-supported seed after SDK completion` means an Obelisk-native plugin can
 be written and documented as a future supported Plugin Hub seed against the stated public

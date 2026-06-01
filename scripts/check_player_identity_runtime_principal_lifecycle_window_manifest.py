@@ -29,6 +29,12 @@ RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
+FORBIDDEN_KEY_RE = re.compile(
+    r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
+    r"resourcehandle|gobjects?|fnames?|fname[_-]?(?:index|id)|gobject[_-]?(?:index|id)|"
+    r"uobject|ue[_-]?pointer|raw[_-]?(?:params?|payload|pointer|trace)|object[_-]?address)",
+    re.IGNORECASE,
+)
 
 REQUIRED_TIMESTAMP_FIELDS = (
     "approved_window_start_utc",
@@ -68,6 +74,20 @@ REQUIRED_SIMPLE_FIELDS = (
 )
 ACCEPTED_USER_POLICIES = frozenset(("no_regular_users", "operator_approved_beta_users"))
 EXPECTED_APPROVAL = "current-turn operator-approved runtime window, not standing approval"
+ALLOWED_FIELDS = frozenset(
+    (
+        *REQUIRED_TIMESTAMP_FIELDS,
+        *REQUIRED_SIMPLE_FIELDS,
+        "target",
+        "instance",
+        "instance_id",
+        "map",
+        "map_name",
+        "user_policy",
+        "users_policy",
+        "notice_sent",
+    )
+)
 
 
 @dataclass
@@ -222,6 +242,11 @@ def validate_user_policy(fields: dict[str, str], blockers: list[dict[str, Any]])
 def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation:
     blockers: list[dict[str, Any]] = []
     timestamps: dict[str, datetime] = {}
+    for key in sorted(fields):
+        if key not in ALLOWED_FIELDS:
+            add(blockers, "unexpected_field", key)
+        if key not in ALLOWED_FIELDS and FORBIDDEN_KEY_RE.search(key):
+            add(blockers, "forbidden_identity_or_ue_field", key)
     for key in REQUIRED_SIMPLE_FIELDS:
         if key not in fields:
             add(blockers, "required_field_missing", key)

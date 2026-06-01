@@ -49,6 +49,14 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
             "gate_mode": "planning_layout_intake",
             "second_source_status": "compared",
             "target_sets": ["structure-aggregate-census-planning"],
+            "target_filters": [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.AllowStructureAccess",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToDemolish",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.SetVariant",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.AllowToggleActivation",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
+            ],
             "totals": {
                 "targets": 6,
                 "comparable": 6,
@@ -188,7 +196,13 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
             payload = json.loads(readiness.read_text(encoding="utf-8"))
             payload["totals"]["second_source_accepted"] = 5
             payload["totals"]["second_source_missing"] = 1
+            payload["totals"]["comparable"] = 5
+            payload["totals"]["blocked"] = 1
             payload["planning_layout_gate"]["ready"] = False
+            payload["planning_layout_gate"]["layout_ready"] = False
+            payload["planning_layout_gate"]["blockers"] = [{"reason": "incomplete"}]
+            payload["promotion_gate"]["ready"] = True
+            payload["target_filters"] = payload["target_filters"][:-1]
             readiness.write_text(json.dumps(payload), encoding="utf-8")
 
             result = self.run_checker(
@@ -206,6 +220,10 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in report["blockers"]}
         self.assertIn("second_source_readiness_total_mismatch", reasons)
         self.assertIn("second_source_readiness_planning_layout_gate_not_ready", reasons)
+        self.assertIn("second_source_readiness_planning_layout_not_ready", reasons)
+        self.assertIn("second_source_readiness_planning_blockers_not_empty", reasons)
+        self.assertIn("second_source_readiness_promotion_gate_ready_not_false", reasons)
+        self.assertIn("second_source_readiness_target_filters_mismatch", reasons)
         self.assertEqual(report["second_source_readiness"]["status"], "blocked")
         self.assertEqual(report["target_readiness"]["second_source"]["status"], "missing")
         self.assertFalse(report["public_sdk_ready"])
