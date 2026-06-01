@@ -113,6 +113,7 @@
         "POD C ABI",
         "abi_version and struct_size front-loaded",
         "owner-token scoped call",
+        "owner-token validation happens before policy lookup, cache lookup, rate budget, or allow result",
         "nonzero plugin owner token with live owner lifecycle is required before policy evaluation",
         "plugin owner token from an unknown or unloading owner fails closed",
         "capability gated",
@@ -192,11 +193,15 @@
         "runtime-local authority must be runtime-owned before it can produce allow",
         "runtime-local authority without runtime-owned provenance fails closed",
         "operator-config cannot establish principal identity or permission claims before runtime principal observation",
+        "operator-config cannot self-attest allow-capable policy provenance",
+        "command text cannot establish policy provenance",
         "command text cannot establish principal identity, permission authority, or policy provenance",
         "permission authority derives only from an established runtime principal plus runtime-owned provenance",
+        "policy provenance must be runtime-owned before allow",
         "allow decisions must carry policy_epoch provenance",
         "allow without policy provenance is forbidden",
-        "plugin input cannot self-attest authority provenance"
+        "plugin input cannot self-attest authority provenance",
+        "plugin input cannot self-attest policy provenance"
       ]
     },
     {
@@ -237,6 +242,8 @@
         "policy source generation mismatch",
         "missing_authority_generation",
         "authority_generation_mismatch",
+        "command text policy provenance claim",
+        "operator config policy provenance claim",
         "runtime-local authority without runtime-owned provenance",
         "operator-config authority before separate allow-capable promotion",
         "missing plugin owner token",
@@ -266,6 +273,9 @@
         "operator-config authority before separate allow-capable promotion",
         "runtime-local authority without runtime-owned provenance",
         "plugin-supplied provenance",
+        "plugin-supplied policy provenance",
+        "command text policy provenance claim",
+        "operator config policy provenance claim",
         "missing plugin owner token",
         "zero plugin owner token",
         "unknown plugin owner token",

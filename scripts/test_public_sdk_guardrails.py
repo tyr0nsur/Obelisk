@@ -1902,6 +1902,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(manifest["schema"], "obelisk.public-sdk-surfaces.v1")
         self.assertEqual(manifest["sdk_version"], "v1.0")
+        self.assertEqual(
+            manifest["release_claim"],
+            "no-v1-stable-release-claim-post-rc-surface-inventory",
+        )
         self.assertEqual(manifest["status"], "planning-contract")
         self.assertFalse(manifest["v1_completion_required"])
         self.assertEqual(manifest["public_header"], "include/obelisk/ObeliskApi.h")
@@ -2072,6 +2076,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("Every promoted-experimental-only surface", release_guardrails)
         self.assertIn(
             "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
+            release_guardrails,
+        )
+        self.assertIn(
+            "Plugin Hub remains post-SDK-complete planning: no seed/package publication, "
+            "intake prioritization, production module availability, or support-tier activation "
+            "may be inferred from v0.1 RC surfaces, installed SDK package shape, foundation "
+            "examples, or promoted-experimental copied-data seeds.",
             release_guardrails,
         )
 
@@ -3034,6 +3045,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "player identity, permissions/admin,\ncommand/chat response path, commands/replies",
             "before `v1_completion_required` can become true",
             "Plugin Hub seed/package publication remains post-SDK-complete",
+            "Plugin Hub remains post-SDK-complete planning",
+            "no seed/package publication, intake\nprioritization, production module availability, or support-tier activation",
             "No Foundation seed, Plugin Hub seed, descriptor/timer example, installed SDK package shape, or\ncopied event example is an ArkApi/AseApi/ArkServerApi compatibility layer",
             "API parity\nclaim, portable plugin path, or evidence that ArkApi plugin families can be ported",
             "structure census/build policy",
@@ -7793,6 +7806,12 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIsNotNone(chat)
         self.assertEqual(chat.get("capability"), "OBELISK_API_CAPABILITY_CHAT_EVENTS")
+        self.assertEqual(chat.get("v1_sdk_status"), "promoted-experimental-only")
+        self.assertIs(chat.get("v1_completion_evidence"), False)
+        self.assertEqual(
+            chat.get("release_claim"),
+            "v0.1-rc-copied-notification-only-not-v1-complete-sdk",
+        )
         self.assertEqual(chat.get("abi_struct"), "ObeliskChatMessageEvent")
         self.assertEqual(chat.get("registration"), "RegisterChatMessageEventWithOwnerTokenHandle")
         self.assertEqual(chat.get("unregister"), "UnregisterChatMessageEventWithOwnerToken")
@@ -9719,6 +9738,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "CMake package target are present",
             "package-shape evidence only, not a `v1.0` completion marker",
             "do not gain priority, support tier, public SDK scope, or `v1.0`\n  completion weight while complete-SDK blockers remain open",
+            "No Plugin\n  Hub publication, intake prioritization, production module availability, or support-tier\n  activation is in the current RC/post-RC SDK scope",
         ):
             with self.subTest(term=term):
                 self.assertIn(normalized(term), compact)

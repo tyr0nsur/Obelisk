@@ -300,7 +300,12 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         decisions = self.load_decisions()
         decisions["claim"] = "command router is public and ready"
         decisions["arkapi_parser_copy_allowed"] = True
-        decisions["notes"] = ["ArkApi command parser copied and supported"]
+        decisions["notes"] = [
+            "ArkApi command parser copied and supported",
+            "send-chat is available",
+            "reply is supported",
+            "router is ready",
+        ]
         with tempfile.TemporaryDirectory() as temp_dir:
             decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
             result = self.run_checker(
@@ -317,6 +322,36 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("public_surface_overclaim", report["blockers"])
         self.assertIn("positive_public_surface_claim", report["blockers"])
+
+    def test_rejects_missing_runtime_owned_principal_permissions_gate(self) -> None:
+        decisions = self.load_decisions()
+        gate = decisions["runtime_owned_principal_permissions_gate"]
+        gate["runtime_owned_permission_allow_required"] = False
+        gate["reply_send_chat_router_claims_allowed"] = True
+        gate["required_runtime_owned_inputs"] = [
+            item for item in gate["required_runtime_owned_inputs"] if item != "permission_decision"
+        ]
+        gate["forbidden_authority_sources"] = [
+            item for item in gate["forbidden_authority_sources"] if item != "router metadata"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("runtime_owned_principal_permissions_gate_required_true_missing", report["blockers"])
+        self.assertIn("runtime_owned_principal_permissions_gate_required_false_missing", report["blockers"])
+        self.assertIn("runtime_owned_principal_permissions_gate_inputs_missing", report["blockers"])
+        self.assertIn("runtime_owned_principal_permissions_gate_forbidden_sources_missing", report["blockers"])
 
     def test_rejects_missing_bridge_principal_fail_closed_auth_behaviors(self) -> None:
         decisions = self.load_decisions()
@@ -337,6 +372,9 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                 "missing principal_scope_flags fails closed",
                 "server process epoch mismatch fails closed",
                 "permission allow cannot be consumed without policy provenance",
+                "permission allow must come from runtime-owned permissions/admin evaluation for the same principal_handle, principal_generation, and principal_scope_flags tuple",
+                "reply requests, send-chat requests, and router metadata cannot establish principal identity, permission authority, or policy provenance",
+                "reply/send-chat/router planning cannot consume permission allow until promoted permissions/admin returns allow with runtime-owned policy provenance",
             }
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -366,6 +404,18 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("missing principal_scope_flags fails closed", detail["missing"])
         self.assertIn("server process epoch mismatch fails closed", detail["missing"])
         self.assertIn("permission allow cannot be consumed without policy provenance", detail["missing"])
+        self.assertIn(
+            "permission allow must come from runtime-owned permissions/admin evaluation for the same principal_handle, principal_generation, and principal_scope_flags tuple",
+            detail["missing"],
+        )
+        self.assertIn(
+            "reply requests, send-chat requests, and router metadata cannot establish principal identity, permission authority, or policy provenance",
+            detail["missing"],
+        )
+        self.assertIn(
+            "reply/send-chat/router planning cannot consume permission allow until promoted permissions/admin returns allow with runtime-owned policy provenance",
+            detail["missing"],
+        )
 
     def test_rejects_missing_migration_vocabulary_guardrail(self) -> None:
         decisions = self.load_decisions()
@@ -391,6 +441,9 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         migration = decisions["migration_vocabulary_not_compatibility"]
         migration["allowed_terms"].remove("admin-like command")
         migration["recognized_source_kinds"].remove("server_console")
+        migration["registration_semantics"].remove(
+            "reply/send-chat/router planning must consume only runtime-owned principal and permissions provenance after separate promotion"
+        )
         migration["registration_semantics"].remove("permission denial or unknown result never dispatches a command")
         migration["non_compatibility_claims"].remove("no direct plugin portability claim")
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -231,6 +231,7 @@
   "guardrails": [
     "Only the five named GameplayPolicyEvent inventory/item signals are public.",
     "Inventory/item signals are post-original copied observations only.",
+    "Copied inventory signal builders require exact reflected ParmsSize provenance before copying scalar fields.",
     "resource_kind INVENTORY_ITEM is categorical metadata only.",
     "No standalone Inventory SDK or Items SDK is implied.",
     "No lookup, mutation, return override, grant/remove, rollback, kits, rewards, engram, or progression API is included.",

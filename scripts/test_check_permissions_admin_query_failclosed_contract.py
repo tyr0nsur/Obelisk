@@ -87,6 +87,8 @@ def manifest() -> dict:
         "missing_authority_generation",
         "authority_generation_mismatch",
         "plugin_supplied_provenance",
+        "command_text_policy_provenance_claim",
+        "operator_config_policy_provenance_claim",
     ]
     return {
         "schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
@@ -189,6 +191,46 @@ def manifest() -> dict:
             "server_process_epoch_mismatch_result": "deny",
             "unsupported_principal_scope_flags_result": "deny",
             "plugin_supplied_principal_tuple_result": "deny",
+            "public_abi_field_allowed": False,
+            "runtime_ready": False,
+        },
+        "owner_token_policy": {
+            "owner_token_source": "runtime_assigned_plugin_owner_token",
+            "nonzero_owner_token_required_before_policy_evaluation": True,
+            "live_owner_required_before_policy_evaluation": True,
+            "owner_token_validation_precedes_policy_evaluation": True,
+            "owner_token_validation_before_rate_budget": True,
+            "owner_token_validation_before_candidate_cache_read": True,
+            "unknown_owner_token_result": "deny",
+            "unloading_owner_token_result": "deny",
+            "zero_owner_token_result": "deny",
+            "missing_owner_token_result": "deny",
+            "owner_cleanup_invalidates_query_budget": True,
+            "owner_cleanup_invalidates_candidate_cache": True,
+            "plugin_supplied_owner_identity_allowed": False,
+            "public_abi_field_allowed": False,
+            "runtime_ready": False,
+        },
+        "policy_provenance_policy": {
+            "policy_provenance_source": "runtime_owned_policy_evaluator",
+            "policy_source_id_required_before_allow": True,
+            "policy_source_generation_required_before_allow": True,
+            "authority_kind_required_before_allow": True,
+            "authority_generation_required_before_allow": True,
+            "policy_epoch_required_before_allow": True,
+            "plugin_supplied_policy_provenance_allowed": False,
+            "command_text_policy_provenance_claim_allowed": False,
+            "operator_config_policy_provenance_claim_allowed": False,
+            "operator_config_allow_provenance_allowed": False,
+            "missing_policy_source_result": "deny",
+            "missing_policy_source_generation_result": "deny",
+            "policy_source_generation_mismatch_result": "deny",
+            "missing_authority_kind_result": "deny",
+            "missing_authority_generation_result": "deny",
+            "authority_generation_mismatch_result": "deny",
+            "missing_policy_epoch_result": "deny",
+            "unknown_authority_result": "unknown",
+            "plugin_supplied_policy_provenance_result": "deny",
             "public_abi_field_allowed": False,
             "runtime_ready": False,
         },
@@ -331,6 +373,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "action_size_exceeds_max",
                 "authority_generation_mismatch",
                 "command_text_permission_claim",
+                "command_text_policy_provenance_claim",
                 "command_text_principal_claim",
                 "malformed_action_size",
                 "malformed_resource_scope_size",
@@ -350,6 +393,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "missing_runtime_principal_identity",
                 "operator_config_allow_capability_claim",
                 "operator_config_permission_claim",
+                "operator_config_policy_provenance_claim",
                 "operator_config_principal_claim",
                 "plugin_supplied_principal_tuple",
                 "plugin_supplied_provenance",
@@ -588,7 +632,9 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "missing_authority_kind",
             "missing_authority_generation",
             "authority_generation_mismatch",
+            "command_text_policy_provenance_claim",
             "plugin_supplied_provenance",
+            "operator_config_policy_provenance_claim",
         ):
             with self.subTest(case_name=case_name):
                 payload = manifest()
@@ -731,6 +777,65 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("principal_provenance_policy_scope_mismatch_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_process_mismatch_result_invalid", report["blockers"])
         self.assertIn("principal_provenance_policy_plugin_supplied_principal_tuple_result_invalid", report["blockers"])
+
+    def test_rejects_missing_or_weakened_owner_token_policy(self) -> None:
+        payload = manifest()
+        payload.pop("owner_token_policy")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("owner_token_policy_missing", report["blockers"])
+
+        payload = manifest()
+        payload["owner_token_policy"]["owner_token_validation_precedes_policy_evaluation"] = False
+        payload["owner_token_policy"]["owner_token_validation_before_rate_budget"] = False
+        payload["owner_token_policy"]["unknown_owner_token_result"] = "allow"
+        payload["owner_token_policy"]["plugin_supplied_owner_identity_allowed"] = True
+        payload["owner_token_policy"]["public_abi_field_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("owner_token_policy_owner_token_validation_precedes_policy_evaluation_invalid", report["blockers"])
+        self.assertIn("owner_token_policy_owner_token_validation_before_rate_budget_invalid", report["blockers"])
+        self.assertIn("owner_token_policy_unknown_owner_token_result_invalid", report["blockers"])
+        self.assertIn("owner_token_policy_plugin_supplied_owner_identity_allowed_invalid", report["blockers"])
+        self.assertIn("owner_token_policy_public_abi_field_allowed_invalid", report["blockers"])
+
+    def test_rejects_missing_or_weakened_policy_provenance_policy(self) -> None:
+        payload = manifest()
+        payload.pop("policy_provenance_policy")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("policy_provenance_policy_missing", report["blockers"])
+
+        payload = manifest()
+        payload["policy_provenance_policy"]["policy_epoch_required_before_allow"] = False
+        payload["policy_provenance_policy"]["plugin_supplied_policy_provenance_allowed"] = True
+        payload["policy_provenance_policy"]["command_text_policy_provenance_claim_allowed"] = True
+        payload["policy_provenance_policy"]["operator_config_allow_provenance_allowed"] = True
+        payload["policy_provenance_policy"]["missing_policy_epoch_result"] = "allow"
+        payload["policy_provenance_policy"]["unknown_authority_result"] = "allow"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("policy_provenance_policy_policy_epoch_required_before_allow_invalid", report["blockers"])
+        self.assertIn("policy_provenance_policy_plugin_supplied_policy_provenance_allowed_invalid", report["blockers"])
+        self.assertIn(
+            "policy_provenance_policy_command_text_policy_provenance_claim_allowed_invalid",
+            report["blockers"],
+        )
+        self.assertIn("policy_provenance_policy_operator_config_allow_provenance_allowed_invalid", report["blockers"])
+        self.assertIn("policy_provenance_policy_missing_policy_epoch_result_invalid", report["blockers"])
+        self.assertIn("policy_provenance_policy_unknown_authority_result_invalid", report["blockers"])
 
     def test_rejects_missing_or_weakened_query_text_policy(self) -> None:
         payload = manifest()

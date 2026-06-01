@@ -1293,6 +1293,12 @@ namespace
                 "CanUse policy event built with truncated params provenance");
         Require(event.View.Scalars.empty(), "truncated params provenance left stale copied event output");
 
+        InventoryReflection::InventoryInvocation oversizedProvenance = makeCanUse();
+        oversizedProvenance.ParamSize = canUseParams.size() + 1;
+        Require(!TryBuildCopiedInventoryPolicyEvent(oversizedProvenance, event),
+                "CanUse policy event built with oversized params provenance");
+        Require(event.View.Scalars.empty(), "oversized params provenance left stale copied event output");
+
         uint8_t nonCanonical = 2;
         InventoryReflection::InventoryInvocation nonCanonicalBool = makeCanUse();
         nonCanonicalBool.Fields[1].Range.Data = &nonCanonical;
@@ -1703,6 +1709,14 @@ namespace
                 "forged ByPC range built a copied policy event");
         requireNoBudgetOrDispatch(forgedByPcRange,
                                   "forged ByPC range consumed copied-bool dispatch budget");
+
+        InventoryReflection::InventoryInvocation oversizedRemoteAddProvenance = makeValidRemoteAdd();
+        oversizedRemoteAddProvenance.ParamSize = remoteAddParams.size() + 1;
+        Require(!TryBuildCopiedInventoryPolicyEvent(oversizedRemoteAddProvenance, event),
+                "oversized AllowRemoteAddToInventory params provenance built a copied policy event");
+        requireNoBudgetOrDispatch(
+            oversizedRemoteAddProvenance,
+            "oversized AllowRemoteAddToInventory params provenance consumed copied-bool dispatch budget");
 
         InventoryReflection::InventoryInvocation additionalDataInvocation;
         additionalDataInvocation.Function = InventoryReflection::InventoryFunction::AllowRemoteAddToInventory;

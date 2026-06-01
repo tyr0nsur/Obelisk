@@ -18,6 +18,14 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_first_evidence_readiness as first_evidence_checker
 import build_player_identity_runtime_principal_lifecycle_evidence_bundle as bundle_builder
+from prepare_player_principal_lifecycle_window_request import (
+    APPROVAL_TEXT,
+    EXPECTED_BINARY_SHA256,
+    FORBIDDEN_MARKERS,
+    NON_CLAIMS,
+    WINDOW_MARKERS,
+    env_lines,
+)
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
@@ -87,6 +95,15 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         observer_env = sidecar_dir / "observer-window.env"
         preflight_pre = manifest.parent / "preflight-pre.txt"
         preflight_post = manifest.parent / "preflight-post.txt"
+        request_args = type(
+            "Args",
+            (),
+            {
+                "instance": "arkserver2",
+                "map_name": "TheIsland",
+                "binary_sha256": EXPECTED_BINARY_SHA256,
+            },
+        )()
         request_pack_sha256 = write_sidecar(
             request_pack,
             json.dumps(
@@ -94,13 +111,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "schema": "obelisk.player-principal-lifecycle-window-request.v1",
                     "run_id": RUN_ID,
                     "status": "candidate_only_request_pack",
+                    "approval_required": APPROVAL_TEXT,
+                    "ark_binary_sha256": EXPECTED_BINARY_SHA256,
                     "obelisk_commit": TEST_COMMIT,
                     "target": {"instance": "arkserver2", "map": "TheIsland"},
                     "approved_window": {
                         "start_utc": "2026-06-01T12:00:00Z",
                         "end_utc": "2026-06-01T12:10:00Z",
                     },
+                    "restart_expectation": "restart",
+                    "final_posture": "stable",
+                    "user_policy": "no_regular_users",
+                    "notice_path": "not_applicable",
+                    "copied_evidence_dir": str(copied_log.parent),
+                    "copied_log_path": str(copied_log),
+                    "window_manifest_path": str(manifest),
                     "observer_env_file": "observer-window.env",
+                    "marker_set": WINDOW_MARKERS,
+                    "forbidden_markers": FORBIDDEN_MARKERS,
+                    "rollback": {
+                        "owner": "operator",
+                        "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+                    },
+                    "non_claims": NON_CLAIMS,
                 },
                 sort_keys=True,
             )
@@ -108,14 +141,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
         observer_env_sha256 = write_sidecar(
             observer_env,
-            "\n".join(
-                [
-                    "OBELISK_WRAPPER_PROFILE=observer-debug",
-                    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
-                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
-                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
-                ]
-            )
+            "\n".join(env_lines(request_args))
             + "\n",
         )
         preflight_pre_sha256 = write_sidecar(
@@ -245,7 +271,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             env=env,
         )
 
-    def test_preflight_classifies_request_pack_only_directory_without_building(self) -> None:
+    def test_preflight_rejects_malformed_request_pack_sidecars_without_building(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             evidence_dir = temp_dir / "live-validation-logs" / RUN_ID
@@ -266,9 +292,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
         self.assertFalse(report["ready"])
         self.assertFalse(report["bundle_inputs_ready"])
-        self.assertTrue(report["request_pack_ready"])
+        self.assertFalse(report["request_pack_ready"])
         self.assertFalse(report["approved_runtime_manifest_present"])
         self.assertEqual(report["next_blocker"], "copied_log_and_window_manifest_required")
+        self.assertIn("request_pack_check_failed", report["blockers"])
         self.assertIn("copied_log_missing", report["blockers"])
         self.assertIn("window_manifest_missing", report["blockers"])
         self.assertIn("approved_runtime_manifest_missing", report["blockers"])

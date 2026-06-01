@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -252,6 +253,24 @@ def validate_paths(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> N
     if not isinstance(run_id, str):
         return
     expected_dir = EVIDENCE_ROOT / run_id
+    if os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES") == "1":
+        for key in ("copied_evidence_dir", "copied_log_path", "window_manifest_path"):
+            value = payload.get(key)
+            if not isinstance(value, str):
+                continue
+            path = Path(value).expanduser()
+            status = protected_paths.protected_path_status(
+                path,
+                protected_root=SERVER_ROOT,
+                approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+            )
+            try:
+                relative = status.resolved.relative_to(APPROVED_OFFLINE_WORKSPACE_ROOTS[0].resolve())
+            except ValueError:
+                continue
+            if relative.parts and relative.parts[0].startswith("obelisk-test-player-principal-"):
+                expected_dir = APPROVED_OFFLINE_WORKSPACE_ROOTS[0] / relative.parts[0] / "live-validation-logs" / run_id
+                break
     expected_paths = {
         "copied_evidence_dir": expected_dir,
         "copied_log_path": expected_dir / "Obelisk.log",

@@ -115,6 +115,8 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
         "missing_authority_generation",
         "authority_generation_mismatch",
         "plugin_supplied_provenance",
+        "command_text_policy_provenance_claim",
+        "operator_config_policy_provenance_claim",
     )
 )
 REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
@@ -156,6 +158,8 @@ REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "missing_authority_generation",
     "authority_generation_mismatch",
     "plugin_supplied_provenance",
+    "command_text_policy_provenance_claim",
+    "operator_config_policy_provenance_claim",
 )
 REQUIRED_REASON_FLAG_SEQUENCE = REQUIRED_FAIL_CLOSED_CASE_SEQUENCE
 REQUIRED_REASON_FLAGS_POLICY = {
@@ -224,6 +228,46 @@ REQUIRED_PRINCIPAL_PROVENANCE_POLICY = {
     "server_process_epoch_mismatch_result": "deny",
     "unsupported_principal_scope_flags_result": "deny",
     "plugin_supplied_principal_tuple_result": "deny",
+    "public_abi_field_allowed": False,
+    "runtime_ready": False,
+}
+REQUIRED_OWNER_TOKEN_POLICY = {
+    "owner_token_source": "runtime_assigned_plugin_owner_token",
+    "nonzero_owner_token_required_before_policy_evaluation": True,
+    "live_owner_required_before_policy_evaluation": True,
+    "owner_token_validation_precedes_policy_evaluation": True,
+    "owner_token_validation_before_rate_budget": True,
+    "owner_token_validation_before_candidate_cache_read": True,
+    "unknown_owner_token_result": "deny",
+    "unloading_owner_token_result": "deny",
+    "zero_owner_token_result": "deny",
+    "missing_owner_token_result": "deny",
+    "owner_cleanup_invalidates_query_budget": True,
+    "owner_cleanup_invalidates_candidate_cache": True,
+    "plugin_supplied_owner_identity_allowed": False,
+    "public_abi_field_allowed": False,
+    "runtime_ready": False,
+}
+REQUIRED_POLICY_PROVENANCE_POLICY = {
+    "policy_provenance_source": "runtime_owned_policy_evaluator",
+    "policy_source_id_required_before_allow": True,
+    "policy_source_generation_required_before_allow": True,
+    "authority_kind_required_before_allow": True,
+    "authority_generation_required_before_allow": True,
+    "policy_epoch_required_before_allow": True,
+    "plugin_supplied_policy_provenance_allowed": False,
+    "command_text_policy_provenance_claim_allowed": False,
+    "operator_config_policy_provenance_claim_allowed": False,
+    "operator_config_allow_provenance_allowed": False,
+    "missing_policy_source_result": "deny",
+    "missing_policy_source_generation_result": "deny",
+    "policy_source_generation_mismatch_result": "deny",
+    "missing_authority_kind_result": "deny",
+    "missing_authority_generation_result": "deny",
+    "authority_generation_mismatch_result": "deny",
+    "missing_policy_epoch_result": "deny",
+    "unknown_authority_result": "unknown",
+    "plugin_supplied_policy_provenance_result": "deny",
     "public_abi_field_allowed": False,
     "runtime_ready": False,
 }
@@ -482,6 +526,8 @@ def build_template_manifest() -> dict[str, Any]:
         },
         "principal_runtime_identity_policy": dict(REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY),
         "principal_provenance_policy": dict(REQUIRED_PRINCIPAL_PROVENANCE_POLICY),
+        "owner_token_policy": dict(REQUIRED_OWNER_TOKEN_POLICY),
+        "policy_provenance_policy": dict(REQUIRED_POLICY_PROVENANCE_POLICY),
         "dependency_context": dict(REQUIRED_DEPENDENCY_CONTEXT),
         "query_text_policy": dict(REQUIRED_QUERY_TEXT_POLICY),
         "abuse_policy": dict(REQUIRED_ABUSE_POLICY),
@@ -858,6 +904,30 @@ def validate_principal_provenance_policy(policy: Any, blockers: list[dict[str, A
     )
 
 
+def validate_owner_token_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    validate_exact_mapping(
+        policy,
+        label="$.owner_token_policy",
+        required=REQUIRED_OWNER_TOKEN_POLICY,
+        missing_reason="owner_token_policy_missing",
+        fields_reason="owner_token_policy_fields_mismatch",
+        invalid_prefix="owner_token_policy",
+        blockers=blockers,
+    )
+
+
+def validate_policy_provenance_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    validate_exact_mapping(
+        policy,
+        label="$.policy_provenance_policy",
+        required=REQUIRED_POLICY_PROVENANCE_POLICY,
+        missing_reason="policy_provenance_policy_missing",
+        fields_reason="policy_provenance_policy_fields_mismatch",
+        invalid_prefix="policy_provenance_policy",
+        blockers=blockers,
+    )
+
+
 def validate_query_text_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
     label = "$.query_text_policy"
     if not isinstance(policy, dict):
@@ -1122,6 +1192,8 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     )
     validate_principal_runtime_identity_policy(payload.get("principal_runtime_identity_policy"), blockers)
     validate_principal_provenance_policy(payload.get("principal_provenance_policy"), blockers)
+    validate_owner_token_policy(payload.get("owner_token_policy"), blockers)
+    validate_policy_provenance_policy(payload.get("policy_provenance_policy"), blockers)
     validate_query_text_policy(payload.get("query_text_policy"), blockers)
     validate_abuse_policy(payload.get("abuse_policy"), blockers)
     validate_sequence_gate(payload.get("sequence_gate"), blockers)

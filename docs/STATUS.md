@@ -43,7 +43,9 @@ Scope terms used here:
   support tier, public SDK scope, or `v1.0` completion weight while complete-SDK blockers remain open. Use
   `docs/PLUGIN_HUB_FOUNDATION_V1.md` and `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` only as
   archived boundaries; installed plugin `.so` files do not promote public SDK scope and
-  do not gain new support tier, public SDK scope, or `v1.0` completion weight;
+  do not gain new support tier, public SDK scope, or `v1.0` completion weight. No Plugin
+  Hub publication, intake prioritization, production module availability, or support-tier
+  activation is in the current RC/post-RC SDK scope;
 - planning-only lane: guidance/demand work that is not release evidence or public SDK
   surface.
 

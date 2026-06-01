@@ -304,6 +304,18 @@
       "case": "plugin_supplied_provenance",
       "consumer_result": "deny",
       "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "command_text_policy_provenance_claim",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "operator_config_policy_provenance_claim",
+      "consumer_result": "deny",
+      "fail_closed": true
     }
   ],
   "fail_closed_reason_flags": {
@@ -616,6 +628,22 @@
         "consumer_result": "deny",
         "fail_closed": true,
         "name": "plugin_supplied_provenance"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 38,
+        "case": "command_text_policy_provenance_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "command_text_policy_provenance_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 39,
+        "case": "operator_config_policy_provenance_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "operator_config_policy_provenance_claim"
       }
     ],
     "operator_config_flags_allowed": false,
@@ -648,6 +676,46 @@
     "does not add public headers, runtime wiring, public cache ABI, command responses, commands, replies, storage, groups, grants, ban/kick, mutation, lookup, ResourceHandle, UE pointers, or return override",
     "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate"
   ],
+  "owner_token_policy": {
+    "live_owner_required_before_policy_evaluation": true,
+    "missing_owner_token_result": "deny",
+    "nonzero_owner_token_required_before_policy_evaluation": true,
+    "owner_cleanup_invalidates_candidate_cache": true,
+    "owner_cleanup_invalidates_query_budget": true,
+    "owner_token_source": "runtime_assigned_plugin_owner_token",
+    "owner_token_validation_before_candidate_cache_read": true,
+    "owner_token_validation_before_rate_budget": true,
+    "owner_token_validation_precedes_policy_evaluation": true,
+    "plugin_supplied_owner_identity_allowed": false,
+    "public_abi_field_allowed": false,
+    "runtime_ready": false,
+    "unknown_owner_token_result": "deny",
+    "unloading_owner_token_result": "deny",
+    "zero_owner_token_result": "deny"
+  },
+  "policy_provenance_policy": {
+    "authority_generation_mismatch_result": "deny",
+    "authority_generation_required_before_allow": true,
+    "authority_kind_required_before_allow": true,
+    "command_text_policy_provenance_claim_allowed": false,
+    "missing_authority_generation_result": "deny",
+    "missing_authority_kind_result": "deny",
+    "missing_policy_epoch_result": "deny",
+    "missing_policy_source_generation_result": "deny",
+    "missing_policy_source_result": "deny",
+    "operator_config_allow_provenance_allowed": false,
+    "operator_config_policy_provenance_claim_allowed": false,
+    "plugin_supplied_policy_provenance_allowed": false,
+    "plugin_supplied_policy_provenance_result": "deny",
+    "policy_epoch_required_before_allow": true,
+    "policy_provenance_source": "runtime_owned_policy_evaluator",
+    "policy_source_generation_mismatch_result": "deny",
+    "policy_source_generation_required_before_allow": true,
+    "policy_source_id_required_before_allow": true,
+    "public_abi_field_allowed": false,
+    "runtime_ready": false,
+    "unknown_authority_result": "unknown"
+  },
   "pre_abi": true,
   "principal_provenance_policy": {
     "command_supplied_principal_tuple_allowed": false,

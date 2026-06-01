@@ -146,6 +146,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "generic chat routing cannot establish permissions or admin authority",
                 "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish permissions, targeting, command authority, moderation authority, or roadmap priority",
                 "commands/replies planning cannot bypass permissions/admin promotion",
+                "runtime-owned permissions/admin allow for the same runtime-owned principal tuple is required before any reply, send-chat, broadcast, moderation, or router response path is public",
             ]},
             {"id": "abi.copied_response_payload", "status": "unresolved"},
             {"id": "abi.capability_and_owner_token", "status": "unresolved", "required_behavior": [
@@ -165,6 +166,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "missing principal provenance fails closed",
                 "server process epoch mismatch fails closed",
                 "permission allow cannot be consumed without policy provenance",
+                "runtime-owned principal tuple must be paired with runtime-owned permission provenance before reply/send-chat/router planning can become public",
                 "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
                 "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
                 "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
@@ -181,6 +183,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "public response path through raw ProcessEvent",
                 "public response path through static thunk orientation",
                 "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
+                "reply/send-chat/router claims before promotion",
                 "moderation API",
             ], "v1_sequence_gate": [
                 "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
@@ -232,6 +235,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "public commands/replies response shortcut before promoted identity and permissions/admin",
                 "reply API",
                 "send-chat API",
+                "reply/send-chat/router claims before promotion",
                 "broadcast/notices API",
                 "moderation API",
                 "raw UE pointers",
@@ -292,6 +296,8 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         readiness["target_set_guidance"][0]["reply_api"] = True
         readiness["claim"] = "reply API is public and ready"
         readiness["generic_chat_claim"] = "generic chat routing is public and ready"
+        readiness["send_chat_claim"] = "send-chat is available"
+        readiness["router_claim"] = "router is supported"
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
             result = self.run_checker(
@@ -465,6 +471,10 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             and not item.startswith("principal tuple source must be runtime-owned")
             and item != "plugin-supplied principal tuple fails closed"
             and item != "permission allow cannot be consumed without policy provenance"
+            and item != (
+                "runtime-owned principal tuple must be paired with runtime-owned permission provenance "
+                "before reply/send-chat/router planning can become public"
+            )
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
@@ -490,6 +500,10 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         )
         self.assertIn("plugin-supplied principal tuple fails closed", detail["missing"])
         self.assertIn("permission allow cannot be consumed without policy provenance", detail["missing"])
+        self.assertIn(
+            "runtime-owned principal tuple must be paired with runtime-owned permission provenance before reply/send-chat/router planning can become public",
+            detail["missing"],
+        )
 
     def test_rejects_missing_not_sufficient_shortcut_evidence(self) -> None:
         decisions = self.make_decisions()

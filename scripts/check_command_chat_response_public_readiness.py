@@ -71,6 +71,7 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
         "direct native-call wrappers",
         "reply API",
         "send-chat API",
+        "reply/send-chat/router claims before promotion",
         "broadcast/notices API",
         "moderation API",
         "principal or permission claims from command text",
@@ -108,6 +109,7 @@ REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
         "missing principal provenance fails closed",
         "server process epoch mismatch fails closed",
         "permission allow cannot be consumed without policy provenance",
+        "runtime-owned principal tuple must be paired with runtime-owned permission provenance before reply/send-chat/router planning can become public",
         "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
         "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
         "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
@@ -241,8 +243,8 @@ NEGATIVE_CONTEXT_TOKENS = (
 POSITIVE_SURFACE_RE = re.compile(
     r"\b("
     r"public\s+headers?|"
-    r"reply\s+api|replies\s+api|send[- ]?chat\s+api|"
-    r"command\s+router|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|"
+    r"repl(?:y|ies)(?:\s+(?:api|path|request))?|send[- ]?chat(?:\s+(?:api|path|request))?|"
+    r"command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
     r")\b.{0,80}\b(allowed|available|enabled|established|promoted|public|ready)\b",
     re.IGNORECASE,
@@ -564,6 +566,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "generic chat routing cannot establish permissions or admin authority",
         "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish permissions, targeting, command authority, moderation authority, or roadmap priority",
         "commands/replies planning cannot bypass permissions/admin promotion",
+        "runtime-owned permissions/admin allow for the same runtime-owned principal tuple is required before any reply, send-chat, broadcast, moderation, or router response path is public",
     ):
         if required not in permission_behaviors:
             add(blockers, "permissions_dependency_behavior_missing", "$.decisions.required_before_public_header", behavior=required)
@@ -600,6 +603,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "public response path through raw ProcessEvent",
         "public response path through static thunk orientation",
         "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
+        "reply/send-chat/router claims before promotion",
         "moderation API",
     ):
         if required not in exclusions:

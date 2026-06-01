@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -26,6 +27,7 @@ from snapshot_evidence_pack import reject_symlink_component
 
 REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 NEXT_BLOCKER_AFTER_WINDOW_MANIFEST = "approved_runtime_observer_log_summary_and_manifest_missing"
+WINDOW_REQUEST_CHECKER = Path(__file__).resolve().parent / "check_player_principal_lifecycle_window_request.py"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
@@ -452,6 +454,46 @@ def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers:
             add(blockers, "request_pack_approved_window_end_mismatch", "request_pack_path")
     else:
         add(blockers, "request_pack_approved_window_missing", "request_pack_path")
+
+    observer_env_text = fields.get("observer_env_path")
+    if not observer_env_text:
+        return
+    observer_env_path = manifest_relative_path(observer_env_text, manifest_path)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(WINDOW_REQUEST_CHECKER),
+            "--json",
+            str(status.resolved),
+            "--env-file",
+            str(observer_env_path),
+        ],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    payload_check: dict[str, Any] | None = None
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+            if isinstance(parsed, dict):
+                payload_check = parsed
+        except json.JSONDecodeError:
+            payload_check = None
+    if (
+        result.returncode != 0
+        or not isinstance(payload_check, dict)
+        or payload_check.get("ready") is not True
+        or payload_check.get("request_pack_ready") is not True
+    ):
+        add(
+            blockers,
+            "request_pack_window_request_check_failed",
+            "request_pack_path",
+            exit_code=result.returncode,
+            request_check_blockers=(payload_check or {}).get("blockers", []),
+        )
 
 
 def validate_user_policy(fields: dict[str, str], blockers: list[dict[str, Any]]) -> str | None:

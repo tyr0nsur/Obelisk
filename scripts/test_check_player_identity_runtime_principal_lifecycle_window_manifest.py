@@ -601,6 +601,54 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("sibling_observer_env_not_absent", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_request_pack_observer_env_drift(self) -> None:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
+            root = Path(tmp)
+            exact_dir = root / "live-validation-logs" / RUN_ID
+            exact_log = exact_dir / "Obelisk.log"
+            exact_manifest = exact_dir / "window-manifest.env"
+            exact_dir.mkdir(parents=True, exist_ok=True)
+            lines = []
+            for line in manifest_lines():
+                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                    lines.append(f"copied_log_path={exact_log}")
+                else:
+                    lines.append(line)
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            fields = write_sidecars(exact_manifest.parent, fields)
+            observer_env = Path(fields["observer_env_path"])
+            if not observer_env.is_absolute():
+                observer_env = exact_manifest.parent / observer_env
+            observer_env.write_text(
+                observer_env.read_text(encoding="utf-8").replace(
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=9",
+                ),
+                encoding="utf-8",
+            )
+            fields["observer_env_sha256"] = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            exact_manifest.write_text(
+                "\n".join(f"{key}={value}" for key, value in fields.items()) + "\n",
+                encoding="utf-8",
+            )
+            exact_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_window_request_check_failed", report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_capture_outside_approved_window_and_bad_rollback_order(self) -> None:
         result = self.run_checker(
             manifest_lines(

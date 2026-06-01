@@ -27,6 +27,7 @@
     "direct native-call wrappers",
     "reply API",
     "send-chat API",
+    "reply/send-chat/router claims before promotion",
     "broadcast/notices API",
     "moderation API",
     "principal or permission claims from command text",
@@ -62,7 +63,8 @@
         "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
         "generic chat routing cannot establish permissions or admin authority",
         "chat intake, send mode, passive parsing, command text, and chat snapshots cannot establish permissions, targeting, command authority, moderation authority, or roadmap priority",
-        "commands/replies planning cannot bypass permissions/admin promotion"
+        "commands/replies planning cannot bypass permissions/admin promotion",
+        "runtime-owned permissions/admin allow for the same runtime-owned principal tuple is required before any reply, send-chat, broadcast, moderation, or router response path is public"
       ]
     },
     {
@@ -141,6 +143,7 @@
         "missing principal provenance fails closed",
         "server process epoch mismatch fails closed",
         "permission allow cannot be consumed without policy provenance",
+        "runtime-owned principal tuple must be paired with runtime-owned permission provenance before reply/send-chat/router planning can become public",
         "principal generation mismatch fails closed",
         "unsupported scope fails closed",
         "private identity fields are not logged",
@@ -189,6 +192,7 @@
         "public response path through raw ProcessEvent",
         "public response path through static thunk orientation",
         "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
+        "reply/send-chat/router claims before promotion",
         "console command API",
         "RCON command API",
         "moderation API",

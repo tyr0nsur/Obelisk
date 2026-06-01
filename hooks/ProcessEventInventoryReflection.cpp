@@ -192,6 +192,7 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
             const ExpectedPolicyField* Fields = nullptr;
             size_t FieldCount = 0;
             size_t ScalarCount = 0;
+            size_t ParamSize = 0;
         };
 
         bool TryGetDispatchShape(Obelisk::UE::InventoryReflection::InventoryFunction function,
@@ -275,6 +276,7 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
                 out.Fields = kAllowRemoteAddFields;
                 out.FieldCount = std::size(kAllowRemoteAddFields);
                 out.ScalarCount = 2;
+                out.ParamSize = 0x12;
                 return true;
             case InventoryFunction::CanUse:
                 if (functionNameIndex != kCanUseNameIndex ||
@@ -286,6 +288,7 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
                 out.Fields = kCanUseFields;
                 out.FieldCount = std::size(kCanUseFields);
                 out.ScalarCount = 2;
+                out.ParamSize = 0x02;
                 return true;
             case InventoryFunction::ServerRequestInventoryUseItem:
             case InventoryFunction::ServerRequestInventoryUseItemWithActor:
@@ -450,8 +453,11 @@ namespace Obelisk::Hooks::ProcessEventInventoryReflection
         {
             return false;
         }
-        if (!invocation.HasParameterRanges)
+        if (!invocation.HasParameterRanges ||
+            invocation.ParamSize != expected.ParamSize)
+        {
             return false;
+        }
 
         if (!expected.Fields || invocation.Fields.size() != expected.FieldCount)
             return false;

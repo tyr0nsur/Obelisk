@@ -17,6 +17,7 @@ DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_CONTRACT_DECISIONS_DIR = REPO_ROOT / "docs"
 DEFAULT_COMMAND_PERMISSION_ROUTE_GATE = REPO_ROOT / "scripts" / "check_command_permission_route_gate.py"
+CANONICAL_MANIFEST_RELEASE_CLAIM = "no-v1-stable-release-claim-post-rc-surface-inventory"
 CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
     "obelisk.chat.local_routing.v1",
@@ -1891,6 +1892,8 @@ def build_report(
         blockers.append("schema_mismatch")
     if manifest.get("sdk_version") != "v1.0":
         blockers.append("sdk_version_not_v1")
+    if manifest.get("release_claim") != CANONICAL_MANIFEST_RELEASE_CLAIM:
+        blockers.append("release_claim_scope_drift")
 
     stable_contract = manifest.get("stable_release_contract")
     if not isinstance(stable_contract, dict):
@@ -2270,6 +2273,8 @@ def build_report(
         "command_permission_route_gate": command_permission_route_gate,
         "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
+        "release_claim": manifest.get("release_claim"),
+        "expected_release_claim": CANONICAL_MANIFEST_RELEASE_CLAIM,
         "v1_completion_required": manifest.get("v1_completion_required"),
         "stable_claim_allowed": stable_claim_allowed,
         "stable_release_contract_claim_allowed": manifest_stable_claim_allowed,
@@ -2418,6 +2423,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "v1_completion_required_false": [
             "v1_completion_required is not true.",
             "Action: do not describe this tree as a complete v1.0 SDK; finish or explicitly exclude blockers first.",
+        ],
+        "release_claim_scope_drift": [
+            "public_sdk_surfaces.json release_claim must remain an explicit no-v1-stable claim.",
+            f"Expected: {CANONICAL_MANIFEST_RELEASE_CLAIM}.",
+            f"Actual: {report.get('release_claim')}.",
         ],
         "stable_release_contract_claim_requires_incomplete": [
             "stable_release_contract.claim_requires is missing required guardrail text.",

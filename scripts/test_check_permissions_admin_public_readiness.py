@@ -521,6 +521,26 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("query_text_boundary_properties_missing", report["blockers"])
 
+    def test_rejects_owner_token_pre_evaluation_boundary_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            abi = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "abi.permission_query_identity_fields"
+            )
+            abi["required_properties"].remove(
+                "owner-token validation happens before policy lookup, cache lookup, rate budget, or allow result"
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_text_boundary_properties_missing", report["blockers"])
+
     def test_rejects_missing_generation_mismatch_fail_closed_cases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -623,6 +643,54 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("policy_operator_config_allow_capable_not_false", report["blockers"])
         self.assertIn("policy_runtime_local_authority_not_required_runtime_owned", report["blockers"])
         self.assertIn("policy_authority_fail_closed_requirements_missing", report["blockers"])
+
+    def test_rejects_policy_provenance_self_attestation_requirements_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            policy = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "policy.authority_provenance_required"
+            )
+            for behavior in (
+                "operator-config cannot self-attest allow-capable policy provenance",
+                "command text cannot establish policy provenance",
+                "policy provenance must be runtime-owned before allow",
+                "plugin input cannot self-attest policy provenance",
+            ):
+                policy["required_behavior"].remove(behavior)
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("policy_authority_fail_closed_requirements_missing", report["blockers"])
+
+    def test_rejects_policy_provenance_claim_fail_closed_cases_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            fail_closed = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "fail_closed.stale_or_scope_mismatch"
+            )
+            for case in (
+                "command text policy provenance claim",
+                "operator config policy provenance claim",
+            ):
+                fail_closed["must_never_return_allow_for"].remove(case)
+                fail_closed["deny_or_unknown_conditions"].remove(case)
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("fail_closed_never_allow_cases_missing", report["blockers"])
+        self.assertIn("fail_closed_deny_or_unknown_cases_missing", report["blockers"])
 
     def test_rejects_runtime_principal_evidence_as_identity_promotion_dependency_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

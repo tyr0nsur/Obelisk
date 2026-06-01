@@ -64,6 +64,16 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         self.assertFalse(payload["public_command_router_allowed"])
         self.assertFalse(payload["public_reply_or_send_chat_abi_allowed"])
         self.assertFalse(payload["public_response_path_allowed"])
+        gate = payload["runtime_owned_principal_permissions_gate"]
+        self.assertTrue(gate["runtime_owned_principal_required"])
+        self.assertTrue(gate["runtime_owned_permission_allow_required"])
+        self.assertTrue(gate["same_principal_tuple_required"])
+        self.assertTrue(gate["permission_policy_provenance_required"])
+        self.assertFalse(gate["reply_send_chat_router_claims_allowed"])
+        self.assertFalse(gate["public_abi_allowed"])
+        self.assertFalse(gate["runtime_delivery_allowed"])
+        self.assertIn("permission_decision", gate["required_runtime_owned_inputs"])
+        self.assertIn("router metadata", gate["forbidden_authority_sources"])
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
 
@@ -147,6 +157,9 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         for forbidden in (
             "principal or permission claims from command text",
             "principal or permission claims from operator config",
+            "principal or permission claims from reply request",
+            "principal or permission claims from router metadata",
+            "runtime-owned principal or permission bypass",
         ):
             self.assertIn(forbidden, payload["forbidden_public_contract"])
 
@@ -160,7 +173,10 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
             "missing principal_generation fails closed",
             "stale principal fails closed",
             "unsupported principal_scope_flags fails closed",
+            "permission allow must come from runtime-owned permissions/admin evaluation for the same principal_handle, principal_generation, and principal_scope_flags tuple",
             "permission denial or unknown result never dispatches a command",
+            "reply requests, send-chat requests, and router metadata cannot establish principal identity, permission authority, or policy provenance",
+            "reply/send-chat/router planning cannot consume permission allow until promoted permissions/admin returns allow with runtime-owned policy provenance",
             "command text remains copied request data only and cannot establish identity, permission authority, or policy provenance",
             "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
             "command callbacks cannot self-attest permission authority",

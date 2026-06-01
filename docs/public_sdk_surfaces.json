@@ -5,7 +5,7 @@
   "abi_version": "0.1",
   "status": "planning-contract",
   "v1_completion_required": false,
-  "release_claim": "post-rc-sdk-surface-inventory",
+  "release_claim": "no-v1-stable-release-claim-post-rc-surface-inventory",
   "public_header": "include/obelisk/ObeliskApi.h",
   "compatibility_statement": "Obelisk v1.0 stable must mean the complete public SDK contract for plugin authors, not a runtime/core-first RC or internal-runtime stability milestone. The current post-RC tree may inventory v1 surfaces without claiming v1.0 completion.",
   "stable_release_contract": {
@@ -137,6 +137,7 @@
     "Static thunk orientation, passive ChatMessageEvent parsing, candidate vtable slots, raw ProcessEvent callbacks, and legacy CallProcessEvent debug access are not public response-path or command/reply promotion evidence.",
     "Installed-SDK foundation examples before identity/principal are limited to lifecycle/config/logging, descriptors, and process-local timers; they are package-shape/contributor-readiness examples only. Plugin Hub seed/package publication remains post-SDK-complete, and neither these examples nor passive chat routing are enough for v1 completion; passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
+    "Plugin Hub remains post-SDK-complete planning: no seed/package publication, intake prioritization, production module availability, or support-tier activation may be inferred from v0.1 RC surfaces, installed SDK package shape, foundation examples, or promoted-experimental copied-data seeds.",
     "Lifecycle/config/logging foundation does not satisfy lifecycle ops recovery demand; plugin watchdogs, hot reload, process restart orchestration, server recovery, operator reload commands, and restart-state semantics must be promoted separately or explicitly excluded/post-v1.",
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
     "Object identity, lookup, and ResourceHandle are cross-cutting post-v1 blockers; no structure, inventory, dino, tribe, buff, mission, transfer, economy, mobility, or area-policy surface may use post-callback object handles until lifecycle/reuse and UObject flag semantics are promoted.",

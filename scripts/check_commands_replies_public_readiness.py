@@ -68,6 +68,7 @@ REQUIRED_MIGRATION_REGISTRATION_SEMANTICS = frozenset(
         "unsupported or unknown source_kind fails closed",
         "permission denial or unknown result never dispatches a command",
         "missing permission policy provenance fails closed",
+        "reply/send-chat/router planning must consume only runtime-owned principal and permissions provenance after separate promotion",
         "reply request is copied request data only and never implies response delivery until command_chat_response_path is separately promoted",
     )
 )
@@ -97,6 +98,9 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
         "send-chat ABI",
         "principal or permission claims from command text",
         "principal or permission claims from operator config",
+        "principal or permission claims from reply request",
+        "principal or permission claims from router metadata",
+        "runtime-owned principal or permission bypass",
         "raw UE pointers",
         "raw ProcessEvent params",
         "raw FString storage",
@@ -126,10 +130,40 @@ REQUIRED_AUTH_BEHAVIORS = frozenset(
         "unsupported principal_scope_flags fails closed",
         "missing permission policy provenance fails closed",
         "permission allow cannot be consumed without policy provenance",
+        "permission allow must come from runtime-owned permissions/admin evaluation for the same principal_handle, principal_generation, and principal_scope_flags tuple",
         "permission denial or unknown result never dispatches a command",
+        "reply requests, send-chat requests, and router metadata cannot establish principal identity, permission authority, or policy provenance",
+        "reply/send-chat/router planning cannot consume permission allow until promoted permissions/admin returns allow with runtime-owned policy provenance",
         "command text remains copied request data only and cannot establish identity, permission authority, or policy provenance",
         "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
         "command callbacks cannot self-attest permission authority",
+    )
+)
+REQUIRED_RUNTIME_OWNED_GATE_INPUTS = frozenset(
+    (
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "server_process_epoch",
+        "permission_decision",
+        "permission_policy_epoch",
+        "policy_source_id",
+        "policy_source_generation",
+        "authority_kind",
+        "authority_generation",
+    )
+)
+REQUIRED_RUNTIME_OWNED_FORBIDDEN_SOURCES = frozenset(
+    (
+        "plugin input",
+        "command text",
+        "operator config",
+        "reply request",
+        "send-chat request",
+        "router metadata",
+        "passive ChatMessageEvent",
+        "raw ProcessEvent",
+        "legacy CallProcessEvent",
     )
 )
 REQUIRED_NOT_SUFFICIENT = frozenset(
@@ -202,6 +236,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_reply_or_send_chat_abi_allowed",
         "public_response_path_allowed",
         "public_sdk_ready",
+        "reply_send_chat_router_claims_allowed",
         "public_send_chat_abi_allowed",
         "reply_allowed",
         "runtime_ready",
@@ -235,8 +270,9 @@ POSITIVE_CLAIM_RE = re.compile(
     r"arkapi\s+(?:command\s+)?parser|aseapi\s+(?:command\s+)?parser|"
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
-    r"command[_ -]?parser|command[_ -]?router|public\s+command\s+sdk|"
-    r"repl(?:y|ies)(?:[_ -]?abi|[_ -]?api)?|send[_ -]?chat(?:[_ -]?abi|[_ -]?api)?"
+    r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
+    r"public\s+command\s+sdk|"
+    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
     r")\b.{0,100}\b(allowed|available|copied|enabled|established|implemented|promoted|public|ready|supported)\b",
     re.IGNORECASE,
 )
@@ -246,8 +282,9 @@ POSITIVE_CLAIM_REVERSED_RE = re.compile(
     r"arkapi\s+(?:command\s+)?parser|aseapi\s+(?:command\s+)?parser|"
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
-    r"command[_ -]?parser|command[_ -]?router|public\s+command\s+sdk|"
-    r"repl(?:y|ies)(?:[_ -]?abi|[_ -]?api)?|send[_ -]?chat(?:[_ -]?abi|[_ -]?api)?"
+    r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
+    r"public\s+command\s+sdk|"
+    r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?"
     r")\b",
     re.IGNORECASE,
 )
@@ -373,6 +410,51 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         )
     if payload.get("public_contract", []) != []:
         add(blockers, "public_contract_not_empty", "$.decisions.public_contract", value=payload.get("public_contract"))
+
+    gate = payload.get("runtime_owned_principal_permissions_gate")
+    if not isinstance(gate, dict):
+        add(blockers, "runtime_owned_principal_permissions_gate_missing", "$.decisions.runtime_owned_principal_permissions_gate")
+    else:
+        for key in (
+            "planning_only",
+            "runtime_owned_principal_required",
+            "runtime_owned_permission_allow_required",
+            "same_principal_tuple_required",
+            "permission_policy_provenance_required",
+        ):
+            if gate.get(key) is not True:
+                add(
+                    blockers,
+                    "runtime_owned_principal_permissions_gate_required_true_missing",
+                    f"$.decisions.runtime_owned_principal_permissions_gate.{key}",
+                    field=key,
+                    value=gate.get(key),
+                )
+        for key in ("reply_send_chat_router_claims_allowed", "public_abi_allowed", "runtime_delivery_allowed"):
+            if gate.get(key) is not False:
+                add(
+                    blockers,
+                    "runtime_owned_principal_permissions_gate_required_false_missing",
+                    f"$.decisions.runtime_owned_principal_permissions_gate.{key}",
+                    field=key,
+                    value=gate.get(key),
+                )
+        missing_inputs = REQUIRED_RUNTIME_OWNED_GATE_INPUTS - string_set(gate.get("required_runtime_owned_inputs"))
+        if missing_inputs:
+            add(
+                blockers,
+                "runtime_owned_principal_permissions_gate_inputs_missing",
+                "$.decisions.runtime_owned_principal_permissions_gate.required_runtime_owned_inputs",
+                missing=sorted(missing_inputs),
+            )
+        missing_sources = REQUIRED_RUNTIME_OWNED_FORBIDDEN_SOURCES - string_set(gate.get("forbidden_authority_sources"))
+        if missing_sources:
+            add(
+                blockers,
+                "runtime_owned_principal_permissions_gate_forbidden_sources_missing",
+                "$.decisions.runtime_owned_principal_permissions_gate.forbidden_authority_sources",
+                missing=sorted(missing_sources),
+            )
 
     migration = payload.get("migration_vocabulary_not_compatibility")
     if not isinstance(migration, dict):

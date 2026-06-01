@@ -38,6 +38,10 @@ descriptor/catalog metadata, installed-SDK consumers, and owner-token process-lo
 timers. Those examples are useful for contributors, but Plugin Hub seed/package
 publication remains post-SDK-complete and pre-identity installed-SDK foundation
 usefulness is insufficient for v1 completion or a `v1.0` complete SDK claim.
+Plugin Hub remains post-SDK-complete planning: no seed/package publication, intake
+prioritization, production module availability, or support-tier activation may be
+inferred from v0.1 RC surfaces, installed SDK package shape, foundation examples, or
+promoted-experimental copied-data seeds.
 Copied chat and gameplay-policy examples are experimental copied-data patterns only.
 `GameplayPolicyEvent` and `ChatMessageEvent`, separately or together, must not be
 described as a complete `v1.0` SDK, `v1.0 stable`, or sufficient to turn on

@@ -26,6 +26,7 @@ ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 BUILDER = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
 CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 WINDOW_MANIFEST_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
+WINDOW_REQUEST_CHECKER = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
 OFFLINE_GATE = SCRIPT_DIR / "validate_offline_artifact_gate.py"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
@@ -193,6 +194,62 @@ def file_state(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[s
     return state
 
 
+def run_json_check(command: list[str]) -> tuple[int, dict[str, Any] | None, str]:
+    result = subprocess.run(command, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    payload: dict[str, Any] | None = None
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+            if isinstance(parsed, dict):
+                payload = parsed
+        except json.JSONDecodeError:
+            payload = None
+    return result.returncode, payload, result.stderr.strip()
+
+
+def request_pack_check_state(
+    request_pack: dict[str, Any],
+    observer_env: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "checked": False,
+        "ready": False,
+        "exit_code": None,
+        "schema": None,
+        "stderr": "",
+    }
+    if not request_pack["exists"] or not observer_env["exists"]:
+        return state
+    state["checked"] = True
+    exit_code, payload, stderr = run_json_check(
+        [
+            sys.executable,
+            str(WINDOW_REQUEST_CHECKER),
+            "--json",
+            str(request_pack["path"]),
+            "--env-file",
+            str(observer_env["path"]),
+        ]
+    )
+    state["exit_code"] = exit_code
+    state["stderr"] = stderr
+    if isinstance(payload, dict):
+        state["schema"] = payload.get("schema")
+        state["ready"] = payload.get("ready") is True and payload.get("request_pack_ready") is True
+        state["blockers"] = payload.get("blockers", [])
+        state["next_blocker"] = payload.get("next_blocker")
+    if not state["ready"]:
+        add_blocker(
+            blockers,
+            "request_pack_check_failed",
+            "request_pack",
+            exit_code=exit_code,
+            request_check_blockers=state.get("blockers", []),
+        )
+    return state
+
+
 def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     reject_symlink_component(evidence_dir, "--evidence-dir")
@@ -226,6 +283,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     observer_env = file_state(resolved / "sidecars" / run_id / "observer-window.env", "observer_env", blockers)
     preflight_pre = file_state(resolved / "sidecars" / run_id / "preflight-pre.txt", "preflight_pre", blockers)
     preflight_post = file_state(resolved / "sidecars" / run_id / "preflight-post.txt", "preflight_post", blockers)
+    request_check = request_pack_check_state(request_pack, observer_env, blockers)
 
     bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
     approved_bundle = file_state(bundle_manifest, "approved_runtime_manifest", blockers)
@@ -242,6 +300,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         and observer_env["exists"]
         and preflight_pre["exists"]
         and preflight_post["exists"]
+        and request_check["ready"]
     )
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
@@ -261,6 +320,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
             "window_manifest": window_manifest,
             "request_pack": request_pack,
             "observer_env": observer_env,
+            "request_pack_check": request_check,
             "preflight_pre": preflight_pre,
             "preflight_post": preflight_post,
             "approved_runtime_manifest": approved_bundle,

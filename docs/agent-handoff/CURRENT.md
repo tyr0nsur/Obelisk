@@ -38,6 +38,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   tests. The command/permission route gate also has an explicit `route_lock` invariant
   keeping permissions, command response, and replies locked behind player-identity runtime
   evidence plus the reviewed identity public-contract gate.
+- Latest offline gate hardening: player-principal runtime evidence bundle preflight and
+  window-manifest checks now validate the paired `window-request.json` and
+  `observer-window.env` semantically, not just by path/SHA. The current request-pack for
+  `arkserver2/TheIsland` is semantically ready again; bundle inputs still correctly fail
+  closed until copied `Obelisk.log`, `window-manifest.env`, and an approved evidence bundle
+  exist. Inventory copied-policy dispatch also requires exact reflected `ParmsSize`
+  provenance before scalar copy.
 
 ## Hard Overrides
 
@@ -187,7 +194,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Current request-pack directory
   `/servidor/ark/workspace-offline/live-validation-logs/20260601T120000Z-player-principal-lifecycle`
   is request-pack ready only and still lacks copied `Obelisk.log` plus
-  `window-manifest.env`; this is not runtime approval or approved evidence.
+  `window-manifest.env`; this is not runtime approval or approved evidence. If this
+  directory is rechecked, `scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py --preflight-only`
+  should report `request_pack_ready=true`, `bundle_inputs_ready=false`, and blockers only
+  for copied log/window manifest/approved manifest.
 - `command_chat_response_public_readiness`, `commands_replies_public_readiness`, and
   `check_command_permission_route_gate.py` preserve runtime-owned principal provenance and
   keep public header, ABI, SDK, runtime, reply/send-chat, command-router, and permissions
@@ -202,6 +212,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Mission copied-bool, buff scalar, structure census/build-policy, operator ingress/storage,
   and mission/transfer/dino/tribe/buff-status accounting stay internal, planning-only, or
   consume-only until their own copied ABI, redaction, lifecycle, and promotion gates exist.
+- Structure build-policy offline intake is already accepted as planning layout for
+  `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
+  `PrimalStructure.BPIsAllowedToBuildEx`; the useful next side-lane is a fixture/policy
+  guardrail that freezes field shape/redaction and prevents public payload, runtime-ready,
+  enforcement-ready, or return-override claims.
 - ResourceHandle remains blocked on rejected runtime object samples plus runtime serial
   reuse/wraparound semantics; do not restart broad FName/GObjects/core scans for it.
 - Demand-map priority from NextGenPlugins names is P0 principal -> permissions/admin ->
