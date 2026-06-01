@@ -183,16 +183,23 @@ advertised to that plugin at init.
 Player identity is planning-only. `players-identity-lifecycle-intake` and
 `obelisk.players-identity-first-evidence.v1` are candidate-only,
 consume-only/promote-blocked evidence lanes, not public SDK or runtime readiness. The
-current lane has candidate fixtures and accepted distinct second-source layout coverage
-for the 12-target intake, including `ShooterPlayerController.ServerListPlayers` and
-`ShooterPlayerController.ServerKickPlayer`. The first-evidence gate force-redacts
+current lane requires a reviewed non-protected complete
+`obelisk.core-dump-evidence-pack.v1`, a reviewed UFunction
+`obelisk.reflection-inventory-pack.v1`, candidate fixtures, and accepted distinct
+second-source layout coverage for the 12-target intake, including
+`ShooterPlayerController.ServerListPlayers` and
+`ShooterPlayerController.ServerKickPlayer`. `ServerListPlayers` and `ServerKickPlayer`
+snapshots are evidence inputs only. The first-evidence gate force-redacts
 identity-like fields and treats `ServerKickPlayer` fields as
 admin-mutation-not-public-identity. It still fails closed until approved runtime principal
 lifecycle evidence, accepted lifecycle ordering, principal privacy/invalidation semantics,
 and cross-instance scope behavior exist. An offline `ShooterGameServer` binary, copied
 core, manual FName/GObjects roots, direct core/bin planning, candidate fixtures, or
 second-source layout acceptance alone is insufficient and must not be described as public
-SDK, runtime-readiness, or promotion evidence.
+SDK, runtime-readiness, or promotion evidence. direct core/bin planning alone is
+insufficient. An offline `ShooterGameServer` binary, copied core, manual FName/GObjects
+roots, or direct core/bin planning alone is insufficient. Future promotion also needs
+accepted lifecycle anchors and independent second-source evidence.
 The future `obelisk.players-identity-principal-invalidation-policy.v1` artifact is a
 candidate-only policy input; it does not promote player identity/principal,
 permissions/admin, command response paths, commands/replies, runtime readiness, or v1 SDK

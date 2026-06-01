@@ -108,6 +108,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("non_promoted_surface_has_public_contract", payload["blockers"])
         self.assertIn("obelisk.player_identity.v1", payload["unresolved_completion_blockers"])
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
+        progress = payload["v1_sdk_progress"]
+        self.assertEqual(progress["completion_blocker_total"], 11)
+        self.assertIn(
+            "obelisk.permissions_admin.v1",
+            progress["completion_blockers_with_post_v1_or_excluded_outcome"],
+        )
+        self.assertIn("obelisk.player_identity.v1", progress["completion_blockers_without_manifest_outcome"])
+        self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 3)
+        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 3)
+        self.assertFalse(progress["stable_claim_allowed"])
+        self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:

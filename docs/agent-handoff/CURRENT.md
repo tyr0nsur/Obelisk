@@ -22,8 +22,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Hard Overrides
 
-- GitHub publication is lead-only. GitHub work may be delegated only for an evidenced, stable milestone; this handoff does not authorize push, tag, release-ref updates,
-  rebase, or routine publication.
+- GitHub publication is lead-only. GitHub work may be delegated only for an evidenced, stable milestone; this handoff does not authorize push, tag, release-ref updates, rebase, or routine publication.
 - No tag or release-ref push may occur without release-manager/lead authorization for
   the current-turn release scope.
 - No server target has standing approval. Server-backed debug/beta work requires a
@@ -81,13 +80,16 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `obelisk.reflection-inventory-pack.v1` with 12/12
   `players-identity-lifecycle-intake` target coverage, and committed candidate fixtures
   for `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer`.
+  `ShooterPlayerController.ServerKickPlayer`. The lane depends on a non-protected
+  evidence root; lifecycle-anchor schema/target-set and principal invalidation policy
+  still need a reviewed gate.
 - Distinct second-source layout is now accepted for the 12-target player-identity intake
   when using candidate root
   `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
   with `scripts/compare_reflection_snapshots.py --planning-layout-intake`: totals are
   `targets=12`, `comparable=12`, `second_source_accepted=12`, rejected/inconclusive/missing
-  all zero, and promotion remains false.
+  all zero, and promotion remains false. This is accepted distinct second-source layout
+  evidence from the vanilla-gdb core.
 - Current identity next step is accepted login/logout lifecycle anchor evidence and
   principal invalidation semantics. The
   `obelisk.players-identity-principal-invalidation-policy.v1` schema is a
@@ -164,9 +166,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
   missions/transfers. Do not copy ArkApi/NextGenPlugins implementation details.
 - No-core fallback: keep progress offline through guardrails, permission/admin query-only
-  design, command/principal contract, and inventory copied-signal hygiene. Inventory copied
+  design, command/principal contract, and inventory copied-signal hygiene. inventory copied
   signals are the higher-value side lane, but do not displace identity -> permissions/admin
-  -> commands/replies and does not authorize Transfer runtime work.
+  -> commands/replies and does not authorize Transfer runtime work. Neither side lane
+  displaces identity -> permissions/admin -> commands/replies. Prefer inventory
+  copied-signal hygiene over structure census when choosing one side lane, while
+  structure census remains useful offline planning/consume-only work.
 - Current no-core side-lane: `item-return-only-policy-slice` has three copied
   `GameplayPolicyEvent` `ReturnValue` checks and accepted descriptor reconciliation; it
   does not promote public Inventory SDK, Items SDK, identity, mutation, return override,
@@ -189,27 +194,25 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Plugin Hub seed review requires exactly one package `Support tier: <tier>` declaration
   and rejects unnegated v1/ArkApi/permissions/identity/replies/mutation/storage/module
   support claims outside that tier.
-- Plugin cleanup failure policy skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown after shutdown already ran.
 - Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
   stays blocked on lifecycle-anchor evidence unless an explicit lifecycle-anchor candidate
   manifest is provided; with both lifecycle-anchor and principal-invalidation policy
   manifests it stays blocked on approved runtime evidence. Public SDK v1 completion stays
   blocked, Plugin Hub docs stay non-promotional, and `git diff --check` passes.
+- lifecycle-anchor and principal-invalidation candidate manifests can now be consumed
+  together; the next blocker is approved runtime principal lifecycle evidence. Do not
+  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes.
+  Current recipe:
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`
 - Start every supervised round by verifying no stale stand-by sub-agent remains open.
-  Assign each sub-agent only the scoped objective, safety baseline, allowed paths,
-  required skills, expert role, expected decision, and whether edits are allowed. Pass
-  only the skills needed for that task. The lead retains server-safety decisions.
-
+  Assign scoped objective, safety baseline, allowed paths, required skills, expert role,
+  expected decision, and edit permission. Pass only the skills needed for that task. The lead retains server-safety decisions.
 ## Agent Protocol
-
 - The lead owns integration. Sub-agents must not commit, amend, rebase, tag, push, update
   GitHub state, touch servers, send Discord updates, or broaden live-ops scope.
-- Use expert roles with disjoint ownership: ABI/API engineer, build/SDK engineer,
-  UE4 reflection engineer, static binary analysis engineer, live-ops engineer, release
-  auditor, or docs/skills worker.
+- Use expert roles with disjoint ownership: ABI/API, build/SDK, UE4 reflection, static
+  binary analysis, live-ops, release audit, or docs/skills.
 - Tell workers they are not alone in the codebase. They must not revert unrelated changes
   and must leave changes unstaged/uncommitted with touched paths and tests run.
-- Read-only explorers should answer concrete questions with file/line evidence and no
-  edits.
-- Close old agents after integrating useful findings. Do not leave active agents without a
-  polling/integration plan.
+- Read-only explorers answer concrete questions with file/line evidence and no edits.
+- Close old agents after integrating findings; do not leave active agents without a plan.

@@ -94,7 +94,7 @@
     "The manifest is documentary until a release gate explicitly packages it.",
     "stable_release_contract.claim_allowed must stay false while v1_completion_required is false.",
     "A v1.0 stable claim must mean the complete public SDK contract for plugin authors, not runtime/core-first RC readiness or internal runtime stability alone.",
-    "v1_completion_required must stay false until docs/STATUS.md claims a complete v1 SDK.",
+    "v1_completion_required must stay false until the reviewed v1 release statement and completion checker allow the stable SDK claim.",
     "Every v1_sdk_completion_blocker must be promoted or explicitly named as excluded/post-v1 in the v1 release statement before v1_completion_required can become true.",
     "Installed SDK package/component validation, including CMake COMPONENTS SDK, is package-shape evidence only and is not a v1.0 completion marker.",
     "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain; if any of those surfaces remains blocked, planning, or post-v1, v1_completion_required must stay false.",

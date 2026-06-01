@@ -132,6 +132,8 @@ Plugin Hub work starts with
 [docs/PLUGIN_HUB_FOUNDATION_V1.md](docs/PLUGIN_HUB_FOUNDATION_V1.md) and
 [docs/PLUGIN_HUB_CAPABILITY_MATRIX.md](docs/PLUGIN_HUB_CAPABILITY_MATRIX.md); those files
 define the current supported seed boundary before any new public SDK surface is proposed.
+Keep copied event examples explicitly experimental. Harden the small release-supported
+Plugin Hub seed set before widening public SDK scope.
 
 ## Build And Test
 

@@ -82,9 +82,11 @@ priorities, and do not use history files as the active source of truth.
   blocked pre-ABI checklist for that future response path; static thunk orientation,
   passive copied chat parsing, candidate vtable slots, raw ProcessEvent callbacks, and
   legacy `CallProcessEvent` are not sufficient response-path evidence.
-  While identity waits on copied core evidence, inventory copied signals are the more
-  valuable side lane than structure census because they already ride copied
-  `GameplayPolicyEvent` evidence; structure census remains offline planning/consume-only.
+  While identity waits on copied core evidence, inventory copied signals are the
+  higher-value side lane. Neither side lane displaces identity -> permissions/admin ->
+  commands/replies. Prefer inventory copied-signal hygiene over structure census when
+  choosing one side lane, while structure census remains useful offline
+  planning/consume-only work.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied

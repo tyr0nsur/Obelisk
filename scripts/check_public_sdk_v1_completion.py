@@ -1465,6 +1465,27 @@ def build_report(
     if blocked_contract_header_symbols:
         blockers.append("blocked_public_contract_header_symbols_detected")
 
+    completion_blocker_statuses = {
+        surface_id: surfaces_by_id.get(surface_id, {}).get("status", "missing")
+        for surface_id in completion_blockers
+    }
+    completion_blockers_with_promoted_outcome = sorted(
+        surface_id
+        for surface_id, status in completion_blocker_statuses.items()
+        if status == "promoted"
+    )
+    completion_blockers_with_post_v1_or_excluded_outcome = sorted(
+        surface_id
+        for surface_id, status in completion_blocker_statuses.items()
+        if status in {"post-v1", "excluded"}
+    )
+    completion_blockers_without_manifest_outcome = sorted(
+        surface_id
+        for surface_id, status in completion_blocker_statuses.items()
+        if status not in {"promoted", "post-v1", "excluded"}
+    )
+    completion_blocker_total = len(completion_blockers)
+
     return {
         "schema": "obelisk.public-sdk-v1-completion-check.v1",
         "status": "ready" if not blockers else "blocked",
@@ -1515,6 +1536,24 @@ def build_report(
         "release_statement_duplicate_or_mixed_records": sorted(set(release_statement_duplicate_records)),
         "release_statement_forbidden_broad_claims": release_statement_forbidden_claims,
         "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
+        "v1_sdk_progress": {
+            "completion_blocker_total": completion_blocker_total,
+            "completion_blockers_with_promoted_outcome": completion_blockers_with_promoted_outcome,
+            "completion_blockers_with_post_v1_or_excluded_outcome": (
+                completion_blockers_with_post_v1_or_excluded_outcome
+            ),
+            "completion_blockers_without_manifest_outcome": completion_blockers_without_manifest_outcome,
+            "completion_blockers_without_manifest_outcome_count": len(
+                completion_blockers_without_manifest_outcome
+            ),
+            "unresolved_completion_blocker_count": len(set(unresolved_completion_blockers)),
+            "unresolved_experimental_surface_count": len(set(unresolved_experimental)),
+            "release_statement_required_for_completion_claim": release_statement_text is None,
+            "stable_claim_allowed": stable_claim_allowed,
+            "non_claim": (
+                "This is accounting only; it does not authorize broad stable SDK release wording."
+            ),
+        },
         "non_claims": [
             "core-first release readiness, install layout, and package-shape checks do not satisfy this v1 SDK completion gate",
             "post-v1 or excluded surfaces must be named in the manifest and release statement before a stable v1 SDK claim",
