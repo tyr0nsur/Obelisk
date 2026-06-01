@@ -2192,10 +2192,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         ):
             self.assertIn(normalized(doc_term), compatibility)
 
-    def test_pre_identity_plugin_hub_production_seeds_stay_limited_to_core_primitives(self) -> None:
+    def test_pre_identity_foundation_surfaces_stay_limited_to_core_primitives(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
-        production_seed_ids = {
+        production_foundation_ids = {
             "obelisk.lifecycle_config_logging.v1",
             "obelisk.descriptors.v1",
             "obelisk.process_local_timers.v1",
@@ -2207,18 +2207,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.inventory_item_copied_signals.v1",
         }
 
-        self.assertEqual(set(manifest["promoted_surfaces"]), production_seed_ids)
+        self.assertEqual(set(manifest["promoted_surfaces"]), production_foundation_ids)
         self.assertEqual(
             {
                 surface["id"]
                 for surface in manifest["surfaces"]
-                if surface.get("support_tier") == "release-supported seed"
+                if surface.get("support_tier") == "release-supported foundation"
             },
-            production_seed_ids,
+            production_foundation_ids,
         )
         self.assertIn("obelisk.player_identity.v1", manifest["v1_sdk_completion_blockers"])
         self.assertNotIn("obelisk.player_identity.v1", manifest["promoted_surfaces"])
-        for surface_id in production_seed_ids:
+        for surface_id in production_foundation_ids:
             with self.subTest(surface=surface_id):
                 self.assertEqual(surfaces[surface_id]["status"], "promoted")
         for surface_id in experimental_ids:
@@ -2242,7 +2242,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(descriptors["category"], "metadata")
         self.assertEqual(descriptors["status"], "promoted")
-        self.assertEqual(descriptors["support_tier"], "release-supported seed")
+        self.assertEqual(descriptors["support_tier"], "release-supported foundation")
         self.assertEqual(
             descriptors["public_contract"],
             [

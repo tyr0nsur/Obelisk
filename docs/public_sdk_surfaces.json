@@ -154,7 +154,7 @@
       "id": "obelisk.lifecycle_config_logging.v1",
       "category": "foundation",
       "status": "promoted",
-      "support_tier": "release-supported seed",
+      "support_tier": "release-supported foundation",
       "public_name": "Plugin lifecycle, configuration context, and logging",
       "capabilities": [],
       "public_contract": [
@@ -272,7 +272,7 @@
       "id": "obelisk.descriptors.v1",
       "category": "metadata",
       "status": "promoted",
-      "support_tier": "release-supported seed",
+      "support_tier": "release-supported foundation",
       "public_name": "Descriptor metadata",
       "capabilities": [
         "OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS",
@@ -314,7 +314,7 @@
       "id": "obelisk.process_local_timers.v1",
       "category": "foundation",
       "status": "promoted",
-      "support_tier": "release-supported seed",
+      "support_tier": "release-supported foundation",
       "public_name": "Process-local timers",
       "capabilities": [
         "OBELISK_API_CAPABILITY_TIMERS"
