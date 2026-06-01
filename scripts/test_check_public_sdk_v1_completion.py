@@ -1875,7 +1875,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
 
-    def test_principal_invalidation_policy_schema_does_not_promote_player_identity(self) -> None:
+    def test_lifecycle_anchor_and_principal_policy_schemas_do_not_promote_player_identity(self) -> None:
         with (
             tempfile.TemporaryDirectory(
                 dir=REPO_ROOT / "tests" / "core",
@@ -1901,7 +1901,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_sdk_ready": True,
                         "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
                         "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
-                        "schemas": ["obelisk.players-identity-principal-invalidation-policy.v1"],
+                        "runtime_ready": True,
+                        "schemas": [
+                            "obelisk.players-identity-lifecycle-anchor-candidates.v1",
+                            "obelisk.players-identity-principal-invalidation-policy.v1",
+                        ],
+                        "blockers": ["approved_runtime_evidence_missing"],
                         "terms": [
                             "obelisk.core-dump-evidence-pack.v1",
                             "obelisk.reflection-inventory-pack.v1",
@@ -2509,6 +2514,55 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     payload["promoted_surfaces_with_unresolved_dependencies"],
                     {surface_id: expected_dependencies},
                 )
+
+    def test_permissions_admin_public_cache_api_contract_blocks_until_player_identity_promoted(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["status"] = "planning"
+                surface["public_contract"] = []
+            if surface["id"] == "obelisk.permissions_admin.v1":
+                surface["public_abi"] = True
+                surface["public_contract"] = [
+                    "ObeliskApi.CheckPermissionWithCopiedPrincipal",
+                    "ObeliskApi.CheckPermissionCachedWithCopiedPrincipal",
+                    "ObeliskPermissionCacheEntry",
+                    "ObeliskPermissionsAdminContractV1",
+                ]
+                surface["public_permission_cache_contract"] = "policy_epoch_generation_scope_keyed"
+        manifest["planning_surfaces"] = ["obelisk.player_identity.v1"]
+        manifest["post_v1_or_excluded_surfaces"] = [
+            surface_id
+            for surface_id in manifest["post_v1_or_excluded_surfaces"]
+            if surface_id != "obelisk.player_identity.v1"
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("promoted_surface_dependency_unresolved", payload["blockers"])
+        self.assertEqual(
+            payload["promoted_surfaces_with_unresolved_dependencies"],
+            {"obelisk.permissions_admin.v1": ["obelisk.player_identity.v1"]},
+        )
+        self.assertIn("non_promoted_surface_has_public_abi", payload["blockers"])
+        self.assertEqual(payload["non_promoted_with_public_abi"], ["obelisk.permissions_admin.v1"])
+        self.assertIn("non_promoted_surface_has_public_contract", payload["blockers"])
+        self.assertIn("obelisk.permissions_admin.v1", payload["non_promoted_with_public_contract"])
 
     def test_promoted_permissions_admin_requires_semantic_evidence_terms(self) -> None:
         with (

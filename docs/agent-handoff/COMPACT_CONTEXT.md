@@ -354,8 +354,10 @@ priorities, and do not use history files as the active source of truth.
   The repo fixture root still reports `missing_base_snapshot=3` for
   `command-chat-response-route-planning`. A 2026-06-01 `/tmp` focal extraction from the
   reviewed offline inventory produced comparable candidate snapshots, but self-comparison
-  remains `second_source_inconclusive=3`; the next offline step is a distinct
-  non-protected second-source root, not ABI/runtime wiring.
+  remains `second_source_inconclusive=3`. A vanilla-gdb `/tmp` extraction has distinct
+  `artifact_sha256` but still collides on generic `capture_id=core` and
+  `evidence_pack_id=core-evidence-pack`; the next offline step is distinct evidence
+  identity plus a non-protected second-source root, not ABI/runtime wiring.
 - Mission copied-bool is the selected v0.2 internal hardening lane only. Keep it
   internal/test-only and default-off; it does not promote a Mission SDK, runtime observer,
   public callback ABI, authority, identity, mutation, return override, or v1 completion.

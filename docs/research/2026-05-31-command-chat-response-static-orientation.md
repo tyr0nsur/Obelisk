@@ -114,3 +114,11 @@ a distinct non-protected second-source snapshot root for the same target set, th
 `compare_reflection_snapshots.py --planning-layout-intake`. Do not add ABI, runtime
 response delivery, command router, replies, send-chat, permissions, identity, raw FString,
 or public SDK claims from these snapshots.
+
+A second local `/tmp` extraction from the vanilla-gdb reflection inventory produced the
+same three target snapshots with distinct `artifact_sha256`, but comparison still reports
+`second_source_inconclusive=3` because both roots used generic evidence identity labels:
+`capture_id=core` and `evidence_pack_id=core-evidence-pack`. This is an evidence-identity
+blocker, not a layout blocker. The next extraction should use distinct capture/pack ids or
+a manifest path whose generated snapshots carry distinct evidence identity before it is
+cited as second-source planning evidence.

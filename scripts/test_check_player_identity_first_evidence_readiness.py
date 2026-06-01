@@ -794,9 +794,16 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(consume_gate["public_sdk_ready"])
         self.assertFalse(consume_gate["runtime_ready"])
         self.assertNotIn("players_identity_first_evidence_consume_gate_blocked", payload["blockers"])
+        anchors = payload["first_evidence"]["lifecycle_anchors"]
+        self.assertEqual(anchors["source"], "players_identity_lifecycle_anchor_candidates")
+        self.assertTrue(anchors["session_start_accepted"])
+        self.assertTrue(anchors["session_end_accepted"])
         policy = payload["first_evidence"]["principal_invalidation_policy"]
         self.assertTrue(policy["policy_consume_ready"])
         self.assertFalse(policy["runtime_evidence_ready"])
+        self.assertFalse(policy["promotion_ready"])
+        self.assertFalse(policy["public_sdk_ready"])
+        self.assertFalse(policy["runtime_ready"])
         runtime_requirements = payload["first_evidence"]["runtime_principal_lifecycle_evidence"]
         self.assertEqual(runtime_requirements["status"], "missing")
         self.assertFalse(runtime_requirements["accepted_by_this_preflight"])
