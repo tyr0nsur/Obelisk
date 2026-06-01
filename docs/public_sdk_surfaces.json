@@ -555,6 +555,24 @@
         ],
         "candidate_policy_artifacts": [
           {
+            "schema": "obelisk.player-identity-private-candidate-contract.v1",
+            "status": "planning",
+            "support_tier": "candidate-only",
+            "path": "docs/research/2026-06-01-player-identity-private-candidate-contract.json",
+            "public_sdk_ready": false,
+            "promotion_ready": false,
+            "runtime_ready": false,
+            "v1_completion_evidence": false,
+            "route": "principal -> permissions/admin -> command response",
+            "non_claims": [
+              "does not promote player identity/principal",
+              "does not claim stable principal identity",
+              "does not promote permissions/admin",
+              "does not promote command response or commands/replies",
+              "does not unlock v1 SDK completion"
+            ]
+          },
+          {
             "schema": "obelisk.players-identity-principal-invalidation-policy.v1",
             "status": "planning",
             "support_tier": "candidate-only",

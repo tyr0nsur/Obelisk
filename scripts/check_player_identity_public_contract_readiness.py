@@ -19,8 +19,10 @@ import check_player_identity_runtime_principal_lifecycle_approved_evidence as ap
 
 
 DECISION_SCHEMA = "obelisk.player-identity-public-contract-decisions.v1"
+PRIVATE_CANDIDATE_SCHEMA = "obelisk.player-identity-private-candidate-contract.v1"
 REPORT_SCHEMA = "obelisk.player-identity-public-contract-readiness-check.v1"
 SURFACE = "obelisk.player_identity.v1"
+DEFAULT_PRIVATE_CANDIDATE_CONTRACT = Path("docs/research/2026-06-01-player-identity-private-candidate-contract.json")
 REQUIRED_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
 REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
 NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
@@ -106,6 +108,18 @@ REQUIRED_NON_CLAIMS = {
     "This manifest does not promote permissions/admin.",
     "This manifest does not promote command/chat response or commands/replies.",
     "This manifest does not authorize storage, persistence, cross-process identity, cluster-stable identity, mutation, return override, or send-chat identity.",
+}
+REQUIRED_PRIVATE_CANDIDATE_NON_CLAIMS = {
+    "This artifact does not add public header symbols.",
+    "This artifact does not reserve final C symbol names.",
+    "This artifact does not promote obelisk.player_identity.v1.",
+    "This artifact does not claim stable principal identity.",
+    "This artifact does not make approved runtime evidence sufficient by itself.",
+    "This artifact does not expose player lookup.",
+    "This artifact does not expose platform account ids, player names, tribe ids, network addresses, UE pointers, FName/GObjects indices, or ResourceHandle.",
+    "This artifact does not promote permissions/admin.",
+    "This artifact does not promote command/chat response or commands/replies.",
+    "This artifact does not authorize storage, persistence, cross-process identity, cluster-stable identity, mutation, return override, or send-chat identity.",
 }
 REQUIRED_TEST_COVERAGE_BY_ID = {
     "manifest.guardrails": {
@@ -331,6 +345,31 @@ REQUIRED_CANDIDATE_FAIL_CLOSED_POLICY = {
     "missing or zero owner token fails closed",
     "later marker or env changes cannot widen a plugin's captured capability",
 }
+REQUIRED_PRIVATE_CANDIDATE_EVENT_KIND_SEMANTICS = {
+    "session_start creates only a copied principal candidate after runtime evidence proves the accepted lifecycle route",
+    "session_start_rejected emits no principal authority and cannot create permissions or command authority",
+    "session_end invalidates the copied principal candidate for later permission and command consumers",
+}
+REQUIRED_PRIVATE_CANDIDATE_SCOPE_SEMANTICS = {
+    "callback-local scope may be consumed only during the callback that supplied the payload",
+    "process-local scope may be compared only inside the same ARK server process and must carry principal_generation",
+    "restart-local scope is a planning label only until restart semantics are promoted",
+    "cluster-stable, cross-map, cross-process, and persistent identity are forbidden until separate storage/operator ingress contracts are promoted",
+}
+REQUIRED_PRIVATE_CANDIDATE_INVALIDATION_SEMANTICS = {
+    "logout invalidates the copied principal candidate",
+    "disconnect invalidates the copied principal candidate unless a later reviewed continuity contract says otherwise",
+    "reconnect creates a new generation unless continuity is proven by a future promoted contract",
+    "duplicate principal observation invalidates or quarantines both candidates",
+    "server restart invalidates all process-local principal handles",
+    "failed evidence validation invalidates the candidate and keeps public identity blocked",
+}
+REQUIRED_PRIVATE_CANDIDATE_DOWNSTREAM_POLICY = {
+    "permissions/admin cannot consume identity until this surface is promoted with public ABI and tests",
+    "command/chat response cannot consume identity until permissions/admin is promoted",
+    "commands/replies cannot consume identity until command/chat response is promoted or explicitly excluded with reviewed wording",
+    "operator config, command text, chat intake, send mode, static thunks, raw ProcessEvent, and runtime evidence alone cannot establish principal identity",
+}
 FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
     "lookup": re.compile(r"lookup", re.IGNORECASE),
     "resolve": re.compile(r"resolve", re.IGNORECASE),
@@ -379,6 +418,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("include/obelisk/ObeliskApi.h"),
         help="Public SDK header to scan for player identity/principal tokens.",
+    )
+    parser.add_argument(
+        "--private-candidate-contract",
+        type=Path,
+        default=DEFAULT_PRIVATE_CANDIDATE_CONTRACT,
+        help="Private candidate-only player identity contract artifact.",
     )
     parser.add_argument("--promote", action="store_true", help="Fail closed for promotion checks.")
     parser.add_argument("--public-readiness", action="store_true", help="Fail closed for public SDK readiness checks.")
@@ -602,44 +647,51 @@ def validate_public_header(decisions: dict[str, Any], path: Path, blockers: list
     return {"path": str(path), "readable": True, "detected_player_identity_tokens": detected}
 
 
-def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any]]) -> None:
+def candidate_public_claim_keys(prefix: str, candidate: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    if candidate.get("public_header_allowed") is not False:
+        add(blockers, f"{prefix}_public_header_allowed_not_false", f"$.{prefix}.public_header_allowed")
+    for key in PUBLIC_CLAIM_KEYS:
+        if key in candidate and candidate.get(key) is not False:
+            add(blockers, f"{prefix}_{key}_claim_not_false", f"$.{prefix}.{key}")
+    for key in ("public_header_symbols_now", "public_capability_bits_now", "public_callback_abi_now"):
+        if key in candidate and candidate.get(key) != []:
+            add(blockers, f"{prefix}_{key}_not_empty", f"$.{prefix}.{key}")
+
+
+def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any]], *, label: str = "proposed_public_pod_abi_candidate") -> None:
     if not isinstance(candidate, dict):
-        add(blockers, "candidate_public_pod_abi_missing", "$.proposed_public_pod_abi_candidate")
+        add(blockers, "candidate_public_pod_abi_missing", f"$.{label}")
         return
 
     if candidate.get("status") != "proposal_only_not_public":
-        add(blockers, "candidate_status_not_proposal_only", "$.proposed_public_pod_abi_candidate.status")
+        add(blockers, "candidate_status_not_proposal_only", f"$.{label}.status")
     if candidate.get("candidate_only") is not True:
-        add(blockers, "candidate_only_not_true", "$.proposed_public_pod_abi_candidate.candidate_only")
-    if candidate.get("public_header_allowed") is not False:
-        add(blockers, "candidate_public_header_allowed_not_false", "$.proposed_public_pod_abi_candidate.public_header_allowed")
-    for key in PUBLIC_CLAIM_KEYS:
-        if key in candidate and candidate.get(key) is not False:
-            add(blockers, f"candidate_{key}_claim_not_false", f"$.proposed_public_pod_abi_candidate.{key}")
+        add(blockers, "candidate_only_not_true", f"$.{label}.candidate_only")
+    candidate_public_claim_keys("candidate", candidate, blockers)
 
     payload_properties = string_list(candidate.get("required_payload_properties"))
     if payload_properties is None:
-        add(blockers, "candidate_required_payload_properties_not_string_list", "$.proposed_public_pod_abi_candidate.required_payload_properties")
+        add(blockers, "candidate_required_payload_properties_not_string_list", f"$.{label}.required_payload_properties")
     else:
         missing = missing_required(payload_properties, REQUIRED_CANDIDATE_PAYLOAD_PROPERTIES)
         if missing:
             add(
                 blockers,
                 "candidate_required_payload_properties_missing",
-                "$.proposed_public_pod_abi_candidate.required_payload_properties",
+                f"$.{label}.required_payload_properties",
                 missing=missing,
             )
 
     event_fields = string_list(candidate.get("candidate_event_payload_fields_or_equivalent"))
     if event_fields is None:
-        add(blockers, "candidate_event_payload_fields_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_event_payload_fields_or_equivalent")
+        add(blockers, "candidate_event_payload_fields_not_string_list", f"$.{label}.candidate_event_payload_fields_or_equivalent")
     else:
         missing = missing_required(event_fields, REQUIRED_CANDIDATE_PAYLOAD_FIELDS)
         if missing:
             add(
                 blockers,
                 "candidate_event_payload_fields_missing",
-                "$.proposed_public_pod_abi_candidate.candidate_event_payload_fields_or_equivalent",
+                f"$.{label}.candidate_event_payload_fields_or_equivalent",
                 missing=missing,
             )
         forbidden = forbidden_candidate_strings(event_fields)
@@ -647,20 +699,20 @@ def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any
             add(
                 blockers,
                 "candidate_event_payload_fields_forbidden_identity_or_lookup",
-                "$.proposed_public_pod_abi_candidate.candidate_event_payload_fields_or_equivalent",
+                f"$.{label}.candidate_event_payload_fields_or_equivalent",
                 forbidden=forbidden,
             )
 
     descriptor_fields = string_list(candidate.get("candidate_descriptor_fields_or_equivalent"))
     if descriptor_fields is None:
-        add(blockers, "candidate_descriptor_fields_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_descriptor_fields_or_equivalent")
+        add(blockers, "candidate_descriptor_fields_not_string_list", f"$.{label}.candidate_descriptor_fields_or_equivalent")
     else:
         missing = missing_required(descriptor_fields, REQUIRED_CANDIDATE_DESCRIPTOR_FIELDS)
         if missing:
             add(
                 blockers,
                 "candidate_descriptor_fields_missing",
-                "$.proposed_public_pod_abi_candidate.candidate_descriptor_fields_or_equivalent",
+                f"$.{label}.candidate_descriptor_fields_or_equivalent",
                 missing=missing,
             )
         forbidden = forbidden_candidate_strings(descriptor_fields)
@@ -668,35 +720,81 @@ def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any
             add(
                 blockers,
                 "candidate_descriptor_fields_forbidden_identity_or_lookup",
-                "$.proposed_public_pod_abi_candidate.candidate_descriptor_fields_or_equivalent",
+                f"$.{label}.candidate_descriptor_fields_or_equivalent",
                 forbidden=forbidden,
             )
 
     registration = string_list(candidate.get("candidate_registration_shape_or_equivalent"))
     if registration is None:
-        add(blockers, "candidate_registration_shape_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_registration_shape_or_equivalent")
+        add(blockers, "candidate_registration_shape_not_string_list", f"$.{label}.candidate_registration_shape_or_equivalent")
     else:
         missing = missing_required(registration, REQUIRED_CANDIDATE_OWNER_TOKEN_REQUIREMENTS)
         if missing:
             add(
                 blockers,
                 "candidate_owner_token_cleanup_requirements_missing",
-                "$.proposed_public_pod_abi_candidate.candidate_registration_shape_or_equivalent",
+                f"$.{label}.candidate_registration_shape_or_equivalent",
                 missing=missing,
             )
 
     capability_policy = string_list(candidate.get("candidate_capability_policy"))
     if capability_policy is None:
-        add(blockers, "candidate_capability_policy_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_capability_policy")
+        add(blockers, "candidate_capability_policy_not_string_list", f"$.{label}.candidate_capability_policy")
     else:
         missing = missing_required(capability_policy, REQUIRED_CANDIDATE_FAIL_CLOSED_POLICY)
         if missing:
             add(
                 blockers,
                 "candidate_fail_closed_policy_missing",
-                "$.proposed_public_pod_abi_candidate.candidate_capability_policy",
+                f"$.{label}.candidate_capability_policy",
                 missing=missing,
             )
+
+
+def validate_private_candidate_contract(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "private_candidate_contract"
+    if payload.get("schema") != PRIVATE_CANDIDATE_SCHEMA:
+        add(blockers, "private_candidate_contract_schema_mismatch", "$.private_candidate_contract.schema")
+    if payload.get("surface") != SURFACE:
+        add(blockers, "private_candidate_contract_surface_mismatch", "$.private_candidate_contract.surface")
+    if payload.get("artifact_status") != "candidate_only":
+        add(blockers, "private_candidate_contract_artifact_status_not_candidate_only", "$.private_candidate_contract.artifact_status")
+    if payload.get("visibility") != "private_planning_contract":
+        add(blockers, "private_candidate_contract_visibility_mismatch", "$.private_candidate_contract.visibility")
+    validate_candidate_only_pod_abi(payload, blockers, label=label)
+    for key, required, reason in (
+        ("candidate_event_kind_semantics", REQUIRED_PRIVATE_CANDIDATE_EVENT_KIND_SEMANTICS, "private_candidate_event_kind_semantics_missing"),
+        ("candidate_scope_semantics", REQUIRED_PRIVATE_CANDIDATE_SCOPE_SEMANTICS, "private_candidate_scope_semantics_missing"),
+        ("candidate_invalidation_semantics", REQUIRED_PRIVATE_CANDIDATE_INVALIDATION_SEMANTICS, "private_candidate_invalidation_semantics_missing"),
+        ("candidate_downstream_dependency_policy", REQUIRED_PRIVATE_CANDIDATE_DOWNSTREAM_POLICY, "private_candidate_downstream_policy_missing"),
+        ("non_claims", REQUIRED_PRIVATE_CANDIDATE_NON_CLAIMS, "private_candidate_non_claims_missing"),
+    ):
+        values = string_list(payload.get(key))
+        if values is None:
+            add(blockers, f"{reason}_not_string_list", f"$.private_candidate_contract.{key}")
+            continue
+        missing = missing_required(values, required)
+        if missing:
+            add(blockers, reason, f"$.private_candidate_contract.{key}", missing=missing)
+
+
+def load_private_candidate_contract(decisions: dict[str, Any], path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    expected = decisions.get("private_candidate_contract")
+    if expected != str(DEFAULT_PRIVATE_CANDIDATE_CONTRACT):
+        add(
+            blockers,
+            "private_candidate_contract_path_mismatch",
+            "$.private_candidate_contract",
+            expected=str(DEFAULT_PRIVATE_CANDIDATE_CONTRACT),
+            observed=expected,
+        )
+    try:
+        payload = load_json(path, "private candidate contract")
+    except (OSError, SystemExit) as exc:
+        add(blockers, "private_candidate_contract_unreadable", "$.private_candidate_contract", path=str(path), error=str(exc))
+        return {}
+    validate_private_candidate_contract(payload, blockers)
+    return payload
 
 
 def validate_required_before_public_header(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -1009,6 +1107,7 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
 def build_report(
     decisions: dict[str, Any],
     runtime_report: dict[str, Any],
+    private_candidate_contract: dict[str, Any],
     public_header_report: dict[str, Any],
     blockers: list[dict[str, Any]],
     check_mode: str,
@@ -1046,6 +1145,17 @@ def build_report(
         "public_capability_bits_now": decisions.get("public_capability_bits_now"),
         "public_callback_abi_now": decisions.get("public_callback_abi_now"),
         "public_header_scan": public_header_report,
+        "private_candidate_contract": {
+            "path": decisions.get("private_candidate_contract"),
+            "schema": private_candidate_contract.get("schema"),
+            "artifact_status": private_candidate_contract.get("artifact_status"),
+            "visibility": private_candidate_contract.get("visibility"),
+            "candidate_only": private_candidate_contract.get("candidate_only") is True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+        },
         "remaining_blockers": [
             blocker["id"]
             for blocker in decisions.get("promotion_blockers", [])
@@ -1085,9 +1195,10 @@ def main() -> int:
     blockers: list[dict[str, Any]] = []
     decisions = load_json(args.decisions, "decisions")
     validate_decisions(decisions, blockers)
+    private_candidate_contract = load_private_candidate_contract(decisions, args.private_candidate_contract, blockers)
     public_header_report = validate_public_header(decisions, args.public_header, blockers)
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
-    report = build_report(decisions, runtime_report, public_header_report, blockers, check_mode)
+    report = build_report(decisions, runtime_report, private_candidate_contract, public_header_report, blockers, check_mode)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif blockers:

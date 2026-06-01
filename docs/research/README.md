@@ -121,6 +121,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-06-01-player-principal-offline-to-runtime-plan.md](2026-06-01-player-principal-offline-to-runtime-plan.md)
 - [2026-06-01-player-principal-runtime-capture-plan.md](2026-06-01-player-principal-runtime-capture-plan.md)
 - [2026-06-01-player-identity-runtime-capture-readiness-checklist.md](2026-06-01-player-identity-runtime-capture-readiness-checklist.md)
+- [2026-06-01-player-identity-private-candidate-contract.json](2026-06-01-player-identity-private-candidate-contract.json) - candidate-only private planning artifact for copied opaque principal shape; no public header, capability bit, callback ABI, lookup, permissions/admin, commands/replies, storage, mutation, return override, runtime readiness, public SDK readiness, or v1 claim.
 - [2026-06-01-static-offline-sdk-v1-command-player-audit.md](2026-06-01-static-offline-sdk-v1-command-player-audit.md)
 - [2026-05-31-native-ufunction-registration-static-discovery-plan.md](2026-05-31-native-ufunction-registration-static-discovery-plan.md)
 - [2026-05-31-arktribute-playerdata-identity-boundary.md](2026-05-31-arktribute-playerdata-identity-boundary.md)

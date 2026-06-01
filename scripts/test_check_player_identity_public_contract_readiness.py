@@ -112,6 +112,68 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         result = self.run_checker(decisions, approved_manifest())
         report = json.loads(result.stdout)
         self.assertEqual(report["blockers"], [])
+        self.assertEqual(
+            report["private_candidate_contract"]["path"],
+            "docs/research/2026-06-01-player-identity-private-candidate-contract.json",
+        )
+        self.assertEqual(report["private_candidate_contract"]["artifact_status"], "candidate_only")
+        self.assertEqual(report["private_candidate_contract"]["visibility"], "private_planning_contract")
+        self.assertTrue(report["private_candidate_contract"]["candidate_only"])
+        self.assertFalse(report["private_candidate_contract"]["public_header_allowed"])
+
+    def test_rejects_private_candidate_contract_path_rerouted_to_public_docs(self) -> None:
+        decisions = self.decisions()
+        decisions["private_candidate_contract"] = "docs/player_identity_private_candidate_contract.json"
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_candidate_contract_path_mismatch", report["blockers"])
+
+    def test_rejects_private_candidate_contract_missing_stable_principal_non_claim(self) -> None:
+        decisions = self.decisions()
+        private_contract = json.loads(
+            (REPO_ROOT / "docs/research/2026-06-01-player-identity-private-candidate-contract.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        private_contract["non_claims"].remove("This artifact does not claim stable principal identity.")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            private_path = root / "private-candidate.json"
+            private_path.write_text(json.dumps(private_contract), encoding="utf-8")
+            decisions_path = root / "decisions.json"
+            runtime_path = root / "approved-runtime.json"
+            decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--decisions",
+                    str(decisions_path),
+                    "--private-candidate-contract",
+                    str(private_path),
+                    "--approved-runtime-evidence",
+                    str(runtime_path),
+                    "--json",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_candidate_non_claims_missing", report["blockers"])
+        detail = next(
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "private_candidate_non_claims_missing"
+        )
+        self.assertIn("This artifact does not claim stable principal identity.", detail["missing"])
 
     def test_blocks_promote_public_and_runtime_modes(self) -> None:
         for flag, blocker in (

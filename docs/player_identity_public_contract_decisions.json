@@ -29,6 +29,7 @@
   "public_header_symbols_now": [],
   "public_capability_bits_now": [],
   "public_callback_abi_now": [],
+  "private_candidate_contract": "docs/research/2026-06-01-player-identity-private-candidate-contract.json",
   "approved_runtime_evidence_intake": {
     "id": "approved_runtime_principal_lifecycle_evidence",
     "status": "external_manifest_required",

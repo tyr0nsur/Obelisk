@@ -1600,6 +1600,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(decisions["public_header_symbols_now"], [])
         self.assertEqual(decisions["public_capability_bits_now"], [])
         self.assertEqual(decisions["public_callback_abi_now"], [])
+        self.assertEqual(
+            decisions["private_candidate_contract"],
+            "docs/research/2026-06-01-player-identity-private-candidate-contract.json",
+        )
 
         forbidden_contract = set(decisions.get("forbidden_public_contract", []))
         self.assertTrue(
@@ -1703,6 +1707,26 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "runtime.evidence_intake",
             },
         )
+
+    def test_player_identity_private_candidate_contract_stays_research_only(self) -> None:
+        contract = json.loads(
+            (REPO_ROOT / "docs/research/2026-06-01-player-identity-private-candidate-contract.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(contract["schema"], "obelisk.player-identity-private-candidate-contract.v1")
+        self.assertEqual(contract["surface"], "obelisk.player_identity.v1")
+        self.assertEqual(contract["artifact_status"], "candidate_only")
+        self.assertEqual(contract["visibility"], "private_planning_contract")
+        self.assertTrue(contract["candidate_only"])
+        self.assertFalse(contract["public_header_allowed"])
+        self.assertEqual(contract["public_header_symbols_now"], [])
+        self.assertEqual(contract["public_capability_bits_now"], [])
+        self.assertEqual(contract["public_callback_abi_now"], [])
+        self.assertFalse(contract["promotion_ready"])
+        self.assertFalse(contract["public_sdk_ready"])
+        self.assertFalse(contract["runtime_ready"])
+        self.assertIn("This artifact does not claim stable principal identity.", contract["non_claims"])
 
     def test_player_principal_dispatcher_stays_internal_until_identity_promotion(self) -> None:
         header = strip_c_comments(PUBLIC_API_HEADER.read_text(encoding="utf-8"))
