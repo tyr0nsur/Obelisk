@@ -43,6 +43,10 @@ namespace
     constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+    constexpr uint8_t kBuffBoolFieldSize = 0x01;
+    constexpr uint8_t kBuffBoolByteOffset = 0x00;
+    constexpr uint8_t kBuffBoolByteMask = 0x01;
+    constexpr uint8_t kBuffBoolFieldMask = 0xff;
 
     static_assert(std::is_standard_layout_v<BuffBoolObservation>,
                   "copied buff bool observations must keep a simple C-compatible layout");
@@ -143,6 +147,19 @@ namespace
         WriteAt(buffer, 0x34, elementSize);
         WriteAt(buffer, 0x38, propertyFlags);
         WriteAt(buffer, 0x4c, offset);
+
+        if (klass)
+        {
+            FNameValue className{};
+            std::memcpy(&className, static_cast<const uint8_t*>(klass) + 0x18, sizeof(className));
+            if (className.ComparisonIndex == kBoolPropertyClassNameIndex && className.Number == 0)
+            {
+                WriteAt(buffer, 0x70, kBuffBoolFieldSize);
+                WriteAt(buffer, 0x71, kBuffBoolByteOffset);
+                WriteAt(buffer, 0x72, kBuffBoolByteMask);
+                WriteAt(buffer, 0x73, kBuffBoolFieldMask);
+            }
+        }
     }
 
     struct FieldDef
@@ -596,6 +613,54 @@ namespace
                     "ReturnValue copied value mismatch");
     }
 
+    void TestObserveRejectsWrongBoolPropertyMetadata()
+    {
+        BuffFixture fixture;
+        BuildBuffOverrideInventoryAccessInput(fixture);
+        fixture.Params[0x08] = 1;
+        fixture.Params[0x09] = 0;
+        WriteAt(fixture.PropertyB, 0x72, uint8_t{0xff});
+        WriteAt(fixture.PropertyB, 0x73, uint8_t{0xff});
+
+        std::atomic<uint64_t> counter{0};
+        uint64_t observationNumber = 0;
+        Attempt attempt = TryObserveInvocation(
+            EnabledGate(),
+            kBuffOverrideInventoryAccessInputNameIndex,
+            fixture.Reader(),
+            fixture.Function.data(),
+            fixture.Params.data(),
+            counter,
+            1,
+            observationNumber);
+
+        Require(attempt.Status == AttemptStatus::Rejected,
+                "buff hook accepted wrong BoolProperty tail metadata");
+        Require(attempt.Invocation.Fields.empty(),
+                "rejected buff hook attempt left stale fields");
+
+        CopiedBuffObservation observation;
+        observation.Function = BuffReflection::BuffFunction::BuffOverrideInventoryAccessInput;
+        observation.FunctionNameIndex = kBuffOverrideInventoryAccessInputNameIndex;
+        observation.OuterNameIndex = kPrimalBuffNameIndex;
+        observation.BoolStorage[0].Field = BuffReflection::BuffField::BInputPressed;
+        observation.BoolStorage[0].Value = true;
+        observation.BoolCount = 1;
+
+        Require(!TryBuildCopiedBuffObservationForMatchedAttempt(attempt, observation),
+                "rejected buff bool-tail attempt produced copied bool output");
+        Require(observation.Function == BuffReflection::BuffFunction::AllowPostProcessEffect,
+                "rejected buff bool-tail attempt did not clear function");
+        Require(observation.FunctionNameIndex == -1,
+                "rejected buff bool-tail attempt did not clear function name");
+        Require(observation.OuterNameIndex == -1,
+                "rejected buff bool-tail attempt did not clear outer name");
+        Require(observation.BoolCount == 0,
+                "rejected buff bool-tail attempt did not clear bool count");
+        Require(!observation.BoolStorage[0].Value && !observation.BoolStorage[1].Value,
+                "rejected buff bool-tail attempt did not clear bool storage");
+    }
+
     void TestBuildsSupportedCopiedBuffShapes()
     {
         {
@@ -834,6 +899,7 @@ int main()
     TestDisabledNonBuffAndZeroBudgetDoNotReadOrReserve();
     TestObserveContainsReaderExceptions();
     TestObserveMatchesAndBuildsCopiedObservation();
+    TestObserveRejectsWrongBoolPropertyMetadata();
     TestBuildsSupportedCopiedBuffShapes();
     TestRejectsForgedOrNonCanonicalCopiedDataAndClearsOutput();
     TestRecognizesAllRuntimeBuffFixtureShapes();

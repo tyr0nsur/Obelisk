@@ -38,6 +38,10 @@ namespace Obelisk::UE::BuffReflection
         constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
         constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
         constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr size_t kBoolPropertyFieldSizeOffset = 0x70;
+        constexpr size_t kBoolPropertyByteOffsetOffset = 0x71;
+        constexpr size_t kBoolPropertyByteMaskOffset = 0x72;
+        constexpr size_t kBoolPropertyFieldMaskOffset = 0x73;
 
         struct BuffFieldSpec
         {
@@ -63,6 +67,14 @@ namespace Obelisk::UE::BuffReflection
             uint16_t ReturnValueOffset;
             const BuffFieldSpec* Fields;
             size_t FieldCount;
+        };
+
+        struct BoolPropertyMetadata
+        {
+            uint8_t FieldSize = 0;
+            uint8_t ByteOffset = 0;
+            uint8_t ByteMask = 0;
+            uint8_t FieldMask = 0;
         };
 
         constexpr std::array<BuffFieldSpec, 1> kBoolReturnFields{{
@@ -264,6 +276,63 @@ namespace Obelisk::UE::BuffReflection
             return RuntimeReflection::ReadResult::Ok();
         }
 
+        RuntimeReflection::ReadResult ReadByteAt(const RuntimeReflection::MemoryReader& reader,
+                                                 const void* base,
+                                                 size_t offset,
+                                                 uint8_t& out)
+        {
+            if (!base)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::InvalidArgument,
+                                                           "null buff bool property pointer");
+
+            const auto baseAddress = reinterpret_cast<uintptr_t>(base);
+            if (baseAddress > UINTPTR_MAX - offset)
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
+                                                           "buff bool property metadata address overflow");
+
+            const auto* address = reinterpret_cast<const uint8_t*>(base) + offset;
+            if (!reader.CanRead(address, sizeof(out)))
+                return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Unreadable,
+                                                           "buff bool property metadata is unreadable");
+
+            std::memcpy(&out, address, sizeof(out));
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
+        RuntimeReflection::ReadResult ReadBoolPropertyMetadata(const RuntimeReflection::MemoryReader& reader,
+                                                               const RuntimeReflection::UPropertyView& property,
+                                                               BoolPropertyMetadata& out)
+        {
+            BoolPropertyMetadata value;
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyFieldSizeOffset, value.FieldSize);
+                !result)
+            {
+                return result;
+            }
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyByteOffsetOffset, value.ByteOffset);
+                !result)
+            {
+                return result;
+            }
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyByteMaskOffset, value.ByteMask);
+                !result)
+            {
+                return result;
+            }
+            if (RuntimeReflection::ReadResult result =
+                    ReadByteAt(reader, property.Address, kBoolPropertyFieldMaskOffset, value.FieldMask);
+                !result)
+            {
+                return result;
+            }
+
+            out = value;
+            return RuntimeReflection::ReadResult::Ok();
+        }
+
         RuntimeReflection::ReadResult ValidateFunctionClass(const RuntimeReflection::MemoryReader& reader,
                                                             const RuntimeReflection::FieldLayout& layout,
                                                             const RuntimeReflection::UFunctionView& function)
@@ -388,7 +457,32 @@ namespace Obelisk::UE::BuffReflection
                 return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
                                                            "buff property flags mismatch");
 
-            return ValidatePropertyClass(reader, layout, property, spec);
+            if (RuntimeReflection::ReadResult result = ValidatePropertyClass(reader, layout, property, spec); !result)
+                return result;
+
+            if (spec.ClassNameIndex == kBoolPropertyClassNameIndex)
+            {
+                BoolPropertyMetadata metadata;
+                if (RuntimeReflection::ReadResult result = ReadBoolPropertyMetadata(reader, property, metadata);
+                    !result)
+                {
+                    return result;
+                }
+                if (metadata.FieldSize != kBoolPropertySize)
+                    return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                               "buff bool property field size mismatch");
+                if (metadata.ByteOffset != 0)
+                    return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                               "buff bool property byte offset mismatch");
+                if (metadata.ByteMask != 0x01)
+                    return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                               "buff bool property byte mask mismatch");
+                if (metadata.FieldMask != 0xff)
+                    return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::Implausible,
+                                                               "buff bool property field mask mismatch");
+            }
+
+            return RuntimeReflection::ReadResult::Ok();
         }
 
         RuntimeReflection::ReadResult ValidateCanonicalCopiedBool(const RuntimeReflection::ParamRange& range)

@@ -40,6 +40,10 @@ namespace
     constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
     constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+    constexpr uint8_t kBuffBoolFieldSize = 0x01;
+    constexpr uint8_t kBuffBoolByteOffset = 0x00;
+    constexpr uint8_t kBuffBoolByteMask = 0x01;
+    constexpr uint8_t kBuffBoolFieldMask = 0xff;
 
     struct Region
     {
@@ -118,6 +122,19 @@ namespace
         WriteAt(buffer, 0x34, elementSize);
         WriteAt(buffer, 0x38, propertyFlags);
         WriteAt(buffer, 0x4c, offset);
+
+        if (klass)
+        {
+            FNameValue className{};
+            std::memcpy(&className, static_cast<const uint8_t*>(klass) + 0x18, sizeof(className));
+            if (className.ComparisonIndex == kBoolPropertyClassNameIndex && className.Number == 0)
+            {
+                WriteAt(buffer, 0x70, kBuffBoolFieldSize);
+                WriteAt(buffer, 0x71, kBuffBoolByteOffset);
+                WriteAt(buffer, 0x72, kBuffBoolByteMask);
+                WriteAt(buffer, 0x73, kBuffBoolFieldMask);
+            }
+        }
     }
 
     struct FieldDef
@@ -634,6 +651,21 @@ namespace
                 fixture.Params.data(),
                 invocation);
             Require(!result, "wrong property flags were accepted");
+        }
+        {
+            BuffFixture fixture;
+            BuildBoolReturn(fixture, kAllowPostProcessEffectNameIndex);
+            WriteAt(fixture.PropertyA, 0x72, uint8_t{0xff});
+            WriteAt(fixture.PropertyA, 0x73, uint8_t{0xff});
+
+            BuffReflection::BuffInvocation invocation;
+            ReadResult result = BuffReflection::TryIdentifyBuffInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(!result, "wrong bool property tail metadata was accepted");
         }
     }
 

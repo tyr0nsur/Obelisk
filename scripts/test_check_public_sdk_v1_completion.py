@@ -227,6 +227,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "release_statement_bookkeeping",
                 "promoted_demand_gaps",
                 "runtime_required_blockers",
+                "next_v1_work",
             },
         )
         self.assertFalse(sections["no_live_progress"]["live_server_required_for_this_report"])
@@ -269,6 +270,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "v1_sdk_completion_blockers_unresolved",
             sections["runtime_required_blockers"]["blocker_codes"],
         )
+        self.assertEqual(
+            sections["next_v1_work"]["critical_path"],
+            payload["v1_sdk_blocker_outcome_summary"]["dependency_chain_remaining"],
+        )
+        self.assertEqual(
+            sections["next_v1_work"]["product_decision_required"],
+            payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing"],
+        )
+        self.assertEqual(
+            sections["next_v1_work"]["release_statement_bookkeeping_required"],
+            payload["release_statement_missing_blocker_outcomes"],
+        )
+        self.assertIn(
+            "approved copied runtime principal lifecycle evidence",
+            sections["next_v1_work"]["recommended_next_action"],
+        )
+        self.assertIn("prioritizes work only", sections["next_v1_work"]["non_claim"])
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)

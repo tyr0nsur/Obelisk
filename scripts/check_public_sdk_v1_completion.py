@@ -1437,6 +1437,30 @@ def categorized_v1_report_sections(
     if isinstance(installed_shape, dict):
         package_shape_status = installed_shape.get("status")
 
+    manifest_outcome_missing = blocker_outcome_summary.get("manifest_outcome_missing", [])
+    dependency_chain_remaining = blocker_outcome_summary.get("dependency_chain_remaining", [])
+    if dependency_chain_remaining:
+        recommended_next_action = (
+            "resolve the player identity/principal critical path first, starting with "
+            "approved copied runtime principal lifecycle evidence before any public "
+            "identity, permissions/admin, command response, or commands/replies ABI"
+        )
+    elif manifest_outcome_missing:
+        recommended_next_action = (
+            "choose reviewed v1 outcomes for planning blockers before counting them "
+            "toward a complete SDK release statement"
+        )
+    elif release_statement_missing_blockers:
+        recommended_next_action = (
+            "add reviewed scoped release-statement records for manifest post-v1 or "
+            "excluded blockers without treating bookkeeping as promoted SDK support"
+        )
+    else:
+        recommended_next_action = (
+            "promote remaining demand-family surfaces with evidence or explicitly keep "
+            "them out of the complete SDK claim"
+        )
+
     runtime_blocker_codes = [
         blocker
         for blocker in blockers
@@ -1544,6 +1568,22 @@ def categorized_v1_report_sections(
                 "These are SDK/runtime promotion blockers and header-drift guardrails; they "
                 "must be resolved by promotion evidence or reviewed non-promoted outcomes "
                 "before stable SDK wording is possible."
+            ),
+        },
+        "next_v1_work": {
+            "critical_path": list(dependency_chain_remaining),
+            "release_statement_bookkeeping_required": sorted(set(release_statement_missing_blockers)),
+            "product_decision_required": list(manifest_outcome_missing),
+            "runtime_or_promotion_required": sorted(
+                set(unresolved_completion_blockers)
+                | set(dependency_chain_remaining)
+                | set(minimum_promoted_demand_family_gaps)
+            ),
+            "experimental_outcome_required": sorted(set(unresolved_experimental)),
+            "recommended_next_action": recommended_next_action,
+            "non_claim": (
+                "This section prioritizes work only; it does not change readiness, "
+                "promote ABI, or authorize complete/full/production/stable SDK wording."
             ),
         },
     }

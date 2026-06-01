@@ -8,9 +8,31 @@
 #error "Public structure API must stay gated until StructureEvents promotion requirements are complete."
 #endif
 
-#if defined(OBELISK_API_CAPABILITY_PLAYER_IDENTITY) || defined(OBELISK_API_CAPABILITY_PLAYER_PRINCIPALS) || \
-    defined(OBELISK_PLAYER_PRINCIPAL_ABI_VERSION) || defined(OBELISK_PLAYER_IDENTITY_EVENT_ABI_VERSION)
+#if defined(OBELISK_API_CAPABILITY_PLAYER_IDENTITY) || defined(OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL) || \
+    defined(OBELISK_API_CAPABILITY_PLAYER_PRINCIPALS) || defined(OBELISK_PLAYER_IDENTITY_ABI_VERSION) || \
+    defined(OBELISK_PLAYER_PRINCIPAL_ABI_VERSION) || defined(OBELISK_PLAYER_PRINCIPAL_EVENT_ABI_VERSION) || \
+    defined(OBELISK_PLAYER_IDENTITY_EVENT_ABI_VERSION)
 #error "Public player identity/principal ABI must stay gated until promotion evidence is accepted."
+#endif
+
+#if defined(OBELISK_API_CAPABILITY_ADMIN) || defined(OBELISK_API_CAPABILITY_AUTHORIZATION) || \
+    defined(OBELISK_API_CAPABILITY_PERMISSION_CHECKS) || defined(OBELISK_API_CAPABILITY_PERMISSIONS_ADMIN) || \
+    defined(OBELISK_PERMISSION_QUERY_ABI_VERSION) || defined(OBELISK_PERMISSION_CACHE_ABI_VERSION) || \
+    defined(OBELISK_PERMISSIONS_ADMIN_ABI_VERSION) || defined(OBELISK_AUTHORIZATION_ABI_VERSION) || \
+    defined(OBELISK_ADMIN_ACTION_ABI_VERSION)
+#error "Public permissions/admin ABI must stay gated until player identity and permissions promotion evidence is accepted."
+#endif
+
+#if defined(OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH) || defined(OBELISK_API_CAPABILITY_COMMAND_RESPONSE) || \
+    defined(OBELISK_API_CAPABILITY_CHAT_RESPONSE) || defined(OBELISK_API_CAPABILITY_CHAT_REPLIES) || \
+    defined(OBELISK_API_CAPABILITY_COMMAND_REPLIES) || defined(OBELISK_API_CAPABILITY_COMMANDS_REPLIES) || \
+    defined(OBELISK_API_CAPABILITY_COMMAND_ROUTER) || defined(OBELISK_API_CAPABILITY_SEND_CHAT) || \
+    defined(OBELISK_API_CAPABILITY_BROADCAST) || defined(OBELISK_API_CAPABILITY_NOTICES) || \
+    defined(OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT_RESPONSE) || \
+    defined(OBELISK_COMMAND_CHAT_RESPONSE_ABI_VERSION) || defined(OBELISK_COMMAND_RESPONSE_ABI_VERSION) || \
+    defined(OBELISK_CHAT_RESPONSE_ABI_VERSION) || defined(OBELISK_COMMANDS_REPLIES_ABI_VERSION) || \
+    defined(OBELISK_COMMAND_ROUTER_ABI_VERSION)
+#error "Public command response/reply ABI must stay gated until identity, permissions/admin, and response-path promotion evidence is accepted."
 #endif
 
 #if defined(OBELISK_API_CAPABILITY_RESOURCE_HANDLE) || defined(OBELISK_API_CAPABILITY_RESOURCE_HANDLES) || \
