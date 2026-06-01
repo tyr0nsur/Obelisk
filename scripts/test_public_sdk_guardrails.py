@@ -1989,8 +1989,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         release_guardrails = normalized(" ".join(manifest["release_guardrails"]))
         for term in (
-            "Before identity/principal is promoted, release-supported Plugin Hub seeds are limited to lifecycle/config/logging, descriptors, and process-local timers",
-            "those pre-identity release-supported seeds are not enough for v1 completion",
+            "Installed-SDK foundation examples before identity/principal are limited to lifecycle/config/logging, descriptors, and process-local timers",
+            "Plugin Hub seed/package publication remains post-SDK-complete, and neither these examples nor passive chat routing are enough for v1 completion",
             "passive chat parsing and plugin-local routing remain promoted-experimental-only",
             "GameplayPolicyEvent and ChatMessageEvent are copied-data seeds only; separately or together they must not be described as v1-complete, v1.0 stable, or sufficient to turn on v1_completion_required",
         ):
@@ -2611,7 +2611,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "installed SDK package shape",
             "player identity, permissions/admin,\ncommand/chat response path, commands/replies",
             "before `v1_completion_required` can become true",
-            "pre-identity release-supported seeds are not enough for v1 completion",
+            "Plugin Hub seed/package publication remains post-SDK-complete",
             "No Foundation/Plugin Hub seed, descriptor/timer example, installed SDK package shape, or\ncopied event example is an ArkApi/AseApi/ArkServerApi compatibility layer",
             "API parity\nclaim, portable plugin path, or evidence that ArkApi plugin families can be ported",
             "structure census/build policy",
@@ -2684,7 +2684,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`",
             "plugin watchdogs, hot plugin reload, Obelisk hot reload, process restart, server recovery API, operator reload commands, detached-worker ingress, and restart-state recovery are excluded or post-v1",
             "Passing runtime/core-first RC gates",
-            "pre-identity release-supported seed usefulness is insufficient for `v1.0 stable`",
+            "pre-identity installed-SDK foundation usefulness is insufficient for `v1.0 stable`",
             "blocker list is promoted or explicitly named as excluded/post-v1",
             "mutation",
             "return override",
@@ -4010,7 +4010,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         required = (
             "what a plugin can honestly build today",
-            "current release-supported seeds are lifecycle/config/logging, descriptor/catalog consumers, and process-local timers",
+            "current installed-SDK foundation examples, not active Plugin Hub work, are lifecycle/config/logging, descriptor/catalog consumers, and process-local timers",
             "Copied chat parsers and `GameplayPolicyEvent` auditors are experimental pattern examples only",
             "not production command/chat/policy SDKs",
             "identity, lookup, mutation, replies/send-chat, permissions, storage, RCON, inventory/item APIs, or structure enforcement stays blocked until promoted",
@@ -4040,7 +4040,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (foundation, "Add process-local timers"),
             (foundation, "Keep passive copied chat parsing experimental and plugin-local only"),
             (foundation, "Keep copied policy auditors experimental"),
-            (foundation, "Copied chat parsers and copied policy auditors\nmay demonstrate patterns, but they remain experimental"),
+            (foundation, "Copied chat parsers and copied policy\nauditors may demonstrate patterns, but they remain experimental"),
             (matrix, "## Post-v0.1 Creator Ladder"),
             (matrix, "Release-supported seed lanes"),
             (matrix, "Experimental pattern examples only"),
@@ -7724,7 +7724,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             rows[columns[1]] = columns[2]
 
         expected_tiers = {
-            "Lifecycle, descriptors, logging, config, local timers": "release-supported seed available",
+            "Lifecycle, descriptors, logging, config, local timers": "parked release-supported seed after SDK completion",
             "Passive chat parsing and plugin-local text routing": "experimental seed only",
             "Copied structure/item policy auditing": "experimental seed only",
             "Timed notices and chat broadcasts": "blocked",
@@ -7746,7 +7746,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "## Support Tier Legend",
             "The `Foundation V1` label means the first reviewed foundation/intake contract revision for contributor readiness",
             "it is not Obelisk SDK v1, `v1.0 stable`, or a Plugin Hub completion claim",
-            "`release-supported seed available`: supported for scoped Obelisk-native examples",
+            "`parked release-supported seed after SDK completion`: future support tier for scoped Obelisk-native examples",
             "`experimental seed only`: allowed for explicitly labeled pattern examples",
             "not supported as production Plugin Hub modules or as general chat, command, policy, structure, inventory, identity, mutation, or enforcement SDKs",
             "`blocked` and `blocked except experimental auditing`: backlog demand only",
@@ -7833,7 +7833,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ),
             "foundation": (
                 "## Contributor Intake Checklist",
-                "Release-supported seed now",
+                "Parked release-supported seed after SDK completion",
                 "Experimental pattern only",
                 "Blocked backlog",
                 "ArkApi/AseApi/NextGenPlugins demand can justify keeping a blocked idea visible",

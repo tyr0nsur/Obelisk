@@ -137,8 +137,9 @@ implementation patterns.
 
 Classify every Plugin Hub proposal before writing code:
 
-1. Release-supported seed now: the proposal uses only lifecycle/config/logging,
-   descriptor/catalog reads, or process-local timers from the current C ABI.
+1. Parked release-supported seed after SDK completion: the future proposal uses only
+   lifecycle/config/logging, descriptor/catalog reads, or process-local timers from the
+   current C ABI.
 2. Experimental pattern only: the proposal passively consumes copied
    `ChatMessageEvent` or `GameplayPolicyEvent` data and clearly avoids identity, lookup,
    public command routing, replies, permissions, moderation, send-chat, enforcement,
@@ -228,11 +229,12 @@ Experimental pattern examples only:
   send-chat, replies, or a public command SDK/router.
 
 Only lifecycle/config/logging examples, descriptor/catalog readers scaffolded from
-`examples/sdk_descriptor_catalog`, and process-local timer examples are
-release-supported seeds after the RC. Copied chat parsers and copied policy auditors
-may demonstrate patterns, but they remain experimental and are not promises of complete
-or partial support for economy, permissions, homes, kits, shops, RCON, inventory, item,
-dino, tribe, mission, transfer, storage/database, webhook, or structure modules.
+`examples/sdk_descriptor_catalog`, and process-local timer examples may become
+release-supported seeds after SDK completion. Copied chat parsers and copied policy
+auditors may demonstrate patterns, but they remain experimental and are not promises of
+complete or partial support for economy, permissions, homes, kits, shops, RCON,
+inventory, item, dino, tribe, mission, transfer, storage/database, webhook, or structure
+modules.
 
 ## Fastest Honest Creator Path
 

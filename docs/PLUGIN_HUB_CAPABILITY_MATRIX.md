@@ -2,9 +2,9 @@
 
 Status: post-SDK-complete planning only.
 
-This matrix is a contributor-facing planning aid for future Obelisk Plugin Hub work. It
-maps common modder intents to the public Obelisk surface that is safe today and separates
-post-RC release-supported seed work from experimental copied-data examples.
+This matrix is an archived contributor-facing planning aid for future Obelisk Plugin Hub
+work. It maps common modder intents to current Obelisk primitives and parked post-SDK
+support tiers.
 It must not drive current engineering priority while the complete SDK blocker chain is
 open.
 `PLUGIN_HUB_FOUNDATION_V1.md` defines the first foundation seed contract that this matrix
@@ -62,9 +62,9 @@ server modding framework.
 
 ## Support Tier Legend
 
-- `release-supported seed available`: supported for scoped Obelisk-native examples that use only
-  the current public C ABI, fail-closed capability checks, safe-disabled config, and
-  process-local ownership.
+- `parked release-supported seed after SDK completion`: future support tier for scoped
+  Obelisk-native examples that use only the current public C ABI, fail-closed capability
+  checks, safe-disabled config, and process-local ownership.
 - `experimental seed only`: allowed for explicitly labeled pattern examples that teach
   copied-data callback handling, but not supported as production Plugin Hub modules or as
   general chat, command/router, replies, permissions, send-chat, policy, structure,
@@ -82,7 +82,8 @@ Plugin Hub work is parked until the complete SDK blocker chain is resolved. Star
 `PLUGIN_HUB_SEED_BOUNDARY.md` only when archived planning is explicitly requested or when
 post-SDK-complete Plugin Hub work resumes.
 
-When that future work resumes, start only from rows marked `release-supported seed available`.
+When that future work resumes, start only from rows marked
+`parked release-supported seed after SDK completion`.
 Rows marked `experimental seed only` may be used for clearly labeled pattern examples, not
 production modules. Rows marked `blocked` or `blocked except experimental auditing` should
 produce design notes, evidence plans, or guardrail tests only; do not start first-party
@@ -133,7 +134,7 @@ today or after promotion gates; it does not promise ArkApi plugin compatibility.
 
 | Priority | Category | Post-RC support tier | Safe interpretation |
 | --- | --- | --- | --- |
-| 1 | Lifecycle, descriptors, logging, config, local timers | release-supported seed available | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
+| 1 | Lifecycle, descriptors, logging, config, local timers | parked release-supported seed after SDK completion | Build native examples around current core primitives; process restart/crash management is not public SDK surface |
 | 2 | Passive chat parsing and plugin-local text routing | experimental seed only | Use copied `ChatMessageEvent` for plugin-local parsing/routing only; no public command SDK/router, sender identity, replies, permissions, blocking, send-chat, or moderation contract |
 | 3 | Copied structure/item policy auditing | experimental seed only | Use copied `GameplayPolicyEvent` only for observational audits of event kinds from `minimal-second-source-intake`, `item-return-only-policy-slice`, and `structure-observer-intake`; no StructureEvents SDK, Inventory SDK, Items SDK, identity, mutation, enforcement, or return override |
 | 4 | Timed notices and chat broadcasts | blocked | Owner-token timers exist, but public response path, send-chat/broadcast policy, command routing, permissions/admin, persistence, and cross-process scheduling are not promoted |
@@ -161,11 +162,12 @@ future promotion gate changes the support tier.
 | Player mobility | `obelisk.player_services_economy_mobility.v1` | No homes, teleport, safe-zone, area-policy, persistent mobility state, or gameplay timer API |
 | Dinos/tribes | `obelisk.mission_transfer_dino_tribe.v1` | No Dino SDK, Tribe SDK, dino mutation/cosmetics/carry rules, tribe MOTD/notices, ownership lookup, teleport/spawn API, or cross-map correlation |
 
-`release-supported seed available` means an Obelisk-native plugin can be written and documented
-as a supported Plugin Hub seed against the stated current public ABI slice. `experimental
-seed only` means the example can teach copied-data callback patterns, but it should not be
-marketed as a production Plugin Hub module or as general chat, command/router, replies,
-permissions, send-chat, moderation, policy, structure, or inventory SDK availability.
+`parked release-supported seed after SDK completion` means an Obelisk-native plugin can
+be written and documented as a future supported Plugin Hub seed against the stated public
+ABI slice only after SDK completion. `experimental seed only` means the example can teach
+copied-data callback patterns, but it should not be marketed as a production Plugin Hub
+module or as general chat, command/router, replies, permissions, send-chat, moderation,
+policy, structure, or inventory SDK availability.
 Neither tier means the corresponding ArkApi plugin family can be ported, that command or
 identity semantics exist, or that blocked dependencies can be simulated through raw game
 access.

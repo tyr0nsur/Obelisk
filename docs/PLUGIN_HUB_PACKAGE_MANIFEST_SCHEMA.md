@@ -2,9 +2,10 @@
 
 Status: post-SDK-complete planning only.
 
-This document defines the minimum machine-readable package manifest for Plugin Hub
-intake. It converts the current read-only package proposal into a JSON manifest contract
-for review tooling and future package indexes.
+This archived planning document sketches a future minimum machine-readable package
+manifest for Plugin Hub intake. It is not active tooling or a publication contract while
+SDK blockers remain open. It converts the current read-only package proposal into a JSON
+manifest contract for review tooling and future package indexes.
 Do not implement or prioritize Plugin Hub manifest tooling while the complete Obelisk SDK
 blocker chain remains open.
 

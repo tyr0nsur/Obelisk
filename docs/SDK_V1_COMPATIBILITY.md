@@ -26,10 +26,11 @@ post-v1 blocker so process-local timers are not mistaken for UE gameplay tick ho
 Those blockers must be promoted or deliberately excluded in the release statement before
 `v1_completion_required` can become true.
 
-A pre-v1 Foundation/Plugin Hub seed can support lifecycle/config/logging,
+A pre-v1 installed-SDK foundation example can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
-timers. That seed is useful for contributors, but pre-identity release-supported seeds are not
-enough for v1 completion and are not a `v1.0` complete SDK claim.
+timers. Those examples are useful for contributors, but Plugin Hub seed/package
+publication remains post-SDK-complete and pre-identity installed-SDK foundation
+usefulness is insufficient for v1 completion or a `v1.0` complete SDK claim.
 Copied chat and gameplay-policy examples are experimental copied-data patterns only.
 `GameplayPolicyEvent` and `ChatMessageEvent`, separately or together, must not be
 described as a complete `v1.0` SDK, `v1.0 stable`, or sufficient to turn on
@@ -337,6 +338,6 @@ player progression/engrams, economy, mobility, and operator ingress/storage each
 narrow copied C ABI surface or an explicit named exclusion.
 
 Passing runtime/core-first RC gates, shipping the promoted foundation, or proving
-pre-identity release-supported seed usefulness is insufficient for `v1.0 stable` until the
+pre-identity installed-SDK foundation usefulness is insufficient for `v1.0 stable` until the
 blocker list is promoted or explicitly named as excluded/post-v1 in the release
 statement.

@@ -22,7 +22,8 @@ not ArkApi portability kits, module SDKs, or evidence that Obelisk SDK v1 is com
   not part of the release-supported install layout.
 
 Each example README owns exactly one `Support tier:` declaration. The current installed
-SDK example tiers are:
+SDK example tiers are for installed-SDK review only. These tiers do not start Plugin Hub
+publication or intake work while SDK blockers remain open.
 
 | Example | Support tier |
 | --- | --- |
@@ -31,7 +32,7 @@ SDK example tiers are:
 | `sdk_timer_plugin/` | release-supported seed |
 | `sdk_inventory_policy_audit/` | experimental pattern |
 
-The three release-supported installed-SDK templates today are the starter template
+The three current installed-SDK foundation templates are the starter template
 (`sdk_minimal_plugin/`), the descriptor catalog template
 (`sdk_descriptor_catalog/`), and the owner-token timer template
 (`sdk_timer_plugin/`). They are package-shape and current-C-ABI hygiene templates only.
@@ -46,9 +47,9 @@ patterns in creator-facing examples.
 
 ## Installed-SDK Author Validation
 
-Use this pass before publishing a copied example or release-supported seed. It validates package
-shape and ABI hygiene only; it does not promote gameplay/module readiness or prove a
-complete v1 SDK claim.
+Use this pass before publishing a copied example or future post-SDK seed. It validates
+package shape and ABI hygiene only; it does not promote gameplay/module readiness or
+prove a complete v1 SDK claim.
 
 From the external plugin source root:
 
