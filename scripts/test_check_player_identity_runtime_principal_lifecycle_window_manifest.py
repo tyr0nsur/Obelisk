@@ -46,6 +46,13 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "plugins_disabled": "true",
         "scanner_disabled": "true",
         "dispatch_limit": "0",
+        "wrapper_profile": "observer-debug",
+        "observer_exclusivity": "player_principal_lifecycle_only",
+        "debug_escape_markers": "absent",
+        "callback_escape_markers": "absent",
+        "native_exec_disabled": "true",
+        "ptrace_disabled": "true",
+        "single_module_summary": "player_principal_lifecycle",
         "delivery_claim": "none",
         "principal_claim": "none",
     }
@@ -122,6 +129,50 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("delivery_claim_not_none", report["blockers"])
         self.assertIn("principal_claim_not_none", report["blockers"])
         self.assertFalse(report["promotion_ready"])
+
+    def test_rejects_non_exclusive_observer_window_escape_gates(self) -> None:
+        result = self.run_checker(
+            manifest_lines(
+                wrapper_profile="stable",
+                observer_exclusivity="chat_and_player_principal",
+                debug_escape_markers="present",
+                callback_escape_markers="present",
+                native_exec_disabled="false",
+                ptrace_disabled="false",
+                single_module_summary="all_observers",
+            ),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("wrapper_profile_not_observer_debug", report["blockers"])
+        self.assertIn("observer_exclusivity_not_player_principal_lifecycle_only", report["blockers"])
+        self.assertIn("debug_escape_markers_not_absent", report["blockers"])
+        self.assertIn("callback_escape_markers_not_absent", report["blockers"])
+        self.assertIn("native_exec_disabled_not_true", report["blockers"])
+        self.assertIn("ptrace_disabled_not_true", report["blockers"])
+        self.assertIn("single_module_summary_not_player_principal_lifecycle", report["blockers"])
+
+    def test_rejects_capture_outside_approved_window_and_bad_rollback_order(self) -> None:
+        result = self.run_checker(
+            manifest_lines(
+                approved_window_start_utc="2026-06-01T12:00:00Z",
+                approved_window_end_utc="2026-06-01T12:10:00Z",
+                actual_capture_start_utc="2026-06-01T11:59:00Z",
+                actual_capture_end_utc="2026-06-01T12:11:00Z",
+                rollback_start_utc="2026-06-01T12:09:00Z",
+                rollback_end_utc="2026-06-01T12:08:00Z",
+            ),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("actual_capture_starts_before_approved_window", report["blockers"])
+        self.assertIn("actual_capture_ends_after_approved_window", report["blockers"])
+        self.assertIn("rollback_starts_before_capture_end", report["blockers"])
+        self.assertIn("rollback_window_not_forward", report["blockers"])
 
     def test_rejects_unstable_posture_and_incomplete_rollback(self) -> None:
         result = self.run_checker(

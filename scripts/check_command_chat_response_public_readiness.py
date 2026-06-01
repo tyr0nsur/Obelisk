@@ -50,6 +50,12 @@ REQUIRED_DECISION_IDS = frozenset(
 )
 REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
     (
+        "raw UE pointers",
+        "raw ProcessEvent params",
+        "raw FString storage",
+        "UObject pointers",
+        "UFunction pointers",
+        "FName/GObjects indices",
         "reply API",
         "send-chat API",
         "principal or permission claims from command text",
@@ -68,6 +74,22 @@ REQUIRED_GUIDANCE_BLOCKERS = frozenset(
         "permissions_admin_blocked",
         "command_router_blocked",
         "runtime_observation_requires_separate_approval",
+    )
+)
+REQUIRED_REDACTION_GUIDANCE_FRAGMENTS = (
+    "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+    "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+    "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+    "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+    "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
+)
+REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
+    (
+        "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+        "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+        "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+        "directed recipient identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+        "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
     )
 )
 FALSE_ONLY_KEYS = frozenset(
@@ -177,6 +199,10 @@ def strings(value: Any) -> list[str]:
 
 def string_set(value: Any) -> set[str]:
     return set(strings(value))
+
+
+def contains_fragment(haystack: str, needle: str) -> bool:
+    return needle.casefold() in haystack.casefold()
 
 
 def normalized_key(key: Any) -> str:
@@ -333,6 +359,19 @@ def validate_readiness(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
                 f"{label}.why_blocked",
                 missing=sorted(REQUIRED_GUIDANCE_BLOCKERS - blockers_seen),
             )
+        guidance_text = "\n".join(strings(item.get("snapshot_prep_checks")) + strings([item.get("non_claim")]))
+        missing_redaction = [
+            fragment
+            for fragment in REQUIRED_REDACTION_GUIDANCE_FRAGMENTS
+            if not contains_fragment(guidance_text, fragment)
+        ]
+        if missing_redaction:
+            add(
+                blockers,
+                "target_set_guidance_missing_redaction_checks",
+                label,
+                missing=missing_redaction,
+            )
 
     collect_surface_overclaims(payload, blockers, "$.readiness")
 
@@ -395,6 +434,17 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     for required in ("command router", "command registration API", "moderation API"):
         if required not in exclusions:
             add(blockers, "separation_exclusion_missing", "$.decisions.required_before_public_header", exclusion=required)
+
+    privacy = by_id.get("privacy.redaction_and_targeting", {})
+    privacy_behaviors = string_set(privacy.get("required_behavior"))
+    missing_privacy = REQUIRED_PRIVACY_DECISION_BEHAVIORS - privacy_behaviors
+    if missing_privacy:
+        add(
+            blockers,
+            "privacy_redaction_behavior_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_privacy),
+        )
 
     evidence = by_id.get("evidence.response_target_set_snapshot_second_source", {})
     if string_set(evidence.get("required_targets")) != TARGETS:

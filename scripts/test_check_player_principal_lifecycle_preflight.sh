@@ -123,4 +123,23 @@ assert_fail stopped-without-allow "${CHECK}" \
     --expected-binary-sha256 "${server_sha}"
 grep -F 'pass --allow-stopped' "${TMP_DIR}/stopped-without-allow.err" >/dev/null
 
+assert_fail offline-only-live-path "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --expected-binary-sha256 0000000000000000000000000000000000000000000000000000000000000000 \
+    --offline-only \
+    --allow-stopped
+grep -F 'Obelisk root must be an offline copy, not a live server path' "${TMP_DIR}/offline-only-live-path.err" >/dev/null
+
+assert_fail offline-only-map "${CHECK}" \
+    --instance arkserver2 \
+    --map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --offline-only
+grep -F -- '--offline-only rejects --map' "${TMP_DIR}/offline-only-map.err" >/dev/null
+
 echo "test_check_player_principal_lifecycle_preflight passed"

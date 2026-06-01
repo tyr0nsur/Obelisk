@@ -1,0 +1,80 @@
+{
+  "schema": "obelisk.operator-ingress-storage-offline-contract.v1",
+  "contract_id": "obelisk.operator_ingress_storage.v1",
+  "artifact_status": "candidate_only",
+  "readiness_classification": "planning_only",
+  "pre_abi": true,
+  "status": "offline_internal_contract",
+  "public_header_allowed": false,
+  "public_sdk_ready": false,
+  "public_abi_ready": false,
+  "promotion_ready": false,
+  "runtime_ready": false,
+  "runtime_services": false,
+  "promotion": {
+    "public_sdk": false,
+    "runtime": false
+  },
+  "lanes": [
+    {
+      "id": "ingress",
+      "label": "ingress",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "required_checks": [
+        "offline_only",
+        "operator_owned_inputs",
+        "no_runtime_entrypoint"
+      ]
+    },
+    {
+      "id": "storage_migration",
+      "label": "storage migration",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "required_checks": [
+        "schema_versioned",
+        "dry_run_required",
+        "rollback_note_required"
+      ]
+    },
+    {
+      "id": "queue_lifecycle",
+      "label": "queue lifecycle",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "required_checks": [
+        "enqueue_dequeue_ack_nack_decisioned",
+        "dead_letter_policy_decisioned",
+        "retry_policy_decisioned"
+      ]
+    },
+    {
+      "id": "text_audit",
+      "label": "text/audit",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "required_checks": [
+        "text_payload_redaction_decisioned",
+        "audit_record_retention_decisioned",
+        "operator_visibility_boundary_decisioned"
+      ]
+    },
+    {
+      "id": "multi_instance_lifecycle",
+      "label": "multi-instance lifecycle",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "required_checks": [
+        "instance_scoped_state",
+        "start_stop_restart_boundaries_decisioned",
+        "cross_instance_isolation_decisioned"
+      ]
+    }
+  ]
+}

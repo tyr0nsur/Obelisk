@@ -222,6 +222,7 @@
         "missing runtime principal identity",
         "command text principal claim",
         "operator config principal claim",
+        "principal_generation_mismatch",
         "unknown authority source",
         "missing policy source provenance",
         "allow without policy_epoch provenance",

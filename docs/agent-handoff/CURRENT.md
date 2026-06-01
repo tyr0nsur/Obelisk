@@ -76,7 +76,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/command_chat_response_public_contract_decisions.json` and accepts only
   planning-layout evidence: `public_readiness_ready`, `public_header_allowed`,
   `promotion_ready`, `public_sdk_ready`, `public_abi_ready`, and `runtime_ready` must all
-  remain false.
+  remain false. The checker now also requires explicit redaction guidance for
+  `ClientChatMessage.Chat`, raw FString message text, sender identity, directed recipient
+  identity, and future targeting through promoted copied principal handle/generation only.
+  The existing offline readiness artifact is now expected to fail until regenerated or
+  patched with that guidance; this is a privacy blocker, not runtime/public readiness.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
@@ -206,7 +210,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Permissions/admin pre-ABI contracts remain candidate-only. Public symbols stay empty
   until copied identity/principal semantics, provenance, scope/generation, epoch,
   rate-limit/audit, and v1 sequence gates are resolved. `operator-config` is recognized
-  for planning/audit but is not allow-capable.
+  for planning/audit but is not allow-capable. Fail-closed coverage must include
+  `principal_generation_mismatch`, not only missing or stale generations.
+- Operator ingress/storage is an offline internal planning contract only:
+  `obelisk.operator_ingress_storage.v1` has no public header, public ABI, runtime
+  services, promotion readiness, or v1 completion meaning. It is useful for shaping later
+  operator-owned inputs, schema migration, queue lifecycle, text/audit redaction, and
+  multi-instance lifecycle, but it must not become a shortcut around identity ->
+  permissions/admin -> command response.
 - Plugin Hub seed review is parked until SDK completion. Current rounds should keep
   Plugin Hub docs non-promotional and focus on SDK blockers.
 - Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root

@@ -18,6 +18,7 @@ Options:
   --expected-binary-sha256 <sha>  Required ShooterGameServer SHA256.
   --proc-root <path>              Procfs root for posture checks. Default: /proc.
   --allow-stopped                 Accept no running process after marker/SHA checks.
+  --offline-only                  Reject live server paths and running-process checks.
   -h, --help                      Show this help.
 EOF
 }
@@ -31,6 +32,9 @@ SERVER_BINARY="/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameS
 EXPECTED_BINARY_SHA256=""
 PROC_ROOT="/proc"
 ALLOW_STOPPED=0
+OFFLINE_ONLY=0
+SERVER_ROOT="/servidor/ark"
+APPROVED_OFFLINE_ROOT="/servidor/ark/workspace-offline"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -70,6 +74,10 @@ while [[ $# -gt 0 ]]; do
             ALLOW_STOPPED=1
             shift
             ;;
+        --offline-only)
+            OFFLINE_ONLY=1
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -92,6 +100,46 @@ done
 [[ "${EXPECTED_BINARY_SHA256}" =~ ^[0-9a-f]{64}$ ]] || {
     echo "--expected-binary-sha256 must be lowercase SHA256 hex." >&2
     exit 2
+}
+
+resolved_existing_path() {
+    local path="$1"
+    if command -v realpath >/dev/null 2>&1; then
+        realpath -e -- "${path}"
+    else
+        readlink -f -- "${path}"
+    fi
+}
+
+reject_protected_live_path() {
+    local label="$1"
+    local path="$2"
+    local resolved
+    case "${path}" in
+        "${SERVER_ROOT}"|"${SERVER_ROOT}/"*)
+            case "${path}" in
+                "${APPROVED_OFFLINE_ROOT}"|"${APPROVED_OFFLINE_ROOT}/"*)
+                    ;;
+                *)
+                    echo "${label} must be an offline copy, not a live server path: ${path}" >&2
+                    exit 1
+                    ;;
+            esac
+            ;;
+    esac
+    resolved="$(resolved_existing_path "${path}" 2>/dev/null || printf '%s' "${path}")"
+    case "${resolved}" in
+        "${SERVER_ROOT}"|"${SERVER_ROOT}/"*)
+            case "${resolved}" in
+                "${APPROVED_OFFLINE_ROOT}"|"${APPROVED_OFFLINE_ROOT}/"*)
+                    ;;
+                *)
+                    echo "${label} must be an offline copy, not a live server path: ${path}" >&2
+                    exit 1
+                    ;;
+            esac
+            ;;
+    esac
 }
 
 require_regular_file() {
@@ -127,6 +175,16 @@ forbid_marker() {
         exit 1
     fi
 }
+
+if [[ "${OFFLINE_ONLY}" == "1" ]]; then
+    reject_protected_live_path "Obelisk root" "${OBELISK_ROOT}"
+    reject_protected_live_path "Installed wrapper" "${INSTALLED_WRAPPER}"
+    reject_protected_live_path "Server binary" "${SERVER_BINARY}"
+    if [[ -n "${MAP}" ]]; then
+        echo "--offline-only rejects --map because it would inspect live process posture." >&2
+        exit 1
+    fi
+fi
 
 require_regular_file "Server binary" "${SERVER_BINARY}"
 actual_sha="$(sha256sum "${SERVER_BINARY}" | awk '{print $1}')"

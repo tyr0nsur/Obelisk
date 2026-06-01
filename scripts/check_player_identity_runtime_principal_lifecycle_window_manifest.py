@@ -13,6 +13,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,13 @@ REQUIRED_SIMPLE_FIELDS = (
     "plugins_disabled",
     "scanner_disabled",
     "dispatch_limit",
+    "wrapper_profile",
+    "observer_exclusivity",
+    "debug_escape_markers",
+    "callback_escape_markers",
+    "native_exec_disabled",
+    "ptrace_disabled",
+    "single_module_summary",
     "delivery_claim",
     "principal_claim",
 )
@@ -134,6 +142,10 @@ def parse_bool(value: str | None) -> bool | None:
     return None
 
 
+def parse_utc_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.removesuffix("Z") + "+00:00").astimezone(timezone.utc)
+
+
 def validate_target(fields: dict[str, str], blockers: list[dict[str, Any]]) -> Target:
     instance = fields.get("instance") or fields.get("instance_id")
     map_name = fields.get("map") or fields.get("map_name")
@@ -208,6 +220,7 @@ def validate_user_policy(fields: dict[str, str], blockers: list[dict[str, Any]])
 
 def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation:
     blockers: list[dict[str, Any]] = []
+    timestamps: dict[str, datetime] = {}
     for key in REQUIRED_SIMPLE_FIELDS:
         if key not in fields:
             add(blockers, "required_field_missing", key)
@@ -217,6 +230,8 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
             add(blockers, "required_field_missing", key)
         elif not UTC_TIMESTAMP_RE.fullmatch(value):
             add(blockers, "utc_timestamp_invalid", key)
+        else:
+            timestamps[key] = parse_utc_timestamp(value)
 
     run_id = fields.get("run_id")
     if run_id is not None and RUN_ID_RE.fullmatch(run_id) is None:
@@ -247,6 +262,20 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
     if not fields.get("rollback_delta"):
         add(blockers, "rollback_delta_missing", "rollback_delta")
 
+    if len(timestamps) == len(REQUIRED_TIMESTAMP_FIELDS):
+        if timestamps["approved_window_start_utc"] >= timestamps["approved_window_end_utc"]:
+            add(blockers, "approved_window_not_forward", "approved_window_end_utc")
+        if timestamps["actual_capture_start_utc"] >= timestamps["actual_capture_end_utc"]:
+            add(blockers, "actual_capture_not_forward", "actual_capture_end_utc")
+        if timestamps["actual_capture_start_utc"] < timestamps["approved_window_start_utc"]:
+            add(blockers, "actual_capture_starts_before_approved_window", "actual_capture_start_utc")
+        if timestamps["actual_capture_end_utc"] > timestamps["approved_window_end_utc"]:
+            add(blockers, "actual_capture_ends_after_approved_window", "actual_capture_end_utc")
+        if timestamps["rollback_start_utc"] < timestamps["actual_capture_end_utc"]:
+            add(blockers, "rollback_starts_before_capture_end", "rollback_start_utc")
+        if timestamps["rollback_start_utc"] > timestamps["rollback_end_utc"]:
+            add(blockers, "rollback_window_not_forward", "rollback_end_utc")
+
     try:
         log_budget = int(fields.get("log_budget", ""))
     except ValueError:
@@ -257,6 +286,28 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
 
     if fields.get("dispatch_limit") != "0":
         add(blockers, "dispatch_limit_not_zero", "dispatch_limit", expected="0")
+    if fields.get("wrapper_profile") != "observer-debug":
+        add(blockers, "wrapper_profile_not_observer_debug", "wrapper_profile", expected="observer-debug")
+    if fields.get("observer_exclusivity") != "player_principal_lifecycle_only":
+        add(
+            blockers,
+            "observer_exclusivity_not_player_principal_lifecycle_only",
+            "observer_exclusivity",
+            expected="player_principal_lifecycle_only",
+        )
+    for key in ("debug_escape_markers", "callback_escape_markers"):
+        if fields.get(key) != "absent":
+            add(blockers, f"{key}_not_absent", key, expected="absent")
+    for key in ("native_exec_disabled", "ptrace_disabled"):
+        if parse_bool(fields.get(key)) is not True:
+            add(blockers, f"{key}_not_true", key, expected=True)
+    if fields.get("single_module_summary") != "player_principal_lifecycle":
+        add(
+            blockers,
+            "single_module_summary_not_player_principal_lifecycle",
+            "single_module_summary",
+            expected="player_principal_lifecycle",
+        )
     if fields.get("delivery_claim") != "none":
         add(blockers, "delivery_claim_not_none", "delivery_claim", expected="none")
     if fields.get("principal_claim") != "none":
@@ -300,6 +351,13 @@ def build_template_fields() -> dict[str, str]:
         "plugins_disabled": "true",
         "scanner_disabled": "true",
         "dispatch_limit": "0",
+        "wrapper_profile": "observer-debug",
+        "observer_exclusivity": "player_principal_lifecycle_only",
+        "debug_escape_markers": "absent",
+        "callback_escape_markers": "absent",
+        "native_exec_disabled": "true",
+        "ptrace_disabled": "true",
+        "single_module_summary": "player_principal_lifecycle",
         "delivery_claim": "none",
         "principal_claim": "none",
     }
@@ -351,6 +409,13 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "plugins_disabled": parse_bool(fields.get("plugins_disabled")),
             "scanner_disabled": parse_bool(fields.get("scanner_disabled")),
             "dispatch_limit": fields.get("dispatch_limit"),
+            "wrapper_profile": fields.get("wrapper_profile"),
+            "observer_exclusivity": fields.get("observer_exclusivity"),
+            "debug_escape_markers": fields.get("debug_escape_markers"),
+            "callback_escape_markers": fields.get("callback_escape_markers"),
+            "native_exec_disabled": parse_bool(fields.get("native_exec_disabled")),
+            "ptrace_disabled": parse_bool(fields.get("ptrace_disabled")),
+            "single_module_summary": fields.get("single_module_summary"),
         },
         "rollback": {
             "completed": parse_bool(fields.get("rollback_completed")),

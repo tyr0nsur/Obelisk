@@ -97,6 +97,11 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                     "snapshot_prep_checks": [
                         "keep reply API, send-chat API, broadcast/notices, moderation, command router, permission checks, mutation, and return override blocked",
                         "require promoted player identity/principal and permissions/admin before any public response path is considered",
+                        "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+                        "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+                        "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+                        "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+                        "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
                     ],
                     "target_set": "command-chat-response-route-planning",
                     "why_blocked": [
@@ -134,7 +139,13 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             {"id": "abi.copied_response_payload", "status": "unresolved"},
             {"id": "abi.capability_and_owner_token", "status": "unresolved"},
             {"id": "lifecycle.owner_scoped_unregister_and_drain", "status": "unresolved"},
-            {"id": "privacy.redaction_and_targeting", "status": "unresolved"},
+            {"id": "privacy.redaction_and_targeting", "status": "unresolved", "required_behavior": [
+                "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+                "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+                "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+                "directed recipient identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+                "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
+            ]},
             {"id": "abuse.rate_limit_and_audit", "status": "unresolved"},
             {"id": "separation.no_commands_router_or_moderation", "status": "unresolved", "required_exclusions": [
                 "command router",
@@ -155,6 +166,12 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "forbidden_public_contract": [
                 "reply API",
                 "send-chat API",
+                "raw UE pointers",
+                "raw ProcessEvent params",
+                "raw FString storage",
+                "UObject pointers",
+                "UFunction pointers",
+                "FName/GObjects indices",
                 "principal or permission claims from command text",
                 "principal or permission claims from operator config",
                 "player lookup",
@@ -265,6 +282,50 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("target_sets_mismatch", report["blockers"])
         self.assertIn("second_source_missing_mismatch", report["blockers"])
         self.assertIn("second_source_status_mismatch", report["blockers"])
+
+    def test_rejects_missing_response_redaction_guidance(self) -> None:
+        cases = (
+            "ClientChatMessage.Chat",
+            "raw FString storage/data",
+            "sender identity remains redacted",
+            "directed recipient identity remains redacted",
+            "future targeting must use only a promoted copied principal handle/generation",
+        )
+        for phrase in cases:
+            with self.subTest(phrase=phrase):
+                readiness = self.make_readiness()
+                readiness["target_set_guidance"][0]["snapshot_prep_checks"] = [
+                    check
+                    for check in readiness["target_set_guidance"][0]["snapshot_prep_checks"]
+                    if phrase not in check
+                ]
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    readiness_path, decisions_path = self.write_inputs(Path(temp_dir), readiness=readiness)
+                    result = self.run_checker(
+                        "--readiness",
+                        str(readiness_path),
+                        "--decisions",
+                        str(decisions_path),
+                        check=False,
+                    )
+
+                report = json.loads(result.stdout)
+                self.assertEqual(1, result.returncode)
+                self.assertIn("target_set_guidance_missing_redaction_checks", report["blockers"])
+
+    def test_rejects_missing_privacy_decision_behavior(self) -> None:
+        decisions = self.make_decisions()
+        privacy = next(item for item in decisions["required_before_public_header"] if item["id"] == "privacy.redaction_and_targeting")
+        privacy["required_behavior"] = [
+            item for item in privacy["required_behavior"] if not item.startswith("raw FString storage/data")
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker("--readiness", str(readiness_path), "--decisions", str(decisions_path), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("privacy_redaction_behavior_missing", report["blockers"])
 
 
 if __name__ == "__main__":
