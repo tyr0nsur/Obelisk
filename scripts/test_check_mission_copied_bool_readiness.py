@@ -361,6 +361,53 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertIn("copied_bool_entry_metadata_mismatch", reasons)
         self.assertIn("mission_copied_bool_policy_copied_bool_shape_mismatch", reasons)
 
+    def test_copied_bool_source_snapshot_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["copied_bools"][0]["source_snapshot_sha256"] = "f" * 64
+            payload["copied_bools"][1]["source_snapshot"] = "snapshot-0004"
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("copied_bool_entry_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("copied_bool_entry_source_snapshot_target_mismatch", reasons)
+
+    def test_redacted_source_snapshot_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["redacted_mission_fields"][0]["source_snapshot"] = "unknown-snapshot"
+            payload["redacted_mission_fields"][1]["target"] = "MissionType.GetPlayerUsableItems"
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("redacted_mission_field_source_snapshot_unknown", reasons)
+        self.assertIn("redacted_mission_field_source_snapshot_target_mismatch", reasons)
+
+    def test_generated_from_snapshot_target_drift_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["generated_from"]["input_snapshots"][0]["target"] = "PrimalItem.CanUse"
+            manifest, sha256 = self.write_pack(root, payload)
+
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("input_snapshot_target_invalid", reasons)
+        self.assertIn("input_snapshot_targets_mismatch", reasons)
+
     def test_manifest_hash_mismatch_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"

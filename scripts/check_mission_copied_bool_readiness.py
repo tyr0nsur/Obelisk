@@ -227,7 +227,96 @@ def require_set(
     return actual_set
 
 
-def validate_copied_bool_entries(policy: dict[str, Any], copied_fields: set[str], blockers: list[dict[str, Any]]) -> None:
+def validate_generated_from(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    generated_from = policy.get("generated_from")
+    if not isinstance(generated_from, dict):
+        append_blocker(blockers, "generated_from_missing")
+        return {}
+    if generated_from.get("snapshot_schema") != "obelisk.ufunction-chain.snapshot.v1":
+        append_blocker(blockers, "snapshot_schema_mismatch", value=generated_from.get("snapshot_schema"))
+    snapshots = generated_from.get("input_snapshots")
+    if not isinstance(snapshots, list) or len(snapshots) != 4:
+        append_blocker(
+            blockers,
+            "input_snapshot_count_mismatch",
+            expected=4,
+            value=len(snapshots) if isinstance(snapshots, list) else None,
+        )
+        return {}
+
+    sources: dict[str, dict[str, str]] = {}
+    targets: set[str] = set()
+    for index, snapshot in enumerate(snapshots):
+        if not isinstance(snapshot, dict):
+            append_blocker(blockers, "input_snapshot_entry_invalid", index=index)
+            continue
+        snapshot_id = snapshot.get("id")
+        snapshot_sha256 = snapshot.get("sha256")
+        target = snapshot.get("target")
+        if not isinstance(snapshot_id, str) or not snapshot_id:
+            append_blocker(blockers, "input_snapshot_id_invalid", index=index)
+            continue
+        if snapshot_id in sources:
+            append_blocker(blockers, "input_snapshot_id_duplicate", index=index, snapshot_id=snapshot_id)
+        if not isinstance(snapshot_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", snapshot_sha256):
+            append_blocker(blockers, "input_snapshot_sha256_invalid", index=index, snapshot_id=snapshot_id)
+            continue
+        if not isinstance(target, str) or target not in EXPECTED_INPUT_TARGETS:
+            append_blocker(blockers, "input_snapshot_target_invalid", index=index, snapshot_id=snapshot_id, target=target)
+            continue
+        sources[snapshot_id] = {"sha256": snapshot_sha256, "target": target}
+        targets.add(target)
+    if targets != EXPECTED_INPUT_TARGETS:
+        append_blocker(
+            blockers,
+            "input_snapshot_targets_mismatch",
+            missing=sorted(EXPECTED_INPUT_TARGETS - targets),
+            unexpected=sorted(targets - EXPECTED_INPUT_TARGETS),
+        )
+    return sources
+
+
+def validate_source_snapshot(
+    entry: dict[str, Any],
+    *,
+    index: int,
+    field_key: str,
+    reason_prefix: str,
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
+) -> None:
+    source_snapshot = entry.get("source_snapshot")
+    source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+    if not isinstance(source_snapshot, str) or source_snapshot not in sources:
+        append_blocker(blockers, f"{reason_prefix}_source_snapshot_unknown", index=index, field=entry.get(field_key))
+        return
+    source = sources[source_snapshot]
+    if source_snapshot_sha256 != source["sha256"]:
+        append_blocker(
+            blockers,
+            f"{reason_prefix}_source_snapshot_sha256_mismatch",
+            index=index,
+            field=entry.get(field_key),
+            expected=source["sha256"],
+            value=source_snapshot_sha256,
+        )
+    if entry.get("target") != source["target"]:
+        append_blocker(
+            blockers,
+            f"{reason_prefix}_source_snapshot_target_mismatch",
+            index=index,
+            field=entry.get(field_key),
+            expected=source["target"],
+            value=entry.get("target"),
+        )
+
+
+def validate_copied_bool_entries(
+    policy: dict[str, Any],
+    copied_fields: set[str],
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
+) -> None:
     entries = policy.get("copied_bools")
     if not isinstance(entries, list):
         append_blocker(blockers, "copied_bools_missing")
@@ -266,12 +355,43 @@ def validate_copied_bool_entries(policy: dict[str, Any], copied_fields: set[str]
                     expected=expected,
                     value=entry.get(key),
                 )
+        validate_source_snapshot(
+            entry,
+            index=index,
+            field_key="copied_field",
+            reason_prefix="copied_bool_entry",
+            sources=sources,
+            blockers=blockers,
+        )
     if entry_fields != copied_fields:
         append_blocker(
             blockers,
             "copied_bool_entry_coverage_mismatch",
             missing=sorted(copied_fields - entry_fields),
             unexpected=sorted(entry_fields - copied_fields),
+        )
+
+
+def validate_redacted_source_entries(
+    policy: dict[str, Any],
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
+) -> None:
+    entries = policy.get("redacted_mission_fields")
+    if not isinstance(entries, list):
+        append_blocker(blockers, "redacted_mission_fields_missing")
+        return
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            append_blocker(blockers, "redacted_mission_field_entry_not_object", index=index)
+            continue
+        validate_source_snapshot(
+            entry,
+            index=index,
+            field_key="redacted_field",
+            reason_prefix="redacted_mission_field",
+            sources=sources,
+            blockers=blockers,
         )
 
 
@@ -373,22 +493,9 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
     if any(field.startswith("MissionType.GetPlayerUsableItems.") for field in copied_fields):
         append_blocker(blockers, "get_player_usable_items_copied_field_not_allowed")
 
-    validate_copied_bool_entries(policy, copied_fields, blockers)
-
-    generated_from = policy.get("generated_from")
-    if not isinstance(generated_from, dict):
-        append_blocker(blockers, "generated_from_missing")
-    else:
-        if generated_from.get("snapshot_schema") != "obelisk.ufunction-chain.snapshot.v1":
-            append_blocker(blockers, "snapshot_schema_mismatch", value=generated_from.get("snapshot_schema"))
-        snapshots = generated_from.get("input_snapshots")
-        if not isinstance(snapshots, list) or len(snapshots) != 4:
-            append_blocker(
-                blockers,
-                "input_snapshot_count_mismatch",
-                expected=4,
-                value=len(snapshots) if isinstance(snapshots, list) else None,
-            )
+    sources = validate_generated_from(policy, blockers)
+    validate_copied_bool_entries(policy, copied_fields, sources, blockers)
+    validate_redacted_source_entries(policy, sources, blockers)
 
     safety_summary = policy.get("safety_summary")
     if not isinstance(safety_summary, dict):
