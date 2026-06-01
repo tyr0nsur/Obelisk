@@ -64,6 +64,7 @@ CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT = {
 CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES = (
     "v1_completion_required is true in this manifest",
     "every v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
+    "minimum promoted demand families are promoted or satisfied by explicit completion equivalents before complete/full/production SDK wording",
     "no promoted-experimental-only surface remains unresolved",
     "the release ships a reviewed SDK compatibility statement based on docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json",
 )
@@ -74,6 +75,7 @@ CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT = (
     "GameplayPolicyEvent and ChatMessageEvent copied-data seeds",
 )
 SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
+    "complete_sdk_claim_requires_promoted_demand_families",
     "stable_release_contract_claim_not_allowed",
     "v1_completion_required_false",
     "promoted_experimental_surfaces_unresolved",
@@ -457,6 +459,7 @@ REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS = {
     "obelisk.command_chat_response_path.v1": "command_chat_response_public_contract_decisions.json",
     "obelisk.commands_replies.v1": "commands_replies_public_contract_decisions.json",
 }
+CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES = CANONICAL_V1_COMPLETION_BLOCKERS
 
 
 def parse_args() -> argparse.Namespace:
@@ -512,6 +515,20 @@ def as_string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
+
+
+def as_string_map(value: Any) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, list[str]] = {}
+    for key, raw_values in value.items():
+        if not isinstance(key, str):
+            continue
+        if isinstance(raw_values, str):
+            result[key] = [raw_values]
+        else:
+            result[key] = as_string_list(raw_values)
+    return result
 
 
 def load_release_statement(path: Path | None) -> tuple[str | None, list[str]]:
@@ -1069,6 +1086,56 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     return False
 
 
+def surface_declares_completion_equivalent(surface: dict[str, Any], blocker_id: str) -> bool:
+    equivalents = as_string_list(surface.get("v1_completion_equivalent_for"))
+    equivalents.extend(as_string_list(surface.get("completion_equivalent_for")))
+    return blocker_id in equivalents
+
+
+def explicit_completion_equivalent_satisfies(
+    blocker_id: str,
+    equivalent_surface_ids: list[str],
+    surfaces_by_id: dict[str, dict[str, Any]],
+) -> str | None:
+    for equivalent_id in equivalent_surface_ids:
+        equivalent_surface = surfaces_by_id.get(equivalent_id)
+        if not equivalent_surface:
+            continue
+        if equivalent_surface.get("status") != "promoted":
+            continue
+        if not surface_declares_completion_equivalent(equivalent_surface, blocker_id):
+            continue
+        if not surface_has_promotion_evidence(equivalent_surface):
+            continue
+        return equivalent_id
+    return None
+
+
+def complete_sdk_minimum_promoted_demand_family_gaps(
+    surfaces_by_id: dict[str, dict[str, Any]],
+    stable_contract: dict[str, Any] | None,
+) -> tuple[list[str], dict[str, str]]:
+    explicit_equivalents = as_string_map(
+        stable_contract.get("promoted_demand_family_equivalents") if stable_contract else None
+    )
+    gaps: list[str] = []
+    satisfied_by: dict[str, str] = {}
+    for blocker_id in sorted(CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES):
+        surface = surfaces_by_id.get(blocker_id)
+        if surface and surface.get("status") == "promoted":
+            continue
+        equivalent_id = explicit_completion_equivalent_satisfies(
+            blocker_id,
+            explicit_equivalents.get(blocker_id, []),
+            surfaces_by_id,
+        )
+        if equivalent_id is not None:
+            satisfied_by[blocker_id] = equivalent_id
+            continue
+        gaps.append(blocker_id)
+    return gaps, satisfied_by
+
+
 def promotion_evidence_key_is_negative_context(parent_key: str | None) -> bool:
     if parent_key is None:
         return False
@@ -1231,6 +1298,13 @@ def build_report(
 
     if manifest.get("v1_completion_required") is not True:
         blockers.append("v1_completion_required_false")
+
+    minimum_promoted_demand_family_gaps, minimum_promoted_demand_family_equivalents = (
+        complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract if isinstance(stable_contract, dict) else None,
+        )
+    )
 
     promoted_surfaces = set(as_string_list(manifest.get("promoted_surfaces")))
     experimental_surfaces = set(as_string_list(manifest.get("experimental_surfaces")))
@@ -1412,6 +1486,12 @@ def build_report(
         blockers.append("canonical_surface_id_missing")
     if missing_canonical_completion_blockers:
         blockers.append("canonical_v1_completion_blocker_missing")
+    if (
+        stable_claim_allowed
+        and manifest.get("v1_completion_required") is True
+        and minimum_promoted_demand_family_gaps
+    ):
+        blockers.append("complete_sdk_claim_requires_promoted_demand_families")
     if unresolved_experimental:
         blockers.append("promoted_experimental_surfaces_unresolved")
     if unresolved_completion_blockers:
@@ -1500,6 +1580,9 @@ def build_report(
         "stable_claim_allowed": stable_claim_allowed,
         "stable_release_contract_missing_claim_requires": missing_stable_claim_requires,
         "stable_release_contract_missing_not_sufficient": missing_stable_not_sufficient,
+        "minimum_promoted_demand_families": sorted(CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES),
+        "minimum_promoted_demand_family_gaps": minimum_promoted_demand_family_gaps,
+        "minimum_promoted_demand_family_equivalents": minimum_promoted_demand_family_equivalents,
         "blockers": blockers,
         "unresolved_experimental_surfaces": sorted(set(unresolved_experimental)),
         "unresolved_completion_blockers": sorted(set(unresolved_completion_blockers)),
@@ -1548,6 +1631,7 @@ def build_report(
             ),
             "unresolved_completion_blocker_count": len(set(unresolved_completion_blockers)),
             "unresolved_experimental_surface_count": len(set(unresolved_experimental)),
+            "minimum_promoted_demand_family_gap_count": len(minimum_promoted_demand_family_gaps),
             "release_statement_required_for_completion_claim": release_statement_text is None,
             "stable_claim_allowed": stable_claim_allowed,
             "non_claim": (
@@ -1621,6 +1705,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "High-demand v1 completion blockers are still unresolved.",
             f"Surfaces: {format_human_list(report.get('unresolved_completion_blockers'))}.",
             "Action: promote with copied C ABI evidence or deliberately exclude/post-v1 where the contract allows it.",
+        ],
+        "complete_sdk_claim_requires_promoted_demand_families": [
+            "The complete/full/production SDK claim requires promoted demand families, not only excluded or post-v1 outcomes.",
+            f"Gaps: {format_human_list(report.get('minimum_promoted_demand_family_gaps'))}.",
+            "Action: use scoped/foundation wording, or promote these families with evidence or explicit promoted equivalents.",
         ],
         "planning_surfaces_unresolved_for_v1_claim": [
             "Planning surfaces remain in the surface table.",

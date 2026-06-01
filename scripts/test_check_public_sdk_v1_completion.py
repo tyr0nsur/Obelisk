@@ -513,7 +513,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
         self.assertIn("v1_completion_required_false", payload["blockers"])
 
-    def test_complete_minimal_manifest_passes(self) -> None:
+    def test_complete_claim_rejects_all_excluded_blockers_as_scoped_only(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
@@ -526,11 +526,68 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--release-statement",
                 str(release_statement_path),
                 "--json",
+                check=False,
+            )
+            scoped_result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(release_statement_path),
+                "--validate-release-statement-scope",
+                "--json",
             )
 
         payload = json.loads(result.stdout)
-        self.assertTrue(payload["ready"])
-        self.assertEqual(payload["blockers"], [])
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
+        self.assertEqual(
+            payload["minimum_promoted_demand_family_gaps"],
+            payload["minimum_promoted_demand_families"],
+        )
+        scoped_payload = json.loads(scoped_result.stdout)
+        self.assertFalse(scoped_payload["ready"])
+        self.assertTrue(scoped_payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "complete_sdk_claim_requires_promoted_demand_families",
+            scoped_payload["scoped_release_statement"]["allowed_remaining_blockers"],
+        )
+
+    def test_minimum_promoted_demand_family_accepts_explicit_promoted_equivalent(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        blocker_id = "obelisk.inventory_items_mutation.v1"
+        equivalent_id = "obelisk.inventory_items_mutation_equivalent.v1"
+        surfaces_by_id = {
+            surface_id: {"id": surface_id, "status": "promoted"}
+            for surface_id in module.CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+        }
+        surfaces_by_id[blocker_id] = {"id": blocker_id, "status": "excluded"}
+        surfaces_by_id[equivalent_id] = {
+            "id": equivalent_id,
+            "status": "promoted",
+            "v1_completion_equivalent_for": [blocker_id],
+            "evidence": {"tests": ["tests/sdk_consumer"]},
+        }
+        stable_contract = {
+            "promoted_demand_family_equivalents": {
+                blocker_id: equivalent_id,
+            }
+        }
+
+        gaps, satisfied_by = module.complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract,
+        )
+
+        self.assertNotIn(blocker_id, gaps)
+        self.assertEqual(satisfied_by[blocker_id], equivalent_id)
 
     def test_empty_or_truncated_manifest_fails_closed(self) -> None:
         manifest = {
@@ -1009,7 +1066,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
         self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
 
@@ -1067,10 +1125,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--release-statement",
                 str(statement_path),
                 "--json",
+                check=False,
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
         self.assertNotIn("release_statement_forbidden_broad_claims", payload["blockers"])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
 
@@ -1174,10 +1234,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--release-statement",
                 str(statement_path),
                 "--json",
+                check=False,
             )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
         self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
 
     def test_release_statement_must_satisfy_surface_exclusion_contract(self) -> None:

@@ -1,13 +1,16 @@
 # oBaseEvents
 
-`oBaseEvents` is the first official Obelisk plugin example. It is intentionally small and
-safe by default.
+`oBaseEvents` is the first official Obelisk runtime reference plugin example. It is
+intentionally small and safe by default.
 
-Support tier: release-supported seed.
+Support tier: experimental pattern.
 
-The support tier applies to lifecycle, config, metadata, shutdown, and guarded callback
-registration mechanics. The optional chat command helper remains an experimental,
-plugin-local pattern and is not part of the release-supported seed tier.
+This is an in-tree runtime reference/debug pattern, not a Plugin Hub release-supported
+seed or installed-SDK template. Its lifecycle, config, metadata, shutdown, and guarded
+callback registration mechanics are useful reference code, but the raw `ProcessEvent`
+path is debug-gated runtime plumbing and must not be treated as a public Plugin Hub API or
+new SDK surface. The optional chat command helper remains an experimental, plugin-local
+pattern.
 
 It demonstrates plugin lifecycle, config, and filtered `ProcessEvent` callback mechanics.
 The promoted v0.1 gameplay callback path is `GameplayPolicyEvent`; use
