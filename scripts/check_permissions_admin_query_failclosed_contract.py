@@ -195,6 +195,24 @@ REQUIRED_QUERY_TEXT_POLICY = {
     "utf8_decoding_required_before_allow": False,
     "command_parser_claim_allowed": False,
 }
+REQUIRED_ABUSE_POLICY = {
+    "rate_limited_per_plugin_owner_token": True,
+    "budget_cleanup_on_plugin_owner_cleanup": True,
+    "burst_exhaustion_result": "deny_or_unknown",
+    "malformed_query_observable": True,
+    "audit_records_redacted": True,
+    "audit_exposes_ue_pointers_raw_params_or_secret_policy": False,
+    "state_public_cache_abi": False,
+    "process_local_owner_scoped": True,
+}
+REQUIRED_SEQUENCE_GATE = {
+    "player_identity_required_before_permission_query": True,
+    "query_result_provenance_required_before_command_response": True,
+    "command_response_dependency_promoted": False,
+    "command_response_contract_required_before_commands_replies": True,
+    "commands_replies_admin_mutation_storage_operator_ingress_allowed": False,
+    "query_result_contains_command_or_reply_handle": False,
+}
 REQUIRED_ARTIFACT_IDENTITY = {
     "artifact_kind": SCHEMA,
     "artifact_status": "candidate_only_pre_abi_contract",
@@ -409,6 +427,8 @@ def build_template_manifest() -> dict[str, Any]:
         "principal_runtime_identity_policy": dict(REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY),
         "dependency_context": dict(REQUIRED_DEPENDENCY_CONTEXT),
         "query_text_policy": dict(REQUIRED_QUERY_TEXT_POLICY),
+        "abuse_policy": dict(REQUIRED_ABUSE_POLICY),
+        "sequence_gate": dict(REQUIRED_SEQUENCE_GATE),
         "fail_closed_cases": [
             {
                 "case": case,
@@ -785,6 +805,30 @@ def validate_query_text_policy(policy: Any, blockers: list[dict[str, Any]]) -> N
             )
 
 
+def validate_abuse_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    validate_exact_mapping(
+        policy,
+        label="$.abuse_policy",
+        required=REQUIRED_ABUSE_POLICY,
+        missing_reason="abuse_policy_missing",
+        fields_reason="abuse_policy_fields_mismatch",
+        invalid_prefix="abuse_policy",
+        blockers=blockers,
+    )
+
+
+def validate_sequence_gate(gate: Any, blockers: list[dict[str, Any]]) -> None:
+    validate_exact_mapping(
+        gate,
+        label="$.sequence_gate",
+        required=REQUIRED_SEQUENCE_GATE,
+        missing_reason="sequence_gate_missing",
+        fields_reason="sequence_gate_fields_mismatch",
+        invalid_prefix="sequence_gate",
+        blockers=blockers,
+    )
+
+
 def validate_exact_mapping(
     value: Any,
     *,
@@ -918,6 +962,8 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     )
     validate_principal_runtime_identity_policy(payload.get("principal_runtime_identity_policy"), blockers)
     validate_query_text_policy(payload.get("query_text_policy"), blockers)
+    validate_abuse_policy(payload.get("abuse_policy"), blockers)
+    validate_sequence_gate(payload.get("sequence_gate"), blockers)
     fail_closed_cases = validate_fail_closed_cases(payload.get("fail_closed_cases"), blockers)
     validate_negative_exclusions(payload.get("negative_surface_exclusions"), blockers)
     validate_promotion_gate(payload.get("promotion_gate"), blockers)

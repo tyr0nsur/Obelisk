@@ -126,6 +126,24 @@ def manifest() -> dict:
             "utf8_decoding_required_before_allow": False,
             "command_parser_claim_allowed": False,
         },
+        "abuse_policy": {
+            "rate_limited_per_plugin_owner_token": True,
+            "budget_cleanup_on_plugin_owner_cleanup": True,
+            "burst_exhaustion_result": "deny_or_unknown",
+            "malformed_query_observable": True,
+            "audit_records_redacted": True,
+            "audit_exposes_ue_pointers_raw_params_or_secret_policy": False,
+            "state_public_cache_abi": False,
+            "process_local_owner_scoped": True,
+        },
+        "sequence_gate": {
+            "player_identity_required_before_permission_query": True,
+            "query_result_provenance_required_before_command_response": True,
+            "command_response_dependency_promoted": False,
+            "command_response_contract_required_before_commands_replies": True,
+            "commands_replies_admin_mutation_storage_operator_ingress_allowed": False,
+            "query_result_contains_command_or_reply_handle": False,
+        },
         "fail_closed_cases": [
             fail_closed_case("stale_principal"),
             fail_closed_case("scope_mismatch"),
@@ -574,6 +592,55 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("query_text_policy_action_max_bytes_invalid", report["blockers"])
         self.assertIn("query_text_policy_resource_scope_required_invalid", report["blockers"])
         self.assertIn("query_text_policy_command_parser_claim_allowed_invalid", report["blockers"])
+
+    def test_rejects_missing_or_weakened_abuse_policy(self) -> None:
+        payload = manifest()
+        payload.pop("abuse_policy")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("abuse_policy_missing", report["blockers"])
+
+        payload = manifest()
+        payload["abuse_policy"]["state_public_cache_abi"] = True
+        payload["abuse_policy"]["audit_exposes_ue_pointers_raw_params_or_secret_policy"] = True
+        payload["abuse_policy"]["burst_exhaustion_result"] = "allow"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("abuse_policy_state_public_cache_abi_invalid", report["blockers"])
+        self.assertIn("abuse_policy_audit_exposes_ue_pointers_raw_params_or_secret_policy_invalid", report["blockers"])
+        self.assertIn("abuse_policy_burst_exhaustion_result_invalid", report["blockers"])
+
+    def test_rejects_missing_or_weakened_sequence_gate(self) -> None:
+        payload = manifest()
+        payload.pop("sequence_gate")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("sequence_gate_missing", report["blockers"])
+
+        payload = manifest()
+        payload["sequence_gate"]["command_response_dependency_promoted"] = True
+        payload["sequence_gate"]["query_result_contains_command_or_reply_handle"] = True
+        payload["sequence_gate"]["commands_replies_admin_mutation_storage_operator_ingress_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("sequence_gate_command_response_dependency_promoted_invalid", report["blockers"])
+        self.assertIn("sequence_gate_query_result_contains_command_or_reply_handle_invalid", report["blockers"])
+        self.assertIn(
+            "sequence_gate_commands_replies_admin_mutation_storage_operator_ingress_allowed_invalid",
+            report["blockers"],
+        )
 
     def test_rejects_principal_or_permission_claim_sources_before_runtime_identity(self) -> None:
         for key, value in (

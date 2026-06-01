@@ -40,13 +40,13 @@ def write_json(root: Path, name: str, payload: dict) -> Path:
 
 
 class PermissionsAdminPublicReadinessTests(unittest.TestCase):
-    def test_accepts_current_permissions_admin_as_planning_only(self) -> None:
+    def test_valid_current_permissions_admin_requires_query_artifact_for_planning_acceptance(self) -> None:
         result = run_checker()
         report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 0)
         self.assertTrue(report["valid"])
-        self.assertTrue(report["accepted_for_planning"])
+        self.assertFalse(report["accepted_for_planning"])
         self.assertTrue(report["planning_only"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_header_allowed"])
@@ -69,6 +69,7 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             result = run_checker("--query-failclosed-artifact", str(manifest_path))
             report = json.loads(result.stdout)
             self.assertEqual(result.returncode, 0)
+            self.assertTrue(report["accepted_for_planning"])
             self.assertEqual(
                 report["query_failclosed_artifact_schema"],
                 "obelisk.permissions-admin-query-failclosed-contract.v1",
@@ -87,10 +88,49 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             result = run_checker("--query-failclosed-artifact", str(report_path))
             report = json.loads(result.stdout)
             self.assertEqual(result.returncode, 0)
+            self.assertTrue(report["accepted_for_planning"])
             self.assertEqual(
                 report["query_failclosed_artifact_schema"],
                 "obelisk.permissions-admin-query-failclosed-contract-check.v1",
             )
+
+    def test_rejects_missing_abuse_rate_limit_audit_requirements(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            for item in decisions["required_before_public_header"]:
+                if item["id"] == "abuse.query_rate_limit_and_audit_gate":
+                    item["required_behavior"] = [
+                        entry
+                        for entry in item["required_behavior"]
+                        if entry != "rate-limit state is not a public cache ABI"
+                    ]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("abuse_rate_limit_audit_requirements_missing", report["blockers"])
+
+    def test_rejects_missing_separation_sequence_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            for item in decisions["required_before_public_header"]:
+                if item["id"] == "separation.no_commands_replies_or_admin_mutation":
+                    item["v1_sequence_gate"] = [
+                        entry
+                        for entry in item["v1_sequence_gate"]
+                        if entry != "query-only permission result provenance is required before command response"
+                    ]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("separation_sequence_gate_requirements_missing", report["blockers"])
 
     def test_rejects_public_contract_and_header_overclaims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

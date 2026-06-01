@@ -194,6 +194,39 @@ REQUIRED_POLICY_AUTHORITY_BEHAVIOR = frozenset(
         "plugin input cannot self-attest authority provenance",
     )
 )
+REQUIRED_ABUSE_BEHAVIOR = frozenset(
+    (
+        "permission queries are rate-limited per plugin owner token",
+        "permission query budgets and audit counters are invalidated by plugin owner cleanup",
+        "burst exhaustion returns deny or unknown, never allow",
+        "abuse counters are process-local and owner-scoped",
+        "repeated malformed queries are observable through runtime logs or counters",
+        "audit records must not expose UE pointers, raw params, or secret policy contents",
+        "rate-limit state is not a public cache ABI",
+    )
+)
+REQUIRED_SEPARATION_SEQUENCE_GATE = frozenset(
+    (
+        "promoted player identity is required before permission checks",
+        "query-only permission result provenance is required before command response",
+        "command response privacy, generation, and scope policy is required before commands/replies",
+        "commands/replies cannot imply permission groups, admin mutation, storage, or operator ingress",
+    )
+)
+REQUIRED_SEPARATION_EXCLUSIONS = frozenset(
+    (
+        "command router",
+        "command/chat response path",
+        "replies/send-chat",
+        "moderation",
+        "ban/kick",
+        "admin actions",
+        "groups/grants",
+        "permission cache ABI",
+        "storage/persistence",
+        "operator ingress",
+    )
+)
 REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT = frozenset(
     (
         "capability_gated",
@@ -468,6 +501,36 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
                 "policy_authority_fail_closed_requirements_missing",
                 "$.required_before_public_header[policy.authority_provenance_required].required_behavior",
             )
+    abuse = by_id.get("abuse.query_rate_limit_and_audit_gate")
+    abuse_behavior = abuse.get("required_behavior") if isinstance(abuse, dict) else None
+    if not isinstance(abuse_behavior, list) or not REQUIRED_ABUSE_BEHAVIOR.issubset(set(abuse_behavior)):
+        add(
+            blockers,
+            "abuse_rate_limit_audit_requirements_missing",
+            "$.required_before_public_header[abuse.query_rate_limit_and_audit_gate].required_behavior",
+        )
+    separation = by_id.get("separation.no_commands_replies_or_admin_mutation")
+    if not isinstance(separation, dict):
+        add(
+            blockers,
+            "separation_no_commands_replies_or_admin_mutation_missing",
+            "$.required_before_public_header[separation.no_commands_replies_or_admin_mutation]",
+        )
+    else:
+        sequence = separation.get("v1_sequence_gate")
+        if not isinstance(sequence, list) or not REQUIRED_SEPARATION_SEQUENCE_GATE.issubset(set(sequence)):
+            add(
+                blockers,
+                "separation_sequence_gate_requirements_missing",
+                "$.required_before_public_header[separation.no_commands_replies_or_admin_mutation].v1_sequence_gate",
+            )
+        exclusions = separation.get("required_exclusions")
+        if not isinstance(exclusions, list) or not REQUIRED_SEPARATION_EXCLUSIONS.issubset(set(exclusions)):
+            add(
+                blockers,
+                "separation_required_exclusions_missing",
+                "$.required_before_public_header[separation.no_commands_replies_or_admin_mutation].required_exclusions",
+            )
     fail_closed = next(
         (
             item
@@ -671,7 +734,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "schema": REPORT_SCHEMA,
         "surface": SURFACE,
         "valid": not blockers,
-        "accepted_for_planning": not blockers,
+        "accepted_for_planning": not blockers and query_artifact_schema is not None,
         "planning_only": True,
         "promotion_ready": False,
         "public_header_allowed": False,
