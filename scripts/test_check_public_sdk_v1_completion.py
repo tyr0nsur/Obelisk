@@ -504,8 +504,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_reply_or_send_chat_abi_allowed": True,
                         "public_reply_api": True,
                         "public_send_chat_api": True,
+                        "public_reply_abi_allowed": True,
+                        "public_send_chat_abi_allowed": True,
+                        "reply_send_chat_router_claims_allowed": True,
+                        "public_abi_allowed": True,
+                        "permissions_admin_ready": True,
+                        "permissions_ready": True,
+                        "permission_ready": True,
                         "reply_allowed": True,
                         "send_chat_allowed": True,
+                        "notes": [
+                            "send-chat ABI is public and ready",
+                            "command routing is public and ready",
+                            "permissions/admin is public and ready",
+                            "replies API is public and ready",
+                        ],
                     }
                 ],
             }
@@ -515,8 +528,19 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].public_reply_or_send_chat_abi_allowed", claims)
         self.assertIn("checks[0].public_reply_api", claims)
         self.assertIn("checks[0].public_send_chat_api", claims)
+        self.assertIn("checks[0].public_reply_abi_allowed", claims)
+        self.assertIn("checks[0].public_send_chat_abi_allowed", claims)
+        self.assertIn("checks[0].reply_send_chat_router_claims_allowed", claims)
+        self.assertIn("checks[0].public_abi_allowed", claims)
+        self.assertIn("checks[0].permissions_admin_ready", claims)
+        self.assertIn("checks[0].permissions_ready", claims)
+        self.assertIn("checks[0].permission_ready", claims)
         self.assertIn("checks[0].reply_allowed", claims)
         self.assertIn("checks[0].send_chat_allowed", claims)
+        self.assertIn("checks[0].notes[0]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[1]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[2]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[3]:positive_text_claim", claims)
 
     def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4060,6 +4084,95 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertTrue(
             outcome_by_surface["obelisk.player_identity.v1"]["unresolved_for_complete_sdk_claim"]
         )
+
+    def test_p0_progress_does_not_count_surface_when_promoted_dependency_lacks_evidence(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PermissionsAdminPromotion",
+            ) as permissions_core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="permissions_admin_promotion",
+            ) as permissions_sdk_dir,
+        ):
+            permissions_core_test = Path(permissions_core_dir) / "PermissionsAdminPromotionTests.cpp"
+            permissions_sdk_test = Path(permissions_sdk_dir) / "permissions_admin_promotion_plugin.c"
+            permissions_core_test.write_text("// promoted permissions admin ABI placeholder\n", encoding="utf-8")
+            permissions_sdk_test.write_text("// promoted permissions admin SDK placeholder\n", encoding="utf-8")
+
+            manifest, release_statement = complete_excluded_manifest()
+            promoted_ids = {"obelisk.player_identity.v1", "obelisk.permissions_admin.v1"}
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": ["scripts/test_check_player_identity_first_evidence_readiness.py"],
+                        "sdk_consumer_tests": ["scripts/test_check_player_identity_first_evidence_readiness.py"],
+                    }
+                if surface["id"] == "obelisk.permissions_admin.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.CheckPermissionWithCopiedPrincipal"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.permissions_admin.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(permissions_core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(permissions_sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "query-only fail-closed permission checks over copied principals",
+                            "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+                            "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+                            "promoted copied principal semantics",
+                        ],
+                    }
+            for surface_id in promoted_ids:
+                if surface_id not in manifest["promoted_surfaces"]:
+                    manifest["promoted_surfaces"].append(surface_id)
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id not in promoted_ids
+            ]
+            release_statement = "\n".join(
+                (
+                    f"{surface_id}: promoted - reviewed ABI and SDK evidence."
+                    if surface_id in promoted_ids
+                    else line
+                )
+                for line in release_statement.splitlines()
+                for surface_id in [line.split(":", 1)[0]]
+            ) + "\n"
+
+            manifest_path = Path(permissions_core_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(permissions_core_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        progress = payload["v1_sdk_progress"]
+        self.assertEqual(progress["completion_blockers_promoted_count"], 0)
+        self.assertEqual(progress["p0_chain_promoted_count"], 0)
+        self.assertEqual(progress["complete_sdk_claim_progress_percent"], 0)
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        self.assertFalse(outcome_by_surface["obelisk.player_identity.v1"]["promotion_evidence_satisfied"])
+        self.assertFalse(outcome_by_surface["obelisk.permissions_admin.v1"]["dependency_claims_satisfied"])
+        self.assertFalse(outcome_by_surface["obelisk.permissions_admin.v1"]["counts_toward_complete_sdk_claim"])
 
     def test_planning_completion_blocker_requires_exclusion_contract(self) -> None:
         manifest, _ = complete_excluded_manifest()

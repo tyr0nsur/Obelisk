@@ -1721,6 +1721,31 @@ def collect_candidate_public_overclaims(
     return found
 
 
+def collect_promoted_status_overclaims(
+    value: object,
+    *,
+    allowed_prefixes: tuple[str, ...] = (),
+) -> list[tuple[str, str]]:
+    promoted_status_keys = {
+        "promotion_status",
+        "readiness_status",
+        "release_status",
+        "sdk_status",
+        "status",
+    }
+    found: list[tuple[str, str]] = []
+    for trail, raw_value in collect_string_fields(value):
+        if any(trail.startswith(prefix) for prefix in allowed_prefixes):
+            continue
+        key = trail.rsplit(".", 1)[-1]
+        if key not in promoted_status_keys:
+            continue
+        normalized = raw_value.casefold().replace("_", "-").strip()
+        if normalized in {"promoted", "promotion-ready", "public-sdk-ready", "ready", "runtime-ready"}:
+            found.append((trail, raw_value))
+    return found
+
+
 def collect_source_artifact_id_values(source_artifact_ids: list[object]) -> tuple[dict[str, list[str]], list[dict[str, Any]]]:
     parsed_source_ids: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
     blockers: list[dict[str, Any]] = []
@@ -6121,6 +6146,11 @@ def validate_structure_aggregate_census_policy_slice_manifest(payload: dict[str,
         allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
     ):
         blockers.append({"reason": f"structure_aggregate_policy_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    for trail, _ in collect_promoted_status_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
+    ):
+        blockers.append({"reason": "structure_aggregate_policy_promotion_status_overclaim", "label": f"{label}:{trail}"})
     for trail, raw_value in collect_string_fields(payload):
         text = raw_value.casefold()
         if (

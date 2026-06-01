@@ -40,6 +40,43 @@ ALLOWED_CRITICAL_PATH_BLOCKERS = {
     "identity_public_contract_gate",
     "identity_public_contract_gate_missing",
 }
+FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
+    "promotion_ready",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "public_abi_allowed",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_readiness_ready",
+    "public_command_router_allowed",
+    "public_reply_or_send_chat_abi_allowed",
+    "public_reply_abi_allowed",
+    "public_send_chat_abi_allowed",
+    "reply_send_chat_router_claims_allowed",
+    "public_reply_api",
+    "public_send_chat_api",
+    "reply_allowed",
+    "reply_api_allowed",
+    "reply_abi_allowed",
+    "send_chat_allowed",
+    "send_chat_api_allowed",
+    "permissions_admin_ready",
+    "permissions_ready",
+    "permission_ready",
+    "command_router_allowed",
+    "runtime_delivery_allowed",
+    "runtime_readiness_allowed",
+    "public_response_path_allowed",
+    "v1_completion_evidence",
+}
+POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_TERMS = (
+    "command routing is public and ready",
+    "permissions/admin is public and ready",
+    "replies api is public and ready",
+    "reply api is public and ready",
+    "send-chat abi is public and ready",
+    "send chat abi is public and ready",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -147,6 +184,28 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
     ]
 
 
+def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]:
+    claims: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}" if path else str(key)
+            if key in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and item is True:
+                claims.append(item_path)
+            if key == "public_or_runtime_claims" and isinstance(item, list):
+                for claim in item:
+                    if isinstance(claim, str) and claim:
+                        claims.append(f"{item_path}:{claim}")
+            claims.extend(collect_public_or_runtime_claims(item, path=item_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            claims.extend(collect_public_or_runtime_claims(item, path=f"{path}[{index}]"))
+    elif isinstance(value, str):
+        text = value.casefold()
+        if any(term in text for term in POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_TERMS):
+            claims.append(f"{path}:positive_text_claim")
+    return sorted(set(claims))
+
+
 def run_check(name: str, argv: list[str]) -> dict[str, Any]:
     command = [sys.executable, str(SCRIPT_DIR / argv[0]), *argv[1:]]
     result = subprocess.run(command, cwd=REPO_ROOT, check=False, capture_output=True, text=True)
@@ -164,26 +223,7 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
 
     public_or_runtime_claims = []
     if report is not None:
-        for key in (
-            "promotion_ready",
-            "public_sdk_ready",
-            "public_abi_ready",
-            "runtime_ready",
-            "public_header_allowed",
-            "public_readiness_ready",
-            "public_command_router_allowed",
-            "public_reply_or_send_chat_abi_allowed",
-            "reply_api_allowed",
-            "reply_abi_allowed",
-            "send_chat_api_allowed",
-            "command_router_allowed",
-            "runtime_delivery_allowed",
-            "runtime_readiness_allowed",
-            "public_response_path_allowed",
-            "v1_completion_evidence",
-        ):
-            if report.get(key) is True:
-                public_or_runtime_claims.append(key)
+        public_or_runtime_claims = collect_public_or_runtime_claims(report)
 
     report_schema = report.get("schema") if report is not None else None
     expected_schema = EXPECTED_ROUTE_CHECK_SCHEMAS.get(name)

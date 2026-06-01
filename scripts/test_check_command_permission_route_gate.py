@@ -272,6 +272,51 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             report["blockers"],
         )
 
+    def test_run_check_recursively_rejects_subreport_public_alias_and_text_claims(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            report = {
+                "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["commands_replies_public_readiness"],
+                "valid": True,
+                "nested": {
+                    "public_reply_abi_allowed": True,
+                    "public_send_chat_abi_allowed": True,
+                    "reply_send_chat_router_claims_allowed": True,
+                    "public_abi_allowed": True,
+                    "permissions_admin_ready": True,
+                    "notes": [
+                        "send-chat ABI is public and ready",
+                        "command routing is public and ready",
+                        "permissions/admin is public and ready",
+                        "replies API is public and ready",
+                    ],
+                },
+            }
+            return subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=json.dumps(report),
+                stderr="",
+            )
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("commands_replies_public_readiness", ["unused.py", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertIn("nested.public_reply_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.public_send_chat_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.reply_send_chat_router_claims_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.public_abi_allowed", result["public_or_runtime_claims"])
+        self.assertIn("nested.permissions_admin_ready", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[0]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[1]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[2]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[3]:positive_text_claim", result["public_or_runtime_claims"])
+
 
 if __name__ == "__main__":
     unittest.main()

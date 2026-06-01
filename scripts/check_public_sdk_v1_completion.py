@@ -123,11 +123,15 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "promotion_ready",
     "public_sdk_ready",
     "public_abi_ready",
+    "public_abi_allowed",
     "runtime_ready",
     "public_header_allowed",
     "public_readiness_ready",
     "public_command_router_allowed",
     "public_reply_or_send_chat_abi_allowed",
+    "public_reply_abi_allowed",
+    "public_send_chat_abi_allowed",
+    "reply_send_chat_router_claims_allowed",
     "public_reply_api",
     "public_send_chat_api",
     "reply_allowed",
@@ -135,6 +139,9 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "reply_abi_allowed",
     "send_chat_allowed",
     "send_chat_api_allowed",
+    "permissions_admin_ready",
+    "permissions_ready",
+    "permission_ready",
     "command_router_allowed",
     "runtime_delivery_allowed",
     "runtime_readiness_allowed",
@@ -146,6 +153,7 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"\b(?:"
     r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
+    r"send[-\s]?chat\s+abi|command\s+routing|permissions/admin|replies\s+api|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
     r")\b.{0,80}\b(?:is|are|now|becomes?|became)?\s*"
@@ -1737,6 +1745,7 @@ def completion_blocker_outcome_rows(
     release_statement_text: str | None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    counts_by_surface: dict[str, bool] = {}
     for index, surface_id in enumerate(completion_blockers, start=1):
         surface = surfaces_by_id.get(surface_id, {})
         status = surface.get("status", "missing")
@@ -1744,6 +1753,7 @@ def completion_blocker_outcome_rows(
         manifest_outcome = status if status in {"promoted", "post-v1", "excluded"} else None
         release_statement_outcome = release_statement_recorded_outcome(release_statement_text, surface_id)
         promotion_evidence_satisfied = bool(surface) and status == "promoted" and surface_has_promotion_evidence(surface)
+        missing_required_terms = surface_missing_required_promotion_evidence(surface)
         release_statement_contract_satisfied = False
         if status == "promoted":
             release_statement_contract_satisfied = release_statement_outcome == "promoted"
@@ -1759,11 +1769,23 @@ def completion_blocker_outcome_rows(
             is_p0_dependency_chain
             and manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
         )
+        dependency_claims_satisfied = True
+        dependency_ids = as_string_list(surface.get("depends_on")) if surface else []
+        for required_dependency_id in REQUIRED_PROMOTED_SURFACE_DEPENDENCIES.get(surface_id, ()):
+            if required_dependency_id not in dependency_ids:
+                dependency_ids.append(required_dependency_id)
+        for dependency_id in dependency_ids:
+            if dependency_id in completion_blockers and counts_by_surface.get(dependency_id) is not True:
+                dependency_claims_satisfied = False
+                break
         counts_toward_complete_sdk_claim = (
             promotion_evidence_satisfied
+            and not missing_required_terms
             and release_statement_contract_satisfied
             and manifest_outcome == "promoted"
+            and dependency_claims_satisfied
         )
+        counts_by_surface[surface_id] = counts_toward_complete_sdk_claim
         rows.append(
             {
                 "surface": surface_id,
@@ -1776,6 +1798,9 @@ def completion_blocker_outcome_rows(
                 "release_statement_contract_satisfied": release_statement_contract_satisfied,
                 "required_release_statement_outcomes": required_outcomes,
                 "promotion_evidence_satisfied": promotion_evidence_satisfied,
+                "required_promotion_evidence_terms_satisfied": not missing_required_terms,
+                "missing_required_promotion_evidence_terms": missing_required_terms,
+                "dependency_claims_satisfied": dependency_claims_satisfied,
                 "scoped_non_complete_outcome_only": scoped_non_complete_outcome_only,
                 "counts_toward_complete_sdk_claim": counts_toward_complete_sdk_claim,
                 "unresolved_for_complete_sdk_claim": not counts_toward_complete_sdk_claim,

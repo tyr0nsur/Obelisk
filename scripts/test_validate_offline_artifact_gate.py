@@ -6817,6 +6817,21 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_aggregate_policy_surface_overclaim_runtime_hooks_ready", reasons)
         self.assertIn("structure_aggregate_policy_surface_overclaim_v1_complete", reasons)
 
+    def test_blocks_structure_aggregate_census_policy_slice_promoted_status_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-aggregate-policy.json"
+            payload = structure_aggregate_census_policy_slice_manifest()
+            payload["promotion_status"] = "promoted"
+            payload["nested_claim"] = {"readiness_status": "ready"}
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_aggregate_policy_promotion_status_overclaim", reasons)
+
     def test_accepts_players_identity_first_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
