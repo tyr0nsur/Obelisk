@@ -266,7 +266,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             with self.subTest(function_name=function_name):
                 body = extract_function_body(
                     text,
-                    rf"void {function_name}\(.*?\)",
+                    rf"(?:void|bool) {function_name}\(.*?\)",
                 )
                 self.assertIn("SafeLog", body)
                 self.assertNotIn("OBELISK_INFO", body)
@@ -349,24 +349,29 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIsNotNone(match)
         body = match.group("body")
 
-        for token in (
-            "CallPluginShutdown(plugin.name, plugin.shutdown)",
-            "SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name)",
-        ):
-            with self.subTest(token=token):
-                token_index = body.find(token)
-                self.assertNotEqual(token_index, -1)
-                preceding = body[max(0, token_index - 120):token_index]
-                following = body[token_index:token_index + 420]
-                self.assertIn("try", preceding)
-                self.assertIn("catch", following)
-                self.assertIn("SafeLogErrorNoThrow", following)
+        shutdown_token = "CallPluginShutdown(plugin.name, plugin.shutdown)"
+        shutdown_index = body.find(shutdown_token)
+        self.assertNotEqual(shutdown_index, -1)
+        shutdown_preceding = body[max(0, shutdown_index - 120):shutdown_index]
+        shutdown_following = body[shutdown_index:shutdown_index + 420]
+        self.assertIn("try", shutdown_preceding)
+        self.assertIn("catch", shutdown_following)
+        self.assertIn("SafeLogErrorNoThrow", shutdown_following)
+
+        close_token = "SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name)"
+        close_index = body.find(close_token)
+        self.assertNotEqual(close_index, -1)
+        self.assertIn("if (!", body[max(0, close_index - 16):close_index])
+        self.assertLess(close_index, body.index("RemoveLoadedPluginOwner(plugin.owner)"))
+        close_following = body[close_index:close_index + 360]
+        self.assertIn("retainedPlugins.push_back(plugin)", close_following)
+        self.assertIn("continue", close_following)
 
     def test_unload_cleanup_failure_retains_plugin_without_dlclose(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         body = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
         failure_match = re.search(
-            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*try\s*\{\s*RemoveLoadedPluginOwner",
+            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
             body,
             re.S,
         )

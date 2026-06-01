@@ -29,6 +29,7 @@ COMMAND_CHAT_RESPONSE_PUBLIC_CONTRACT_DECISIONS = (
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PLUGIN_HUB_PACKAGE_TEMPLATE_DOC = REPO_ROOT / "docs" / "PLUGIN_HUB_PACKAGE_TEMPLATE.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+AGENT_SKILL_FILES = sorted((REPO_ROOT / "agent-skills").glob("*/SKILL.md"))
 PUBLIC_DOC_FILES = [
     REPO_ROOT / "README.md",
     REPO_ROOT / "CONTRIBUTING.md",
@@ -463,7 +464,7 @@ BROAD_V1_COMPLETION_CLAIM_FILES = [
     REPO_ROOT / "examples" / "README.md",
     REPO_ROOT / "examples" / "sdk_minimal_plugin" / "README.md",
     REPO_ROOT / "examples" / "sdk_timer_plugin" / "README.md",
-    REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md",
+    *AGENT_SKILL_FILES,
 ]
 BROAD_V1_COMPLETION_POSITIVE_RE = re.compile(
     r"\b(?:"
@@ -5125,6 +5126,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         scanned_files = [
             *PUBLIC_SDK_GUIDANCE_DOC_FILES,
+            *AGENT_SKILL_FILES,
             PUBLIC_SDK_V1_COMPATIBILITY_DOC,
             REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",
             REPO_ROOT / "docs" / "agent-handoff" / "COMPACT_CONTEXT.md",

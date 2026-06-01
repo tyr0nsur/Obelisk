@@ -192,9 +192,15 @@ namespace Obelisk::Core
                 return handle;
             }
 
-            void Close(void* handle) override
+            bool Close(void* handle, std::string& error) override
             {
-                dlclose(handle);
+                dlerror();
+                if (dlclose(handle) == 0)
+                    return true;
+
+                const char* closeError = dlerror();
+                error = closeError ? closeError : "unknown dlclose error";
+                return false;
             }
         };
 
@@ -496,22 +502,31 @@ namespace Obelisk::Core
             }
         }
 
-        void SafeCloseLibrary(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
+        bool SafeCloseLibrary(PluginManager::LibraryLoader& loader, void* handle, const std::string& pluginName)
         {
             if (!handle)
-                return;
+                return true;
 
             try
             {
-                loader.Close(handle);
+                std::string closeError;
+                if (loader.Close(handle, closeError))
+                    return true;
+
+                SafeLogErrorNoThrow(
+                    ("Plugin " + pluginName + " library close failed").c_str(),
+                    closeError.empty() ? "unknown close failure" : closeError.c_str());
+                return false;
             }
             catch (const std::exception& e)
             {
                 SafeLogErrorNoThrow(("Plugin " + pluginName + " threw while closing library handle").c_str(), e.what());
+                return false;
             }
             catch (...)
             {
                 SafeLogErrorNoThrow(("Plugin " + pluginName + " threw an unknown exception while closing library handle").c_str());
+                return false;
             }
         }
 
@@ -2755,6 +2770,15 @@ namespace Obelisk::Core
                 continue;
             }
 
+            if (!SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name))
+            {
+                SafeLogErrorNoThrow(
+                    "Plugin library close failed during unload; retaining plugin for retry",
+                    plugin.name.c_str());
+                retainedPlugins.push_back(plugin);
+                continue;
+            }
+
             try
             {
                 RemoveLoadedPluginOwner(plugin.owner);
@@ -2805,19 +2829,6 @@ namespace Obelisk::Core
             catch (...)
             {
                 SafeLogErrorNoThrow("Failed to clear plugin owner unloading with unknown exception");
-            }
-
-            try
-            {
-                SafeCloseLibrary(*m_Loader, plugin.handle, plugin.name);
-            }
-            catch (const std::exception& e)
-            {
-                SafeLogErrorNoThrow("Failed to close plugin library during unload", e.what());
-            }
-            catch (...)
-            {
-                SafeLogErrorNoThrow("Failed to close plugin library during unload with unknown exception");
             }
         }
         std::reverse(retainedPlugins.begin(), retainedPlugins.end());

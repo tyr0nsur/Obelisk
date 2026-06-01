@@ -1044,7 +1044,7 @@ namespace
             return static_cast<FakePlugin*>(handle)->owner;
         }
 
-        void Close(void* handle) override
+        bool Close(void* handle, std::string&) override
         {
             auto* plugin = static_cast<FakePlugin*>(handle);
             if (plugin->chatDispatcher)
@@ -1079,6 +1079,7 @@ namespace
                 plugin->orderLog->push_back("close:" + plugin->filename);
             if (plugin->throwOnClose)
                 throw std::runtime_error("fake close failure");
+            return true;
         }
 
     private:
@@ -5623,10 +5624,11 @@ namespace
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
         manager.UnloadAll();
+        pluginB.throwOnClose = false;
         manager.UnloadAll();
 
         Require(pluginA.closeCalls == 1, "unload did not continue after later plugin close threw");
-        Require(pluginB.closeCalls == 1, "throwing plugin close was repeated after unload");
+        Require(pluginB.closeCalls == 2, "throwing plugin close was not retained for retry");
 
         CleanupPlugin(pluginA);
         CleanupPlugin(pluginB);

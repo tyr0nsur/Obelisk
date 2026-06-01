@@ -16,7 +16,7 @@ namespace Obelisk::Core
             virtual void* Open(const std::filesystem::path& path, std::string& error) = 0;
             virtual void* Resolve(void* handle, const char* symbolName, std::string& error) = 0;
             virtual void* GetSymbolOwner(void* handle, void* symbol) = 0;
-            virtual void Close(void* handle) = 0;
+            virtual bool Close(void* handle, std::string& error) = 0;
         };
 
         static PluginManager& Get();
