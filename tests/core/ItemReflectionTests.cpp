@@ -374,6 +374,8 @@ namespace
         Require(invocation.FunctionNameIndex == kAllowEquipItemNameIndex, "AllowEquipItem function index mismatch");
         Require(invocation.OuterNameIndex == kPrimalItemNameIndex, "AllowEquipItem outer index mismatch");
         Require(invocation.HasParameterRanges, "AllowEquipItem did not report provided params");
+        Require(invocation.ParamData == fixture.Params.data(), "AllowEquipItem params provenance data mismatch");
+        Require(invocation.ParamSize == 0x09, "AllowEquipItem params provenance size mismatch");
         Require(invocation.Fields.size() == 2, "AllowEquipItem field count mismatch");
         RequireFieldMetadata(invocation.Fields[0],
                              ItemReflection::ItemField::ToInventory,
@@ -410,6 +412,9 @@ namespace
 
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == ItemReflection::ItemFunction::CanRepair, "CanRepair kind mismatch");
+        Require(invocation.HasParameterRanges, "CanRepair did not report provided params");
+        Require(invocation.ParamData == fixture.Params.data(), "CanRepair params provenance data mismatch");
+        Require(invocation.ParamSize == 0x02, "CanRepair params provenance size mismatch");
         Require(invocation.Fields.size() == 2, "CanRepair field count mismatch");
         RequireFieldMetadata(invocation.Fields[0],
                              ItemReflection::ItemField::BIgnoreInventoryRequirement,
@@ -448,6 +453,9 @@ namespace
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == ItemReflection::ItemFunction::CraftBlueprint,
                 "CraftBlueprint kind mismatch");
+        Require(invocation.HasParameterRanges, "CraftBlueprint did not report provided params");
+        Require(invocation.ParamData == fixture.Params.data(), "CraftBlueprint params provenance data mismatch");
+        Require(invocation.ParamSize == 0x01, "CraftBlueprint params provenance size mismatch");
         Require(invocation.Fields.size() == 1, "CraftBlueprint field count mismatch");
         RequireFieldMetadata(invocation.Fields[0],
                              ItemReflection::ItemField::BConsumeResources,
@@ -478,6 +486,9 @@ namespace
         Require(static_cast<bool>(result), result.Reason.c_str());
         Require(invocation.Function == ItemReflection::ItemFunction::UseItemOntoItem,
                 "UseItemOntoItem kind mismatch");
+        Require(invocation.HasParameterRanges, "UseItemOntoItem did not report provided params");
+        Require(invocation.ParamData == fixture.Params.data(), "UseItemOntoItem params provenance data mismatch");
+        Require(invocation.ParamSize == 0x0d, "UseItemOntoItem params provenance size mismatch");
         Require(invocation.Fields.size() == 3, "UseItemOntoItem field count mismatch");
         RequireFieldMetadata(invocation.Fields[0],
                              ItemReflection::ItemField::DestinationItem,
@@ -546,6 +557,8 @@ namespace
 
             Require(static_cast<bool>(result), result.Reason.c_str());
             Require(!invocation.HasParameterRanges, "null params should produce metadata-only CanRepair invocation");
+            Require(invocation.ParamData == nullptr, "null params should clear CanRepair provenance data");
+            Require(invocation.ParamSize == 0, "null params should clear CanRepair provenance size");
             Require(invocation.Fields.size() == 2, "metadata-only CanRepair field count mismatch");
             for (const ItemReflection::ItemFieldRange& field : invocation.Fields)
             {
@@ -568,6 +581,10 @@ namespace
             Require(static_cast<bool>(result), result.Reason.c_str());
             Require(!invocation.HasParameterRanges,
                     "null params should produce metadata-only UseItemOntoItem invocation");
+            Require(invocation.ParamData == nullptr,
+                    "null params should clear UseItemOntoItem provenance data");
+            Require(invocation.ParamSize == 0,
+                    "null params should clear UseItemOntoItem provenance size");
             Require(invocation.Fields.size() == 3, "metadata-only UseItemOntoItem field count mismatch");
             for (const ItemReflection::ItemFieldRange& field : invocation.Fields)
             {

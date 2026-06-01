@@ -59,6 +59,15 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   progress. Inventory copied-signal stability now has a standalone offline checker for the
   exact five allowed copied signals, category-only `resource_kind`, and no Inventory SDK,
   Items SDK, lookup, mutation, `AdditionalData`, or `ResourceHandle` claims.
+- Latest copied-signal integration hardening: the v1 completion checker now composes the
+  inventory/item copied-signal stability checker and rejects any drift that makes it public
+  SDK or v1-completion evidence. It also rejects nested public/runtime claims reported by
+  the command/permission route gate. Item-return copied bool observations now carry
+  borrowed params provenance internally and require copied `ReturnValue` ranges to point
+  exactly at `ParamData + reflected_offset` with the exact reflected `ParmsSize`, matching
+  the inventory copied-scalar provenance pattern. This does not promote Inventory SDK,
+  Items SDK, lookup, mutation, `ResourceHandle`, return override, runtime readiness, or v1
+  completion.
 
 ## Hard Overrides
 
@@ -232,6 +241,18 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   five copied signals remain aligned across decisions, public gameplay events, and the
   public header. This does not promote Inventory SDK, Items SDK, identity, mutation, return
   override, runtime readiness, or v1 completion.
+- Next offline-only inventory/items patch should continue tightening copied-signal and
+  redacted observer boundaries, especially `scripts/check_inventory_action_redacted_observer_gate.py`
+  and `scripts/check_inventory_action_fixture_boundary.py`, while preserving
+  `InventoryReflection` action targets as `ExposesRange=false`. Do not convert
+  `AdditionalData` into public copied range, dispatch, Inventory SDK, Items SDK, lookup,
+  mutation, return override, or v1 completion evidence.
+- `command-chat-response-route-planning` already has documented distinct second-source
+  planning evidence under
+  `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
+  for `ClientServerChatDirectMessage`, `ClientServerChatMessage`, and `ClientChatMessage`
+  with 3/3 second-source accepted. Reverify that root offline if needed, but do not treat
+  it as public reply/send-chat ABI, command router, runtime readiness, or v1 completion.
 - Mission copied-bool, buff scalar, structure census/build-policy, operator ingress/storage,
   and mission/transfer/dino/tribe/buff-status accounting stay internal, planning-only, or
   consume-only until their own copied ABI, redaction, lifecycle, and promotion gates exist.

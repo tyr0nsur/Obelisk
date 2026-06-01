@@ -2,11 +2,11 @@
 
 Obelisk is a Linux-native runtime, C API, and SDK track for ARK: Survival
 Evolved server modders on Linux. It uses UE4 reflection and `ProcessEvent`
-evidence to promote copied, stable plugin-facing APIs without ArkApi/Windows ABI
+evidence to promote copied, scoped plugin-facing APIs without ArkApi/Windows ABI
 assumptions.
 
 It aims to bring familiar ARK plugin concepts to Linux as an Obelisk-native SDK:
-runtime injection, UE event hooks, a stable plugin ABI, reflection-driven
+runtime injection, UE event hooks, a scoped core plugin ABI, reflection-driven
 research tooling, and promoted gameplay APIs with explicit ownership, privacy,
 and lifecycle gates. ArkServerApi/AseApi and popular plugin families are names and demand
 signals only. They are not architecture or ergonomics sources, behavior maps, porting

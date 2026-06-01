@@ -199,6 +199,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("non_promoted_surface_has_public_contract", payload["blockers"])
         self.assertIn("obelisk.player_identity.v1", payload["unresolved_completion_blockers"])
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
+        inventory_stability = payload["inventory_copied_signals_stability"]
+        self.assertEqual(
+            inventory_stability["schema"],
+            "obelisk.inventory-item-copied-signals-stability-check.v1",
+        )
+        self.assertTrue(inventory_stability["ready"])
+        self.assertEqual(inventory_stability["allowed_signal_count"], 5)
+        self.assertEqual(inventory_stability["resource_kind_contract"], "category-only metadata")
+        self.assertFalse(inventory_stability["public_sdk_ready"])
+        self.assertFalse(inventory_stability["v1_completion_ready"])
+        self.assertNotIn("inventory_copied_signals_stability_invalid", payload["blockers"])
         progress = payload["v1_sdk_progress"]
         self.assertEqual(progress["completion_blocker_total"], 12)
         self.assertEqual(progress["completion_blockers_promoted_count"], 0)
@@ -248,6 +259,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.mission_transfer_dino_tribe.v1",
             ],
         )
+
         self.assertEqual(
             payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing"],
             [
@@ -339,6 +351,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertIn("prioritizes work only", sections["next_v1_work"]["non_claim"])
 
+    def test_inventory_copied_signal_stability_checker_is_required(self) -> None:
+        result = self.run_checker(
+            "--inventory-copied-signals-stability",
+            "/tmp/obelisk-missing-inventory-copied-signals-checker.py",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("inventory_copied_signals_stability_output_invalid", payload["blockers"])
+        self.assertEqual(
+            payload["inventory_copied_signals_stability"]["path"],
+            "/tmp/obelisk-missing-inventory-copied-signals-checker.py",
+        )
+        self.assertEqual(payload["inventory_copied_signals_stability"]["exit_code"], 2)
+
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)
 
@@ -350,6 +379,52 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
         self.assertIn("obelisk.chat_message.v1", result.stdout)
         self.assertIn("Use --json for the full machine-readable report.", result.stdout)
+
+    def test_completion_gate_rejects_route_gate_public_or_runtime_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = Path(temp_dir) / "fake_route_gate.py"
+            route_gate_path.write_text(
+                "import json\n"
+                "print(json.dumps({\n"
+                "    'schema': 'obelisk.command-permission-route-gate-check.v1',\n"
+                "    'valid': True,\n"
+                "    'accepted_for_planning': True,\n"
+                "    'planning_only': True,\n"
+                "    'promotion_ready': False,\n"
+                "    'public_sdk_ready': False,\n"
+                "    'public_abi_ready': False,\n"
+                "    'runtime_ready': False,\n"
+                "    'public_header_allowed': False,\n"
+                "    'checks': [{\n"
+                "        'name': 'command_chat_response_public_readiness',\n"
+                "        'public_or_runtime_claims': ['reply_api_allowed'],\n"
+                "        'runtime_delivery_allowed': True\n"
+                "    }],\n"
+                "    'blockers': []\n"
+                "} ))\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_public_or_runtime_claims", payload["blockers"])
+        route_gate = payload["command_permission_route_gate"]
+        self.assertIn(
+            "checks[0].public_or_runtime_claims:reply_api_allowed",
+            route_gate["public_or_runtime_claims"],
+        )
+        self.assertIn(
+            "checks[0].runtime_delivery_allowed",
+            route_gate["public_or_runtime_claims"],
+        )
+        self.assertFalse(payload["stable_claim_allowed"])
 
     def test_blocked_contract_decisions_detect_untracked_public_header_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

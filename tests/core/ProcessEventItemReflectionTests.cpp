@@ -140,6 +140,16 @@ namespace
         return value;
     }
 
+    void SetBorrowedParamProvenance(Obelisk::UE::ItemReflection::ItemInvocation& invocation,
+                                    const uint8_t* returnValue,
+                                    int32_t returnOffset,
+                                    size_t paramSize)
+    {
+        invocation.ParamData = reinterpret_cast<const uint8_t*>(
+            reinterpret_cast<uintptr_t>(returnValue) - static_cast<uintptr_t>(returnOffset));
+        invocation.ParamSize = paramSize;
+    }
+
     void RequireRejected(const Obelisk::UE::ItemReflection::ItemInvocation& invocation,
                          const char* message)
     {
@@ -229,6 +239,7 @@ namespace
                                               true,
                                               &returnValue,
                                               sizeof(returnValue)));
+        SetBorrowedParamProvenance(invocation, &returnValue, 0x08, 0x09);
         return invocation;
     }
 
@@ -255,6 +266,7 @@ namespace
                                               true,
                                               &returnValue,
                                               sizeof(returnValue)));
+        SetBorrowedParamProvenance(invocation, &returnValue, 0x01, 0x02);
         return invocation;
     }
 
@@ -282,6 +294,7 @@ namespace
                                               true,
                                               &returnValue,
                                               sizeof(returnValue)));
+        SetBorrowedParamProvenance(invocation, &returnValue, 0x0c, 0x0d);
         return invocation;
     }
 
@@ -507,6 +520,7 @@ namespace
                                                   true,
                                                   &trueValue,
                                                   sizeof(trueValue)));
+            SetBorrowedParamProvenance(invocation, &trueValue, 0x08, 0x09);
 
             CopiedItemObservation observation;
             Require(TryBuildCopiedItemObservation(invocation, observation),
@@ -541,6 +555,7 @@ namespace
                                                   true,
                                                   &falseValue,
                                                   sizeof(falseValue)));
+            SetBorrowedParamProvenance(invocation, &falseValue, 0x01, 0x02);
 
             CopiedItemObservation observation;
             Require(TryBuildCopiedItemObservation(invocation, observation),
@@ -590,6 +605,7 @@ namespace
                                                   true,
                                                   &trueValue,
                                                   sizeof(trueValue)));
+            SetBorrowedParamProvenance(invocation, &trueValue, 0x0c, 0x0d);
 
             CopiedItemObservation observation;
             Require(TryBuildCopiedItemObservation(invocation, observation),
@@ -639,6 +655,8 @@ namespace
                                               true,
                                               params.data() + 0x01,
                                               sizeof(uint8_t)));
+        invocation.ParamData = params.data();
+        invocation.ParamSize = 0x02;
 
         CopiedItemObservation observation;
         Require(TryBuildCopiedItemObservation(invocation, observation),
@@ -1087,6 +1105,7 @@ namespace
                                                   true,
                                                   &returnValue,
                                                   sizeof(returnValue)));
+        SetBorrowedParamProvenance(validCanRepair, &returnValue, 0x01, 0x02);
 
         CopiedItemObservation observation;
         Require(TryBuildCopiedItemObservation(validCanRepair, observation),
@@ -1135,6 +1154,28 @@ namespace
         nullRange.Fields[1].Range = {nullptr, sizeof(uint8_t)};
         Require(!TryBuildCopiedItemObservation(nullRange, observation),
                 "null ReturnValue range built copied item observation");
+
+        Obelisk::UE::ItemReflection::ItemInvocation missingProvenance = validCanRepair;
+        missingProvenance.ParamData = nullptr;
+        missingProvenance.ParamSize = 0;
+        Require(!TryBuildCopiedItemObservation(missingProvenance, observation),
+                "missing item params provenance built copied item observation");
+
+        Obelisk::UE::ItemReflection::ItemInvocation truncatedProvenance = validCanRepair;
+        truncatedProvenance.ParamSize = 1;
+        Require(!TryBuildCopiedItemObservation(truncatedProvenance, observation),
+                "truncated item params provenance built copied item observation");
+
+        Obelisk::UE::ItemReflection::ItemInvocation oversizedProvenance = validCanRepair;
+        oversizedProvenance.ParamSize = 3;
+        Require(!TryBuildCopiedItemObservation(oversizedProvenance, observation),
+                "oversized item params provenance built copied item observation");
+
+        uint8_t forgedReturnValue = 1;
+        Obelisk::UE::ItemReflection::ItemInvocation forgedReturnRange = validCanRepair;
+        forgedReturnRange.Fields[1].Range = {&forgedReturnValue, sizeof(forgedReturnValue)};
+        Require(!TryBuildCopiedItemObservation(forgedReturnRange, observation),
+                "forged item ReturnValue range built copied item observation");
 
         Obelisk::UE::ItemReflection::ItemInvocation noReturnRange = validCanRepair;
         noReturnRange.Fields[1].ExposesRange = false;

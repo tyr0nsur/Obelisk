@@ -426,6 +426,18 @@ namespace Obelisk::UE::ItemReflection
         value.FunctionNameIndex = spec->NameIndex;
         value.OuterNameIndex = spec->OuterNameIndex;
         value.HasParameterRanges = params != nullptr;
+        if (value.HasParameterRanges)
+        {
+            for (size_t i = 0; i < spec->FieldCount; ++i)
+            {
+                if (spec->Fields[i].ExposesRange)
+                {
+                    value.ParamData = static_cast<const uint8_t*>(params);
+                    value.ParamSize = reflectedFunction.ParmsSize;
+                    break;
+                }
+            }
+        }
         if (spec->FieldCount > value.Fields.capacity())
             return RuntimeReflection::ReadResult::Fail(RuntimeReflection::ReadStatus::OutOfBounds,
                                                        "item field count exceeds storage capacity");

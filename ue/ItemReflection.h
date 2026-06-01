@@ -44,6 +44,11 @@ namespace Obelisk::UE::ItemReflection
         int32_t FunctionNameIndex = -1;
         int32_t OuterNameIndex = -1;
         bool HasParameterRanges = false;
+        // Borrowed params provenance for immediate copied-scalar validation only.
+        // Do not persist, mutate through, log, expose to plugins, or treat as raw
+        // Item payload access.
+        const uint8_t* ParamData = nullptr;
+        size_t ParamSize = 0;
         RuntimeReflection::FixedVector<ItemFieldRange, 3> Fields;
     };
 

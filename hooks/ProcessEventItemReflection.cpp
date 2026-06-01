@@ -153,6 +153,7 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
             const ExpectedItemField* Fields = nullptr;
             size_t FieldCount = 0;
             size_t BoolCount = 0;
+            size_t ParamSize = 0;
         };
 
         constexpr std::array<ExpectedItemField, 2> kAllowEquipItemFields{{
@@ -226,19 +227,22 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
              kPrimalItemNameIndex,
              kAllowEquipItemFields.data(),
              kAllowEquipItemFields.size(),
-             1},
+             1,
+             0x09},
             {Obelisk::UE::ItemReflection::ItemFunction::CanRepair,
              kCanRepairNameIndex,
              kPrimalItemNameIndex,
              kCanRepairFields.data(),
              kCanRepairFields.size(),
-             1},
+             1,
+             0x02},
             {Obelisk::UE::ItemReflection::ItemFunction::UseItemOntoItem,
              kUseItemOntoItemNameIndex,
              kPrimalItemNameIndex,
              kUseItemOntoItemFields.data(),
              kUseItemOntoItemFields.size(),
-             1},
+             1,
+             0x0d},
         };
 
         const ExpectedItemObservation* FindExpectedObservation(
@@ -313,6 +317,32 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
             uint8_t value = 0;
             std::memcpy(&value, field.Range.Data, sizeof(value));
             return value <= 1;
+        }
+
+        bool MatchesExpectedParamRange(
+            const Obelisk::UE::ItemReflection::ItemInvocation& invocation,
+            const Obelisk::UE::ItemReflection::ItemFieldRange& field,
+            const ExpectedItemField& expected)
+        {
+            if (!invocation.HasParameterRanges ||
+                !invocation.ParamData ||
+                expected.Offset < 0 ||
+                expected.Size > invocation.ParamSize)
+            {
+                return false;
+            }
+
+            const size_t offset = static_cast<size_t>(expected.Offset);
+            if (offset > invocation.ParamSize ||
+                expected.Size > invocation.ParamSize - offset)
+            {
+                return false;
+            }
+
+            const auto base = reinterpret_cast<uintptr_t>(invocation.ParamData);
+            const auto actual = reinterpret_cast<uintptr_t>(field.Range.Data);
+            return actual == base + offset &&
+                   field.Range.Size == expected.Size;
         }
     }
 
@@ -413,6 +443,8 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
 
         if (expected->BoolCount != 0 && !invocation.HasParameterRanges)
             return false;
+        if (expected->BoolCount != 0 && invocation.ParamSize != expected->ParamSize)
+            return false;
 
         if (invocation.Fields.size() != expected->FieldCount)
             return false;
@@ -452,7 +484,8 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
             }
 
             ItemBoolObservation copiedBool;
-            if (!TryCopyBool(field, copiedBool))
+            if (!MatchesExpectedParamRange(invocation, field, expectedField) ||
+                !TryCopyBool(field, copiedBool))
             {
                 out = {};
                 return false;

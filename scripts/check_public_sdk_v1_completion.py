@@ -17,6 +17,9 @@ DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_CONTRACT_DECISIONS_DIR = REPO_ROOT / "docs"
 DEFAULT_COMMAND_PERMISSION_ROUTE_GATE = REPO_ROOT / "scripts" / "check_command_permission_route_gate.py"
+DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY = (
+    REPO_ROOT / "scripts" / "check_inventory_item_copied_signals_stability.py"
+)
 CANONICAL_MANIFEST_RELEASE_CLAIM = "no-v1-stable-release-claim-post-rc-surface-inventory"
 CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
@@ -114,6 +117,24 @@ SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "planning_surfaces_unresolved_for_v1_claim",
     "top_level_planning_surfaces_unresolved_for_v1_claim",
 }
+COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
+    "promotion_ready",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "runtime_ready",
+    "public_header_allowed",
+    "public_readiness_ready",
+    "reply_api_allowed",
+    "reply_abi_allowed",
+    "send_chat_api_allowed",
+    "command_router_allowed",
+    "runtime_delivery_allowed",
+    "runtime_readiness_allowed",
+    "public_response_path_allowed",
+    "v1_completion_evidence",
+    "v1_completion_ready",
+    "stable_claim_allowed",
+)
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
@@ -637,6 +658,15 @@ def parse_args() -> argparse.Namespace:
         help="Planning-only route gate that guards player identity -> permissions/admin -> command response -> commands/replies.",
     )
     parser.add_argument(
+        "--inventory-copied-signals-stability",
+        type=Path,
+        default=DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY,
+        help=(
+            "Offline guardrail that keeps inventory/item copied GameplayPolicyEvent "
+            "signals narrow and non-promotional."
+        ),
+    )
+    parser.add_argument(
         "--validate-release-statement-scope",
         action="store_true",
         help=(
@@ -678,6 +708,7 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
             },
             ["command_permission_route_gate_output_invalid"],
         )
+    public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
     if result.returncode != 0 or payload.get("valid") is not True:
         blockers.append("command_permission_route_gate_invalid")
     if payload.get("accepted_for_planning") is not True or payload.get("planning_only") is not True:
@@ -685,6 +716,8 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
     for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
         if payload.get(key) is not False:
             blockers.append(f"command_permission_route_gate_{key}_not_false")
+    if public_or_runtime_claims:
+        blockers.append("command_permission_route_gate_public_or_runtime_claims")
     return (
         {
             "path": str(path),
@@ -698,9 +731,91 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
             "public_abi_ready": payload.get("public_abi_ready"),
             "runtime_ready": payload.get("runtime_ready"),
             "public_header_allowed": payload.get("public_header_allowed"),
+            "public_or_runtime_claims": public_or_runtime_claims,
             "blockers": payload.get("blockers", []),
             "stderr": result.stderr.strip(),
             "non_claim": "planning-only route guard; not v1 completion evidence",
+        },
+        blockers,
+    )
+
+
+def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, Any]) -> list[str]:
+    claims: list[str] = []
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                item_path = f"{path}.{key}" if path else str(key)
+                if key in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS and item is True:
+                    claims.append(item_path)
+                if key == "public_or_runtime_claims" and isinstance(item, list):
+                    for claim in item:
+                        if isinstance(claim, str) and claim:
+                            claims.append(f"{item_path}:{claim}")
+                visit(item, item_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+
+    visit(payload, "")
+    return sorted(set(claims))
+
+
+def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    result = subprocess.run(
+        [sys.executable, str(path), "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": f"stdout_json_decode_error: {exc}",
+                "stderr": result.stderr.strip(),
+            },
+            ["inventory_copied_signals_stability_output_invalid"],
+        )
+    if not isinstance(payload, dict):
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": "stdout_json_not_object",
+                "stderr": result.stderr.strip(),
+            },
+            ["inventory_copied_signals_stability_output_invalid"],
+        )
+
+    if result.returncode != 0 or payload.get("ready") is not True:
+        blockers.append("inventory_copied_signals_stability_invalid")
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    if summary.get("public_sdk_ready") is not False:
+        blockers.append("inventory_copied_signals_public_sdk_ready_not_false")
+    if summary.get("v1_completion_ready") is not False:
+        blockers.append("inventory_copied_signals_v1_completion_ready_not_false")
+
+    return (
+        {
+            "path": str(path),
+            "exit_code": result.returncode,
+            "schema": payload.get("schema"),
+            "ready": payload.get("ready"),
+            "surface": payload.get("surface"),
+            "allowed_signal_count": summary.get("allowed_signal_count"),
+            "resource_kind_contract": summary.get("resource_kind_contract"),
+            "public_sdk_ready": summary.get("public_sdk_ready"),
+            "v1_completion_ready": summary.get("v1_completion_ready"),
+            "blockers": payload.get("blockers", []),
+            "stderr": result.stderr.strip(),
+            "non_claim": "copied-signal stability guard; not Inventory SDK, Items SDK, or v1 completion evidence",
         },
         blockers,
     )
@@ -1828,12 +1943,17 @@ def build_report(
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
     contract_decisions_dir: Path = DEFAULT_CONTRACT_DECISIONS_DIR,
     command_permission_route_gate_path: Path = DEFAULT_COMMAND_PERMISSION_ROUTE_GATE,
+    inventory_copied_signals_stability_path: Path = DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY,
 ) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     command_permission_route_gate, route_gate_blockers = run_command_permission_route_gate(
         command_permission_route_gate_path
     )
     blockers.extend(route_gate_blockers)
+    inventory_copied_signals_stability, inventory_stability_blockers = (
+        run_inventory_copied_signals_stability(inventory_copied_signals_stability_path)
+    )
+    blockers.extend(inventory_stability_blockers)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
     blockers.extend(release_statement_blockers)
     blocked_contract_header_symbols, contract_symbol_blockers = blocked_contract_public_header_symbol_drift(
@@ -1854,6 +1974,7 @@ def build_report(
             "public_header": str(public_header_path),
             "contract_decisions_dir": str(contract_decisions_dir),
             "command_permission_route_gate": command_permission_route_gate,
+            "inventory_copied_signals_stability": inventory_copied_signals_stability,
             "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
             "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
             "blockers": blockers,
@@ -2267,6 +2388,7 @@ def build_report(
         "public_header": str(public_header_path),
         "contract_decisions_dir": str(contract_decisions_dir),
         "command_permission_route_gate": command_permission_route_gate,
+        "inventory_copied_signals_stability": inventory_copied_signals_stability,
         "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
         "release_claim": manifest.get("release_claim"),
@@ -2561,6 +2683,26 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "The public header contains symbols that look like blocked public contract surface drift.",
             "Action: remove those symbols or update the reviewed public contract decisions before claiming v1.",
         ],
+        "command_permission_route_gate_public_or_runtime_claims": [
+            "The command/permission route gate reported a public, runtime, or v1-completion claim.",
+            "Action: keep the route gate planning-only; identity, permissions, command response, and replies need separate promotion evidence.",
+        ],
+        "inventory_copied_signals_stability_output_invalid": [
+            "The inventory/item copied-signal stability checker did not emit valid JSON.",
+            "Action: fix scripts/check_inventory_item_copied_signals_stability.py before relying on copied inventory signals in release accounting.",
+        ],
+        "inventory_copied_signals_stability_invalid": [
+            "The inventory/item copied-signal stability checker failed.",
+            "Action: keep inventory copied signals as non-promotional until the exact five copied signal contract, category-only resource kind, and no Inventory/Items SDK boundaries are restored.",
+        ],
+        "inventory_copied_signals_public_sdk_ready_not_false": [
+            "Inventory copied-signal stability attempted to mark public SDK readiness.",
+            "Action: keep this checker as a copied-signal guardrail only; Inventory SDK and Items SDK need separate promotion gates.",
+        ],
+        "inventory_copied_signals_v1_completion_ready_not_false": [
+            "Inventory copied-signal stability attempted to mark v1 completion readiness.",
+            "Action: copied inventory signals cannot count toward complete/full/production SDK progress.",
+        ],
         "schema_mismatch": [
             "The manifest schema is not obelisk.public-sdk-surfaces.v1.",
         ],
@@ -2648,6 +2790,7 @@ def main() -> int:
         args.public_header,
         args.contract_decisions_dir,
         args.command_permission_route_gate,
+        args.inventory_copied_signals_stability,
     )
     if args.validate_release_statement_scope:
         report = add_scoped_release_statement_result(report)
