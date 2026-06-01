@@ -4246,7 +4246,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (matrix, "## Deferred Support Boundary"),
             (matrix, "Plugin Hub seed work resumes after SDK completion"),
             (matrix, "Copied `ChatMessageEvent` parsing and\ncopied `GameplayPolicyEvent` auditing may remain useful experimental seed examples"),
-            (matrix, "Those three are seed examples only, not production Plugin Hub modules"),
+            (matrix, "These are installed-SDK foundation\ntemplates now and parked Plugin Hub seed lanes after SDK completion"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -4304,8 +4304,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for required in (
             "passive copied chat auditing/parsing is a candidate for promotion review before copied policy auditing, not a promised graduation path",
-            "The first useful Plugin Hub seed examples should be built from surfaces that already exist",
-            "Those are the release-supported seed lanes",
+            "The first useful Plugin Hub seed examples should be built from surfaces that already exist after that point",
+            "These are installed-SDK foundation templates now and parked Plugin Hub seed lanes after\nSDK completion",
             "Copied `GameplayPolicyEvent` auditors and\ncopied `ChatMessageEvent` parsers may still be useful experimental pattern examples",
             "must not claim policy enforcement, general chat,\ncommands, identity, replies, moderation, send-chat, or production Plugin Hub availability",
         ):
@@ -8156,21 +8156,21 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ),
             "matrix": (
                 "## Foundation-To-Roadmap Alignment",
-                "`hub foundation` means release-supported seed work",
+                "`hub foundation` means parked post-SDK-complete seed planning",
                 "`gameplay policy backing` means preserving evidence and tests for already promoted",
                 "`internal recognizer planning` means docs, fixtures, and offline copied-bool planning",
                 "only a named promotion gate can move a row's support tier",
             ),
             "roadmap": (
                 "Roadmap-to-Plugin-Hub alignment for contributors",
-                "`hub foundation` is the only release-supported seed lane now",
+                "`hub foundation` is archived post-SDK-complete Plugin Hub seed planning only",
                 "`gameplay policy backing` protects the existing copied/redacted `GameplayPolicyEvent`",
                 "`internal recognizer planning` stays offline/test-only",
                 "append-only ABI/consumer-test plan",
             ),
             "research_readme": (
                 "Plugin Hub contributor intake uses the same three buckets as the public matrix",
-                "release-supported seed now for lifecycle/config/logging, descriptor/catalog, timer, packaging",
+                "future release-supported seed\nafter SDK completion for lifecycle/config/logging, descriptor/catalog, timer, packaging",
                 "experimental pattern only for passive copied chat or copied policy examples",
                 "blocked backlog for commands, identity, persistence, operator ingress, mutation",
                 "cannot change the support tier without a named promotion gate",

@@ -94,7 +94,7 @@ modules are supported.
 
 For new contributors, the roadmap maps to this matrix in one direction only:
 
-- `hub foundation` means release-supported seed work on lifecycle/config/logging,
+- `hub foundation` means parked post-SDK-complete seed planning for lifecycle/config/logging,
   descriptor/catalog consumers, timers, packaging, and fail-closed capability checks.
 - `gameplay policy backing` means preserving evidence and tests for already promoted
   copied/redacted `GameplayPolicyEvent` fields from exact release-readiness target sets
@@ -213,9 +213,9 @@ experimental plugin-local `ChatMessageEvent` parsing lane.
 
 ## Current Safe Route
 
-For plugin authors, the current v0.1.x core-first release-supported seed shape is
-lifecycle/config/logging, descriptor-driven discovery, and process-local timers. Stop
-there for Foundation examples intended to be release-supported seeds. In this section,
+For plugin authors today, the supported installed-SDK foundation surfaces are
+lifecycle/config/logging, descriptor-driven discovery, and process-local timers; treat
+Plugin Hub seeds as parked until SDK completion. In this section,
 `promoted` means a copied, capability-gated ABI
 entry with an exact release-readiness second-source target set can be discovered or
 subscribed to by explicitly experimental copied-data examples; it does not turn copied
@@ -249,7 +249,7 @@ Installed-SDK consumer seed:
 3. `examples/sdk_timer_plugin` as the installed-SDK timer seed for owner-token scheduled
    work and shutdown cleanup.
 
-These three release-supported installed-SDK templates are the starter template, the
+These three installed-SDK foundation templates are the starter template, the
 descriptor catalog template, and the owner-token timer template. Their no-promises are
 part of the template contract: they do not promise identity/principal,
 permissions/admin, command routing, replies/send-chat/broadcast, storage,
@@ -274,9 +274,11 @@ the promoted timer surface. `examples/sdk_inventory_policy_audit` is separate fr
 release-supported example set; it is an experimental copied policy audit pattern only.
 Under `plugins/`, `oBaseEvents`, `oProcessTimer`, and `oDescriptorCatalog` cover the
 release-scope foundation, while `oPolicyAudit`, `oChatLogger`, and `oChatAudit` cover the
-experimental copied policy and copied chat slices. Those three are seed examples only, not production Plugin Hub modules; specifically, they are archived examples and planning
-references, not active Plugin Hub modules, not production Hub work, and not promises that
-copied chat/policy auditing is generally available.
+experimental copied policy and copied chat slices. These are installed-SDK foundation
+templates now and parked Plugin Hub seed lanes after SDK completion; specifically, they
+are archived examples and planning references, not active Plugin Hub modules, not
+production Hub work, and not promises that copied chat/policy auditing is generally
+available.
 Before any new first-party Plugin Hub work resumes, the SDK blocker chain must be handled
 or explicitly scoped. Existing copied-data examples may still be useful as guardrail
 fixtures, but they are not a graduation path and no additional public category is
@@ -296,7 +298,8 @@ evidence gates are satisfied.
 ## Plugin Hub Direction
 
 Plugin Hub direction is parked until SDK completion. The first useful Plugin Hub seed
-examples should be built from surfaces that already exist. The installed-SDK starter
+examples should be built from surfaces that already exist after that point. The
+installed-SDK starter
 consumers are `examples/sdk_minimal_plugin`,
 `examples/sdk_descriptor_catalog`, and `examples/sdk_timer_plugin`; `plugins/*` contains
 in-tree runtime reference plugins.
@@ -305,7 +308,8 @@ in-tree runtime reference plugins.
 - descriptor/catalog consumers;
 - process-local timer utilities.
 
-Those are the release-supported seed lanes. Copied `GameplayPolicyEvent` auditors and
+These are installed-SDK foundation templates now and parked Plugin Hub seed lanes after
+SDK completion. Copied `GameplayPolicyEvent` auditors and
 copied `ChatMessageEvent` parsers may still be useful experimental pattern examples, but
 they must be labeled as experimental and must not claim policy enforcement, general chat,
 commands, identity, replies, moderation, send-chat, or production Plugin Hub availability.

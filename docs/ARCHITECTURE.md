@@ -1,8 +1,8 @@
 # Architecture
 
-Obelisk is split into a small Linux runtime core, a C plugin ABI, a core SDK header,
-and optional plugins. The current ARK server integration is a validation adapter for
-checking that core against a real stripped UE4 dedicated server process.
+Obelisk is organized around a Linux runtime core, stable C plugin ABI, installed SDK
+surfaces, and optional plugins. The ARK integration validates and promotes those surfaces
+against a real stripped UE4 dedicated server process.
 
 ## Runtime Bootstrap
 

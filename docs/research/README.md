@@ -205,12 +205,11 @@ SDK, Items SDK, `StructureEvents`, build-policy API, identity/lookup, `ResourceH
 mutation, return override, runtime observation, or raw UE parameter access.
 
 Plugin Hub contributor intake uses the same three buckets as the public matrix, but it is
-parked until SDK completion. Its archived buckets remain: release-supported seed now for
-lifecycle/config/logging, descriptor/catalog, timer, packaging, and fail-closed
-capability work as post-SDK-complete planning only; experimental pattern only for passive
-copied chat or copied policy examples; blocked backlog for commands, identity,
-persistence, operator ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or
-cross-instance state.
+parked until SDK completion. Its archived buckets remain: future release-supported seed
+after SDK completion for lifecycle/config/logging, descriptor/catalog, timer, packaging,
+and fail-closed capability work; experimental pattern only for passive copied chat or
+copied policy examples; blocked backlog for commands, identity, persistence, operator
+ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or cross-instance state.
 ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change
 the support tier without a named promotion gate.
 

@@ -24,11 +24,11 @@ stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
 while remembering that those documents are a planning contract until a release gate
 packages or supersedes them.
 Treat `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` as the lead-owned list
-of high-demand blockers that prevent a complete v1 SDK claim. Foundation/Plugin Hub seed
-work can improve contributor readiness, but it must not be used to declare v1 complete
-while those blockers remain planning or post-v1. Explicitly excluded blockers require a
-reviewed v1 release statement with scoped wording; exclusions do not permit claiming a
-complete SDK for the excluded capability.
+of high-demand blockers that prevent a complete v1 SDK claim. Installed-SDK foundation
+examples can improve contributor readiness, but Plugin Hub seed work remains
+post-SDK-complete. Neither can declare v1 complete while blockers remain planning or
+post-v1. Explicitly excluded blockers require a reviewed v1 release statement with scoped
+wording; exclusions do not permit claiming a complete SDK for the excluded capability.
 
 Compatibility research may consult ArkServerApi/AseApi and local NextGenPlugins clones
 only as names and demand signals for familiar ARK plugin concepts. They are not architecture,

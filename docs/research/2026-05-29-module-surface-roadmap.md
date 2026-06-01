@@ -2,8 +2,9 @@
 
 ## Objective
 
-Rank the next ARK/UE4 module surfaces from existing Obelisk evidence, prioritizing stable
-v0.1 production value and copied-POD event feasibility.
+Rank the next ARK/UE4 module surfaces from existing Obelisk evidence, prioritizing
+complete-SDK blocker reduction and copied-POD feasibility without widening the published
+RC scope.
 
 ## Environment
 
@@ -91,8 +92,8 @@ only; they do not turn target-set labels into public SDK names.
 
 Roadmap-to-Plugin-Hub alignment for contributors:
 
-- `hub foundation` is the only release-supported seed lane now, but only as archived
-  post-SDK-complete planning while the complete SDK blocker chain remains open.
+- `hub foundation` is archived post-SDK-complete Plugin Hub seed planning only while the
+  complete SDK blocker chain remains open.
 - Active rounds are SDK-complete-first: identity/principal evidence, permissions/admin
   query-only groundwork, command response, and then commands/replies. Plugin Hub
   foundation is parked until the SDK blocker chain is resolved.
