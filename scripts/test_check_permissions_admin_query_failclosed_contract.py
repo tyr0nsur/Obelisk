@@ -30,7 +30,7 @@ def query_field(name: str, field_type: str) -> dict:
 def fail_closed_case(name: str) -> dict:
     return {
         "case": name,
-        "consumer_result": "deny",
+        "consumer_result": "unknown" if name == "unknown_authority" else "deny",
         "fail_closed": True,
         "allow_allowed": False,
     }
@@ -43,7 +43,7 @@ def reason_flag(name: str, bit_index: int) -> dict:
         "bit_index": bit_index,
         "fail_closed": True,
         "allow_allowed": False,
-        "consumer_result": "deny",
+        "consumer_result": "unknown" if name == "unknown_authority" else "deny",
     }
 
 
@@ -661,6 +661,22 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("fail_closed_case_not_fail_closed", report["blockers"])
         self.assertIn("fail_closed_case_allow_not_forbidden", report["blockers"])
         self.assertIn("fail_closed_case_consumer_result_not_denied_or_unknown", report["blockers"])
+
+    def test_rejects_fail_closed_case_and_reason_flag_result_drift(self) -> None:
+        payload = manifest()
+        for case in payload["fail_closed_cases"]:
+            if case["case"] == "unknown_authority":
+                case["consumer_result"] = "deny"
+        for flag in payload["fail_closed_reason_flags"]["flags"]:
+            if flag["name"] == "unknown_authority":
+                flag["consumer_result"] = "deny"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("fail_closed_case_consumer_result_mismatch", report["blockers"])
+        self.assertIn("reason_flag_consumer_result_mismatch", report["blockers"])
 
     def test_rejects_authority_policy_overclaims(self) -> None:
         payload = manifest()

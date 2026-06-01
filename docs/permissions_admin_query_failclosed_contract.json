@@ -254,7 +254,7 @@
     {
       "allow_allowed": false,
       "case": "unknown_authority",
-      "consumer_result": "deny",
+      "consumer_result": "unknown",
       "fail_closed": true
     },
     {
@@ -561,7 +561,7 @@
         "allow_allowed": false,
         "bit_index": 29,
         "case": "unknown_authority",
-        "consumer_result": "deny",
+        "consumer_result": "unknown",
         "fail_closed": true,
         "name": "unknown_authority"
       },

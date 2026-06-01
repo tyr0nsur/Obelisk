@@ -150,6 +150,9 @@ This file is an active routing table only. Durable evidence belongs in
 - Offline: keep tightening guardrails around permissions/admin query-only provenance,
   command/principal contracts, command route drift, inventory copied-signal hygiene, and
   structure build-policy snapshot envelopes.
+  Current command route hardening requires `commands_replies_public_readiness` to consume
+  the exact composed `command_chat_response_public_readiness` report; validating both as
+  sibling checks is not enough.
 - Offline artifact gates: keep tightening consume-vs-promote overclaim checks for
   ResourceHandle, Mission copied-bool, and Structure planning slices. Consume acceptance
   must not imply public SDK, runtime readiness, mutation, return override, lookup,

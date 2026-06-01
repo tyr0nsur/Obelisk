@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -311,6 +312,7 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         "blockers": report.get("blockers", []) if report is not None else [],
         "parse_error": parse_error,
         "stderr": result.stderr.strip(),
+        "report_payload": report,
     }
 
 
@@ -387,9 +389,29 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
-    checks = [run_check(name, argv) for name, argv in route_checks(args)]
+    checks = []
+    response_path_report: dict[str, Any] | None = None
+    with tempfile.TemporaryDirectory(prefix="obelisk-command-route-gate-") as tmp:
+        response_path_report_path = Path(tmp) / "command-chat-response-public-readiness.json"
+        for name, argv in route_checks(args):
+            effective_argv = list(argv)
+            if name == "commands_replies_public_readiness":
+                if response_path_report is not None:
+                    response_path_report_path.write_text(
+                        json.dumps(response_path_report, indent=2, sort_keys=True),
+                        encoding="utf-8",
+                    )
+                    effective_argv.extend(["--response-path-report", str(response_path_report_path)])
+            check = run_check(name, effective_argv)
+            checks.append(check)
+            if name == "command_chat_response_public_readiness":
+                payload = check.get("report_payload")
+                if isinstance(payload, dict):
+                    response_path_report = payload
     blockers = []
     for check in checks:
+        if check["name"] == "commands_replies_public_readiness" and "--response-path-report" not in check["argv"]:
+            blockers.append("commands_replies_public_readiness: missing composed response path report")
         if check["exit_code"] != 0:
             blockers.append(f"{check['name']}: checker exited {check['exit_code']}")
         if check["parse_error"] is not None:
@@ -432,7 +454,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             ],
             "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
         },
-        "checks": checks,
+        "checks": [
+            {key: value for key, value in check.items() if key != "report_payload"}
+            for check in checks
+        ],
         "blockers": blockers,
     }
 

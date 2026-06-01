@@ -162,6 +162,10 @@ REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "operator_config_policy_provenance_claim",
 )
 REQUIRED_REASON_FLAG_SEQUENCE = REQUIRED_FAIL_CLOSED_CASE_SEQUENCE
+REQUIRED_FAIL_CLOSED_RESULT_BY_CASE = {
+    **{name: "deny" for name in REQUIRED_FAIL_CLOSED_CASE_SEQUENCE},
+    "unknown_authority": "unknown",
+}
 REQUIRED_REASON_FLAGS_POLICY = {
     "classification": "internal_candidate_only",
     "encoding": "uint64_flags",
@@ -521,7 +525,7 @@ def build_template_manifest() -> dict[str, Any]:
                     "bit_index": bit_index,
                     "fail_closed": True,
                     "allow_allowed": False,
-                    "consumer_result": "deny",
+                    "consumer_result": REQUIRED_FAIL_CLOSED_RESULT_BY_CASE[name],
                 }
                 for bit_index, name in enumerate(REQUIRED_REASON_FLAG_SEQUENCE)
             ],
@@ -547,7 +551,7 @@ def build_template_manifest() -> dict[str, Any]:
         "fail_closed_cases": [
             {
                 "case": case,
-                "consumer_result": "deny",
+                "consumer_result": REQUIRED_FAIL_CLOSED_RESULT_BY_CASE[case],
                 "fail_closed": True,
                 "allow_allowed": False,
             }
@@ -1041,6 +1045,16 @@ def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> li
             add(blockers, "fail_closed_case_allow_not_forbidden", f"{label}.allow_allowed", case=name)
         if case.get("consumer_result") not in {"deny", "unknown"}:
             add(blockers, "fail_closed_case_consumer_result_not_denied_or_unknown", f"{label}.consumer_result", case=name)
+        expected_result = REQUIRED_FAIL_CLOSED_RESULT_BY_CASE.get(name)
+        if expected_result is not None and case.get("consumer_result") != expected_result:
+            add(
+                blockers,
+                "fail_closed_case_consumer_result_mismatch",
+                f"{label}.consumer_result",
+                case=name,
+                expected=expected_result,
+                value=case.get("consumer_result"),
+            )
     missing = REQUIRED_FAIL_CLOSED_CASES - set(names)
     if missing:
         add(blockers, "fail_closed_cases_missing_required", "$.fail_closed_cases", missing=sorted(missing))
@@ -1118,6 +1132,16 @@ def validate_reason_flags(contract: Any, blockers: list[dict[str, Any]]) -> list
             add(blockers, "reason_flag_allow_not_forbidden", f"{flag_label}.allow_allowed", flag=name)
         if flag.get("consumer_result") not in {"deny", "unknown"}:
             add(blockers, "reason_flag_consumer_result_not_denied_or_unknown", f"{flag_label}.consumer_result", flag=name)
+        expected_result = REQUIRED_FAIL_CLOSED_RESULT_BY_CASE.get(name)
+        if expected_result is not None and flag.get("consumer_result") != expected_result:
+            add(
+                blockers,
+                "reason_flag_consumer_result_mismatch",
+                f"{flag_label}.consumer_result",
+                flag=name,
+                expected=expected_result,
+                value=flag.get("consumer_result"),
+            )
 
     missing = REQUIRED_FAIL_CLOSED_CASES - set(names)
     if missing:

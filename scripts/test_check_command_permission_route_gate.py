@@ -92,6 +92,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         check_names = {check["name"] for check in report["checks"]}
         self.assertIn("player_identity_public_contract_gap", check_names)
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
+        commands_replies_check = next(
+            check for check in report["checks"] if check["name"] == "commands_replies_public_readiness"
+        )
+        self.assertIn("--response-path-report", commands_replies_check["argv"])
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)
@@ -271,6 +275,94 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "public_command_router_allowed, public_reply_or_send_chat_abi_allowed",
             report["blockers"],
         )
+
+    def test_route_gate_composes_response_path_report_into_commands_replies(self) -> None:
+        original = ROUTE_GATE.run_check
+        seen_response_path_report = False
+
+        def base_result(name: str, argv: list[str]) -> dict[str, object]:
+            return {
+                "name": name,
+                "argv": argv,
+                "exit_code": 0,
+                "valid": True,
+                "report_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                "planning_only": True,
+                "accepted_for_planning": True,
+                "public_or_runtime_claims": [],
+                "blockers": [],
+                "parse_error": None,
+                "stderr": "",
+                "report_payload": {
+                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "runtime_ready": False,
+                },
+            }
+
+        def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+            nonlocal seen_response_path_report
+            result = base_result(name, argv)
+            if name == "command_chat_response_public_readiness":
+                result["report_payload"] = {
+                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "surface": "obelisk.command_chat_response_path.v1",
+                    "target_set": "command-chat-response-intake",
+                    "target_filters": [
+                        "ShooterPlayerController.ServerSendChatMessage",
+                        "ShooterPlayerController.ServerChatMessage_Impl",
+                    ],
+                    "readiness_status": "compared",
+                    "decisions_status": "blocked",
+                    "blockers": [],
+                    "public_readiness_ready": False,
+                    "public_header_allowed": False,
+                    "promotion_ready": True,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "runtime_ready": False,
+                }
+            if name == "commands_replies_public_readiness":
+                self.assertIn("--response-path-report", argv)
+                report_path = Path(argv[argv.index("--response-path-report") + 1])
+                composed = json.loads(report_path.read_text(encoding="utf-8"))
+                seen_response_path_report = True
+                if composed.get("promotion_ready") is True:
+                    result["valid"] = False
+                    result["exit_code"] = 1
+                    result["blockers"] = ["response_path_report_promotion_ready_not_false"]
+            return result
+
+        args = SimpleNamespace(
+            query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+            player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+            public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            json=True,
+        )
+        try:
+            ROUTE_GATE.run_check = fake_run_check
+            report = ROUTE_GATE.build_report(args)
+        finally:
+            ROUTE_GATE.run_check = original
+
+        self.assertTrue(seen_response_path_report)
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn("commands_replies_public_readiness: checker exited 1", report["blockers"])
+        self.assertIn("commands_replies_public_readiness: invalid route prerequisite", report["blockers"])
 
     def test_run_check_recursively_rejects_subreport_public_alias_and_text_claims(self) -> None:
         original_run = ROUTE_GATE.subprocess.run

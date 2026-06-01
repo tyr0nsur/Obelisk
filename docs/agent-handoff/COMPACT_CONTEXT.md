@@ -126,6 +126,13 @@ priorities, and do not use history files as the active source of truth.
   `operator-config` is recognized but not allow-capable; only runtime-local/runtime-owned
   provenance may allow. Nested readiness/promotion overclaims in the candidate contract
   must be rejected by the schema checker and offline artifact gate.
+  `unknown_authority` is an explicit fail-closed `unknown` result in both fail-closed
+  cases and reason flags; drift back to `deny` must fail the checker because downstream
+  command/reply planning distinguishes `deny` from `unknown`.
+- `scripts/check_command_permission_route_gate.py --json` must compose the exact
+  `command_chat_response_public_readiness` report into
+  `commands_replies_public_readiness --response-path-report`. The route is not aligned if
+  response path and commands/replies only pass as independent sibling checks.
 - Stable plugin loading requires safe `OBELISK_INSTANCE_ID` plus real non-symlink plugin,
   config, log, and state roots.
 - `ObeliskApi` v1 is append-only for `v0.1.0`; ABI v2 requires an explicit migration plan.
