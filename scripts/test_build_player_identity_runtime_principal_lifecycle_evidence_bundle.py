@@ -23,6 +23,8 @@ BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidenc
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+OTHER_TEST_COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
 
 
 def runtime_log_lines() -> list[str]:
@@ -92,7 +94,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "schema": "obelisk.player-principal-lifecycle-window-request.v1",
                     "run_id": RUN_ID,
                     "status": "candidate_only_request_pack",
-                    "obelisk_commit": "test-commit",
+                    "obelisk_commit": TEST_COMMIT,
                     "target": {"instance": "arkserver2", "map": "TheIsland"},
                     "approved_window": {
                         "start_utc": "2026-06-01T12:00:00Z",
@@ -128,7 +130,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             "\n".join(
                 [
                     f"run_id={RUN_ID}",
-                    "obelisk_commit=test-commit",
+                    f"obelisk_commit={TEST_COMMIT}",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",
                     "approved_window_start_utc=2026-06-01T12:00:00Z",
@@ -212,7 +214,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 "--output-dir",
                 str(output_dir),
                 "--obelisk-commit",
-                "test-commit",
+                TEST_COMMIT,
                 "--reviewed-by",
                 "runtime-reviewer",
                 "--review-note",
@@ -274,7 +276,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 "20260601T120000Z-player-principal-lifecycle",
             )
             self.assertTrue(report["operational_window"]["manifest_ready"])
-            self.assertEqual(report["operational_window"]["obelisk_commit"], "test-commit")
+            self.assertEqual(report["operational_window"]["obelisk_commit"], TEST_COMMIT)
+
+    def test_rejects_placeholder_cli_obelisk_commit(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            result = self.run_bundle(copied_log, output_dir)
+            command = result.args
+            command[command.index("--obelisk-commit") + 1] = "test-commit"
+            placeholder = subprocess.run(
+                command,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            )
+
+        self.assertNotEqual(placeholder.returncode, 0)
+        self.assertIn("--obelisk-commit must be a reviewed 40-character lowercase Git SHA", placeholder.stderr)
 
     def test_builds_bundle_with_relative_window_manifest_log_path(self) -> None:
         with self.temp_offline_workspace() as temp:
@@ -475,7 +499,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             window_manifest = self.write_window_manifest(temp_dir, copied_log)
             text = window_manifest.read_text(encoding="utf-8")
             window_manifest.write_text(
-                text.replace("obelisk_commit=test-commit", "obelisk_commit=other-commit"),
+                text.replace(f"obelisk_commit={TEST_COMMIT}", f"obelisk_commit={OTHER_TEST_COMMIT}"),
                 encoding="utf-8",
             )
 

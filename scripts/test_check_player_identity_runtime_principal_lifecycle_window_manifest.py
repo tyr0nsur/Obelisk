@@ -18,12 +18,13 @@ SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
 GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
+TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 def manifest_lines(**overrides: str | None) -> list[str]:
     fields = {
         "run_id": RUN_ID,
-        "obelisk_commit": "test-commit",
+        "obelisk_commit": TEST_COMMIT,
         "target": "arkserver2/TheIsland",
         "approval": "current-turn operator-approved runtime window, not standing approval",
         "approved_window_start_utc": "2026-06-01T12:00:00Z",
@@ -265,7 +266,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertTrue(report["ready"])
         self.assertTrue(report["operational_window_manifest_ready"])
-        self.assertEqual(report["obelisk_commit"], "test-commit")
+        self.assertEqual(report["obelisk_commit"], TEST_COMMIT)
         self.assertEqual(report["copied_log"]["path_status"], "approved_offline_workspace")
         self.assertTrue(Path(report["copied_log"]["path"]).is_absolute())
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
@@ -538,6 +539,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
         unsafe_report = json.loads(unsafe.stdout)
         self.assertNotEqual(unsafe.returncode, 0)
         self.assertIn("obelisk_commit_invalid", unsafe_report["blockers"])
+
+        placeholder = self.run_checker(manifest_lines(obelisk_commit="test-commit"), check=False)
+        placeholder_report = json.loads(placeholder.stdout)
+        self.assertNotEqual(placeholder.returncode, 0)
+        self.assertIn("obelisk_commit_invalid", placeholder_report["blockers"])
 
     def test_rejects_non_exclusive_observer_window_escape_gates(self) -> None:
         result = self.run_checker(

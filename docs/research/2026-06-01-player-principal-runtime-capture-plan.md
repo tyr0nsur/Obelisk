@@ -77,7 +77,7 @@ Operator approval must name the exact values for:
 instance=<instance-id>
 map=<map>
 ark_binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
-obelisk_commit=<reviewed build containing PlayerPrincipalLifecycleObserver>
+obelisk_commit=<reviewed 40-character lowercase Git SHA containing PlayerPrincipalLifecycleObserver>
 run_id=<YYYYMMDDThhmmssZ-player-principal-lifecycle>
 window=<approved start/end UTC>
 final_posture=<stable|stopped>
@@ -209,7 +209,7 @@ python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundl
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
   --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
-  --obelisk-commit <reviewed-obelisk-commit> \
+  --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
   --reviewed-by <reviewer> \
   --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
 ```
@@ -362,7 +362,7 @@ python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundl
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
   --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
-  --obelisk-commit <reviewed-obelisk-commit> \
+  --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
   --reviewed-by <reviewer> \
   --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
 ```
@@ -375,7 +375,7 @@ Manual equivalent analyzer command:
 
 ```bash
 python3 scripts/analyze_runtime_observer_log.py \
-  --obelisk-commit <reviewed-obelisk-commit> \
+  --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
   --fail-on-quality-blockers \
   /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
   > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/runtime-observer-summary.json

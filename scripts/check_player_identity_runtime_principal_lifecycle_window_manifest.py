@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import protected_paths
+from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import reject_symlink_component
 
 
@@ -498,7 +499,7 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
     if run_id is not None and RUN_ID_RE.fullmatch(run_id) is None:
         add(blockers, "run_id_invalid", "run_id")
     obelisk_commit = fields.get("obelisk_commit")
-    if obelisk_commit is not None and not SAFE_COMPONENT_RE.fullmatch(obelisk_commit):
+    if obelisk_commit is not None and not is_reviewed_obelisk_commit(obelisk_commit):
         add(blockers, "obelisk_commit_invalid", "obelisk_commit")
 
     copied_log_sha256 = fields.get("copied_log_sha256")
@@ -624,7 +625,7 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
 def build_template_fields() -> dict[str, str]:
     return {
         "run_id": "20260601T120000Z-player-principal-lifecycle",
-        "obelisk_commit": "reviewed-obelisk-commit",
+        "obelisk_commit": "<reviewed-40-character-lowercase-git-sha>",
         "target": "arkserver2/TheIsland",
         "approval": EXPECTED_APPROVAL,
         "approved_window_start_utc": "2026-06-01T12:00:00Z",

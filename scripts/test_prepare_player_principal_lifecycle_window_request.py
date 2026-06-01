@@ -15,6 +15,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 def base_args(output_dir: Path) -> list[str]:
@@ -28,7 +29,7 @@ def base_args(output_dir: Path) -> list[str]:
         "--run-id",
         "20260601T120000Z-player-principal-lifecycle",
         "--obelisk-commit",
-        "5957c1e",
+        TEST_COMMIT,
         "--approved-window-start-utc",
         "2026-06-01T12:00:00Z",
         "--approved-window-end-utc",
@@ -153,6 +154,15 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         live_output_result = subprocess.run(live_output, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertNotEqual(live_output_result.returncode, 0)
         self.assertIn("must not write under protected server root", live_output_result.stderr)
+
+    def test_rejects_placeholder_obelisk_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = base_args(Path(tmp) / "request")
+            args[args.index("--obelisk-commit") + 1] = "test-commit"
+            result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--obelisk-commit must be a reviewed 40-character lowercase Git SHA", result.stderr)
 
 
 if __name__ == "__main__":

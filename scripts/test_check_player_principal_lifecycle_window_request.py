@@ -16,6 +16,7 @@ PREPARE = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 CHECK = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 def prepare_args(output_dir: Path) -> list[str]:
@@ -29,7 +30,7 @@ def prepare_args(output_dir: Path) -> list[str]:
         "--run-id",
         RUN_ID,
         "--obelisk-commit",
-        "72a419e",
+        TEST_COMMIT,
         "--approved-window-start-utc",
         "2026-06-01T12:00:00Z",
         "--approved-window-end-utc",
@@ -164,6 +165,20 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(live_result.returncode, 0)
         self.assertIn("must not read from protected server root", live_result.stderr)
+
+    def test_rejects_placeholder_obelisk_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["obelisk_commit"] = "reviewed-obelisk-commit"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("obelisk_commit_invalid", report["blockers"])
 
 
 if __name__ == "__main__":

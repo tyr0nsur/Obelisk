@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import protected_paths
+from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import reject_protected_output_path, reject_symlink_component
 
 
@@ -187,6 +188,10 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
     if copied.get("sha256") != source.get("sha256"):
         raise SystemExit("window manifest copied_log.sha256 does not match runtime observer summary")
     evidence_commit = evidence.get("obelisk_commit") if isinstance(evidence, dict) else None
+    if not is_reviewed_obelisk_commit(evidence_commit):
+        raise SystemExit("runtime observer summary obelisk_commit must be a reviewed 40-character lowercase Git SHA")
+    if not is_reviewed_obelisk_commit(window.get("obelisk_commit")):
+        raise SystemExit("window manifest obelisk_commit must be a reviewed 40-character lowercase Git SHA")
     if window.get("obelisk_commit") != evidence_commit:
         raise SystemExit("window manifest obelisk_commit does not match runtime observer summary")
     modules = summary.get("modules")
@@ -225,6 +230,8 @@ def require_runtime_log_posture(summary: dict[str, Any], window: dict[str, Any])
 
 def main() -> int:
     args = parse_args()
+    if not is_reviewed_obelisk_commit(args.obelisk_commit):
+        raise SystemExit("--obelisk-commit must be a reviewed 40-character lowercase Git SHA")
     copied_log = require_approved_copied_log(args.copied_log)
     output_dir = args.output_dir.expanduser()
     reject_symlink_component(output_dir, "--output-dir")

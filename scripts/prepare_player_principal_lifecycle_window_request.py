@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from protected_paths import reject_protected_output_path
+from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import reject_symlink_component
 
 
@@ -124,8 +125,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--binary-sha256 must be lowercase SHA256 hex")
     if args.binary_sha256 != EXPECTED_BINARY_SHA256:
         raise SystemExit(f"--binary-sha256 must match reviewed ARK SHA256 {EXPECTED_BINARY_SHA256}")
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+", args.obelisk_commit):
-        raise SystemExit("--obelisk-commit must be a safe token")
+    if not is_reviewed_obelisk_commit(args.obelisk_commit):
+        raise SystemExit("--obelisk-commit must be a reviewed 40-character lowercase Git SHA")
     start = parse_utc(args.approved_window_start_utc, "--approved-window-start-utc")
     end = parse_utc(args.approved_window_end_utc, "--approved-window-end-utc")
     if not start < end:

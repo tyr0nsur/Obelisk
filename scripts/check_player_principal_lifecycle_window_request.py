@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import protected_paths
+from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import first_symlink_component, reject_symlink_component
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_TEXT,
@@ -347,7 +348,7 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
     if sha is not None and (not SHA256_RE.fullmatch(sha) or sha != EXPECTED_BINARY_SHA256):
         add(blockers, "ark_binary_sha256_not_reviewed", "ark_binary_sha256", expected=EXPECTED_BINARY_SHA256)
     commit = string_at(payload, "obelisk_commit", blockers)
-    if commit is not None and not SAFE_TOKEN_RE.fullmatch(commit):
+    if commit is not None and not is_reviewed_obelisk_commit(commit):
         add(blockers, "obelisk_commit_invalid", "obelisk_commit")
     if payload.get("restart_expectation") not in ALLOWED_RESTART_EXPECTATIONS:
         add(blockers, "restart_expectation_invalid", "restart_expectation")
