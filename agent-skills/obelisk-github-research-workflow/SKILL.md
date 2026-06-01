@@ -32,12 +32,14 @@ complete SDK for the excluded capability.
 
 Compatibility research may consult ArkServerApi/AseApi as names and demand dictionaries
 for familiar ARK plugin concepts. Local NextGenPlugins clones are names and demand
-signals only, not porting or copying sources. Obelisk must not copy ArkServerApi/AseApi,
+signals only, not porting or copying sources. They may also inform conceptual
+architecture and migration ergonomics: capability grouping, owner/operator workflows,
+plugin families, and the shape modders expect when moving to Linux. Obelisk must not copy ArkServerApi/AseApi,
 NextGenPlugins, or other ArkApi plugin offsets, vtables, layouts, `.lib` artifacts,
-MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall` wrappers, raw UE
-pointer APIs, constants, schemas, control flow, command parsers, return semantics, or
-algorithmic implementations; Linux support is rebuilt from Obelisk reflection and
-ProcessEvent copied-data evidence.
+MSVC/Windows ABI assumptions, direct
+`GetNativePointerField`/`NativeCall` wrappers, raw UE pointer APIs, constants, schemas,
+control flow, command parsers, return semantics, or algorithmic implementations; Linux
+support is rebuilt from Obelisk reflection and ProcessEvent copied-data evidence.
 For Plugin Hub work, start from `docs/PLUGIN_HUB_FOUNDATION_V1.md` and
 `docs/PLUGIN_HUB_CAPABILITY_MATRIX.md` before proposing new public SDK surface.
 

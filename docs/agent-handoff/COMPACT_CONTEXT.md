@@ -38,15 +38,14 @@ priorities, and do not use history files as the active source of truth.
   or agent status. Explicit current-turn approval is required for every Discord send;
   publication approval does not imply Discord approval. Always dry-run the embed first and
   verify a public-safe title, description, status/scope, and 2-5 useful fields.
-- `ArkServerApi/AseApi` may be used only as a names and demand dictionary for familiar
-  ArkApi-style plugin concepts. Do not import offsets, vtables, layouts, `.lib`
-  artifacts, MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall`
-  wrappers, raw UE pointer APIs, constants, schemas, control flow, command parsers,
-  return semantics, or source-derived implementations; all access must be rebuilt through
-  Obelisk reflection/ProcessEvent copied-data evidence.
-- Local `NextGenPlugins` clones are names and demand dictionaries only, not porting or
-  copying sources. Keep clones out of the repo and do not copy code, constants, schemas,
-  control flow, command parsers, return constants, or implementations.
+- `ArkServerApi/AseApi` and local `NextGenPlugins` clones may be used as conceptual
+  architecture, naming, demand, and migration-ergonomics references for familiar ArkApi-
+  style plugin concepts. Use them to understand capability grouping and operator/plugin
+  expectations, but do not import offsets, vtables, layouts, `.lib` artifacts,
+  MSVC/Windows ABI assumptions, direct `GetNativePointerField`/`NativeCall` wrappers, raw
+  UE pointer APIs, constants, schemas, control flow, command parsers, return semantics, or
+  source-derived implementations; all access must be rebuilt through Obelisk
+  reflection/ProcessEvent copied-data evidence.
 
 ## Stable Baseline
 
@@ -278,25 +277,17 @@ priorities, and do not use history files as the active source of truth.
   inventory pack and committed candidate fixtures for `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`. A distinct vanilla-gdb candidate root at
   `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
-  now compares `12/12` accepted in planning-layout mode. The remaining blocker is accepted
-  lifecycle anchors plus principal invalidation semantics. If an explicit
-  `--lifecycle-anchor-candidates-manifest` is provided to
-  `scripts/check_player_identity_first_evidence_readiness.py`, it may clear only the
-  lifecycle-anchor evidence precondition and must then remain blocked on
-  `principal_invalidation_semantics_unresolved`.
-  A consume-only policy/lifecycle bundle at
+  now compares `12/12` accepted in planning-layout mode. A consume-only policy/lifecycle
+  bundle at
   `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
-  is accepted by the offline artifact gate. Passing both that lifecycle-anchor candidate
-  manifest and the principal-invalidation policy manifest to the first-evidence readiness
-  checker now first exposes `players_identity_first_evidence_consume_gate_blocked`: the
-  generated first-evidence payload is rejected for
-  `players_identity_first_evidence_artifact_identity_source_id_count_mismatch` and
-  `players_identity_first_evidence_public_overclaim_public_api`. Fix that offline artifact
-  shape before treating approved runtime evidence as the immediate blocker again. The
-  report still carries a requirements-only `first_evidence.runtime_principal_lifecycle_evidence`
-  block for the future approved runtime window; it is not accepted evidence and must not be
-  used for promotion. The optional runtime-principal lifecycle manifest checker accepts only
-  a synthetic/redacted shape fixture and stays blocked on runtime promotion.
+  is accepted by the offline artifact gate. Passing both lifecycle-anchor and
+  principal-invalidation manifests to the first-evidence readiness checker now keeps
+  consume-gate acceptance and exposes `approved_runtime_evidence_missing` as the primary
+  blocker. The report still carries a requirements-only
+  `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
+  runtime window; it is not accepted evidence and must not be used for promotion. The
+  optional runtime-principal lifecycle manifest checker accepts only a synthetic/redacted
+  shape fixture and stays blocked on runtime promotion.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as

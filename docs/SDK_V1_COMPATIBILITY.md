@@ -79,9 +79,18 @@ find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(MyPlugin PRIVATE Obelisk::obelisk_sdk)
 ```
 
-The `SDK` component means the installed public header and CMake package target are
-present. It is package-shape evidence only, not a `v1.0` completion marker, and does not
-imply private runtime headers, vendored runtime dependencies, or any blocked gameplay
+The `SDK` component means only the installed public header and CMake package target are
+present:
+
+```text
+include/obelisk/ObeliskApi.h
+lib/cmake/Obelisk/ObeliskConfig.cmake
+lib/cmake/Obelisk/ObeliskConfigVersion.cmake
+lib/cmake/Obelisk/ObeliskTargets.cmake
+```
+
+That file set is package-shape evidence only, not a `v1.0` completion marker, and does
+not imply private runtime headers, vendored runtime dependencies, or any blocked gameplay
 module surface.
 
 Lifecycle ownership is part of the promoted foundation contract: metadata string

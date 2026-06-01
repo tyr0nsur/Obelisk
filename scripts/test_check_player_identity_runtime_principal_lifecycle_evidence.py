@@ -208,6 +208,24 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             },
         )
 
+    def test_emits_canonical_shape_fixture_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "runtime-principal-lifecycle-template.json"
+            subprocess.run(
+                [sys.executable, str(SCRIPT), "--emit-template", str(path)],
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            result = self.run_checker(payload)
+            report = json.loads(result.stdout)
+
+        self.assertTrue(report["shape_accepted_by_this_checker"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
+        self.assertEqual(report["remaining_blockers"], ["approved_runtime_evidence_missing"])
+
     def test_promote_mode_blocks_shape_fixture(self) -> None:
         result = self.run_checker(manifest(), "--promote", check=False)
         self.assertNotEqual(result.returncode, 0)

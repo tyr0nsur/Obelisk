@@ -215,6 +215,24 @@ expect_wrapper_failure player-principal-marker-with-dispatch-budget env \
     OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=1 \
     OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=1 \
     "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure player-principal-marker-without-stable-markers env \
+    OBELISK_ROOT="${root_player_principal}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/player-principal-marker-without-stable-markers.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=1 \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0 \
+    "${WRAPPER}" TheIsland?listen
+expect_wrapper_failure player-principal-marker-with-too-large-log-budget env \
+    OBELISK_ROOT="${root_player_principal}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/player-principal-marker-with-too-large-log-budget.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=11 \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0 \
+    "${WRAPPER}" TheIsland?listen
+: > "${root_player_principal}/state/instances/arkserver2/enable-process-event-hook"
+: > "${root_player_principal}/state/instances/arkserver2/disable-plugins"
 (
     cd "${RUN_CWD}"
     OBELISK_ROOT="${root_player_principal}" \

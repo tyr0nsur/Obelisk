@@ -235,6 +235,29 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             ],
         )
 
+    def test_emits_canonical_candidate_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "permissions-admin-query-template.json"
+            subprocess.run(
+                [sys.executable, str(SCRIPT), "--emit-template", str(path)],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            result = self.run_checker(payload)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["candidate_only"])
+        self.assertTrue(report["pre_abi"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["mode"], "consume")
+
     def test_promote_public_and_runtime_modes_fail_closed(self) -> None:
         for flag, expected in (
             ("--promote", "promote_blocked_for_candidate_only_pre_abi_contract"),

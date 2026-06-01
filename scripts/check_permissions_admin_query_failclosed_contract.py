@@ -30,7 +30,30 @@ REQUIRED_QUERY_FIELDS = frozenset(
         "request_flags",
     )
 )
+REQUIRED_QUERY_FIELD_SEQUENCE = (
+    "plugin_owner_token",
+    "principal_handle",
+    "principal_generation",
+    "principal_scope_flags",
+    "action",
+    "action_size",
+    "resource_scope",
+    "resource_scope_size",
+    "request_flags",
+)
+REQUIRED_QUERY_FIELD_TYPES = {
+    "plugin_owner_token": "uint64_owner_token",
+    "principal_handle": "uint64_opaque",
+    "principal_generation": "uint64",
+    "principal_scope_flags": "uint64_flags",
+    "action": "copied_bytes",
+    "action_size": "size_t",
+    "resource_scope": "copied_bytes",
+    "resource_scope_size": "size_t",
+    "request_flags": "uint64_flags",
+}
 REQUIRED_DECISIONS = frozenset(("deny", "allow", "unknown"))
+REQUIRED_DECISION_SEQUENCE = ("deny", "allow", "unknown")
 REQUIRED_PROVENANCE_FIELDS = frozenset(
     (
         "policy_source_id",
@@ -70,6 +93,25 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
         "authority_generation_mismatch",
         "plugin_supplied_provenance",
     )
+)
+REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
+    "stale_principal",
+    "scope_mismatch",
+    "missing_runtime_principal_identity",
+    "command_text_principal_claim",
+    "operator_config_principal_claim",
+    "missing_principal_generation",
+    "missing_plugin_owner_token",
+    "missing_capability",
+    "rate_limit_exceeded",
+    "unknown_authority",
+    "missing_policy_source",
+    "missing_policy_source_generation",
+    "policy_source_generation_mismatch",
+    "missing_policy_epoch",
+    "missing_authority_generation",
+    "authority_generation_mismatch",
+    "plugin_supplied_provenance",
 )
 REQUIRED_EXCLUSIONS = frozenset(
     (
@@ -208,8 +250,13 @@ class Validation:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("manifest", type=Path, help="Permissions/admin query candidate contract to validate.")
+    parser.add_argument("manifest", type=Path, nargs="?", help="Permissions/admin query candidate contract to validate.")
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
+    parser.add_argument(
+        "--emit-template",
+        type=Path,
+        help="Write the canonical permissions/admin query fail-closed candidate template and exit.",
+    )
     parser.add_argument("--promote", action="store_true", help="Check promote readiness; candidate-only contracts fail closed.")
     parser.add_argument(
         "--public-readiness",
@@ -240,6 +287,83 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SystemExit(f"{path}: top-level JSON must be an object")
     return payload
+
+
+def build_template_manifest() -> dict[str, Any]:
+    return {
+        "schema": SCHEMA,
+        "artifact_status": "candidate_only",
+        "readiness_classification": "planning_only",
+        "pre_abi": True,
+        "public_header_allowed": False,
+        "public_cache_abi_allowed": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "runtime_promotion_allowed": False,
+        "query_contract": {
+            "kind": "query_only_fail_closed_permission_check",
+            "mutation_allowed": False,
+            "command_response_allowed": False,
+            "public_cache_allowed": False,
+            "fields": [
+                {
+                    "name": name,
+                    "type": REQUIRED_QUERY_FIELD_TYPES[name],
+                    "copied": True,
+                    "source": "obelisk_owned_copy",
+                    "consumer_visible": True,
+                }
+                for name in REQUIRED_QUERY_FIELD_SEQUENCE
+            ],
+        },
+        "decision_contract": {
+            "results": [
+                {
+                    "decision": decision,
+                    "fail_closed": decision != "allow",
+                    "requires_provenance": decision == "allow",
+                }
+                for decision in REQUIRED_DECISION_SEQUENCE
+            ],
+            "provenance_fields": sorted(REQUIRED_PROVENANCE_FIELDS),
+            "allow_without_provenance_allowed": False,
+            "unknown_authority_result": "unknown",
+        },
+        "authority_policy": {
+            "recognized_authority_kinds": sorted(REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
+            "allow_capable_authority_kinds": sorted(REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS),
+            "allowed_authority_kinds": sorted(REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
+            "operator_config_allow_capable": False,
+            "plugin_supplied_authority_allowed": False,
+            "remote_authority_allowed": False,
+            "cross_process_authority_allowed": False,
+            "unknown_authority_fails_closed": True,
+        },
+        "principal_runtime_identity_policy": dict(REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY),
+        "fail_closed_cases": [
+            {
+                "case": case,
+                "consumer_result": "deny",
+                "fail_closed": True,
+                "allow_allowed": False,
+            }
+            for case in REQUIRED_FAIL_CLOSED_CASE_SEQUENCE
+        ],
+        "negative_surface_exclusions": sorted(REQUIRED_EXCLUSIONS),
+        "promotion_gate": {
+            "ready": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": [
+                "candidate_only_pre_abi_contract",
+                "public_abi_review_missing",
+                "runtime_evidence_missing",
+            ],
+        },
+        "non_claims": sorted(REQUIRED_NON_CLAIMS),
+    }
 
 
 def mode(args: argparse.Namespace) -> str:
@@ -690,6 +814,12 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
 def main() -> int:
     args = parse_args()
     check_mode = mode(args)
+    if args.emit_template is not None:
+        payload = build_template_manifest()
+        args.emit_template.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return 0
+    if args.manifest is None:
+        raise SystemExit("manifest is required unless --emit-template is used")
     payload = load_json(args.manifest)
     validation = validate_manifest(payload, check_mode=check_mode)
     report = build_report(payload, validation, check_mode=check_mode)

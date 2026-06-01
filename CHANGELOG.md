@@ -63,7 +63,7 @@
   inside the matching gameplay callback scope, core evidence-pack manifests carry an
   explicit schema before snapshot consumers trust `core.path`, target-set listings state
   layout-only/non-public SDK scope, installed SDK docs name only the public header, and
-  research/Plugin Hub notes separate production-supported seeds from experimental patterns.
+  research/Plugin Hub notes separate release-supported seeds from experimental patterns.
 - Hardened dispatcher cleanup and evidence identity so `DestroyUserData` reentrancy does
   not deadlock copied-event dispatcher cleanup, snapshot evidence IDs must be safe
   non-placeholder components, SHA256 metadata is normalized, release-readiness target
@@ -107,7 +107,7 @@
 - Clarified UFunction target-set listing and Structure build-policy guidance so
   release-readiness target sets, internal/layout-only sets, and planning-only sets are
   machine-readable and exact snapshot inputs stay separate from evidence-pack manifests.
-- Clarified Plugin Hub support tiers so production-supported seeds, experimental examples,
+- Clarified Plugin Hub support tiers so release-supported seeds, experimental examples,
   and blocked/backlog lanes are explicit for plugin authors.
 - Hardened `EventManager` owned callback registration so null raw ProcessEvent callbacks
   fail closed without creating inert handles or owner-cleanup state.
@@ -149,7 +149,7 @@
   interpretation is checked against evaluator constants.
 - Hardened Discord embed sending so forbidden secret/webhook/player-text phrases are
   rejected from both embed fields and top-level content.
-- Clarified post-RC Plugin Hub terminology so production-supported seeds are limited to
+- Clarified post-RC Plugin Hub terminology so release-supported seeds are limited to
   lifecycle/config/logging, descriptor/catalog, and process-local timer examples, while
   copied chat and copied policy examples remain experimental seed patterns.
 - Hardened offline snapshot/artifact tooling: `inspect_core_ufunctions.py --snapshot-json`

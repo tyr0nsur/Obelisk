@@ -24,6 +24,21 @@
       "GameplayPolicyEvent and ChatMessageEvent copied-data seeds"
     ]
   },
+  "installed_sdk_package_shape": {
+    "component": "SDK",
+    "status": "package-shape-evidence-only",
+    "installed_files": [
+      "include/obelisk/ObeliskApi.h",
+      "lib/cmake/Obelisk/ObeliskConfig.cmake",
+      "lib/cmake/Obelisk/ObeliskConfigVersion.cmake",
+      "lib/cmake/Obelisk/ObeliskTargets.cmake"
+    ],
+    "not_sufficient_for": [
+      "v1_completion_required",
+      "stable_release_contract.claim_allowed",
+      "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces"
+    ]
+  },
   "status_values": [
     "promoted",
     "promoted-experimental-only",

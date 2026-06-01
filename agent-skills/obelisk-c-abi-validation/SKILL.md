@@ -27,9 +27,10 @@ registration, and any SDK surface that a `.so` will consume.
   `ObeliskPluginInitContext`. The runtime accepts those owner-token registrations during
   `ObeliskPlugin_Init`, including from helper/background threads that do not inherit the
   loader thread-local current owner.
-- Handle-returning owner-token ProcessEvent registrations are the preferred public path
-  for long-lived callbacks. Public unregister must be owner-scoped with the same
-  `plugin_owner_token`; never expose bare unregister-by-id across the plugin ABI.
+- Handle-returning owner-token registrations are the required ownership model for any
+  long-lived callback surface. Raw ProcessEvent registrations remain debug-gated ABI
+  plumbing, not a public SDK/module surface. Public unregister must be owner-scoped with
+  the same `plugin_owner_token`; never expose bare unregister-by-id across the plugin ABI.
 - `CallProcessEvent` remains in the ABI v1 function table for compatibility, but it is an
   init-window debug escape hatch only. The runtime must reject it unless the calling plugin
   is currently inside `ObeliskPlugin_Init`, that plugin owner's captured capability

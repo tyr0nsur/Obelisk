@@ -59,7 +59,7 @@ The installed SDK must also expose a CMake package:
 External plugin projects should prefer:
 
 ```cmake
-find_package(Obelisk CONFIG REQUIRED)
+find_package(Obelisk 0.1.0 CONFIG REQUIRED COMPONENTS SDK)
 target_link_libraries(my_plugin PRIVATE Obelisk::obelisk_sdk)
 ```
 

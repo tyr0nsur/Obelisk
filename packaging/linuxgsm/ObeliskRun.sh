@@ -161,6 +161,18 @@ require_positive_integer() {
     fi
 }
 
+require_positive_integer_at_most() {
+    local name="$1"
+    local value="$2"
+    local max="$3"
+
+    require_positive_integer "${name}" "${value}"
+    if (( 10#${value} > max )); then
+        echo "${name} must be <= ${max} for observer-debug observer gates." >&2
+        exit 1
+    fi
+}
+
 require_nonnegative_integer() {
     local name="$1"
     local value="$2"
@@ -294,9 +306,17 @@ configure_player_principal_lifecycle_observer() {
     enable_marker "allow-observer-debug-window" || return 0
     enable_marker "allow-experimental-observers" || return 0
     enable_marker "enable-player-principal-lifecycle-observer" || return 0
+    enable_marker "enable-process-event-hook" || {
+        echo "enable-process-event-hook marker is required for player principal lifecycle observer windows." >&2
+        exit 1
+    }
+    enable_marker "disable-plugins" || {
+        echo "disable-plugins marker is required for player principal lifecycle observer windows." >&2
+        exit 1
+    }
 
     require_supported_sha256 "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256" "${inherited_player_principal_lifecycle_binary_sha256}"
-    require_positive_integer "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT" "${inherited_player_principal_lifecycle_log_limit}"
+    require_positive_integer_at_most "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT" "${inherited_player_principal_lifecycle_log_limit}" 10
     if [[ "${inherited_player_principal_lifecycle_dispatch_limit}" != "0" ]]; then
         echo "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT must be 0 for observer-debug player principal lifecycle evidence." >&2
         exit 1

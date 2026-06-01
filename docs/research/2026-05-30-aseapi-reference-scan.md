@@ -14,9 +14,11 @@ Windows/MSVC assumptions into the Linux runtime.
 
 ## Result
 
-Useful, but only as a names and demand dictionary. It is not a behavior map,
+Useful, but only as a names and demand dictionary for evidence promotion. It is not a behavior map,
 compatibility target, implementation guide, or evidence source for public Obelisk SDK
-surfaces.
+surfaces. It is also valuable as conceptual architecture and
+migration-ergonomics input: AseApi helps Obelisk understand the plugin families, service
+boundaries, and operator workflows modders/server owners already expect.
 
 Use AseApi for:
 
@@ -26,6 +28,9 @@ Use AseApi for:
 - Demand taxonomy for future Obelisk design discussions: chat commands, console/RCON
   commands, tick callbacks, timers, plugin lifecycle commands, logging/config helpers,
   permissions, and common ArkApi-style plugin expectations.
+- Compatibility-oriented product design: familiar capability grouping, command/plugin
+  administration expectations, config/logging conventions, and migration priorities that
+  reduce friction for AseApi plugin authors moving to Linux.
 - Candidate name discovery only, before running Obelisk's own snapshot/second-source
   checks.
 

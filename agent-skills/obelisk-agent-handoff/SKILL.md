@@ -52,7 +52,8 @@ Do not pass vague claims as facts. Include evidence or mark them as hypotheses.
 ## Before Starting
 
 1. If you are the lead, read `docs/agent-handoff/CURRENT.md`.
-2. Check `git status --short --ignored`.
+2. Check `git status --short --ignored` unless the current instruction explicitly
+   prohibits Git.
 3. Identify your owned files and avoid editing outside that scope.
 4. Read the relevant skills for the subsystem.
 5. Note any stale or conflicting handoff state before changing files.

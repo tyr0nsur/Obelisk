@@ -204,8 +204,13 @@ class Validation:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("manifest", type=Path, help="Synthetic/redacted runtime evidence shape manifest.")
+    parser.add_argument("manifest", type=Path, nargs="?", help="Synthetic/redacted runtime evidence shape manifest.")
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
+    parser.add_argument(
+        "--emit-template",
+        type=Path,
+        help="Write the canonical synthetic/redacted shape fixture template and exit.",
+    )
     parser.add_argument("--promote", action="store_true", help="Fail closed for promotion checks.")
     parser.add_argument("--public-readiness", action="store_true", help="Fail closed for public SDK readiness checks.")
     parser.add_argument("--runtime-readiness", action="store_true", help="Fail closed for runtime readiness checks.")
@@ -243,6 +248,77 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SystemExit(f"{path}: top-level JSON must be an object")
     return payload
+
+
+def build_template_manifest() -> dict[str, Any]:
+    approval_gates = [
+        "server access or player-facing evidence windows",
+        "debug attachment, ptrace, gcore, or runtime scanners",
+        "server starts, stops, restarts, or marker changes",
+        "Discord/community/beta-test notices",
+        "GitHub publication, tags, pushes, or release claims",
+    ]
+    observations = []
+    for case in REQUIRED_CASE_SEQUENCE:
+        observations.append(
+            {
+                "case": case,
+                "target": REQUIRED_TARGETS[case],
+                "synthetic": True,
+                "redacted": True,
+                "runtime_observed": False,
+                "result": "shape_only",
+                "consumer_result": "deny_or_invalidate_only",
+                "copied_fields": list(REQUIRED_COPIED_FIELDS[case]),
+                "copied_bool_fields": list(REQUIRED_COPIED_BOOL_FIELDS[case]),
+                "copied_bool_values": list(REQUIRED_COPIED_BOOL_VALUES[case]),
+                "redacted_count": len(REQUIRED_OBSERVATION_REDACTIONS[case]),
+                "redacted_fields": list(REQUIRED_OBSERVATION_REDACTIONS[case]),
+                "post_original": REQUIRED_POST_ORIGINAL[case],
+                "role": REQUIRED_ROLE[case],
+                "principal_action": REQUIRED_PRINCIPAL_ACTION[case],
+                "delivery_claim": "none",
+                "raw_payload_retained": False,
+            }
+        )
+    return {
+        "schema": SCHEMA,
+        "artifact_status": "synthetic_redacted_fixture",
+        "readiness_classification": "shape_only_private_fixture",
+        "synthetic_fixture": True,
+        "private_manifest": True,
+        "redacted": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "approval": {
+            "approved_runtime_evidence_present": False,
+            "runtime_work_authorized_by_this_manifest": False,
+            "server_operations_authorized_by_this_manifest": False,
+            "publication_authorized_by_this_manifest": False,
+            "separate_operator_approval_required_before": approval_gates,
+        },
+        "observations": observations,
+        "privacy_boundary": {
+            "copied_opaque_principal_only": True,
+            "redacted_fields": sorted(REQUIRED_REDACTED_FIELDS),
+            "lookup_allowed": False,
+            "resource_handle_allowed": False,
+            "mutation_allowed": False,
+            "return_override_allowed": False,
+        },
+        "promotion_gate": {
+            "ready": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": [
+                "approved_runtime_evidence_missing",
+                "synthetic_shape_fixture_not_runtime_evidence",
+            ],
+        },
+        "non_claims": sorted(REQUIRED_NON_CLAIMS),
+    }
 
 
 def is_negative_context(trail: str) -> bool:
@@ -545,6 +621,12 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
 def main() -> int:
     args = parse_args()
     check_mode = mode(args)
+    if args.emit_template is not None:
+        payload = build_template_manifest()
+        args.emit_template.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return 0
+    if args.manifest is None:
+        raise SystemExit("manifest is required unless --emit-template is used")
     payload = load_json(args.manifest)
     validation = validate_manifest(payload, check_mode=check_mode)
     report = build_report(payload, validation, check_mode=check_mode)

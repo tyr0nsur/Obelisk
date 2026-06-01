@@ -230,6 +230,17 @@ should prove:
 - stable posture rejects the observer env and marker names;
 - dispatch remains disabled and non-zero dispatch budget fails closed.
 
+The canonical synthetic/redacted shape fixture can be emitted locally with:
+
+```bash
+python3 scripts/check_player_identity_runtime_principal_lifecycle_evidence.py \
+  --emit-template /tmp/players-identity-runtime-principal-lifecycle-template.json
+```
+
+That template is a private shape contract only. Passing it through the checker keeps
+`approved_runtime_evidence_present=false` and `approved_runtime_evidence_missing` as the
+remaining blocker.
+
 This validation floor is not approval to run a server.
 
 ## Non-Claims

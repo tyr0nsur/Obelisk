@@ -4012,13 +4012,30 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         installer = (REPO_ROOT / "scripts" / "install_obelisk.sh").read_text(encoding="utf-8")
         install_doc = (REPO_ROOT / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+        compatibility_doc = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
+        surfaces = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         public_headers = sorted(
             path.relative_to(REPO_ROOT).as_posix()
             for path in (REPO_ROOT / "include").rglob("*")
             if path.is_file()
         )
+        sdk_package_shape = surfaces["installed_sdk_package_shape"]
+        expected_sdk_files = [
+            "include/obelisk/ObeliskApi.h",
+            "lib/cmake/Obelisk/ObeliskConfig.cmake",
+            "lib/cmake/Obelisk/ObeliskConfigVersion.cmake",
+            "lib/cmake/Obelisk/ObeliskTargets.cmake",
+        ]
 
         self.assertEqual(public_headers, ["include/obelisk/ObeliskApi.h"])
+        self.assertEqual(sdk_package_shape["component"], "SDK")
+        self.assertEqual(sdk_package_shape["status"], "package-shape-evidence-only")
+        self.assertEqual(sdk_package_shape["installed_files"], expected_sdk_files)
+        self.assertIn("v1_completion_required", sdk_package_shape["not_sufficient_for"])
+        self.assertIn(
+            "stable_release_contract.claim_allowed",
+            sdk_package_shape["not_sufficient_for"],
+        )
         self.assertNotRegex(root_cmake, r"install\s*\(\s*DIRECTORY\s+include/?\b")
         self.assertRegex(
             root_cmake,
@@ -4033,6 +4050,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("lib/cmake/Obelisk/ObeliskConfig.cmake", install_doc)
         self.assertIn("lib/cmake/Obelisk/ObeliskConfigVersion.cmake", install_doc)
         self.assertIn("lib/cmake/Obelisk/ObeliskTargets.cmake", install_doc)
+        for sdk_file in expected_sdk_files:
+            with self.subTest(sdk_file=sdk_file):
+                self.assertIn(f'"{sdk_file}"', installer)
+                self.assertIn(sdk_file, install_doc)
+                self.assertIn(sdk_file, compatibility_doc)
         for managed_subpath in (
             "include/obelisk",
             "lib/cmake",
