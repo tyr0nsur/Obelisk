@@ -236,7 +236,17 @@
     },
     {
       "id": "runtime.evidence_intake",
-      "status": "missing",
+      "status": "covered",
+      "coverage_status": "contract_review_input_only",
+      "promotion_ready": false,
+      "public_sdk_ready": false,
+      "runtime_ready": false,
+      "public_header_allowed": false,
+      "covered_by": [
+        "scripts/check_player_identity_public_contract_readiness.py",
+        "scripts/test_check_player_identity_public_contract_readiness.py",
+        "scripts/test_player_identity_public_contract_decisions.py"
+      ],
       "required_coverage": [
         "approved runtime evidence is checked as an input to promotion",
         "approved runtime evidence alone leaves the public-header gate closed",

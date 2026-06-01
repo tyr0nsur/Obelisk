@@ -174,6 +174,34 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             "scripts/check_player_identity_public_contract_readiness.py",
         )
 
+    def test_runtime_evidence_intake_test_is_covered_without_promotion(self) -> None:
+        payload = self.load_decisions()
+        tests = {
+            item["id"]: item
+            for item in payload["required_tests_before_public_header"]
+        }
+        runtime_intake = tests["runtime.evidence_intake"]
+
+        self.assertEqual(runtime_intake["status"], "covered")
+        self.assertEqual(runtime_intake["coverage_status"], "contract_review_input_only")
+        self.assertFalse(runtime_intake["promotion_ready"])
+        self.assertFalse(runtime_intake["public_sdk_ready"])
+        self.assertFalse(runtime_intake["runtime_ready"])
+        self.assertFalse(runtime_intake["public_header_allowed"])
+        self.assertEqual(
+            set(runtime_intake["covered_by"]),
+            {
+                "scripts/check_player_identity_public_contract_readiness.py",
+                "scripts/test_check_player_identity_public_contract_readiness.py",
+                "scripts/test_player_identity_public_contract_decisions.py",
+            },
+        )
+
+        for test_id, item in tests.items():
+            if test_id != "runtime.evidence_intake":
+                with self.subTest(test_id=test_id):
+                    self.assertEqual(item["status"], "missing")
+
 
 if __name__ == "__main__":
     unittest.main()

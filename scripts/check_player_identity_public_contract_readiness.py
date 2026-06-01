@@ -40,6 +40,22 @@ REQUIRED_BLOCKERS = {
     "lifecycle.owner_cleanup",
     "separation.downstream_surfaces",
 }
+REQUIRED_TESTS_BEFORE_PUBLIC_HEADER = {
+    "manifest.guardrails",
+    "abi.layout",
+    "sdk.consumer",
+    "lifecycle.owner_cleanup",
+    "identity.fail_closed",
+    "privacy.redaction",
+    "runtime.evidence_intake",
+}
+CONTRACT_REVIEW_INPUT_ONLY_TESTS = {
+    "runtime.evidence_intake": {
+        "scripts/check_player_identity_public_contract_readiness.py",
+        "scripts/test_check_player_identity_public_contract_readiness.py",
+        "scripts/test_player_identity_public_contract_decisions.py",
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -97,7 +113,7 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
 def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     try:
         payload = approved_evidence.load_json(path)
-    except SystemExit as exc:
+    except (OSError, SystemExit) as exc:
         add(blockers, "approved_runtime_evidence_unreadable", "$.approved_runtime_evidence", error=str(exc))
         return {
             "ready": False,
@@ -170,6 +186,51 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             if isinstance(item, dict) and item.get("status") == "resolved":
                 add(blockers, "promotion_blocker_resolved_without_public_gate", f"$.promotion_blockers[{index}]")
 
+    required_tests = decisions.get("required_tests_before_public_header")
+    observed_test_ids: set[Any] = set()
+    if isinstance(required_tests, list):
+        observed_test_ids = {
+            item.get("id")
+            for item in required_tests
+            if isinstance(item, dict)
+        }
+    else:
+        add(blockers, "required_tests_before_public_header_not_list", "$.required_tests_before_public_header")
+    if observed_test_ids != REQUIRED_TESTS_BEFORE_PUBLIC_HEADER:
+        add(
+            blockers,
+            "required_tests_before_public_header_mismatch",
+            "$.required_tests_before_public_header",
+            expected=sorted(REQUIRED_TESTS_BEFORE_PUBLIC_HEADER),
+            observed=sorted(str(item) for item in observed_test_ids),
+        )
+    if isinstance(required_tests, list):
+        for index, item in enumerate(required_tests):
+            if not isinstance(item, dict):
+                add(blockers, "required_tests_before_public_header_entry_not_object", f"$.required_tests_before_public_header[{index}]")
+                continue
+            test_id = item.get("id")
+            if test_id in CONTRACT_REVIEW_INPUT_ONLY_TESTS:
+                if item.get("status") != "covered":
+                    add(blockers, "contract_review_input_test_not_covered", f"$.required_tests_before_public_header[{index}].status", test_id=test_id)
+                if item.get("coverage_status") != "contract_review_input_only":
+                    add(blockers, "contract_review_input_test_status_mismatch", f"$.required_tests_before_public_header[{index}].coverage_status", test_id=test_id)
+                covered_by = set(item.get("covered_by", [])) if isinstance(item.get("covered_by"), list) else set()
+                missing_coverage = CONTRACT_REVIEW_INPUT_ONLY_TESTS[test_id] - covered_by
+                if missing_coverage:
+                    add(
+                        blockers,
+                        "contract_review_input_test_coverage_missing",
+                        f"$.required_tests_before_public_header[{index}].covered_by",
+                        test_id=test_id,
+                        missing=sorted(missing_coverage),
+                    )
+                for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+                    if item.get(key) is not False:
+                        add(blockers, f"contract_review_input_test_{key}_not_false", f"$.required_tests_before_public_header[{index}].{key}", test_id=test_id)
+            elif item.get("status") != "missing":
+                add(blockers, "pre_header_test_marked_ready_without_public_gate", f"$.required_tests_before_public_header[{index}].status", test_id=test_id)
+
 
 def build_report(decisions: dict[str, Any], runtime_report: dict[str, Any], blockers: list[dict[str, Any]], check_mode: str) -> dict[str, Any]:
     runtime_ready = (
@@ -209,6 +270,14 @@ def build_report(decisions: dict[str, Any], runtime_report: dict[str, Any], bloc
             for blocker in decisions.get("promotion_blockers", [])
             if isinstance(blocker, dict)
         ],
+        "required_tests_before_public_header": {
+            "covered_for_contract_review_only": sorted(CONTRACT_REVIEW_INPUT_ONLY_TESTS),
+            "remaining_missing": [
+                item["id"]
+                for item in decisions.get("required_tests_before_public_header", [])
+                if isinstance(item, dict) and item.get("status") == "missing"
+            ],
+        },
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "approved_runtime_evidence": {

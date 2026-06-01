@@ -68,6 +68,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["public_header_symbols_now"], [])
         self.assertEqual(report["public_capability_bits_now"], [])
         self.assertEqual(report["public_callback_abi_now"], [])
+        self.assertEqual(report["required_tests_before_public_header"]["covered_for_contract_review_only"], ["runtime.evidence_intake"])
+        self.assertIn("abi.layout", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
         self.assertEqual(report["blockers"], [])
 
@@ -116,6 +118,35 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_not_accepted", report["blockers"])
         self.assertIn("approved_runtime_evidence_missing_or_not_ready", report["blockers"])
 
+    def test_missing_runtime_evidence_path_reports_json_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions_path = root / "decisions.json"
+            missing_runtime_path = root / "missing-approved-runtime.json"
+            decisions_path.write_text(json.dumps(self.decisions()), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--decisions",
+                    str(decisions_path),
+                    "--approved-runtime-evidence",
+                    str(missing_runtime_path),
+                    "--json",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        report = json.loads(result.stdout)
+        self.assertIn("approved_runtime_evidence_unreadable", report["blockers"])
+        self.assertIn("approved_runtime_evidence_missing_or_not_ready", report["blockers"])
+
     def test_rejects_forbidden_contract_terms_removed(self) -> None:
         decisions = self.decisions()
         decisions["forbidden_public_contract"] = ["lookup"]
@@ -124,6 +155,32 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+
+    def test_rejects_pre_header_test_overclaims(self) -> None:
+        decisions = self.decisions()
+        for item in decisions["required_tests_before_public_header"]:
+            if item["id"] == "runtime.evidence_intake":
+                item["promotion_ready"] = True
+            elif item["id"] == "abi.layout":
+                item["status"] = "covered"
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("contract_review_input_test_promotion_ready_not_false", report["blockers"])
+        self.assertIn("pre_header_test_marked_ready_without_public_gate", report["blockers"])
+
+    def test_malformed_required_tests_reports_json_blocker(self) -> None:
+        decisions = self.decisions()
+        decisions["required_tests_before_public_header"] = {}
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required_tests_before_public_header_not_list", report["blockers"])
+        self.assertIn("required_tests_before_public_header_mismatch", report["blockers"])
 
     def test_header_still_has_no_player_identity_public_symbols(self) -> None:
         header = HEADER.read_text(encoding="utf-8")

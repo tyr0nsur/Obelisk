@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -20,6 +21,12 @@ DEFAULT_ROOT = Path(
     "/home/flowcommunity-ark/obelisk-artifacts/structure-aggregate-census-policy-slice-20260531T034715Z"
 )
 DEFAULT_MANIFEST_NAME = "structure-aggregate-census-policy-slice.json"
+DEFAULT_SECOND_SOURCE_READINESS = Path(
+    "/servidor/ark/workspace-offline/"
+    "structure-aggregate-census-planning-second-source-bool-tail-20260530-offline-regenerated/"
+    "structure-aggregate-census-planning-readiness.json"
+)
+DEFAULT_SECOND_SOURCE_READINESS_SHA256 = "bba7a2023a77c297069d06c7350ed8804b0fad0ecdf41945889119bfce5d785e"
 REPORT_SCHEMA = "obelisk.structure-census-readiness-check.v1"
 POLICY_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
 SECOND_SOURCE_READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
@@ -177,7 +184,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--second-source-readiness",
         type=Path,
-        help="Offline reflection snapshot readiness JSON for structure-aggregate-census-planning.",
+        help=(
+            "Offline reflection snapshot readiness JSON for structure-aggregate-census-planning. "
+            "Defaults to the hash-pinned approved offline workspace report."
+        ),
+    )
+    parser.add_argument(
+        "--no-default-second-source-readiness",
+        action="store_true",
+        help="Do not consume the default hash-pinned second-source readiness report.",
     )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
@@ -305,6 +320,18 @@ def read_second_source_readiness(
     return parsed
 
 
+def sha256_file(path: Path, blockers: list[dict[str, Any]]) -> str | None:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        append_blocker(blockers, "second_source_readiness_hash_unreadable", path=str(path), detail=str(exc))
+        return None
+    return digest.hexdigest()
+
+
 def iter_named_values(value: object, key_name: str, *, trail: str = "$") -> list[tuple[str, object]]:
     found: list[tuple[str, object]] = []
     if isinstance(value, dict):
@@ -326,8 +353,18 @@ def validate_second_source_readiness(
     blockers: list[dict[str, Any]],
     *,
     path: Path,
+    expected_sha256: str | None = None,
 ) -> dict[str, Any]:
     local_blocker_start = len(blockers)
+    observed_sha256 = sha256_file(path, blockers)
+    if expected_sha256 is not None and observed_sha256 != expected_sha256:
+        append_blocker(
+            blockers,
+            "second_source_readiness_sha256_mismatch",
+            expected=expected_sha256,
+            value=observed_sha256,
+            path=str(path),
+        )
     if readiness.get("schema") != SECOND_SOURCE_READINESS_SCHEMA:
         append_blocker(
             blockers,
@@ -456,6 +493,8 @@ def validate_second_source_readiness(
     accepted = len(blockers) == local_blocker_start
     return {
         "path": str(path),
+        "sha256": observed_sha256,
+        "expected_sha256": expected_sha256,
         "status": "accepted" if accepted else "blocked",
         "schema": readiness.get("schema"),
         "gate_mode": readiness.get("gate_mode"),
@@ -791,10 +830,16 @@ def build_report(root_arg: Path, manifest_arg: Path | None, second_source_arg: P
     if second_source_path is not None:
         second_source_payload = read_second_source_readiness(second_source_path, blockers)
         if second_source_payload is not None:
+            expected_sha256 = (
+                DEFAULT_SECOND_SOURCE_READINESS_SHA256
+                if second_source_path == DEFAULT_SECOND_SOURCE_READINESS.resolve()
+                else None
+            )
             second_source_summary = validate_second_source_readiness(
                 second_source_payload,
                 blockers,
                 path=second_source_path,
+                expected_sha256=expected_sha256,
             )
     source_isolation = validate_source_isolation(REPO_ROOT, blockers)
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
@@ -878,7 +923,14 @@ def build_report(root_arg: Path, manifest_arg: Path | None, second_source_arg: P
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.root, args.manifest, args.second_source_readiness)
+    if args.no_default_second_source_readiness and args.second_source_readiness is not None:
+        raise SystemExit("--no-default-second-source-readiness cannot be combined with --second-source-readiness")
+    second_source_readiness = (
+        None
+        if args.no_default_second_source_readiness
+        else args.second_source_readiness or DEFAULT_SECOND_SOURCE_READINESS
+    )
+    report = build_report(args.root, args.manifest, second_source_readiness)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["ready"] else 1
 

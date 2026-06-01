@@ -200,8 +200,9 @@ Do not use live roots, restarts, ptrace, gcore, markers, `/servidor/ark`, or
 ## Offline Readiness Report
 
 `scripts/check_structure_census_readiness.py --json` is the offline readiness report for
-this slice. It remains a report over fixture artifacts and source isolation only; it is
-not a public SDK gate, runtime gate, enforcement gate, or artifact promotion gate.
+this slice. It remains a report over fixture artifacts, approved offline second-source
+readiness, and source isolation only; it is not a public SDK gate, runtime gate,
+enforcement gate, or artifact promotion gate.
 
 The report now emits `target_readiness` with one entry for each fixture target. The
 allowed per-target states are:
@@ -212,12 +213,17 @@ allowed per-target states are:
   requirement failure in that entry.
 - `second-source-missing`: target has fixture-backed first-source evidence, but no
   distinct sanitized second-source artifact identity or strict comparison is present.
+- `second-source-accepted`: target has fixture-backed first-source evidence plus the
+  consumed planning-layout readiness report accepted all six exact targets.
 - `blocked`: target is missing from required coverage or the report encountered a
   target-level blocker.
 
-For the current materialized aggregate/census slice, all six targets are expected to
-report `second-source-missing`: they are fixture-backed first-source evidence for
-internal planning, not promoted runtime or public SDK evidence.
+For the current materialized aggregate/census slice, all six targets report
+`second-source-accepted` by default only because the checker consumes the hash-pinned
+approved offline workspace readiness report listed below. Passing
+`--no-default-second-source-readiness` preserves the earlier accounting and reports all
+six targets as `second-source-missing`: fixture-backed first-source evidence for internal
+planning with no second-source report consumed.
 
 Follow-up audit on 2026-06-01 checked the offline snapshot root
 `/servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots`
@@ -269,6 +275,17 @@ completion.
 The same JSON includes machine-readable non-claims. These are intentional and must stay
 visible in future edits: no public `StructureEvents`, no public Structure SDK, no
 identity/lookup, no mutation, no return override, no enforcement, and no runtime claim.
+
+The checker now consumes that readiness report by default from:
+
+- path:
+  `/servidor/ark/workspace-offline/structure-aggregate-census-planning-second-source-bool-tail-20260530-offline-regenerated/structure-aggregate-census-planning-readiness.json`
+- sha256:
+  `bba7a2023a77c297069d06c7350ed8804b0fad0ecdf41945889119bfce5d785e`
+
+The SHA256 is versioned in the checker. If the offline workspace report drifts, the
+readiness check fails closed with `second_source_readiness_sha256_mismatch` rather than
+silently accepting a new unreviewed JSON.
 
 ## Internal Accumulator Checkpoint
 

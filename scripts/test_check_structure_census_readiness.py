@@ -22,6 +22,11 @@ DEFAULT_ROOT = Path(
     "/home/flowcommunity-ark/obelisk-artifacts/structure-aggregate-census-policy-slice-20260531T034715Z"
 )
 DEFAULT_MANIFEST = DEFAULT_ROOT / "structure-aggregate-census-policy-slice.json"
+DEFAULT_SECOND_SOURCE_READINESS = Path(
+    "/servidor/ark/workspace-offline/"
+    "structure-aggregate-census-planning-second-source-bool-tail-20260530-offline-regenerated/"
+    "structure-aggregate-census-planning-readiness.json"
+)
 
 SPEC = importlib.util.spec_from_file_location("check_structure_census_readiness", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -112,22 +117,34 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertEqual(payload["consume_gate"]["status"], "accepted")
         self.assertEqual(payload["promote_gate"]["status"], "blocked")
         self.assertEqual(payload["source_isolation"]["status"], "isolated")
-        self.assertEqual(payload["target_readiness"]["status"], "second-source-missing")
-        self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-missing": 6})
+        self.assertEqual(payload["target_readiness"]["status"], "second-source-accepted")
+        self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-accepted": 6})
         self.assertEqual(
             payload["target_readiness"]["allowed_statuses"],
             ["candidate", "fixture-backed", "second-source-missing", "second-source-accepted", "blocked"],
         )
-        self.assertEqual(payload["target_readiness"]["second_source"]["status"], "missing")
-        self.assertEqual(payload["second_source_readiness"]["status"], "missing")
+        self.assertEqual(payload["target_readiness"]["second_source"]["status"], "accepted")
+        self.assertEqual(
+            payload["target_readiness"]["second_source"]["path"],
+            str(DEFAULT_SECOND_SOURCE_READINESS.resolve()),
+        )
+        self.assertEqual(payload["second_source_readiness"]["status"], "accepted")
+        self.assertEqual(
+            payload["second_source_readiness"]["expected_sha256"],
+            CHECKER.DEFAULT_SECOND_SOURCE_READINESS_SHA256,
+        )
+        self.assertEqual(
+            payload["second_source_readiness"]["sha256"],
+            CHECKER.DEFAULT_SECOND_SOURCE_READINESS_SHA256,
+        )
         for target in payload["target_readiness"]["targets"]:
-            self.assertEqual(target["status"], "second-source-missing")
+            self.assertEqual(target["status"], "second-source-accepted")
             self.assertTrue(target["candidate"])
             self.assertEqual(target["candidate_status"], "candidate")
             self.assertTrue(target["fixture_backed"])
             self.assertEqual(target["fixture_status"], "fixture-backed")
-            self.assertFalse(target["second_source_backed"])
-            self.assertEqual(target["second_source_status"], "second-source-missing")
+            self.assertTrue(target["second_source_backed"])
+            self.assertEqual(target["second_source_status"], "second-source-accepted")
             self.assertEqual(target["blockers"], [])
         self.assertEqual(
             set(payload["promote_gate"]["blocker_reasons"]),
@@ -149,6 +166,21 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertEqual(payload["non_claim_matrix"]["public_structure_events"], "not_claimed")
         self.assertEqual(payload["non_claim_matrix"]["identity_lookup"], "not_claimed")
         self.assertEqual(payload["non_claim_matrix"]["enforcement"], "not_claimed")
+
+    def test_no_default_second_source_readiness_preserves_missing_accounting(self) -> None:
+        result = self.run_checker("--no-default-second-source-readiness", "--json")
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["status"], "candidate_ready")
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["target_readiness"]["status"], "second-source-missing")
+        self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-missing": 6})
+        self.assertEqual(payload["target_readiness"]["second_source"]["status"], "missing")
+        self.assertEqual(payload["second_source_readiness"]["status"], "missing")
+        for target in payload["target_readiness"]["targets"]:
+            self.assertEqual(target["status"], "second-source-missing")
+            self.assertFalse(target["second_source_backed"])
+            self.assertEqual(target["second_source_status"], "second-source-missing")
 
     def test_second_source_readiness_accepts_planning_accounting_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -257,6 +289,25 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
+
+    def test_second_source_readiness_expected_hash_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+            payload = json.loads(readiness.read_text(encoding="utf-8"))
+            blockers: list[dict] = []
+
+            result = CHECKER.validate_second_source_readiness(
+                payload,
+                blockers,
+                path=readiness,
+                expected_sha256="0" * 64,
+            )
+
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn(
+            "second_source_readiness_sha256_mismatch",
+            {blocker["reason"] for blocker in blockers},
+        )
 
     def test_source_isolation_blocks_runtime_or_public_wiring(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
