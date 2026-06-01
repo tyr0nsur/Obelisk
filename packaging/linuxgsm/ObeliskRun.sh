@@ -62,6 +62,9 @@ inherited_structure_reflection_dispatch_limit="${OBELISK_STRUCTURE_REFLECTION_DI
 inherited_item_return_events_binary_sha256="${OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256:-}"
 inherited_item_return_events_dispatch_limit="${OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT:-}"
 inherited_item_return_events_log_limit="${OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT:-}"
+inherited_player_principal_lifecycle_binary_sha256="${OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256:-}"
+inherited_player_principal_lifecycle_log_limit="${OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT:-}"
+inherited_player_principal_lifecycle_dispatch_limit="${OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT:-}"
 
 unset OBELISK_ENABLE_PROCESS_EVENT_HOOK
 unset OBELISK_DISABLE_PLUGINS
@@ -96,6 +99,10 @@ unset OBELISK_ENABLE_ITEM_RETURN_EVENTS
 unset OBELISK_ITEM_RETURN_EVENTS_BINARY_SHA256
 unset OBELISK_ITEM_RETURN_EVENTS_DISPATCH_LIMIT
 unset OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT
+unset OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER
+unset OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256
+unset OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT
+unset OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT
 
 enable_marker() {
     local feature="$1"
@@ -178,7 +185,8 @@ validate_observer_wrapper_profile() {
                 enable-chat-route-observer \
                 enable-inventory-reflection \
                 enable-structure-reflection \
-                enable-item-return-events
+                enable-item-return-events \
+                enable-player-principal-lifecycle-observer
             do
                 if marker_entry_exists "${marker}"; then
                     echo "Experimental observer marker ${marker} is present for ${OBELISK_INSTANCE_ID}; refusing stable wrapper launch." >&2
@@ -281,6 +289,25 @@ configure_item_return_events() {
     export OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT="${inherited_item_return_events_log_limit:-0}"
 }
 
+configure_player_principal_lifecycle_observer() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "allow-observer-debug-window" || return 0
+    enable_marker "allow-experimental-observers" || return 0
+    enable_marker "enable-player-principal-lifecycle-observer" || return 0
+
+    require_supported_sha256 "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256" "${inherited_player_principal_lifecycle_binary_sha256}"
+    require_positive_integer "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT" "${inherited_player_principal_lifecycle_log_limit}"
+    if [[ "${inherited_player_principal_lifecycle_dispatch_limit}" != "0" ]]; then
+        echo "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT must be 0 for observer-debug player principal lifecycle evidence." >&2
+        exit 1
+    fi
+
+    export OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1
+    export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256="${inherited_player_principal_lifecycle_binary_sha256}"
+    export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT="${inherited_player_principal_lifecycle_log_limit}"
+    export OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0
+}
+
 case "${1:-}" in
     Ragnarok*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver}"
@@ -297,6 +324,7 @@ case "${1:-}" in
         configure_inventory_reflection
         configure_structure_reflection
         configure_item_return_events
+        configure_player_principal_lifecycle_observer
         ;;
     TheIsland*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver2}"
@@ -313,6 +341,7 @@ case "${1:-}" in
         configure_inventory_reflection
         configure_structure_reflection
         configure_item_return_events
+        configure_player_principal_lifecycle_observer
         ;;
 esac
 

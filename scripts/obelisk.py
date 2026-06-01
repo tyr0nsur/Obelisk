@@ -32,6 +32,7 @@ FORBIDDEN_STABLE_MARKERS = frozenset(
         "enable-inventory-reflection",
         "enable-structure-reflection",
         "enable-item-return-events",
+        "enable-player-principal-lifecycle-observer",
         "enable-reflection-scanner",
         "request-static-fname-probe",
     )

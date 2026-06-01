@@ -28,6 +28,32 @@ SAFE_DETAIL_KEYS = {
     "chat": {
         "ServerSendChatMessage": {"send_mode", "send_mode_name", "send_mode_known"},
     },
+    "player_principal_lifecycle": {
+        "ShooterGameMode.HandleNewPlayer": {
+            "copied_bool_fields",
+            "copied_bool_values",
+            "delivery_claim",
+            "post_original",
+            "principal_action",
+            "principal_generation_logged",
+            "principal_id_logged",
+            "redacted_count",
+            "redacted_fields",
+            "role",
+        },
+        "ShooterGameMode.OnLogout": {
+            "copied_bool_fields",
+            "copied_bool_values",
+            "delivery_claim",
+            "post_original",
+            "principal_action",
+            "principal_generation_logged",
+            "principal_id_logged",
+            "redacted_count",
+            "redacted_fields",
+            "role",
+        },
+    },
     "item_return": {
         "AllowEquipItem": {"callbacks", "field_mask"},
         "CanRepair": {"callbacks", "field_mask"},
@@ -46,6 +72,28 @@ ITEM_RETURN_GATE_RE = re.compile(
     LOG_PREFIX
     + r"Experimental item return event producer enabled for ShooterGameServer "
     r"SHA256 (?P<sha256>[a-fA-F0-9]{64})\.?"
+)
+PLAYER_PRINCIPAL_LIFECYCLE_GATE_RE = re.compile(
+    LOG_PREFIX
+    + r"PlayerPrincipalLifecycleObserver enabled binary_sha256=(?P<sha256>[a-fA-F0-9]{64}) "
+    r"target_set=(?P<target_set>players-lifecycle-anchor-candidates) "
+    r"limit=(?P<limit>\d+) dispatch_limit=(?P<dispatch_limit>\d+) "
+    r"delivery_claim=(?P<delivery_claim>\S+) principal_claim=(?P<principal_claim>\S+)\.?"
+)
+PLAYER_PRINCIPAL_LIFECYCLE_EVENT_RE = re.compile(
+    LOG_PREFIX
+    + r"PlayerPrincipalLifecycleObserver event sequence=(?P<sequence>\d+) "
+    r"role=(?P<role>session_start|session_end|session_start_rejected) "
+    r"target=(?P<target>ShooterGameMode\.(?:HandleNewPlayer|OnLogout)) "
+    r"post_original=(?P<post_original>true|false) "
+    r"copied_bool_fields=(?P<copied_bool_fields>\S*) "
+    r"copied_bool_values=(?P<copied_bool_values>\S*) "
+    r"redacted_count=(?P<redacted_count>\d+) "
+    r"redacted_fields=(?P<redacted_fields>\S*) "
+    r"principal_action=(?P<principal_action>candidate_created|candidate_invalidated|none) "
+    r"principal_id_logged=(?P<principal_id_logged>true|false) "
+    r"principal_generation_logged=(?P<principal_generation_logged>true|false) "
+    r"delivery_claim=(?P<delivery_claim>\S+)\.?"
 )
 PROCESS_EVENT_RE = re.compile(
     LOG_PREFIX
@@ -359,6 +407,51 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             add_unique(modules[module]["gate_sha256"], match.group("sha256").lower())
             continue
 
+        if match := PLAYER_PRINCIPAL_LIFECYCLE_GATE_RE.fullmatch(stripped):
+            module = "player_principal_lifecycle"
+            close_active_context(source_index, module)
+            record = modules[module]
+            add_source_index(record, source_index)
+            record["source_merge_explicit"] = source_merge_explicit
+            add_unique(record["gate_sha256"], match.group("sha256").lower())
+            gate_function = "observer_gate"
+            record["functions"].setdefault(gate_function, function_record())
+            for key in ("target_set", "limit", "dispatch_limit", "delivery_claim", "principal_claim"):
+                add_unique(record["functions"][gate_function]["details"][key], int_or_text(match.group(key)))
+            continue
+
+        if match := PLAYER_PRINCIPAL_LIFECYCLE_EVENT_RE.fullmatch(stripped):
+            module = "player_principal_lifecycle"
+            function = match.group("target")
+            close_active_context(source_index, module)
+            record = modules[module]
+            record["source_merge_explicit"] = source_merge_explicit
+            add_source_index(record, source_index)
+            record["accepted_count"] += 1
+            functions = record["functions"]
+            functions.setdefault(function, function_record())
+            function_data = functions[function]
+            function_data["accepted"] += 1
+            allowed_keys = safe_detail_keys(module, function)
+            for key in (
+                "role",
+                "post_original",
+                "copied_bool_fields",
+                "copied_bool_values",
+                "redacted_count",
+                "redacted_fields",
+                "principal_action",
+                "principal_id_logged",
+                "principal_generation_logged",
+                "delivery_claim",
+            ):
+                raw_value = match.group(key)
+                if key not in allowed_keys:
+                    record["redacted_detail_keys"][key] += 1
+                    continue
+                add_unique(function_data["details"][key], int_or_text(raw_value))
+            continue
+
         if match := PROCESS_EVENT_RE.fullmatch(stripped):
             module = match.group("module")
             function = match.group("function")
@@ -503,9 +596,9 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
                 add_unique(functions[function]["details"][key], int_or_text(raw_value))
             continue
 
-        if "Reflected " in stripped or "Experimental " in stripped:
+        if "Reflected " in stripped or "Experimental " in stripped or "PlayerPrincipalLifecycleObserver " in stripped:
             match = re.search(r"(?:Reflected|Experimental) (?P<module>[A-Za-z0-9_]+)", stripped)
-            module = match.group("module") if match else "unknown"
+            module = "player_principal_lifecycle" if "PlayerPrincipalLifecycleObserver " in stripped else (match.group("module") if match else "unknown")
             modules[module]["source_merge_explicit"] = source_merge_explicit
             add_source_index(modules[module], source_index)
             modules[module]["malformed_observer_lines"] += 1

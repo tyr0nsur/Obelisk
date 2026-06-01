@@ -112,6 +112,7 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   - `enable-structure-reflection`
   - `enable-inventory-reflection`
   - `enable-item-return-events`
+  - `enable-player-principal-lifecycle-observer`
 - Runtime debug/scanner gates also require both env and instance markers:
   - `allow-ptrace`
   - `enable-debug-control`

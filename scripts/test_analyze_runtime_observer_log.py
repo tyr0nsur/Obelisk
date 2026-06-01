@@ -201,6 +201,61 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(item_return["functions"]["CanRepair"]["details"]["callbacks"], [2])
         self.assertEqual(item_return["reject_reasons"], {"non-item function": 1})
 
+    def test_summarizes_player_principal_lifecycle_observer_lines(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[info] PlayerPrincipalLifecycleObserver enabled "
+                "binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 "
+                "target_set=players-lifecycle-anchor-candidates limit=10 dispatch_limit=0 "
+                "delivery_claim=none principal_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,1 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=candidate_created principal_id_logged=false "
+                "principal_generation_logged=false delivery_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=2 role=session_end "
+                "target=ShooterGameMode.OnLogout post_original=true copied_bool_fields= "
+                "copied_bool_values= redacted_count=1 redacted_fields=Exiting "
+                "principal_action=candidate_invalidated principal_id_logged=false "
+                "principal_generation_logged=false delivery_claim=none.",
+            ]
+        )
+
+        module = result["modules"]["player_principal_lifecycle"]
+        self.assertEqual(module["accepted_count"], 2)
+        self.assertEqual(module["blockers"], ["runtime_observer_evidence_only"])
+        self.assertEqual(
+            module["gate_sha256"],
+            ["7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"],
+        )
+        self.assertEqual(module["functions"]["observer_gate"]["details"]["dispatch_limit"], [0])
+        self.assertEqual(module["functions"]["observer_gate"]["details"]["limit"], [10])
+        start = module["functions"]["ShooterGameMode.HandleNewPlayer"]
+        self.assertEqual(start["accepted"], 1)
+        self.assertEqual(start["details"]["role"], ["session_start"])
+        self.assertEqual(start["details"]["principal_action"], ["candidate_created"])
+        self.assertEqual(start["details"]["principal_id_logged"], ["false"])
+        self.assertEqual(start["details"]["principal_generation_logged"], ["false"])
+        self.assertEqual(start["details"]["redacted_count"], [3])
+        end = module["functions"]["ShooterGameMode.OnLogout"]
+        self.assertEqual(end["details"]["role"], ["session_end"])
+        self.assertEqual(end["details"]["principal_action"], ["candidate_invalidated"])
+
+    def test_flags_malformed_player_principal_lifecycle_lines(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true raw_pointer=0x1234",
+            ]
+        )
+
+        module = result["modules"]["player_principal_lifecycle"]
+        self.assertEqual(module["accepted_count"], 0)
+        self.assertEqual(module["malformed_observer_lines"], 1)
+        self.assertIn("missing_experimental_gate", module["blockers"])
+        self.assertIn("malformed_observer_lines", module["blockers"])
+
     def test_keeps_same_field_name_layouts_separate_by_function(self) -> None:
         result = self.run_analyzer(
             [
