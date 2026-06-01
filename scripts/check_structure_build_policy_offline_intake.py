@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from artifact_identity import ARTIFACT_IDENTITY_KEYS, complete_artifact_identity, is_sha256
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -323,7 +324,20 @@ FORBIDDEN_SNAPSHOT_KEYS = {
     "object",
     "pointer_window",
 }
-ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{8,}")
+FIELD_VALUE_BEARING_KEY_TOKENS = {
+    "payload",
+    "range",
+    "ranges",
+    "value",
+    "values",
+}
+FIELD_PUBLIC_KEY_TOKENS = {
+    "expose",
+    "exposed",
+    "exposes",
+    "public",
+}
+ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{6,}")
 HEX_METADATA_KEYS = {"function_flags", "property_flags", "return_value_offset"}
 
 
@@ -349,8 +363,11 @@ def add(blockers: list[dict[str, Any]], reason: str, **details: Any) -> None:
 
 
 def read_json(path: Path, blockers: list[dict[str, Any]], label: str) -> dict[str, Any] | None:
+    safe_path = safe_read_path(path, blockers, label)
+    if safe_path is None:
+        return None
     try:
-        parsed = json.loads(path.read_text(encoding="utf-8"))
+        parsed = json.loads(safe_path.read_text(encoding="utf-8"))
     except OSError as exc:
         add(blockers, f"{label}_unreadable", path=str(path), detail=str(exc))
         return None
@@ -364,10 +381,22 @@ def read_json(path: Path, blockers: list[dict[str, Any]], label: str) -> dict[st
 
 
 def sha256_file(path: Path, blockers: list[dict[str, Any]]) -> str | None:
+    safe_path = safe_read_path(path, blockers, "readiness")
+    if safe_path is None:
+        return None
     try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        return hashlib.sha256(safe_path.read_bytes()).hexdigest()
     except OSError as exc:
         add(blockers, "readiness_unreadable_for_sha256", path=str(path), detail=str(exc))
+        return None
+
+
+def safe_read_path(path: Path, blockers: list[dict[str, Any]], label: str) -> Path | None:
+    try:
+        reject_symlink_component(path, label)
+        return reject_protected_input_path(path, label)
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", path=str(path), detail=str(exc))
         return None
 
 
@@ -534,26 +563,22 @@ def validate_snapshot_path(
     if not snapshot_path.is_absolute():
         add(blockers, "readiness_target_detail_path_not_absolute", target=target_filter, value=str(snapshot_path))
         return None
-    try:
-        resolved_path = snapshot_path.resolve(strict=False)
-        resolved_expected = expected_path.resolve(strict=False)
-    except OSError as exc:
-        add(blockers, "readiness_target_detail_path_unresolvable", target=target_filter, value=str(snapshot_path), detail=str(exc))
-        return None
-    if resolved_path != resolved_expected:
+    if snapshot_path != expected_path:
         add(
             blockers,
             "readiness_target_detail_path_mismatch",
             target=target_filter,
-            expected=str(resolved_expected),
-            value=str(resolved_path),
+            expected=str(expected_path),
+            value=str(snapshot_path),
         )
         return None
-    return resolved_path
+    if safe_read_path(snapshot_path, blockers, "snapshot") is None:
+        return None
+    return snapshot_path
 
 
-def candidate_snapshot_path(base_snapshot_path: Path) -> Path:
-    return base_snapshot_path.parent.parent / SNAPSHOT_CANDIDATE_DIR / base_snapshot_path.name
+def candidate_snapshot_path(readiness_path: Path, base_snapshot_path: Path) -> Path:
+    return readiness_path.parent / SNAPSHOT_CANDIDATE_DIR / base_snapshot_path.name
 
 
 def snapshot_artifact_identity(snapshot: dict[str, Any], blockers: list[dict[str, Any]], path: str) -> dict[str, str] | None:
@@ -729,11 +754,28 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
         redaction = FIELD_REDACTION_POLICY.get(str(prop.get("name")))
         if redaction is None:
             continue
+        forbidden_keys = field_policy_forbidden_keys(prop, redaction)
+        for key in forbidden_keys:
+            add(blockers, "snapshot_field_value_bearing_key", path=prop_path, field=prop.get("name"), key=key)
         if redaction.startswith("redacted_") and prop.get("exposes_range") is True:
             add(blockers, "snapshot_redacted_field_exposes_range", path=prop_path, field=prop.get("name"))
         if redaction.startswith("layout_only_") and prop.get("exposes_public_payload") is True:
             add(blockers, "snapshot_layout_only_field_public_payload", path=prop_path, field=prop.get("name"))
     return snapshot
+
+
+def field_policy_forbidden_keys(prop: dict[str, Any], redaction: str) -> list[str]:
+    if not redaction.startswith(("redacted_", "layout_only_")):
+        return []
+    forbidden: list[str] = []
+    for key in prop:
+        tokens = key_tokens(str(key))
+        if tokens & FIELD_VALUE_BEARING_KEY_TOKENS:
+            forbidden.append(str(key))
+            continue
+        if (tokens & FIELD_PUBLIC_KEY_TOKENS) and (tokens & PUBLIC_PAYLOAD_KEY_TOKENS):
+            forbidden.append(str(key))
+    return forbidden
 
 
 def validate_readiness_snapshot_shapes(readiness: dict[str, Any], readiness_path: Path, blockers: list[dict[str, Any]]) -> None:
@@ -791,7 +833,9 @@ def validate_readiness_snapshot_shapes(readiness: dict[str, Any], readiness_path
         base_path = validate_snapshot_path(target_filter, Path(path_value), readiness_path, blockers)
         if base_path is None:
             continue
-        candidate_path = candidate_snapshot_path(base_path)
+        candidate_path = candidate_snapshot_path(readiness_path, base_path)
+        if safe_read_path(candidate_path, blockers, "snapshot") is None:
+            continue
         base_snapshot = validate_snapshot_shape(target_filter, base_path, blockers)
         candidate_snapshot = validate_snapshot_shape(target_filter, candidate_path, blockers)
         if base_snapshot is None or candidate_snapshot is None:

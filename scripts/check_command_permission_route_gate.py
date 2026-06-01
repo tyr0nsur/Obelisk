@@ -171,6 +171,8 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
             "runtime_ready",
             "public_header_allowed",
             "public_readiness_ready",
+            "public_command_router_allowed",
+            "public_reply_or_send_chat_abi_allowed",
             "reply_api_allowed",
             "reply_abi_allowed",
             "send_chat_api_allowed",

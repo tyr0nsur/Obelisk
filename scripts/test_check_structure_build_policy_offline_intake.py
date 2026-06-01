@@ -659,6 +659,22 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertIn("snapshot_raw_sanitization_mismatch", {item["reason"] for item in payload["blockers"]})
 
+    def test_snapshot_short_ark_address_redaction_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "base" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            snapshot["targets"][0]["property_chain"]["properties"][0]["native_func"] = "0x1d34e20"
+            snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_raw_sanitization_mismatch", {item["reason"] for item in payload["blockers"]})
+
     def test_snapshot_redacted_field_exposure_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -674,6 +690,88 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertFalse(payload["ready"])
         self.assertIn("snapshot_redacted_field_exposes_range", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_redacted_field_value_bearing_keys_fail_closed(self) -> None:
+        cases = [
+            ("PrimalStructure.IsAllowedToBuild.snapshot.json", 3, "public_payload", {"x": 1}),
+            ("PrimalStructure.BPIsAllowedToBuild.snapshot.json", 1, "range", [96, 100]),
+            ("PrimalStructure.BPIsAllowedToBuildEx.snapshot.json", 5, "value", 1),
+        ]
+        for filename, property_index, key, value in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    readiness_payload = self.readiness_payload()
+                    manifest, _ = self.write_case(root, readiness_payload)
+                    snapshot_path = root / "base" / filename
+                    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+                    snapshot["targets"][0]["property_chain"]["properties"][property_index][key] = value
+                    snapshot_path.write_text(json.dumps(snapshot, sort_keys=True), encoding="utf-8")
+                    result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertFalse(payload["ready"])
+                self.assertIn("snapshot_field_value_bearing_key", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_base_directory_symlink_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            real_base = root / "real-base"
+            (root / "base").rename(real_base)
+            (root / "base").symlink_to(real_base, target_is_directory=True)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_path_rejected", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_candidate_directory_symlink_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            real_candidate = root / "real-candidate"
+            (root / "candidate").rename(real_candidate)
+            (root / "candidate").symlink_to(real_candidate, target_is_directory=True)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_path_rejected", {item["reason"] for item in payload["blockers"]})
+
+    def test_snapshot_file_symlink_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            manifest, _ = self.write_case(root, readiness_payload)
+            snapshot_path = root / "base" / "PrimalStructure.IsAllowedToBuild.snapshot.json"
+            real_snapshot = root / "base" / "real.snapshot.json"
+            snapshot_path.rename(real_snapshot)
+            snapshot_path.symlink_to(real_snapshot)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("snapshot_path_rejected", {item["reason"] for item in payload["blockers"]})
+
+    def test_protected_manifest_path_fails_closed_before_reading(self) -> None:
+        result = self.run_checker(
+            "--manifest",
+            "/servidor/ark/obelisk/structure-build-policy/public_sdk_surfaces.json",
+            "--json",
+            check=False,
+        )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("manifest_path_rejected", {item["reason"] for item in payload["blockers"]})
 
 
 if __name__ == "__main__":

@@ -235,6 +235,43 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             report["blockers"],
         )
 
+    def test_route_check_rejects_public_command_reply_alias_claims(self) -> None:
+        original = ROUTE_GATE.run_check
+
+        def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+            result = original(name, argv)
+            if name == "commands_replies_public_readiness":
+                result["valid"] = False
+                result["public_or_runtime_claims"] = [
+                    "public_command_router_allowed",
+                    "public_reply_or_send_chat_abi_allowed",
+                ]
+            return result
+
+        args = SimpleNamespace(
+            query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+            player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+            public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            json=True,
+        )
+        try:
+            ROUTE_GATE.run_check = fake_run_check
+            report = ROUTE_GATE.build_report(args)
+        finally:
+            ROUTE_GATE.run_check = original
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn(
+            "commands_replies_public_readiness: unexpected public/runtime claim: "
+            "public_command_router_allowed, public_reply_or_send_chat_abi_allowed",
+            report["blockers"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
