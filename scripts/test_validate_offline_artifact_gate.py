@@ -1749,6 +1749,24 @@ def resource_handle_revalidation_evaluator_manifest(*, ready: bool = False) -> d
     return payload
 
 
+def refresh_resource_handle_revalidation_output_identity(payload: dict) -> None:
+    identity = payload["output_artifact_identity"]
+    identity_without_hash = {
+        "artifact_kind": identity["artifact_kind"],
+        "capture_id": identity["capture_id"],
+        "evidence_pack_id": identity["evidence_pack_id"],
+    }
+    material = {
+        "artifact_identity": identity_without_hash,
+        "report": {
+            key: value
+            for key, value in payload.items()
+            if key != "output_artifact_identity"
+        },
+    }
+    identity["artifact_sha256"] = hashlib.sha256(gate.canonical_json_bytes(material)).hexdigest()
+
+
 def internal_uobject_post_callback_contract_manifest(*, overclaim: bool = False) -> dict:
     payload = {
         "schema": gate.INTERNAL_UOBJECT_POST_CALLBACK_CONTRACT_SCHEMA,
@@ -6558,6 +6576,33 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_return_policy_input_target_set_mismatch", reasons)
         self.assertIn("structure_return_policy_input_snapshot_count_mismatch", reasons)
 
+    def test_blocks_structure_policy_slices_promotion_gate_ready_in_consume_mode(self) -> None:
+        cases = [
+            (
+                "structure-return-policy.json",
+                structure_return_only_policy_slice_manifest,
+                "structure_return_policy_readiness_overclaim",
+            ),
+            (
+                "structure-nonpin-policy.json",
+                structure_nonpin_copied_scalar_policy_slice_manifest,
+                "structure_nonpin_policy_readiness_overclaim",
+            ),
+        ]
+        for filename, payload_factory, expected_reason in cases:
+            with self.subTest(filename=filename):
+                with tempfile.TemporaryDirectory() as tmp:
+                    protected = Path(tmp) / "server"
+                    workspace = protected / "workspace-offline"
+                    manifest = workspace / filename
+                    payload = payload_factory()
+                    payload["promotion_gate"] = {"ready": True, "blockers": []}
+                    write_json(manifest, payload)
+
+                    result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+                self.assertIn(expected_reason, {blocker["reason"] for blocker in result["blockers"]})
+
     def test_accepts_structure_nonpin_copied_scalar_policy_slice_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -6640,6 +6685,19 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("structure_nonpin_policy_contains_verify_pin_code_payload", reasons)
         self.assertIn("structure_nonpin_policy_readiness_overclaim", reasons)
         self.assertIn("structure_nonpin_policy_public_overclaim_public_structure_events", reasons)
+
+    def test_blocks_structure_nonpin_copied_scalar_policy_slice_public_structure_events_boolean_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-nonpin-policy.json"
+            payload = structure_nonpin_copied_scalar_policy_slice_manifest()
+            payload["public_structure_events_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertIn("structure_nonpin_policy_readiness_overclaim", {blocker["reason"] for blocker in result["blockers"]})
 
     def test_accepts_structure_aggregate_census_policy_slice_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -7622,6 +7680,26 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             "resource_handle_revalidation_output_artifact_identity_hash_mismatch",
             {blocker["reason"] for blocker in result["blockers"]},
         )
+
+    def test_blocks_resource_handle_revalidation_consume_ready_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "resource-handle.json"
+            payload = resource_handle_revalidation_evaluator_manifest()
+            payload["post_callback_resource_handle_ready"] = True
+            payload["uobject_flags_validity_semantics_proven"] = True
+            payload["promotion_gate"]["ready"] = True
+            refresh_resource_handle_revalidation_output_identity(payload)
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("resource_handle_revalidation_consume_post_callback_ready_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_consume_flag_semantics_overclaim", reasons)
+        self.assertIn("resource_handle_revalidation_consume_promotion_gate_not_false", reasons)
+        self.assertNotIn("resource_handle_revalidation_output_artifact_identity_hash_mismatch", reasons)
 
     def test_blocks_resource_handle_revalidation_evaluator_in_promote_mode_when_not_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

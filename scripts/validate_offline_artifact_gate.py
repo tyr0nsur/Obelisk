@@ -514,6 +514,19 @@ REQUIRED_STRUCTURE_RETURN_ONLY_EXPLICIT_EXCLUSIONS = {
     "resource_handle",
     "return_override",
 }
+STRUCTURE_POLICY_FORBIDDEN_TRUE_READY_KEYS = {
+    "dispatcher_ready",
+    "identity_ready",
+    "lookup_ready",
+    "mutation_ready",
+    "public_api_ready",
+    "public_sdk_ready",
+    "public_structure_events_ready",
+    "resource_handle_ready",
+    "return_override_ready",
+    "runtime_hook_ready",
+    "structure_events_ready",
+}
 REQUIRED_STRUCTURE_NONPIN_COPIED_SCALAR_FIELDS = {
     "PrimalStructure.SetVariant.VariantIndex",
     "PrimalStructure.SetVariant.bForceSet",
@@ -5728,20 +5741,11 @@ def validate_structure_return_only_policy_slice_manifest(payload: dict[str, Any]
         blockers.append({"reason": "promote_mode_structure_return_policy_slice_evidence_only", "label": label})
     for trail, _ in collect_ready_overclaims(payload):
         blockers.append({"reason": "structure_return_policy_readiness_overclaim", "label": f"{label}:{trail}"})
+    promotion_gate = payload.get("promotion_gate")
+    if isinstance(promotion_gate, dict) and promotion_gate.get("ready") is True:
+        blockers.append({"reason": "structure_return_policy_readiness_overclaim", "label": f"{label}:$.promotion_gate.ready"})
     for trail, value in collect_bool_fields(payload):
-        if value is True and trail.rsplit(".", 1)[-1] in {
-            "dispatcher_ready",
-            "identity_ready",
-            "lookup_ready",
-            "mutation_ready",
-            "public_api_ready",
-            "public_sdk_ready",
-            "public_structure_events_ready",
-            "resource_handle_ready",
-            "return_override_ready",
-            "runtime_hook_ready",
-            "structure_events_ready",
-        }:
+        if value is True and trail.rsplit(".", 1)[-1] in STRUCTURE_POLICY_FORBIDDEN_TRUE_READY_KEYS:
             blockers.append({"reason": "structure_return_policy_readiness_overclaim", "label": f"{label}:{trail}"})
     for trail, _, reason in collect_candidate_public_overclaims(
         payload,
@@ -5909,6 +5913,12 @@ def validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload: dict[
         blockers.append({"reason": "promote_mode_structure_nonpin_copied_scalar_policy_slice_evidence_only", "label": label})
     for trail, _ in collect_ready_overclaims(payload):
         blockers.append({"reason": "structure_nonpin_policy_readiness_overclaim", "label": f"{label}:{trail}"})
+    promotion_gate = payload.get("promotion_gate")
+    if isinstance(promotion_gate, dict) and promotion_gate.get("ready") is True:
+        blockers.append({"reason": "structure_nonpin_policy_readiness_overclaim", "label": f"{label}:$.promotion_gate.ready"})
+    for trail, value in collect_bool_fields(payload):
+        if value is True and trail.rsplit(".", 1)[-1] in STRUCTURE_POLICY_FORBIDDEN_TRUE_READY_KEYS:
+            blockers.append({"reason": "structure_nonpin_policy_readiness_overclaim", "label": f"{label}:{trail}"})
     for trail, _, reason in collect_candidate_public_overclaims(
         payload,
         allowed_prefixes=("$.non_claims", "$.safety_summary.explicitly_excluded"),
@@ -6999,7 +7009,29 @@ def validate_resource_handle_revalidation_evaluator_manifest(
                         "recorded": output_identity["artifact_sha256"],
                     }
                 )
+    promotion_gate = payload.get("promotion_gate")
     if mode != "promote":
+        if payload.get("post_callback_resource_handle_ready") is not False:
+            blockers.append(
+                {
+                    "reason": "resource_handle_revalidation_consume_post_callback_ready_overclaim",
+                    "label": f"{label}:$.post_callback_resource_handle_ready",
+                }
+            )
+        if payload.get("uobject_flags_validity_semantics_proven") is not False:
+            blockers.append(
+                {
+                    "reason": "resource_handle_revalidation_consume_flag_semantics_overclaim",
+                    "label": f"{label}:$.uobject_flags_validity_semantics_proven",
+                }
+            )
+        if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
+            blockers.append(
+                {
+                    "reason": "resource_handle_revalidation_consume_promotion_gate_not_false",
+                    "label": f"{label}:$.promotion_gate.ready",
+                }
+            )
         return blockers
 
     if payload.get("post_callback_resource_handle_ready") is not True:
@@ -7019,7 +7051,6 @@ def validate_resource_handle_revalidation_evaluator_manifest(
     manifest_blockers = payload.get("blockers")
     if isinstance(manifest_blockers, list) and manifest_blockers:
         blockers.append({"reason": "promote_mode_resource_handle_manifest_has_blockers", "label": f"{label}:$.blockers"})
-    promotion_gate = payload.get("promotion_gate")
     if isinstance(promotion_gate, dict):
         if promotion_gate.get("ready") is not True:
             blockers.append({"reason": "promote_mode_resource_handle_promotion_gate_not_ready", "label": f"{label}:$.promotion_gate.ready"})

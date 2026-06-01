@@ -477,6 +477,91 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertFalse(payload["stable_claim_allowed"])
 
+    def test_route_gate_claim_scanner_rejects_public_command_reply_aliases(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        claims = module.command_permission_route_gate_public_or_runtime_claims(
+            {
+                "schema": "obelisk.command-permission-route-gate-check.v1",
+                "valid": True,
+                "accepted_for_planning": True,
+                "planning_only": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "checks": [
+                    {
+                        "name": "commands_replies_public_readiness",
+                        "public_command_router_allowed": True,
+                        "public_reply_or_send_chat_abi_allowed": True,
+                        "public_reply_api": True,
+                        "public_send_chat_api": True,
+                        "reply_allowed": True,
+                        "send_chat_allowed": True,
+                    }
+                ],
+            }
+        )
+
+        self.assertIn("checks[0].public_command_router_allowed", claims)
+        self.assertIn("checks[0].public_reply_or_send_chat_abi_allowed", claims)
+        self.assertIn("checks[0].public_reply_api", claims)
+        self.assertIn("checks[0].public_send_chat_api", claims)
+        self.assertIn("checks[0].reply_allowed", claims)
+        self.assertIn("checks[0].send_chat_allowed", claims)
+
+    def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = Path(temp_dir) / "fake_route_gate.py"
+            route_gate_path.write_text(
+                "import json\n"
+                "print(json.dumps({\n"
+                "    'schema': 'obelisk.command-permission-route-gate-check.v1',\n"
+                "    'valid': True,\n"
+                "    'accepted_for_planning': True,\n"
+                "    'planning_only': True,\n"
+                "    'promotion_ready': False,\n"
+                "    'public_sdk_ready': False,\n"
+                "    'public_abi_ready': False,\n"
+                "    'runtime_ready': False,\n"
+                "    'public_header_allowed': False,\n"
+                "    'checks': [{\n"
+                "        'name': 'commands_replies_public_readiness',\n"
+                "        'public_command_router_allowed': True,\n"
+                "        'public_reply_or_send_chat_abi_allowed': True,\n"
+                "        'public_reply_api': True,\n"
+                "        'public_send_chat_api': True,\n"
+                "        'reply_allowed': True,\n"
+                "        'send_chat_allowed': True\n"
+                "    }],\n"
+                "    'blockers': []\n"
+                "} ))\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_public_or_runtime_claims", payload["blockers"])
+        claims = payload["command_permission_route_gate"]["public_or_runtime_claims"]
+        self.assertIn("checks[0].public_command_router_allowed", claims)
+        self.assertIn("checks[0].public_reply_or_send_chat_abi_allowed", claims)
+        self.assertFalse(payload["stable_claim_allowed"])
+
     def test_blocked_contract_decisions_detect_untracked_public_header_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)

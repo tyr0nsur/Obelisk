@@ -48,8 +48,8 @@ This file is an active routing table only. Durable evidence belongs in
   before any approved send. Always dry-run before any approved send; use embeds.
 - ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only,
   not architecture, ergonomics, behavior maps, porting targets, or copying source. Do not
-  copy offsets, layouts, ABI assumptions, wrappers, raw UE pointer APIs, command parsers,
-  return semantics, or implementations.
+  copy code, offsets, layouts, vtables, ABI assumptions, wrappers, raw UE pointer APIs,
+  command parsers, return semantics, or implementations.
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   controls, and observers unless the matching approved env+marker pair is enabled for a
@@ -71,9 +71,17 @@ This file is an active routing table only. Durable evidence belongs in
   includes `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`; do not replace exact focal targets with a
   broad target-set plan.
-- Current player-identity offline evidence is accepted for planning: core/reflection
-  inventory, 12/12 candidate fixtures, distinct second-source layout evidence, and
-  consume-only lifecycle-anchor/principal-invalidation manifests. Promotion remains false.
+- Current player-identity offline evidence is accepted for planning: complete
+  `obelisk.core-dump-evidence-pack.v1` from a non-protected source, accepted
+  `obelisk.reflection-inventory-pack.v1`, 12/12 candidate fixtures, accepted distinct
+  second-source layout evidence from the vanilla-gdb core, and consume-only
+  lifecycle-anchor and principal-invalidation manifests. The lifecycle-anchor and
+  principal-invalidation manifests are accepted for consume-only planning. Promotion
+  remains false; the next identity blocker is approved runtime principal lifecycle
+  evidence. Do not rerun the completed admin snapshot, second-source layout, or lifecycle
+  layout routes.
+- Current recipe:
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - The old `20260601T120000Z-player-principal-lifecycle` request-pack is expired and should
   report `approved_window_expired`, `request_pack_ready=false`, and `bundle_inputs_ready=false`.
   It is not runtime evidence. Missing runtime artifacts remain copied `Obelisk.log`,
@@ -85,6 +93,10 @@ This file is an active routing table only. Durable evidence belongs in
   `ResourceHandle`, runtime readiness, or v1 completion evidence.
 - process-local owner-token timers are core scheduling only with explicit unregister, not
   gameplay/module timer APIs, persistent handles, UE identity, or shared scheduler state.
+- The field-window packaging blocker clears only package-shape evidence once the CMake
+  package target are present; it is not a `v1.0` SDK blocker, route shortcut, or completion
+  signal. Installed SDK/package checks are package-shape evidence only, not a `v1.0`
+  completion marker.
 - Inventory action targets stay redacted/metadata-only: `AdditionalData` is action
   metadata, `ExposesRange=false`, no copied integer range, no dispatch, no public
   Inventory SDK, and no public Items SDK.
@@ -96,7 +108,9 @@ This file is an active routing table only. Durable evidence belongs in
 - Structure build-policy offline intake is accepted only as planning layout for
   `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
   `PrimalStructure.BPIsAllowedToBuildEx`; no Structure SDK, enforcement, runtime readiness,
-  mutation, return override, identity/lookup, `ResourceHandle`, or v1 completion.
+  mutation, return override, identity/lookup, `ResourceHandle`, or v1 completion. The
+  checker rejects protected/symlink snapshot paths, non-sibling `base/`/`candidate/`
+  roots, raw address leaks, and value-bearing keys on redacted/layout-only fields.
 - ResourceHandle/public GObjects remain blocked. old flag-policy artifact is obsolete;
   durable rich-provenance refresh is preserved; Consume mode accepts it and promote mode
   stays blocked; post-callback rejection contract is preserved as candidate-only; first
@@ -118,9 +132,10 @@ This file is an active routing table only. Durable evidence belongs in
 - Offline: keep tightening guardrails around permissions/admin query-only provenance,
   command/principal contracts, command route drift, inventory copied-signal hygiene, and
   structure build-policy snapshot envelopes.
-- Structure hardening: add tests for protected/symlink path rejection, expected `base/`
-  and sibling `candidate/` roots, artifact identity/address policy, and no exposed or
-  value-bearing keys in redacted/layout-only fields.
+- Offline artifact gates: keep tightening consume-vs-promote overclaim checks for
+  ResourceHandle, Mission copied-bool, and Structure planning slices. Consume acceptance
+  must not imply public SDK, runtime readiness, mutation, return override, lookup,
+  post-callback handles, or v1 completion.
 - ResourceHandle: wait for rejected runtime object samples plus runtime serial
   reuse/wraparound semantics from an approved live-ops brief; offline/core artifacts cannot
   synthesize that blocker away.

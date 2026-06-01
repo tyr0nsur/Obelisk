@@ -2,8 +2,9 @@
 
 This note records the current offline preflight boundary for the 12-target
 `players-identity-lifecycle-intake` lane without touching a live server. The admin
-candidate fixtures and distinct planning-layout second source are present; the remaining
-blockers are lifecycle anchor acceptance and principal invalidation semantics.
+candidate fixtures, distinct planning-layout second source, lifecycle-anchor manifests,
+and principal-invalidation manifests are accepted for consume-only planning. The remaining
+blocker is approved runtime principal lifecycle evidence.
 
 ## Result
 
@@ -90,14 +91,20 @@ The combined preflight currently reports:
 
 When the vanilla-gdb candidate root is supplied, the combined preflight advances to:
 
-- `readiness_statement=second-source layout accepted; lifecycle invalidation remains`;
+- `readiness_statement=second-source layout accepted; approved runtime evidence missing`;
 - `fixture_coverage.second_source_missing=0`;
 - `fixture_coverage.second_source_accepted=12`;
 - `fixture_coverage.second_source_layout_accepted=true`;
 - `fixture_coverage.second_source_inconclusive=0`;
 - `fixture_coverage.second_source_rejected=0`;
 - `fixture_coverage.second_source_status=compared`;
-- `primary_blocker=accepted_lifecycle_anchor_evidence_missing`.
+- `lifecycle-anchor and principal-invalidation manifests are accepted for consume-only planning`;
+- `primary_blocker=approved_runtime_evidence_missing`.
+
+Historical prior state for this same lane was
+`primary_blocker=accepted_lifecycle_anchor_evidence_missing`; that blocker is preserved as
+diagnostic vocabulary for absent/rejected lifecycle evidence, not as the current blocker
+for the accepted planning artifacts.
 
 It also emits a top-level `progress_signal` field for leads/operators who need the
 current blocker without reading the whole report. The field is only a compact rendering
@@ -112,9 +119,9 @@ of existing gates:
 
 The wrapper still uses the diagnostic vocabulary `second_source_evidence_missing`,
 `second_source_evidence_not_accepted`, and `accepted_lifecycle_anchors_missing` when the
-corresponding evidence is absent or rejected. With the vanilla-gdb candidate root, the
-second-source diagnostics are cleared and the remaining blocker is lifecycle/principal
-policy.
+corresponding evidence is absent or rejected. With the vanilla-gdb candidate root and
+accepted lifecycle/principal planning manifests, those diagnostics are cleared and the
+remaining blocker is approved runtime principal lifecycle evidence.
 
 If a matching non-protected `ShooterGameServer` is present but the non-protected core
 input is absent, `progress_signal.primary_blocker` reports

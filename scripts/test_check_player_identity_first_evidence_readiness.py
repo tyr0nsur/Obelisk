@@ -1248,6 +1248,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         self.assertTrue(diagnosis["ready"])
         self.assertTrue(diagnosis["request_pack_ready"])
+        self.assertFalse(diagnosis["bundle_inputs_ready"])
         self.assertFalse(diagnosis["request_pack_is_runtime_evidence"])
         self.assertTrue(diagnosis["operator_current_turn_runtime_window_approval_required"])
         self.assertFalse(diagnosis["approved_runtime_evidence_present"])
