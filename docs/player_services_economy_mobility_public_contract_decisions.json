@@ -1,0 +1,173 @@
+{
+  "schema": "obelisk.player-services-economy-mobility-public-contract-decisions.v1",
+  "contract_id": "obelisk.player_services_economy_mobility.v1",
+  "artifact_status": "candidate_only",
+  "readiness_classification": "planning_only",
+  "pre_abi": true,
+  "status": "offline_internal_contract",
+  "public_header_allowed": false,
+  "public_contract_allowed": false,
+  "public_sdk_ready": false,
+  "public_abi_ready": false,
+  "promotion_ready": false,
+  "runtime_ready": false,
+  "runtime_services": false,
+  "promotion": {
+    "public_sdk": false,
+    "runtime": false
+  },
+  "dependencies": [
+    {
+      "id": "obelisk.player_identity.v1",
+      "kind": "identity",
+      "required_before_public_surface": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "obelisk.permissions_admin.v1",
+      "kind": "permissions_admin",
+      "required_before_public_surface": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "obelisk.operator_ingress_storage.v1",
+      "kind": "storage_persistence",
+      "required_before_public_surface": true,
+      "status": "unresolved"
+    }
+  ],
+  "required_control_gates": [
+    {
+      "id": "identity",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Promote copied player principal semantics, generations, invalidation, privacy, and scope before any economy, mobility, area, or timed-notice API is public."
+    },
+    {
+      "id": "permissions_admin",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Promote fail-closed authority and permission checks before any grant, spend, teleport, area-policy, or timed-notice action is public."
+    },
+    {
+      "id": "storage_persistence",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Promote versioned storage, migration, durability, cross-instance isolation, and recovery semantics before balances, homes, cooldowns, area state, or scheduled notices are public."
+    },
+    {
+      "id": "audit",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Define redacted stable audit records for every economy, mobility, area, and timed-notice decision before implementation."
+    },
+    {
+      "id": "rollback",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Define reversible transaction, compensation, and operator recovery semantics before any spend, reward, kit, home, teleport, or area-policy mutation is public."
+    },
+    {
+      "id": "abuse",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Define owner-scoped rate limits, cooldowns, replay protection, deny reasons, and malformed-request handling before public action surfaces exist."
+    }
+  ],
+  "audit_units": [
+    {
+      "id": "economy",
+      "label": "economy, shops, rewards, kits, and stats",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "blocked_until_controls": [
+        "identity",
+        "permissions_admin",
+        "storage_persistence",
+        "audit",
+        "rollback",
+        "abuse"
+      ],
+      "forbidden_public_contract": [
+        "economy API",
+        "shop API",
+        "rewards API",
+        "kits API",
+        "stats API",
+        "balance API",
+        "currency mutation"
+      ]
+    },
+    {
+      "id": "mobility",
+      "label": "homes, teleport, spawn, and movement services",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "blocked_until_controls": [
+        "identity",
+        "permissions_admin",
+        "storage_persistence",
+        "audit",
+        "rollback",
+        "abuse"
+      ],
+      "forbidden_public_contract": [
+        "homes API",
+        "teleport API",
+        "spawn API",
+        "movement service",
+        "location mutation"
+      ]
+    },
+    {
+      "id": "areas",
+      "label": "safe zones and area policy",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "blocked_until_controls": [
+        "identity",
+        "permissions_admin",
+        "storage_persistence",
+        "audit",
+        "rollback",
+        "abuse"
+      ],
+      "forbidden_public_contract": [
+        "safe-zone API",
+        "area policy API",
+        "area membership API",
+        "area mutation"
+      ]
+    },
+    {
+      "id": "timed_notices",
+      "label": "broadcast and timed notices",
+      "mode": "offline_contract_only",
+      "runtime_required": false,
+      "public_surface": false,
+      "blocked_until_controls": [
+        "identity",
+        "permissions_admin",
+        "storage_persistence",
+        "audit",
+        "rollback",
+        "abuse"
+      ],
+      "forbidden_public_contract": [
+        "broadcast API",
+        "timed notice service",
+        "scheduled notices API",
+        "send-chat API"
+      ]
+    }
+  ],
+  "non_claims": [
+    "candidate-only pre-ABI planning contract for player services, economy, mobility, areas, and timed notices",
+    "does not add public headers, public ABI, runtime wiring, runtime services, storage, commands, replies, send-chat, broadcast, teleport, homes, shops, rewards, kits, stats, safe-zone, area-policy, mutation, lookup, ResourceHandle, UE pointers, raw params, or return override",
+    "identity, permissions/admin, storage/persistence, audit, rollback, and abuse controls are all required before any audit unit can be promoted",
+    "each audit unit must be promoted as a separate narrow copied C ABI surface or explicitly excluded from v1"
+  ]
+}

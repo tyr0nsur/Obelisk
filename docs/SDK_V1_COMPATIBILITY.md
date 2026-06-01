@@ -153,6 +153,9 @@ blocked `obelisk.command_chat_response_path.v1` planning dependency before any
 public command router or reply API can be claimed.
 The pre-ABI decision checklist for the future commands/replies surface is
 [`commands_replies_public_contract_decisions.json`](commands_replies_public_contract_decisions.json).
+`scripts/check_commands_replies_public_readiness.py` is the matching local readiness
+guardrail; on the current tree it must remain a blocked/post-v1 report, not promotion
+or public SDK evidence.
 It is a blocking checklist only: passive `ChatMessageEvent` parsing, plugin-local
 command parser scaffolds, static thunk orientation, raw `ProcessEvent` callbacks,
 legacy `CallProcessEvent` debug access, and ArkApi/AseApi compatibility names are not
@@ -234,7 +237,9 @@ append-only copied C ABI contract with the required ingress/storage evidence and
 name the surface as excluded or post-v1 in the v1 release statement. Until one of those decisions is
 recorded, `v1_completion_required` must stay false and no public header, plugin callback,
 storage service, RCON service, webhook client, secret manager, or cross-instance storage
-API is part of the SDK.
+API is part of the SDK. `scripts/check_operator_ingress_storage_offline_contract.py`
+validates the offline planning contract only and must not be cited as public ABI,
+runtime readiness, promotion readiness, or v1 completion evidence.
 
 The shortest useful route toward a complete v1 SDK is:
 
@@ -260,6 +265,8 @@ The shortest useful route toward a complete v1 SDK is:
    promoted or explicitly excluded in a reviewed v1 release statement. Player
    services/economy/mobility/areas, operator ingress/storage, and gameplay/server tick
    callbacks remain separate blockers.
+   `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` is an accounting
+   guardrail for that leaf outcome split, not a promotion checker.
 6. Keep gameplay/server tick callbacks separate from process-local timers unless a future
    promoted copied ABI defines cadence, budget, lifecycle, shutdown, and hitch/backpressure
    behavior.

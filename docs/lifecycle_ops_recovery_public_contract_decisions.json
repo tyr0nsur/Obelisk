@@ -1,0 +1,116 @@
+{
+  "schema": "obelisk.lifecycle-ops-recovery-public-contract-decisions.v1",
+  "surface": "obelisk.lifecycle_ops_recovery.v1",
+  "status": "blocked",
+  "planning_stage": "v1_completion_blocker",
+  "artifact_status": "candidate_only",
+  "readiness_classification": "planning_only",
+  "public_header_allowed": false,
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "public_header_symbols_now": [],
+  "public_capability_bits_now": [],
+  "public_callback_abi_now": [],
+  "public_ops_api_now": [],
+  "foundation_surface": "obelisk.lifecycle_config_logging.v1",
+  "foundation_lifecycle_config_logging_not_sufficient": true,
+  "allowed_now": [
+    "document blockers",
+    "document candidate-only separation from lifecycle/config/logging",
+    "document tests required before promotion"
+  ],
+  "forbidden_public_contract": [
+    "plugin watchdog API",
+    "plugin crash recovery API",
+    "hot plugin reload API",
+    "Obelisk hot reload API",
+    "process restart orchestration API",
+    "server recovery API",
+    "operator reload command API",
+    "detached-worker ingress API",
+    "restart-state recovery API",
+    "public header symbols",
+    "public capability bits",
+    "runtime readiness",
+    "v1 SDK completion evidence"
+  ],
+  "separation_contract": {
+    "promoted_foundation_surface": "obelisk.lifecycle_config_logging.v1",
+    "promoted_foundation_allowed": [
+      "ObeliskPlugin_GetInfo",
+      "ObeliskPlugin_Init",
+      "ObeliskPlugin_Shutdown",
+      "ObeliskPluginMetadata",
+      "ObeliskPluginInitContext",
+      "ObeliskApi.LogInfo",
+      "ObeliskApi.LogWarn",
+      "ObeliskApi.LogError"
+    ],
+    "not_satisfied_by_foundation": [
+      "plugin watchdog API",
+      "plugin crash recovery API",
+      "hot plugin reload API",
+      "Obelisk hot reload API",
+      "process restart orchestration API",
+      "server recovery API",
+      "operator reload command API",
+      "detached-worker ingress API",
+      "restart-state recovery API"
+    ]
+  },
+  "required_before_public_header": [
+    {
+      "id": "separation.foundation_not_ops_recovery",
+      "category": "scope",
+      "status": "unresolved",
+      "decision_required": "Keep lifecycle/config/logging separate from watchdog, hot reload, restart, and recovery APIs."
+    },
+    {
+      "id": "abi.no_public_symbols_now",
+      "category": "abi",
+      "status": "unresolved",
+      "decision_required": "Do not add lifecycle ops recovery public header symbols, capability bits, callback ABI, or ops API until every blocker is resolved."
+    },
+    {
+      "id": "lifecycle.hot_reload_quiescence",
+      "category": "lifecycle",
+      "status": "unresolved",
+      "decision_required": "Define callback quiescence, unload drain, worker shutdown, and dlclose safety before any hot reload or restart orchestration API exists."
+    },
+    {
+      "id": "ops.operator_reload_ingress",
+      "category": "ops",
+      "status": "unresolved",
+      "decision_required": "Define operator reload ingress, authorization, audit, rollback, and failure reporting before any reload command API exists."
+    },
+    {
+      "id": "recovery.multi_instance_restart_state",
+      "category": "recovery",
+      "status": "unresolved",
+      "decision_required": "Define multi-instance restart-state and recovery semantics with explicit fail-closed behavior before any recovery API exists."
+    },
+    {
+      "id": "crash.watchdog_policy",
+      "category": "crash",
+      "status": "unresolved",
+      "decision_required": "Define crash containment and watchdog behavior that does not run plugin code after unsafe failure before any watchdog API exists."
+    },
+    {
+      "id": "evidence.sdk_integration_coverage",
+      "category": "evidence",
+      "status": "unresolved",
+      "decision_required": "Add SDK consumer or integration coverage for the promoted ops recovery contract before adding public header symbols."
+    },
+    {
+      "id": "release.explicit_post_v1_or_excluded",
+      "category": "release",
+      "status": "unresolved",
+      "decision_required": "A v1 release statement must name obelisk.lifecycle_ops_recovery.v1 as post-v1 or explicitly excluded until this surface is promoted."
+    }
+  ],
+  "non_claims": [
+    "This manifest does not add public header symbols.",
+    "This manifest does not promote obelisk.lifecycle_ops_recovery.v1.",
+    "This manifest does not make lifecycle/config/logging sufficient for watchdog, reload, restart, or recovery behavior.",
+    "This manifest does not authorize runtime tests, server access, marker edits, restarts, Discord notices, commits, tags, or pushes."
+  ]
+}

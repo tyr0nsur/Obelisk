@@ -49,6 +49,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
   has been regenerated with that guidance and its `SHA256SUMS` updated; this restores
   planning-layout acceptance only, not runtime/public readiness.
+- `scripts/check_commands_replies_public_readiness.py` is the current commands/replies
+  readiness guardrail. It must keep `obelisk.commands_replies.v1` blocked/post-v1 until
+  promoted player identity, permissions/admin, and `obelisk.command_chat_response_path.v1`
+  all exist; a green blocked report is not public header, runtime, or SDK readiness.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
@@ -176,6 +180,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `native_bool=false`; consume mode accepts it and promote mode blocks it as candidate-only.
   Detail:
   `docs/research/2026-05-31-v02-module-priority.md`.
+- `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` is accounting-only:
+  the umbrella blocker must name mission, transfer, dino policy, tribe policy, and
+  buff/status leaf outcomes, but the checker does not promote any module SDK.
 - Buff copied-scalar work is viable but not ready for a green readiness checker over both
   target sets. Current `buff-breadth-intake` second-source is accepted `3/3`, while a
   fresh `buff-compact-intake` comparison is `1/3` because two compact candidate snapshots
@@ -197,6 +204,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   operator-owned inputs, schema migration, queue lifecycle, text/audit redaction, and
   multi-instance lifecycle, but it must not become a shortcut around identity ->
   permissions/admin -> command response.
+  `scripts/check_operator_ingress_storage_offline_contract.py` validates only this
+  offline planning contract and does not create public SDK, runtime, or promotion evidence.
 - Plugin Hub seed review is parked until SDK completion. Current rounds should keep
   Plugin Hub docs non-promotional and focus on SDK blockers.
 - Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
