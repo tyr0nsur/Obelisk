@@ -30,6 +30,8 @@ namespace obelisk::permissions_admin
         Unknown
     };
 
+    // Internal diagnostics only. These bits are deliberately not the public/candidate
+    // fail_closed_reason_flags artifact contract and must not cross the SDK boundary.
     using ReasonFlags = uint64_t;
 
     enum class ReasonFlag : uint64_t

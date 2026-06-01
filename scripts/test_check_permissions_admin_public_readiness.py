@@ -17,6 +17,7 @@ SCRIPT = SCRIPT_DIR / "check_permissions_admin_public_readiness.py"
 DECISIONS = REPO_ROOT / "docs" / "permissions_admin_public_contract_decisions.json"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+AUTHZ_DECISION_MODEL = REPO_ROOT / "core" / "AuthzDecisionModel.h"
 QUERY_CHECKER = SCRIPT_DIR / "check_permissions_admin_query_failclosed_contract.py"
 CANONICAL_QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
 
@@ -110,6 +111,14 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+
+    def test_internal_authz_reason_flags_do_not_claim_manifest_bit_compatibility(self) -> None:
+        header = AUTHZ_DECISION_MODEL.read_text(encoding="utf-8")
+
+        self.assertIn("Internal diagnostics only", header)
+        self.assertIn("not the public/candidate", header)
+        self.assertIn("fail_closed_reason_flags artifact contract", header)
+        self.assertIn("must not cross the SDK boundary", header)
 
     def test_rejects_missing_abuse_rate_limit_audit_requirements(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1098,11 +1098,32 @@ namespace
         wrongOffset.Fields[1].Offset = 0x02;
         Require(!TryBuildCopiedInventoryPolicyEvent(wrongOffset, event),
                 "CanUse policy event built with wrong scalar offset");
+        Require(event.View.Scalars.empty(), "wrong scalar offset left stale copied event output");
+
+        InventoryReflection::InventoryInvocation wrongPropertyClassName = makeCanUse();
+        wrongPropertyClassName.Fields[0].PropertyClassNameIndex = kObjectPropertyClassNameIndex;
+        Require(!TryBuildCopiedInventoryPolicyEvent(wrongPropertyClassName, event),
+                "CanUse policy event built with wrong scalar property class FName");
+        Require(event.View.Scalars.empty(), "wrong scalar property class FName left stale copied event output");
+
+        InventoryReflection::InventoryInvocation wrongPropertyClassObject = makeCanUse();
+        wrongPropertyClassObject.Fields[0].PropertyClassObjectIndex = kObjectPropertyClassObjectIndex;
+        Require(!TryBuildCopiedInventoryPolicyEvent(wrongPropertyClassObject, event),
+                "CanUse policy event built with wrong scalar property class object index");
+        Require(event.View.Scalars.empty(),
+                "wrong scalar property class object index left stale copied event output");
+
+        InventoryReflection::InventoryInvocation wrongPropertyFlags = makeCanUse();
+        wrongPropertyFlags.Fields[0].PropertyFlags = kBoolReturnPropertyFlags;
+        Require(!TryBuildCopiedInventoryPolicyEvent(wrongPropertyFlags, event),
+                "CanUse policy event built with wrong scalar property flags");
+        Require(event.View.Scalars.empty(), "wrong scalar property flags left stale copied event output");
 
         InventoryReflection::InventoryInvocation wrongRangeSize = makeCanUse();
         wrongRangeSize.Fields[0].Range.Size = 0;
         Require(!TryBuildCopiedInventoryPolicyEvent(wrongRangeSize, event),
                 "CanUse policy event built with wrong scalar range size");
+        Require(event.View.Scalars.empty(), "wrong scalar range size left stale copied event output");
 
         uint8_t nonCanonical = 2;
         InventoryReflection::InventoryInvocation nonCanonicalBool = makeCanUse();

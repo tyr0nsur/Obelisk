@@ -689,6 +689,32 @@ namespace
         {
             InventoryFixture fixture;
             BuildCanUse(fixture);
+            WriteObject(fixture.BoolPropertyClass,
+                        kObjectPropertyClassNameIndex,
+                        kBoolPropertyClassObjectIndex,
+                        nullptr,
+                        nullptr);
+
+            InventoryReflection::InventoryInvocation invocation;
+            invocation.FunctionNameIndex = 123;
+            invocation.OuterNameIndex = 456;
+            invocation.HasParameterRanges = true;
+            invocation.Fields.push_back({});
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible, "wrong BoolProperty class FName was accepted");
+            Require(invocation.FunctionNameIndex == -1, "rejected BoolProperty FName left stale function name");
+            Require(invocation.OuterNameIndex == -1, "rejected BoolProperty FName left stale outer name");
+            Require(!invocation.HasParameterRanges, "rejected BoolProperty FName left stale range state");
+            Require(invocation.Fields.empty(), "rejected BoolProperty FName left stale fields");
+        }
+        {
+            InventoryFixture fixture;
+            BuildCanUse(fixture);
             WriteAt(fixture.PropertyB, 0x38, uint64_t{kBoolInputPropertyFlags});
 
             InventoryReflection::InventoryInvocation invocation;
@@ -714,6 +740,46 @@ namespace
                 invocation);
             Require(result.Status == ReadStatus::Implausible,
                     "wrong AllowRemoteAddToInventory invComp property flags were accepted");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
+            WriteObject(fixture.ObjectPropertyClass,
+                        kBoolPropertyClassNameIndex,
+                        kObjectPropertyClassObjectIndex,
+                        nullptr,
+                        nullptr);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong ObjectProperty class FName was accepted for AllowRemoteAddToInventory");
+            Require(invocation.FunctionNameIndex == -1, "rejected ObjectProperty FName left stale function name");
+            Require(invocation.Fields.empty(), "rejected ObjectProperty FName left stale fields");
+        }
+        {
+            InventoryFixture fixture;
+            BuildAllowRemoteAdd(fixture);
+            WriteObject(fixture.ObjectPropertyClass,
+                        kObjectPropertyClassNameIndex,
+                        kBoolPropertyClassObjectIndex,
+                        nullptr,
+                        nullptr);
+
+            InventoryReflection::InventoryInvocation invocation;
+            ReadResult result = InventoryReflection::TryIdentifyInventoryInvocation(
+                fixture.Reader(),
+                Options(),
+                fixture.Function.data(),
+                fixture.Params.data(),
+                invocation);
+            Require(result.Status == ReadStatus::Implausible,
+                    "wrong ObjectProperty class object index was accepted for AllowRemoteAddToInventory");
         }
         {
             InventoryFixture fixture;

@@ -5948,6 +5948,7 @@ namespace
             .registerChatCallback = true,
             .registerInventoryPolicyCallback = true,
             .registerItemReturnCallback = true,
+            .registerPlayerPrincipalCallback = true,
             .registerStructureCallback = true,
             .registerGameplayPolicyCallback = true,
             .registerTimerCallback = true,
@@ -5979,6 +5980,8 @@ namespace
                 "init-cleanup-fail inventory callbacks were removed despite injected cleanup failure");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 2,
                 "init-cleanup-fail item-return callbacks were removed despite injected cleanup failure");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "init-cleanup-fail player-principal callback was removed despite injected cleanup failure");
 
         manager.UnloadAll();
 
@@ -5994,6 +5997,8 @@ namespace
                 "init-cleanup-fail inventory callbacks were removed during failed retry");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 2,
                 "init-cleanup-fail item-return callbacks were removed during failed retry");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "init-cleanup-fail player-principal callback was removed during failed retry");
         Require(plugin.capturedApi.RegisterPreProcessEventForNameIndexWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     42,
@@ -6025,6 +6030,8 @@ namespace
                 "init-cleanup-fail inventory callbacks survived cleanup retry");
         Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
                 "init-cleanup-fail item-return callbacks survived cleanup retry");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-cleanup-fail player-principal callback survived cleanup retry");
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "init-cleanup-fail timer callback survived cleanup retry");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
