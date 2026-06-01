@@ -250,6 +250,13 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-05-29-buff-compact-second-source-result.md`, and
   `docs/research/2026-05-29-next-targetset-discovery.md` for exact target counts and
   blockers.
+  Dino now has `scripts/check_dino_scalar_readiness.py --json` as a read-only internal
+  candidate gate over the redacted UFunction descriptor preflight for `dino-compact-intake`.
+  It accepts the four `AddPassenger` pre-call copied scalars only, keeps
+  `AddPassenger.ReturnValue` and `AllowCarryCharacter.ReturnValue` deferred, keeps
+  `ACharacter` and `CanCarryPawn` recognition-only, and reports public/runtime/v1
+  readiness false. It does not promote a Dino SDK, ABI, runtime observer, identity,
+  lookup, mutation, return override, `ResourceHandle`, or v1 completion.
 - Structure non-PIN copied-scalar evidence is historical legacy context at
   `/home/flowcommunity-ark/obelisk-artifacts/structure-nonpin-copied-scalar-policy-slice-20260530T100717Z/`.
   It excludes `VerifyPinCode`, copies only `SetVariant.{VariantIndex,bForceSet,ReturnValue}`,

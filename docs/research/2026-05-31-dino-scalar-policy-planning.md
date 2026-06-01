@@ -89,3 +89,29 @@ Promotion can be considered only after a follow-up note or patch demonstrates:
 
 Until those gates pass, Dino remains an internal copied-data planning lane behind Mission,
 not an externally consumable module surface.
+
+## Readiness Gate
+
+`scripts/check_dino_scalar_readiness.py --json` is the read-only candidate readiness
+checker for this lane. It consumes the existing
+`obelisk.redacted-ufunction-signatures.v1` descriptor preflight for
+`dino-compact-intake` and verifies:
+
+- exact descriptor coverage for `dino_character.add_passenger` and
+  `dino_character.allow_carry_character`;
+- six layout scalar fields, but only four pre-call copied scalar fields:
+  `PassengerSeatIndex`, `bForcePassenger`, `bAllowFlyersAndWaterDinos`, and
+  `bSkipLineTrace`;
+- `AddPassenger.ReturnValue` and `AllowCarryCharacter.ReturnValue` remain deferred
+  return fields with `postcall_return_ready=false`;
+- `ACharacter` and `CanCarryPawn` remain recognition-only object refs;
+- no public Dino SDK, public ABI, runtime wiring, identity, lookup, mutation, return
+  override, `ResourceHandle`, or v1 completion claim is promoted.
+
+Validated on 2026-06-01:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_dino_scalar_readiness.py --json
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_dino_scalar_readiness
+ctest --test-dir build --output-on-failure -R '^(DinoReflectionTests|ProcessEventDinoReflectionTests)$'
+```
