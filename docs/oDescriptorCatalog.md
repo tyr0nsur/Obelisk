@@ -6,6 +6,9 @@ event kinds before deciding what copied events it wants to handle.
 
 Support tier: release-supported seed.
 
+Boundary: this is a release-supported SDK example, not active Plugin Hub work and not v1
+SDK completion evidence.
+
 The plugin uses only:
 
 - `DescribeResourceKind`

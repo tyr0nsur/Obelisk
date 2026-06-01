@@ -7794,6 +7794,62 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             [gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA],
         )
 
+    def test_blocks_runtime_evidence_pair_run_identity_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            rejection_manifest = workspace / "runtime-rejection-samples.json"
+            serial_manifest = workspace / "runtime-serial-semantics.json"
+            rejection_payload = runtime_rejection_samples_manifest()
+            serial_payload = runtime_serial_semantics_manifest()
+            serial_payload["redacted_run_identity"]["marker_profile"] = "different-redacted-marker"
+            serial_payload["redacted_run_identity"]["allowlist_label"] = "different-allowlist"
+            attach_runtime_output_identity(
+                serial_payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                capture_id="runtime-serial-test",
+                evidence_pack_id="runtime-serial-pack",
+            )
+            write_json(rejection_manifest, rejection_payload)
+            write_json(serial_manifest, serial_payload)
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[rejection_manifest, serial_manifest])
+            )
+
+        pair_blocker = next(
+            blocker for blocker in result["blockers"] if blocker["reason"] == "runtime_evidence_pair_run_identity_mismatch"
+        )
+        self.assertEqual(["allowlist_label", "marker_profile"], pair_blocker["fields"])
+
+    def test_blocks_runtime_evidence_pair_source_identity_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            rejection_manifest = workspace / "runtime-rejection-samples.json"
+            serial_manifest = workspace / "runtime-serial-semantics.json"
+            rejection_payload = runtime_rejection_samples_manifest()
+            serial_payload = runtime_serial_semantics_manifest()
+            serial_payload["source_artifacts"][0]["capture_id"] = "different-serial-policy-capture"
+            serial_payload["source_artifacts"][0]["evidence_pack_id"] = "different-serial-policy-pack"
+            attach_runtime_output_identity(
+                serial_payload,
+                schema=gate.INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                capture_id="runtime-serial-test",
+                evidence_pack_id="runtime-serial-pack",
+            )
+            write_json(rejection_manifest, rejection_payload)
+            write_json(serial_manifest, serial_payload)
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[rejection_manifest, serial_manifest])
+            )
+
+        pair_blocker = next(
+            blocker for blocker in result["blockers"] if blocker["reason"] == "runtime_evidence_pair_source_identity_mismatch"
+        )
+        self.assertEqual(["capture_id", "evidence_pack_id"], pair_blocker["fields"])
+
     def test_blocks_runtime_rejection_samples_in_promote_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

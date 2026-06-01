@@ -133,16 +133,14 @@ public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 
 ## v1 Planning Clarification
 
-The next high-value Plugin Hub clarification is production-readiness criteria for the
-current safe seed classes, not another demand category from this inventory.
+Plugin Hub work is parked until the complete SDK blocker chain is handled or explicitly
+scoped. For v1 planning, treat the existing example/plugin notes only as archived
+reference material:
 
-For v1 planning, split work into two lanes:
-
-- Production Plugin Hub lane: lifecycle/config/logging, descriptor readers,
-  and process-local timers. This lane can improve docs, examples, packaging, capability
-  checks, fail-closed config, shutdown cleanup, and multi-instance-safe file layout
-  without adding new SDK symbols.
-- Experimental seed lane: `oChatLogger`, `oChatAudit`, and `oPolicyAudit` may teach
+- Archived SDK example lane: lifecycle/config/logging, descriptor readers, and
+  process-local timers can remain useful as guardrail fixtures, but they are not active
+  Plugin Hub production work while SDK blockers remain open.
+- Experimental pattern lane: `oChatLogger`, `oChatAudit`, and `oPolicyAudit` may teach
   copied chat/policy audit patterns, but they are not production Plugin Hub modules and
   do not promise that copied chat or policy auditing is generally available.
 - Evidence/design backlog: permissions/admin, RCON, economy, homes/safe zones, broadcasts,

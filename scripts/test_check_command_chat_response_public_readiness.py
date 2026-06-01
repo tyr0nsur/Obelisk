@@ -181,17 +181,27 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "required_before_public_header": required,
         }
 
-    def write_inputs(self, root: Path, readiness: dict | None = None, decisions: dict | None = None) -> tuple[Path, Path]:
+    def write_inputs(self, root: Path, readiness: dict | None = None, decisions: dict | None = None) -> tuple[Path, Path, Path]:
         readiness_path = root / "command-chat-response-route-planning-readiness.json"
         decisions_path = root / "command_chat_response_public_contract_decisions.json"
+        public_header_path = root / "ObeliskApi.h"
         readiness_path.write_text(json.dumps(readiness if readiness is not None else self.make_readiness()), encoding="utf-8")
         decisions_path.write_text(json.dumps(decisions if decisions is not None else self.make_decisions()), encoding="utf-8")
-        return readiness_path, decisions_path
+        public_header_path.write_text("/* minimal public header without response-path ABI */\n", encoding="utf-8")
+        return readiness_path, decisions_path, public_header_path
 
     def test_accepts_planning_layout_second_source_but_not_public_readiness(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            readiness_path, decisions_path = self.write_inputs(Path(temp_dir))
-            result = self.run_checker("--readiness", str(readiness_path), "--decisions", str(decisions_path), "--json")
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir))
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+            )
 
         report = json.loads(result.stdout)
         self.assertTrue(report["valid"])
@@ -213,8 +223,16 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         readiness["target_set_guidance"][0]["reply_api"] = True
         readiness["claim"] = "reply API is public and ready"
         with tempfile.TemporaryDirectory() as temp_dir:
-            readiness_path, decisions_path = self.write_inputs(Path(temp_dir), readiness=readiness)
-            result = self.run_checker("--readiness", str(readiness_path), "--decisions", str(decisions_path), check=False)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
@@ -233,8 +251,16 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         decisions["public_header_symbols_now"] = ["RegisterCommandChatResponse"]
         decisions["required_before_public_header"][0]["status"] = "resolved"
         with tempfile.TemporaryDirectory() as temp_dir:
-            readiness_path, decisions_path = self.write_inputs(Path(temp_dir), decisions=decisions)
-            result = self.run_checker("--readiness", str(readiness_path), "--decisions", str(decisions_path), check=False)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
@@ -242,6 +268,34 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("public_header_allowed_not_false", report["blockers"])
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("required_before_public_header_item_not_unresolved", report["blockers"])
+
+    def test_rejects_response_path_symbols_in_public_header(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            public_header_path.write_text(
+                "typedef struct ObeliskCommandChatResponse ObeliskCommandChatResponse;\n"
+                "void RegisterCommandChatResponse(void);\n"
+                "#define OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH 0x80000000u\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("public_header_forbidden_symbols_present", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
+        self.assertIn("ObeliskCommandChatResponse", detail["symbols"])
+        self.assertIn("RegisterCommandChatResponse", detail["symbols"])
+        self.assertIn("OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH", detail["symbols"])
 
     def test_rejects_explicit_surface_claim_fields(self) -> None:
         for field in (
@@ -255,12 +309,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 readiness = self.make_readiness()
                 readiness[field] = True
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    readiness_path, decisions_path = self.write_inputs(Path(temp_dir), readiness=readiness)
+                    readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
                     result = self.run_checker(
                         "--readiness",
                         str(readiness_path),
                         "--decisions",
                         str(decisions_path),
+                        "--public-header",
+                        str(public_header_path),
                         check=False,
                     )
 
@@ -274,8 +330,16 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         readiness["totals"]["second_source_missing"] = 1
         readiness["modules"][0]["target_details"][0]["second_source_status"] = "missing"
         with tempfile.TemporaryDirectory() as temp_dir:
-            readiness_path, decisions_path = self.write_inputs(Path(temp_dir), readiness=readiness)
-            result = self.run_checker("--readiness", str(readiness_path), "--decisions", str(decisions_path), check=False)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
@@ -300,12 +364,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                     if phrase not in check
                 ]
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    readiness_path, decisions_path = self.write_inputs(Path(temp_dir), readiness=readiness)
+                    readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
                     result = self.run_checker(
                         "--readiness",
                         str(readiness_path),
                         "--decisions",
                         str(decisions_path),
+                        "--public-header",
+                        str(public_header_path),
                         check=False,
                     )
 
@@ -320,8 +386,16 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             item for item in privacy["required_behavior"] if not item.startswith("raw FString storage/data")
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
-            readiness_path, decisions_path = self.write_inputs(Path(temp_dir), decisions=decisions)
-            result = self.run_checker("--readiness", str(readiness_path), "--decisions", str(decisions_path), check=False)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)

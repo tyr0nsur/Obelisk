@@ -21,6 +21,7 @@ DEFAULT_ROOT = Path(
 )
 DEFAULT_READINESS_NAME = "command-chat-response-route-planning-readiness.json"
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.command-chat-response-public-readiness-check.v1"
 READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
@@ -92,6 +93,48 @@ REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
         "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
     )
 )
+REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
+    (
+        "OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH",
+        "OBELISK_API_CAPABILITY_COMMAND_RESPONSE",
+        "OBELISK_API_CAPABILITY_CHAT_RESPONSE",
+        "OBELISK_API_CAPABILITY_CHAT_REPLIES",
+        "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
+        "OBELISK_API_CAPABILITY_SEND_CHAT",
+        "OBELISK_API_CAPABILITY_BROADCAST",
+        "OBELISK_API_CAPABILITY_NOTICES",
+        "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT_RESPONSE",
+        "OBELISK_COMMAND_CHAT_RESPONSE_ABI_VERSION",
+        "OBELISK_COMMAND_RESPONSE_ABI_VERSION",
+        "OBELISK_CHAT_RESPONSE_ABI_VERSION",
+        "ObeliskCommandChatResponse",
+        "ObeliskCommandResponse",
+        "ObeliskChatResponse",
+        "ObeliskCommandReply",
+        "ObeliskChatReply",
+        "ObeliskSendChat",
+        "ObeliskBroadcast",
+        "ObeliskNotice",
+        "RegisterCommandChatResponse",
+        "RegisterCommandResponse",
+        "RegisterChatResponse",
+        "RegisterCommandReply",
+        "UnregisterCommandChatResponse",
+        "UnregisterCommandResponse",
+        "UnregisterChatResponse",
+        "UnregisterCommandReply",
+        "ReplyToCommand",
+        "ReplyToCommandWithOwnerToken",
+        "SendChat",
+        "SendChatWithOwnerToken",
+        "BroadcastChat",
+        "BroadcastNotice",
+        "SendNotice",
+        "CallProcessEventCommandResponse",
+        "CallProcessEventChatResponse",
+        "CallProcessEventReply",
+    )
+)
 FALSE_ONLY_KEYS = frozenset(
     (
         "command_router",
@@ -160,6 +203,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_DECISIONS,
         help="Command/chat response public contract decisions JSON.",
+    )
+    parser.add_argument(
+        "--public-header",
+        type=Path,
+        default=DEFAULT_PUBLIC_HEADER,
+        help="Public Obelisk API header to scan for forbidden response-path symbols.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON. The checker always emits JSON.")
     return parser.parse_args()
@@ -453,7 +502,25 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     collect_surface_overclaims(payload, blockers, "$.decisions")
 
 
-def build_report(readiness_path: Path, decisions_path: Path) -> dict[str, Any]:
+def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
+    try:
+        reject_symlink_component(path, "public_header")
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        add(blockers, "public_header_unreadable", "$.public_header", path=str(path), detail=str(exc))
+        return
+    present = sorted(token for token in REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS if token in text)
+    if present:
+        add(
+            blockers,
+            "public_header_forbidden_symbols_present",
+            "$.public_header",
+            path=str(path),
+            symbols=present,
+        )
+
+
+def build_report(readiness_path: Path, decisions_path: Path, public_header_path: Path) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     readiness = safe_load_json(readiness_path, "readiness", blockers)
     decisions = safe_load_json(decisions_path, "decisions", blockers)
@@ -461,6 +528,7 @@ def build_report(readiness_path: Path, decisions_path: Path) -> dict[str, Any]:
         validate_readiness(readiness, blockers)
     if decisions is not None:
         validate_decisions(decisions, blockers)
+    validate_public_header(public_header_path, blockers)
 
     valid = not blockers
     return {
@@ -479,6 +547,7 @@ def build_report(readiness_path: Path, decisions_path: Path) -> dict[str, Any]:
         "target_filters": sorted(TARGETS),
         "readiness_path": str(readiness_path),
         "decisions_path": str(decisions_path),
+        "public_header_path": str(public_header_path),
         "readiness_status": readiness.get("second_source_status") if isinstance(readiness, dict) else None,
         "decisions_status": decisions.get("status") if isinstance(decisions, dict) else None,
         "blockers": [blocker["reason"] for blocker in blockers],
@@ -489,7 +558,7 @@ def build_report(readiness_path: Path, decisions_path: Path) -> dict[str, Any]:
 def main() -> int:
     args = parse_args()
     readiness_path = args.readiness if args.readiness is not None else args.root / DEFAULT_READINESS_NAME
-    report = build_report(readiness_path, args.decisions)
+    report = build_report(readiness_path, args.decisions, args.public_header)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1
 

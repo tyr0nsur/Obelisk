@@ -4,6 +4,9 @@
 
 Support tier: release-supported seed.
 
+Boundary: this is a release-supported SDK example, not active Plugin Hub work and not v1
+SDK completion evidence.
+
 Release-scope caveat: this plugin and the timer ABI are part of the current
 `v0.1.0-rc.2` core runtime surface. They remain process-local core primitives and do not
 promote UE timers, gameplay/module timers, identity, command routing, or shared-cluster

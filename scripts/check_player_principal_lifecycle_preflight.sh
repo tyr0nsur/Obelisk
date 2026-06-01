@@ -176,6 +176,26 @@ forbid_marker() {
     fi
 }
 
+require_exact_marker_set() {
+    local allowed_markers=""
+    for marker in "$@"; do
+        allowed_markers="${allowed_markers}${marker}"$'\n'
+    done
+
+    while IFS= read -r -d '' path; do
+        local marker
+        marker="$(basename -- "${path}")"
+        if [[ "${allowed_markers}" != *"${marker}"$'\n'* ]]; then
+            echo "Unexpected marker exists for player-principal preflight: ${path}" >&2
+            exit 1
+        fi
+        if [[ -L "${path}" || ! -f "${path}" ]]; then
+            echo "Marker must be a regular non-symlink file: ${path}" >&2
+            exit 1
+        fi
+    done < <(find "${MARKER_DIR}" -mindepth 1 -maxdepth 1 -print0)
+}
+
 if [[ "${OFFLINE_ONLY}" == "1" ]]; then
     reject_protected_live_path "Obelisk root" "${OBELISK_ROOT}"
     reject_protected_live_path "Installed wrapper" "${INSTALLED_WRAPPER}"
@@ -224,10 +244,19 @@ if [[ "${MODE}" == "stable" ]]; then
     forbid_marker allow-observer-debug-window
     forbid_marker allow-experimental-observers
     forbid_marker enable-player-principal-lifecycle-observer
+    require_exact_marker_set \
+        enable-process-event-hook \
+        disable-plugins
 else
     require_marker allow-observer-debug-window
     require_marker allow-experimental-observers
     require_marker enable-player-principal-lifecycle-observer
+    require_exact_marker_set \
+        enable-process-event-hook \
+        disable-plugins \
+        allow-observer-debug-window \
+        allow-experimental-observers \
+        enable-player-principal-lifecycle-observer
 fi
 
 if [[ -n "${MAP}" ]]; then

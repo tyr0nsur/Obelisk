@@ -256,6 +256,13 @@ def validate_copied_log_path(fields: dict[str, str], manifest_path: Path, blocke
             )
     if status.approved_offline_workspace:
         return "approved_offline_workspace"
+    add(
+        blockers,
+        "copied_log_path_not_under_approved_offline_workspace",
+        "copied_log_path",
+        expected="/servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log",
+        resolved=str(status.resolved),
+    )
     return "unprotected_offline"
 
 

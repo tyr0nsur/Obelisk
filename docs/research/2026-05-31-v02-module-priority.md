@@ -29,11 +29,12 @@ choices, behavior, control flow, or source-derived implementation guidance are u
 
 ## Matrix And README Alignment
 
-The Plugin Hub matrix and research README agree on the current support boundary:
+The Plugin Hub matrix and research README agree on the current SDK-first boundary:
 
-- Production Plugin Hub seeds are still foundation work only: lifecycle/config/logging,
-  descriptor/catalog consumers, process-local timers, packaging, and fail-closed
-  capability checks.
+- Plugin Hub foundation notes are archived post-SDK-complete planning only:
+  lifecycle/config/logging, descriptor/catalog consumers, process-local timers,
+  packaging, and fail-closed capability checks are not active Hub priorities while the
+  complete SDK blocker chain remains open.
 - Passive copied chat parsing and copied `GameplayPolicyEvent` auditing are experimental
   pattern examples or promoted copied-policy backing, not general Chat, Command,
   Inventory, Items, StructureEvents, moderation, enforcement, identity, mutation, or

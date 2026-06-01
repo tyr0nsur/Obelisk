@@ -1203,6 +1203,30 @@ RUNTIME_EVIDENCE_PREFLIGHT_REQUIRED_FALSE = {
 }
 RUNTIME_EVIDENCE_PREFLIGHT_SCOPE = "resource_handle_runtime_semantics_candidate"
 RUNTIME_EVIDENCE_PREFLIGHT_COMPLETION_RULE = "both_runtime_manifests_required_and_still_candidate_only"
+RUNTIME_EVIDENCE_PAIR_SCHEMAS = {
+    INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+    INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+}
+RUNTIME_EVIDENCE_PAIR_RUN_IDENTITY_KEYS = (
+    "redacted",
+    "approved_debug_window",
+    "target_instance_redacted",
+    "map_redacted",
+    "broad_tracing",
+    "reflection_scanner",
+    "ptrace_or_gcore",
+    "binary_sha256",
+    "obelisk_commit",
+    "marker_profile",
+    "allowlist_label",
+)
+RUNTIME_EVIDENCE_PAIR_SOURCE_IDENTITY_KEYS = (
+    "schema",
+    "artifact_sha256",
+    "capture_id",
+    "evidence_pack_id",
+    "consume_gate_status",
+)
 RUNTIME_SCHEMA_COMMON_ALLOWED_KEYS = {
     "schema",
     "evidence_kind",
@@ -7917,6 +7941,124 @@ def validate_internal_uobject_runtime_serial_semantics_manifest(
     return blockers
 
 
+def runtime_evidence_pair_identity(payload: dict[str, Any]) -> dict[str, Any] | None:
+    if payload.get("schema") not in RUNTIME_EVIDENCE_PAIR_SCHEMAS:
+        return None
+
+    source_identity: dict[str, Any] | None = None
+    source_artifacts = payload.get("source_artifacts")
+    if isinstance(source_artifacts, list) and len(source_artifacts) == 1 and isinstance(source_artifacts[0], dict):
+        source_identity = {
+            key: source_artifacts[0].get(key)
+            for key in RUNTIME_EVIDENCE_PAIR_SOURCE_IDENTITY_KEYS
+            if key in source_artifacts[0]
+        }
+
+    run_identity: dict[str, Any] | None = None
+    redacted_run_identity = payload.get("redacted_run_identity")
+    if isinstance(redacted_run_identity, dict):
+        run_identity = {
+            key: redacted_run_identity.get(key)
+            for key in RUNTIME_EVIDENCE_PAIR_RUN_IDENTITY_KEYS
+            if key in redacted_run_identity
+        }
+
+    return {
+        "binary_sha256": payload.get("binary_sha256"),
+        "run_identity": run_identity,
+        "source_identity": source_identity,
+    }
+
+
+def runtime_evidence_pair_mismatch_fields(
+    left: dict[str, Any],
+    right: dict[str, Any],
+) -> list[str]:
+    fields = []
+    for key in sorted(set(left) | set(right)):
+        if left.get(key) != right.get(key):
+            fields.append(key)
+    return fields
+
+
+def validate_runtime_evidence_pair_correlation(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    blockers: list[dict[str, Any]] = []
+    runtime_records = [
+        record
+        for record in records
+        if record.get("schema") in RUNTIME_EVIDENCE_PAIR_SCHEMAS
+    ]
+    runtime_schema_counts = Counter(record.get("schema") for record in runtime_records)
+    for schema, count in sorted(runtime_schema_counts.items()):
+        if count > 1:
+            blockers.append(
+                {
+                    "reason": "runtime_evidence_pair_duplicate_schema",
+                    "schema": schema,
+                    "count": count,
+                }
+            )
+
+    if set(runtime_schema_counts) != RUNTIME_EVIDENCE_PAIR_SCHEMAS or any(count != 1 for count in runtime_schema_counts.values()):
+        return blockers
+
+    rejection_record = next(
+        record for record in runtime_records if record.get("schema") == INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA
+    )
+    serial_record = next(
+        record for record in runtime_records if record.get("schema") == INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA
+    )
+    rejection_identity = rejection_record.get("_runtime_evidence_pair_identity")
+    serial_identity = serial_record.get("_runtime_evidence_pair_identity")
+    if not isinstance(rejection_identity, dict) or not isinstance(serial_identity, dict):
+        return blockers
+
+    if rejection_identity.get("binary_sha256") != serial_identity.get("binary_sha256"):
+        blockers.append(
+            {
+                "reason": "runtime_evidence_pair_binary_sha256_mismatch",
+                "schemas": [
+                    INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                    INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                ],
+            }
+        )
+
+    rejection_run_identity = rejection_identity.get("run_identity")
+    serial_run_identity = serial_identity.get("run_identity")
+    if isinstance(rejection_run_identity, dict) and isinstance(serial_run_identity, dict):
+        mismatch_fields = runtime_evidence_pair_mismatch_fields(rejection_run_identity, serial_run_identity)
+        if mismatch_fields:
+            blockers.append(
+                {
+                    "reason": "runtime_evidence_pair_run_identity_mismatch",
+                    "fields": mismatch_fields,
+                    "schemas": [
+                        INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                        INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                    ],
+                }
+            )
+
+    rejection_source_identity = rejection_identity.get("source_identity")
+    serial_source_identity = serial_identity.get("source_identity")
+    if isinstance(rejection_source_identity, dict) and isinstance(serial_source_identity, dict):
+        mismatch_fields = runtime_evidence_pair_mismatch_fields(rejection_source_identity, serial_source_identity)
+        if mismatch_fields:
+            blockers.append(
+                {
+                    "reason": "runtime_evidence_pair_source_identity_mismatch",
+                    "fields": mismatch_fields,
+                    "schemas": [
+                        INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
+                        INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+                    ],
+                }
+            )
+
+    return blockers
+
+
 def resource_handle_zero_serial_negative_samples_canonical_report(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema": payload.get("schema"),
@@ -9954,6 +10096,9 @@ def validate_manifest(
     if payload is None:
         return record, load_blockers
     record["schema"] = payload.get("schema")
+    pair_identity = runtime_evidence_pair_identity(payload)
+    if pair_identity is not None:
+        record["_runtime_evidence_pair_identity"] = pair_identity
     try:
         record["sha256"] = checked_sha256_file(path)
     except SymlinkPathError as exc:
@@ -10202,6 +10347,7 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
     all_blockers: list[dict[str, Any]] = []
     artifacts: list[dict[str, Any]] = []
     manifests: list[dict[str, Any]] = []
+    manifest_records: list[dict[str, Any]] = []
 
     all_blockers.extend(
         path_blockers(
@@ -10222,17 +10368,14 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
             strict_target_set_coverage=getattr(args, "strict_target_set_coverage", False),
             expected_binary_sha256=expected_binary_sha256,
         )
-        manifests.append(record)
+        manifest_records.append(record)
+        manifests.append({key: value for key, value in record.items() if not key.startswith("_")})
         all_blockers.extend(blockers)
 
-    runtime_pair_schemas = {
-        INTERNAL_UOBJECT_RUNTIME_REJECTION_SAMPLES_SCHEMA,
-        INTERNAL_UOBJECT_RUNTIME_SERIAL_SEMANTICS_SCHEMA,
-    }
-    present_runtime_pair_schemas = {record.get("schema") for record in manifests} & runtime_pair_schemas
-    if present_runtime_pair_schemas and present_runtime_pair_schemas != runtime_pair_schemas:
-        missing_runtime_pair_schemas = sorted(runtime_pair_schemas - present_runtime_pair_schemas)
-        for record in manifests:
+    present_runtime_pair_schemas = {record.get("schema") for record in manifest_records} & RUNTIME_EVIDENCE_PAIR_SCHEMAS
+    if present_runtime_pair_schemas and present_runtime_pair_schemas != RUNTIME_EVIDENCE_PAIR_SCHEMAS:
+        missing_runtime_pair_schemas = sorted(RUNTIME_EVIDENCE_PAIR_SCHEMAS - present_runtime_pair_schemas)
+        for record in manifest_records:
             if record.get("schema") in present_runtime_pair_schemas:
                 all_blockers.append(
                     {
@@ -10242,6 +10385,7 @@ def build_result(args: argparse.Namespace) -> dict[str, Any]:
                         "missing_schemas": missing_runtime_pair_schemas,
                     }
                 )
+    all_blockers.extend(validate_runtime_evidence_pair_correlation(manifest_records))
 
     for label, path in args.artifact:
         record, blockers = validate_artifact(

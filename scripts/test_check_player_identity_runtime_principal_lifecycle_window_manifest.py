@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import subprocess
 import sys
 import tempfile
@@ -93,14 +94,44 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 stderr=subprocess.PIPE,
             )
 
-    def test_accepts_offline_window_manifest_without_promoting_identity(self) -> None:
-        result = self.run_checker(manifest_lines())
+    def run_checker_in_approved_workspace(
+        self,
+        lines: list[str],
+        *,
+        check: bool = True,
+        create_copied_log: bool = True,
+        copied_log_text: str = COPIED_LOG_TEXT,
+    ) -> subprocess.CompletedProcess[str]:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        with tempfile.TemporaryDirectory(dir=workspace) as tmp:
+            path = Path(tmp) / "window-manifest.env"
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            copied_log = fields.get("copied_log_path")
+            if create_copied_log and copied_log:
+                copied_log_path = Path(copied_log)
+                if not copied_log_path.is_absolute():
+                    copied_log_path = path.parent / copied_log_path
+                copied_log_path.parent.mkdir(parents=True, exist_ok=True)
+                copied_log_path.write_text(copied_log_text, encoding="utf-8")
+            return subprocess.run(
+                [sys.executable, str(SCRIPT), str(path), "--json"],
+                check=check,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+    def test_accepts_approved_workspace_window_manifest_without_promoting_identity(self) -> None:
+        result = self.run_checker_in_approved_workspace(manifest_lines())
         report = json.loads(result.stdout)
 
         self.assertTrue(report["ready"])
         self.assertTrue(report["operational_window_manifest_ready"])
         self.assertEqual(report["obelisk_commit"], "test-commit")
-        self.assertEqual(report["copied_log"]["path_status"], "unprotected_offline")
+        self.assertEqual(report["copied_log"]["path_status"], "approved_offline_workspace")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
@@ -111,12 +142,21 @@ class WindowManifestCheckerTests(unittest.TestCase):
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)
         lines.append("users_policy=no_regular_users")
-        result = self.run_checker(lines)
+        result = self.run_checker_in_approved_workspace(lines)
         report = json.loads(result.stdout)
 
         self.assertTrue(report["ready"])
         self.assertEqual(report["user_policy"], "no_regular_users")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
+
+    def test_rejects_generic_unprotected_offline_window_manifest(self) -> None:
+        result = self.run_checker(manifest_lines(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("copied_log_path_not_under_approved_offline_workspace", report["blockers"])
+        self.assertEqual(report["copied_log"]["path_status"], "unprotected_offline")
+        self.assertFalse(report["ready"])
 
     def test_rejects_copied_log_path_under_live_server_root(self) -> None:
         result = self.run_checker(

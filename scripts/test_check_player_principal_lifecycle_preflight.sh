@@ -89,6 +89,32 @@ assert_fail debug-request-marker "${CHECK}" \
     --allow-stopped
 grep -F 'Forbidden marker exists' "${TMP_DIR}/debug-request-marker.err" >/dev/null
 
+root_unexpected_marker="${TMP_DIR}/root-unexpected-marker"
+prepare_root "${root_unexpected_marker}"
+: > "${root_unexpected_marker}/state/instances/arkserver2/local-test-marker"
+assert_fail unexpected-marker "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --obelisk-root "${root_unexpected_marker}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F 'Unexpected marker exists' "${TMP_DIR}/unexpected-marker.err" >/dev/null
+
+root_unexpected_dir="${TMP_DIR}/root-unexpected-dir"
+prepare_root "${root_unexpected_dir}"
+mkdir -p "${root_unexpected_dir}/state/instances/arkserver2/enable-process-event-hook-dir"
+assert_fail unexpected-marker-dir "${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --obelisk-root "${root_unexpected_dir}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F 'Unexpected marker exists' "${TMP_DIR}/unexpected-marker-dir.err" >/dev/null
+
 root_symlink="${TMP_DIR}/root-symlink"
 prepare_root "${root_symlink}"
 : > "${TMP_DIR}/external-marker"
