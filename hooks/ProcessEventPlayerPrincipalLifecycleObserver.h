@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/PlayerPrincipalEventDispatcher.h"
 #include "ue/PlayerPrincipalLifecycleReflection.h"
 #include "ue/RuntimeReflection.h"
 
@@ -125,6 +126,14 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
     bool TryBuildCopiedLifecycleObservationAfterOriginal(bool originalWasCalled,
                                                          const Attempt& attempt,
                                                          CopiedLifecycleObservation& out);
+    bool TryMapPlayerPrincipalEventKind(LifecycleRole role,
+                                        Obelisk::Core::PlayerPrincipalEventKind& out);
+    bool TryMapPlayerPrincipalAction(PrincipalAction action,
+                                     Obelisk::Core::PlayerPrincipalAction& out);
+    bool TryBuildPlayerPrincipalEventView(
+        const CopiedLifecycleObservation& observation,
+        std::array<Obelisk::Core::PlayerPrincipalBoolValue, 2>& boolStorage,
+        Obelisk::Core::PlayerPrincipalEventView& out);
 
     const char* LifecycleFunctionName(Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction function);
     const char* LifecycleTargetName(Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction function);

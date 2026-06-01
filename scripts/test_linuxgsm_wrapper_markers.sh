@@ -249,7 +249,56 @@ assert_contains "${capture_player_principal}" '^OBELISK_PLAYER_PRINCIPAL_LIFECYC
 assert_contains "${capture_player_principal}" '^OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=2$'
 assert_contains "${capture_player_principal}" '^OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0$'
 assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_CHAT_EVENTS='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_CHAT_REFLECTION='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_CHAT_ROUTE_OBSERVER='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_ITEM_RETURN_EVENTS='
+
+for residual_observer_marker in \
+    enable-chat-events \
+    enable-chat-reflection \
+    enable-chat-route-observer \
+    enable-inventory-reflection \
+    enable-structure-reflection \
+    enable-item-return-events
+do
+    root_player_principal_residual="${TMP_DIR}/root-player-principal-residual-${residual_observer_marker}"
+    prepare_root "${root_player_principal_residual}"
+    : > "${root_player_principal_residual}/state/instances/arkserver2/allow-observer-debug-window"
+    : > "${root_player_principal_residual}/state/instances/arkserver2/allow-experimental-observers"
+    : > "${root_player_principal_residual}/state/instances/arkserver2/enable-process-event-hook"
+    : > "${root_player_principal_residual}/state/instances/arkserver2/disable-plugins"
+    : > "${root_player_principal_residual}/state/instances/arkserver2/enable-player-principal-lifecycle-observer"
+    : > "${root_player_principal_residual}/state/instances/arkserver2/${residual_observer_marker}"
+    expect_wrapper_failure "player-principal-window-with-residual-${residual_observer_marker}" env \
+        OBELISK_ROOT="${root_player_principal_residual}" \
+        OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/player-principal-window-with-residual-${residual_observer_marker}.env" \
+        OBELISK_WRAPPER_PROFILE=observer-debug \
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=2 \
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0 \
+        "${WRAPPER}" TheIsland?listen
+done
+
+root_player_principal_symlink_residual="${TMP_DIR}/root-player-principal-symlink-residual"
+prepare_root "${root_player_principal_symlink_residual}"
+: > "${root_player_principal_symlink_residual}/state/instances/arkserver2/allow-observer-debug-window"
+: > "${root_player_principal_symlink_residual}/state/instances/arkserver2/allow-experimental-observers"
+: > "${root_player_principal_symlink_residual}/state/instances/arkserver2/enable-process-event-hook"
+: > "${root_player_principal_symlink_residual}/state/instances/arkserver2/disable-plugins"
+: > "${root_player_principal_symlink_residual}/state/instances/arkserver2/enable-player-principal-lifecycle-observer"
+: > "${TMP_DIR}/external-player-principal-chat-reflection-marker"
+ln -s "${TMP_DIR}/external-player-principal-chat-reflection-marker" \
+    "${root_player_principal_symlink_residual}/state/instances/arkserver2/enable-chat-reflection"
+expect_wrapper_failure player-principal-window-with-symlink-residual-marker env \
+    OBELISK_ROOT="${root_player_principal_symlink_residual}" \
+    OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/player-principal-window-with-symlink-residual-marker.env" \
+    OBELISK_WRAPPER_PROFILE=observer-debug \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=2 \
+    OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0 \
+    "${WRAPPER}" TheIsland?listen
 
 root_chat_events="${TMP_DIR}/root-chat-events"
 capture_chat_events="${TMP_DIR}/chat-events.env"

@@ -1,10 +1,13 @@
 #include "hooks/ProcessEventPlayerPrincipalLifecycleObserver.h"
 
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 namespace
 {
@@ -24,6 +27,15 @@ namespace
     constexpr int32_t kNewPlayerNameIndex = 28411;
     constexpr int32_t kBIsFromLoginNameIndex = 28509;
     constexpr int32_t kExitingNameIndex = 28543;
+
+    static_assert(std::is_standard_layout_v<Observer::LifecycleBoolObservation>,
+                  "copied player lifecycle bool observations must keep a simple layout");
+    static_assert(std::is_trivially_copyable_v<Observer::LifecycleBoolObservation>,
+                  "copied player lifecycle bool observations must remain byte-copyable");
+    static_assert(std::is_standard_layout_v<Observer::CopiedLifecycleObservation>,
+                  "copied player lifecycle observations must keep a simple layout");
+    static_assert(std::is_trivially_copyable_v<Observer::CopiedLifecycleObservation>,
+                  "copied player lifecycle observations must remain byte-copyable");
 
     void Require(bool condition, const char* message)
     {
@@ -103,6 +115,25 @@ namespace
         invocation.HasParameterRanges = true;
         invocation.Fields.push_back(RedactedField(LifecycleField::Exiting, kExitingNameIndex, 0x00, 0x08));
         return invocation;
+    }
+
+    void RequirePlayerPrincipalEventView(
+        const Observer::CopiedLifecycleObservation& observation,
+        Obelisk::Core::PlayerPrincipalEventKind expectedKind,
+        Obelisk::Core::PlayerPrincipalAction expectedAction,
+        size_t expectedBoolCount,
+        const char* message)
+    {
+        std::array<Obelisk::Core::PlayerPrincipalBoolValue, 2> boolStorage{};
+        Obelisk::Core::PlayerPrincipalEventView event;
+        Require(Observer::TryBuildPlayerPrincipalEventView(observation, boolStorage, event), message);
+        Require(event.Kind == expectedKind, message);
+        Require(event.Action == expectedAction, message);
+        Require(event.Bools.size() == expectedBoolCount, message);
+        if (expectedBoolCount != 0)
+            Require(event.Bools.data() == boolStorage.data(), message);
+        else
+            Require(event.Bools.empty(), message);
     }
 
     void TestGateMatrix()
@@ -263,6 +294,156 @@ namespace
         Require(Observer::TryBuildCopiedLifecycleObservationAfterOriginal(true, attempt, observation),
                 "post-original lifecycle observation rejected");
     }
+
+    void TestBuildsPlayerPrincipalEventViews()
+    {
+        Obelisk::Core::PlayerPrincipalEventKind kind =
+            Obelisk::Core::PlayerPrincipalEventKind::SessionEnd;
+        Require(Observer::TryMapPlayerPrincipalEventKind(Observer::LifecycleRole::SessionStart, kind),
+                "session start role did not map");
+        Require(kind == Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                "session start kind mismatch");
+        Require(Observer::TryMapPlayerPrincipalEventKind(Observer::LifecycleRole::SessionStartRejected, kind),
+                "session start rejected role did not map");
+        Require(kind == Obelisk::Core::PlayerPrincipalEventKind::SessionStartRejected,
+                "session start rejected kind mismatch");
+        Require(Observer::TryMapPlayerPrincipalEventKind(Observer::LifecycleRole::SessionEnd, kind),
+                "session end role did not map");
+        Require(kind == Obelisk::Core::PlayerPrincipalEventKind::SessionEnd,
+                "session end kind mismatch");
+
+        Obelisk::Core::PlayerPrincipalAction action =
+            Obelisk::Core::PlayerPrincipalAction::CandidateInvalidated;
+        Require(Observer::TryMapPlayerPrincipalAction(Observer::PrincipalAction::None, action),
+                "none action did not map");
+        Require(action == Obelisk::Core::PlayerPrincipalAction::None,
+                "none action mismatch");
+        Require(Observer::TryMapPlayerPrincipalAction(Observer::PrincipalAction::CandidateCreated, action),
+                "candidate-created action did not map");
+        Require(action == Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+                "candidate-created action mismatch");
+        Require(Observer::TryMapPlayerPrincipalAction(Observer::PrincipalAction::CandidateInvalidated, action),
+                "candidate-invalidated action did not map");
+        Require(action == Obelisk::Core::PlayerPrincipalAction::CandidateInvalidated,
+                "candidate-invalidated action mismatch");
+
+        Observer::CopiedLifecycleObservation observation;
+        Require(Observer::TryBuildCopiedLifecycleObservation(HandleNewPlayerInvocation(1, 1), observation),
+                "accepted start observation did not build");
+
+        std::array<Obelisk::Core::PlayerPrincipalBoolValue, 2> boolStorage{};
+        Obelisk::Core::PlayerPrincipalEventView event;
+        Require(Observer::TryBuildPlayerPrincipalEventView(observation, boolStorage, event),
+                "accepted start event view did not build");
+        Require(event.Kind == Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                "accepted start event kind mismatch");
+        Require(event.Action == Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+                "accepted start action mismatch");
+        Require(event.Bools.data() == boolStorage.data(), "event did not use caller bool storage");
+        Require(event.Bools.size() == 2, "accepted start bool count mismatch");
+        Require(event.Bools[0].Field == Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin,
+                "accepted start first bool field mismatch");
+        Require(event.Bools[0].Value, "accepted start bIsFromLogin mismatch");
+        Require(event.Bools[1].Field == Obelisk::Core::PlayerPrincipalBoolField::ReturnValue,
+                "accepted start second bool field mismatch");
+        Require(event.Bools[1].Value, "accepted start ReturnValue mismatch");
+
+        observation.BoolStorage[0].Value = false;
+        Require(event.Bools[0].Value, "event view retained copied observation storage");
+
+        Require(Observer::TryBuildCopiedLifecycleObservation(HandleNewPlayerInvocation(1, 0), observation),
+                "rejected start observation did not build");
+        RequirePlayerPrincipalEventView(
+            observation,
+            Obelisk::Core::PlayerPrincipalEventKind::SessionStartRejected,
+            Obelisk::Core::PlayerPrincipalAction::None,
+            2,
+            "rejected start event view mismatch");
+
+        Require(Observer::TryBuildCopiedLifecycleObservation(OnLogoutInvocation(), observation),
+                "session end observation did not build");
+        RequirePlayerPrincipalEventView(
+            observation,
+            Obelisk::Core::PlayerPrincipalEventKind::SessionEnd,
+            Obelisk::Core::PlayerPrincipalAction::CandidateInvalidated,
+            0,
+            "session end event view mismatch");
+    }
+
+    void TestPlayerPrincipalEventViewRejectsMalformedObservations()
+    {
+        Obelisk::Core::PlayerPrincipalEventKind kind =
+            Obelisk::Core::PlayerPrincipalEventKind::SessionStart;
+        Require(!Observer::TryMapPlayerPrincipalEventKind(
+                    static_cast<Observer::LifecycleRole>(99),
+                    kind),
+                "unknown lifecycle role mapped to event kind");
+
+        Obelisk::Core::PlayerPrincipalAction action =
+            Obelisk::Core::PlayerPrincipalAction::None;
+        Require(!Observer::TryMapPlayerPrincipalAction(
+                    static_cast<Observer::PrincipalAction>(99),
+                    action),
+                "unknown principal action mapped to core action");
+
+        std::array<Obelisk::Core::PlayerPrincipalBoolValue, 2> boolStorage{};
+        Obelisk::Core::PlayerPrincipalEventView event;
+        Observer::CopiedLifecycleObservation observation;
+        Require(Observer::TryBuildCopiedLifecycleObservation(HandleNewPlayerInvocation(1, 1), observation),
+                "valid accepted start observation did not build");
+
+        Observer::CopiedLifecycleObservation malformed = observation;
+        malformed.Role = static_cast<Observer::LifecycleRole>(99);
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "unknown lifecycle role built event view");
+
+        malformed = observation;
+        malformed.Action = Observer::PrincipalAction::None;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "accepted start without candidate-created action built event view");
+
+        malformed = observation;
+        malformed.BoolCount = 0;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "start without canonical bools built event view");
+
+        malformed = observation;
+        std::swap(malformed.BoolStorage[0], malformed.BoolStorage[1]);
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "start with swapped bool fields built event view");
+
+        malformed = observation;
+        malformed.Role = Observer::LifecycleRole::SessionStartRejected;
+        malformed.Action = Observer::PrincipalAction::None;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "accepted start bools built rejected event view");
+
+        malformed = observation;
+        malformed.BoolStorage[1].Value = false;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "rejected start bools built accepted event view");
+
+        malformed = observation;
+        malformed.RedactedCount = 2;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "start with missing redacted field built event view");
+
+        Require(Observer::TryBuildCopiedLifecycleObservation(OnLogoutInvocation(), observation),
+                "valid session end observation did not build");
+        malformed = observation;
+        malformed.BoolStorage[0] = {
+            .Field = LifecycleField::ReturnValue,
+            .Value = true,
+        };
+        malformed.BoolCount = 1;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "session end with bool payload built event view");
+
+        malformed = observation;
+        malformed.Action = Observer::PrincipalAction::None;
+        Require(!Observer::TryBuildPlayerPrincipalEventView(malformed, boolStorage, event),
+                "session end without invalidation action built event view");
+    }
 }
 
 int main()
@@ -273,6 +454,8 @@ int main()
     TestBuildsHandleNewPlayerObservation();
     TestBuildsOnLogoutObservationWithoutIdentity();
     TestAfterOriginalGuard();
+    TestBuildsPlayerPrincipalEventViews();
+    TestPlayerPrincipalEventViewRejectsMalformedObservations();
 
     std::cout << "ProcessEventPlayerPrincipalLifecycleObserverTests passed\n";
     return 0;

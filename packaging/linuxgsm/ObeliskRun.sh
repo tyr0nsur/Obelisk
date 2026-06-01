@@ -219,6 +219,26 @@ validate_observer_wrapper_profile() {
     esac
 }
 
+validate_player_principal_lifecycle_window_exclusive() {
+    [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
+    enable_marker "enable-player-principal-lifecycle-observer" || return 0
+
+    local marker
+    for marker in \
+        enable-chat-events \
+        enable-chat-reflection \
+        enable-chat-route-observer \
+        enable-inventory-reflection \
+        enable-structure-reflection \
+        enable-item-return-events
+    do
+        if marker_entry_exists "${marker}"; then
+            echo "Player principal lifecycle observer window must be exact; experimental observer marker ${marker} is also present for ${OBELISK_INSTANCE_ID}." >&2
+            exit 1
+        fi
+    done
+}
+
 configure_chat_events() {
     [[ "${OBELISK_WRAPPER_PROFILE:-stable}" == "observer-debug" ]] || return 0
     enable_marker "allow-observer-debug-window" || return 0
@@ -332,6 +352,7 @@ case "${1:-}" in
     Ragnarok*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver}"
         validate_observer_wrapper_profile
+        validate_player_principal_lifecycle_window_exclusive
         enable_marker "enable-process-event-hook" && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1
@@ -349,6 +370,7 @@ case "${1:-}" in
     TheIsland*)
         export OBELISK_INSTANCE_ID="${OBELISK_INSTANCE_ID:-arkserver2}"
         validate_observer_wrapper_profile
+        validate_player_principal_lifecycle_window_exclusive
         enable_marker "enable-process-event-hook" && export OBELISK_ENABLE_PROCESS_EVENT_HOOK=1
         enable_marker "disable-plugins" && export OBELISK_DISABLE_PLUGINS=1
         enable_marker "allow-ptrace" && export OBELISK_DEBUG_ALLOW_PTRACE=1

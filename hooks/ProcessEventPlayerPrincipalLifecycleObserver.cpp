@@ -89,6 +89,44 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
             out.BoolStorage[out.BoolCount++] = value;
             return true;
         }
+
+        bool TryMapPlayerPrincipalBoolField(
+            Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField field,
+            Obelisk::Core::PlayerPrincipalBoolField& out)
+        {
+            using Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField;
+            switch (field)
+            {
+            case LifecycleField::BIsFromLogin:
+                out = Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin;
+                return true;
+            case LifecycleField::ReturnValue:
+                out = Obelisk::Core::PlayerPrincipalBoolField::ReturnValue;
+                return true;
+            case LifecycleField::NewPlayer:
+            case LifecycleField::PlayerData:
+            case LifecycleField::PlayerCharacter:
+            case LifecycleField::Exiting:
+                return false;
+            }
+            return false;
+        }
+
+        bool HasCanonicalHandleNewPlayerRedactions(const CopiedLifecycleObservation& observation)
+        {
+            using Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField;
+            return observation.RedactedCount == 3 &&
+                observation.RedactedStorage[0] == LifecycleField::NewPlayer &&
+                observation.RedactedStorage[1] == LifecycleField::PlayerData &&
+                observation.RedactedStorage[2] == LifecycleField::PlayerCharacter;
+        }
+
+        bool HasCanonicalOnLogoutRedactions(const CopiedLifecycleObservation& observation)
+        {
+            using Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField;
+            return observation.RedactedCount == 1 &&
+                observation.RedactedStorage[0] == LifecycleField::Exiting;
+        }
     }
 
     Gate EvaluateGate(const char* enableLifecycleObserver,
@@ -376,6 +414,148 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
         if (!originalWasCalled || attempt.Status != AttemptStatus::Matched)
             return false;
         return TryBuildCopiedLifecycleObservation(attempt.Invocation, out);
+    }
+
+    bool TryMapPlayerPrincipalEventKind(LifecycleRole role,
+                                        Obelisk::Core::PlayerPrincipalEventKind& out)
+    {
+        switch (role)
+        {
+        case LifecycleRole::SessionStart:
+            out = Obelisk::Core::PlayerPrincipalEventKind::SessionStart;
+            return true;
+        case LifecycleRole::SessionStartRejected:
+            out = Obelisk::Core::PlayerPrincipalEventKind::SessionStartRejected;
+            return true;
+        case LifecycleRole::SessionEnd:
+            out = Obelisk::Core::PlayerPrincipalEventKind::SessionEnd;
+            return true;
+        }
+        return false;
+    }
+
+    bool TryMapPlayerPrincipalAction(PrincipalAction action,
+                                     Obelisk::Core::PlayerPrincipalAction& out)
+    {
+        switch (action)
+        {
+        case PrincipalAction::None:
+            out = Obelisk::Core::PlayerPrincipalAction::None;
+            return true;
+        case PrincipalAction::CandidateCreated:
+            out = Obelisk::Core::PlayerPrincipalAction::CandidateCreated;
+            return true;
+        case PrincipalAction::CandidateInvalidated:
+            out = Obelisk::Core::PlayerPrincipalAction::CandidateInvalidated;
+            return true;
+        }
+        return false;
+    }
+
+    bool TryBuildPlayerPrincipalEventView(
+        const CopiedLifecycleObservation& observation,
+        std::array<Obelisk::Core::PlayerPrincipalBoolValue, 2>& boolStorage,
+        Obelisk::Core::PlayerPrincipalEventView& out)
+    {
+        using Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleField;
+        using Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction;
+
+        out = {};
+
+        Obelisk::Core::PlayerPrincipalEventKind kind =
+            Obelisk::Core::PlayerPrincipalEventKind::SessionStart;
+        if (!TryMapPlayerPrincipalEventKind(observation.Role, kind))
+            return false;
+
+        Obelisk::Core::PlayerPrincipalAction action =
+            Obelisk::Core::PlayerPrincipalAction::None;
+        if (!TryMapPlayerPrincipalAction(observation.Action, action))
+            return false;
+
+        switch (observation.Role)
+        {
+        case LifecycleRole::SessionStart:
+        case LifecycleRole::SessionStartRejected:
+        {
+            if (observation.Function != LifecycleFunction::HandleNewPlayer ||
+                observation.FunctionNameIndex != kHandleNewPlayerNameIndex ||
+                observation.OuterNameIndex != kShooterGameModeNameIndex ||
+                observation.BoolCount != 2 ||
+                !HasCanonicalHandleNewPlayerRedactions(observation))
+            {
+                return false;
+            }
+
+            if (observation.BoolStorage[0].Field != LifecycleField::BIsFromLogin ||
+                observation.BoolStorage[1].Field != LifecycleField::ReturnValue)
+            {
+                return false;
+            }
+
+            const bool acceptedStart =
+                observation.BoolStorage[0].Value && observation.BoolStorage[1].Value;
+            if (observation.Role == LifecycleRole::SessionStart)
+            {
+                if (!acceptedStart ||
+                    observation.Action != PrincipalAction::CandidateCreated ||
+                    action != Obelisk::Core::PlayerPrincipalAction::CandidateCreated)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                if (acceptedStart ||
+                    observation.Action != PrincipalAction::None ||
+                    action != Obelisk::Core::PlayerPrincipalAction::None)
+                {
+                    return false;
+                }
+            }
+
+            for (size_t i = 0; i < observation.BoolCount; ++i)
+            {
+                Obelisk::Core::PlayerPrincipalBoolField mappedField =
+                    Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin;
+                if (!TryMapPlayerPrincipalBoolField(observation.BoolStorage[i].Field, mappedField))
+                    return false;
+
+                boolStorage[i] = {
+                    .Field = mappedField,
+                    .Value = observation.BoolStorage[i].Value,
+                };
+            }
+
+            out = {
+                .Kind = kind,
+                .Action = action,
+                .Bools = std::span<const Obelisk::Core::PlayerPrincipalBoolValue>(
+                    boolStorage.data(),
+                    observation.BoolCount),
+            };
+            return true;
+        }
+        case LifecycleRole::SessionEnd:
+            if (observation.Function != LifecycleFunction::OnLogout ||
+                observation.FunctionNameIndex != kOnLogoutNameIndex ||
+                observation.OuterNameIndex != kShooterGameModeNameIndex ||
+                observation.BoolCount != 0 ||
+                observation.Action != PrincipalAction::CandidateInvalidated ||
+                action != Obelisk::Core::PlayerPrincipalAction::CandidateInvalidated ||
+                !HasCanonicalOnLogoutRedactions(observation))
+            {
+                return false;
+            }
+
+            out = {
+                .Kind = kind,
+                .Action = action,
+                .Bools = {},
+            };
+            return true;
+        }
+
+        return false;
     }
 
     const char* LifecycleFunctionName(Obelisk::UE::PlayerPrincipalLifecycleReflection::LifecycleFunction function)
