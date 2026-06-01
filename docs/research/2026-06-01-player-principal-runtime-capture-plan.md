@@ -89,6 +89,23 @@ Before any future activation:
 - The copied/analyzed runtime summary must contain exactly one observer module:
   `player_principal_lifecycle`.
 
+Read-only preflight examples:
+
+```bash
+scripts/check_player_principal_lifecycle_preflight.sh \
+  --instance <instance-id> \
+  --map <map> \
+  --mode stable \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+
+scripts/check_player_principal_lifecycle_preflight.sh \
+  --instance <instance-id> \
+  --map <map> \
+  --mode stable \
+  --allow-stopped \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+```
+
 ## Markers And Environment
 
 Exact future env gates for the first window:
@@ -293,6 +310,12 @@ preserve stable markers:
 Post-check must be for the same approved instance and map:
 
 ```bash
+scripts/check_player_principal_lifecycle_preflight.sh \
+  --instance <instance-id> \
+  --map <map> \
+  --mode stable \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+
 scripts/check_obelisk_server_posture.sh --expect-stable \
   --map <map> --instance <instance-id>
 ```
