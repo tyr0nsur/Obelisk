@@ -281,6 +281,12 @@ EXPECTED_EXCLUDED_FIELDS = {
     "PrimalItem.UseItemOntoItem.DestinationItem",
     "PrimalItem.UseItemOntoItem.AdditionalData",
 }
+EXPECTED_SOURCE_TARGETS = {
+    "snapshot-0001": "PrimalItem.AllowEquipItem",
+    "snapshot-0002": "PrimalItem.CanRepair",
+    "snapshot-0003": "PrimalItem.CraftBlueprint",
+    "snapshot-0004": "PrimalItem.UseItemOntoItem",
+}
 REQUIRED_NON_CLAIM_TOKENS = (
     "does not promote public SDK callbacks",
     "does not expose UE pointers",
@@ -430,6 +436,104 @@ def require_not_promoted_claim(
         return
     if "not promoted" not in value.lower() or required_token not in value:
         append_blocker(blockers, reason, value=value)
+
+
+def validate_generated_from(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    generated_from = policy.get("generated_from")
+    if not isinstance(generated_from, dict):
+        append_blocker(blockers, "generated_from_missing")
+        return {}
+    reject_forbidden_claim_fields(
+        blockers,
+        reason="generated_from_unexpected_field",
+        mapping=generated_from,
+        path="generated_from",
+        allowed_keys={"snapshot_schema", "input_snapshots"},
+    )
+    if generated_from.get("snapshot_schema") != "obelisk.ufunction-chain.snapshot.v1":
+        append_blocker(blockers, "snapshot_schema_mismatch", value=generated_from.get("snapshot_schema"))
+    snapshots = generated_from.get("input_snapshots")
+    if not isinstance(snapshots, list) or len(snapshots) != len(EXPECTED_SOURCE_TARGETS):
+        append_blocker(
+            blockers,
+            "input_snapshot_count_mismatch",
+            expected=len(EXPECTED_SOURCE_TARGETS),
+            value=len(snapshots) if isinstance(snapshots, list) else None,
+        )
+        return {}
+
+    sources: dict[str, dict[str, str]] = {}
+    for index, snapshot in enumerate(snapshots):
+        if not isinstance(snapshot, dict):
+            append_blocker(blockers, "input_snapshot_entry_invalid", index=index)
+            continue
+        reject_forbidden_claim_fields(
+            blockers,
+            reason="input_snapshot_unexpected_field",
+            mapping=snapshot,
+            path=f"generated_from.input_snapshots[{index}]",
+            allowed_keys={"id", "sha256"},
+        )
+        snapshot_id = snapshot.get("id")
+        snapshot_sha256 = snapshot.get("sha256")
+        if not isinstance(snapshot_id, str) or not snapshot_id:
+            append_blocker(blockers, "input_snapshot_id_invalid", index=index)
+            continue
+        if snapshot_id in sources:
+            append_blocker(blockers, "input_snapshot_id_duplicate", index=index, snapshot_id=snapshot_id)
+        if snapshot_id not in EXPECTED_SOURCE_TARGETS:
+            append_blocker(blockers, "input_snapshot_id_unexpected", index=index, snapshot_id=snapshot_id)
+        if not isinstance(snapshot_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", snapshot_sha256):
+            append_blocker(blockers, "input_snapshot_sha256_invalid", index=index, snapshot_id=snapshot_id)
+            continue
+        sources[snapshot_id] = {
+            "sha256": snapshot_sha256,
+            "target": EXPECTED_SOURCE_TARGETS.get(snapshot_id, ""),
+        }
+    if set(sources) != set(EXPECTED_SOURCE_TARGETS):
+        append_blocker(
+            blockers,
+            "input_snapshot_ids_mismatch",
+            missing=sorted(set(EXPECTED_SOURCE_TARGETS) - set(sources)),
+            unexpected=sorted(set(sources) - set(EXPECTED_SOURCE_TARGETS)),
+        )
+    return sources
+
+
+def validate_source_snapshot(
+    entry: dict[str, Any],
+    *,
+    index: int,
+    field_key: str,
+    reason_prefix: str,
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
+    require_sha256: bool,
+) -> None:
+    source_snapshot = entry.get("source_snapshot")
+    source_snapshot_sha256 = entry.get("source_snapshot_sha256")
+    if not isinstance(source_snapshot, str) or source_snapshot not in sources:
+        append_blocker(blockers, f"{reason_prefix}_source_snapshot_unknown", index=index, field=entry.get(field_key))
+        return
+    source = sources[source_snapshot]
+    if require_sha256 and source_snapshot_sha256 != source["sha256"]:
+        append_blocker(
+            blockers,
+            f"{reason_prefix}_source_snapshot_sha256_mismatch",
+            index=index,
+            field=entry.get(field_key),
+            expected=source["sha256"],
+            value=source_snapshot_sha256,
+        )
+    if entry.get("target") != source["target"]:
+        append_blocker(
+            blockers,
+            f"{reason_prefix}_source_snapshot_target_mismatch",
+            index=index,
+            field=entry.get(field_key),
+            expected=source["target"],
+            value=entry.get("target"),
+        )
 
 
 def find_gameplay_policy_event(public_events: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any]:
@@ -774,7 +878,10 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
 
 
 def validate_return_bool_entries(
-    policy: dict[str, Any], copied_fields: set[str], blockers: list[dict[str, Any]]
+    policy: dict[str, Any],
+    copied_fields: set[str],
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
 ) -> None:
     entries = policy.get("copied_return_bools")
     if not isinstance(entries, list):
@@ -828,6 +935,15 @@ def validate_return_bool_entries(
                 append_blocker(blockers, "copied_return_bool_mask_mismatch", index=index, field="byte_mask")
             if bool_masks.get("field_mask") != "0xff":
                 append_blocker(blockers, "copied_return_bool_mask_mismatch", index=index, field="field_mask")
+        validate_source_snapshot(
+            entry,
+            index=index,
+            field_key="copied_field",
+            reason_prefix="copied_return_bool_entry",
+            sources=sources,
+            blockers=blockers,
+            require_sha256=True,
+        )
     if entry_fields != copied_fields:
         append_blocker(
             blockers,
@@ -837,7 +953,11 @@ def validate_return_bool_entries(
         )
 
 
-def validate_excluded_field_entries(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_excluded_field_entries(
+    policy: dict[str, Any],
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
+) -> None:
     entries = policy.get("excluded_fields")
     if not isinstance(entries, list):
         append_blocker(blockers, "excluded_fields_missing")
@@ -853,9 +973,23 @@ def validate_excluded_field_entries(policy: dict[str, Any], blockers: list[dict[
             path=f"excluded_fields[{index}]",
             allowed_keys=EXCLUDED_FIELD_ALLOWED_KEYS,
         )
+        validate_source_snapshot(
+            entry,
+            index=index,
+            field_key="excluded_field",
+            reason_prefix="excluded_field_entry",
+            sources=sources,
+            blockers=blockers,
+            require_sha256=False,
+        )
 
 
-def validate_descriptor_preflight(policy: dict[str, Any], copied_fields: set[str], blockers: list[dict[str, Any]]) -> None:
+def validate_descriptor_preflight(
+    policy: dict[str, Any],
+    copied_fields: set[str],
+    sources: dict[str, dict[str, str]],
+    blockers: list[dict[str, Any]],
+) -> None:
     preflight = policy.get("descriptor_preflight")
     if preflight is None:
         return
@@ -939,6 +1073,15 @@ def validate_descriptor_preflight(policy: dict[str, Any], copied_fields: set[str
                     expected=expected,
                     value=descriptor.get(key),
                 )
+        validate_source_snapshot(
+            descriptor,
+            index=index,
+            field_key="copied_field",
+            reason_prefix="descriptor_preflight_descriptor",
+            sources=sources,
+            blockers=blockers,
+            require_sha256=True,
+        )
     if descriptor_fields != copied_fields:
         append_blocker(
             blockers,
@@ -999,9 +1142,10 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         if any(field.startswith(forbidden_prefix) for field in copied_fields):
             append_blocker(blockers, "craftblueprint_copied_field_not_allowed")
 
-    validate_return_bool_entries(policy, copied_fields, blockers)
-    validate_excluded_field_entries(policy, blockers)
-    validate_descriptor_preflight(policy, copied_fields, blockers)
+    sources = validate_generated_from(policy, blockers)
+    validate_return_bool_entries(policy, copied_fields, sources, blockers)
+    validate_excluded_field_entries(policy, sources, blockers)
+    validate_descriptor_preflight(policy, copied_fields, sources, blockers)
 
     safety = policy.get("safety_summary")
     if not isinstance(safety, dict):

@@ -30,7 +30,15 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         )
 
     def make_policy(self) -> dict:
+        snapshot_sources = {
+            "PrimalItem.AllowEquipItem": ("snapshot-0001", "1" * 64),
+            "PrimalItem.CanRepair": ("snapshot-0002", "2" * 64),
+            "PrimalItem.CraftBlueprint": ("snapshot-0003", "3" * 64),
+            "PrimalItem.UseItemOntoItem": ("snapshot-0004", "4" * 64),
+        }
+
         def copied(target: str, offset: str) -> dict:
+            source_snapshot, source_sha256 = snapshot_sources[target]
             return {
                 "bool_masks": {"byte_mask": "0x01", "field_mask": "0xff"},
                 "copied_field": f"{target}.ReturnValue",
@@ -39,11 +47,14 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                 "evidence_status": "copied-return-bool-only",
                 "field": "ReturnValue",
                 "offset": offset,
+                "source_snapshot": source_snapshot,
+                "source_snapshot_sha256": source_sha256,
                 "target": target,
                 "type": "bool",
             }
 
         def descriptor(target: str, name: str) -> dict:
+            source_snapshot, source_sha256 = snapshot_sources[target]
             return {
                 "assigned_event_kind": None,
                 "assigned_event_kind_mask": None,
@@ -57,10 +68,20 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                 "public_promotion": False,
                 "resource_backing": "inventory_backed",
                 "resource_kind": "INVENTORY_ITEM",
-                "source_snapshot": f"{target}.snapshot.json",
-                "source_snapshot_sha256": "a" * 64,
+                "source_snapshot": source_snapshot,
+                "source_snapshot_sha256": source_sha256,
                 "target": target,
                 "type": "bool",
+            }
+
+        def excluded(target: str, field: str) -> dict:
+            source_snapshot, _ = snapshot_sources[target]
+            return {
+                "excluded_field": f"{target}.{field}",
+                "field": field,
+                "reason": "unit_test_excluded",
+                "source_snapshot": source_snapshot,
+                "target": target,
             }
 
         return {
@@ -100,12 +121,24 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
                 copied("PrimalItem.UseItemOntoItem", "0xc"),
             ],
             "excluded_fields": [
-                {"excluded_field": "PrimalItem.AllowEquipItem.toInventory"},
-                {"excluded_field": "PrimalItem.CanRepair.bIgnoreInventoryRequirement"},
-                {"excluded_field": "PrimalItem.CraftBlueprint.bConsumeResources"},
-                {"excluded_field": "PrimalItem.UseItemOntoItem.DestinationItem"},
-                {"excluded_field": "PrimalItem.UseItemOntoItem.AdditionalData"},
+                excluded("PrimalItem.AllowEquipItem", "toInventory"),
+                excluded("PrimalItem.CanRepair", "bIgnoreInventoryRequirement"),
+                excluded("PrimalItem.CraftBlueprint", "bConsumeResources"),
+                excluded("PrimalItem.UseItemOntoItem", "DestinationItem"),
+                excluded("PrimalItem.UseItemOntoItem", "AdditionalData"),
             ],
+            "generated_from": {
+                "snapshot_schema": "obelisk.ufunction-chain.snapshot.v1",
+                "input_snapshots": [
+                    {"id": snapshot_id, "sha256": sha256}
+                    for snapshot_id, sha256 in (
+                        snapshot_sources["PrimalItem.AllowEquipItem"],
+                        snapshot_sources["PrimalItem.CanRepair"],
+                        snapshot_sources["PrimalItem.CraftBlueprint"],
+                        snapshot_sources["PrimalItem.UseItemOntoItem"],
+                    )
+                ],
+            },
             "safety_summary": {
                 "artifact_status": "evidence_only",
                 "copied_bool_count": 3,
@@ -472,6 +505,65 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("copied_return_bool_entry_metadata_mismatch", {b["reason"] for b in report["blockers"]})
+
+    def test_copied_return_source_snapshot_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["copied_return_bools"][0]["source_snapshot_sha256"] = "f" * 64
+            payload["copied_return_bools"][1]["source_snapshot"] = "snapshot-0004"
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("copied_return_bool_entry_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("copied_return_bool_entry_source_snapshot_target_mismatch", reasons)
+
+    def test_excluded_field_source_snapshot_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["excluded_fields"][0]["source_snapshot"] = "unknown-snapshot"
+            payload["excluded_fields"][1]["target"] = "PrimalItem.UseItemOntoItem"
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("excluded_field_entry_source_snapshot_unknown", reasons)
+        self.assertIn("excluded_field_entry_source_snapshot_target_mismatch", reasons)
+
+    def test_descriptor_source_snapshot_mismatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["descriptor_preflight"]["descriptors"][0]["source_snapshot_sha256"] = "f" * 64
+            payload["descriptor_preflight"]["descriptors"][1]["target"] = "PrimalItem.AllowEquipItem"
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("descriptor_preflight_descriptor_source_snapshot_sha256_mismatch", reasons)
+        self.assertIn("descriptor_preflight_descriptor_source_snapshot_target_mismatch", reasons)
+
+    def test_generated_from_snapshot_identity_drift_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            payload = self.make_policy()
+            payload["generated_from"]["input_snapshots"][0]["id"] = "snapshot-9999"
+            manifest, sha256 = self.write_pack(root, payload)
+            result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+        report = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("input_snapshot_id_unexpected", reasons)
+        self.assertIn("input_snapshot_ids_mismatch", reasons)
 
     def test_protected_and_symlink_inputs_are_rejected(self) -> None:
         result = self.run_checker(
