@@ -120,12 +120,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Consume mode accepts it and promote mode stays blocked, and the post-callback rejection
   contract is preserved as candidate-only. The first strict serial reuse/wraparound policy
   artifact is preserved; manifest consume mode accepts it and promote mode blocks it as
-  candidate-only. This does not unlock runtime negative samples, public lookup, object
-  identity, mutation, or fail-closed semantic helper promotion. Do not rerun broad FName,
-  GObjects, or core scans for ResourceHandle. Do not replace this with another broad offline
-  FName/GObjects scan. The next strict ResourceHandle blocker is rejected runtime object
-  samples plus runtime serial reuse/wraparound semantics, with a future-runtime-observation-plan
-  only after an operator-approved live-ops brief names the exact debug target.
+  candidate-only. The offline zero-serial negative cohort is now reproducible across both
+  copied cores and remains candidate-blocked. This does not unlock runtime negative
+  samples, public lookup, object identity, mutation, or fail-closed semantic helper
+  promotion. Do not rerun broad FName, GObjects, or core scans for ResourceHandle. Do not
+  replace this with another broad offline FName/GObjects scan. The next strict ResourceHandle
+  blocker is rejected runtime object samples plus runtime serial reuse/wraparound semantics,
+  with a future-runtime-observation-plan only after an operator-approved live-ops brief
+  names the exact debug target.
 - `scripts/check_inventory_action_redacted_observer_gate.py` is an offline
   candidate-only checker for the future `enable-inventory-action-redacted-observer`
   marker and `inventory-action-compact-intake` fixtures. It must stay non-promotional:

@@ -8213,7 +8213,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "Experimental pattern examples only",
             ),
             REPO_ROOT / "plugins" / "README.md": (
-                "The release-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
+                "Plugin Hub work is post-SDK-complete planning only",
+                "Do not add new first-party Plugin Hub seed examples while the complete-SDK blockers remain open",
+                "The parked release-supported additions after `v0.1` are descriptor readers and process-local timer utilities",
                 "Passive copied-chat parsers and copied policy auditors are experimental pattern examples only",
                 "promoted in the public ABI, recorded in the capability matrix, and documented with its own evidence gate",
                 "These examples observe copied data only",

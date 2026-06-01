@@ -56,3 +56,33 @@ The next valid step is a candidate-only snapshot/intake pack through
 - keep `public_sdk_ready=false`, `runtime_ready=false`, and `promotion_ready=false`;
 - keep the set out of release-readiness, public SDK, runtime hook, mutation, enforcement,
   and return-override paths.
+
+## Fast Offline Snapshot Path
+
+The two existing offline inventory packs already plan all three targets with
+`planned_command_count=3` and `blocked_count=0`; do not rebuild broad inventories first.
+Use the reviewed copied cores and compare the resulting roots in planning-layout mode:
+
+```bash
+python3 scripts/plan_ufunction_focal_snapshots.py \
+  --inventory-pack /servidor/ark/workspace-offline/reflection-inventory-pack-second-source-20260529T000000Z \
+  --target-set structure-build-policy-offline-intake \
+  --evidence-obelisk-commit <commit> > <root>/base-plan.json
+
+python3 scripts/plan_ufunction_focal_snapshots.py \
+  --inventory-pack /servidor/ark/workspace-offline/reflection-inventory-pack-20260529T091700Z-minimal \
+  --target-set structure-build-policy-offline-intake \
+  --evidence-obelisk-commit <commit> > <root>/candidate-plan.json
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root <root>/base \
+  --candidate-root <root>/candidate \
+  --readiness-report \
+  --target-set structure-build-policy-offline-intake \
+  --planning-layout-intake \
+  --json > <root>/readiness.json
+```
+
+Expected success remains planning-only: `targets=3`, `comparable=3`,
+`second_source_accepted=3`, `planning_layout_gate.ready=true`, while
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`.

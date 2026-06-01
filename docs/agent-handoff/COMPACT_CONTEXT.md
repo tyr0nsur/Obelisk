@@ -498,9 +498,11 @@ priorities, and do not use history files as the active source of truth.
   `docs/research/2026-06-01-object-identity-resource-handle-v1-blocker.md`. The old
   flag-policy artifact is obsolete; the rich-provenance refresh remains preserved and
   consume-accepted/promote-blocked, and the strict serial reuse/wraparound policy is
-  candidate-only. The next offline package should build rejected zero-serial object
-  samples from the two existing cores, while runtime rejected-object samples and runtime
-  serial reuse/wraparound semantics still require an approved live-ops brief.
+  candidate-only. `scripts/build_resource_handle_zero_serial_negative_samples.py` now
+  produces a deterministic zero-serial negative cohort from both existing cores with
+  positive anchor index `50834`. Do not rerun broad FName, GObjects, or core scans for
+  ResourceHandle; runtime rejected-object samples and runtime serial reuse/wraparound
+  semantics still require an approved live-ops brief.
 - Weak-helper caller-mode manifests now require embedded verified provenance for
   `ghidra_stdout`, `r2_windows`, and `direct_call_counts`; consume acceptance remains
   internal static evidence only and promote mode stays blocked.

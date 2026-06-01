@@ -114,3 +114,45 @@ PrimalBuff.BPPreventAddingOtherBuff
 Consume gate accepted the readiness report. This is still internal layout evidence only:
 no public Buff SDK, runtime hooks, callbacks, object/class exposure, mutation, return
 override, raw params, `ResourceHandle`, or gameplay semantics are promoted.
+
+## 2026-06-01 Current Comparator Refresh Gap
+
+A fresh check with the current comparator keeps `buff-breadth-intake` accepted `3/3`, but
+`buff-compact-intake` now reports `1/3` because two stale compact candidate snapshots lack
+the current `BoolProperty` tail fields:
+
+- `PrimalBuff.AllowPostProcessEffect`
+- `PrimalBuff.BPBuffPreventUploading`
+
+The missing fields are `bool_property_semantics`, `bool_field_size`,
+`bool_byte_offset`, `byte_mask`, `field_mask`, and `native_bool`. The zero-param
+`PrimalBuff.BP_OnBuffLifetimeUpdated` snapshot still accepts. This is a fixture freshness
+gap, not a reason to hand-edit values into old snapshots.
+
+Fast safe repair route:
+
+```bash
+python3 scripts/regenerate_ufunction_snapshots.py \
+  --core /servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw/core \
+  --gobjects 0x595b7e0 \
+  --fname-root-slot 0x5956f30 \
+  --artifact-kind offline_core \
+  --artifact-sha256 56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb \
+  --capture-id core \
+  --evidence-pack-id gobjects-sampling \
+  --output-root /servidor/ark/workspace-offline/<new-buff-compact-bool-tail-root>/ufunction-snapshots \
+  --target-set buff-compact-intake \
+  --write
+
+python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --candidate-root /servidor/ark/workspace-offline/<new-buff-compact-bool-tail-root>/ufunction-snapshots \
+  --target-set buff-compact-intake \
+  --readiness-report \
+  --fail-on-readiness-gaps \
+  --json
+```
+
+The old documented `--evidence-pack-manifest .../gobjects-sampling/manifest.json` route
+now fails current schema validation; direct `--gobjects`, `--fname-root-slot`, and
+artifact identity arguments are the shortest working path.

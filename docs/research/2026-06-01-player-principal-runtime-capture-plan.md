@@ -303,27 +303,18 @@ log window into an offline run directory such as:
 /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log
 ```
 
-Keep a secret-free window manifest beside the copied log:
+Keep a secret-free window manifest beside the copied log. Generate the initial file from
+the checker rather than hand-writing fields:
 
-```text
-run_id=<YYYYMMDDThhmmssZ-player-principal-lifecycle>
-target=<instance-id>/<map>
-approval=current-turn operator-approved runtime window, not standing approval
-approved_window_start_utc=<timestamp>
-approved_window_end_utc=<timestamp>
-actual_capture_start_utc=<first copied-log timestamp included>
-actual_capture_end_utc=<last copied-log timestamp included>
-copied_log_path=/servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log
-copied_log_sha256=<sha256>
-copy_method=<operator-local copy summary without live paths or secrets>
-ark_binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
-obelisk_commit=<reviewed build>
-pre_check=passed
-post_check=passed|failed
-rollback_completed=true|false
-users_policy=<no_regular_users|operator_approved_beta_users|unknown>
-notice_sent=<not_applicable|true|false>
+```bash
+python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
+  --emit-template /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env
 ```
+
+Then replace the template values with the reviewed run id, target, timestamps,
+`copied_log_path`, `copied_log_sha256`, `obelisk_commit`, posture fields, rollback fields,
+and notice/user-policy fields for the approved window. Validate the manifest before
+building an evidence bundle; stale or extra keys must fail closed.
 
 If users are involved, the manifest may record only a notice path label and a sanitized
 notice digest. It must not record endpoints, webhooks, tokens, message URLs, player

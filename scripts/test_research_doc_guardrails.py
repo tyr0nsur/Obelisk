@@ -671,6 +671,27 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("Do not expose a public plugin ABI callback-by-name", text)
         self.assertIn("operator-side name-to-index workflow", text)
 
+    def test_player_principal_capture_plan_uses_window_manifest_template(self) -> None:
+        note = REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-capture-plan.md"
+        text = note.read_text(encoding="utf-8")
+        log_copying = text.split("## Log Copying", 1)[1].split("## Manifest And Checker", 1)[0]
+
+        self.assertIn(
+            "check_player_identity_runtime_principal_lifecycle_window_manifest.py",
+            log_copying,
+        )
+        self.assertIn("--emit-template", log_copying)
+        self.assertIn("stale or extra keys must fail closed", log_copying)
+        for stale_key in (
+            "copy_method=",
+            "ark_binary_sha256=",
+            "post_check=passed|failed",
+            "rollback_completed=true|false",
+            "users_policy=<no_regular_users|operator_approved_beta_users|unknown>",
+        ):
+            with self.subTest(stale_key=stale_key):
+                self.assertNotIn(stale_key, log_copying)
+
     def test_chat_command_readiness_stays_plugin_local_docs_tests_only(self) -> None:
         note = REPO_ROOT / "docs/research/2026-05-31-chat-command-readiness.md"
         text = note.read_text(encoding="utf-8")

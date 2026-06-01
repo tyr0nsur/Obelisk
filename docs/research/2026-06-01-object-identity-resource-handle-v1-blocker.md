@@ -60,3 +60,46 @@ The candidate cohort should record object items with non-null object pointers an
 samples such as index `50834` with serial `1001`. This still does not prove UObject flag
 validity semantics, runtime reuse/wraparound behavior, public lookup, or `ResourceHandle`
 promotion.
+
+## 2026-06-01 Zero-Serial Negative Cohort Candidate
+
+Added `scripts/build_resource_handle_zero_serial_negative_samples.py` to make the next
+negative-sample package reproducible from the two copied cores without broad rediscovery.
+The helper scans index order only through the known positive anchor by default
+(`--anchor-index 50834`) and treats `FUObjectItem+0x8` as a candidate `uint32` serial
+field. It emits candidate-only JSON with `status=candidate_blocked`; it does not expose
+lookup, mutation, public `ResourceHandle`, or runtime lifecycle semantics.
+
+Command run:
+
+```bash
+python3 scripts/build_resource_handle_zero_serial_negative_samples.py \
+  --core vanilla=/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw/core \
+  --core second_source=/servidor/ark/workspace-offline/second-source-arkserver2-TheIsland-20260529T011227Z/raw/core \
+  --core-sha256 vanilla=56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb \
+  --core-sha256 second_source=62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78 \
+  --gobjects 0x595b7e0 \
+  --fname-root-slot 0x5956f30 \
+  --anchor-index 50834 \
+  --negative-limit 8
+```
+
+Result: `deterministic_negative_cohort=true` for both sources. Each source scanned
+`50835` indices, saw `50835` non-null candidate UObjects, collected the first 8
+zero-serial negative samples, and found the positive anchor at index `50834` with
+serial `1001`.
+
+| source | core sha256 | fname table | zero-serial cohort | positive anchor |
+| --- | --- | --- | --- | --- |
+| vanilla | `56cf24c61d6822a060fa1bb74ebdb7dc13e3ddf9afc3d5f4843787c046eeeedb` | `0x5a94660` | indexes `0..7`, all `membership=candidate-uobject`, `item_dword_0x8=0` | index `50834`, `LinkerLoad`, `item_dword_0x8=1001`, `item_dword_0xC=116` |
+| second_source | `62d1768fd5962ee9270641f0a340dc04dc15edde53eacefbf247eff37e5bed78` | `0x3dff0660` | indexes `0..7`, all `membership=candidate-uobject`, `item_dword_0x8=0` | index `50834`, `LinkerLoad`, `item_dword_0x8=1001`, `item_dword_0xC=114` |
+
+The first 8 zero-serial names/classes are stable across both cores:
+`/Script/CoreUObject` (`Package`), `Object` (`Class`), `/Script/ShooterGame`
+(`Package`), `AhoCorasickMatch` (`Class`), `/Script/Engine` (`Package`), `Actor`
+(`Class`), `Controller` (`Class`), and `/Script/AIModule` (`Package`).
+
+Remaining blockers are unchanged: this cohort is useful negative evidence for a
+fail-closed serial contract, but it does not prove stale-object lifecycle behavior,
+serial reuse or wraparound, UObject flag validity semantics, callback-scope validity,
+owner-token cleanup, public lookup, or ABI-safe `ResourceHandle` promotion.
