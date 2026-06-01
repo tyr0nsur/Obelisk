@@ -142,6 +142,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Write a canonical secret-free key=value window manifest template and exit.",
     )
+    parser.add_argument(
+        "--copied-log",
+        type=Path,
+        help=(
+            "When used with --emit-template, fill copied_log_path, copied_log_sha256, "
+            "and run_id from an existing approved-workspace live-validation log copy."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -461,7 +469,41 @@ def build_template_fields() -> dict[str, str]:
     }
 
 
-def write_template(path: Path) -> None:
+def template_fields_from_copied_log(copied_log: Path) -> dict[str, str]:
+    reject_symlink_component(copied_log, "--copied-log")
+    status = protected_paths.protected_path_status(
+        copied_log,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected:
+        raise SystemExit(f"--copied-log must not read from protected server root {SERVER_ROOT}: {status.resolved}")
+    if not any(
+        copied_log.expanduser().is_absolute()
+        and protected_paths.is_under_path(copied_log.expanduser(), root)
+        and protected_paths.is_under_path(status.resolved, root.resolve())
+        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
+    ):
+        raise SystemExit("--copied-log must be under /servidor/ark/workspace-offline")
+    if not status.resolved.is_file():
+        raise SystemExit(f"--copied-log does not exist: {status.resolved}")
+    if len(status.resolved.parts) < 3:
+        raise SystemExit("--copied-log must be live-validation-logs/<run-id>/Obelisk.log")
+    expected_parent = status.resolved.parts[-3]
+    run_id = status.resolved.parts[-2]
+    file_name = status.resolved.parts[-1]
+    if expected_parent != EXPECTED_COPIED_LOG_PARENT or file_name != "Obelisk.log":
+        raise SystemExit("--copied-log must be live-validation-logs/<run-id>/Obelisk.log")
+    if RUN_ID_RE.fullmatch(run_id) is None:
+        raise SystemExit(f"--copied-log run id is invalid: {run_id}")
+    return {
+        "run_id": run_id,
+        "copied_log_path": str(status.resolved),
+        "copied_log_sha256": hashlib.sha256(status.resolved.read_bytes()).hexdigest(),
+    }
+
+
+def write_template(path: Path, copied_log: Path | None = None) -> None:
     reject_symlink_component(path, "--emit-template")
     resolved = protected_paths.reject_protected_input_path(
         path,
@@ -470,11 +512,14 @@ def write_template(path: Path) -> None:
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
     resolved.parent.mkdir(parents=True, exist_ok=True)
+    fields = build_template_fields()
+    if copied_log is not None:
+        fields.update(template_fields_from_copied_log(copied_log))
     lines = [
         "# Secret-free operational manifest for a future approved player-principal lifecycle window.",
         "# Replace timestamps, run_id, copied_log_path, copied_log_sha256, and target with the reviewed window values.",
     ]
-    lines.extend(f"{key}={value}" for key, value in build_template_fields().items())
+    lines.extend(f"{key}={value}" for key, value in fields.items())
     resolved.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -541,8 +586,10 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
 def main() -> int:
     args = parse_args()
     if args.emit_template is not None:
-        write_template(args.emit_template)
+        write_template(args.emit_template, args.copied_log)
         return 0
+    if args.copied_log is not None:
+        raise SystemExit("--copied-log is only valid with --emit-template")
     if args.manifest is None:
         raise SystemExit("manifest is required unless --emit-template is used")
     fields = load_manifest(args.manifest)

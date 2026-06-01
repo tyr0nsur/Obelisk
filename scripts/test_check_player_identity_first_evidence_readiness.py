@@ -607,6 +607,101 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertTrue(payload["reflection_inventory"]["ready"])
         self.assertTrue(payload["artifact_chain"]["ready_to_plan_admin_snapshots"])
 
+    def test_default_preflight_uses_approved_workspace_identity_inputs_when_available(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+        scanned_roots: list[str] = []
+        compared_with_candidate: list[str] = []
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                root = args[args.index("--root") + 1]
+                scanned_roots.append(root)
+                if root == str(checker.DEFAULT_ARTIFACT_ROOT):
+                    return ok, {
+                        "ready": False,
+                        "accepted_pack": None,
+                        "manifests_scanned": 0,
+                        "candidate_packs": [],
+                        "reasons": [],
+                    }
+                return ok, self.lower_level_accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                self.assertIn("--candidate-root", args)
+                compared_with_candidate.append(args[args.index("--candidate-root") + 1])
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            candidate_root = root / "focal-snapshots"
+            candidate_root.mkdir()
+            lifecycle_manifest = root / "players-identity-lifecycle-anchor-candidates.json"
+            principal_manifest = root / "players-identity-principal-invalidation-policy.json"
+            lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            args = SimpleNamespace(
+                artifact_root=checker.DEFAULT_ARTIFACT_ROOT,
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=None,
+                lifecycle_anchor_candidates_manifest=None,
+                principal_invalidation_policy_manifest=None,
+                runtime_principal_lifecycle_evidence_manifest=None,
+                approved_runtime_principal_lifecycle_evidence_manifest=None,
+            )
+            with (
+                mock.patch.object(checker, "APPROVED_WORKSPACE_FALLBACK_ROOT", root),
+                mock.patch.object(checker, "APPROVED_CANDIDATE_ROOT_FALLBACK", candidate_root),
+                mock.patch.object(checker, "APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK", lifecycle_manifest),
+                mock.patch.object(checker, "APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK", principal_manifest),
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False, "resolved_root": str(root)},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertEqual(scanned_roots, [str(checker.DEFAULT_ARTIFACT_ROOT), str(root)])
+        self.assertEqual(compared_with_candidate, [str(candidate_root)])
+        self.assertEqual(payload["candidate_root"], str(candidate_root))
+        self.assertEqual(payload["lifecycle_anchor_candidates_manifest"], str(lifecycle_manifest))
+        self.assertEqual(payload["principal_invalidation_policy_manifest"], str(principal_manifest))
+        self.assertEqual(
+            set(payload["input_fallbacks"]["used"]),
+            {
+                "candidate_root",
+                "lifecycle_anchor_candidates_manifest",
+                "principal_invalidation_policy_manifest",
+            },
+        )
+        self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(payload["blockers"], ["approved_runtime_evidence_missing"])
+        self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
+
     def test_explicit_artifact_root_does_not_use_workspace_fallback(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
         scanned_roots: list[str] = []

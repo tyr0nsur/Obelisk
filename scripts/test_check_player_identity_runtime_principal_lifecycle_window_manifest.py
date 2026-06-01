@@ -139,6 +139,81 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertEqual(report["remaining_blockers"], [])
         self.assertEqual(report["next_blocker"], "approved_runtime_observer_log_summary_and_manifest_missing")
 
+    def test_emit_template_from_copied_log_fills_path_sha_and_run_id(self) -> None:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        with tempfile.TemporaryDirectory(dir=workspace) as tmp:
+            root = Path(tmp)
+            copied_log = root / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            template = copied_log.parent / "window-manifest.env"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--emit-template",
+                    str(template),
+                    "--copied-log",
+                    str(copied_log),
+                ],
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            self.assertEqual(result.stdout, "")
+            fields = dict(
+                line.split("=", 1)
+                for line in template.read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#")
+            )
+            self.assertEqual(fields["run_id"], RUN_ID)
+            self.assertEqual(fields["copied_log_path"], str(copied_log.resolve()))
+            self.assertEqual(fields["copied_log_sha256"], GOOD_SHA)
+
+    def test_emit_template_from_copied_log_rejects_protected_live_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            template = Path(temp_dir) / "window-manifest.env"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--emit-template",
+                    str(template),
+                    "--copied-log",
+                    "/servidor/ark/obelisk/logs/arkserver2/Obelisk.log",
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--copied-log must not read from protected server root", result.stderr)
+
+    def test_copied_log_option_requires_emit_template(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--copied-log",
+                "/servidor/ark/workspace-offline/live-validation-logs/"
+                f"{RUN_ID}/Obelisk.log",
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--copied-log is only valid with --emit-template", result.stderr)
+
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)
         lines.append("users_policy=no_regular_users")

@@ -54,6 +54,21 @@ STATIC_ORIENTATION_MANIFEST_TOKENS = (
 )
 DEFAULT_ARTIFACT_ROOT = Path("/home/flowcommunity-ark/obelisk-artifacts")
 APPROVED_WORKSPACE_FALLBACK_ROOT = Path("/servidor/ark/workspace-offline")
+APPROVED_CANDIDATE_ROOT_FALLBACK = (
+    APPROVED_WORKSPACE_FALLBACK_ROOT
+    / "player-identity-offline-identity-vanilla-gdb-20260529T012853Z"
+    / "focal-snapshots"
+)
+APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK = (
+    APPROVED_WORKSPACE_FALLBACK_ROOT
+    / "player-identity-principal-invalidation-policy-20260531T231247Z"
+    / "players-identity-lifecycle-anchor-candidates.json"
+)
+APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK = (
+    APPROVED_WORKSPACE_FALLBACK_ROOT
+    / "player-identity-principal-invalidation-policy-20260531T231247Z"
+    / "players-identity-principal-invalidation-policy.json"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -503,6 +518,44 @@ def scan_reflection_inventory_root(root: Path) -> tuple[subprocess.CompletedProc
         ]
     )
     return result, payload, None
+
+
+def approved_workspace_input_fallbacks(args: argparse.Namespace) -> dict[str, Any]:
+    """Select read-only approved workspace inputs when the caller uses defaults.
+
+    These fallbacks do not promote public readiness. They only keep the default
+    preflight aligned with already-reviewed offline evidence in the approved workspace.
+    Explicit caller inputs always win.
+    """
+
+    requested_default_root = getattr(args, "artifact_root", None) == DEFAULT_ARTIFACT_ROOT
+    candidate_root = getattr(args, "candidate_root", None)
+    lifecycle_manifest = getattr(args, "lifecycle_anchor_candidates_manifest", None)
+    principal_manifest = getattr(args, "principal_invalidation_policy_manifest", None)
+
+    result: dict[str, Any] = {
+        "candidate_root": candidate_root,
+        "lifecycle_anchor_candidates_manifest": lifecycle_manifest,
+        "principal_invalidation_policy_manifest": principal_manifest,
+        "used": {},
+        "non_claims": [
+            "approved workspace fallbacks are read-only routing aids",
+            "fallback input selection does not promote identity, runtime readiness, public SDK readiness, or v1 completion",
+        ],
+    }
+    if not requested_default_root:
+        return result
+
+    if candidate_root is None and APPROVED_CANDIDATE_ROOT_FALLBACK.is_dir():
+        result["candidate_root"] = APPROVED_CANDIDATE_ROOT_FALLBACK
+        result["used"]["candidate_root"] = str(APPROVED_CANDIDATE_ROOT_FALLBACK)
+    if lifecycle_manifest is None and APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK.is_file():
+        result["lifecycle_anchor_candidates_manifest"] = APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK
+        result["used"]["lifecycle_anchor_candidates_manifest"] = str(APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK)
+    if principal_manifest is None and APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK.is_file():
+        result["principal_invalidation_policy_manifest"] = APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK
+        result["used"]["principal_invalidation_policy_manifest"] = str(APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK)
+    return result
 
 
 def second_source_missing_count(coverage_payload: dict[str, Any] | None) -> int | None:
@@ -1731,6 +1784,10 @@ def build_progress_signal(
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
+    input_fallbacks = approved_workspace_input_fallbacks(args)
+    effective_candidate_root = input_fallbacks["candidate_root"]
+    effective_lifecycle_anchor_candidates_manifest = input_fallbacks["lifecycle_anchor_candidates_manifest"]
+    effective_principal_invalidation_policy_manifest = input_fallbacks["principal_invalidation_policy_manifest"]
     requested_artifact_root = args.artifact_root
     effective_artifact_root = requested_artifact_root
     inventory_result, inventory_payload, artifact_root_rejection = scan_reflection_inventory_root(requested_artifact_root)
@@ -1781,8 +1838,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "--readiness-report",
         "--json",
     ]
-    if args.candidate_root:
-        coverage_command.extend(["--candidate-root", str(args.candidate_root)])
+    if effective_candidate_root:
+        coverage_command.extend(["--candidate-root", str(effective_candidate_root)])
     coverage_result, coverage_payload = run_json_command(coverage_command)
     first_evidence_result, first_evidence_payload = run_json_command(
         [
@@ -1826,14 +1883,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     first_evidence_consume_gate = first_evidence_consume_gate_diagnosis(first_evidence_payload)
     first_evidence_lifecycle_diagnosis = lifecycle_anchor_diagnosis(first_evidence_payload)
     lifecycle_candidate_diagnosis = lifecycle_anchor_candidate_manifest_diagnosis(
-        getattr(args, "lifecycle_anchor_candidates_manifest", None)
+        effective_lifecycle_anchor_candidates_manifest
     )
     lifecycle_diagnosis = merge_lifecycle_diagnosis(
         first_evidence_lifecycle_diagnosis,
         lifecycle_candidate_diagnosis,
     )
     principal_policy_diagnosis = principal_invalidation_policy_diagnosis(
-        getattr(args, "principal_invalidation_policy_manifest", None)
+        effective_principal_invalidation_policy_manifest
     )
     runtime_evidence_manifest_diagnosis = runtime_principal_lifecycle_evidence_manifest_diagnosis(
         getattr(args, "runtime_principal_lifecycle_evidence_manifest", None)
@@ -2040,16 +2097,20 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_root": str(requested_artifact_root),
         "effective_artifact_root": str(effective_artifact_root),
         "artifact_root_fallback": artifact_root_fallback,
+        "input_fallbacks": {
+            "used": input_fallbacks["used"],
+            "non_claims": input_fallbacks["non_claims"],
+        },
         "snapshot_root": str(args.snapshot_root),
-        "candidate_root": str(args.candidate_root) if args.candidate_root else None,
+        "candidate_root": str(effective_candidate_root) if effective_candidate_root else None,
         "lifecycle_anchor_candidates_manifest": (
-            str(args.lifecycle_anchor_candidates_manifest)
-            if getattr(args, "lifecycle_anchor_candidates_manifest", None)
+            str(effective_lifecycle_anchor_candidates_manifest)
+            if effective_lifecycle_anchor_candidates_manifest
             else None
         ),
         "principal_invalidation_policy_manifest": (
-            str(args.principal_invalidation_policy_manifest)
-            if getattr(args, "principal_invalidation_policy_manifest", None)
+            str(effective_principal_invalidation_policy_manifest)
+            if effective_principal_invalidation_policy_manifest
             else None
         ),
         "runtime_principal_lifecycle_evidence_manifest": (
