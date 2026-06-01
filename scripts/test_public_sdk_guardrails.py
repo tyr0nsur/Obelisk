@@ -8974,6 +8974,31 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_command_chat_response_route_planning_stays_out_of_release_and_public_claims(self) -> None:
+        target_set = "command-chat-response-route-planning"
+
+        self.assertIn(target_set, TARGET_SETS)
+        self.assertIn(target_set, PLANNING_ONLY_TARGET_SETS)
+        self.assertNotIn(target_set, RELEASE_READINESS_TARGET_SETS)
+
+        public_gameplay_events = PUBLIC_GAMEPLAY_EVENTS_MANIFEST.read_text(encoding="utf-8")
+        self.assertNotIn(target_set, public_gameplay_events)
+
+        release_claim_sinks = [
+            REPO_ROOT / "CHANGELOG.md",
+            REPO_ROOT / "docs" / "RELEASE.md",
+            REPO_ROOT / "docs" / "STATUS.md",
+            REPO_ROOT / ".github" / "pull_request_template.md",
+        ]
+        public_sdk_claim_sinks = [
+            REPO_ROOT / "README.md",
+            PUBLIC_SDK_V1_COMPATIBILITY_DOC,
+            PUBLIC_SDK_SURFACES_MANIFEST,
+        ]
+        for path in release_claim_sinks + public_sdk_claim_sinks:
+            with self.subTest(path=path.relative_to(REPO_ROOT)):
+                self.assertNotIn(target_set, path.read_text(encoding="utf-8"))
+
     def test_planning_only_artifact_packs_are_not_release_or_public_sdk_claims(self) -> None:
         curation = (
             REPO_ROOT / "docs" / "research" / "2026-05-31-offline-artifact-curation.md"

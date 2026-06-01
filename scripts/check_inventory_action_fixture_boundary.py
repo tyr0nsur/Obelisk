@@ -105,6 +105,19 @@ REQUIRED_INVENTORY_MUTATION_EXCLUSIONS = (
     "return override",
     "ResourceHandle",
 )
+REQUIRED_INVENTORY_MUTATION_EXCLUSION_REQUIRES = (
+    "Inventory SDK",
+    "Items SDK",
+    "give item API",
+    "remove item API",
+    "kits/rewards API",
+    "engram/progression API",
+    "inventory lookup",
+    "item handles",
+    "item mutation",
+    "return override",
+    "ResourceHandle API",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -386,11 +399,17 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
         mutation_contract = inventory_mutation.get("public_contract")
         mutation_payload_contract = inventory_mutation.get("payload_contract", [])
         mutation_exclusions = inventory_mutation.get("exclusions")
+        mutation_decision_contract = inventory_mutation.get("v1_decision_contract")
         surface_summary[INVENTORY_MUTATION_SURFACE] = {
             "status": mutation_status,
             "public_contract_count": len(mutation_contract) if isinstance(mutation_contract, list) else None,
             "payload_contract_count": (
                 len(mutation_payload_contract) if isinstance(mutation_payload_contract, list) else None
+            ),
+            "must_remain_without_public_contract_until_promotion": (
+                mutation_decision_contract.get("must_remain_without_public_contract_until_promotion")
+                if isinstance(mutation_decision_contract, dict)
+                else None
             ),
         }
         if mutation_status != "post-v1":
@@ -424,6 +443,38 @@ def scan_public_contract_manifest(path: Path, blockers: list[dict[str, Any]]) ->
                     "inventory_mutation_exclusions_incomplete",
                     missing=missing_exclusions,
                 )
+        if not isinstance(mutation_decision_contract, dict):
+            append_blocker(blockers, "inventory_mutation_v1_decision_contract_missing")
+        else:
+            if mutation_decision_contract.get("current_decision") != "blocked_until_promoted_or_explicitly_excluded":
+                append_blocker(
+                    blockers,
+                    "inventory_mutation_v1_decision_current_decision_mismatch",
+                    expected="blocked_until_promoted_or_explicitly_excluded",
+                    value=mutation_decision_contract.get("current_decision"),
+                )
+            if mutation_decision_contract.get("must_remain_without_public_contract_until_promotion") is not True:
+                append_blocker(
+                    blockers,
+                    "inventory_mutation_v1_decision_public_contract_guard_missing",
+                    value=mutation_decision_contract.get("must_remain_without_public_contract_until_promotion"),
+                )
+            exclusion_requires = mutation_decision_contract.get("exclusion_requires")
+            if not isinstance(exclusion_requires, list) or not all(
+                isinstance(item, str) for item in exclusion_requires
+            ):
+                append_blocker(blockers, "inventory_mutation_v1_decision_exclusion_requires_missing")
+            else:
+                exclusion_text = "\n".join(exclusion_requires)
+                missing_required = [
+                    token for token in REQUIRED_INVENTORY_MUTATION_EXCLUSION_REQUIRES if token not in exclusion_text
+                ]
+                if missing_required:
+                    append_blocker(
+                        blockers,
+                        "inventory_mutation_v1_decision_exclusion_requires_incomplete",
+                        missing=missing_required,
+                    )
 
     return {"path": str(path), "offenders": offenders, "surface_summary": surface_summary}
 

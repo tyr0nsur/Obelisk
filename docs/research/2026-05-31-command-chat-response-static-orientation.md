@@ -89,3 +89,28 @@ fails.
 - Does not replace a non-protected complete core evidence pack, reflection inventory pack,
   focal snapshots, second-source evidence, isolated runtime validation, or a copied-data
   response contract.
+
+## Focal Snapshot Follow-up
+
+On 2026-06-01 the planning-only target set
+`command-chat-response-route-planning` was added for the three response-path targets in
+this note. It remains outside release-readiness and public SDK target sets.
+
+The already reviewed offline reflection inventory pack under
+`/servidor/ark/workspace-offline/player-identity-offline-identity-second-source-20260529T011227Z/reflection-inventory-pack`
+plans all three focal snapshots with `planned_command_count=3`, `blocked_count=0`, and
+`fname_root_ready=true`.
+
+A local `/tmp` extraction produced comparable candidate snapshots for:
+
+- `ShooterPlayerController.ClientServerChatDirectMessage`
+- `ShooterPlayerController.ClientServerChatMessage`
+- `ShooterPlayerController.ClientChatMessage`
+
+Those temporary snapshots are not committed fixtures and do not close second-source
+readiness. A self-comparison reports `second_source_inconclusive=3` with
+`same_evidence_artifact_identity`. The next useful offline step is generating or locating
+a distinct non-protected second-source snapshot root for the same target set, then running
+`compare_reflection_snapshots.py --planning-layout-intake`. Do not add ABI, runtime
+response delivery, command router, replies, send-chat, permissions, identity, raw FString,
+or public SDK claims from these snapshots.

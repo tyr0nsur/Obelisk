@@ -749,6 +749,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
     def test_release_gate_rejects_guidance_only_target_sets_before_build(self) -> None:
         blocked_cases = [
             ("--ufunction-second-source-target-set", "players-identity-lifecycle-intake", "UFunction"),
+            ("--ufunction-second-source-target-set", "command-chat-response-route-planning", "UFunction"),
             ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
             ("--ufunction-second-source-target-set", "structure-aggregate-census-planning", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),

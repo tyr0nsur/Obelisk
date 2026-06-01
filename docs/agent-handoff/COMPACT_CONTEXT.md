@@ -351,9 +351,11 @@ priorities, and do not use history files as the active source of truth.
   exposure, mutation, runtime readiness, or public SDK promotion. Details:
   `docs/research/2026-05-31-command-chat-response-static-orientation.md` and
   `docs/research/2026-05-31-command-chat-response-thunk-orientation.md`.
-  The current repo fixture root reports `missing_base_snapshot=3` for
-  `command-chat-response-route-planning`; the next offline step is generating/reviewing
-  base snapshots from non-protected evidence, not adding ABI/runtime wiring.
+  The repo fixture root still reports `missing_base_snapshot=3` for
+  `command-chat-response-route-planning`. A 2026-06-01 `/tmp` focal extraction from the
+  reviewed offline inventory produced comparable candidate snapshots, but self-comparison
+  remains `second_source_inconclusive=3`; the next offline step is a distinct
+  non-protected second-source root, not ABI/runtime wiring.
 - Mission copied-bool is the selected v0.2 internal hardening lane only. Keep it
   internal/test-only and default-off; it does not promote a Mission SDK, runtime observer,
   public callback ABI, authority, identity, mutation, return override, or v1 completion.

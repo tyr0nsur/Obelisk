@@ -76,6 +76,11 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         self.assertEqual("post-v1", surface_summary["obelisk.inventory_items_mutation.v1"]["status"])
         self.assertEqual(0, surface_summary["obelisk.inventory_items_mutation.v1"]["public_contract_count"])
         self.assertEqual(0, surface_summary["obelisk.inventory_items_mutation.v1"]["payload_contract_count"])
+        self.assertTrue(
+            surface_summary["obelisk.inventory_items_mutation.v1"][
+                "must_remain_without_public_contract_until_promotion"
+            ]
+        )
 
     def test_mutated_fixture_counts_fail_closed(self) -> None:
         report = checker.build_fixture_report()
@@ -116,6 +121,13 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
                                 "public_contract": [],
                                 "payload_contract": [],
                                 "exclusions": list(checker.REQUIRED_INVENTORY_MUTATION_EXCLUSIONS),
+                                "v1_decision_contract": {
+                                    "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+                                    "must_remain_without_public_contract_until_promotion": True,
+                                    "exclusion_requires": [
+                                        "the v1 release statement states that no Inventory SDK, Items SDK, give item API, remove item API, kits/rewards API, engram/progression API, inventory lookup, item handles, item mutation, return override, or ResourceHandle API is included in v1"
+                                    ],
+                                },
                             },
                             {
                                 "id": "synthetic.inventory",
@@ -159,6 +171,11 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
                                 "public_contract": ["GiveItem"],
                                 "payload_contract": ["mutation payload"],
                                 "exclusions": ["Inventory SDK"],
+                                "v1_decision_contract": {
+                                    "current_decision": "promoted",
+                                    "must_remain_without_public_contract_until_promotion": False,
+                                    "exclusion_requires": ["Inventory SDK"],
+                                },
                             },
                         ]
                     }
@@ -176,6 +193,49 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         self.assertIn("inventory_mutation_public_contract_present", reasons)
         self.assertIn("inventory_mutation_payload_contract_present", reasons)
         self.assertIn("inventory_mutation_exclusions_incomplete", reasons)
+        self.assertIn("inventory_mutation_v1_decision_current_decision_mismatch", reasons)
+        self.assertIn("inventory_mutation_v1_decision_public_contract_guard_missing", reasons)
+        self.assertIn("inventory_mutation_v1_decision_exclusion_requires_incomplete", reasons)
+
+    def test_inventory_mutation_v1_decision_contract_mutations_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "surfaces": [
+                            {
+                                "id": "obelisk.inventory_item_copied_signals.v1",
+                                "status": "promoted-experimental-only",
+                                "public_contract": checker.EXPECTED_INVENTORY_COPIED_PUBLIC_CONTRACT,
+                                "payload_contract": checker.EXPECTED_INVENTORY_COPIED_PAYLOAD_CONTRACT,
+                                "exclusions": list(checker.REQUIRED_INVENTORY_COPIED_EXCLUSIONS),
+                            },
+                            {
+                                "id": "obelisk.inventory_items_mutation.v1",
+                                "status": "post-v1",
+                                "public_contract": [],
+                                "payload_contract": [],
+                                "exclusions": list(checker.REQUIRED_INVENTORY_MUTATION_EXCLUSIONS),
+                                "v1_decision_contract": {
+                                    "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+                                    "must_remain_without_public_contract_until_promotion": False,
+                                    "exclusion_requires": [
+                                        "the v1 release statement states that no Inventory SDK is included in v1"
+                                    ],
+                                },
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker("--public-sdk-surfaces", str(manifest), check=False)
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("inventory_mutation_v1_decision_public_contract_guard_missing", reasons)
+        self.assertIn("inventory_mutation_v1_decision_exclusion_requires_incomplete", reasons)
 
     def test_item_id_and_additional_data_redaction_mutations_fail_closed(self) -> None:
         report = checker.build_fixture_report()
