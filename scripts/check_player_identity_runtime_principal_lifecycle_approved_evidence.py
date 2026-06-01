@@ -96,6 +96,8 @@ ALLOWED_FORBIDDEN_LEAF_PATHS = (
     "$.schema",
     "$.operational_window.schema",
     "$.operational_window.run_id",
+    "$.operational_window.posture.observer_exclusivity",
+    "$.operational_window.posture.single_module_summary",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.HandleNewPlayer.details.principal_id_logged",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.OnLogout.details.principal_id_logged",
 )
@@ -505,8 +507,6 @@ def validate_promotion_gate(gate: Any, blockers: list[dict[str, Any]]) -> None:
 
 def find_forbidden_key(value: Any, trail: str = "$") -> tuple[str, str] | None:
     if any(token in trail for token in NEGATIVE_CONTEXT_TOKENS):
-        return None
-    if trail == "$.operational_window" or trail.startswith("$.operational_window."):
         return None
     if trail in ALLOWED_FORBIDDEN_LEAF_PATHS:
         return None

@@ -459,6 +459,7 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
 PUBLIC_CONTRACT_DECISIONS_GLOB = "*_public_contract_decisions.json"
 REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS = {
     "obelisk.player_identity.v1": "player_identity_public_contract_decisions.json",
+    "obelisk.inventory_item_copied_signals.v1": "inventory_item_copied_signals_public_contract_decisions.json",
     "obelisk.permissions_admin.v1": "permissions_admin_public_contract_decisions.json",
     "obelisk.command_chat_response_path.v1": "command_chat_response_public_contract_decisions.json",
     "obelisk.commands_replies.v1": "commands_replies_public_contract_decisions.json",

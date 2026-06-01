@@ -178,9 +178,9 @@ verification.
 
 ## Release Alignment
 
-- Treat `scripts/check_release_readiness.sh` as the single core-first release gate. CI may
-  keep fast build/test jobs, but install/package validation should not drift into separate
-  ad hoc CI commands with different defaults.
+- Treat `scripts/check_release_readiness.sh` as the single release-readiness entry point.
+  CI may keep fast build/test jobs, but install/package and SDK-completion validation
+  should not drift into separate ad hoc CI commands with different defaults.
 - For release gates that require second-source UFunction evidence, never trust a reused
   `/tmp` root by name. Smoke or regenerate the second-source root for the intended ref with
   current snapshot metadata, then pass that exact root to

@@ -1,0 +1,167 @@
+{
+  "schema": "obelisk.inventory-item-copied-signals-public-contract-decisions.v1",
+  "surface": "obelisk.inventory_item_copied_signals.v1",
+  "status": "promoted-experimental-only",
+  "decision": "copied_signal_only",
+  "support_tier": "promoted-experimental-only copied-data seed",
+  "depends_on": [
+    "obelisk.gameplay_policy_event.v1"
+  ],
+  "public_header_allowed": true,
+  "public_header": "include/obelisk/ObeliskApi.h",
+  "public_header_symbols_now": [
+    "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
+    "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+    "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
+    "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+    "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+    "ObeliskGameplayPolicyEvent",
+    "ObeliskGameplayPolicyEventDescriptor",
+    "ObeliskGameplayPolicyEventCallback",
+    "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+    "UnregisterGameplayPolicyEventWithOwnerToken",
+    "DescribeGameplayPolicyEventKind"
+  ],
+  "source_of_truth": {
+    "public_gameplay_events_manifest": "docs/public_gameplay_events.json",
+    "public_abi_header": "include/obelisk/ObeliskApi.h",
+    "blocked_mutation_surface": "obelisk.inventory_items_mutation.v1"
+  },
+  "public_contract": {
+    "event_family": "GameplayPolicyEvent",
+    "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
+    "descriptor_capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+    "registration": "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+    "unregister": "UnregisterGameplayPolicyEventWithOwnerToken",
+    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+    "resource_contract": "category-only metadata; no identity, lookup, handle, persistence, or cross-event correlation",
+    "payload_contract": "copied POD scalar observation only",
+    "public_fields": [
+      "abi_version",
+      "struct_size",
+      "event_kind",
+      "resource_kind",
+      "flags",
+      "field_mask",
+      "bool_values",
+      "int32_values"
+    ],
+    "required_flags": [
+      "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+      "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED"
+    ]
+  },
+  "allowed_signals": [
+    {
+      "stable_name": "inventory.remote_add_check",
+      "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_REMOTE_ADD_CHECK",
+      "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+      "field_mask": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER"
+      ]
+    },
+    {
+      "stable_name": "inventory.use_check",
+      "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_CHECK",
+      "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+      "field_mask": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
+      ]
+    },
+    {
+      "stable_name": "inventory_item.allow_equip_check",
+      "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+      "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+      "field_mask": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+      ]
+    },
+    {
+      "stable_name": "inventory_item.can_repair_check",
+      "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_CAN_REPAIR_CHECK",
+      "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK",
+      "field_mask": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+      ]
+    },
+    {
+      "stable_name": "inventory_item.use_onto_item_check",
+      "kind": "OBELISK_GAMEPLAY_POLICY_EVENT_KIND_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+      "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+      "field_mask": [
+        "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
+      ]
+    }
+  ],
+  "blocked_public_contract": {
+    "standalone_inventory_sdk_allowed": false,
+    "standalone_items_sdk_allowed": false,
+    "inventory_mutation_surface": {
+      "id": "obelisk.inventory_items_mutation.v1",
+      "status": "post-v1",
+      "public_contract": []
+    },
+    "forbidden_terms": [
+      "Inventory SDK",
+      "Items SDK",
+      "InventoryPolicyEvent public ABI",
+      "ItemReturn public ABI",
+      "Inventory callback API",
+      "item identity",
+      "inventory identity",
+      "ItemNetID identity",
+      "lookup",
+      "mutation",
+      "return override",
+      "ResourceHandle",
+      "CraftBlueprint",
+      "AdditionalData",
+      "ServerRequestInventoryUseItem",
+      "ServerRequestInventoryUseItemWithActor",
+      "ItemId",
+      "ItemID1",
+      "InventoryComp",
+      "anActor",
+      "action params",
+      "raw params",
+      "UObject pointers",
+      "UFunction pointers",
+      "FName/GObjects indices"
+    ]
+  },
+  "v1_completion_contract": {
+    "claim_effect": "does_not_complete_v1_sdk",
+    "required_before_stable_sdk_claim": [
+      "Promote this copied-signal surface to stable SDK wording, explicitly exclude it from v1, or keep the release statement scoped so it cannot imply Inventory SDK or Items SDK coverage.",
+      "Promote obelisk.inventory_items_mutation.v1 separately before claiming inventory/item mutation, lookup, grants, removal, kits, rewards, engrams, or return override."
+    ]
+  },
+  "guardrails": [
+    "Only the five named GameplayPolicyEvent inventory/item signals are public.",
+    "Inventory/item signals are post-original copied observations only.",
+    "resource_kind INVENTORY_ITEM is categorical metadata only.",
+    "No standalone Inventory SDK or Items SDK is implied.",
+    "No lookup, mutation, return override, grant/remove, rollback, kits, rewards, engram, or progression API is included.",
+    "No ResourceHandle, object identity, item identity, inventory identity, persistent handle, or cross-event correlation is included.",
+    "CraftBlueprint and AdditionalData remain excluded from public payloads.",
+    "Controller inventory action params remain internal/candidate-only and must not appear in public_contract or payload_contract fields.",
+    "Descriptors are metadata-only and must not resolve objects or imply authority.",
+    "Any future expansion requires a separate promotion gate, append-only POD C ABI, capability gate, owner-scoped cleanup, and SDK consumer tests."
+  ]
+}

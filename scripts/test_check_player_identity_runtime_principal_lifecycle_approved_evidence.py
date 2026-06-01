@@ -301,6 +301,16 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("operational_window_copied_log_sha256_mismatch", report["blockers"])
         self.assertIn("operational_window_posture_mismatch", report["blockers"])
 
+    def test_rejects_identity_or_ue_leakage_inside_operational_window(self) -> None:
+        payload = manifest()
+        payload["operational_window"]["steamid"] = "76561198000000000"
+        payload["operational_window"]["raw_params"] = {"uobject": "0x1234"}
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden_identity_or_ue_internal_leakage", report["blockers"])
+
     def test_rejects_mixed_observer_modules(self) -> None:
         payload = manifest()
         payload["source_summary"]["modules"]["chat"] = {

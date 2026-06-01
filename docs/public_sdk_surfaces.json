@@ -592,7 +592,7 @@
       "id": "obelisk.inventory_item_copied_signals.v1",
       "category": "inventory/items copied signals",
       "status": "promoted-experimental-only",
-      "support_tier": "experimental Plugin Hub seed",
+      "support_tier": "promoted-experimental-only copied-data seed",
       "public_name": "Inventory and item copied policy signals",
       "depends_on": [
         "obelisk.gameplay_policy_event.v1"
@@ -612,6 +612,7 @@
         "post-original observation only; no authority"
       ],
       "evidence": {
+        "decision_manifest": "docs/inventory_item_copied_signals_public_contract_decisions.json",
         "manifest": "docs/public_gameplay_events.json",
         "release_readiness_target_sets": [
           "minimal-second-source-intake",

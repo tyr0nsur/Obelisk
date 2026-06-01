@@ -90,6 +90,37 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
 
+    def test_inventory_copied_signals_contract_decision_manifest_is_required(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        surface_id = "obelisk.inventory_item_copied_signals.v1"
+        filename = "inventory_item_copied_signals_public_contract_decisions.json"
+        self.assertEqual(module.REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS[surface_id], filename)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_dir = Path(temp_dir) / "docs"
+            decisions_dir.mkdir()
+            original_default = module.DEFAULT_CONTRACT_DECISIONS_DIR
+            module.DEFAULT_CONTRACT_DECISIONS_DIR = decisions_dir
+            try:
+                missing = module.missing_required_contract_decision_manifests(decisions_dir)
+                self.assertEqual(missing[surface_id], filename)
+
+                (decisions_dir / filename).write_text(
+                    json.dumps({"surface": surface_id}),
+                    encoding="utf-8",
+                )
+                missing = module.missing_required_contract_decision_manifests(decisions_dir)
+                self.assertNotIn(surface_id, missing)
+            finally:
+                module.DEFAULT_CONTRACT_DECISIONS_DIR = original_default
+
     def test_current_manifest_fails_closed_for_v1_completion(self) -> None:
         result = self.run_checker("--json", check=False)
         payload = json.loads(result.stdout)
