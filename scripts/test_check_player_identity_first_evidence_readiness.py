@@ -1245,11 +1245,23 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         self.assertTrue(diagnosis["ready"])
         self.assertTrue(diagnosis["request_pack_ready"])
+        self.assertFalse(diagnosis["request_pack_is_runtime_evidence"])
         self.assertTrue(diagnosis["operator_current_turn_runtime_window_approval_required"])
         self.assertFalse(diagnosis["approved_runtime_evidence_present"])
         self.assertFalse(diagnosis["runtime_evidence_ready"])
         self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(diagnosis["next_blocker"], "operator_current_turn_runtime_window_approval_required")
+        self.assertEqual(
+            [artifact["artifact"] for artifact in diagnosis["next_required_runtime_artifacts"]],
+            [
+                "copied_obelisk_log",
+                "checked_window_manifest_env",
+                "approved_runtime_principal_lifecycle_evidence_manifest",
+            ],
+        )
+        self.assertFalse(diagnosis["next_required_runtime_artifacts"][0]["satisfies_approved_runtime_evidence"])
+        self.assertFalse(diagnosis["next_required_runtime_artifacts"][1]["satisfies_approved_runtime_evidence"])
+        self.assertTrue(diagnosis["next_required_runtime_artifacts"][2]["satisfies_approved_runtime_evidence"])
 
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

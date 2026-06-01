@@ -239,6 +239,10 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "CallProcessEventReply",
     )
 )
+REQUIRED_PUBLIC_HEADER_FORBIDDEN_PREFIXES = frozenset()
+REQUIRED_PUBLIC_HEADER_FORBIDDEN_EXACT_TOKENS = (
+    REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS - REQUIRED_PUBLIC_HEADER_FORBIDDEN_PREFIXES
+)
 FALSE_ONLY_KEYS = frozenset(
     (
         "command_router",
@@ -383,6 +387,19 @@ def normalized_key(key: Any) -> str:
 def negative_context(trail: str) -> bool:
     lowered = trail.casefold()
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
+
+
+def strip_c_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"//.*", "", text)
+
+
+def c_identifier_exact_re(token: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
+
+
+def c_identifier_prefix_re(prefix: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(prefix)}[A-Za-z0-9_]*")
 
 
 def collect_surface_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
@@ -766,11 +783,22 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
 def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
     try:
         reject_symlink_component(path, "public_header")
-        text = path.read_text(encoding="utf-8")
+        text = strip_c_comments(path.read_text(encoding="utf-8"))
     except OSError as exc:
         add(blockers, "public_header_unreadable", "$.public_header", path=str(path), detail=str(exc))
         return
-    present = sorted(token for token in REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS if token in text)
+    present = sorted(
+        token
+        for token in REQUIRED_PUBLIC_HEADER_FORBIDDEN_EXACT_TOKENS
+        if c_identifier_exact_re(token).search(text)
+    )
+    present.extend(
+        sorted(
+            prefix
+            for prefix in REQUIRED_PUBLIC_HEADER_FORBIDDEN_PREFIXES
+            if c_identifier_prefix_re(prefix).search(text)
+        )
+    )
     if present:
         add(
             blockers,

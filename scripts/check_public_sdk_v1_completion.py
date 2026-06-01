@@ -135,6 +135,29 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "v1_completion_ready",
     "stable_claim_allowed",
 )
+COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
+    r"\b(?:"
+    r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
+    r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
+    r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
+    r")\b.{0,80}\b(?:is|are|now|becomes?|became)?\s*"
+    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked)\b",
+    re.IGNORECASE,
+)
+COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
+    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked)\b"
+    r".{0,80}\b(?:"
+    r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
+    r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
+    r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
+    r")\b",
+    re.IGNORECASE,
+)
+COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE = re.compile(
+    r"\b(?:no|not|never|without|does\s+not|do\s+not|cannot|can't|must\s+not|"
+    r"blocked|planning[- ]only|non[- ]claim|false)\b",
+    re.IGNORECASE,
+)
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
@@ -743,6 +766,26 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
 def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, Any]) -> list[str]:
     claims: list[str] = []
 
+    def positive_text_claim(text: str) -> bool:
+        if not (
+            COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE.search(text)
+            or COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED.search(text)
+        ):
+            return False
+        claim_start = min(
+            [
+                match.start()
+                for pattern in (
+                    COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE,
+                    COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED,
+                )
+                for match in pattern.finditer(text)
+            ]
+            or [0]
+        )
+        context = text[max(0, claim_start - 48) : min(len(text), claim_start + 128)]
+        return not COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE.search(context)
+
     def visit(value: Any, path: str) -> None:
         if isinstance(value, dict):
             for key, item in value.items():
@@ -757,6 +800,8 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         elif isinstance(value, list):
             for index, item in enumerate(value):
                 visit(item, f"{path}[{index}]")
+        elif isinstance(value, str) and positive_text_claim(value):
+            claims.append(f"{path}:positive_text_claim")
 
     visit(payload, "")
     return sorted(set(claims))

@@ -185,6 +185,59 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_header_contains_permissions_admin_symbol", report["blockers"])
 
+    def test_public_header_scan_ignores_comments_and_identifier_supersets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            header_path = root / "ObeliskApi.h"
+            header_path.write_text(
+                "/* ObeliskPermissionQuery and OBELISK_PERMISSION_REASON_DENY stay blocked. */\n"
+                "// RegisterPermission and CheckPermissionWithOwnerToken remain absent.\n"
+                "typedef struct MyObeliskPermissionQuerySuffix MyObeliskPermissionQuerySuffix;\n"
+                "#define OBELISK_PERMISSION_REASONABLE_NAME 1\n"
+                "uint64_t not_reason_flags_or_ReasonFlags_suffix;\n",
+                encoding="utf-8",
+            )
+
+            result = run_checker("--public-header", str(header_path))
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["valid"])
+        self.assertNotIn("public_header_contains_permissions_admin_symbol", report["blockers"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
+    def test_public_header_scan_rejects_exact_symbols_and_blocked_prefixes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            header_path = root / "ObeliskApi.h"
+            header_path.write_text(
+                "typedef struct ObeliskPermissionQuery ObeliskPermissionQuery;\n"
+                "#define OBELISK_PERMISSION_REASON_DENY 1\n",
+                encoding="utf-8",
+            )
+
+            result = run_checker("--public-header", str(header_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_header_contains_permissions_admin_symbol", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "public_header_contains_permissions_admin_symbol"
+        )
+        self.assertIn("ObeliskPermissionQuery", detail["tokens"])
+        self.assertIn("OBELISK_PERMISSION_REASON_", detail["tokens"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
     def test_rejects_expanded_post_identity_allowed_surface(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

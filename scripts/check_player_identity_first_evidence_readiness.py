@@ -1216,6 +1216,7 @@ def player_principal_lifecycle_window_request_diagnosis(
         "env_path": str(env_path) if env_path is not None else None,
         "ready": False,
         "request_pack_ready": False,
+        "request_pack_is_runtime_evidence": False,
         "operator_current_turn_runtime_window_approval_required": False,
         "approved_runtime_evidence_present": False,
         "runtime_evidence_ready": False,
@@ -1224,6 +1225,7 @@ def player_principal_lifecycle_window_request_diagnosis(
         "runtime_ready": False,
         "blockers": [],
         "remaining_blockers": ["approved_runtime_evidence_missing"],
+        "next_required_runtime_artifacts": [],
         "non_claims": [
             "pre-window request-pack diagnosis only; does not authorize server operations, runtime capture, Discord, GitHub publication, public SDK readiness, or v1 completion",
         ],
@@ -1255,6 +1257,26 @@ def player_principal_lifecycle_window_request_diagnosis(
         "next_blocker": report.get("next_blocker"),
         "target": report.get("target"),
         "run_id": report.get("run_id"),
+        "next_required_runtime_artifacts": [
+            {
+                "artifact": "copied_obelisk_log",
+                "path": payload.get("copied_log_path"),
+                "required_for": "offline_runtime_principal_lifecycle_bundle_builder_input",
+                "satisfies_approved_runtime_evidence": False,
+            },
+            {
+                "artifact": "checked_window_manifest_env",
+                "path": payload.get("window_manifest_path"),
+                "required_for": "offline_runtime_principal_lifecycle_bundle_builder_input",
+                "satisfies_approved_runtime_evidence": False,
+            },
+            {
+                "artifact": "approved_runtime_principal_lifecycle_evidence_manifest",
+                "path": "approved-bundle/approved-runtime-principal-lifecycle-evidence.json",
+                "required_for": "approved_runtime_evidence_missing",
+                "satisfies_approved_runtime_evidence": True,
+            },
+        ] if ready else [],
     }
 
 

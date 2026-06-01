@@ -398,7 +398,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'checks': [{\n"
                 "        'name': 'command_chat_response_public_readiness',\n"
                 "        'public_or_runtime_claims': ['reply_api_allowed'],\n"
-                "        'runtime_delivery_allowed': True\n"
+                "        'runtime_delivery_allowed': True,\n"
+                "        'notes': ['reply API is public and ready']\n"
+                "    }, {\n"
+                "        'name': 'commands_replies_public_readiness',\n"
+                "        'non_claim': 'reply API is not public, not ready, and must remain blocked'\n"
                 "    }],\n"
                 "    'blockers': []\n"
                 "} ))\n",
@@ -422,6 +426,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertIn(
             "checks[0].runtime_delivery_allowed",
+            route_gate["public_or_runtime_claims"],
+        )
+        self.assertIn(
+            "checks[0].notes[0]:positive_text_claim",
+            route_gate["public_or_runtime_claims"],
+        )
+        self.assertNotIn(
+            "checks[1].non_claim:positive_text_claim",
             route_gate["public_or_runtime_claims"],
         )
         self.assertFalse(payload["stable_claim_allowed"])

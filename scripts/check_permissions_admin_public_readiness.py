@@ -307,6 +307,13 @@ REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
         "KickPlayer",
     )
 )
+REQUIRED_HEADER_ABSENT_PREFIXES = frozenset(
+    (
+        "OBELISK_PERMISSION_REASON_",
+        "OBELISK_ADMIN_REASON_",
+    )
+)
+REQUIRED_HEADER_ABSENT_EXACT_TOKENS = REQUIRED_HEADER_ABSENT_TOKENS - REQUIRED_HEADER_ABSENT_PREFIXES
 QUERY_READY_FALSE_KEYS = (
     "promotion_ready",
     "public_header_allowed",
@@ -417,6 +424,19 @@ def normalized_key(key: Any) -> str:
 def is_negative_context(trail: str) -> bool:
     lowered = trail.casefold()
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
+
+
+def strip_c_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"//.*", "", text)
+
+
+def c_identifier_exact_re(token: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
+
+
+def c_identifier_prefix_re(prefix: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(prefix)}[A-Za-z0-9_]*")
 
 
 def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
@@ -809,8 +829,19 @@ def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bo
 
 
 def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:
-    text = path.read_text(encoding="utf-8")
-    present = sorted(token for token in REQUIRED_HEADER_ABSENT_TOKENS if token in text)
+    text = strip_c_comments(path.read_text(encoding="utf-8"))
+    present = sorted(
+        token
+        for token in REQUIRED_HEADER_ABSENT_EXACT_TOKENS
+        if c_identifier_exact_re(token).search(text)
+    )
+    present.extend(
+        sorted(
+            prefix
+            for prefix in REQUIRED_HEADER_ABSENT_PREFIXES
+            if c_identifier_prefix_re(prefix).search(text)
+        )
+    )
     if present:
         add(blockers, "public_header_contains_permissions_admin_symbol", str(path), tokens=present)
 

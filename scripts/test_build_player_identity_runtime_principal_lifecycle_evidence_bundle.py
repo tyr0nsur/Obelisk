@@ -293,8 +293,22 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertFalse(report["bundle_inputs_ready"])
         self.assertFalse(report["request_pack_ready"])
+        self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "copied_log_and_window_manifest_required")
+        self.assertEqual(
+            [artifact["artifact"] for artifact in report["next_required_artifacts"]],
+            [
+                "copied_obelisk_log",
+                "checked_window_manifest_env",
+                "approved_runtime_principal_lifecycle_evidence_manifest",
+            ],
+        )
+        self.assertEqual(
+            [artifact["present"] for artifact in report["next_required_artifacts"]],
+            [False, False, False],
+        )
         self.assertIn("request_pack_check_failed", report["blockers"])
         self.assertIn("copied_log_missing", report["blockers"])
         self.assertIn("window_manifest_missing", report["blockers"])
@@ -314,8 +328,15 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertTrue(report["ready"])
         self.assertTrue(report["bundle_inputs_ready"])
+        self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
         self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
+        self.assertEqual(
+            [artifact["present"] for artifact in report["next_required_artifacts"]],
+            [True, True, False],
+        )
+        self.assertTrue(report["next_required_artifacts"][2]["satisfies_approved_runtime_evidence"])
         self.assertNotIn("copied_log_missing", report["blockers"])
         self.assertNotIn("window_manifest_missing", report["blockers"])
         self.assertIn(

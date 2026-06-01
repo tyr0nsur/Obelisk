@@ -93,6 +93,20 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   workflow-shape, ergonomics, architecture, or implementation guidance. These remain
   offline guardrails and do not promote Structure SDK, Mission SDK, commands/replies,
   runtime readiness, public SDK readiness, or v1 completion.
+- Latest P0/pre-runtime/public-header hardening: player-principal request-pack diagnostics
+  now explicitly report `request_pack_is_runtime_evidence=false` and list the three
+  required runtime artifacts: copied `Obelisk.log`, checked `window-manifest.env`, and an
+  approved runtime principal lifecycle evidence manifest. The bundle preflight mirrors this
+  with `approved_runtime_evidence_ready=false`, keeping request-pack readiness separate
+  from runtime evidence. Permissions/admin and command/chat response public-header scans
+  now strip C/C++ comments and match blocked symbols by C identifier boundary/prefix so
+  comments or superstrings cannot mask or create P0 public ABI drift. The v1 completion
+  checker now rejects nested positive text claims from the command/permission route gate,
+  while allowing explicit negative non-claims. Public `ObeliskApi.h` comments now mark raw
+  ProcessEvent registrations as legacy ABI/debug-window compatibility only, with global
+  and filtered capability gates, no stable SDK/module surface, and no owner-token handle
+  lifecycle. These are guardrails only and do not promote identity, permissions/admin,
+  command response, replies, runtime readiness, public SDK readiness, or v1 completion.
 
 ## Hard Overrides
 

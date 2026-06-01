@@ -251,12 +251,16 @@ typedef struct ObeliskApi {
     void (*LogWarn)(const char* message);
     void (*LogError)(const char* message);
 
-    // Raw ProcessEvent callback registration. These callbacks expose borrowed UE4
-    // pointers and raw parameter buffers; stable plugin code should prefer copied v0.1
-    // ABI seeds such as GameplayPolicyEvent and minimal ChatMessageEvent. Those copied
-    // seeds are promoted-experimental-only for v1 planning and are not a v1-complete
-    // SDK claim.
-    // Filtered registrations are rejected unless
+    // Legacy raw ProcessEvent callback registration. These slots remain for ABI
+    // compatibility and scoped debug windows only; they are not a stable SDK/module
+    // surface and do not provide owner-token handles for long-lived lifecycle ownership.
+    // These callbacks expose borrowed UE4 pointers and raw parameter buffers; stable
+    // plugin code should use copied v0.1 ABI seeds such as GameplayPolicyEvent and
+    // minimal ChatMessageEvent. Those copied seeds are promoted-experimental-only for v1
+    // planning and are not a v1-complete SDK claim.
+    // Global registrations are rejected unless
+    // OBELISK_API_CAPABILITY_GLOBAL_PROCESS_EVENT_CALLBACKS is advertised. Filtered
+    // registrations are rejected unless
     // OBELISK_API_CAPABILITY_FILTERED_PROCESS_EVENT_CALLBACKS is advertised.
     void (*RegisterPreProcessEvent)(OnProcessEventCallback callback);
     void (*RegisterPostProcessEvent)(OnProcessEventCallback callback);

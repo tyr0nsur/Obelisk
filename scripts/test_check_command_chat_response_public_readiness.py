@@ -428,6 +428,38 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("RegisterChatRouter", detail["symbols"])
         self.assertIn("OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH", detail["symbols"])
 
+    def test_public_header_scan_ignores_comments_and_identifier_supersets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            public_header_path.write_text(
+                "/* ObeliskCommandChatResponse and RegisterCommandChatResponse stay blocked. */\n"
+                "// OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH remains absent.\n"
+                "typedef struct MyObeliskCommandChatResponseSuffix MyObeliskCommandChatResponseSuffix;\n"
+                "void RegisterCommandChatResponseForTestsOnly(void);\n"
+                "#define OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH_EXTRA 1\n",
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(0, result.returncode)
+        self.assertTrue(report["valid"])
+        self.assertNotIn("public_header_forbidden_symbols_present", report["blockers"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
     def test_rejects_explicit_surface_claim_fields(self) -> None:
         for field in (
             "send_chat_api",

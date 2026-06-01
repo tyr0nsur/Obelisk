@@ -290,6 +290,45 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
     return state
 
 
+def next_required_preflight_artifacts(
+    copied_log: dict[str, Any],
+    window_manifest: dict[str, Any],
+    approved_bundle: dict[str, Any],
+) -> list[dict[str, Any]]:
+    required = [
+        (
+            "copied_obelisk_log",
+            copied_log,
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
+            "checked_window_manifest_env",
+            window_manifest,
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
+            "approved_runtime_principal_lifecycle_evidence_manifest",
+            approved_bundle,
+            "approved_runtime_evidence_missing",
+            True,
+        ),
+    ]
+    artifacts: list[dict[str, Any]] = []
+    for artifact, state, required_for, satisfies_approved_runtime_evidence in required:
+        artifacts.append(
+            {
+                "artifact": artifact,
+                "path": state.get("path"),
+                "present": state.get("exists") is True,
+                "required_for": required_for,
+                "satisfies_approved_runtime_evidence": satisfies_approved_runtime_evidence,
+            }
+        )
+    return artifacts
+
+
 def read_manifest_fields(path: Path, blockers: list[dict[str, Any]]) -> dict[str, str]:
     fields: dict[str, str] = {}
     try:
@@ -422,7 +461,9 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "ready": bool(input_ready),
         "bundle_inputs_ready": bool(bundle_inputs_ready),
         "request_pack_ready": bool(request_pack_ready),
+        "request_pack_is_runtime_evidence": False,
         "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
+        "approved_runtime_evidence_ready": False,
         "next_blocker": (
             "run_offline_evidence_bundle_builder"
             if input_ready and not approved_bundle["exists"]
@@ -441,6 +482,11 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
             "preflight_post": preflight_post,
             "approved_runtime_manifest": approved_bundle,
         },
+        "next_required_artifacts": next_required_preflight_artifacts(
+            copied_log,
+            window_manifest,
+            approved_bundle,
+        ),
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": [
