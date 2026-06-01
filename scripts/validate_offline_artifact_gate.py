@@ -126,6 +126,7 @@ MISSION_COPIED_BOOL_POLICY_SLICE_SCHEMA = "obelisk.mission-copied-bool-policy-sl
 STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA = "obelisk.structure-return-only-policy-slice.v1"
 STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA = "obelisk.structure-nonpin-copied-scalar-policy-slice.v1"
 STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA = "obelisk.structure-aggregate-census-policy-slice.v1"
+STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA = "obelisk.structure-build-policy-offline-attestation.v1"
 PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.players-identity-first-evidence.v1"
 PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA = lifecycle_anchor_candidates.SCHEMA
 PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA = principal_invalidation_policy.SCHEMA
@@ -177,6 +178,7 @@ SUPPORTED_MANIFEST_SCHEMAS = {
     STRUCTURE_RETURN_ONLY_POLICY_SLICE_SCHEMA,
     STRUCTURE_NONPIN_COPIED_SCALAR_POLICY_SLICE_SCHEMA,
     STRUCTURE_AGGREGATE_CENSUS_POLICY_SLICE_SCHEMA,
+    STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA,
     PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA,
     PLAYERS_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES_SCHEMA,
     PLAYERS_IDENTITY_PRINCIPAL_INVALIDATION_POLICY_SCHEMA,
@@ -657,6 +659,20 @@ STRUCTURE_AGGREGATE_FORBIDDEN_CLAIM_PHRASES = {
     "v1 completion": "v1_completion",
     "v1 done": "v1_completion",
     "v1 ready": "v1_completion",
+}
+STRUCTURE_BUILD_POLICY_TARGET_SET = "structure-build-policy-offline-intake"
+STRUCTURE_BUILD_POLICY_READINESS_SHA256 = "d9742e5ea97dbd1d6f12e40154c5891c72184126e90a29a2c57b43a507a38072"
+REQUIRED_STRUCTURE_BUILD_POLICY_REDACTED_FIELDS = {
+    "PC",
+    "OutPlacementData",
+    "PlayerViewRotation",
+    "location",
+    "rotation",
+}
+REQUIRED_STRUCTURE_BUILD_POLICY_NON_CLAIMS = {
+    "does not promote StructureEvents, Structure SDK, build-policy SDK, enforcement, identity, lookup, mutation, return override, runtime hooks, or v1 completion",
+    "redacts player controller, location, rotation, OutPlacementData, and PlayerViewRotation",
+    "planning-layout evidence only",
 }
 
 
@@ -6171,6 +6187,83 @@ def validate_structure_aggregate_census_policy_slice_manifest(payload: dict[str,
     return blockers
 
 
+def validate_structure_build_policy_offline_attestation_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
+    if payload.get("schema") != STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA:
+        return []
+
+    blockers: list[dict[str, Any]] = []
+    if payload.get("artifact_status") != "evidence-only":
+        blockers.append({"reason": "structure_build_policy_attestation_status_not_evidence_only", "label": f"{label}:$.artifact_status"})
+    if payload.get("target_set") != STRUCTURE_BUILD_POLICY_TARGET_SET:
+        blockers.append({"reason": "structure_build_policy_attestation_target_set_mismatch", "label": f"{label}:$.target_set"})
+    if payload.get("readiness_sha256") != STRUCTURE_BUILD_POLICY_READINESS_SHA256:
+        blockers.append({"reason": "structure_build_policy_attestation_readiness_sha256_mismatch", "label": f"{label}:$.readiness_sha256"})
+    if payload.get("consume_only") is not True:
+        blockers.append({"reason": "structure_build_policy_attestation_not_consume_only", "label": f"{label}:$.consume_only"})
+
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
+        if payload.get(key) is not False:
+            blockers.append({"reason": f"structure_build_policy_attestation_{key}_not_false", "label": f"{label}:$.{key}"})
+
+    promotion_gate = payload.get("promotion_gate")
+    if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
+        blockers.append({"reason": "structure_build_policy_attestation_promotion_gate_not_false", "label": f"{label}:$.promotion_gate.ready"})
+    elif "planning_layout_only_no_public_build_policy_sdk" not in set(promotion_gate.get("blockers") or []):
+        blockers.append({"reason": "structure_build_policy_attestation_promotion_gate_blocker_missing", "label": f"{label}:$.promotion_gate.blockers"})
+
+    snapshot_sources = payload.get("snapshot_sources")
+    if not isinstance(snapshot_sources, dict):
+        blockers.append({"reason": "structure_build_policy_attestation_snapshot_sources_missing", "label": f"{label}:$.snapshot_sources"})
+    else:
+        expected_source_keys = {"base", "candidate"}
+        if set(snapshot_sources) != expected_source_keys:
+            blockers.append({"reason": "structure_build_policy_attestation_snapshot_sources_mismatch", "label": f"{label}:$.snapshot_sources"})
+        source_hashes: set[str] = set()
+        for source_name in expected_source_keys:
+            source = snapshot_sources.get(source_name)
+            source_label = f"{label}:$.snapshot_sources.{source_name}"
+            if not isinstance(source, dict):
+                blockers.append({"reason": "structure_build_policy_attestation_snapshot_source_invalid", "label": source_label})
+                continue
+            if source.get("target_set") != STRUCTURE_BUILD_POLICY_TARGET_SET:
+                blockers.append({"reason": "structure_build_policy_attestation_snapshot_source_target_set_mismatch", "label": f"{source_label}.target_set"})
+            source_hash = source.get("sha256")
+            if not isinstance(source_hash, str) or SHA256_RE.fullmatch(source_hash) is None:
+                blockers.append({"reason": "structure_build_policy_attestation_snapshot_source_sha256_invalid", "label": f"{source_label}.sha256"})
+            else:
+                source_hashes.add(source_hash)
+            source_id = source.get("id")
+            if not isinstance(source_id, str) or not source_id:
+                blockers.append({"reason": "structure_build_policy_attestation_snapshot_source_id_invalid", "label": f"{source_label}.id"})
+        if len(source_hashes) == 1:
+            blockers.append({"reason": "structure_build_policy_attestation_snapshot_sources_not_distinct", "label": f"{label}:$.snapshot_sources"})
+
+    redaction_policy = payload.get("redaction_policy")
+    if not isinstance(redaction_policy, dict):
+        blockers.append({"reason": "structure_build_policy_attestation_redaction_policy_missing", "label": f"{label}:$.redaction_policy"})
+    elif not REQUIRED_STRUCTURE_BUILD_POLICY_REDACTED_FIELDS.issubset(set(redaction_policy.get("redacted_fields") or [])):
+        blockers.append({"reason": "structure_build_policy_attestation_redacted_fields_missing", "label": f"{label}:$.redaction_policy.redacted_fields"})
+
+    if not isinstance(payload.get("non_claims"), list) or not REQUIRED_STRUCTURE_BUILD_POLICY_NON_CLAIMS.issubset(set(payload["non_claims"])):
+        blockers.append({"reason": "structure_build_policy_attestation_non_claims_missing_required_boundaries", "label": f"{label}:$.non_claims"})
+
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_structure_build_policy_attestation_consume_only", "label": label})
+    for trail, _ in collect_ready_overclaims(payload):
+        blockers.append({"reason": "structure_build_policy_attestation_readiness_overclaim", "label": f"{label}:{trail}"})
+    for trail, _, reason in collect_candidate_public_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.promotion_gate.blockers"),
+    ):
+        blockers.append({"reason": f"structure_build_policy_attestation_public_overclaim_{reason}", "label": f"{label}:{trail}"})
+    for trail, _ in collect_promoted_status_overclaims(
+        payload,
+        allowed_prefixes=("$.non_claims", "$.promotion_gate.blockers"),
+    ):
+        blockers.append({"reason": "structure_build_policy_attestation_promotion_status_overclaim", "label": f"{label}:{trail}"})
+    return blockers
+
+
 def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *, label: str, mode: str) -> list[dict[str, Any]]:
     if payload.get("schema") != PLAYERS_IDENTITY_FIRST_EVIDENCE_SCHEMA:
         return []
@@ -10289,6 +10382,7 @@ def validate_manifest(
     blockers.extend(validate_structure_return_only_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_nonpin_copied_scalar_policy_slice_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_structure_aggregate_census_policy_slice_manifest(payload, label=str(resolved), mode=mode))
+    blockers.extend(validate_structure_build_policy_offline_attestation_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_first_evidence_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_lifecycle_anchor_candidates_manifest(payload, label=str(resolved), mode=mode))
     blockers.extend(validate_players_identity_principal_invalidation_policy_manifest(payload, label=str(resolved), mode=mode))

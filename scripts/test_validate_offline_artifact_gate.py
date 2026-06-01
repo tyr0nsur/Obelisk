@@ -1204,6 +1204,46 @@ def structure_aggregate_census_policy_slice_manifest(
     }
 
 
+def structure_build_policy_offline_attestation_manifest() -> dict:
+    return {
+        "schema": gate.STRUCTURE_BUILD_POLICY_OFFLINE_ATTESTATION_SCHEMA,
+        "artifact_status": "evidence-only",
+        "target_set": gate.STRUCTURE_BUILD_POLICY_TARGET_SET,
+        "readiness_sha256": gate.STRUCTURE_BUILD_POLICY_READINESS_SHA256,
+        "consume_only": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "enforcement_ready": False,
+        "snapshot_sources": {
+            "base": {
+                "id": "base-structure-build-policy-fixture",
+                "target_set": gate.STRUCTURE_BUILD_POLICY_TARGET_SET,
+                "sha256": "a" * 64,
+            },
+            "candidate": {
+                "id": "candidate-structure-build-policy-fixture",
+                "target_set": gate.STRUCTURE_BUILD_POLICY_TARGET_SET,
+                "sha256": "b" * 64,
+            },
+        },
+        "redaction_policy": {
+            "redacted_fields": [
+                "PC",
+                "location",
+                "rotation",
+                "OutPlacementData",
+                "PlayerViewRotation",
+            ],
+        },
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["planning_layout_only_no_public_build_policy_sdk"],
+        },
+        "non_claims": sorted(gate.REQUIRED_STRUCTURE_BUILD_POLICY_NON_CLAIMS),
+    }
+
+
 def players_identity_first_evidence_manifest(
     *,
     artifact_status: str = "candidate_only",
@@ -6831,6 +6871,57 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("structure_aggregate_policy_promotion_status_overclaim", reasons)
+
+    def test_accepts_structure_build_policy_offline_attestation_for_consume_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-attestation.json"
+            write_json(manifest, structure_build_policy_offline_attestation_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual(result["blockers"], [])
+
+    def test_blocks_structure_build_policy_offline_attestation_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-attestation.json"
+            write_json(manifest, structure_build_policy_offline_attestation_manifest())
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote"))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("promote_mode_structure_build_policy_attestation_consume_only", reasons)
+
+    def test_blocks_structure_build_policy_offline_attestation_drift_and_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "structure-build-policy-attestation.json"
+            payload = structure_build_policy_offline_attestation_manifest()
+            payload["readiness_sha256"] = "c" * 64
+            payload["public_sdk_ready"] = True
+            payload["promotion_gate"] = {"ready": True, "blockers": []}
+            payload["snapshot_sources"]["candidate"]["sha256"] = payload["snapshot_sources"]["base"]["sha256"]
+            payload["redaction_policy"]["redacted_fields"] = ["PC"]
+            payload["claim"] = "public SDK ready"
+            payload["promotion_status"] = "promoted"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("structure_build_policy_attestation_readiness_sha256_mismatch", reasons)
+        self.assertIn("structure_build_policy_attestation_public_sdk_ready_not_false", reasons)
+        self.assertIn("structure_build_policy_attestation_promotion_gate_not_false", reasons)
+        self.assertIn("structure_build_policy_attestation_snapshot_sources_not_distinct", reasons)
+        self.assertIn("structure_build_policy_attestation_redacted_fields_missing", reasons)
+        self.assertIn("structure_build_policy_attestation_readiness_overclaim", reasons)
+        self.assertIn("structure_build_policy_attestation_public_overclaim_public_sdk", reasons)
+        self.assertIn("structure_build_policy_attestation_promotion_status_overclaim", reasons)
 
     def test_accepts_players_identity_first_evidence_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
