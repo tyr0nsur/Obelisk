@@ -151,6 +151,21 @@ REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "authority_generation_mismatch",
     "plugin_supplied_provenance",
 )
+REQUIRED_REASON_FLAG_SEQUENCE = REQUIRED_FAIL_CLOSED_CASE_SEQUENCE
+REQUIRED_REASON_FLAGS_POLICY = {
+    "classification": "internal_candidate_only",
+    "encoding": "uint64_flags",
+    "source": "obelisk_internal_query_evaluator",
+    "public_header_allowed": False,
+    "public_cache_abi_allowed": False,
+    "plugin_supplied_flags_allowed": False,
+    "operator_config_flags_allowed": False,
+    "command_text_flags_allowed": False,
+    "allow_requires_zero_reason_flags": True,
+    "deny_unknown_require_nonzero_reason_flags": True,
+    "unknown_authority_result": "unknown",
+    "runtime_ready": False,
+}
 REQUIRED_EXCLUSIONS = frozenset(
     (
         "permission_groups",
@@ -325,6 +340,7 @@ class Validation:
     decisions: list[str]
     decision_fields: list[str]
     provenance_fields: list[str]
+    reason_flags: list[str]
     fail_closed_cases: list[str]
     recognized_authority_kinds: list[str]
     allow_capable_authority_kinds: list[str]
@@ -413,6 +429,20 @@ def build_template_manifest() -> dict[str, Any]:
             "provenance_fields": sorted(REQUIRED_PROVENANCE_FIELDS),
             "allow_without_provenance_allowed": False,
             "unknown_authority_result": "unknown",
+        },
+        "fail_closed_reason_flags": {
+            **dict(REQUIRED_REASON_FLAGS_POLICY),
+            "flags": [
+                {
+                    "name": name,
+                    "case": name,
+                    "bit_index": bit_index,
+                    "fail_closed": True,
+                    "allow_allowed": False,
+                    "consumer_result": "deny",
+                }
+                for bit_index, name in enumerate(REQUIRED_REASON_FLAG_SEQUENCE)
+            ],
         },
         "authority_policy": {
             "recognized_authority_kinds": sorted(REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
@@ -890,6 +920,97 @@ def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> li
     return sorted(names)
 
 
+def validate_reason_flags(contract: Any, blockers: list[dict[str, Any]]) -> list[str]:
+    label = "$.fail_closed_reason_flags"
+    if not isinstance(contract, dict):
+        add(blockers, "reason_flags_contract_missing", label)
+        return []
+
+    required_keys = set(REQUIRED_REASON_FLAGS_POLICY) | {"flags"}
+    if set(contract) != required_keys:
+        add(
+            blockers,
+            "reason_flags_contract_fields_mismatch",
+            label,
+            missing=sorted(required_keys - set(contract)),
+            unexpected=sorted(set(contract) - required_keys),
+        )
+    for key, expected in REQUIRED_REASON_FLAGS_POLICY.items():
+        if contract.get(key) != expected:
+            add(
+                blockers,
+                f"reason_flags_{key}_invalid",
+                f"{label}.{key}",
+                expected=expected,
+                value=contract.get(key),
+            )
+
+    flags = contract.get("flags")
+    if not isinstance(flags, list):
+        add(blockers, "reason_flags_not_list", f"{label}.flags")
+        return []
+
+    names: list[str] = []
+    bit_indexes: list[int] = []
+    for index, flag in enumerate(flags):
+        flag_label = f"{label}.flags[{index}]"
+        if not isinstance(flag, dict):
+            add(blockers, "reason_flag_invalid", flag_label)
+            continue
+        expected_keys = {"name", "case", "bit_index", "fail_closed", "allow_allowed", "consumer_result"}
+        if set(flag) != expected_keys:
+            add(
+                blockers,
+                "reason_flag_fields_mismatch",
+                flag_label,
+                missing=sorted(expected_keys - set(flag)),
+                unexpected=sorted(set(flag) - expected_keys),
+            )
+
+        name = flag.get("name")
+        if not isinstance(name, str) or not name:
+            add(blockers, "reason_flag_name_missing", f"{flag_label}.name")
+            continue
+        names.append(name)
+        if name not in REQUIRED_FAIL_CLOSED_CASES:
+            add(blockers, "reason_flag_unexpected", f"{flag_label}.name", flag=name)
+        if flag.get("case") != name:
+            add(blockers, "reason_flag_case_mismatch", f"{flag_label}.case", flag=name, value=flag.get("case"))
+
+        bit_index = flag.get("bit_index")
+        if isinstance(bit_index, bool) or not isinstance(bit_index, int):
+            add(blockers, "reason_flag_bit_index_invalid", f"{flag_label}.bit_index", flag=name, value=bit_index)
+        else:
+            bit_indexes.append(bit_index)
+            if bit_index < 0 or bit_index >= 64:
+                add(blockers, "reason_flag_bit_index_out_of_uint64_range", f"{flag_label}.bit_index", flag=name)
+
+        if flag.get("fail_closed") is not True:
+            add(blockers, "reason_flag_not_fail_closed", f"{flag_label}.fail_closed", flag=name)
+        if flag.get("allow_allowed") is not False:
+            add(blockers, "reason_flag_allow_not_forbidden", f"{flag_label}.allow_allowed", flag=name)
+        if flag.get("consumer_result") not in {"deny", "unknown"}:
+            add(blockers, "reason_flag_consumer_result_not_denied_or_unknown", f"{flag_label}.consumer_result", flag=name)
+
+    missing = REQUIRED_FAIL_CLOSED_CASES - set(names)
+    if missing:
+        add(blockers, "reason_flags_missing_required", f"{label}.flags", missing=sorted(missing))
+    duplicates = sorted({bit for bit in bit_indexes if bit_indexes.count(bit) > 1})
+    if duplicates:
+        add(blockers, "reason_flag_bit_index_duplicate", f"{label}.flags", bit_indexes=duplicates)
+    expected_bits = set(range(len(REQUIRED_REASON_FLAG_SEQUENCE)))
+    actual_bits = set(bit_indexes)
+    if actual_bits and actual_bits != expected_bits:
+        add(
+            blockers,
+            "reason_flag_bit_index_sequence_mismatch",
+            f"{label}.flags",
+            missing=sorted(expected_bits - actual_bits),
+            unexpected=sorted(actual_bits - expected_bits),
+        )
+    return sorted(names)
+
+
 def validate_negative_exclusions(exclusions: Any, blockers: list[dict[str, Any]]) -> None:
     if not isinstance(exclusions, list):
         add(blockers, "negative_surface_exclusions_not_list", "$.negative_surface_exclusions")
@@ -919,7 +1040,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
-        return Validation(blockers, [], [], [], [], [], [])
+        return Validation(blockers, [], [], [], [], [], [], [])
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -965,6 +1086,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     validate_abuse_policy(payload.get("abuse_policy"), blockers)
     validate_sequence_gate(payload.get("sequence_gate"), blockers)
     fail_closed_cases = validate_fail_closed_cases(payload.get("fail_closed_cases"), blockers)
+    reason_flags = validate_reason_flags(payload.get("fail_closed_reason_flags"), blockers)
     validate_negative_exclusions(payload.get("negative_surface_exclusions"), blockers)
     validate_promotion_gate(payload.get("promotion_gate"), blockers)
 
@@ -998,6 +1120,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         decisions,
         decision_fields,
         provenance_fields,
+        reason_flags,
         fail_closed_cases,
         recognized_authority_kinds,
         allow_capable_authority_kinds,
@@ -1021,6 +1144,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "decisions": validation.decisions,
         "decision_fields": validation.decision_fields,
         "provenance_fields": validation.provenance_fields,
+        "reason_flags": validation.reason_flags,
         "fail_closed_cases": validation.fail_closed_cases,
         "recognized_authority_kinds": validation.recognized_authority_kinds,
         "allow_capable_authority_kinds": validation.allow_capable_authority_kinds,

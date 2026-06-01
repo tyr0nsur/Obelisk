@@ -374,15 +374,16 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     "obelisk.permissions_admin.v1": (
         re.compile(
             r"(?:Permission|Permissions|Admin|Authorization|Authorize|Authz|AuthZ|ACL|Acl|"
-            r"Moderation|Moderator|BanPlayer|KickPlayer|Grant|Revoke|RoleId|RoleID)"
+            r"Moderation|Moderator|BanPlayer|KickPlayer|Grant|Revoke|RoleId|RoleID|"
+            r"ReasonFlag|ReasonFlags)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:PERMISSION|ADMIN|AUTHORIZATION|MODERATION|"
-            r"AUTHZ|ACL|BAN|KICK|GRANT|REVOKE|ROLE_ID)[A-Z0-9_]*$"
+            r"AUTHZ|ACL|BAN|KICK|GRANT|REVOKE|ROLE_ID|REASON_FLAG|REASON_FLAGS)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:permission|permissions|admin|authorization|authority_kind|"
-            r"authz|acl|policy_epoch|ban_player|kick_player|grant|revoke|role_id)(?:_|$)"
+            r"authz|acl|policy_epoch|reason_flag|reason_flags|ban_player|kick_player|grant|revoke|role_id)(?:_|$)"
         ),
     ),
     "obelisk.command_chat_response_path.v1": (

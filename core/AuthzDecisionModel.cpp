@@ -7,6 +7,11 @@ namespace obelisk::permissions_admin
         constexpr size_t kMaxActionBytes = 128;
         constexpr size_t kMaxResourceScopeBytes = 256;
 
+        constexpr ReasonFlags Flag(ReasonFlag reason)
+        {
+            return static_cast<ReasonFlags>(reason);
+        }
+
         bool HasValidCopiedByteSpan(const char* data, size_t size, size_t max_size, bool allow_empty)
         {
             if (size > max_size)
@@ -38,7 +43,7 @@ namespace obelisk::permissions_admin
         return authority == PolicyAuthority::RuntimeOwned;
     }
 
-    Decision EvaluatePermissionQuery(const PermissionQuery& query)
+    PermissionEvaluation EvaluatePermissionQueryDetailed(const PermissionQuery& query)
     {
         const Principal& principal = query.PrincipalValue;
         const OwnerContext& owner = query.Owner;
@@ -47,42 +52,104 @@ namespace obelisk::permissions_admin
 
         if (!owner.HasOwnerToken || !owner.OwnerTokenNonZero || !owner.OwnerKnown ||
             owner.OwnerUnloading || !owner.HasCapability)
-            return Decision::Deny;
+        {
+            ReasonFlags reasons = 0;
+            if (!owner.HasOwnerToken)
+                reasons |= Flag(ReasonFlag::MissingOwnerToken);
+            if (!owner.OwnerTokenNonZero)
+                reasons |= Flag(ReasonFlag::ZeroOwnerToken);
+            if (!owner.OwnerKnown)
+                reasons |= Flag(ReasonFlag::UnknownOwner);
+            if (owner.OwnerUnloading)
+                reasons |= Flag(ReasonFlag::OwnerUnloading);
+            if (!owner.HasCapability)
+                reasons |= Flag(ReasonFlag::MissingCapability);
+            return {Decision::Deny, reasons};
+        }
 
         if (!HasWellFormedCopiedQueryText(query.Text))
-            return Decision::Deny;
+            return {Decision::Deny, Flag(ReasonFlag::MalformedQueryText)};
 
         if (!principal.Copied || principal.Handle == 0)
-            return Decision::Deny;
+        {
+            ReasonFlags reasons = 0;
+            if (!principal.Copied)
+                reasons |= Flag(ReasonFlag::PrincipalNotCopied);
+            if (principal.Handle == 0)
+                reasons |= Flag(ReasonFlag::MissingPrincipalHandle);
+            return {Decision::Deny, reasons};
+        }
 
         if (!principal.HasGeneration || principal.Generation != principal.CurrentGeneration)
-            return Decision::Unknown;
+        {
+            ReasonFlags reasons = 0;
+            if (!principal.HasGeneration)
+                reasons |= Flag(ReasonFlag::MissingPrincipalGeneration);
+            if (principal.HasGeneration && principal.Generation != principal.CurrentGeneration)
+                reasons |= Flag(ReasonFlag::StalePrincipalGeneration);
+            return {Decision::Unknown, reasons};
+        }
 
         if (!IsSupportedScope(principal.Scope) || !principal.SameProcess)
-            return Decision::Unknown;
+        {
+            ReasonFlags reasons = 0;
+            if (!IsSupportedScope(principal.Scope))
+                reasons |= Flag(ReasonFlag::UnsupportedPrincipalScope);
+            if (!principal.SameProcess)
+                reasons |= Flag(ReasonFlag::CrossProcessPrincipal);
+            return {Decision::Unknown, reasons};
+        }
 
         if (!provenance.HasSourceId || !provenance.HasSourceGeneration ||
             !provenance.HasAuthorityGeneration || !provenance.HasPolicyEpoch)
         {
-            return Decision::Unknown;
+            ReasonFlags reasons = 0;
+            if (!provenance.HasSourceId)
+                reasons |= Flag(ReasonFlag::MissingPolicySourceId);
+            if (!provenance.HasSourceGeneration)
+                reasons |= Flag(ReasonFlag::MissingPolicySourceGeneration);
+            if (!provenance.HasAuthorityGeneration)
+                reasons |= Flag(ReasonFlag::MissingAuthorityGeneration);
+            if (!provenance.HasPolicyEpoch)
+                reasons |= Flag(ReasonFlag::MissingPolicyEpoch);
+            return {Decision::Unknown, reasons};
         }
 
         if (provenance.SuppliedByPlugin || provenance.Authority == PolicyAuthority::PluginSupplied)
-            return Decision::Deny;
+            return {Decision::Deny, Flag(ReasonFlag::PluginSuppliedProvenance)};
 
         if (!IsRecognizedAuthority(provenance.Authority) || !IsAllowCapableAuthority(provenance.Authority))
-            return Decision::Unknown;
+        {
+            ReasonFlags reasons = 0;
+            if (!IsRecognizedAuthority(provenance.Authority))
+                reasons |= Flag(ReasonFlag::UnrecognizedAuthority);
+            if (IsRecognizedAuthority(provenance.Authority) && !IsAllowCapableAuthority(provenance.Authority))
+                reasons |= Flag(ReasonFlag::AuthorityNotAllowCapable);
+            return {Decision::Unknown, reasons};
+        }
 
         if (!provenance.SourceGenerationMatches || !provenance.AuthorityGenerationMatches)
-            return Decision::Unknown;
+        {
+            ReasonFlags reasons = 0;
+            if (!provenance.SourceGenerationMatches)
+                reasons |= Flag(ReasonFlag::PolicySourceGenerationMismatch);
+            if (!provenance.AuthorityGenerationMatches)
+                reasons |= Flag(ReasonFlag::AuthorityGenerationMismatch);
+            return {Decision::Unknown, reasons};
+        }
 
         if (!abuse.RateLimitOk)
-            return Decision::Deny;
+            return {Decision::Deny, Flag(ReasonFlag::RateLimited)};
 
         if (!abuse.AuditOk)
-            return Decision::Unknown;
+            return {Decision::Unknown, Flag(ReasonFlag::AuditUnavailable)};
 
-        return Decision::Allow;
+        return {Decision::Allow, 0};
+    }
+
+    Decision EvaluatePermissionQuery(const PermissionQuery& query)
+    {
+        return EvaluatePermissionQueryDetailed(query).DecisionValue;
     }
 
     PermissionQuery CompleteRuntimeOwnedQuery()

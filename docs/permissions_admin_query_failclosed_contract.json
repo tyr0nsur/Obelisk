@@ -288,6 +288,302 @@
       "fail_closed": true
     }
   ],
+  "fail_closed_reason_flags": {
+    "allow_requires_zero_reason_flags": true,
+    "classification": "internal_candidate_only",
+    "command_text_flags_allowed": false,
+    "deny_unknown_require_nonzero_reason_flags": true,
+    "encoding": "uint64_flags",
+    "flags": [
+      {
+        "allow_allowed": false,
+        "bit_index": 0,
+        "case": "stale_principal",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "stale_principal"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 1,
+        "case": "scope_mismatch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "scope_mismatch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 2,
+        "case": "process_mismatch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "process_mismatch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 3,
+        "case": "missing_principal",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_principal"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 4,
+        "case": "missing_runtime_principal_identity",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_runtime_principal_identity"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 5,
+        "case": "command_text_principal_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "command_text_principal_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 6,
+        "case": "command_text_permission_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "command_text_permission_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 7,
+        "case": "operator_config_principal_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "operator_config_principal_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 8,
+        "case": "operator_config_permission_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "operator_config_permission_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 9,
+        "case": "operator_config_allow_capability_claim",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "operator_config_allow_capability_claim"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 10,
+        "case": "missing_action",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_action"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 11,
+        "case": "malformed_action_size",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "malformed_action_size"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 12,
+        "case": "action_size_exceeds_max",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "action_size_exceeds_max"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 13,
+        "case": "malformed_resource_scope_size",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "malformed_resource_scope_size"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 14,
+        "case": "resource_scope_size_exceeds_max",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "resource_scope_size_exceeds_max"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 15,
+        "case": "missing_principal_handle",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_principal_handle"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 16,
+        "case": "missing_principal_generation",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_principal_generation"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 17,
+        "case": "missing_principal_scope_flags",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_principal_scope_flags"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 18,
+        "case": "principal_generation_mismatch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "principal_generation_mismatch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 19,
+        "case": "unsupported_principal_scope_flags",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "unsupported_principal_scope_flags"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 20,
+        "case": "missing_plugin_owner_token",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_plugin_owner_token"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 21,
+        "case": "zero_plugin_owner_token",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "zero_plugin_owner_token"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 22,
+        "case": "unknown_plugin_owner_token",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "unknown_plugin_owner_token"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 23,
+        "case": "unloading_plugin_owner_token",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "unloading_plugin_owner_token"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 24,
+        "case": "missing_capability",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_capability"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 25,
+        "case": "rate_limit_exceeded",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "rate_limit_exceeded"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 26,
+        "case": "unknown_authority",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "unknown_authority"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 27,
+        "case": "missing_authority_kind",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_authority_kind"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 28,
+        "case": "missing_policy_source",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_policy_source"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 29,
+        "case": "missing_policy_source_generation",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_policy_source_generation"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 30,
+        "case": "policy_source_generation_mismatch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "policy_source_generation_mismatch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 31,
+        "case": "missing_policy_epoch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_policy_epoch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 32,
+        "case": "missing_authority_generation",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_authority_generation"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 33,
+        "case": "authority_generation_mismatch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "authority_generation_mismatch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 34,
+        "case": "plugin_supplied_provenance",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "plugin_supplied_provenance"
+      }
+    ],
+    "operator_config_flags_allowed": false,
+    "plugin_supplied_flags_allowed": false,
+    "public_cache_abi_allowed": false,
+    "public_header_allowed": false,
+    "runtime_ready": false,
+    "source": "obelisk_internal_query_evaluator",
+    "unknown_authority_result": "unknown"
+  },
   "negative_surface_exclusions": [
     "ResourceHandle",
     "admin_groups",

@@ -30,6 +30,36 @@ namespace obelisk::permissions_admin
         Unknown
     };
 
+    using ReasonFlags = uint64_t;
+
+    enum class ReasonFlag : uint64_t
+    {
+        None = 0,
+        MissingOwnerToken = 1ull << 0,
+        ZeroOwnerToken = 1ull << 1,
+        UnknownOwner = 1ull << 2,
+        OwnerUnloading = 1ull << 3,
+        MissingCapability = 1ull << 4,
+        MalformedQueryText = 1ull << 5,
+        PrincipalNotCopied = 1ull << 6,
+        MissingPrincipalHandle = 1ull << 7,
+        MissingPrincipalGeneration = 1ull << 8,
+        StalePrincipalGeneration = 1ull << 9,
+        UnsupportedPrincipalScope = 1ull << 10,
+        CrossProcessPrincipal = 1ull << 11,
+        MissingPolicySourceId = 1ull << 12,
+        MissingPolicySourceGeneration = 1ull << 13,
+        MissingAuthorityGeneration = 1ull << 14,
+        MissingPolicyEpoch = 1ull << 15,
+        PluginSuppliedProvenance = 1ull << 16,
+        UnrecognizedAuthority = 1ull << 17,
+        AuthorityNotAllowCapable = 1ull << 18,
+        PolicySourceGenerationMismatch = 1ull << 19,
+        AuthorityGenerationMismatch = 1ull << 20,
+        RateLimited = 1ull << 21,
+        AuditUnavailable = 1ull << 22,
+    };
+
     struct Principal
     {
         bool Copied = false;
@@ -85,10 +115,17 @@ namespace obelisk::permissions_admin
         QueryText Text;
     };
 
+    struct PermissionEvaluation
+    {
+        Decision DecisionValue = Decision::Deny;
+        ReasonFlags ReasonFlagsValue = 0;
+    };
+
     bool HasWellFormedCopiedQueryText(const QueryText& text);
     bool IsSupportedScope(PrincipalScope scope);
     bool IsRecognizedAuthority(PolicyAuthority authority);
     bool IsAllowCapableAuthority(PolicyAuthority authority);
+    PermissionEvaluation EvaluatePermissionQueryDetailed(const PermissionQuery& query);
     Decision EvaluatePermissionQuery(const PermissionQuery& query);
     PermissionQuery CompleteRuntimeOwnedQuery();
 }

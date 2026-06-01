@@ -36,7 +36,55 @@ def fail_closed_case(name: str) -> dict:
     }
 
 
+def reason_flag(name: str, bit_index: int) -> dict:
+    return {
+        "name": name,
+        "case": name,
+        "bit_index": bit_index,
+        "fail_closed": True,
+        "allow_allowed": False,
+        "consumer_result": "deny",
+    }
+
+
 def manifest() -> dict:
+    fail_closed_names = [
+        "stale_principal",
+        "scope_mismatch",
+        "process_mismatch",
+        "missing_principal",
+        "missing_runtime_principal_identity",
+        "command_text_principal_claim",
+        "command_text_permission_claim",
+        "operator_config_principal_claim",
+        "operator_config_permission_claim",
+        "operator_config_allow_capability_claim",
+        "missing_action",
+        "malformed_action_size",
+        "action_size_exceeds_max",
+        "malformed_resource_scope_size",
+        "resource_scope_size_exceeds_max",
+        "missing_principal_handle",
+        "missing_principal_generation",
+        "missing_principal_scope_flags",
+        "principal_generation_mismatch",
+        "unsupported_principal_scope_flags",
+        "missing_plugin_owner_token",
+        "zero_plugin_owner_token",
+        "unknown_plugin_owner_token",
+        "unloading_plugin_owner_token",
+        "missing_capability",
+        "rate_limit_exceeded",
+        "unknown_authority",
+        "missing_authority_kind",
+        "missing_policy_source",
+        "missing_policy_source_generation",
+        "policy_source_generation_mismatch",
+        "missing_policy_epoch",
+        "missing_authority_generation",
+        "authority_generation_mismatch",
+        "plugin_supplied_provenance",
+    ]
     return {
         "schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
         "artifact_identity": {
@@ -86,6 +134,21 @@ def manifest() -> dict:
             ],
             "allow_without_provenance_allowed": False,
             "unknown_authority_result": "unknown",
+        },
+        "fail_closed_reason_flags": {
+            "classification": "internal_candidate_only",
+            "encoding": "uint64_flags",
+            "source": "obelisk_internal_query_evaluator",
+            "public_header_allowed": False,
+            "public_cache_abi_allowed": False,
+            "plugin_supplied_flags_allowed": False,
+            "operator_config_flags_allowed": False,
+            "command_text_flags_allowed": False,
+            "allow_requires_zero_reason_flags": True,
+            "deny_unknown_require_nonzero_reason_flags": True,
+            "unknown_authority_result": "unknown",
+            "runtime_ready": False,
+            "flags": [reason_flag(name, bit_index) for bit_index, name in enumerate(fail_closed_names)],
         },
         "authority_policy": {
             "recognized_authority_kinds": ["operator-config", "runtime-local"],
@@ -144,43 +207,7 @@ def manifest() -> dict:
             "commands_replies_admin_mutation_storage_operator_ingress_allowed": False,
             "query_result_contains_command_or_reply_handle": False,
         },
-        "fail_closed_cases": [
-            fail_closed_case("stale_principal"),
-            fail_closed_case("scope_mismatch"),
-            fail_closed_case("process_mismatch"),
-            fail_closed_case("missing_principal"),
-            fail_closed_case("missing_runtime_principal_identity"),
-            fail_closed_case("command_text_principal_claim"),
-            fail_closed_case("command_text_permission_claim"),
-            fail_closed_case("operator_config_principal_claim"),
-            fail_closed_case("operator_config_permission_claim"),
-            fail_closed_case("operator_config_allow_capability_claim"),
-            fail_closed_case("missing_action"),
-            fail_closed_case("malformed_action_size"),
-            fail_closed_case("action_size_exceeds_max"),
-            fail_closed_case("malformed_resource_scope_size"),
-            fail_closed_case("resource_scope_size_exceeds_max"),
-            fail_closed_case("missing_principal_handle"),
-            fail_closed_case("missing_principal_generation"),
-            fail_closed_case("missing_principal_scope_flags"),
-            fail_closed_case("principal_generation_mismatch"),
-            fail_closed_case("unsupported_principal_scope_flags"),
-            fail_closed_case("missing_plugin_owner_token"),
-            fail_closed_case("zero_plugin_owner_token"),
-            fail_closed_case("unknown_plugin_owner_token"),
-            fail_closed_case("unloading_plugin_owner_token"),
-            fail_closed_case("missing_capability"),
-            fail_closed_case("rate_limit_exceeded"),
-            fail_closed_case("unknown_authority"),
-            fail_closed_case("missing_authority_kind"),
-            fail_closed_case("missing_policy_source"),
-            fail_closed_case("missing_policy_source_generation"),
-            fail_closed_case("policy_source_generation_mismatch"),
-            fail_closed_case("missing_policy_epoch"),
-            fail_closed_case("missing_authority_generation"),
-            fail_closed_case("authority_generation_mismatch"),
-            fail_closed_case("plugin_supplied_provenance"),
-        ],
+        "fail_closed_cases": [fail_closed_case(name) for name in fail_closed_names],
         "negative_surface_exclusions": [
             "permission_groups",
             "admin_groups",
@@ -315,6 +342,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "zero_plugin_owner_token",
             ],
         )
+        self.assertEqual(report["reason_flags"], report["fail_closed_cases"])
 
     def test_emits_canonical_candidate_template(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -438,6 +466,56 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("decision_fields_missing_required", report["blockers"])
         self.assertIn("decision_results_missing_required", report["blockers"])
         self.assertIn("provenance_fields_missing_required", report["blockers"])
+
+    def test_rejects_missing_or_public_reason_flags_contract(self) -> None:
+        payload = manifest()
+        payload.pop("fail_closed_reason_flags")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("reason_flags_contract_missing", report["blockers"])
+
+        payload = manifest()
+        payload["fail_closed_reason_flags"]["public_header_allowed"] = True
+        payload["fail_closed_reason_flags"]["public_cache_abi_allowed"] = True
+        payload["fail_closed_reason_flags"]["runtime_ready"] = True
+        payload["fail_closed_reason_flags"]["plugin_supplied_flags_allowed"] = True
+        payload["fail_closed_reason_flags"]["operator_config_flags_allowed"] = True
+        payload["fail_closed_reason_flags"]["command_text_flags_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("reason_flags_public_header_allowed_invalid", report["blockers"])
+        self.assertIn("reason_flags_public_cache_abi_allowed_invalid", report["blockers"])
+        self.assertIn("reason_flags_runtime_ready_invalid", report["blockers"])
+        self.assertIn("reason_flags_plugin_supplied_flags_allowed_invalid", report["blockers"])
+        self.assertIn("reason_flags_operator_config_flags_allowed_invalid", report["blockers"])
+        self.assertIn("reason_flags_command_text_flags_allowed_invalid", report["blockers"])
+
+    def test_rejects_incomplete_or_malformed_reason_flags(self) -> None:
+        payload = manifest()
+        payload["fail_closed_reason_flags"]["flags"] = [
+            flag for flag in payload["fail_closed_reason_flags"]["flags"] if flag["name"] != "scope_mismatch"
+        ]
+        payload["fail_closed_reason_flags"]["flags"][0]["bit_index"] = 2
+        payload["fail_closed_reason_flags"]["flags"][1]["consumer_result"] = "allow"
+        payload["fail_closed_reason_flags"]["flags"][2]["allow_allowed"] = True
+        payload["fail_closed_reason_flags"]["flags"][3]["fail_closed"] = False
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("reason_flags_missing_required", report["blockers"])
+        self.assertIn("reason_flag_bit_index_duplicate", report["blockers"])
+        self.assertIn("reason_flag_bit_index_sequence_mismatch", report["blockers"])
+        self.assertIn("reason_flag_consumer_result_not_denied_or_unknown", report["blockers"])
+        self.assertIn("reason_flag_allow_not_forbidden", report["blockers"])
+        self.assertIn("reason_flag_not_fail_closed", report["blockers"])
 
     def test_rejects_allow_without_policy_provenance(self) -> None:
         payload = manifest()

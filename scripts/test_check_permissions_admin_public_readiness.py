@@ -155,11 +155,17 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
             decisions["public_header_allowed"] = True
             decisions["public_cache_abi_allowed"] = True
-            decisions["public_header_symbols_now"] = ["ObeliskPermissionQuery"]
+            decisions["public_header_symbols_now"] = ["ObeliskPermissionQuery", "ObeliskPermissionReasonFlags"]
             decisions_path = write_json(root, "decisions.json", decisions)
 
             header_path = root / "ObeliskApi.h"
-            header_path.write_text(HEADER.read_text(encoding="utf-8") + "\nstruct ObeliskPermissionQuery {};\n")
+            header_path.write_text(
+                HEADER.read_text(encoding="utf-8") +
+                "\nstruct ObeliskPermissionQuery {};\n"
+                "typedef uint64_t ObeliskPermissionReasonFlags;\n"
+                "#define OBELISK_PERMISSION_REASON_DENY 1\n"
+                "uint64_t reason_flags;\n"
+            )
 
             result = run_checker("--decisions", str(decisions_path), "--public-header", str(header_path), check=False)
             report = json.loads(result.stdout)

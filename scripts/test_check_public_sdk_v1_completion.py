@@ -369,6 +369,57 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("RegisterPlayerIdentityWithOwnerTokenHandle", drift["undeclared_symbols"])
         self.assertIn("principal_handle", drift["undeclared_symbols"])
 
+    def test_blocked_permissions_contract_detects_public_reason_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#include <stdint.h>\n"
+                "typedef uint64_t ObeliskPermissionReasonFlags;\n"
+                "#define OBELISK_PERMISSION_REASON_DENY 1\n"
+                "typedef struct ObeliskApi {\n"
+                "    uint64_t reason_flags;\n"
+                "} ObeliskApi;\n",
+                encoding="utf-8",
+            )
+            (decisions_dir / "permissions_admin_public_contract_decisions.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.permissions-admin-public-contract-decisions.v1",
+                        "surface": "obelisk.permissions_admin.v1",
+                        "status": "blocked",
+                        "public_header_allowed": False,
+                        "public_header": str(header_path),
+                        "public_header_symbols_now": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        drift = next(
+            item
+            for item in payload["blocked_public_contract_header_symbols"].values()
+            if item["surface"] == "obelisk.permissions_admin.v1"
+        )
+        self.assertIn("ObeliskPermissionReasonFlags", drift["undeclared_symbols"])
+        self.assertIn("OBELISK_PERMISSION_REASON_DENY", drift["undeclared_symbols"])
+        self.assertIn("reason_flags", drift["undeclared_symbols"])
+
     def test_blocked_contract_symbol_drift_ignores_existing_chat_message_rc_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
