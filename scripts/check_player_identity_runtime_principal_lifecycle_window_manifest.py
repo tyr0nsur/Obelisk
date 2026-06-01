@@ -80,6 +80,14 @@ REQUIRED_SIMPLE_FIELDS = (
     "approval",
     "copied_log_path",
     "copied_log_sha256",
+    "request_pack_path",
+    "request_pack_sha256",
+    "observer_env_path",
+    "observer_env_sha256",
+    "preflight_pre_path",
+    "preflight_pre_sha256",
+    "preflight_post_path",
+    "preflight_post_sha256",
     "pre_posture",
     "post_posture",
     "pre_check",
@@ -354,6 +362,97 @@ def validate_copied_log_path(fields: dict[str, str], manifest_path: Path, blocke
     return "unprotected_offline"
 
 
+def validate_sidecar_file(
+    fields: dict[str, str],
+    manifest_path: Path,
+    blockers: list[dict[str, Any]],
+    *,
+    path_key: str,
+    sha_key: str,
+    expected_name: str | None = None,
+) -> str | None:
+    path_text = fields.get(path_key)
+    sha_text = fields.get(sha_key)
+    if not path_text:
+        return None
+    path = manifest_relative_path(path_text, manifest_path)
+    reject_symlink_component(path, path_key)
+    status = protected_paths.protected_path_status(
+        path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected:
+        add(blockers, f"{path_key}_under_protected_server_root", path_key, resolved=str(status.resolved))
+        return "protected"
+    if not status.approved_offline_workspace:
+        add(blockers, f"{path_key}_not_under_approved_offline_workspace", path_key, resolved=str(status.resolved))
+    if expected_name is not None and status.resolved.name != expected_name:
+        add(blockers, f"{path_key}_filename_mismatch", path_key, expected=expected_name, resolved=str(status.resolved))
+    run_id = fields.get("run_id")
+    if run_id and run_id not in status.resolved.parts:
+        add(blockers, f"{path_key}_run_id_mismatch", path_key, run_id=run_id, resolved=str(status.resolved))
+    if not sha_text:
+        add(blockers, f"{sha_key}_missing", sha_key)
+    elif SHA256_RE.fullmatch(sha_text) is None:
+        add(blockers, f"{sha_key}_invalid", sha_key)
+    elif sha_text == "0" * 64:
+        add(blockers, f"{sha_key}_placeholder", sha_key)
+    if not status.resolved.is_file():
+        add(blockers, f"{path_key}_file_missing", path_key, resolved=str(status.resolved))
+    elif sha_text and SHA256_RE.fullmatch(sha_text):
+        actual_sha256 = hashlib.sha256(status.resolved.read_bytes()).hexdigest()
+        if actual_sha256 != sha_text:
+            add(blockers, f"{sha_key}_mismatch", sha_key, expected=sha_text, actual=actual_sha256)
+    return "approved_offline_workspace" if status.approved_offline_workspace else "unprotected_offline"
+
+
+def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers: list[dict[str, Any]]) -> None:
+    path_text = fields.get("request_pack_path")
+    if not path_text:
+        return
+    request_path = manifest_relative_path(path_text, manifest_path)
+    status = protected_paths.protected_path_status(
+        request_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if not status.resolved.is_file():
+        return
+    try:
+        payload = json.loads(status.resolved.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        add(blockers, "request_pack_json_invalid", "request_pack_path", detail=str(exc))
+        return
+    if not isinstance(payload, dict):
+        add(blockers, "request_pack_not_object", "request_pack_path")
+        return
+    if payload.get("schema") != "obelisk.player-principal-lifecycle-window-request.v1":
+        add(blockers, "request_pack_schema_mismatch", "request_pack_path")
+    if payload.get("run_id") != fields.get("run_id"):
+        add(blockers, "request_pack_run_id_mismatch", "request_pack_path")
+    target = payload.get("target")
+    if isinstance(target, dict):
+        instance = fields.get("instance") or fields.get("instance_id")
+        map_name = fields.get("map") or fields.get("map_name")
+        if fields.get("target") and "/" in fields["target"]:
+            instance, map_name = fields["target"].split("/", 1)
+        if target.get("instance") != instance:
+            add(blockers, "request_pack_instance_mismatch", "request_pack_path")
+        if target.get("map") != map_name:
+            add(blockers, "request_pack_map_mismatch", "request_pack_path")
+    else:
+        add(blockers, "request_pack_target_missing", "request_pack_path")
+    approved_window = payload.get("approved_window")
+    if isinstance(approved_window, dict):
+        if approved_window.get("start_utc") != fields.get("approved_window_start_utc"):
+            add(blockers, "request_pack_approved_window_start_mismatch", "request_pack_path")
+        if approved_window.get("end_utc") != fields.get("approved_window_end_utc"):
+            add(blockers, "request_pack_approved_window_end_mismatch", "request_pack_path")
+    else:
+        add(blockers, "request_pack_approved_window_missing", "request_pack_path")
+
+
 def validate_user_policy(fields: dict[str, str], blockers: list[dict[str, Any]]) -> str | None:
     has_new = "user_policy" in fields
     has_legacy = "users_policy" in fields
@@ -410,6 +509,37 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
 
     target = validate_target(fields, blockers)
     copied_log_status = validate_copied_log_path(fields, manifest_path, blockers)
+    validate_sidecar_file(
+        fields,
+        manifest_path,
+        blockers,
+        path_key="request_pack_path",
+        sha_key="request_pack_sha256",
+        expected_name="window-request.json",
+    )
+    validate_sidecar_file(
+        fields,
+        manifest_path,
+        blockers,
+        path_key="observer_env_path",
+        sha_key="observer_env_sha256",
+        expected_name="observer-window.env",
+    )
+    validate_sidecar_file(
+        fields,
+        manifest_path,
+        blockers,
+        path_key="preflight_pre_path",
+        sha_key="preflight_pre_sha256",
+    )
+    validate_sidecar_file(
+        fields,
+        manifest_path,
+        blockers,
+        path_key="preflight_post_path",
+        sha_key="preflight_post_sha256",
+    )
+    validate_request_pack(fields, manifest_path, blockers)
     user_policy = validate_user_policy(fields, blockers)
 
     for key in ("pre_posture", "post_posture"):
@@ -506,6 +636,26 @@ def build_template_fields() -> dict[str, str]:
             "20260601T120000Z-player-principal-lifecycle/Obelisk.log"
         ),
         "copied_log_sha256": "0" * 64,
+        "request_pack_path": (
+            "/servidor/ark/workspace-offline/player-principal-preflight/"
+            "20260601T120000Z-player-principal-lifecycle/window-request.json"
+        ),
+        "request_pack_sha256": "0" * 64,
+        "observer_env_path": (
+            "/servidor/ark/workspace-offline/player-principal-preflight/"
+            "20260601T120000Z-player-principal-lifecycle/observer-window.env"
+        ),
+        "observer_env_sha256": "0" * 64,
+        "preflight_pre_path": (
+            "/servidor/ark/workspace-offline/live-validation-logs/"
+            "20260601T120000Z-player-principal-lifecycle/preflight-pre.txt"
+        ),
+        "preflight_pre_sha256": "0" * 64,
+        "preflight_post_path": (
+            "/servidor/ark/workspace-offline/live-validation-logs/"
+            "20260601T120000Z-player-principal-lifecycle/preflight-post.txt"
+        ),
+        "preflight_post_sha256": "0" * 64,
         "pre_posture": "stable",
         "post_posture": "stable",
         "pre_check": "passed",
@@ -592,6 +742,10 @@ def write_template(path: Path, copied_log: Path | None = None) -> None:
 
 def build_report(fields: dict[str, str], validation: Validation, manifest_path: Path) -> dict[str, Any]:
     accepted = not validation.blockers
+    try:
+        manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    except OSError:
+        manifest_sha256 = None
     copied_log_path = fields.get("copied_log_path")
     resolved_copied_log_path = None
     if copied_log_path:
@@ -614,11 +768,32 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "instance": validation.target.instance,
             "map": validation.target.map_name,
         },
-        "manifest": str(manifest_path),
+        "manifest": {
+            "path": str(manifest_path),
+            "sha256": manifest_sha256,
+        },
         "copied_log": {
             "path": resolved_copied_log_path,
             "sha256": fields.get("copied_log_sha256"),
             "path_status": validation.copied_log_status,
+        },
+        "request_pack": {
+            "path": fields.get("request_pack_path"),
+            "sha256": fields.get("request_pack_sha256"),
+        },
+        "observer_env": {
+            "path": fields.get("observer_env_path"),
+            "sha256": fields.get("observer_env_sha256"),
+        },
+        "preflight": {
+            "pre": {
+                "path": fields.get("preflight_pre_path"),
+                "sha256": fields.get("preflight_pre_sha256"),
+            },
+            "post": {
+                "path": fields.get("preflight_post_path"),
+                "sha256": fields.get("preflight_post_sha256"),
+            },
         },
         "posture": {
             "pre_posture": fields.get("pre_posture"),

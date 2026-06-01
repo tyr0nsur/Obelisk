@@ -76,7 +76,11 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
         "run_id",
         "obelisk_commit",
         "target",
+        "manifest",
         "copied_log",
+        "request_pack",
+        "observer_env",
+        "preflight",
         "posture",
         "rollback",
         "claims",
@@ -87,6 +91,8 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
     )
 )
 ALLOWED_OPERATIONAL_WINDOW_COPIED_LOG_KEYS = frozenset(("path", "path_status", "sha256"))
+ALLOWED_OPERATIONAL_WINDOW_ARTIFACT_KEYS = frozenset(("path", "sha256"))
+ALLOWED_OPERATIONAL_WINDOW_PREFLIGHT_KEYS = frozenset(("pre", "post"))
 ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
     (
         "pre_check",
@@ -267,7 +273,12 @@ ALLOWED_FORBIDDEN_LEAF_PATHS = (
     "$.output_artifact_identity.capture_id",
     "$.output_artifact_identity.evidence_pack_id",
     "$.operational_window.run_id",
+    "$.operational_window.manifest.path",
     "$.operational_window.copied_log.path",
+    "$.operational_window.request_pack.path",
+    "$.operational_window.observer_env.path",
+    "$.operational_window.preflight.pre.path",
+    "$.operational_window.preflight.post.path",
     "$.operational_window.posture.observer_exclusivity",
     "$.operational_window.posture.single_module_summary",
     "$.source_summary.evidence.sources[0].path",
@@ -453,6 +464,62 @@ def validate_copied_source_file(source: dict[str, Any], label: str, blockers: li
             "source_summary_source_sha256_mismatch",
             f"{label}.sha256",
             expected=expected_sha256,
+            actual=actual_sha256,
+        )
+
+
+def validate_operational_window_artifact(
+    artifact: Any,
+    label: str,
+    blockers: list[dict[str, Any]],
+    *,
+    run_id: str | None,
+    expected_name: str | None = None,
+) -> None:
+    if not isinstance(artifact, dict):
+        add(blockers, "operational_window_artifact_missing", label)
+        return
+    unexpected_keys = set(artifact) - ALLOWED_OPERATIONAL_WINDOW_ARTIFACT_KEYS
+    if unexpected_keys:
+        add(blockers, "operational_window_artifact_keys_unexpected", label, unexpected=sorted(unexpected_keys))
+    path_text = artifact.get("path")
+    sha256 = artifact.get("sha256")
+    if not isinstance(sha256, str) or SHA256_RE.fullmatch(sha256) is None or sha256 == "0" * 64:
+        add(blockers, "operational_window_artifact_sha256_invalid", f"{label}.sha256")
+    if not isinstance(path_text, str) or not path_text:
+        add(blockers, "operational_window_artifact_path_missing", f"{label}.path")
+        return
+    symlink_component = symlink_component_for_path_text(path_text)
+    if symlink_component is not None:
+        add(
+            blockers,
+            "operational_window_artifact_path_symlink_component",
+            f"{label}.path",
+            symlink=str(symlink_component),
+        )
+    if not source_path_is_copied_or_offline(path_text):
+        add(blockers, "operational_window_artifact_path_not_copied_or_offline", f"{label}.path")
+    elif not source_path_is_approved_offline_workspace(path_text):
+        add(blockers, "operational_window_artifact_path_not_approved_offline_workspace", f"{label}.path")
+    path = Path(path_text).expanduser()
+    if run_id and run_id not in path.parts:
+        add(blockers, "operational_window_artifact_run_id_mismatch", f"{label}.path", run_id=run_id)
+    if expected_name is not None and path.name != expected_name:
+        add(blockers, "operational_window_artifact_filename_mismatch", f"{label}.path", expected=expected_name)
+    try:
+        actual_sha256 = sha256_file(path)
+    except FileNotFoundError:
+        add(blockers, "operational_window_artifact_file_missing", f"{label}.path")
+        return
+    except OSError as exc:
+        add(blockers, "operational_window_artifact_file_unreadable", f"{label}.path", error=str(exc))
+        return
+    if isinstance(sha256, str) and SHA256_RE.fullmatch(sha256) and actual_sha256 != sha256:
+        add(
+            blockers,
+            "operational_window_artifact_sha256_mismatch",
+            f"{label}.sha256",
+            expected=sha256,
             actual=actual_sha256,
         )
 
@@ -878,6 +945,52 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         add(blockers, "operational_window_copied_log_sha256_mismatch", f"{label}.copied_log.sha256")
     if window.get("obelisk_commit") != evidence.get("obelisk_commit"):
         add(blockers, "operational_window_obelisk_commit_mismatch", f"{label}.obelisk_commit")
+    run_id = window.get("run_id") if isinstance(window.get("run_id"), str) else None
+    validate_operational_window_artifact(
+        window.get("manifest"),
+        f"{label}.manifest",
+        blockers,
+        run_id=run_id,
+        expected_name="window-manifest.env",
+    )
+    validate_operational_window_artifact(
+        window.get("request_pack"),
+        f"{label}.request_pack",
+        blockers,
+        run_id=run_id,
+        expected_name="window-request.json",
+    )
+    validate_operational_window_artifact(
+        window.get("observer_env"),
+        f"{label}.observer_env",
+        blockers,
+        run_id=run_id,
+        expected_name="observer-window.env",
+    )
+    preflight = window.get("preflight")
+    if not isinstance(preflight, dict):
+        add(blockers, "operational_window_preflight_missing", f"{label}.preflight")
+    else:
+        unexpected_preflight_keys = set(preflight) - ALLOWED_OPERATIONAL_WINDOW_PREFLIGHT_KEYS
+        if unexpected_preflight_keys:
+            add(
+                blockers,
+                "operational_window_preflight_keys_unexpected",
+                f"{label}.preflight",
+                unexpected=sorted(unexpected_preflight_keys),
+            )
+        validate_operational_window_artifact(
+            preflight.get("pre"),
+            f"{label}.preflight.pre",
+            blockers,
+            run_id=run_id,
+        )
+        validate_operational_window_artifact(
+            preflight.get("post"),
+            f"{label}.preflight.post",
+            blockers,
+            run_id=run_id,
+        )
 
     posture = window.get("posture")
     if not isinstance(posture, dict):

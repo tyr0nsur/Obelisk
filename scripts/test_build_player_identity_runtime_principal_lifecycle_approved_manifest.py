@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import subprocess
 import sys
@@ -20,6 +21,12 @@ WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+
+
+def write_sidecar(path: Path, text: str) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def runtime_log_lines() -> list[str]:
@@ -79,7 +86,51 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
     def write_window_check(self, temp_dir: Path, summary_path: Path) -> Path:
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         source = summary["evidence"]["sources"][0]
-        manifest_path = temp_dir / "window.env"
+        manifest_path = temp_dir / "live-validation-logs" / RUN_ID / "window-manifest.env"
+        sidecar_dir = temp_dir / "player-principal-preflight" / RUN_ID
+        request_pack = sidecar_dir / "window-request.json"
+        observer_env = sidecar_dir / "observer-window.env"
+        preflight_pre = manifest_path.parent / "preflight-pre.txt"
+        preflight_post = manifest_path.parent / "preflight-post.txt"
+        request_pack_sha256 = write_sidecar(
+            request_pack,
+            json.dumps(
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                    "run_id": RUN_ID,
+                    "status": "candidate_only_request_pack",
+                    "obelisk_commit": summary["evidence"]["obelisk_commit"],
+                    "target": {"instance": "arkserver2", "map": "TheIsland"},
+                    "approved_window": {
+                        "start_utc": "2026-06-01T12:00:00Z",
+                        "end_utc": "2026-06-01T12:10:00Z",
+                    },
+                    "observer_env_file": "observer-window.env",
+                },
+                sort_keys=True,
+            )
+            + "\n",
+        )
+        observer_env_sha256 = write_sidecar(
+            observer_env,
+            "\n".join(
+                [
+                    "OBELISK_WRAPPER_PROFILE=observer-debug",
+                    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+                ]
+            )
+            + "\n",
+        )
+        preflight_pre_sha256 = write_sidecar(
+            preflight_pre,
+            "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+        )
+        preflight_post_sha256 = write_sidecar(
+            preflight_post,
+            "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+        )
         manifest_path.write_text(
             "\n".join(
                 [
@@ -93,6 +144,14 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     "actual_capture_end_utc=2026-06-01T12:09:00Z",
                     f"copied_log_path={source['path']}",
                     f"copied_log_sha256={source['sha256']}",
+                    f"request_pack_path={request_pack}",
+                    f"request_pack_sha256={request_pack_sha256}",
+                    f"observer_env_path={observer_env}",
+                    f"observer_env_sha256={observer_env_sha256}",
+                    f"preflight_pre_path={preflight_pre}",
+                    f"preflight_pre_sha256={preflight_pre_sha256}",
+                    f"preflight_post_path={preflight_post}",
+                    f"preflight_post_sha256={preflight_post_sha256}",
                     "pre_posture=stable",
                     "post_posture=stable",
                     "pre_check=passed",

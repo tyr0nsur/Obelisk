@@ -61,6 +61,12 @@ def copied_log_path(root: Path) -> Path:
     return root / "live-validation-logs" / RUN_ID / "Obelisk.log"
 
 
+def write_sidecar(path: Path, text: str) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def temp_offline_workspace(self) -> tempfile.TemporaryDirectory[str]:
         if not OFFLINE_WORKSPACE.is_dir():
@@ -68,11 +74,55 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
 
     def write_window_manifest(self, temp_dir: Path, copied_log: Path) -> Path:
-        manifest = temp_dir / "window.env"
+        manifest = temp_dir / "live-validation-logs" / RUN_ID / "window-manifest.env"
         copied_log_sha256 = (
             hashlib.sha256(copied_log.read_bytes()).hexdigest()
             if copied_log.is_file()
             else "0000000000000000000000000000000000000000000000000000000000000000"
+        )
+        sidecar_dir = temp_dir / "player-principal-preflight" / RUN_ID
+        request_pack = sidecar_dir / "window-request.json"
+        observer_env = sidecar_dir / "observer-window.env"
+        preflight_pre = manifest.parent / "preflight-pre.txt"
+        preflight_post = manifest.parent / "preflight-post.txt"
+        request_pack_sha256 = write_sidecar(
+            request_pack,
+            json.dumps(
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                    "run_id": RUN_ID,
+                    "status": "candidate_only_request_pack",
+                    "obelisk_commit": "test-commit",
+                    "target": {"instance": "arkserver2", "map": "TheIsland"},
+                    "approved_window": {
+                        "start_utc": "2026-06-01T12:00:00Z",
+                        "end_utc": "2026-06-01T12:10:00Z",
+                    },
+                    "observer_env_file": "observer-window.env",
+                },
+                sort_keys=True,
+            )
+            + "\n",
+        )
+        observer_env_sha256 = write_sidecar(
+            observer_env,
+            "\n".join(
+                [
+                    "OBELISK_WRAPPER_PROFILE=observer-debug",
+                    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+                ]
+            )
+            + "\n",
+        )
+        preflight_pre_sha256 = write_sidecar(
+            preflight_pre,
+            "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+        )
+        preflight_post_sha256 = write_sidecar(
+            preflight_post,
+            "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
         )
         manifest.write_text(
             "\n".join(
@@ -87,6 +137,14 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "actual_capture_end_utc=2026-06-01T12:09:00Z",
                     f"copied_log_path={copied_log}",
                     f"copied_log_sha256={copied_log_sha256}",
+                    f"request_pack_path={request_pack}",
+                    f"request_pack_sha256={request_pack_sha256}",
+                    f"observer_env_path={observer_env}",
+                    f"observer_env_sha256={observer_env_sha256}",
+                    f"preflight_pre_path={preflight_pre}",
+                    f"preflight_pre_sha256={preflight_pre_sha256}",
+                    f"preflight_post_path={preflight_post}",
+                    f"preflight_post_sha256={preflight_post_sha256}",
                     "pre_posture=stable",
                     "post_posture=stable",
                     "pre_check=passed",
@@ -126,7 +184,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         manifest.write_text(
             manifest.read_text(encoding="utf-8").replace(
                 f"copied_log_path={copied_log}",
-                f"copied_log_path={copied_log.relative_to(temp_dir)}",
+                f"copied_log_path={copied_log.relative_to(manifest.parent)}",
             ),
             encoding="utf-8",
         )

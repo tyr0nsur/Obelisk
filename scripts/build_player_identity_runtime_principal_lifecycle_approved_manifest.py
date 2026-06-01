@@ -245,6 +245,12 @@ def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> No
     copied = window.get("copied_log")
     if not isinstance(copied, dict):
         raise SystemExit("--window-manifest-check must include copied_log object")
+    manifest = window.get("manifest")
+    if not isinstance(manifest, dict) or not manifest.get("path") or not manifest.get("sha256"):
+        raise SystemExit("--window-manifest-check must include manifest path and sha256")
+    for key in ("request_pack", "observer_env", "preflight"):
+        if not isinstance(window.get(key), dict):
+            raise SystemExit(f"--window-manifest-check must include {key} object")
     if copied.get("path_status") != EXPECTED_COPIED_LOG_PATH_STATUS:
         raise SystemExit("--window-manifest-check copied_log.path_status must be approved_offline_workspace")
     if not path_is_approved_offline_workspace(copied.get("path")):
@@ -295,7 +301,11 @@ def build_manifest(
             "run_id": window.get("run_id"),
             "obelisk_commit": window.get("obelisk_commit"),
             "target": window.get("target"),
+            "manifest": window.get("manifest"),
             "copied_log": window.get("copied_log"),
+            "request_pack": window.get("request_pack"),
+            "observer_env": window.get("observer_env"),
+            "preflight": window.get("preflight"),
             "posture": window.get("posture"),
             "rollback": window.get("rollback"),
             "claims": window.get("claims"),

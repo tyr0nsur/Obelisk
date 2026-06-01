@@ -32,6 +32,14 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "actual_capture_end_utc": "2026-06-01T12:09:00Z",
         "copied_log_path": f"live-validation-logs/{RUN_ID}/Obelisk.log",
         "copied_log_sha256": GOOD_SHA,
+        "request_pack_path": f"sidecars/{RUN_ID}/window-request.json",
+        "request_pack_sha256": "0" * 64,
+        "observer_env_path": f"sidecars/{RUN_ID}/observer-window.env",
+        "observer_env_sha256": "0" * 64,
+        "preflight_pre_path": f"sidecars/{RUN_ID}/preflight-pre.txt",
+        "preflight_pre_sha256": "0" * 64,
+        "preflight_post_path": f"sidecars/{RUN_ID}/preflight-post.txt",
+        "preflight_post_sha256": "0" * 64,
         "pre_posture": "stable",
         "post_posture": "stable",
         "pre_check": "passed",
@@ -68,6 +76,109 @@ def manifest_lines(**overrides: str | None) -> list[str]:
     return [f"{key}={value}" for key, value in fields.items()]
 
 
+def request_pack_payload(fields: dict[str, str]) -> dict:
+    target = fields.get("target", "arkserver2/TheIsland").split("/", 1)
+    return {
+        "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+        "status": "candidate_only_request_pack",
+        "approval_required": "current-turn operator-approved runtime window, not standing approval",
+        "target": {"instance": target[0], "map": target[1]},
+        "run_id": fields["run_id"],
+        "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+        "obelisk_commit": fields.get("obelisk_commit", "missing-obelisk-commit"),
+        "approved_window": {
+            "start_utc": fields["approved_window_start_utc"],
+            "end_utc": fields["approved_window_end_utc"],
+        },
+        "restart_expectation": "restart",
+        "final_posture": "stable",
+        "user_policy": fields.get("user_policy", "no_regular_users"),
+        "notice_path": "not_applicable",
+        "copied_evidence_dir": f"/servidor/ark/workspace-offline/live-validation-logs/{fields['run_id']}",
+        "copied_log_path": f"/servidor/ark/workspace-offline/live-validation-logs/{fields['run_id']}/Obelisk.log",
+        "window_manifest_path": f"/servidor/ark/workspace-offline/live-validation-logs/{fields['run_id']}/window-manifest.env",
+        "observer_env_file": "observer-window.env",
+        "marker_set": [
+            "enable-process-event-hook",
+            "disable-plugins",
+            "allow-observer-debug-window",
+            "allow-experimental-observers",
+            "enable-player-principal-lifecycle-observer",
+        ],
+        "forbidden_markers": [
+            "allow-ptrace",
+            "enable-debug-control",
+            "enable-reflection-scanner",
+            "enable-native-exec-probes",
+            "allow-global-process-event-callbacks",
+            "allow-filtered-process-event-callbacks",
+            "allow-call-process-event",
+            "allow-process-event-blocking",
+            "request-static-fname-probe",
+            "enable-chat-events",
+            "enable-chat-reflection",
+            "enable-chat-route-observer",
+            "enable-inventory-reflection",
+            "enable-structure-reflection",
+            "enable-item-return-events",
+        ],
+        "rollback": {
+            "owner": "operator",
+            "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+        },
+        "non_claims": [
+            "does not authorize server operations",
+            "does not authorize marker/env changes",
+            "does not authorize starts, restarts, or stops",
+            "does not authorize Discord/community notices",
+            "does not promote public player identity",
+            "does not claim stable principal identity",
+            "does not promote permissions/admin",
+            "does not promote command/chat response or commands/replies",
+            "does not authorize lookup, persistence, mutation, return override, plugin delivery, runtime readiness, public SDK readiness, or v1 SDK completion",
+        ],
+    }
+
+
+def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
+    contents = {
+        "request_pack": json.dumps(request_pack_payload(fields), sort_keys=True) + "\n",
+        "observer_env": "\n".join(
+            [
+                "OBELISK_INSTANCE_ID=arkserver2",
+                "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
+                "OBELISK_DISABLE_PLUGINS=1",
+                "OBELISK_WRAPPER_PROFILE=observer-debug",
+                "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+                "OBELISK_PE_TRACE_LIMIT=0",
+            ]
+        )
+        + "\n",
+        "preflight_pre": "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+        "preflight_post": "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+    }
+    key_map = {
+        "request_pack": ("request_pack_path", "request_pack_sha256"),
+        "observer_env": ("observer_env_path", "observer_env_sha256"),
+        "preflight_pre": ("preflight_pre_path", "preflight_pre_sha256"),
+        "preflight_post": ("preflight_post_path", "preflight_post_sha256"),
+    }
+    updated = dict(fields)
+    for content_key, (path_key, sha_key) in key_map.items():
+        if path_key not in updated:
+            continue
+        path = Path(updated[path_key])
+        if not path.is_absolute():
+            path = base / path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents[content_key], encoding="utf-8")
+        updated[sha_key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return updated
+
+
 class WindowManifestCheckerTests(unittest.TestCase):
     def run_checker(
         self,
@@ -79,8 +190,9 @@ class WindowManifestCheckerTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "window-manifest.env"
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
             fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            fields = write_sidecars(path.parent, fields)
+            path.write_text("\n".join(f"{key}={value}" for key, value in fields.items()) + "\n", encoding="utf-8")
             copied_log = fields.get("copied_log_path")
             if create_copied_log and copied_log:
                 copied_log_path = Path(copied_log)
@@ -119,8 +231,9 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 rewritten_lines.append(line)
         try:
             path = exact_manifest
-            path.write_text("\n".join(rewritten_lines) + "\n", encoding="utf-8")
             fields = dict(line.split("=", 1) for line in rewritten_lines if "=" in line)
+            fields = write_sidecars(path.parent, fields)
+            path.write_text("\n".join(f"{key}={value}" for key, value in fields.items()) + "\n", encoding="utf-8")
             copied_log = fields.get("copied_log_path")
             if create_copied_log and copied_log:
                 copied_log_path = Path(copied_log)

@@ -96,6 +96,51 @@ def runtime_log_lines() -> list[str]:
     ]
 
 
+def write_sidecar(path: Path, text: str) -> dict[str, str]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def operational_sidecars(copied_log: Path) -> dict[str, dict]:
+    workspace = copied_log.parents[2]
+    live_dir = copied_log.parent
+    sidecar_dir = workspace / "player-principal-preflight" / RUN_ID
+    return {
+        "manifest": write_sidecar(live_dir / "window-manifest.env", f"run_id={RUN_ID}\n"),
+        "request_pack": write_sidecar(
+            sidecar_dir / "window-request.json",
+            json.dumps(
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                    "run_id": RUN_ID,
+                    "target": {"instance": "arkserver2", "map": "TheIsland"},
+                    "approved_window": {
+                        "start_utc": "2026-06-01T12:00:00Z",
+                        "end_utc": "2026-06-01T12:10:00Z",
+                    },
+                },
+                sort_keys=True,
+            )
+            + "\n",
+        ),
+        "observer_env": write_sidecar(
+            sidecar_dir / "observer-window.env",
+            "OBELISK_WRAPPER_PROFILE=observer-debug\n",
+        ),
+        "preflight": {
+            "pre": write_sidecar(
+                live_dir / "preflight-pre.txt",
+                "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+            ),
+            "post": write_sidecar(
+                live_dir / "preflight-post.txt",
+                "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+            ),
+        },
+    }
+
+
 def analyzer_summary() -> dict:
     temp_dir = temp_offline_workspace()
     LIVE_TEMP_DIRS.append(temp_dir)
@@ -115,6 +160,7 @@ def analyzer_summary() -> dict:
 def manifest() -> dict:
     summary = analyzer_summary()
     source = summary["evidence"]["sources"][0]
+    sidecars = operational_sidecars(Path(source["path"]))
     return add_output_artifact_identity({
         "schema": APPROVED_SCHEMA,
         "artifact_status": "approved_runtime_observer_summary",
@@ -138,6 +184,7 @@ def manifest() -> dict:
             "run_id": RUN_ID,
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
             "target": {"instance": "arkserver2", "map": "TheIsland"},
+            **sidecars,
             "copied_log": {"path": source["path"], "path_status": "approved_offline_workspace", "sha256": source["sha256"]},
             "posture": {
                 "pre_check": "passed",
@@ -232,6 +279,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
         ],
         "server_paths_allowed": False,
     }
+    sidecars = operational_sidecars(copied_log)
     return add_output_artifact_identity({
         "schema": APPROVED_SCHEMA,
         "artifact_status": "approved_runtime_observer_summary",
@@ -255,6 +303,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             "run_id": RUN_ID,
             "obelisk_commit": "test-commit",
             "target": {"instance": "arkserver2", "map": "TheIsland"},
+            **sidecars,
             "copied_log": {"path": str(copied_log), "path_status": "approved_offline_workspace", "sha256": source_sha256},
             "posture": {
                 "pre_check": "passed",
