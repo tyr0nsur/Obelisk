@@ -7,12 +7,14 @@
   "public_header_symbols_now": [],
   "legacy_call_process_event_public_response_allowed": false,
   "minimal_chat_message_event_public_response_allowed": false,
+  "generic_chat_routing_public_response_allowed": false,
   "raw_process_event_public_response_allowed": false,
   "static_thunk_orientation_public_response_allowed": false,
   "commands_replies_shortcut_public_response_allowed": false,
   "forbidden_public_contract": [
     "public CallProcessEvent response path",
     "public minimal ChatMessageEvent response path",
+    "public generic chat routing response path",
     "public raw ProcessEvent response path",
     "public static thunk orientation response path",
     "public commands/replies response shortcut before promoted identity and permissions/admin",
@@ -98,6 +100,7 @@
         "missing or zero plugin_owner_token fails closed",
         "captured post-init debug CallProcessEvent tables do not authorize response delivery",
         "minimal ChatMessageEvent registration does not authorize response delivery",
+        "generic chat routing does not authorize response delivery",
         "raw ProcessEvent callbacks do not authorize response delivery",
         "static thunk orientation does not authorize response delivery",
         "all response handles are owner-scoped"
@@ -160,6 +163,7 @@
         "promoted query-only permissions/admin is required before directed responses",
         "copied command/chat response semantics may be defined only after identity and permissions/admin promotion",
         "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+        "generic chat routing cannot bypass promoted identity and permissions/admin",
         "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
         "commands/replies remains blocked until command_chat_response_path is promoted or explicitly excluded"
       ],
@@ -168,6 +172,7 @@
         "command registration API",
         "commands/replies shortcut before identity and permissions/admin",
         "public response path through ChatMessageEvent",
+        "public response path through generic chat routing",
         "public response path through raw ProcessEvent",
         "public response path through static thunk orientation",
         "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
@@ -197,6 +202,7 @@
         "candidate vtable slots",
         "minimal ChatMessageEvent callback registration",
         "passive ChatMessageEvent parsing",
+        "generic chat routing",
         "commands/replies planning status",
         "legacy CallProcessEvent debug gate",
         "raw ProcessEvent callbacks"

@@ -1042,10 +1042,10 @@
           "raw ProcessEvent callbacks"
         ],
         "promotion_requires": [
-          "promoted player identity/principal semantics",
+          "promoted copied player identity/principal semantics, including principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle",
           "query-only fail-closed permission checks over copied principals",
           "permission queries include principal_generation and principal_scope_flags or are formally callback-local only",
-          "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+          "stale principal, scope mismatch, missing generation, missing owner token, zero owner token, unknown owner token, unloading owner token, unknown authority source, and missing policy provenance fail closed",
           "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance; allow without provenance is forbidden",
           "authority source, abuse controls, audit, and privacy boundaries",
           "no public permission cache ABI until policy_epoch, generation, and scope keying semantics are separately promoted",
@@ -1143,7 +1143,7 @@
         "docs": [
           "docs/research/2026-06-01-object-identity-resource-handle-v1-blocker.md"
         ],
-        "current_public_slice": "copied/redacted scalar callback data and metadata descriptors only; no object identity, lookup, ResourceHandle, or post-callback object correlation"
+        "current_public_slice": "copied/redacted scalar callback data and category-only metadata descriptors only; copied events, resource_kind metadata, raw UObject pointers, lookup, persistence, or mutation must not imply object identity, lookup, ResourceHandle, or post-callback object correlation"
       },
       "v1_decision_contract": {
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
@@ -1168,6 +1168,7 @@
         "No callback-scope versus post-callback validity rule.",
         "No promoted UObject flag semantics for safe public handle validity.",
         "No owner-token scoped lookup, cleanup, privacy, or redaction policy.",
+        "No dedicated tested checker enforcing that copied events, category-only resource_kind metadata, raw UObject pointers, lookup paths, persistence, and mutation surfaces cannot imply ResourceHandle or post-callback object identity.",
         "No append-only public POD C ABI, capability policy, ABI layout tests, or installed-SDK consumer coverage."
       ],
       "audit_units": [

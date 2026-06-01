@@ -91,6 +91,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md)
 - [2026-05-31-v1-sdk-round-identity-static-demand-audit.md](2026-05-31-v1-sdk-round-identity-static-demand-audit.md)
 - [2026-06-01-v1-sdk-demand-chain-from-aseapi-nextgen.md](2026-06-01-v1-sdk-demand-chain-from-aseapi-nextgen.md)
+- [2026-06-01-aseapi-name-demand-map.md](2026-06-01-aseapi-name-demand-map.md)
 - [2026-05-31-aggregate-census-product-priority.md](2026-05-31-aggregate-census-product-priority.md)
 - [2026-05-29-next-targetset-discovery.md](2026-05-29-next-targetset-discovery.md)
 - [2026-05-31-batch-snapshot-planner-design.md](2026-05-31-batch-snapshot-planner-design.md)
@@ -278,6 +279,7 @@ when a task explicitly targets that module.
 | [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md) | v1 core capability map | Defines the post-RC route toward a general Linux ARK modding core and separates v1 infrastructure from later ArkApi-style module/plugin work. |
 | [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md) | AseApi reference scan | Allows ArkServerApi/AseApi as names/demand evidence only while banning copied architecture, ergonomics, behavior, offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns. |
 | [2026-05-30-nextgenplugins-reference-inventory.md](2026-05-30-nextgenplugins-reference-inventory.md) | NextGenPlugins reference inventory | Records the local ArkApi plugin-source clone as a future Plugin Hub demand signal only, not as runtime evidence or portable implementation source. |
+| [2026-06-01-aseapi-name-demand-map.md](2026-06-01-aseapi-name-demand-map.md) | AseApi/NextGen name demand map | Maps high-demand dictionary-only plugin capability families to candidate Obelisk surfaces and likely UE4 names without promoting SDK, runtime, mutation, or Plugin Hub work. |
 | [2026-05-30-post-rc-targetset-priorities.md](2026-05-30-post-rc-targetset-priorities.md) | Post-RC target-set priorities | Ranks Mission, Dino, Buff, Structure build-policy, Tribe, and Transfer follow-up work for offline/internal research without promoting new SDK surfaces. |
 | [2026-05-30-chat-command-helper-roadmap.md](2026-05-30-chat-command-helper-roadmap.md) | Chat command helper roadmap | Defines a plugin-local, non-ABI helper pattern over `ChatMessageEvent` with `principal=unknown`, global config-only enablement, and no player permissions or chat response path. |
 | [2026-05-31-chat-command-readiness.md](2026-05-31-chat-command-readiness.md) | Chat command readiness audit | Confirms copied chat is enough for repo-local plugin command parsing tests only, with docs/tests as the next hardening step and no public command SDK, identity, replies, moderation, mutation, or live-test approval. |

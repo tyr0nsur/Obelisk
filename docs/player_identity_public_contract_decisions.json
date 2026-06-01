@@ -124,6 +124,7 @@
       "no tribe ids",
       "no network addresses",
       "no lookup handle",
+      "principal handles are process-local and non-persistent",
       "no mutation or return override authority"
     ],
     "candidate_event_payload_fields_or_equivalent": [
@@ -152,6 +153,7 @@
       "nonzero plugin_owner_token required",
       "event-kind mask required",
       "opaque uint64 registration handle returned on success",
+      "registration handles are process-local and non-persistent",
       "owner-token unregister required",
       "plugin init failure removes registrations",
       "plugin unload removes registrations and drains in-flight callbacks",
@@ -448,6 +450,7 @@
         "nonzero plugin_owner_token required",
         "registration returns an opaque process-local handle",
         "unregister requires the same owner token",
+        "registration handles are not persisted or shared across server processes",
         "init failure and plugin unload remove all owner registrations",
         "cleanup waits for in-flight callbacks except when policy explicitly permits same-callback self-unregister"
       ]

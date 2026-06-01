@@ -224,6 +224,7 @@ REQUIRED_OWNER_TOKEN_BEHAVIOR = {
     "nonzero plugin_owner_token required",
     "registration returns an opaque process-local handle",
     "unregister requires the same owner token",
+    "registration handles are not persisted or shared across server processes",
     "init failure and plugin unload remove all owner registrations",
     "cleanup waits for in-flight callbacks except when policy explicitly permits same-callback self-unregister",
 }
@@ -287,12 +288,14 @@ REQUIRED_CANDIDATE_PAYLOAD_PROPERTIES = {
     "no tribe ids",
     "no network addresses",
     "no lookup handle",
+    "principal handles are process-local and non-persistent",
     "no mutation or return override authority",
 }
 REQUIRED_CANDIDATE_OWNER_TOKEN_REQUIREMENTS = {
     "nonzero plugin_owner_token required",
     "event-kind mask required",
     "opaque uint64 registration handle returned on success",
+    "registration handles are process-local and non-persistent",
     "owner-token unregister required",
     "plugin init failure removes registrations",
     "plugin unload removes registrations and drains in-flight callbacks",
@@ -316,6 +319,10 @@ FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
     "ip": re.compile(r"\bIP\b|ip[_\s-]*address(?:es)?|network[_\s-]*address(?:es)?", re.IGNORECASE),
     "fname_gobjects": re.compile(r"FName|GObjects", re.IGNORECASE),
     "resource_handle": re.compile(r"ResourceHandle|resource[_\s-]*handle", re.IGNORECASE),
+    "persistent": re.compile(r"persist(?:ent|ed|ence)?", re.IGNORECASE),
+    "cluster": re.compile(r"cluster", re.IGNORECASE),
+    "cross_process": re.compile(r"cross[_\s-]*process", re.IGNORECASE),
+    "cross_map": re.compile(r"cross[_\s-]*map", re.IGNORECASE),
 }
 PUBLIC_CLAIM_KEYS = ("public_header_allowed", "promotion_ready", "public_sdk_ready", "runtime_ready")
 PUBLIC_HEADER_IDENTITY_IDENTIFIER_RE = re.compile(

@@ -187,7 +187,7 @@ storage/persistence, and operator ingress remain excluded unless a future promot
 explicitly says otherwise. The pre-ABI decision checklist for this future surface is
 [`permissions_admin_public_contract_decisions.json`](permissions_admin_public_contract_decisions.json).
 groups, grants, admin actions, and mutation authority remain excluded from the
-permissions/admin candidate unless a future promotion gate explicitly says otherwise.
+permissions/admin candidate.
 
 The command/chat response path is a named planning dependency only, not a promoted
 surface. Until it is separately promoted, Obelisk v1 exposes no public `CallProcessEvent`
@@ -239,12 +239,10 @@ identity-like fields and treats `ServerKickPlayer` fields as
 admin-mutation-not-public-identity. It still fails closed until approved runtime principal
 lifecycle evidence, accepted lifecycle ordering, principal privacy/invalidation semantics,
 and cross-instance scope behavior exist. An offline `ShooterGameServer` binary, copied
-core, manual FName/GObjects roots, direct core/bin planning, candidate fixtures, or
-second-source layout acceptance alone is insufficient and must not be described as public
-SDK, runtime-readiness, or promotion evidence. direct core/bin planning alone is
-insufficient. An offline `ShooterGameServer` binary, copied core, manual FName/GObjects
-roots, or direct core/bin planning alone is insufficient. Future promotion also needs
-accepted lifecycle anchors and independent second-source evidence.
+core, manual FName/GObjects roots, or direct core/bin planning alone is insufficient.
+Candidate fixtures or second-source layout acceptance alone are also insufficient and
+must not be described as public SDK, runtime-readiness, or promotion evidence. Future
+promotion also needs accepted lifecycle anchors and independent second-source evidence.
 The future `obelisk.players-identity-principal-invalidation-policy.v1` artifact is a
 candidate-only policy input; it does not promote player identity/principal,
 permissions/admin, command response paths, commands/replies, runtime readiness, or v1 SDK

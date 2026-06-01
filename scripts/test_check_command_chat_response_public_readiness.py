@@ -147,6 +147,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             {"id": "abi.capability_and_owner_token", "status": "unresolved", "required_behavior": [
                 "captured post-init debug CallProcessEvent tables do not authorize response delivery",
                 "minimal ChatMessageEvent registration does not authorize response delivery",
+                "generic chat routing does not authorize response delivery",
                 "raw ProcessEvent callbacks do not authorize response delivery",
                 "static thunk orientation does not authorize response delivery",
             ]},
@@ -164,12 +165,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "command registration API",
                 "commands/replies shortcut before identity and permissions/admin",
                 "public response path through ChatMessageEvent",
+                "public response path through generic chat routing",
                 "public response path through raw ProcessEvent",
                 "public response path through static thunk orientation",
                 "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
                 "moderation API",
             ], "v1_sequence_gate": [
                 "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+                "generic chat routing cannot bypass promoted identity and permissions/admin",
                 "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
             ]},
             {
@@ -180,6 +183,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                     "candidate vtable slots",
                     "minimal ChatMessageEvent callback registration",
                     "passive ChatMessageEvent parsing",
+                    "generic chat routing",
                     "commands/replies planning status",
                     "legacy CallProcessEvent debug gate",
                     "raw ProcessEvent callbacks",
@@ -187,6 +191,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             },
             {"id": "evidence.response_target_set_snapshot_second_source", "status": "unresolved", "required_targets": TARGETS, "not_sufficient": [
                 "minimal ChatMessageEvent callback registration",
+                "generic chat routing",
                 "raw ProcessEvent callbacks",
                 "legacy CallProcessEvent debug gate",
             ]},
@@ -200,12 +205,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "public_header_symbols_now": [],
             "legacy_call_process_event_public_response_allowed": False,
             "minimal_chat_message_event_public_response_allowed": False,
+            "generic_chat_routing_public_response_allowed": False,
             "raw_process_event_public_response_allowed": False,
             "static_thunk_orientation_public_response_allowed": False,
             "commands_replies_shortcut_public_response_allowed": False,
             "forbidden_public_contract": [
                 "public CallProcessEvent response path",
                 "public minimal ChatMessageEvent response path",
+                "public generic chat routing response path",
                 "public raw ProcessEvent response path",
                 "public static thunk orientation response path",
                 "public commands/replies response shortcut before promoted identity and permissions/admin",
@@ -270,6 +277,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         readiness["promotion_gate"]["ready"] = True
         readiness["target_set_guidance"][0]["reply_api"] = True
         readiness["claim"] = "reply API is public and ready"
+        readiness["generic_chat_claim"] = "generic chat routing is public and ready"
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), readiness=readiness)
             result = self.run_checker(
@@ -323,7 +331,9 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             readiness_path, decisions_path, public_header_path = self.write_inputs(root)
             public_header_path.write_text(
                 "typedef struct ObeliskCommandChatResponse ObeliskCommandChatResponse;\n"
+                "typedef struct ObeliskChatRouter ObeliskChatRouter;\n"
                 "void RegisterCommandChatResponse(void);\n"
+                "void RegisterChatRouter(void);\n"
                 "#define OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH 0x80000000u\n",
                 encoding="utf-8",
             )
@@ -342,13 +352,17 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertIn("public_header_forbidden_symbols_present", report["blockers"])
         detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
         self.assertIn("ObeliskCommandChatResponse", detail["symbols"])
+        self.assertIn("ObeliskChatRouter", detail["symbols"])
         self.assertIn("RegisterCommandChatResponse", detail["symbols"])
+        self.assertIn("RegisterChatRouter", detail["symbols"])
         self.assertIn("OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH", detail["symbols"])
 
     def test_rejects_explicit_surface_claim_fields(self) -> None:
         for field in (
             "send_chat_api",
             "command_router",
+            "chat_routing",
+            "generic_chat_routing_public_response_allowed",
             "player_identity_ready",
             "permissions_ready",
             "public_header_ready",
@@ -482,8 +496,53 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         )
         self.assertIn("passive ChatMessageEvent parsing", detail["missing"])
         self.assertIn("minimal ChatMessageEvent callback registration", detail["missing"])
+        self.assertIn("generic chat routing", detail["missing"])
         self.assertIn("static thunk orientation", detail["missing"])
         self.assertIn("legacy CallProcessEvent debug gate", detail["missing"])
+
+    def test_rejects_missing_generic_chat_routing_separation(self) -> None:
+        decisions = self.make_decisions()
+        decisions["generic_chat_routing_public_response_allowed"] = True
+        decisions["forbidden_public_contract"] = [
+            item for item in decisions["forbidden_public_contract"] if item != "public generic chat routing response path"
+        ]
+        capability = next(
+            item for item in decisions["required_before_public_header"] if item["id"] == "abi.capability_and_owner_token"
+        )
+        capability["required_behavior"] = [
+            item for item in capability["required_behavior"] if item != "generic chat routing does not authorize response delivery"
+        ]
+        separation = next(
+            item for item in decisions["required_before_public_header"] if item["id"] == "separation.no_commands_router_or_moderation"
+        )
+        separation["v1_sequence_gate"] = [
+            item for item in separation["v1_sequence_gate"] if item != "generic chat routing cannot bypass promoted identity and permissions/admin"
+        ]
+        separation["required_exclusions"] = [
+            item for item in separation["required_exclusions"] if item != "public response path through generic chat routing"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(
+                Path(temp_dir),
+                decisions=decisions,
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("generic_chat_routing_public_response_allowed_not_false", report["blockers"])
+        self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+        self.assertIn("capability_behavior_missing", report["blockers"])
+        self.assertIn("separation_sequence_gate_missing", report["blockers"])
+        self.assertIn("separation_exclusion_missing", report["blockers"])
 
     def test_rejects_missing_call_process_event_and_native_wrapper_forbidden_contracts(self) -> None:
         decisions = self.make_decisions()

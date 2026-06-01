@@ -58,6 +58,7 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
     (
         "public CallProcessEvent response path",
         "public minimal ChatMessageEvent response path",
+        "public generic chat routing response path",
         "public raw ProcessEvent response path",
         "public static thunk orientation response path",
         "public commands/replies response shortcut before promoted identity and permissions/admin",
@@ -112,6 +113,7 @@ REQUIRED_LAYOUT_RUNTIME_SDK_NOT_SUFFICIENT = frozenset(
         "candidate vtable slots",
         "minimal ChatMessageEvent callback registration",
         "passive ChatMessageEvent parsing",
+        "generic chat routing",
         "commands/replies planning status",
         "legacy CallProcessEvent debug gate",
         "raw ProcessEvent callbacks",
@@ -123,6 +125,8 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "OBELISK_API_CAPABILITY_COMMAND_RESPONSE",
         "OBELISK_API_CAPABILITY_CHAT_RESPONSE",
         "OBELISK_API_CAPABILITY_CHAT_REPLIES",
+        "OBELISK_API_CAPABILITY_CHAT_ROUTING",
+        "OBELISK_API_CAPABILITY_CHAT_LOCAL_ROUTING",
         "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
         "OBELISK_API_CAPABILITY_SEND_CHAT",
         "OBELISK_API_CAPABILITY_BROADCAST",
@@ -136,12 +140,16 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "ObeliskChatResponse",
         "ObeliskCommandReply",
         "ObeliskChatReply",
+        "ObeliskChatRoute",
+        "ObeliskChatRouter",
         "ObeliskSendChat",
         "ObeliskBroadcast",
         "ObeliskNotice",
         "RegisterCommandChatResponse",
         "RegisterCommandResponse",
         "RegisterChatResponse",
+        "RegisterChatRoute",
+        "RegisterChatRouter",
         "RegisterCommandReply",
         "UnregisterCommandChatResponse",
         "UnregisterCommandResponse",
@@ -149,6 +157,8 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
         "UnregisterCommandReply",
         "ReplyToCommand",
         "ReplyToCommandWithOwnerToken",
+        "RouteChat",
+        "RouteChatWithOwnerToken",
         "SendChat",
         "SendChatWithOwnerToken",
         "BroadcastChat",
@@ -162,6 +172,10 @@ REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
 FALSE_ONLY_KEYS = frozenset(
     (
         "command_router",
+        "chat_router",
+        "chat_routing",
+        "generic_chat_router",
+        "generic_chat_routing",
         "identity_ready",
         "permission_admin_contract",
         "permission_ready",
@@ -172,11 +186,14 @@ FALSE_ONLY_KEYS = frozenset(
         "principal_identity_ready",
         "promotion_ready",
         "public_abi_ready",
+        "public_chat_router",
+        "public_chat_routing",
         "public_command_router",
         "public_header_allowed",
         "public_header_ready",
         "public_headers_ready",
         "public_reply_api",
+        "generic_chat_routing_public_response_allowed",
         "minimal_chat_message_event_public_response_allowed",
         "raw_process_event_public_response_allowed",
         "static_thunk_orientation_public_response_allowed",
@@ -208,7 +225,7 @@ POSITIVE_SURFACE_RE = re.compile(
     r"\b("
     r"public\s+headers?|"
     r"reply\s+api|replies\s+api|send[- ]?chat\s+api|"
-    r"command\s+router|"
+    r"command\s+router|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
     r")\b.{0,80}\b(allowed|available|enabled|established|promoted|public|ready)\b",
     re.IGNORECASE,
@@ -467,6 +484,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     require_false(payload, "public_header_allowed", "$.decisions", blockers)
     require_false(payload, "legacy_call_process_event_public_response_allowed", "$.decisions", blockers)
     require_false(payload, "minimal_chat_message_event_public_response_allowed", "$.decisions", blockers)
+    require_false(payload, "generic_chat_routing_public_response_allowed", "$.decisions", blockers)
     require_false(payload, "raw_process_event_public_response_allowed", "$.decisions", blockers)
     require_false(payload, "static_thunk_orientation_public_response_allowed", "$.decisions", blockers)
     require_false(payload, "commands_replies_shortcut_public_response_allowed", "$.decisions", blockers)
@@ -534,6 +552,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     for required in (
         "captured post-init debug CallProcessEvent tables do not authorize response delivery",
         "minimal ChatMessageEvent registration does not authorize response delivery",
+        "generic chat routing does not authorize response delivery",
         "raw ProcessEvent callbacks do not authorize response delivery",
         "static thunk orientation does not authorize response delivery",
     ):
@@ -544,6 +563,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     sequence_gate = string_set(separation.get("v1_sequence_gate"))
     for required in (
         "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+        "generic chat routing cannot bypass promoted identity and permissions/admin",
         "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
     ):
         if required not in sequence_gate:
@@ -554,6 +574,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "command registration API",
         "commands/replies shortcut before identity and permissions/admin",
         "public response path through ChatMessageEvent",
+        "public response path through generic chat routing",
         "public response path through raw ProcessEvent",
         "public response path through static thunk orientation",
         "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",

@@ -250,7 +250,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         )
         self.assertEqual(detail["missing"], ["principal_generation", "reserved"])
 
-    def test_rejects_candidate_lookup_resolve_get_and_private_identity_fields(self) -> None:
+    def test_rejects_candidate_lookup_persistence_scope_and_private_identity_fields(self) -> None:
         decisions = self.decisions()
         candidate = decisions["proposed_public_pod_abi_candidate"]
         candidate["candidate_event_payload_fields_or_equivalent"].extend(
@@ -265,6 +265,10 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "FName_index",
                 "GObjects_index",
                 "ResourceHandle",
+                "persistent_principal_handle",
+                "cluster_stable_principal_handle",
+                "cross_process_principal_handle",
+                "cross_map_principal_handle",
             ]
         )
 
@@ -290,9 +294,48 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             "ip",
             "fname_gobjects",
             "resource_handle",
+            "persistent",
+            "cluster",
+            "cross_process",
+            "cross_map",
         ):
             with self.subTest(token=token):
                 self.assertIn(token, detail["forbidden"])
+
+    def test_rejects_candidate_process_local_non_persistent_requirements_removed(self) -> None:
+        decisions = self.decisions()
+        candidate = decisions["proposed_public_pod_abi_candidate"]
+        candidate["required_payload_properties"].remove(
+            "principal handles are process-local and non-persistent"
+        )
+        candidate["candidate_registration_shape_or_equivalent"].remove(
+            "registration handles are process-local and non-persistent"
+        )
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("candidate_required_payload_properties_missing", report["blockers"])
+        self.assertIn("candidate_owner_token_cleanup_requirements_missing", report["blockers"])
+        payload_detail = next(
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "candidate_required_payload_properties_missing"
+        )
+        self.assertIn(
+            "principal handles are process-local and non-persistent",
+            payload_detail["missing"],
+        )
+        registration_detail = next(
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "candidate_owner_token_cleanup_requirements_missing"
+        )
+        self.assertIn(
+            "registration handles are process-local and non-persistent",
+            registration_detail["missing"],
+        )
 
     def test_rejects_candidate_owner_token_cleanup_requirements_removed(self) -> None:
         decisions = self.decisions()
@@ -490,6 +533,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         )
         requirements["abi.capability_bits"]["required_behavior"].remove("missing capability fails closed")
         requirements["abi.owner_token_registration"]["required_behavior"].remove("nonzero plugin_owner_token required")
+        requirements["abi.owner_token_registration"]["required_behavior"].remove(
+            "registration handles are not persisted or shared across server processes"
+        )
         requirements["separation.no_commands_permissions_persistence"]["forbidden_in_identity_contract"].remove(
             "storage/persistence"
         )
