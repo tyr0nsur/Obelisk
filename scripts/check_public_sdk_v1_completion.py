@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_CONTRACT_DECISIONS_DIR = REPO_ROOT / "docs"
+DEFAULT_COMMAND_PERMISSION_ROUTE_GATE = REPO_ROOT / "scripts" / "check_command_permission_route_gate.py"
 CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
     "obelisk.chat.local_routing.v1",
@@ -57,6 +60,7 @@ CANONICAL_V1_DEPENDENCY_SEQUENCE = (
     "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
 )
+CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN = CANONICAL_V1_DEPENDENCY_SEQUENCE
 CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.gameplay_policy_event.v1",
     "obelisk.chat_message.v1",
@@ -71,7 +75,8 @@ CANONICAL_EXPERIMENTAL_RELEASE_STATEMENT_TEXT = {
 }
 CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES = (
     "v1_completion_required is true in this manifest",
-    "every v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
+    "every v1_required_dependency_chain surface is promoted with evidence before complete/full/production SDK wording",
+    "every non-chain v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
     "minimum promoted demand families are promoted or satisfied by explicit completion equivalents before complete/full/production SDK wording",
     "no promoted-experimental-only surface remains unresolved",
     "the release ships a reviewed SDK compatibility statement based on docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json",
@@ -104,6 +109,7 @@ SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "v1_completion_required_false",
     "promoted_experimental_surfaces_unresolved",
     "v1_sdk_completion_blockers_unresolved",
+    "v1_required_dependency_chain_unpromoted",
     "planning_surfaces_unresolved_for_v1_claim",
     "top_level_planning_surfaces_unresolved_for_v1_claim",
 }
@@ -624,6 +630,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--json", action="store_true", help="Emit the full readiness report as JSON.")
     parser.add_argument(
+        "--command-permission-route-gate",
+        type=Path,
+        default=DEFAULT_COMMAND_PERMISSION_ROUTE_GATE,
+        help="Planning-only route gate that guards player identity -> permissions/admin -> command response -> commands/replies.",
+    )
+    parser.add_argument(
         "--validate-release-statement-scope",
         action="store_true",
         help=(
@@ -632,6 +644,65 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     return parser.parse_args()
+
+
+def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    result = subprocess.run(
+        [sys.executable, str(path), "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": f"stdout_json_decode_error: {exc}",
+                "stderr": result.stderr.strip(),
+            },
+            ["command_permission_route_gate_output_invalid"],
+        )
+    if not isinstance(payload, dict):
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": "stdout_json_not_object",
+                "stderr": result.stderr.strip(),
+            },
+            ["command_permission_route_gate_output_invalid"],
+        )
+    if result.returncode != 0 or payload.get("valid") is not True:
+        blockers.append("command_permission_route_gate_invalid")
+    if payload.get("accepted_for_planning") is not True or payload.get("planning_only") is not True:
+        blockers.append("command_permission_route_gate_not_planning_only")
+    for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
+        if payload.get(key) is not False:
+            blockers.append(f"command_permission_route_gate_{key}_not_false")
+    return (
+        {
+            "path": str(path),
+            "exit_code": result.returncode,
+            "schema": payload.get("schema"),
+            "valid": payload.get("valid"),
+            "accepted_for_planning": payload.get("accepted_for_planning"),
+            "planning_only": payload.get("planning_only"),
+            "promotion_ready": payload.get("promotion_ready"),
+            "public_sdk_ready": payload.get("public_sdk_ready"),
+            "public_abi_ready": payload.get("public_abi_ready"),
+            "runtime_ready": payload.get("runtime_ready"),
+            "public_header_allowed": payload.get("public_header_allowed"),
+            "blockers": payload.get("blockers", []),
+            "stderr": result.stderr.strip(),
+            "non_claim": "planning-only route guard; not v1 completion evidence",
+        },
+        blockers,
+    )
 
 
 def load_manifest(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
@@ -919,6 +990,8 @@ def required_release_statement_text(requirement: str) -> str | None:
     if lowered.startswith(marker):
         return requirement[len(marker) :]
     if lowered.startswith("the v1 release statement names "):
+        return None
+    if lowered.startswith("a scoped non-complete-sdk release statement may name "):
         return None
     if "v1_completion_required changes only" in lowered:
         return None
@@ -1476,7 +1549,7 @@ def blocker_outcome_next_action(
     if status == "missing":
         return "restore the canonical blocker row in docs/public_sdk_surfaces.json"
     if surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE:
-        return "priority dependency-chain blocker: promote with evidence or explicitly exclude before downstream permissions/commands can count"
+        return "priority dependency-chain blocker: promote with evidence; excluded/post-v1 cannot satisfy complete SDK"
     return "choose a reviewed v1 outcome: promote with evidence or explicitly exclude/post-v1 where the contract allows it"
 
 
@@ -1753,8 +1826,13 @@ def build_report(
     release_statement_path: Path | None = None,
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
     contract_decisions_dir: Path = DEFAULT_CONTRACT_DECISIONS_DIR,
+    command_permission_route_gate_path: Path = DEFAULT_COMMAND_PERMISSION_ROUTE_GATE,
 ) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
+    command_permission_route_gate, route_gate_blockers = run_command_permission_route_gate(
+        command_permission_route_gate_path
+    )
+    blockers.extend(route_gate_blockers)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
     blockers.extend(release_statement_blockers)
     blocked_contract_header_symbols, contract_symbol_blockers = blocked_contract_public_header_symbol_drift(
@@ -1774,6 +1852,7 @@ def build_report(
             "release_statement": str(release_statement_path) if release_statement_path else None,
             "public_header": str(public_header_path),
             "contract_decisions_dir": str(contract_decisions_dir),
+            "command_permission_route_gate": command_permission_route_gate,
             "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
             "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
             "blockers": blockers,
@@ -1855,6 +1934,7 @@ def build_report(
     )
     missing_dependency_declarations = missing_required_dependency_declarations(surfaces_by_id)
     dependency_sequence_mismatches = v1_dependency_sequence_mismatches(manifest, surfaces_by_id)
+    required_dependency_chain = as_string_list(manifest.get("v1_required_dependency_chain"))
 
     promoted_surfaces = set(as_string_list(manifest.get("promoted_surfaces")))
     experimental_surfaces = set(as_string_list(manifest.get("experimental_surfaces")))
@@ -1903,6 +1983,11 @@ def build_report(
     promoted_dependency_failures: dict[str, list[str]] = {}
     promoted_missing_required_evidence_terms: dict[str, list[str]] = {}
     non_promoted_with_public_abi: list[str] = []
+    unpromoted_required_dependency_chain = [
+        surface_id
+        for surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN
+        if surfaces_by_id.get(surface_id, {}).get("status") != "promoted"
+    ]
 
     if manifest_stable_claim_allowed and manifest.get("v1_completion_required") is True and release_statement_text is None:
         blockers.append("release_statement_required_for_v1_completion")
@@ -2066,6 +2151,10 @@ def build_report(
         blockers.append("required_surface_dependency_declaration_missing")
     if dependency_sequence_mismatches:
         blockers.append("v1_dependency_sequence_mismatch")
+    if required_dependency_chain != list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN):
+        blockers.append("v1_required_dependency_chain_mismatch")
+    if unpromoted_required_dependency_chain:
+        blockers.append("v1_required_dependency_chain_unpromoted")
     if non_promoted_with_contract:
         blockers.append("non_promoted_surface_has_public_contract")
     if non_promoted_with_public_abi:
@@ -2178,6 +2267,7 @@ def build_report(
         "release_statement": str(release_statement_path) if release_statement_path else None,
         "public_header": str(public_header_path),
         "contract_decisions_dir": str(contract_decisions_dir),
+        "command_permission_route_gate": command_permission_route_gate,
         "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
         "v1_completion_required": manifest.get("v1_completion_required"),
@@ -2221,6 +2311,9 @@ def build_report(
         "v1_dependency_sequence": as_string_list(manifest.get("v1_dependency_sequence")),
         "v1_dependency_sequence_expected": list(CANONICAL_V1_DEPENDENCY_SEQUENCE),
         "v1_dependency_sequence_mismatches": sorted(set(dependency_sequence_mismatches)),
+        "v1_required_dependency_chain": required_dependency_chain,
+        "v1_required_dependency_chain_expected": list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
+        "unpromoted_required_dependency_chain": unpromoted_required_dependency_chain,
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "non_promoted_with_public_abi": sorted(set(non_promoted_with_public_abi)),
@@ -2347,7 +2440,12 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "v1_sdk_completion_blockers_unresolved": [
             "High-demand v1 completion blockers are still unresolved.",
             f"Surfaces: {format_human_list(report.get('unresolved_completion_blockers'))}.",
-            "Action: promote with copied C ABI evidence or deliberately exclude/post-v1 where the contract allows it.",
+            "Action: promote P0 dependency-chain surfaces with evidence; non-chain blockers may be promoted or scoped excluded/post-v1 where the contract allows it.",
+        ],
+        "v1_required_dependency_chain_unpromoted": [
+            "The P0 dependency chain is not fully promoted.",
+            f"Surfaces: {format_human_list(report.get('unpromoted_required_dependency_chain'))}.",
+            "Action: promote player identity, permissions/admin, command/chat response path, and commands/replies with evidence before complete/full/production SDK wording.",
         ],
         "complete_sdk_claim_requires_promoted_demand_families": [
             "The complete/full/production SDK claim requires promoted demand families, not only excluded or post-v1 outcomes.",
@@ -2529,6 +2627,7 @@ def main() -> int:
         args.release_statement,
         args.public_header,
         args.contract_decisions_dir,
+        args.command_permission_route_gate,
     )
     if args.validate_release_statement_scope:
         report = add_scoped_release_statement_result(report)

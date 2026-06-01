@@ -494,8 +494,8 @@ BROAD_V1_COMPLETION_POSITIVE_RE = re.compile(
 )
 BROAD_V1_COMPLETION_NEGATED_RE = re.compile(
     r"\b(?:"
-    r"blocked|candidate|candidate-only|definition|does\s+not|do\s+not|foundation|meaning|"
-    r"intended|must\s+mean|must\s+not|no|not|planning|post-v1|prevent|prevents|rc|scanned|toward|track|unless|until|without"
+    r"before|blocked|candidate|candidate-only|cannot|definition|does\s+not|do\s+not|foundation|meaning|"
+    r"intended|must\s+mean|must\s+not|no|non[- ]complete|not|planning|post-v1|prevent|prevents|required|rc|scanned|toward|track|tracked|unless|until|without"
     r")\b",
     re.IGNORECASE,
 )
@@ -1910,10 +1910,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "compatibility_statement",
             "stable_release_contract",
             "promoted_surfaces",
-            "experimental_surfaces",
-            "planning_surfaces",
-            "v1_sdk_completion_blockers",
-            "post_v1_or_excluded_surfaces",
+    "experimental_surfaces",
+    "planning_surfaces",
+    "v1_sdk_completion_blockers",
+    "v1_required_dependency_chain",
+    "post_v1_or_excluded_surfaces",
             "debug_only_surfaces",
             "promotion_requirements",
             "release_guardrails",
@@ -1938,7 +1939,11 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             stable_contract["claim_requires"],
         )
         self.assertIn(
-            "every v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
+            "every v1_required_dependency_chain surface is promoted with evidence before complete/full/production SDK wording",
+            stable_contract["claim_requires"],
+        )
+        self.assertIn(
+            "every non-chain v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
             stable_contract["claim_requires"],
         )
         self.assertIn(
@@ -2061,7 +2066,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "excluded by name in the v1 release statement.",
             release_guardrails,
         )
-        self.assertIn("Every v1_sdk_completion_blocker", release_guardrails)
+        self.assertIn("Every v1_required_dependency_chain surface", release_guardrails)
+        self.assertIn("Every non-chain v1_sdk_completion_blocker", release_guardrails)
         self.assertIn("before v1_completion_required can become true", release_guardrails)
         self.assertIn("Every promoted-experimental-only surface", release_guardrails)
         self.assertIn(
@@ -2100,10 +2106,16 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertEqual(surface.get("support_tier"), "blocked")
                 decision = surface.get("v1_decision_contract")
                 self.assertIsInstance(decision, dict)
-                self.assertEqual(
-                    decision.get("current_decision"),
-                    "blocked_until_promoted_or_explicitly_excluded",
-                )
+                if surface_id in set(manifest.get("v1_required_dependency_chain", [])):
+                    self.assertEqual(
+                        decision.get("current_decision"),
+                        "blocked_until_promoted_for_complete_sdk",
+                    )
+                else:
+                    self.assertEqual(
+                        decision.get("current_decision"),
+                        "blocked_until_promoted_or_explicitly_excluded",
+                    )
                 self.assertTrue(decision.get("must_remain_without_public_contract_until_promotion"))
                 self.assertTrue(decision.get("promotion_requires"))
                 self.assertTrue(decision.get("exclusion_requires"))
@@ -2473,7 +2485,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
         commands = surfaces["obelisk.commands_replies.v1"]
 
-        self.assertEqual(commands["status"], "post-v1")
+        self.assertEqual(commands["status"], "planning")
         self.assertEqual(commands["support_tier"], "blocked")
         self.assertEqual(commands["public_contract"], [])
         self.assertEqual(
@@ -2485,13 +2497,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             ],
         )
         self.assertIn("obelisk.commands_replies.v1", manifest["v1_sdk_completion_blockers"])
-        self.assertIn("obelisk.commands_replies.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertIn("obelisk.commands_replies.v1", manifest["planning_surfaces"])
+        self.assertIn("obelisk.commands_replies.v1", manifest["v1_required_dependency_chain"])
+        self.assertNotIn("obelisk.commands_replies.v1", manifest["post_v1_or_excluded_surfaces"])
         self.assertNotIn("obelisk.commands_replies.v1", manifest["promoted_surfaces"])
 
         for blocker in (
             "Needs promoted player identity/principal semantics.",
             "Needs promoted permission/authority model.",
-            "Needs obelisk.command_chat_response_path.v1 promoted before replies/send-chat can be claimed; this blocker must be promoted or explicitly excluded/post-v1 before v1_completion_required can change.",
+            "Needs obelisk.command_chat_response_path.v1 promoted before replies/send-chat can be claimed; this blocker must be promoted with evidence before v1_completion_required can change.",
             "Send-chat, broadcast, scheduled notices, and moderation are separate response/authority surfaces, not implied by passive copied chat parsing.",
             "Needs command lifecycle and abuse boundaries.",
         ):
@@ -2521,7 +2535,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
         permissions = surfaces["obelisk.permissions_admin.v1"]
 
-        self.assertEqual(permissions["status"], "post-v1")
+        self.assertEqual(permissions["status"], "planning")
         self.assertEqual(permissions["support_tier"], "blocked")
         self.assertEqual(permissions["public_contract"], [])
         self.assertEqual(permissions["depends_on"], ["obelisk.player_identity.v1"])
@@ -2573,12 +2587,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         response = surfaces["obelisk.command_chat_response_path.v1"]
         commands = surfaces["obelisk.commands_replies.v1"]
 
-        self.assertEqual(response["status"], "post-v1")
+        self.assertEqual(response["status"], "planning")
         self.assertEqual(response["support_tier"], "blocked")
         self.assertFalse(response["public_abi"])
         self.assertFalse(response["adds_obelisk_api"])
         self.assertEqual(response["public_contract"], [])
-        self.assertIn("obelisk.command_chat_response_path.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertIn("obelisk.command_chat_response_path.v1", manifest["planning_surfaces"])
+        self.assertIn("obelisk.command_chat_response_path.v1", manifest["v1_required_dependency_chain"])
+        self.assertNotIn("obelisk.command_chat_response_path.v1", manifest["post_v1_or_excluded_surfaces"])
         self.assertNotIn("obelisk.command_chat_response_path.v1", manifest["promoted_surfaces"])
         self.assertIn("obelisk.command_chat_response_path.v1", commands["depends_on"])
         self.assertEqual(
@@ -3096,7 +3112,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "plugin watchdogs, hot plugin reload, Obelisk hot reload, process restart, server recovery API, operator reload commands, detached-worker ingress, and restart-state recovery are excluded or post-v1",
             "Passing runtime/core-first RC gates",
             "pre-identity installed-SDK foundation usefulness is insufficient for `v1.0 stable`",
-            "blocker list is promoted or explicitly named as excluded/post-v1",
+            "P0 dependency chain is promoted with evidence",
+            "non-chain blockers are promoted or explicitly named as excluded/post-v1",
             "mutation",
             "return override",
         )
@@ -3404,7 +3421,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_public_sdk_docs_do_not_imply_command_chat_response_path_promotion(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
-        self.assertEqual(surfaces["obelisk.command_chat_response_path.v1"]["status"], "post-v1")
+        self.assertEqual(surfaces["obelisk.command_chat_response_path.v1"]["status"], "planning")
 
         scan_text = "\n".join(
             [

@@ -573,16 +573,15 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if DEPENDENCY_CHAIN[1] in promoted:
         add(blockers, "permissions_admin_manifest_promotion_without_evidence", "$.surfaces.promoted_surfaces")
 
-    post_v1_or_excluded = string_set(payload.get("post_v1_or_excluded_surfaces"))
-    if SURFACE not in post_v1_or_excluded:
-        add(blockers, "commands_replies_missing_from_post_v1_or_excluded", "$.surfaces.post_v1_or_excluded_surfaces")
-    if RESPONSE_PATH_SURFACE not in post_v1_or_excluded:
-        add(blockers, "response_path_missing_from_post_v1_or_excluded", "$.surfaces.post_v1_or_excluded_surfaces")
+    required_chain = string_set(payload.get("v1_required_dependency_chain"))
+    for surface in DEPENDENCY_CHAIN:
+        if surface not in required_chain:
+            add(blockers, "dependency_chain_surface_missing_from_required_chain", "$.surfaces.v1_required_dependency_chain", surface=surface)
 
     blockers_set = string_set(payload.get("v1_sdk_completion_blockers"))
     for surface in DEPENDENCY_CHAIN:
-        if surface not in blockers_set and surface not in post_v1_or_excluded:
-            add(blockers, "dependency_chain_surface_missing_from_blockers_or_post_v1", "$.surfaces", surface=surface)
+        if surface not in blockers_set:
+            add(blockers, "dependency_chain_surface_missing_from_blockers", "$.surfaces.v1_sdk_completion_blockers", surface=surface)
 
     surfaces = payload.get("surfaces")
     if not isinstance(surfaces, list):
@@ -608,8 +607,14 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if not isinstance(commands, dict):
         add(blockers, "commands_replies_surface_missing", "$.surfaces.surfaces")
     else:
-        if commands.get("status") != "post-v1":
-            add(blockers, "commands_replies_status_mismatch", "$.surfaces.surfaces", value=commands.get("status"))
+        if commands.get("status") not in {"planning", "post-v1"}:
+            add(
+                blockers,
+                "commands_replies_status_mismatch",
+                "$.surfaces.surfaces",
+                expected=["planning", "post-v1"],
+                value=commands.get("status"),
+            )
         if commands.get("public_contract") != []:
             add(blockers, "commands_replies_public_contract_not_empty", "$.surfaces.surfaces.public_contract", value=commands.get("public_contract"))
         if commands.get("depends_on") != REQUIRED_DEPENDS_ON:
@@ -640,8 +645,14 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if not isinstance(response_path, dict):
         add(blockers, "response_path_surface_missing", "$.surfaces.surfaces")
     else:
-        if response_path.get("status") != "post-v1":
-            add(blockers, "response_path_planning_evidence_treated_as_promoted", "$.surfaces.surfaces.status")
+        if response_path.get("status") not in {"planning", "post-v1"}:
+            add(
+                blockers,
+                "response_path_planning_evidence_treated_as_promoted",
+                "$.surfaces.surfaces.status",
+                expected=["planning", "post-v1"],
+                value=response_path.get("status"),
+            )
         if response_path.get("public_contract") not in ([], None) and response_path.get("status") != "promoted":
             add(blockers, "response_path_public_contract_not_empty_while_unpromoted", "$.surfaces.surfaces.public_contract")
 
@@ -649,7 +660,7 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     for fragment in (
         "Identity/principal, permissions/admin, command/chat response path, and commands/replies are an ordered v1 dependency chain",
         "Commands/replies also depend on obelisk.command_chat_response_path.v1",
-        "command/chat response path is post-v1, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted",
+        "command/chat response path is unpromoted, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted",
         "legacy CallProcessEvent debug access are not public response-path or command/reply promotion evidence",
     ):
         if fragment not in guardrails:

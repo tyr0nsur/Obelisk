@@ -674,7 +674,14 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if not isinstance(response, dict):
         add(blockers, "command_chat_response_surface_missing", "$.surfaces")
         return
-    require_equal(response, "status", "post-v1", "$.surfaces.command_chat_response_path", blockers)
+    if response.get("status") not in {"planning", "post-v1"}:
+        add(
+            blockers,
+            "status_mismatch",
+            "$.surfaces.command_chat_response_path",
+            expected=["planning", "post-v1"],
+            value=response.get("status"),
+        )
     require_equal(response, "support_tier", "blocked", "$.surfaces.command_chat_response_path", blockers)
     require_false(response, "public_abi", "$.surfaces.command_chat_response_path", blockers)
     require_false(response, "adds_obelisk_api", "$.surfaces.command_chat_response_path", blockers)

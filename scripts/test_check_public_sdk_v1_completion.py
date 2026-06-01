@@ -201,7 +201,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
         progress = payload["v1_sdk_progress"]
         self.assertEqual(progress["completion_blocker_total"], 12)
-        self.assertIn(
+        self.assertNotIn(
             "obelisk.permissions_admin.v1",
             progress["completion_blockers_with_post_v1_or_excluded_outcome"],
         )
@@ -218,20 +218,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             0,
         )
         self.assertIn("obelisk.player_identity.v1", progress["completion_blockers_without_manifest_outcome"])
-        self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 3)
-        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 3)
+        self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 6)
+        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 6)
         self.assertFalse(progress["stable_claim_allowed"])
         self.assertIn("status accounting", progress["outcome_accounting_note"])
         self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
-        self.assertEqual(progress["manifest_outcome_missing_count"], 3)
-        self.assertEqual(progress["release_statement_outcome_missing_count"], 9)
+        self.assertEqual(progress["manifest_outcome_missing_count"], 6)
+        self.assertEqual(progress["release_statement_outcome_missing_count"], 6)
         self.assertEqual(progress["dependency_chain_remaining_count"], 4)
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["total"], 12)
         self.assertEqual(
             payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing"],
             [
                 "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
                 "obelisk.structure_census.v1",
                 "obelisk.mission_transfer_dino_tribe.v1",
             ],
@@ -239,9 +242,6 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing"],
             [
-                "obelisk.permissions_admin.v1",
-                "obelisk.command_chat_response_path.v1",
-                "obelisk.commands_replies.v1",
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.object_identity_resource_handle.v1",
                 "obelisk.lifecycle_ops_recovery.v1",
@@ -258,7 +258,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIsNone(blocker_rows[0]["manifest_outcome"])
         self.assertIn("priority dependency-chain blocker", blocker_rows[0]["next_action"])
         self.assertEqual(blocker_rows[1]["surface"], "obelisk.permissions_admin.v1")
-        self.assertEqual(blocker_rows[1]["manifest_outcome"], "post-v1")
+        self.assertIsNone(blocker_rows[1]["manifest_outcome"])
         self.assertIsNone(blocker_rows[1]["release_statement_outcome"])
         self.assertFalse(blocker_rows[1]["release_statement_contract_satisfied"])
         sections = payload["v1_sdk_report_sections"]
@@ -335,7 +335,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("The stable v1 SDK claim remains disabled", result.stdout)
-        self.assertIn("12-blocker outcome accounting: 3 need manifest outcomes; 9 need release-statement outcomes", result.stdout)
+        self.assertIn("12-blocker outcome accounting: 6 need manifest outcomes; 6 need release-statement outcomes", result.stdout)
         self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
         self.assertIn("obelisk.player_identity.v1", result.stdout)
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
@@ -696,7 +696,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             payload["unresolved_completion_blockers"],
             [
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
                 "obelisk.mission_transfer_dino_tribe.v1",
+                "obelisk.permissions_admin.v1",
                 "obelisk.player_identity.v1",
                 "obelisk.structure_census.v1",
             ],
@@ -719,14 +722,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             payload["release_statement_missing_blocker_outcomes"],
             [
-                "obelisk.command_chat_response_path.v1",
-                "obelisk.commands_replies.v1",
                 "obelisk.gameplay_tick_callbacks.v1",
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.lifecycle_ops_recovery.v1",
                 "obelisk.object_identity_resource_handle.v1",
                 "obelisk.operator_ingress_storage.v1",
-                "obelisk.permissions_admin.v1",
                 "obelisk.player_services_economy_mobility.v1",
             ],
         )
@@ -749,14 +749,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
             [
-                "obelisk.command_chat_response_path.v1",
-                "obelisk.commands_replies.v1",
                 "obelisk.gameplay_tick_callbacks.v1",
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.lifecycle_ops_recovery.v1",
                 "obelisk.object_identity_resource_handle.v1",
                 "obelisk.operator_ingress_storage.v1",
-                "obelisk.permissions_admin.v1",
                 "obelisk.player_services_economy_mobility.v1",
             ],
         )
@@ -779,7 +776,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             [],
         )
         self.assertFalse(payload["v1_sdk_report_sections"]["no_live_progress"]["stable_claim_allowed"])
-        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing_count"], 3)
+        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing_count"], 6)
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing_count"], 0)
         outcome_by_surface = {
             row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
@@ -788,7 +785,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             outcome_by_surface["obelisk.permissions_admin.v1"]["release_statement_outcome"],
             "post-v1",
         )
-        self.assertTrue(
+        self.assertFalse(
             outcome_by_surface["obelisk.permissions_admin.v1"][
                 "release_statement_contract_satisfied"
             ]
@@ -2053,13 +2050,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_completion_blocker_status_must_match_required_release_outcome(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         for surface in manifest["surfaces"]:
-            if surface["id"] == "obelisk.player_identity.v1":
+            if surface["id"] == "obelisk.structure_census.v1":
                 surface["status"] = "post-v1"
                 break
-        manifest["post_v1_or_excluded_surfaces"].append("obelisk.player_identity.v1")
+        manifest["post_v1_or_excluded_surfaces"].append("obelisk.structure_census.v1")
         release_statement = release_statement.replace(
-            "obelisk.player_identity.v1: excluded -",
-            "obelisk.player_identity.v1: post-v1 -",
+            "obelisk.structure_census.v1: excluded -",
+            "obelisk.structure_census.v1: post-v1 -",
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
@@ -2078,7 +2075,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
-        self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.player_identity.v1"])
+        self.assertEqual(payload["release_statement_missing_exclusion_contracts"], ["obelisk.structure_census.v1"])
 
     def test_docs_only_promotion_evidence_blocks_claim(self) -> None:
         manifest = {

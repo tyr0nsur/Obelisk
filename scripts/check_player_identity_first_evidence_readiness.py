@@ -15,6 +15,7 @@ from typing import Any
 
 import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
+import check_player_identity_public_contract_gap_report as public_contract_gap_report
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence
 import check_player_principal_lifecycle_window_request as player_principal_lifecycle_window_request
@@ -146,6 +147,30 @@ def parse_args() -> argparse.Namespace:
         "--player-principal-lifecycle-window-env",
         type=Path,
         help="observer-window.env paired with --player-principal-lifecycle-window-request.",
+    )
+    parser.add_argument(
+        "--player-identity-public-contract-decisions",
+        type=Path,
+        default=REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json",
+        help="Player identity public contract decisions manifest for the offline gap guardrail.",
+    )
+    parser.add_argument(
+        "--public-sdk-surfaces",
+        type=Path,
+        default=REPO_ROOT / "docs" / "public_sdk_surfaces.json",
+        help="Public SDK surfaces manifest for the offline identity gap guardrail.",
+    )
+    parser.add_argument(
+        "--player-identity-private-candidate-contract",
+        type=Path,
+        default=REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json",
+        help="Private candidate-only identity contract for the offline gap guardrail.",
+    )
+    parser.add_argument(
+        "--public-header",
+        type=Path,
+        default=REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h",
+        help="Public SDK header for accidental player identity symbol scanning.",
     )
     parser.add_argument(
         "--json",
@@ -1329,6 +1354,83 @@ def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
     }
 
 
+def player_identity_public_contract_gap_diagnosis(
+    *,
+    decisions: Path,
+    surfaces: Path,
+    private_candidate_contract: Path,
+    public_header: Path,
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    report_blockers: list[dict[str, Any]] = []
+    decisions_payload = public_contract_gap_report.load_json(decisions, "decisions", report_blockers)
+    surfaces_payload = public_contract_gap_report.load_json(surfaces, "surfaces", report_blockers)
+    candidate_payload = public_contract_gap_report.load_json(
+        private_candidate_contract,
+        "private_candidate_contract",
+        report_blockers,
+    )
+    if decisions_payload:
+        public_contract_gap_report.validate_decisions(decisions_payload, report_blockers)
+    surface = (
+        public_contract_gap_report.validate_surfaces(surfaces_payload, report_blockers)
+        if surfaces_payload
+        else {}
+    )
+    if candidate_payload:
+        public_contract_gap_report.validate_private_candidate(candidate_payload, report_blockers)
+    header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
+    args = argparse.Namespace(
+        decisions=decisions,
+        surfaces=surfaces,
+        private_candidate_contract=private_candidate_contract,
+        public_header=public_header,
+    )
+    report = public_contract_gap_report.build_report(
+        args,
+        report_blockers,
+        decisions_payload,
+        surface,
+        header_scan,
+        candidate_payload,
+    )
+
+    if report.get("schema") != public_contract_gap_report.SCHEMA:
+        blockers.append("player_identity_public_contract_gap_report_schema_mismatch")
+    if report.get("guardrail_passed") is not True:
+        blockers.append("player_identity_public_contract_gap_guardrail_not_passed")
+    if report.get("status") != "blocked":
+        blockers.append("player_identity_public_contract_gap_status_not_blocked")
+    if report.get("primary_offline_gap") != public_contract_gap_report.PRIMARY_OFFLINE_GAP:
+        blockers.append("player_identity_public_contract_gap_primary_gap_mismatch")
+    if report.get("runtime_evidence_missing") is not True:
+        blockers.append("player_identity_public_contract_gap_runtime_evidence_missing_not_true")
+    for key in ("accepted_for_contract_review", "promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+        if report.get(key) is not False:
+            blockers.append(f"player_identity_public_contract_gap_{key}_not_false")
+    ready = not blockers
+    return {
+        "provided": True,
+        "returncode": 0 if report.get("guardrail_passed") is True else 1,
+        "ready": ready,
+        "guardrail_passed": report.get("guardrail_passed") is True,
+        "status": report.get("status"),
+        "primary_offline_gap": report.get("primary_offline_gap"),
+        "runtime_evidence_missing": report.get("runtime_evidence_missing"),
+        "accepted_for_contract_review": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "blockers": blockers,
+        "report_blockers": report.get("blockers", []),
+        "surface_manifest": report.get("surface_manifest", {}),
+        "non_claims": [
+            "identity public-contract gap report is an offline guardrail only; it does not satisfy approved runtime evidence or public identity promotion",
+        ],
+    }
+
+
 def first_matching_binary_path(offline_inputs: dict[str, Any]) -> str | None:
     candidates = offline_inputs.get("shooter_game_server_candidates")
     if not isinstance(candidates, list):
@@ -1499,6 +1601,13 @@ def next_actionable_blocker(
             "code": "principal_invalidation_semantics_unresolved",
             "blocked_until": "reviewed_fail_closed_principal_invalidation_policy",
             "why": "lifecycle anchor layout evidence is present, but public identity still lacks reviewed principal invalidation semantics",
+        }
+    if "identity_public_contract_gap_report_invalid" in downstream_blockers:
+        return {
+            **base,
+            "code": "identity_public_contract_gap_report_invalid",
+            "blocked_until": "blocked_identity_public_contract_gap_guardrail_restored",
+            "why": "the offline public-contract gap guardrail must keep player identity blocked, private, and non-promotional before runtime evidence can route to contract review",
         }
     if "approved_runtime_evidence_missing" in downstream_blockers:
         return {
@@ -1994,6 +2103,20 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         getattr(args, "player_principal_lifecycle_window_request", None),
         getattr(args, "player_principal_lifecycle_window_env", None),
     )
+    public_contract_gap_diagnosis = player_identity_public_contract_gap_diagnosis(
+        decisions=getattr(
+            args,
+            "player_identity_public_contract_decisions",
+            REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json",
+        ),
+        surfaces=getattr(args, "public_sdk_surfaces", REPO_ROOT / "docs" / "public_sdk_surfaces.json"),
+        private_candidate_contract=getattr(
+            args,
+            "player_identity_private_candidate_contract",
+            REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json",
+        ),
+        public_header=getattr(args, "public_header", REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"),
+    )
     approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True
     runtime_evidence_requirements = runtime_principal_lifecycle_evidence_requirements()
     lifecycle_ready = (
@@ -2053,6 +2176,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         downstream_blockers.append("principal_invalidation_semantics_unresolved")
     if lifecycle_ready and principal_invalidation_ready and not approved_runtime_evidence_ready:
         downstream_blockers.append("approved_runtime_evidence_missing")
+    if not public_contract_gap_diagnosis.get("ready"):
+        downstream_blockers.append("identity_public_contract_gap_report_invalid")
     if inventory_ready:
         blockers.extend(downstream_blockers)
 
@@ -2360,6 +2485,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "runtime_principal_lifecycle_evidence_manifest": runtime_evidence_manifest_diagnosis,
             "approved_runtime_principal_lifecycle_evidence_manifest": approved_runtime_evidence_manifest_diagnosis,
             "player_principal_lifecycle_window_request": window_request_diagnosis,
+            "public_contract_gap_report": public_contract_gap_diagnosis,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,

@@ -18,6 +18,15 @@ SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 PRIVATE_CANDIDATE_SCHEMA = "obelisk.player-identity-private-candidate-contract.v1"
 SURFACE = "obelisk.player_identity.v1"
 PRIMARY_OFFLINE_GAP = "privacy.identifier_redaction"
+REQUIRED_PROMOTION_BLOCKERS = {
+    "runtime.lifecycle_evidence",
+    "privacy.identifier_redaction",
+}
+REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS = {
+    "privacy.public_identifier_form",
+    "privacy.redacted_identifier_fields",
+    "privacy.logging_and_storage_policy",
+}
 
 READINESS_FALSE_KEYS = {
     "accepted_for_contract_review",
@@ -257,6 +266,53 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         add(blockers, "decisions_status_not_blocked", "$.status", value=decisions.get("status"))
     if decisions.get("public_header_allowed") is not False:
         add(blockers, "decisions_public_header_allowed_not_false", "$.public_header_allowed")
+    promotion_blockers = decisions.get("promotion_blockers")
+    if not isinstance(promotion_blockers, list):
+        add(blockers, "decisions_promotion_blockers_not_list", "$.promotion_blockers")
+    else:
+        by_id = {
+            item.get("id"): item
+            for item in promotion_blockers
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        missing = sorted(REQUIRED_PROMOTION_BLOCKERS - set(by_id))
+        if missing:
+            add(blockers, "decisions_required_promotion_blockers_missing", "$.promotion_blockers", missing=missing)
+        for blocker_id in sorted(REQUIRED_PROMOTION_BLOCKERS & set(by_id)):
+            if by_id[blocker_id].get("status") != "unresolved":
+                add(
+                    blockers,
+                    "decisions_required_promotion_blocker_not_unresolved",
+                    "$.promotion_blockers",
+                    id=blocker_id,
+                    value=by_id[blocker_id].get("status"),
+                )
+    required_before_public_header = decisions.get("required_before_public_header")
+    if not isinstance(required_before_public_header, list):
+        add(blockers, "decisions_required_before_public_header_not_list", "$.required_before_public_header")
+    else:
+        by_id = {
+            item.get("id"): item
+            for item in required_before_public_header
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        missing = sorted(REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS - set(by_id))
+        if missing:
+            add(
+                blockers,
+                "decisions_required_privacy_public_header_blockers_missing",
+                "$.required_before_public_header",
+                missing=missing,
+            )
+        for blocker_id in sorted(REQUIRED_PRIVACY_PUBLIC_HEADER_BLOCKERS & set(by_id)):
+            if by_id[blocker_id].get("status") != "unresolved":
+                add(
+                    blockers,
+                    "decisions_required_privacy_public_header_blocker_not_unresolved",
+                    "$.required_before_public_header",
+                    id=blocker_id,
+                    value=by_id[blocker_id].get("status"),
+                )
     validate_empty_public_lists(decisions, blockers, "decisions")
     validate_false_flags(decisions, blockers, "decisions")
 

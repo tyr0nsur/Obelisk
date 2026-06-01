@@ -15,6 +15,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_command_permission_route_gate.py"
 QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
+IDENTITY_DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 
 
 class CommandPermissionRouteGateTests(unittest.TestCase):
@@ -48,8 +49,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
-        self.assertEqual(7, len(report["checks"]))
+        self.assertEqual(8, len(report["checks"]))
         check_names = {check["name"] for check in report["checks"]}
+        self.assertIn("player_identity_public_contract_gap", check_names)
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
@@ -75,6 +77,28 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             self.assertFalse(report["valid"])
             self.assertFalse(report["accepted_for_planning"])
             self.assertTrue(any("permissions_query_failclosed" in blocker for blocker in report["blockers"]))
+
+    def test_rejects_identity_public_contract_gap_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            decisions = Path(tmp) / "player_identity_public_contract_decisions.json"
+            payload = json.loads(IDENTITY_DECISIONS.read_text(encoding="utf-8"))
+            payload["public_header_allowed"] = True
+            decisions.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker(
+                "--player-identity-decisions",
+                str(decisions),
+                "--json",
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertFalse(report["valid"])
+            self.assertFalse(report["accepted_for_planning"])
+            self.assertTrue(
+                any("player_identity_public_contract_gap" in blocker for blocker in report["blockers"])
+            )
 
 
 if __name__ == "__main__":

@@ -14,9 +14,12 @@ promoted-experimental copied-data surface cannot flip it.
 The completion checker reports that raw switch as
 `stable_release_contract_claim_allowed` and reserves `stable_claim_allowed` for the final
 computed gate result after all blockers are applied.
-`v1.0` must not be used for a runtime-only release. A stable SDK release must either
-promote each important modding category through copied ABI contracts and evidence, or
-explicitly exclude that category from the `v1.0` support statement.
+`v1.0` must not be used for a runtime-only release. The P0 dependency chain
+(`player_identity`, `permissions_admin`, `command_chat_response_path`,
+`commands_replies`) must be promoted through copied ABI contracts and evidence before any
+complete SDK claim. Non-chain high-demand categories may be promoted or explicitly named
+as excluded/post-v1 in a scoped release statement, but that accounting does not complete
+the excluded capability.
 The machine-readable `v1_sdk_completion_blockers` list records the high-demand categories
 that currently prevent a complete SDK claim: player identity, permissions/admin,
 command/chat response path, commands/replies, inventory/items mutation, structure
@@ -26,8 +29,9 @@ tracked as `obelisk.lifecycle_ops_recovery.v1`
 so lifecycle/config/logging cannot be mistaken for watchdog, reload, restart, or server
 recovery APIs. Gameplay/server tick callbacks are also tracked as a separate
 v1 completion blocker so process-local timers are not mistaken for UE gameplay tick hooks.
-Those blockers must be promoted or deliberately excluded in the release statement before
-`v1_completion_required` can become true.
+The P0 chain must be promoted before `v1_completion_required` can become true; non-chain
+blockers must be promoted or deliberately excluded/post-v1 in the release statement before
+they stop blocking scoped support-statement accounting.
 
 A pre-v1 installed-SDK foundation example can support lifecycle/config/logging,
 descriptor/catalog metadata, installed-SDK consumers, and owner-token process-local
@@ -341,7 +345,11 @@ SDK-consumer evidence, lifecycle cleanup coverage, privacy/no-internals guarante
 the required gameplay evidence for that surface.
 The manifest's `post_v1_or_excluded_surfaces` list must exactly match surfaces whose
 status is `post-v1` or `excluded`; it cannot be used to classify promoted, planning,
-experimental, or debug-only surfaces as release exclusions.
+experimental, or debug-only surfaces as release exclusions. The ordered P0 dependency
+chain (`player_identity`, `permissions_admin`, `command_chat_response_path`,
+`commands_replies`) is the complete-SDK spine and is tracked separately as
+`v1_required_dependency_chain`; excluded/post-v1 is not a valid complete-SDK outcome for
+that chain.
 Post-v1 or excluded records are support-statement accounting only. They do not authorize
 complete, full, production, or stable SDK wording unless
 `scripts/check_public_sdk_v1_completion.py --json` reports that the stable claim is
@@ -353,10 +361,10 @@ approval and must not be cited as evidence that a surface is included in v1.
 
 | Surface or demand family | Required v1 outcome | Depends on | Release-statement detail |
 | --- | --- | --- | --- |
-| `obelisk.player_identity.v1` | `promoted` or `excluded` | accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source | Name player identity, principal, player lookup, permission principal, economy identity, and send-chat identity. |
-| `obelisk.permissions_admin.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal | Name permission groups, admin groups, grant/revoke, admin actions, permission cache ABI, storage/persistence, operator ingress, command router, command/chat response path, replies/send-chat, moderation, ban/kick, and public header permission symbols. |
-| `obelisk.command_chat_response_path.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity/principal and permissions/admin | Name command/chat response path, public CallProcessEvent response path, raw UE pointer/ProcessEvent/FString response APIs, chat replies, send-chat, broadcast/notices, and moderation. |
-| `obelisk.commands_replies.v1` | `promoted`, `excluded`, or `post-v1` | promoted player identity, permissions/admin, and command/chat response path | Name command router, console/RCON commands, player/admin commands, chat replies, send-chat, broadcast/notices, and moderation. |
+| `obelisk.player_identity.v1` | `promoted` | accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no-complete-SDK wording. |
+| `obelisk.permissions_admin.v1` | `promoted` | promoted player identity/principal | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no permission/admin SDK wording. |
+| `obelisk.command_chat_response_path.v1` | `promoted` | promoted player identity/principal and permissions/admin | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no reply/send-chat/response-path wording. |
+| `obelisk.commands_replies.v1` | `promoted` | promoted player identity, permissions/admin, and command/chat response path | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no command SDK/router wording. |
 | `obelisk.inventory_items_mutation.v1` | `promoted`, `excluded`, or `post-v1` | player/inventory/item identity plus rollback/privacy controls | Name Inventory SDK, Items SDK, give/remove item, kits/rewards, engrams/progression, lookup, item handles, mutation, return override, and `ResourceHandle`. |
 | `obelisk.structure_census.v1` | `promoted` or `excluded` | copied structure evidence, privacy/redaction, identity policy if exposed | Name StructureEvents SDK, structure census, structure identity, lookup, build placement policy, no-collision policy, and ownership lookup. |
 | `obelisk.object_identity_resource_handle.v1` | `promoted`, `excluded`, or `post-v1` | lifecycle/reuse semantics, privacy/redaction, paired runtime ResourceHandle evidence | Name ResourceHandle, object identity, object lookup, post-callback handles, persistent handles, serial reuse/wraparound, mutation, and return override. |
@@ -393,6 +401,6 @@ player progression/engrams, economy, mobility, and operator ingress/storage each
 narrow copied C ABI surface or an explicit named exclusion.
 
 Passing runtime/core-first RC gates, shipping the promoted foundation, or proving
-pre-identity installed-SDK foundation usefulness is insufficient for `v1.0 stable` until the
-blocker list is promoted or explicitly named as excluded/post-v1 in the release
-statement.
+pre-identity installed-SDK foundation usefulness is insufficient for `v1.0 stable` until
+the P0 dependency chain is promoted with evidence and non-chain blockers are promoted or
+explicitly named as excluded/post-v1 in the release statement.

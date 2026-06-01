@@ -124,6 +124,56 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.evidence.candidate_policy_artifacts[0].public_sdk_ready", labels)
         self.assertIn("$.runtime_ready", labels)
 
+    def test_rejects_missing_runtime_and_privacy_promotion_blockers(self) -> None:
+        decisions = self.load_decisions()
+        decisions["promotion_blockers"] = [
+            item
+            for item in decisions["promotion_blockers"]
+            if item["id"] not in {"runtime.lifecycle_evidence", "privacy.identifier_redaction"}
+        ]
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_required_promotion_blockers_missing", report["blockers"])
+        detail = next(
+            item for item in report["blocker_details"] if item["reason"] == "decisions_required_promotion_blockers_missing"
+        )
+        self.assertEqual(["privacy.identifier_redaction", "runtime.lifecycle_evidence"], detail["missing"])
+
+    def test_rejects_missing_privacy_required_before_public_header_items(self) -> None:
+        decisions = self.load_decisions()
+        decisions["required_before_public_header"] = [
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] != "privacy.logging_and_storage_policy"
+        ]
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_required_privacy_public_header_blockers_missing", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "decisions_required_privacy_public_header_blockers_missing"
+        )
+        self.assertEqual(["privacy.logging_and_storage_policy"], detail["missing"])
+
+    def test_rejects_privacy_required_before_public_header_marked_resolved(self) -> None:
+        decisions = self.load_decisions()
+        for item in decisions["required_before_public_header"]:
+            if item["id"] == "privacy.public_identifier_form":
+                item["status"] = "resolved"
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_required_privacy_public_header_blocker_not_unresolved", report["blockers"])
+
     def test_rejects_surface_promotion_or_public_contract(self) -> None:
         surfaces = self.load_surfaces()
         surface = self.player_identity_surface(surfaces)

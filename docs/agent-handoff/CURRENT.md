@@ -26,6 +26,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   and server-process epoch mismatch fails closed internally. These are guardrails only
   and do not promote identity, permissions/admin, Inventory SDK, runtime readiness,
   public SDK readiness, or v1 completion.
+- Latest SDK-v1 alignment: `docs/public_sdk_surfaces.json::v1_required_dependency_chain`
+  is the P0 complete-SDK spine: `player_identity`, `permissions_admin`,
+  `command_chat_response_path`, and `commands_replies`. Those four surfaces must be
+  promoted with evidence for any complete/full/production SDK wording; excluding or
+  naming them post-v1 is only scoped non-complete release-statement accounting.
 
 ## Hard Overrides
 
@@ -47,7 +52,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - RC public scope remains limited to `GameplayPolicyEvent`, minimal copied
   `ChatMessageEvent`, `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and
   process-local owner-token timers with explicit unregister; this is not a gameplay/module timer API, shared scheduler state, UE identity, or persistent handles. It is not a production-stable `v1.0` claim.
-- `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim; all blocker rows remain unresolved unless promoted or explicitly excluded/post-v1 where the reviewed v1 release statement and surface contract allow it.
+- `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list
+  for a complete SDK claim. The P0 `v1_required_dependency_chain` is promoted-only for a
+  complete SDK claim; non-chain blockers may be promoted or explicitly excluded/post-v1
+  where the reviewed v1 release statement and surface contract allow scoped accounting.
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or `production SDK` in public sinks unless that gate allows the stable SDK claim. The checker also enforces canonical `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data surfaces cannot become sufficient evidence by manifest drift.
 - Plugin Hub work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or package hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 contributor/package-shape evidence only and are not Plugin Hub inputs.
 - `obelisk.command_chat_response_path.v1` and `obelisk.commands_replies.v1` remain
@@ -56,7 +64,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   migration/ArkApi portability claims false.
 - `scripts/check_command_permission_route_gate.py --json` is the canonical offline
   planning gate for the principal -> permissions/admin -> command response ->
-  commands/replies route. It composes the permissions query fail-closed contract,
+  commands/replies route. It now starts with the player-identity public-contract gap
+  guardrail, then composes the permissions query fail-closed contract,
   permissions/admin public-readiness, command copied-response intent, command/principal/
   authz bridge, command copied-response intent lifecycle, command/chat response
   public-readiness, and commands/replies readiness checks. A pass is planning-only;

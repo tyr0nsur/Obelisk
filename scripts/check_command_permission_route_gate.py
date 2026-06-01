@@ -14,6 +14,12 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 DEFAULT_QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
+DEFAULT_PLAYER_IDENTITY_DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
+DEFAULT_PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE = (
+    REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json"
+)
+DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
 
@@ -25,6 +31,30 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_QUERY_CONTRACT,
         help="Permissions/admin query fail-closed artifact used by dependent planning checks.",
+    )
+    parser.add_argument(
+        "--player-identity-decisions",
+        type=Path,
+        default=DEFAULT_PLAYER_IDENTITY_DECISIONS,
+        help="Player identity public contract decisions manifest used by the route's identity gap guardrail.",
+    )
+    parser.add_argument(
+        "--public-sdk-surfaces",
+        type=Path,
+        default=DEFAULT_PUBLIC_SDK_SURFACES,
+        help="Public SDK surfaces manifest used by the route's identity gap guardrail.",
+    )
+    parser.add_argument(
+        "--player-identity-private-candidate-contract",
+        type=Path,
+        default=DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+        help="Private candidate-only identity contract used by the route's identity gap guardrail.",
+    )
+    parser.add_argument(
+        "--public-header",
+        type=Path,
+        default=DEFAULT_PUBLIC_HEADER,
+        help="Public C ABI header scanned by the route's identity gap guardrail.",
     )
     parser.add_argument(
         "--command-response-root",
@@ -49,6 +79,21 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
 
     query_artifact = str(args.query_failclosed_artifact)
     return [
+        (
+            "player_identity_public_contract_gap",
+            [
+                "check_player_identity_public_contract_gap_report.py",
+                "--decisions",
+                str(args.player_identity_decisions),
+                "--surfaces",
+                str(args.public_sdk_surfaces),
+                "--private-candidate-contract",
+                str(args.player_identity_private_candidate_contract),
+                "--public-header",
+                str(args.public_header),
+                "--json",
+            ],
+        ),
         (
             "permissions_query_failclosed",
             ["check_permissions_admin_query_failclosed_contract.py", query_artifact, "--json"],
