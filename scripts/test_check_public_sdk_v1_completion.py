@@ -781,10 +781,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         outcome_by_surface = {
             row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
         }
-        self.assertEqual(
-            outcome_by_surface["obelisk.permissions_admin.v1"]["release_statement_outcome"],
-            "post-v1",
-        )
+        for surface in (
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+        ):
+            with self.subTest(surface=surface):
+                self.assertIsNone(outcome_by_surface[surface]["release_statement_outcome"])
+                self.assertEqual(
+                    outcome_by_surface[surface]["next_action"],
+                    "priority dependency-chain blocker: promote with evidence; excluded/post-v1 cannot satisfy complete SDK",
+                )
         self.assertFalse(
             outcome_by_surface["obelisk.permissions_admin.v1"][
                 "release_statement_contract_satisfied"
