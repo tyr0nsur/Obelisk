@@ -116,3 +116,34 @@ validation, scanner/native-exec/ptrace/gcore use, broad `ProcessEvent` tracing, 
 or community notices, GitHub publication, public Inventory/Items SDK claims, item or
 inventory handles, `ResourceHandle`, mutation, return override, public callbacks, raw
 params, or production validation.
+
+## Offline Checker
+
+The candidate-only offline gate now has a mechanical checker:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_inventory_action_redacted_observer_gate.py \
+  --gate-enabled \
+  --observer-profile observer-debug \
+  --marker allow-observer-debug-window \
+  --marker allow-experimental-observers \
+  --marker enable-inventory-action-redacted-observer \
+  --marker enable-process-event-hook \
+  --marker disable-plugins \
+  --ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --fname-index 2651 \
+  --dispatch-budget 0 \
+  --json
+```
+
+It consumes committed sanitized fixtures through
+`scripts/check_inventory_action_fixture_boundary.py`, verifies the exact
+`inventory-action-compact-intake` target set and supported binary SHA, and derives the
+two accepted target FName indices from the fixture snapshots. The checker accepts only an
+offline candidate gate; it still reports `runtime_ready=false`, `public_sdk_ready=false`,
+`promotion_ready=false`, and `dispatch_ready=false`.
+
+The dedicated tests cover fail-closed blockers for disabled gate, missing marker,
+unsupported SHA, non-target FName, public contract leak, incomplete coverage, redaction
+drift, and non-zero dispatch budget. This remains planning hygiene only and does not
+authorize any runtime/live work.
