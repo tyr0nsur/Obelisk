@@ -72,6 +72,61 @@ REQUIRED_OBSERVED_EVENT_CASES = (
         "principal_action": "candidate_invalidated",
     },
 )
+REQUIRED_OBSERVED_EVENT_CASE_SET = frozenset(
+    tuple((key, tuple(value) if isinstance(value, list) else value) for key, value in case.items())
+    for case in REQUIRED_OBSERVED_EVENT_CASES
+)
+OBSERVED_EVENT_CASE_KEYS = frozenset(
+    ("sequence", "target", "role", "copied_bool_fields", "copied_bool_values", "principal_action")
+)
+EXPECTED_DETAIL_VALUES = {
+    "observer_gate": {
+        "target_set": {"players-lifecycle-anchor-candidates"},
+        "limit": {10},
+        "dispatch_limit": {0},
+        "delivery_claim": {"none"},
+        "principal_claim": {"none"},
+    },
+    "ShooterGameMode.HandleNewPlayer": {
+        "role": {"session_start", "session_start_rejected"},
+        "post_original": {"true"},
+        "copied_bool_fields": {"bIsFromLogin,ReturnValue"},
+        "copied_bool_values": {"1,1", "0,1"},
+        "redacted_count": {3},
+        "redacted_fields": {"NewPlayer,PlayerData,PlayerCharacter"},
+        "principal_action": {"candidate_created", "none"},
+        "principal_id_logged": {"false"},
+        "principal_generation_logged": {"false"},
+        "delivery_claim": {"none"},
+    },
+    "ShooterGameMode.OnLogout": {
+        "role": {"session_end"},
+        "post_original": {"true"},
+        "copied_bool_fields": {""},
+        "copied_bool_values": {""},
+        "redacted_count": {1},
+        "redacted_fields": {"Exiting"},
+        "principal_action": {"candidate_invalidated"},
+        "principal_id_logged": {"false"},
+        "principal_generation_logged": {"false"},
+        "delivery_claim": {"none"},
+    },
+}
+EXPECTED_DETAIL_KEYS = {
+    function: frozenset(details)
+    for function, details in EXPECTED_DETAIL_VALUES.items()
+}
+PRIVACY_BOUNDARY_KEYS = frozenset(
+    (
+        "copied_opaque_principal_only",
+        "redacted_runtime_observer",
+        "player_identifiers_logged",
+        "lookup_allowed",
+        "resource_handle_allowed",
+        "mutation_allowed",
+        "return_override_allowed",
+    )
+)
 REQUIRED_NON_CLAIMS = frozenset(
     (
         "approved runtime observer evidence only",
@@ -88,6 +143,13 @@ FORBIDDEN_KEY_RE = re.compile(
 )
 ALLOWED_FORBIDDEN_KEY_PATHS = (
     "$.schema",
+    "$.privacy_boundary.copied_opaque_principal_only",
+    "$.privacy_boundary.redacted_runtime_observer",
+    "$.privacy_boundary.player_identifiers_logged",
+    "$.privacy_boundary.lookup_allowed",
+    "$.privacy_boundary.resource_handle_allowed",
+    "$.privacy_boundary.mutation_allowed",
+    "$.privacy_boundary.return_override_allowed",
     "$.source_summary.modules.player_principal_lifecycle",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.HandleNewPlayer.details.principal_id_logged",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.OnLogout.details.principal_id_logged",
@@ -201,6 +263,45 @@ def require_values(
             expected=sorted(expected, key=str),
             observed=sorted(values, key=str),
         )
+    extra_values = values - expected
+    if extra_values:
+        add(
+            blockers,
+            "runtime_summary_detail_values_unexpected",
+            f"$.source_summary.modules.{MODULE}.functions.{function}.details.{key}",
+            expected=sorted(expected, key=str),
+            observed=sorted(values, key=str),
+            unexpected=sorted(extra_values, key=str),
+        )
+
+
+def require_expected_detail_values(
+    blockers: list[dict[str, Any]],
+    functions: dict[str, Any],
+    function: str,
+) -> None:
+    function_payload = functions.get(function)
+    label = f"$.source_summary.modules.{MODULE}.functions.{function}"
+    if not isinstance(function_payload, dict):
+        add(blockers, "runtime_summary_function_missing", label)
+        return
+    details = function_payload.get("details")
+    if not isinstance(details, dict):
+        add(blockers, "runtime_summary_function_details_missing", f"{label}.details")
+        return
+
+    expected_keys = EXPECTED_DETAIL_KEYS[function]
+    observed_keys = set(details)
+    unexpected_keys = observed_keys - expected_keys
+    if unexpected_keys:
+        add(
+            blockers,
+            "runtime_summary_detail_keys_unexpected",
+            f"{label}.details",
+            unexpected=sorted(unexpected_keys),
+        )
+    for key, expected in EXPECTED_DETAIL_VALUES[function].items():
+        require_values(blockers, functions, function, key, expected)
 
 
 def case_without_sequence(case: dict[str, Any]) -> dict[str, Any]:
@@ -211,6 +312,13 @@ def case_without_sequence(case: dict[str, Any]) -> dict[str, Any]:
         "copied_bool_values": case.get("copied_bool_values"),
         "principal_action": case.get("principal_action"),
     }
+
+
+def freeze_case(case: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
+    return tuple(
+        (key, tuple(value) if isinstance(value, list) else value)
+        for key, value in case.items()
+    )
 
 
 def validate_observed_event_cases(module: dict[str, Any], blockers: list[dict[str, Any]]) -> list[str]:
@@ -234,13 +342,30 @@ def validate_observed_event_cases(module: dict[str, Any], blockers: list[dict[st
         if not isinstance(case, dict):
             add(blockers, "runtime_summary_observed_event_case_invalid", case_label)
             continue
+        unexpected_keys = set(case) - OBSERVED_EVENT_CASE_KEYS
+        if unexpected_keys:
+            add(
+                blockers,
+                "runtime_summary_observed_event_case_keys_unexpected",
+                case_label,
+                unexpected=sorted(unexpected_keys),
+            )
         sequence = case.get("sequence")
         if not isinstance(sequence, int) or sequence <= previous_sequence:
             add(blockers, "runtime_summary_observed_event_case_sequence_invalid", f"{case_label}.sequence")
         if isinstance(sequence, int):
             previous_sequence = sequence
         compact_case = case_without_sequence(case)
-        if compact_case in remaining_expected:
+        case_is_required_shape = freeze_case(compact_case) in REQUIRED_OBSERVED_EVENT_CASE_SET
+        case_matches_remaining_required = compact_case in remaining_expected
+        if not case_is_required_shape or not case_matches_remaining_required:
+            add(
+                blockers,
+                "runtime_summary_observed_event_case_unexpected",
+                case_label,
+                observed=compact_case,
+            )
+        if case_matches_remaining_required:
             remaining_expected.remove(compact_case)
             observed_runtime_cases.append(case_labels[str(compact_case["role"])])
 
@@ -340,28 +465,8 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
     if not isinstance(functions, dict):
         add(blockers, "runtime_summary_functions_missing", f"$.source_summary.modules.{MODULE}.functions")
         return []
-    require_values(blockers, functions, "observer_gate", "target_set", {"players-lifecycle-anchor-candidates"})
-    require_values(blockers, functions, "observer_gate", "dispatch_limit", {0})
-    require_values(blockers, functions, "observer_gate", "delivery_claim", {"none"})
-    require_values(blockers, functions, "observer_gate", "principal_claim", {"none"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "role", {"session_start", "session_start_rejected"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "copied_bool_fields", {"bIsFromLogin,ReturnValue"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "copied_bool_values", {"1,1", "0,1"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "redacted_count", {3})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "redacted_fields", {"NewPlayer,PlayerData,PlayerCharacter"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "principal_action", {"candidate_created", "none"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "principal_id_logged", {"false"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "principal_generation_logged", {"false"})
-    require_values(blockers, functions, "ShooterGameMode.HandleNewPlayer", "delivery_claim", {"none"})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "role", {"session_end"})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "copied_bool_fields", {""})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "copied_bool_values", {""})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "redacted_count", {1})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "redacted_fields", {"Exiting"})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "principal_action", {"candidate_invalidated"})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "principal_id_logged", {"false"})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "principal_generation_logged", {"false"})
-    require_values(blockers, functions, "ShooterGameMode.OnLogout", "delivery_claim", {"none"})
+    for function in EXPECTED_DETAIL_VALUES:
+        require_expected_detail_values(blockers, functions, function)
     return validate_observed_event_cases(module, blockers)
 
 
@@ -471,6 +576,14 @@ def validate_privacy(boundary: Any, blockers: list[dict[str, Any]]) -> None:
     if not isinstance(boundary, dict):
         add(blockers, "privacy_boundary_missing", "$.privacy_boundary")
         return
+    unexpected_keys = set(boundary) - PRIVACY_BOUNDARY_KEYS
+    if unexpected_keys:
+        add(
+            blockers,
+            "privacy_boundary_keys_unexpected",
+            "$.privacy_boundary",
+            unexpected=sorted(unexpected_keys),
+        )
     for key in ("copied_opaque_principal_only", "redacted_runtime_observer", "player_identifiers_logged"):
         expected = False if key == "player_identifiers_logged" else True
         if boundary.get(key) is not expected:
@@ -508,8 +621,6 @@ def validate_promotion_gate(gate: Any, blockers: list[dict[str, Any]]) -> None:
 
 
 def find_forbidden_key(value: Any, trail: str = "$") -> tuple[str, str] | None:
-    if any(token in trail for token in NEGATIVE_CONTEXT_TOKENS):
-        return None
     if trail in ALLOWED_FORBIDDEN_LEAF_PATHS:
         return None
     if isinstance(value, dict):
@@ -530,7 +641,12 @@ def find_forbidden_key(value: Any, trail: str = "$") -> tuple[str, str] | None:
             found = find_forbidden_key(child, f"{trail}[{index}]")
             if found is not None:
                 return found
-    elif isinstance(value, str) and FORBIDDEN_KEY_RE.search(value) and "does not expose" not in value:
+    elif (
+        isinstance(value, str)
+        and not any(token in trail for token in NEGATIVE_CONTEXT_TOKENS)
+        and FORBIDDEN_KEY_RE.search(value)
+        and "does not expose" not in value
+    ):
         return value, trail
     return None
 

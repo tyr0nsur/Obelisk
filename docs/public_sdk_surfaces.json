@@ -733,6 +733,7 @@
           "transfer-ufunction-intake",
           "transfer-baccept-only-policy-slice",
           "buff-compact-intake",
+          "buff-breadth-intake",
           "tribe-compact-intake"
         ]
       },
@@ -808,7 +809,8 @@
           "id": "buff_status",
           "status": "planning",
           "current_evidence": [
-            "buff-compact-intake"
+            "buff-compact-intake",
+            "buff-breadth-intake"
           ],
           "current_blocker": "no public Buff/status SDK ABI, no class/object redaction contract, no lifecycle/stacking/invalidation semantics, and no aggregate/count/proximity or mutation API",
           "allowed_v1_outcome": "promoted as a narrow copied C ABI surface or explicitly excluded by name from v1"

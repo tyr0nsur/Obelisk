@@ -28,6 +28,8 @@
     "admin mutation",
     "storage/persistence",
     "operator ingress",
+    "principal or permission claims from command text",
+    "principal or permission claims from operator config",
     "raw UE pointers",
     "raw ProcessEvent params",
     "raw FString storage",
@@ -125,6 +127,8 @@
         "unsupported principal_scope_flags fails closed",
         "missing permission policy provenance fails closed",
         "permission denial or unknown result never dispatches a command",
+        "command text remains copied request data only and cannot establish identity, permission authority, or policy provenance",
+        "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
         "command callbacks cannot self-attest permission authority",
         "admin-like commands require a separately promoted admin authority contract"
       ]

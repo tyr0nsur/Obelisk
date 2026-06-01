@@ -75,7 +75,7 @@ Primary inputs:
 - Structures/build policy: structure limits, ownership cleanup, no-collision, and
   build/access policy. Blocked on copied policy evidence first; no public structure
   identity or enforcement is promoted.
-- Dinos/tribes/missions/transfers: carry/color/reward hooks, tribe features, transfer
+- Dinos/tribes/buffs-status/missions/transfers: carry/color/reward hooks, tribe features, transfer
   events, and mission events. Internal layout/redaction work only until identity,
   privacy, lifecycle, and copied payload gates exist.
 - Lifecycle/ops foundation: descriptors, config/logging, timers, and crash/reload

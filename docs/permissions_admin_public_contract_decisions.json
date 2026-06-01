@@ -51,7 +51,7 @@
         "runtime observation must establish principal identity before permissions/admin can consume it",
         "operator config enables surfaces or policy inputs only and cannot establish principal identity",
         "command text cannot establish principal identity",
-        "permissions/admin remains blocked until this dependency is promoted or explicitly scoped in a reviewed v1 release statement"
+        "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded"
       ]
     },
     {

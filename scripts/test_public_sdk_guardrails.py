@@ -7877,7 +7877,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Shared persistence, database-backed state, webhook services",
             "Commands, permissions, economy, kits, shops, RCON",
             "Persistent storage, databases, webhooks",
-            "Players, tribes, dinos, missions, transfers",
+            "Players, tribes, dinos, buffs/status, missions, transfers",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, compact)

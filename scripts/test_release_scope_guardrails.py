@@ -536,7 +536,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("scripts/check_release_readiness.sh", build_skill)
         self.assertIn("scripts/check_release_readiness.sh", workflow_skill)
         self.assertIn("canonical local and CI gate", build_skill)
-        self.assertIn("single core-first release gate", workflow_skill)
+        self.assertIn("single release-readiness entry point", workflow_skill)
         self.assertIn("analyze_runtime_observer_log.py --fail-on-quality-blockers", pr_template)
         self.assertIn("observational only", pr_template)
         self.assertIn("not release readiness or second-source promotion evidence", pr_template)
@@ -862,7 +862,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             compact,
         )
         self.assertLess(
-            matrix.index("Players, tribes, dinos, missions, transfers"),
+            matrix.index("Players, tribes, dinos, buffs/status, missions, transfers"),
             matrix.index("Player identity lifecycle intake"),
         )
 

@@ -873,6 +873,80 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
 
+    def test_approved_runtime_evidence_routes_to_identity_public_contract_gate(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"layout_ready": True, "promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            lifecycle_manifest = Path(tmp) / "lifecycle-candidates.json"
+            principal_manifest = Path(tmp) / "principal-policy.json"
+            approved_runtime_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            approved_runtime_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                artifact_root=Path("/tmp/player-identity-artifacts"),
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=Path("/tmp/player-identity-second-source"),
+                lifecycle_anchor_candidates_manifest=lifecycle_manifest,
+                principal_invalidation_policy_manifest=principal_manifest,
+                runtime_principal_lifecycle_evidence_manifest=None,
+                approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime_manifest,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertNotIn("approved_runtime_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["next_step"], "prepare_identity_public_contract_review")
+        self.assertEqual(payload["primary_blocker"], "identity_public_contract_gate")
+        self.assertEqual(payload["next_actionable_blocker"]["code"], "identity_public_contract_gate")
+        self.assertEqual(
+            payload["next_actionable_blocker"]["decision_manifest"],
+            "docs/player_identity_public_contract_decisions.json",
+        )
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -1351,9 +1351,10 @@ def next_actionable_blocker(
         }
     return {
         **base,
-        "code": "validate_first_evidence_consume_promote_blocked",
-        "blocked_until": "consume_accepted_promote_blocked_first_evidence_artifact",
-        "why": "candidate evidence is ready enough for internal planning only; validate it as consume-only and promote-blocked",
+        "code": "identity_public_contract_gate",
+        "blocked_until": "reviewed_identity_public_contract",
+        "why": "runtime evidence is accepted for the player-principal lane, but public identity still requires the reviewed public contract gate",
+        "decision_manifest": "docs/player_identity_public_contract_decisions.json",
     }
 
 

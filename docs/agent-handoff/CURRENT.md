@@ -184,8 +184,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   unless a new binary hash or rejected evidence requires it.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0 principal ->
   permissions/admin -> command response; P1 economy/storage/operator
-  ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
-  missions/transfers. Do not copy ArkApi/NextGenPlugins implementation details.
+  ingress, inventory/items mutation, and structure/build policy; P2 dino/tribe/
+  buff-status/mission/transfer leaf lanes. Do not copy ArkApi/NextGenPlugins
+  implementation details.
 - No-core fallback: keep progress offline through guardrails, permission/admin query-only
   design, command/principal contract, and inventory copied-signal hygiene. inventory copied
   signals are the higher-value side lane, but do not displace identity -> permissions/admin

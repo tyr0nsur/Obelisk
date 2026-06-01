@@ -57,7 +57,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(payload["schema"], "obelisk.commands-replies-public-contract-decisions.v1")
         self.assertEqual(payload["surface"], "obelisk.commands_replies.v1")
         self.assertEqual(payload["status"], "blocked")
-        self.assertEqual(payload["planning_stage"], "post-v1")
+        self.assertEqual(payload["planning_stage"], "v1_completion_blocker")
         self.assertTrue(payload["not_sufficient_for_v1"])
         self.assertFalse(payload["public_header_allowed"])
         self.assertEqual(payload["public_header_symbols_now"], [])
@@ -77,7 +77,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
         response_path = requirements["dependency.promoted_command_chat_response_path"]
         self.assertEqual(response_path["required_dependency"], "obelisk.command_chat_response_path.v1")
         for behavior in (
-            "commands/replies remains blocked while command_chat_response_path is planning or post-v1",
+            "commands/replies remains blocked while command_chat_response_path is unpromoted or unresolved",
             "passive ChatMessageEvent parsing does not authorize replies",
             "legacy CallProcessEvent debug access does not authorize responses",
             "no response path is public through commands/replies until the response path is separately promoted",
@@ -144,6 +144,11 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
             "UFunction pointers",
         ):
             self.assertIn(forbidden, payload["forbidden_public_contract"])
+        for forbidden in (
+            "principal or permission claims from command text",
+            "principal or permission claims from operator config",
+        ):
+            self.assertIn(forbidden, payload["forbidden_public_contract"])
 
     def test_auth_lifecycle_abuse_and_arkapi_boundaries_are_explicit(self) -> None:
         payload = self.load_decisions()
@@ -156,6 +161,8 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
             "stale principal fails closed",
             "unsupported principal_scope_flags fails closed",
             "permission denial or unknown result never dispatches a command",
+            "command text remains copied request data only and cannot establish identity, permission authority, or policy provenance",
+            "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
             "command callbacks cannot self-attest permission authority",
         ):
             self.assertIn(behavior, auth["required_behavior"])
@@ -220,9 +227,9 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
 
         release = requirements["release.not_sufficient_for_v1"]
         for behavior in (
-            "commands/replies is planning/post-v1 now",
+            "commands/replies is a blocked v1 completion surface now",
             "commands/replies is not sufficient for a complete v1 SDK claim now",
-            "public_contract stays empty while status is post-v1 or blocked",
+            "public_contract stays empty while status is blocked or unresolved",
             "v1_completion_required must not change because of this planning contract alone",
         ):
             self.assertIn(behavior, release["required_behavior"])

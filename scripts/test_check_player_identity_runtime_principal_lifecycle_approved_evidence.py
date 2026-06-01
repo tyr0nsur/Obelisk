@@ -269,6 +269,81 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime_summary_required_observed_event_cases_missing", report["blockers"])
 
+    def test_rejects_extra_lifecycle_detail_values(self) -> None:
+        payload = manifest()
+        details = payload["source_summary"]["modules"]["player_principal_lifecycle"]["functions"][
+            "ShooterGameMode.HandleNewPlayer"
+        ]["details"]
+        details["principal_action"].append("public_lookup_enabled")
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_detail_values_unexpected", report["blockers"])
+
+    def test_rejects_extra_lifecycle_detail_keys(self) -> None:
+        payload = manifest()
+        details = payload["source_summary"]["modules"]["player_principal_lifecycle"]["functions"][
+            "ShooterGameMode.HandleNewPlayer"
+        ]["details"]
+        details["redacted_fields_extra"] = ["SteamId"]
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_detail_keys_unexpected", report["blockers"])
+
+    def test_rejects_extra_observed_lifecycle_case(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        module["observed_event_cases"].append(
+            {
+                "sequence": 4,
+                "target": "ShooterGameMode.HandleNewPlayer",
+                "role": "session_start_promoted",
+                "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+                "copied_bool_values": ["1", "1"],
+                "principal_action": "candidate_created",
+            }
+        )
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_observed_event_case_unexpected", report["blockers"])
+
+    def test_rejects_duplicate_observed_lifecycle_case(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        duplicate = copy.deepcopy(module["observed_event_cases"][0])
+        duplicate["sequence"] = 4
+        module["observed_event_cases"].append(duplicate)
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_observed_event_case_unexpected", report["blockers"])
+
+    def test_rejects_extra_observed_lifecycle_case_keys(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        module["observed_event_cases"][0]["raw_params"] = "redacted"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_observed_event_case_keys_unexpected", report["blockers"])
+
+    def test_rejects_extra_privacy_boundary_keys(self) -> None:
+        payload = manifest()
+        payload["privacy_boundary"]["steamid"] = "redacted"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("privacy_boundary_keys_unexpected", report["blockers"])
+        self.assertIn("forbidden_identity_or_ue_internal_leakage", report["blockers"])
+
     def test_rejects_public_readiness_and_identity_leak_overclaims(self) -> None:
         payload = manifest()
         payload["public_sdk_ready"] = True
