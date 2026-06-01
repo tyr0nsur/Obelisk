@@ -23,12 +23,15 @@ the excluded capability.
 The machine-readable `v1_sdk_completion_blockers` list records the high-demand categories
 that currently prevent a complete SDK claim: player identity, permissions/admin,
 command/chat response path, commands/replies, inventory/items mutation, structure
-census/build policy, gameplay modules including buffs, player
-services/economy/mobility/areas, and operator ingress/storage. Lifecycle ops recovery is
-tracked as `obelisk.lifecycle_ops_recovery.v1`
+census/build policy, object identity/ResourceHandle, lifecycle ops recovery, gameplay
+modules including mission/transfer/dino/tribe/buff-status, player
+services/economy/mobility/areas, operator ingress/storage, and gameplay/server tick
+callbacks. Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`
 so lifecycle/config/logging cannot be mistaken for watchdog, reload, restart, or server
-recovery APIs. Gameplay/server tick callbacks are also tracked as a separate
-v1 completion blocker so process-local timers are not mistaken for UE gameplay tick hooks.
+recovery APIs. Object identity/ResourceHandle is tracked separately so copied category
+metadata cannot be mistaken for lookup handles, persistent handles, or post-callback
+object correlation. Gameplay/server tick callbacks are also tracked as a separate v1
+completion blocker so process-local timers are not mistaken for UE gameplay tick hooks.
 The P0 chain must be promoted before `v1_completion_required` can become true; non-chain
 blockers must be promoted or deliberately excluded/post-v1 in the release statement before
 they stop blocking scoped support-statement accounting.

@@ -129,6 +129,10 @@ ITEM_RETURN_ONLY_EXCLUDED_REASONS = {
     "PrimalItem.UseItemOntoItem.AdditionalData": "non_return_scalar_excluded",
 }
 
+INVENTORY_ACTION_METADATA_ONLY_SCALAR_FIELDS = {
+    "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData",
+}
+
 DINO_COMPACT_DESCRIPTOR_EXPECTED_SHAPES: dict[str, dict[str, Any]] = {
     "PrimalDinoCharacter.AddPassenger": {
         "function_flags": 0x4020401,
@@ -903,7 +907,12 @@ def redaction_notes(prop: dict[str, Any]) -> list[str]:
     return notes
 
 
-def classify_property(prop: dict[str, Any], return_value_offset: Any) -> dict[str, Any]:
+def classify_property(
+    prop: dict[str, Any],
+    return_value_offset: Any,
+    *,
+    target: str | None = None,
+) -> dict[str, Any]:
     name = prop.get("name")
     class_name = prop.get("class_name")
     if not isinstance(name, str) or not name:
@@ -912,7 +921,12 @@ def classify_property(prop: dict[str, Any], return_value_offset: Any) -> dict[st
         raise SystemExit(f"invalid property class for {name}: {prop!r}")
 
     flags = property_flags(prop)
-    type_name, reason = redacted_type(prop)
+    field_key = f"{target}.{name}" if target is not None else None
+    if field_key in INVENTORY_ACTION_METADATA_ONLY_SCALAR_FIELDS and class_name in SCALAR_TYPE_BY_CLASS:
+        type_name = "redacted_action_metadata_scalar"
+        reason = "inventory action metadata scalar redacted; no copied range"
+    else:
+        type_name, reason = redacted_type(prop)
     field: dict[str, Any] = {
         "name": name,
         "direction": classify_direction(prop, return_value_offset),
@@ -982,6 +996,7 @@ def build_target_signature(
         raise SystemExit(f"snapshot property_chain.properties must be a list: {path}")
 
     return_value_offset = target_payload.get("return_value_offset")
+    identity = target_name(target_identity)
     params: list[dict[str, Any]] = []
     blocked: list[dict[str, Any]] = []
     for prop in properties:
@@ -991,13 +1006,12 @@ def build_target_signature(
         if prop.get("status") != "candidate":
             blocked.append(blocked_property(prop, "property status is not candidate"))
             continue
-        field = classify_property(prop, return_value_offset)
+        field = classify_property(prop, return_value_offset, target=identity)
         if field["type"] == "blocked_unknown":
             blocked.append(blocked_property(prop, field["redaction"]))
             continue
         params.append(field)
 
-    identity = target_name(target_identity)
     signature = {
         "target": identity,
         "outer_name": target_identity.get("outer_name"),
@@ -1040,6 +1054,8 @@ def scalar_summary_kind(type_name: str) -> str | None:
 
 
 def redacted_summary_reason(type_name: str) -> str | None:
+    if type_name == "redacted_action_metadata_scalar":
+        return "action_metadata_scalar"
     if type_name == "redacted_sensitive_scalar":
         return "sensitive_scalar"
     if type_name in {"redacted_uobject_ref", "redacted_interface_ref"}:

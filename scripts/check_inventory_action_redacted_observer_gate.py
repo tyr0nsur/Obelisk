@@ -26,7 +26,8 @@ import check_inventory_action_fixture_boundary as fixture_boundary  # noqa: E402
 REPORT_SCHEMA = "obelisk.inventory-action-redacted-observer-gate-check.v1"
 TARGET_SET = fixture_boundary.TARGET_SET
 EXPECTED_TARGETS = fixture_boundary.EXPECTED_TARGETS
-EXPECTED_COPIED_INTEGER_FIELDS = (
+EXPECTED_COPIED_INTEGER_FIELDS: tuple[str, ...] = ()
+EXPECTED_REDACTED_ACTION_METADATA_FIELDS = (
     "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData",
 )
 EXPECTED_REDACTED_STRUCT_FIELDS = (
@@ -454,6 +455,13 @@ def validate_fixture_boundary_report(report: dict[str, Any], blockers: list[dict
             expected=list(EXPECTED_COPIED_INTEGER_FIELDS),
             value=summary.get("copied_integer_fields"),
         )
+    if summary.get("redacted_action_metadata_fields") != list(EXPECTED_REDACTED_ACTION_METADATA_FIELDS):
+        append_blocker(
+            blockers,
+            "redacted_action_metadata_contract_mismatch",
+            expected=list(EXPECTED_REDACTED_ACTION_METADATA_FIELDS),
+            value=summary.get("redacted_action_metadata_fields"),
+        )
     if summary.get("redacted_struct_fields") != list(EXPECTED_REDACTED_STRUCT_FIELDS):
         append_blocker(
             blockers,
@@ -813,7 +821,7 @@ def build_check(
             "offline preflight only; does not read runtime metadata, params, cores, or server files",
             "candidate redacted observer planning only; no runtime observer is implemented or approved",
             "no public Inventory SDK, Items SDK, mutation, lookup, ResourceHandle, return override, or public ABI",
-            "AdditionalData remains a copied int32 candidate only with no stable semantic claim",
+            "AdditionalData remains action metadata only with no copied range or stable semantic claim",
         ],
     }
 

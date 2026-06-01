@@ -68,6 +68,17 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   the inventory copied-scalar provenance pattern. This does not promote Inventory SDK,
   Items SDK, lookup, mutation, `ResourceHandle`, return override, runtime readiness, or v1
   completion.
+- Latest inventory-action/P0 guardrail hardening: redacted inventory-action signatures now
+  classify `ServerRequestInventoryUseItemWithActor.AdditionalData` as
+  `redacted_action_metadata_scalar`, not a copied integer candidate. Fixture and observer
+  gates expect zero copied inventory-action scalars and require `AdditionalData` to stay in
+  the redacted action-metadata bucket, matching runtime `ExposesRange=false` behavior.
+  The command/permission route gate also rejects malformed or schema-drifted
+  `check_player_identity_first_evidence_readiness.py` output instead of falling back to a
+  default identity blocker. Public docs now state that the P0 dependency chain must be
+  promoted with evidence and cannot be satisfied by excluded/post-v1 accounting. These are
+  guardrails only and do not promote Inventory SDK, Items SDK, command replies, runtime
+  readiness, or v1 completion.
 
 ## Hard Overrides
 
@@ -244,9 +255,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Next offline-only inventory/items patch should continue tightening copied-signal and
   redacted observer boundaries, especially `scripts/check_inventory_action_redacted_observer_gate.py`
   and `scripts/check_inventory_action_fixture_boundary.py`, while preserving
-  `InventoryReflection` action targets as `ExposesRange=false`. Do not convert
-  `AdditionalData` into public copied range, dispatch, Inventory SDK, Items SDK, lookup,
-  mutation, return override, or v1 completion evidence.
+  `InventoryReflection` action targets as `ExposesRange=false`. `AdditionalData` is
+  action metadata only with no copied range or stable semantic claim. Do not convert it
+  into public copied range, dispatch, Inventory SDK, Items SDK, lookup, mutation, return
+  override, or v1 completion evidence.
 - `command-chat-response-route-planning` already has documented distinct second-source
   planning evidence under
   `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
@@ -260,8 +272,23 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
   `PrimalStructure.BPIsAllowedToBuildEx`; its checker now freezes field shape/redaction and
   prevents public payload, runtime-ready, enforcement-ready, or return-override claims.
+- Next structure offline hardening should target `scripts/check_structure_build_policy_offline_intake.py`
+  with snapshot envelope checks: protected/symlink path rejection, readiness snapshot paths
+  under the expected `base/` root, frozen artifact identity/address policy, and no
+  exposed/copied/value-bearing keys in redacted/layout-only fields. This remains fixture
+  hardening only, not Structure SDK, enforcement, runtime readiness, return override,
+  identity/lookup, mutation, `ResourceHandle`, or v1 completion.
 - ResourceHandle remains blocked on rejected runtime object samples plus runtime serial
-  reuse/wraparound semantics; do not restart broad FName/GObjects/core scans for it.
+  reuse/wraparound semantics; do not restart broad FName/GObjects/core scans for it. The
+  strict next evidence pair is runtime object rejection samples plus runtime serial
+  semantics from an approved runtime window; offline/core artifacts cannot synthesize that
+  blocker away. A future public-contract decision checker can reduce wording risk, but it
+  does not unlock object identity, lookup, or post-callback handles.
+- Mission is the strongest non-inventory offline leaf for later rounds: keep
+  `mission-copied-bool-policy-slice` consume-only, preserve exactly three copied targets
+  and five bool fields, keep `MissionType.GetPlayerUsableItems` recognition-only with
+  copied bool count `0`, and avoid Mission/Transfer/Dino/Tribe/Buff SDK, identity,
+  mutation, return override, runtime hook wiring, public ABI, or installed SDK exposure.
 - Demand-map priority from NextGenPlugins names is P0 principal -> permissions/admin ->
   command response; P1 economy/storage/operator ingress, inventory/items mutation, and
   structure/build policy; P2 dino/tribe/buff-status/mission/transfer leaves. Names are

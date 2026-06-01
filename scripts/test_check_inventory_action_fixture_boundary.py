@@ -52,11 +52,12 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         self.assertEqual("complete", summary["target_set_coverage_status"])
         self.assertEqual("candidate_only", summary["artifact_status"])
         self.assertFalse(summary["promotion_ready"])
-        self.assertEqual({"integer": 1}, summary["copied_scalar_by_kind"])
-        self.assertEqual({"object_ref": 3, "struct": 2}, summary["redacted_by_reason"])
+        self.assertEqual({}, summary["copied_scalar_by_kind"])
+        self.assertEqual({"action_metadata_scalar": 1, "object_ref": 3, "struct": 2}, summary["redacted_by_reason"])
+        self.assertEqual([], summary["copied_integer_fields"])
         self.assertEqual(
             ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
-            summary["copied_integer_fields"],
+            summary["redacted_action_metadata_fields"],
         )
         self.assertEqual(
             [
@@ -88,7 +89,7 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         mutated["signature_count"] = 3
         mutated["target_set_coverage"]["status"] = "partial"
         mutated["safety_summary"]["promotion_ready"] = True
-        mutated["safety_summary"]["copied_scalar_by_kind"] = {"integer": 2}
+        mutated["safety_summary"]["copied_scalar_by_kind"] = {"integer": 1}
         mutated["safety_summary"]["redacted_by_reason"] = {"object_ref": 3, "struct": 1}
 
         blockers: list[dict] = []
@@ -100,6 +101,37 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         self.assertIn("safety_value_mismatch", reasons)
         self.assertIn("copied_scalar_by_kind_mismatch", reasons)
         self.assertIn("redacted_by_reason_mismatch", reasons)
+
+    def test_additional_data_copied_scalar_drift_fails_closed(self) -> None:
+        report = checker.build_fixture_report()
+        mutated = copy.deepcopy(report)
+        with_actor = next(
+            signature
+            for signature in mutated["signatures"]
+            if signature["target"] == "ShooterPlayerController.ServerRequestInventoryUseItemWithActor"
+        )
+        additional_data = next(param for param in with_actor["params"] if param["name"] == "AdditionalData")
+        additional_data["type"] = "int32"
+        additional_data["redaction"] = "copied scalar candidate"
+        mutated["safety_summary"]["copied_scalar_count_total"] = 1
+        mutated["safety_summary"]["copied_scalar_by_kind"] = {"integer": 1}
+        mutated["safety_summary"]["redacted_count_total"] = 5
+        mutated["safety_summary"]["redacted_by_reason"] = {"object_ref": 3, "struct": 2}
+
+        blockers: list[dict] = []
+        summary = checker.validate_report(mutated, blockers)
+        reasons = {blocker["reason"] for blocker in blockers}
+
+        self.assertEqual([], summary["copied_integer_fields"])
+        self.assertEqual(
+            ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
+            summary["redacted_action_metadata_fields"],
+        )
+        self.assertIn("safety_value_mismatch", reasons)
+        self.assertIn("copied_scalar_by_kind_mismatch", reasons)
+        self.assertIn("redacted_by_reason_mismatch", reasons)
+        self.assertIn("param_type_mismatch", reasons)
+        self.assertIn("redacted_action_metadata_scalar_redaction_mismatch", reasons)
 
     def test_item_action_fields_crossing_public_contract_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -291,7 +323,7 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in blockers}
 
         self.assertIn("param_type_mismatch", reasons)
-        self.assertIn("copied_scalar_redaction_mismatch", reasons)
+        self.assertIn("redacted_action_metadata_scalar_redaction_mismatch", reasons)
 
     def test_function_and_param_shape_drift_fails_closed(self) -> None:
         report = checker.build_fixture_report()

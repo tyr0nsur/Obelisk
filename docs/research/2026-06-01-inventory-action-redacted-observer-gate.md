@@ -21,10 +21,10 @@ The only planning input is the existing `inventory-action-compact-intake` target
 
 The current accepted offline evidence is layout/signature evidence only. It keeps
 `ItemId` and `ItemID1` as redacted structs, keeps `InventoryComp` and `anActor` as
-redacted UObject references, and treats `AdditionalData` as a copied `int32` candidate
-with unknown semantics. That evidence does not promote an Inventory SDK, Items SDK,
-item identity, inventory identity, actor identity, lookup, `ResourceHandle`, mutation,
-return override, raw params, plugin callbacks, or public ABI.
+redacted UObject references, and keeps `AdditionalData` as redacted action metadata
+with no copied range or stable semantics. That evidence does not promote an Inventory
+SDK, Items SDK, item identity, inventory identity, actor identity, lookup,
+`ResourceHandle`, mutation, return override, raw params, plugin callbacks, or public ABI.
 
 ## Future Gate Shape
 
@@ -75,7 +75,7 @@ If a later implementation exists, recognition must be exact before copying anyth
   the accepted target set;
 - redacted object references only for `InventoryComp` and `anActor`;
 - redacted struct fields only for `ItemId` and `ItemID1`;
-- copied scalar only for `AdditionalData`, and still candidate-only;
+- redacted action metadata only for `AdditionalData`, with no copied range;
 - no `ItemNetID` identity, UObject identity, actor identity, inventory identity, pointer,
   object index, FName/GObjects value, raw buffer, raw params, object name, class name,
   player name, platform id, tribe id, location, or hash of redacted identity values.
@@ -133,6 +133,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_inventory_action_redacted_observ
   --ark-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
   --fname-index 2651 \
   --dispatch-budget 0 \
+  --observation-budget 1 \
   --json
 ```
 
@@ -145,8 +146,8 @@ offline candidate gate; it still reports `runtime_ready=false`, `public_sdk_read
 
 The dedicated tests cover fail-closed blockers for disabled gate, missing marker,
 unsupported SHA, non-target FName, public contract leak, incomplete coverage, redaction
-drift, and non-zero dispatch budget. This remains planning hygiene only and does not
-authorize any runtime/live work.
+drift, copied `AdditionalData` drift, and non-zero dispatch budget. This remains
+planning hygiene only and does not authorize any runtime/live work.
 
 ## C++ Metadata Recognition
 

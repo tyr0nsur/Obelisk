@@ -22,6 +22,7 @@ DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE = (
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
+PLAYER_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
 ALLOWED_CRITICAL_PATH_BLOCKERS = {
     "approved_runtime_evidence_missing",
     "identity_public_contract_gate",
@@ -244,6 +245,10 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
     blockers: list[str] = []
     if phase.get("current_surface") != "obelisk.player_identity.v1":
         blockers.append("critical_path_identity_gate_not_locked")
+    if phase.get("source_checker_schema") != PLAYER_IDENTITY_FIRST_EVIDENCE_SCHEMA:
+        blockers.append("critical_path_identity_readiness_schema_mismatch")
+    if phase.get("source_checker_parse_error") is not None:
+        blockers.append("critical_path_identity_readiness_output_invalid")
     if phase.get("current_blocker") not in ALLOWED_CRITICAL_PATH_BLOCKERS:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
     for key in (

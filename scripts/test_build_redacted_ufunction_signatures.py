@@ -1416,10 +1416,10 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIs(False, safety["promotion_ready"])
         self.assertEqual("offline_review_only", safety["intended_use"])
         self.assertEqual(6, safety["param_count_total"])
-        self.assertEqual(1, safety["copied_scalar_count_total"])
-        self.assertEqual({"integer": 1}, safety["copied_scalar_by_kind"])
-        self.assertEqual(5, safety["redacted_count_total"])
-        self.assertEqual({"object_ref": 3, "struct": 2}, safety["redacted_by_reason"])
+        self.assertEqual(0, safety["copied_scalar_count_total"])
+        self.assertEqual({}, safety["copied_scalar_by_kind"])
+        self.assertEqual(6, safety["redacted_count_total"])
+        self.assertEqual({"action_metadata_scalar": 1, "object_ref": 3, "struct": 2}, safety["redacted_by_reason"])
         self.assertIn("function_flags_not_bound_to_exact_target_gate", safety["promotion_blockers_by_reason"])
         self.assertIn("property_flags_unknown_bits", safety["promotion_blockers_by_reason"])
 
@@ -1445,14 +1445,14 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertEqual("StructProperty identity/payload redacted", with_actor["params"][2]["redaction"])
         self.assertEqual("candidate", with_actor["params"][2]["status"])
         self.assertEqual("AdditionalData", with_actor["params"][3]["name"])
-        self.assertEqual("int32", with_actor["params"][3]["type"])
+        self.assertEqual("redacted_action_metadata_scalar", with_actor["params"][3]["type"])
         self.assertEqual("IntProperty", with_actor["params"][3]["source_property_class"])
-        self.assertEqual("copied scalar candidate", with_actor["params"][3]["redaction"])
+        self.assertEqual("inventory action metadata scalar redacted; no copied range", with_actor["params"][3]["redaction"])
         self.assertEqual("candidate", with_actor["params"][3]["status"])
         self.assertEqual("in", with_actor["params"][3]["direction"])
         self.assertEqual(24, with_actor["params"][3]["offset"])
         self.assertEqual(4, with_actor["params"][3]["element_size"])
-        self.assertEqual(["AdditionalData"], [
+        self.assertEqual([], [
             param["name"]
             for signature in report["signatures"]
             for param in signature["params"]

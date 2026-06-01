@@ -115,9 +115,10 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
                 self.assertTrue(payload["gate"]["cheap_gate_passed"])
                 self.assertTrue(payload["gate"]["observation_budget_reservation_allowed"])
                 self.assert_no_runtime_read_or_dispatch_budget(payload)
+                self.assertEqual([], payload["fixture_summary"]["copied_integer_fields"])
                 self.assertEqual(
                     ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
-                    payload["fixture_summary"]["copied_integer_fields"],
+                    payload["fixture_summary"]["redacted_action_metadata_fields"],
                 )
                 self.assertEqual(
                     [
@@ -543,6 +544,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
             "ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData",
             "ShooterPlayerController.ServerRequestInventoryUseItem.ItemId",
         ]
+        mutated["summary"]["redacted_action_metadata_fields"] = []
         mutated["runtime_ready"] = True
         mutated["promotion_ready"] = True
 
@@ -562,6 +564,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("coverage_incomplete", reasons)
         self.assertIn("redaction_contract_mismatch", reasons)
         self.assertIn("scalar_contract_mismatch", reasons)
+        self.assertIn("redacted_action_metadata_contract_mismatch", reasons)
         self.assertIn("public_or_runtime_flag_promoted", reasons)
         self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
         self.assert_no_runtime_read_or_dispatch_budget(payload)

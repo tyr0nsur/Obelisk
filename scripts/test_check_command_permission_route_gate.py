@@ -142,6 +142,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         phase = {
             "current_surface": "obelisk.player_identity.v1",
             "current_blocker": "approved_runtime_evidence_missing",
+            "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+            "source_checker_parse_error": None,
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -162,6 +164,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         phase = {
             "current_surface": "obelisk.player_identity.v1",
             "current_blocker": "unexpected",
+            "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+            "source_checker_parse_error": None,
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": True,
@@ -173,6 +177,26 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         blockers = ROUTE_GATE.validate_critical_path_phase(phase)
         self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
         self.assertIn("critical_path_commands_replies_unlocked_must_stay_false", blockers)
+
+    def test_critical_path_phase_rejects_unparsable_or_schema_drifted_identity_readiness(self) -> None:
+        phase = {
+            "current_surface": "obelisk.player_identity.v1",
+            "current_blocker": "approved_runtime_evidence_missing",
+            "source_checker_schema": "wrong-schema",
+            "source_checker_parse_error": "stdout_json_decode_error: broken",
+            "permissions_admin_unlocked": False,
+            "command_response_unlocked": False,
+            "commands_replies_unlocked": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+        }
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+
+        self.assertIn("critical_path_identity_readiness_schema_mismatch", blockers)
+        self.assertIn("critical_path_identity_readiness_output_invalid", blockers)
 
 
 if __name__ == "__main__":

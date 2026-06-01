@@ -35,13 +35,13 @@ EXPECTED_TARGETS = (
 EXPECTED_SAFETY_VALUES = {
     "artifact_status": "candidate_only",
     "promotion_ready": False,
-    "copied_scalar_count_total": 1,
-    "redacted_count_total": 5,
+    "copied_scalar_count_total": 0,
+    "redacted_count_total": 6,
     "signature_count": 2,
     "snapshot_count": 2,
 }
-EXPECTED_COPIED_SCALAR_BY_KIND = {"integer": 1}
-EXPECTED_REDACTED_BY_REASON = {"object_ref": 3, "struct": 2}
+EXPECTED_COPIED_SCALAR_BY_KIND: dict[str, int] = {}
+EXPECTED_REDACTED_BY_REASON = {"action_metadata_scalar": 1, "object_ref": 3, "struct": 2}
 EXPECTED_PARAM_BOUNDARY = {
     "ShooterPlayerController.ServerRequestInventoryUseItem": {
         "InventoryComp": ("redacted_uobject_ref", "ObjectProperty", 0, 8, 1, "0x1044080280", "in"),
@@ -51,7 +51,15 @@ EXPECTED_PARAM_BOUNDARY = {
         "anActor": ("redacted_uobject_ref", "ObjectProperty", 0, 8, 1, "0x1040000280", "in"),
         "InventoryComp": ("redacted_uobject_ref", "ObjectProperty", 8, 8, 1, "0x1044080280", "in"),
         "ItemID1": ("redacted_struct", "StructProperty", 16, 8, 1, "0x1040000280", "in"),
-        "AdditionalData": ("int32", "IntProperty", 24, 4, 1, "0x1040000280", "in"),
+        "AdditionalData": (
+            "redacted_action_metadata_scalar",
+            "IntProperty",
+            24,
+            4,
+            1,
+            "0x1040000280",
+            "in",
+        ),
     },
 }
 EXPECTED_FUNCTION_SHAPE = {
@@ -344,6 +352,7 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         )
 
     copied_integer_fields: list[str] = []
+    redacted_action_metadata_fields: list[str] = []
     redacted_struct_fields: list[str] = []
     redacted_object_fields: list[str] = []
     for target, expected_params in EXPECTED_PARAM_BOUNDARY.items():
@@ -435,6 +444,16 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
                         param=name,
                         value=param.get("redaction"),
                     )
+            elif expected_type == "redacted_action_metadata_scalar":
+                redacted_action_metadata_fields.append(field)
+                if param.get("redaction") != "inventory action metadata scalar redacted; no copied range":
+                    append_blocker(
+                        blockers,
+                        "redacted_action_metadata_scalar_redaction_mismatch",
+                        target=target,
+                        param=name,
+                        value=param.get("redaction"),
+                    )
             elif expected_type == "redacted_struct":
                 redacted_struct_fields.append(field)
                 if param.get("redaction") != "StructProperty identity/payload redacted":
@@ -469,6 +488,7 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         "copied_scalar_by_kind": safety.get("copied_scalar_by_kind"),
         "redacted_by_reason": safety.get("redacted_by_reason"),
         "copied_integer_fields": copied_integer_fields,
+        "redacted_action_metadata_fields": redacted_action_metadata_fields,
         "redacted_struct_fields": redacted_struct_fields,
         "redacted_object_fields": redacted_object_fields,
     }
@@ -693,7 +713,7 @@ def build_check(
         "non_claims": [
             "fixture-only redacted signature boundary; no core, runtime, or server path evidence",
             "does not promote Inventory SDK, mutation, lookup, ResourceHandle, or return override",
-            "InventoryComp, anActor, ItemId, ItemID1, and AdditionalData do not cross public_contract or payload_contract",
+            "InventoryComp, anActor, ItemId, ItemID1, and AdditionalData stay metadata-only/redacted and do not cross public_contract or payload_contract",
         ],
     }
 

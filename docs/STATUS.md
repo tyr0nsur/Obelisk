@@ -135,10 +135,13 @@ runtime readiness, or v1 SDK completion.
 `v1.0` should not be used for a partial runtime-only release. A stable SDK release needs:
 
 - installed SDK package validation for every promoted public surface;
-- plugin lifecycle, config, logging, timers, descriptors, chat, policy, identity, command,
+- the P0 dependency chain to be promoted with evidence, not excluded:
+  player identity/principal, permissions/admin, command/chat response path, and
+  commands/replies;
+- non-chain plugin lifecycle, config, logging, timers, descriptors, chat, policy,
   inventory/item, structure, dino, tribe/player, mission/transfer, and operator-facing
-  extension paths to be either promoted with evidence or explicitly excluded from the
-  `v1.0` compatibility statement;
+  extension paths to be either promoted with evidence or explicitly excluded/post-v1 in
+  the `v1.0` compatibility statement;
 - umbrella blockers such as gameplay modules, player services, and operator/storage must
   name high-demand families explicitly: dino, tribe, buff/status, chat send/broadcast,
   player progression/engrams, economy, mobility, and operator ingress/storage each need a
@@ -159,7 +162,8 @@ scripts/check_release_readiness.sh \
 
 It intentionally fails on the current post-RC tree; passing the core-first release gate
 alone is not enough to claim `v1.0 stable`. The release statement is part of the gate
-because every non-promoted blocker must be named as excluded or post-v1.
+because every non-chain non-promoted blocker must be named as excluded or post-v1, while
+the P0 dependency chain must be promoted with evidence.
 Current complete-SDK blocker promotion is 0/12, the P0 dependency chain promotion is 0/4,
 and the stable SDK claim switch is disabled. Excluded/post-v1 accounting does not count
 as completion progress for a complete SDK claim.
