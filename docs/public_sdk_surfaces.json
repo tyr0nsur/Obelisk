@@ -137,6 +137,7 @@
     "obelisk.players-identity-principal-invalidation-policy.v1 is a planning/candidate-only policy artifact; it does not promote player identity/principal, permissions/admin, command/chat response path, commands/replies, or v1 SDK completion.",
     "obelisk.permissions-admin-query-failclosed-contract.v1 is a candidate-only pre-ABI permissions/admin artifact; consume-mode acceptance is not public permissions/admin ABI, public SDK readiness, runtime readiness, or v1 SDK completion evidence.",
     "obelisk.command_copied_response_intent.planning.v1 is planning-only copied response intent vocabulary; it does not promote command_chat_response_path, commands_replies, reply/send-chat, runtime delivery, public ABI, public SDK readiness, or v1 SDK completion.",
+    "obelisk.command_copied_response_intent_lifecycle.planning.v1 is planning-only copied response intent lifecycle vocabulary; it does not promote command_chat_response_path, commands_replies, reply/send-chat, runtime delivery, public ABI, public SDK readiness, or v1 SDK completion.",
     "scripts/check_command_permission_route_gate.py is a planning-only aggregate posture check for the identity/principal -> permissions/admin -> command response -> commands/replies dependency chain; a passing report is not release evidence, public ABI readiness, runtime readiness, command router readiness, reply/send-chat readiness, or v1 completion evidence.",
     "While player identity waits on approved copied runtime principal lifecycle evidence, inventory_item_copied_signals may be treated as the higher-value near-term side lane than structure_census because it rides promoted-experimental copied GameplayPolicyEvent signals; this must not reorder the identity/principal -> permissions/admin -> commands/replies dependency chain, promote inventory mutation/identity/lookup, or promote structure_census beyond planning/consume-only.",
     "Every promoted-experimental-only surface must be promoted, downgraded to planning/post-v1, or explicitly excluded before v1_completion_required can become true.",
@@ -925,7 +926,8 @@
         "current_decision": "blocked_until_promoted_or_explicitly_excluded",
         "decision_manifest": "docs/command_chat_response_public_contract_decisions.json",
         "planning_guardrail_decision_manifests": [
-          "docs/command_copied_response_intent_planning_decisions.json"
+          "docs/command_copied_response_intent_planning_decisions.json",
+          "docs/command_copied_response_intent_lifecycle_planning_decisions.json"
         ],
         "must_remain_without_public_contract_until_promotion": true,
         "not_sufficient_evidence": [
@@ -934,7 +936,8 @@
           "candidate vtable slots",
           "raw ProcessEvent callbacks",
           "legacy CallProcessEvent debug access",
-          "command copied response intent planning vocabulary"
+          "command copied response intent planning vocabulary",
+          "command copied response intent lifecycle planning vocabulary"
         ],
         "promotion_requires": [
           "promoted player identity/principal semantics and promoted permission/authority checks for directed responses",

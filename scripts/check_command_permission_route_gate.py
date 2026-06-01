@@ -71,6 +71,13 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
                 "--json",
             ],
         ),
+        (
+            "command_copied_response_intent_lifecycle_planning",
+            [
+                "check_command_copied_response_intent_lifecycle_planning.py",
+                "--json",
+            ],
+        ),
         ("command_principal_authz_response_bridge", ["check_command_principal_authz_response_bridge.py", "--json"]),
         ("command_chat_response_public_readiness", command_response_args),
         ("commands_replies_public_readiness", ["check_commands_replies_public_readiness.py", "--json"]),
@@ -101,6 +108,14 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
             "runtime_ready",
             "public_header_allowed",
             "public_readiness_ready",
+            "reply_api_allowed",
+            "reply_abi_allowed",
+            "send_chat_api_allowed",
+            "command_router_allowed",
+            "runtime_delivery_allowed",
+            "runtime_readiness_allowed",
+            "public_response_path_allowed",
+            "v1_completion_evidence",
         ):
             if report.get(key) is True:
                 public_or_runtime_claims.append(key)

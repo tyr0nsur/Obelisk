@@ -48,7 +48,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
-        self.assertEqual(6, len(report["checks"]))
+        self.assertEqual(7, len(report["checks"]))
+        check_names = {check["name"] for check in report["checks"]}
+        self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)

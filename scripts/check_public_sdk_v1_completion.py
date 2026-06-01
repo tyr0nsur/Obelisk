@@ -590,6 +590,7 @@ REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS = {
 }
 REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS = {
     "obelisk.command_copied_response_intent.planning.v1": "command_copied_response_intent_planning_decisions.json",
+    "obelisk.command_copied_response_intent_lifecycle.planning.v1": "command_copied_response_intent_lifecycle_planning_decisions.json",
 }
 CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES = CANONICAL_V1_COMPLETION_BLOCKERS
 

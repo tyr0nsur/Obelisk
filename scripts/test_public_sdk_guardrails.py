@@ -29,6 +29,9 @@ COMMAND_CHAT_RESPONSE_PUBLIC_CONTRACT_DECISIONS = (
 COMMAND_COPIED_RESPONSE_INTENT_PLANNING_DECISIONS = (
     REPO_ROOT / "docs" / "command_copied_response_intent_planning_decisions.json"
 )
+COMMAND_COPIED_RESPONSE_INTENT_LIFECYCLE_PLANNING_DECISIONS = (
+    REPO_ROOT / "docs" / "command_copied_response_intent_lifecycle_planning_decisions.json"
+)
 PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PLUGIN_HUB_PACKAGE_TEMPLATE_DOC = REPO_ROOT / "docs" / "PLUGIN_HUB_PACKAGE_TEMPLATE.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
@@ -2621,12 +2624,22 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_command_copied_response_intent_planning_guardrail_is_not_a_surface(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surface_ids = {surface["id"] for surface in manifest["surfaces"]}
-        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", surface_ids)
-        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", manifest["promoted_surfaces"])
-        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", manifest["planning_surfaces"])
-        self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", manifest["v1_sdk_completion_blockers"])
+        guardrail_ids = {
+            "obelisk.command_copied_response_intent.planning.v1",
+            "obelisk.command_copied_response_intent_lifecycle.planning.v1",
+        }
+        for guardrail_id in guardrail_ids:
+            with self.subTest(guardrail_id=guardrail_id):
+                self.assertNotIn(guardrail_id, surface_ids)
+                self.assertNotIn(guardrail_id, manifest["promoted_surfaces"])
+                self.assertNotIn(guardrail_id, manifest["planning_surfaces"])
+                self.assertNotIn(guardrail_id, manifest["v1_sdk_completion_blockers"])
         release_guardrails = " ".join(manifest["release_guardrails"])
         self.assertIn("obelisk.command_copied_response_intent.planning.v1 is planning-only", release_guardrails)
+        self.assertIn(
+            "obelisk.command_copied_response_intent_lifecycle.planning.v1 is planning-only",
+            release_guardrails,
+        )
         self.assertIn("does not promote command_chat_response_path", release_guardrails)
 
         checker = runpy.run_path(str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"))
@@ -2635,13 +2648,19 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             required["obelisk.command_copied_response_intent.planning.v1"],
             "command_copied_response_intent_planning_decisions.json",
         )
+        self.assertEqual(
+            required["obelisk.command_copied_response_intent_lifecycle.planning.v1"],
+            "command_copied_response_intent_lifecycle_planning_decisions.json",
+        )
         contract_paths = {
             path.name
             for path in checker["contract_decision_paths"](REPO_ROOT / "docs")
         }
         self.assertIn("command_copied_response_intent_planning_decisions.json", contract_paths)
+        self.assertIn("command_copied_response_intent_lifecycle_planning_decisions.json", contract_paths)
         missing = checker["missing_required_contract_decision_manifests"](REPO_ROOT / "docs")
         self.assertNotIn("obelisk.command_copied_response_intent.planning.v1", missing)
+        self.assertNotIn("obelisk.command_copied_response_intent_lifecycle.planning.v1", missing)
 
     def test_public_header_does_not_expose_blocked_v1_sdk_surface_tokens(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")

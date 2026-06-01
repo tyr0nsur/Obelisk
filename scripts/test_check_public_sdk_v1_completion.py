@@ -105,6 +105,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         bridge_surface_id = "obelisk.command_principal_authz_response_bridge.v1"
         bridge_filename = "command_principal_authz_response_bridge_decisions.json"
         self.assertEqual(module.REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS[bridge_surface_id], bridge_filename)
+        lifecycle_surface_id = "obelisk.command_copied_response_intent_lifecycle.planning.v1"
+        lifecycle_filename = "command_copied_response_intent_lifecycle_planning_decisions.json"
+        self.assertEqual(
+            module.REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS[lifecycle_surface_id],
+            lifecycle_filename,
+        )
 
         with tempfile.TemporaryDirectory() as temp_dir:
             decisions_dir = Path(temp_dir) / "docs"
@@ -115,6 +121,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 missing = module.missing_required_contract_decision_manifests(decisions_dir)
                 self.assertEqual(missing[surface_id], filename)
                 self.assertEqual(missing[bridge_surface_id], bridge_filename)
+                self.assertEqual(missing[lifecycle_surface_id], lifecycle_filename)
 
                 (decisions_dir / filename).write_text(
                     json.dumps(
@@ -140,6 +147,22 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 )
                 missing = module.missing_required_contract_decision_manifests(decisions_dir)
                 self.assertNotIn(surface_id, missing)
+                self.assertIn(lifecycle_surface_id, missing)
+                self.assertIn(bridge_surface_id, missing)
+
+                (decisions_dir / lifecycle_filename).write_text(
+                    json.dumps(
+                        {
+                            "surface": lifecycle_surface_id,
+                            "status": "blocked",
+                            "public_header_allowed": False,
+                            "public_header_symbols_now": [],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                missing = module.missing_required_contract_decision_manifests(decisions_dir)
+                self.assertNotIn(lifecycle_surface_id, missing)
                 self.assertIn(bridge_surface_id, missing)
 
                 (decisions_dir / bridge_filename).write_text(
