@@ -98,6 +98,7 @@ add_library(obelisk SHARED
     hooks/ProcessEventChatReflection.cpp
     hooks/ProcessEventInventoryReflection.cpp
     hooks/ProcessEventItemReflection.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleObserver.cpp
     hooks/ProcessEventStructureReflection.cpp
     hooks/ProcessEventHook.cpp
     core/ChatEventDispatcher.cpp
@@ -416,6 +417,16 @@ add_executable(player_principal_lifecycle_reflection_tests
 target_include_directories(player_principal_lifecycle_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME PlayerPrincipalLifecycleReflectionTests COMMAND player_principal_lifecycle_reflection_tests)
+
+add_executable(process_event_player_principal_lifecycle_observer_tests
+    tests/core/ProcessEventPlayerPrincipalLifecycleObserverTests.cpp
+    hooks/ProcessEventPlayerPrincipalLifecycleObserver.cpp
+    ue/PlayerPrincipalLifecycleReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(process_event_player_principal_lifecycle_observer_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME ProcessEventPlayerPrincipalLifecycleObserverTests COMMAND process_event_player_principal_lifecycle_observer_tests)
 
 add_executable(process_event_item_reflection_tests
     tests/core/ProcessEventItemReflectionTests.cpp

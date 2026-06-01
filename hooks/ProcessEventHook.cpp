@@ -4,6 +4,7 @@
 #include "ProcessEventChatReflection.h"
 #include "ProcessEventInventoryReflection.h"
 #include "ProcessEventItemReflection.h"
+#include "ProcessEventPlayerPrincipalLifecycleObserver.h"
 #include "ProcessEventStructureReflection.h"
 #include "core/ItemReturnEventDispatcher.h"
 #include "ue/Memory.h"
@@ -109,6 +110,8 @@ namespace Obelisk::Hooks
     static std::atomic<uint64_t> s_ReflectedItemReturnRejects{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnAttempts{0};
     static std::atomic<uint64_t> s_ReflectedItemReturnDispatches{0};
+    static std::atomic<uint64_t> s_PlayerPrincipalLifecycleObservations{0};
+    static std::atomic<uint64_t> s_PlayerPrincipalLifecycleRejects{0};
     static std::atomic<uint64_t> s_ReflectedStructureCalls{0};
     static std::atomic<uint64_t> s_ReflectedStructureDispatches{0};
     static std::atomic<uint64_t> s_ReflectedStructureRejects{0};
@@ -757,9 +760,83 @@ namespace Obelisk::Hooks
         return gate;
     }
 
+    static const ProcessEventPlayerPrincipalLifecycleObserver::Gate& GetPlayerPrincipalLifecycleObserverGate()
+    {
+        static ProcessEventPlayerPrincipalLifecycleObserver::Gate gate = [] {
+            ProcessEventPlayerPrincipalLifecycleObserver::Gate value =
+                ProcessEventPlayerPrincipalLifecycleObserver::EvaluateGate(
+                    std::getenv("OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER"),
+                    IsObserverDebugProfileEnabled(),
+                    IsObserverDebugWindowMarkerEnabled(),
+                    AreExperimentalObserverMarkersEnabled("enable-player-principal-lifecycle-observer"),
+                    std::getenv("OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256"),
+                    std::getenv("OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT"),
+                    std::getenv("OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT"));
+
+            switch (value.Status)
+            {
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::Disabled:
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MissingObserverDebugProfile:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_WRAPPER_PROFILE=observer-debug is required.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MissingObserverDebugWindow:
+                OBELISK_WARN("Player principal lifecycle observer disabled: allow-observer-debug-window instance marker is required.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MissingInstanceMarker:
+                OBELISK_WARN("Player principal lifecycle observer disabled: instance markers allow-experimental-observers and "
+                             "enable-player-principal-lifecycle-observer are required.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MissingBinarySha256:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256 is required.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::UnsupportedBinarySha256:
+                OBELISK_WARN("Player principal lifecycle observer disabled: unsupported ShooterGameServer SHA256 '{}'.",
+                             value.BinarySha256);
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MissingLogLimit:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT is required.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MalformedLogLimit:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT is malformed.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::ZeroLogLimit:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT must be positive.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::LogLimitTooLarge:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT must be <= 10.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MissingDispatchLimit:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT is required.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::MalformedDispatchLimit:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT is malformed.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::NonZeroDispatchLimit:
+                OBELISK_WARN("Player principal lifecycle observer disabled: OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT must be 0.");
+                break;
+            case ProcessEventPlayerPrincipalLifecycleObserver::GateStatus::Enabled:
+                OBELISK_WARN("PlayerPrincipalLifecycleObserver enabled binary_sha256={} "
+                             "target_set=players-lifecycle-anchor-candidates limit={} dispatch_limit=0 "
+                             "delivery_claim=none principal_claim=none.",
+                             value.BinarySha256,
+                             value.LogLimit);
+                break;
+            }
+
+            return value;
+        }();
+        return gate;
+    }
+
     static bool IsItemReturnEventProducerEnabled()
     {
         return GetItemReturnEventGate().Enabled();
+    }
+
+    static bool IsPlayerPrincipalLifecycleObserverEnabled()
+    {
+        return GetPlayerPrincipalLifecycleObserverGate().Enabled();
     }
 
     static uint64_t GetChatReflectionLogLimit()
@@ -916,6 +993,15 @@ namespace Obelisk::Hooks
                Core::ItemReturnEventDispatcher::Get().SubscriptionCount() > 0;
     }
 
+    static bool IsPlayerPrincipalLifecycleObserverActive()
+    {
+        const auto& gate = GetPlayerPrincipalLifecycleObserverGate();
+        return IsPlayerPrincipalLifecycleObserverEnabled() &&
+               ProcessEventPlayerPrincipalLifecycleObserver::HasObservationBudgetRemaining(
+                   s_PlayerPrincipalLifecycleObservations,
+                   gate.LogLimit);
+    }
+
     static const char* ChatFunctionName(Obelisk::UE::ChatReflection::ChatFunction function)
     {
         using Obelisk::UE::ChatReflection::ChatFunction;
@@ -1065,6 +1151,47 @@ namespace Obelisk::Hooks
         return "Unknown";
     }
 
+    static std::string LifecycleBoolFieldsCsv(
+        const ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation& observation)
+    {
+        std::string value;
+        for (size_t i = 0; i < observation.BoolCount; ++i)
+        {
+            if (!value.empty())
+                value += ",";
+            value += ProcessEventPlayerPrincipalLifecycleObserver::LifecycleFieldName(
+                observation.BoolStorage[i].Field);
+        }
+        return value;
+    }
+
+    static std::string LifecycleBoolValuesCsv(
+        const ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation& observation)
+    {
+        std::string value;
+        for (size_t i = 0; i < observation.BoolCount; ++i)
+        {
+            if (!value.empty())
+                value += ",";
+            value += observation.BoolStorage[i].Value ? "1" : "0";
+        }
+        return value;
+    }
+
+    static std::string LifecycleRedactedFieldsCsv(
+        const ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation& observation)
+    {
+        std::string value;
+        for (size_t i = 0; i < observation.RedactedCount; ++i)
+        {
+            if (!value.empty())
+                value += ",";
+            value += ProcessEventPlayerPrincipalLifecycleObserver::LifecycleFieldName(
+                observation.RedactedStorage[i]);
+        }
+        return value;
+    }
+
     static size_t DispatchReflectedItemReturnEventAfterOriginal(
         bool originalWasCalled,
         int32_t nameIndex,
@@ -1132,6 +1259,76 @@ namespace Obelisk::Hooks
                          dispatched);
         }
         return dispatched;
+    }
+
+    static void ObservePlayerPrincipalLifecycleAfterOriginal(
+        bool originalWasCalled,
+        int32_t nameIndex,
+        void* function,
+        void* params)
+    {
+        if (!originalWasCalled)
+            return;
+
+        const auto& gate = GetPlayerPrincipalLifecycleObserverGate();
+        if (!gate.Enabled())
+            return;
+        if (!ProcessEventPlayerPrincipalLifecycleObserver::IsReflectedLifecycleNameIndex(nameIndex))
+            return;
+
+        Obelisk::UE::RuntimeReflection::MemoryReader reader{RuntimeReflectionReader, nullptr};
+        uint64_t observationNumber = 0;
+        ProcessEventPlayerPrincipalLifecycleObserver::Attempt attempt =
+            ProcessEventPlayerPrincipalLifecycleObserver::TryObserveInvocation(
+                gate,
+                nameIndex,
+                reader,
+                function,
+                params,
+                s_PlayerPrincipalLifecycleObservations,
+                observationNumber);
+
+        if (attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Disabled ||
+            attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::NonLifecycleFunction ||
+            attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::BudgetExhausted)
+        {
+            return;
+        }
+
+        if (attempt.Status == ProcessEventPlayerPrincipalLifecycleObserver::AttemptStatus::Rejected)
+        {
+            ++s_PlayerPrincipalLifecycleRejects;
+            return;
+        }
+
+        ProcessEventPlayerPrincipalLifecycleObserver::CopiedLifecycleObservation observation;
+        if (!ProcessEventPlayerPrincipalLifecycleObserver::TryBuildCopiedLifecycleObservationAfterOriginal(
+                originalWasCalled,
+                attempt,
+                observation))
+        {
+            return;
+        }
+
+        if (!ProcessEventPlayerPrincipalLifecycleObserver::ShouldLogObservation(
+                observationNumber,
+                gate.LogLimit))
+        {
+            return;
+        }
+
+        OBELISK_INFO("PlayerPrincipalLifecycleObserver event sequence={} role={} target={} post_original=true "
+                     "copied_bool_fields={} copied_bool_values={} redacted_count={} redacted_fields={} "
+                     "principal_action={} principal_id_logged=false principal_generation_logged=false "
+                     "delivery_claim=none.",
+                     observationNumber,
+                     ProcessEventPlayerPrincipalLifecycleObserver::LifecycleRoleName(observation.Role),
+                     ProcessEventPlayerPrincipalLifecycleObserver::LifecycleTargetName(observation.Function),
+                     LifecycleBoolFieldsCsv(observation),
+                     LifecycleBoolValuesCsv(observation),
+                     observation.RedactedCount,
+                     LifecycleRedactedFieldsCsv(observation),
+                     ProcessEventPlayerPrincipalLifecycleObserver::PrincipalActionName(observation.Action));
     }
 
     static void TraceReflectedChatInvocation(int32_t nameIndex, void* function, void* params)
@@ -1520,11 +1717,12 @@ namespace Obelisk::Hooks
             const bool chatRouteObserverActive = IsChatRouteObserverActive();
             const bool inventoryObservationActive = IsInventoryObservationActive();
             const bool itemReturnEventProducerActive = IsItemReturnEventProducerActive();
+            const bool playerPrincipalLifecycleObserverActive = IsPlayerPrincipalLifecycleObserverActive();
             const bool structureObservationActive = IsStructureObservationActive();
             const bool needsNameIndex =
                 hasPreCallbacks || hasPostCallbacks || chatReflectionEnabled || chatEventProducerActive ||
                 chatRouteObserverActive || inventoryObservationActive || itemReturnEventProducerActive ||
-                structureObservationActive;
+                playerPrincipalLifecycleObserverActive || structureObservationActive;
             const int32_t nameIndex = needsNameIndex ? GetFunctionNameIndex(function) : -1;
 
             TraceReflectedChatInvocation(nameIndex, function, params);
@@ -1539,6 +1737,7 @@ namespace Obelisk::Hooks
 
             ObserveChatRouteAfterOriginal(originalWasCalled, nameIndex, function, params);
             DispatchReflectedChatMessageEventAfterOriginal(originalWasCalled, nameIndex, function, params);
+            ObservePlayerPrincipalLifecycleAfterOriginal(originalWasCalled, nameIndex, function, params);
             DispatchReflectedItemReturnEventAfterOriginal(originalWasCalled, nameIndex, function, params);
             TraceReflectedInventoryInvocation(originalWasCalled, nameIndex, function, params);
             TraceReflectedStructureInvocation(originalWasCalled, nameIndex, function, params);

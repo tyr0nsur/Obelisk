@@ -95,6 +95,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   planning-only and candidate-only: no public identity, permissions, commands, runtime
   lookup, ResourceHandle, mutation, return override, or v1 SDK completion claim is
   promoted.
+- Private hook-side player-principal lifecycle observer wiring now exists for
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`: it is default-off,
+  observer-debug/env/marker/SHA/log-budget gated, redacted, dispatch-limit `0`, and
+  plugin-invisible. This is a runtime-evidence collection path only; it does not promote
+  player identity/principal, lookup, permissions/admin, commands/replies, runtime
+  readiness, public SDK readiness, or v1 SDK completion.
 - Candidate lifecycle layouts are reproducible for all six
   `players-lifecycle-anchor-candidates` targets, but remain planning-only. The narrow
   candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
