@@ -65,6 +65,135 @@ the exact scoped run. That approval must name:
 - rollback owner and rollback delta;
 - post-check command and expected final posture or shutdown state.
 
+## Exact Approved-Window Preflight
+
+This checklist is the exact preflight contract for a future approved
+`PlayerPrincipalLifecycleObserver` runtime window. It is still documentation-only and is
+not standing approval to touch a server.
+
+Operator approval must name the exact values for:
+
+```text
+instance=<instance-id>
+map=<map>
+ark_binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+obelisk_commit=<reviewed build containing PlayerPrincipalLifecycleObserver>
+run_id=<YYYYMMDDThhmmssZ-player-principal-lifecycle>
+window=<approved start/end UTC>
+final_posture=<stable|stopped>
+copied_evidence_dir=/servidor/ark/workspace-offline/live-validation-logs/<run-id>/
+```
+
+Before any marker/env activation, run the read-only stable preflight for the same target:
+
+```bash
+scripts/check_player_principal_lifecycle_preflight.sh \
+  --instance <instance-id> \
+  --map <map> \
+  --mode stable \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+```
+
+If the approved target is intentionally stopped before launch, the preflight may be run
+with `--allow-stopped`. Do not use `--offline-only` against live install paths; that mode
+is for offline copies and rejects live server paths by design.
+
+The future observer-window launch must use only these env gates:
+
+```text
+OBELISK_WRAPPER_PROFILE=observer-debug
+OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0
+OBELISK_PE_TRACE_LIMIT=0
+```
+
+`LOG_LIMIT=10` is the exact first-window bundle/checker contract. A smaller approved
+budget is still privacy-bounded, but the current approved-evidence checker expects the
+observer enable line to report `limit=10`; change the checker before the runtime window if
+a smaller exact limit is selected.
+
+The future observer-window marker set for the instance must be exactly:
+
+```text
+enable-process-event-hook
+disable-plugins
+allow-observer-debug-window
+allow-experimental-observers
+enable-player-principal-lifecycle-observer
+```
+
+The wrapper/preflight must fail closed if any required marker is missing, malformed, or a
+symlink. It must also fail closed if any residual observer or escape marker entry exists,
+including symlink entries. Forbidden marker entries for this window are:
+
+```text
+allow-ptrace
+enable-debug-control
+enable-reflection-scanner
+enable-native-exec-probes
+allow-global-process-event-callbacks
+allow-filtered-process-event-callbacks
+allow-call-process-event
+allow-process-event-blocking
+request-static-fname-probe
+enable-chat-events
+enable-chat-reflection
+enable-chat-route-observer
+enable-inventory-reflection
+enable-structure-reflection
+enable-item-return-events
+```
+
+Plugins must remain disabled for the entire first window. `dispatch_limit=0` means this
+is not a plugin delivery test and must not call public callbacks. The accepted observer
+enable line must state `delivery_claim=none` and `principal_claim=none`.
+
+Runtime copied output is reviewable only if all of the following stay true:
+
+- the summary contains exactly one module, `player_principal_lifecycle`;
+- `HandleNewPlayer` accepted case logs only `bIsFromLogin,ReturnValue=1,1`,
+  redacts `NewPlayer,PlayerData,PlayerCharacter`, and records
+  `principal_action=candidate_created`;
+- `HandleNewPlayer` rejected case logs only `bIsFromLogin,ReturnValue=0,1`,
+  redacts `NewPlayer,PlayerData,PlayerCharacter`, and records
+  `principal_action=none`;
+- `OnLogout` logs `session_end`, redacts `Exiting`, and records
+  `principal_action=candidate_invalidated`;
+- every event is post-original and keeps `principal_id_logged=false`,
+  `principal_generation_logged=false`, and `delivery_claim=none`;
+- no player name, Steam/EOS/platform id, IP, tribe id, persistent lookup key, object
+  identity, UE pointer, FName/GObjects index, raw params, raw buffers, chat text, command
+  text, permission/admin state, plugin subscriber state, `ResourceHandle`, or hash of a
+  redacted identity value appears in logs, summaries, manifests, review text, or bundle
+  output.
+
+After rollback and log copy, the secret-free window manifest must be checked offline:
+
+```bash
+python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
+  --json \
+  /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.check.json
+```
+
+Then build and check the consume-only bundle from copied evidence only:
+
+```bash
+python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
+  --obelisk-commit <reviewed-obelisk-commit> \
+  --reviewed-by <reviewer> \
+  --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
+```
+
+The bundle is acceptable only if consume mode passes and the generated promote,
+public-readiness, and runtime-readiness checks fail closed. If any public/promotion mode
+passes, treat the bundle as invalid.
+
 Before any future activation:
 
 - Stable pre-check for the same approved instance must pass.
@@ -114,7 +243,7 @@ Exact future env gates for the first window:
 OBELISK_WRAPPER_PROFILE=observer-debug
 OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1
 OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
-OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=<1..10>
+OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10
 OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0
 OBELISK_PE_TRACE_LIMIT=0
 ```
@@ -131,8 +260,9 @@ state/instances/<instance-id>/enable-player-principal-lifecycle-observer
 
 First-window invariants:
 
-- `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT` must be positive and no greater than
-  `10`.
+- `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT` must be `10` for the current
+  approved-evidence checker. A different approved value in the safe `1..10` range is a
+  checker-change-before-window item, not a runtime improvisation.
 - `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT` must be `0`.
 - `disable-plugins` must stay present.
 - `OBELISK_PE_TRACE_LIMIT` must stay `0`.
@@ -343,8 +473,8 @@ No-go for any future runtime window if any item is true:
   observers, chat observers, inventory/structure/item observers, global callbacks, or
   public `CallProcessEvent` are present.
 - The ARK binary SHA does not match the expected SHA for this plan.
-- `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT` is absent, zero, greater than `10`,
-  malformed, or overflowing.
+- `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT` is absent, not `10`, malformed, or
+  overflowing for the current approved-evidence checker.
 - `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT` is not `0`.
 - The log copy destination is a live log path, symlinked path, protected path outside the
   approved offline workspace, or missing a manifest.

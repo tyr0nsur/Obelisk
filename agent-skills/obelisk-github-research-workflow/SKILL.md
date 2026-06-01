@@ -46,6 +46,13 @@ packaging, examples, intake tooling, or seed hardening while the complete SDK bl
 chain remains open, unless the user explicitly asks to inspect archived planning. Current
 priority is the SDK itself: identity/principal, permissions/admin, command/response,
 storage/mutation, gameplay module surfaces, and their promotion evidence.
+Identity/principal work must be blocker-driven and targeted: use the named lifecycle
+anchors, evidence gaps, and runtime-capture preflight instead of broad rediscovery unless
+a new binary/hash or explicit SDK blocker contradicts the current evidence. Structure
+build-policy work defaults to offline snapshot/intake evidence before any runtime or
+release-policy claim. Treat `ResourceHandle` and object identity/lifetime as a
+cross-cutting SDK blocker for any surface that needs post-callback object correlation,
+lookup, mutation, or persistent handles.
 
 Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts unless
 that context changes the agent's concrete task.

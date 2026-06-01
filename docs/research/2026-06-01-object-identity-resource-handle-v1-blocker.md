@@ -6,8 +6,9 @@ The SDK map already excludes raw UE pointers, lookup, and `ResourceHandle` from 
 surfaces, but object identity is a cross-cutting blocker and should be treated as its own
 SDK design lane before any public API relies on post-callback object correlation.
 
-This is planning guidance only. It does not add a blocker to `public_sdk_surfaces.json`,
-does not promote an object identity API, and does not change v1 completion status.
+This is planning guidance only. It adds a `post-v1` completion blocker to
+`public_sdk_surfaces.json`, does not promote an object identity API, and does not change
+v1 completion status or stable claim eligibility.
 
 ## Why It Matters
 

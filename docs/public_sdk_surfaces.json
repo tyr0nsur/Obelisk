@@ -76,6 +76,7 @@
     "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
+    "obelisk.object_identity_resource_handle.v1",
     "obelisk.structure_census.v1",
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
@@ -88,6 +89,7 @@
     "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
     "obelisk.inventory_items_mutation.v1",
+    "obelisk.object_identity_resource_handle.v1",
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
@@ -121,6 +123,7 @@
     "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
     "Lifecycle/config/logging foundation does not satisfy lifecycle ops recovery demand; plugin watchdogs, hot reload, process restart orchestration, server recovery, operator reload commands, and restart-state semantics must be promoted separately or explicitly excluded/post-v1.",
     "Umbrella blockers do not imply broad module coverage; dino, tribe, buff/status, chat send/broadcast, player progression/engrams, economy, mobility, and operator ingress/storage must each be promoted as narrow copied C ABI surfaces or explicitly excluded by name in the v1 release statement.",
+    "Object identity, lookup, and ResourceHandle are cross-cutting post-v1 blockers; no structure, inventory, dino, tribe, buff, mission, transfer, economy, mobility, or area-policy surface may use post-callback object handles until lifecycle/reuse and UObject flag semantics are promoted.",
     "Player identity/principal evidence does not unlock operator ingress/storage; operator_ingress_storage remains a separate blocked/post-v1 surface until secret-safe ingress, storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted or explicitly excluded.",
     "Player identity/principal planning requires a non-protected complete core evidence pack plus a reviewed UFunction reflection-inventory pack; an offline ShooterGameServer binary, copied core, manual roots, or direct core/bin planning alone is not public SDK or promotion evidence.",
     "obelisk.players-identity-principal-invalidation-policy.v1 is a planning/candidate-only policy artifact; it does not promote player identity/principal, permissions/admin, command/chat response path, commands/replies, or v1 SDK completion.",
@@ -1074,6 +1077,69 @@
         "item mutation",
         "return override",
         "ResourceHandle"
+      ]
+    },
+    {
+      "id": "obelisk.object_identity_resource_handle.v1",
+      "category": "cross-cutting object identity and handles",
+      "status": "post-v1",
+      "support_tier": "blocked",
+      "public_name": "Object identity, lookup, and ResourceHandle",
+      "public_contract": [],
+      "evidence": {
+        "docs": [
+          "docs/research/2026-06-01-object-identity-resource-handle-v1-blocker.md"
+        ],
+        "current_public_slice": "copied/redacted scalar callback data and metadata descriptors only; no object identity, lookup, ResourceHandle, or post-callback object correlation"
+      },
+      "v1_decision_contract": {
+        "current_decision": "blocked_until_promoted_or_explicitly_excluded",
+        "must_remain_without_public_contract_until_promotion": true,
+        "promotion_requires": [
+          "lifecycle and invalidation semantics for UObject-backed identities",
+          "reuse and stale-object negative evidence across isolated captures or an equivalent independent validation path",
+          "callback-scope versus post-callback validity rules, including UObject flag semantics",
+          "privacy and redaction boundaries for owner, player, tribe, structure, item, dino, buff, mission, transfer, economy, mobility, and area-policy identity",
+          "owner-token scoped lookup and cleanup policy if lookup is ever exposed",
+          "append-only POD C ABI design with capability gates, owner-scoped cleanup, ABI layout tests, and installed-SDK consumer tests"
+        ],
+        "exclusion_requires": [
+          "the v1 release statement names obelisk.object_identity_resource_handle.v1 as post-v1 or excluded",
+          "the v1 release statement states that no object identity, UObject identity, object lookup, ResourceHandle, post-callback object handle, structure handle, item handle, inventory handle, dino handle, tribe handle, buff/status handle, mission/transfer correlation handle, economy/mobility handle, or area-policy object handle API is included in v1",
+          "v1_completion_required changes only after this blocker is promoted or that explicit exclusion is recorded"
+        ]
+      },
+      "blockers": [
+        "No proven UObject-backed identity lifecycle or invalidation contract.",
+        "No reuse/wraparound or stale-object negative evidence.",
+        "No callback-scope versus post-callback validity rule.",
+        "No promoted UObject flag semantics for safe public handle validity.",
+        "No owner-token scoped lookup, cleanup, privacy, or redaction policy.",
+        "No append-only public POD C ABI, capability policy, ABI layout tests, or installed-SDK consumer coverage."
+      ],
+      "audit_units": [
+        "object identity lifecycle",
+        "ResourceHandle validity and reuse",
+        "object lookup",
+        "post-callback object correlation",
+        "owner-scoped handle cleanup",
+        "privacy/redaction boundaries"
+      ],
+      "exclusions": [
+        "object identity",
+        "UObject identity",
+        "object lookup",
+        "ResourceHandle",
+        "post-callback object handles",
+        "structure handles",
+        "item handles",
+        "inventory handles",
+        "dino handles",
+        "tribe handles",
+        "buff/status handles",
+        "mission/transfer correlation handles",
+        "economy/mobility handles",
+        "area-policy object handles"
       ]
     },
     {

@@ -29,6 +29,7 @@ CANONICAL_SURFACE_IDS = {
     "obelisk.lifecycle_config_logging.v1",
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.object_identity_resource_handle.v1",
     "obelisk.operator_ingress_storage.v1",
     "obelisk.permissions_admin.v1",
     "obelisk.player_identity.v1",
@@ -45,6 +46,7 @@ CANONICAL_V1_COMPLETION_BLOCKERS = {
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.structure_census.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.object_identity_resource_handle.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
     "obelisk.gameplay_tick_callbacks.v1",
@@ -205,6 +207,7 @@ MANIFEST_BACKED_BLOCKED_HEADER_SURFACE_IDS = {
     "obelisk.inventory_items_mutation.v1",
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.mission_transfer_dino_tribe.v1",
+    "obelisk.object_identity_resource_handle.v1",
     "obelisk.operator_ingress_storage.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.structure_census.v1",
@@ -348,6 +351,25 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
             r"(?:^|_)(?:inventory_sdk|items_sdk|inventory_lookup|item_lookup|item_handle|"
             r"give_item|remove_item|grant_item|inventory_mutation|item_mutation|kits?|"
             r"rewards?|engram|progression|resource_handle)(?:_|$)"
+        ),
+    ),
+    "obelisk.object_identity_resource_handle.v1": (
+        re.compile(
+            r"(?:ObjectIdentity|UObjectIdentity|ObjectLookup|ResourceHandle|ObjectHandle|"
+            r"PostCallbackObject|StructureHandle|ItemHandle|InventoryHandle|DinoHandle|"
+            r"TribeHandle|BuffStatusHandle|MissionTransferHandle|AreaPolicyObjectHandle)"
+        ),
+        re.compile(
+            r"^OBELISK_[A-Z0-9_]*(?:OBJECT_IDENTITY|UOBJECT_IDENTITY|OBJECT_LOOKUP|"
+            r"RESOURCE_HANDLE|OBJECT_HANDLE|POST_CALLBACK_OBJECT|STRUCTURE_HANDLE|"
+            r"ITEM_HANDLE|INVENTORY_HANDLE|DINO_HANDLE|TRIBE_HANDLE|BUFF_STATUS_HANDLE|"
+            r"MISSION_TRANSFER_HANDLE|AREA_POLICY_OBJECT_HANDLE)[A-Z0-9_]*$"
+        ),
+        re.compile(
+            r"(?:^|_)(?:object_identity|uobject_identity|object_lookup|resource_handle|"
+            r"object_handle|post_callback_object|structure_handle|item_handle|"
+            r"inventory_handle|dino_handle|tribe_handle|buff_status_handle|"
+            r"mission_transfer_handle|area_policy_object_handle)(?:_|$)"
         ),
     ),
     "obelisk.lifecycle_ops_recovery.v1": (

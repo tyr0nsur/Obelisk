@@ -158,7 +158,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.player_identity.v1", payload["unresolved_completion_blockers"])
         self.assertIn("obelisk.gameplay_policy_event.v1", payload["unresolved_experimental_surfaces"])
         progress = payload["v1_sdk_progress"]
-        self.assertEqual(progress["completion_blocker_total"], 11)
+        self.assertEqual(progress["completion_blocker_total"], 12)
         self.assertIn(
             "obelisk.permissions_admin.v1",
             progress["completion_blockers_with_post_v1_or_excluded_outcome"],
@@ -388,6 +388,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "typedef struct ObeliskStructureCensus { uint32_t abi_version; } ObeliskStructureCensus;\n"
                 "typedef struct ObeliskDinoSdk { uint32_t abi_version; } ObeliskDinoSdk;\n"
                 "typedef struct ObeliskInventoryMutation { uint32_t abi_version; } ObeliskInventoryMutation;\n"
+                "typedef struct ObeliskObjectIdentity { uint32_t abi_version; } ObeliskObjectIdentity;\n"
                 "typedef struct ObeliskEconomyApi { uint32_t abi_version; } ObeliskEconomyApi;\n"
                 "typedef struct ObeliskRCONIngress { uint32_t abi_version; } ObeliskRCONIngress;\n"
                 "typedef struct ObeliskPluginWatchdog { uint32_t abi_version; } ObeliskPluginWatchdog;\n"
@@ -396,6 +397,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    uint64_t (*RegisterStructureCensusWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterMissionWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*GiveItemWithOwnerTokenHandle)(uint64_t ownerToken);\n"
+                "    uint64_t (*RegisterResourceHandleWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterEconomyWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterOperatorReloadWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "    uint64_t (*RegisterPluginWatchdogWithOwnerTokenHandle)(uint64_t ownerToken);\n"
@@ -429,6 +431,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("ObeliskStructureCensus", drift_by_surface["obelisk.structure_census.v1"])
         self.assertIn("RegisterMissionWithOwnerTokenHandle", drift_by_surface["obelisk.mission_transfer_dino_tribe.v1"])
         self.assertIn("GiveItemWithOwnerTokenHandle", drift_by_surface["obelisk.inventory_items_mutation.v1"])
+        self.assertIn("ObeliskObjectIdentity", drift_by_surface["obelisk.object_identity_resource_handle.v1"])
+        self.assertIn(
+            "RegisterResourceHandleWithOwnerTokenHandle",
+            drift_by_surface["obelisk.object_identity_resource_handle.v1"],
+        )
         self.assertIn("RegisterEconomyWithOwnerTokenHandle", drift_by_surface["obelisk.player_services_economy_mobility.v1"])
         self.assertIn("ObeliskRCONIngress", drift_by_surface["obelisk.operator_ingress_storage.v1"])
         self.assertIn("ObeliskPluginWatchdog", drift_by_surface["obelisk.lifecycle_ops_recovery.v1"])
@@ -472,6 +479,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.gameplay_tick_callbacks.v1",
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.lifecycle_ops_recovery.v1",
+                "obelisk.object_identity_resource_handle.v1",
                 "obelisk.operator_ingress_storage.v1",
                 "obelisk.permissions_admin.v1",
                 "obelisk.player_services_economy_mobility.v1",
@@ -501,6 +509,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.gameplay_tick_callbacks.v1",
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.lifecycle_ops_recovery.v1",
+                "obelisk.object_identity_resource_handle.v1",
                 "obelisk.operator_ingress_storage.v1",
                 "obelisk.permissions_admin.v1",
                 "obelisk.player_services_economy_mobility.v1",
@@ -594,11 +603,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 str(statement_path),
                 "--validate-release-statement-scope",
                 "--json",
+                check=False,
             )
 
         payload = json.loads(result.stdout)
         self.assertTrue(payload["scoped_release_statement"]["ready"])
         self.assertEqual(payload["release_statement_forbidden_broad_claims"], [])
+        self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
         self.assertIn("v1_completion_required_false", payload["blockers"])
 
     def test_complete_claim_rejects_all_excluded_blockers_as_scoped_only(self) -> None:
