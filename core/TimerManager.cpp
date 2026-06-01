@@ -176,12 +176,24 @@ namespace Obelisk::Core
             std::thread(WorkerLoop).detach();
             state.WorkerStarted = true;
         }
+
+        uint64_t MaxSupportedTimerDurationMs()
+        {
+            const auto safeDuration = Clock::duration::max() / 4;
+            const auto safeMilliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(safeDuration).count();
+            return safeMilliseconds > 0 ? static_cast<uint64_t>(safeMilliseconds) : 0;
+        }
     }
 
     TimerManager& TimerManager::Get()
     {
         static auto* manager = new TimerManager();
         return *manager;
+    }
+
+    bool TimerManager::IsSupportedDuration(uint64_t durationMs)
+    {
+        return durationMs != 0 && durationMs <= MaxSupportedTimerDurationMs();
     }
 
     uint64_t TimerManager::Register(void* owner,
@@ -191,7 +203,9 @@ namespace Obelisk::Core
                                     TimerCallback callback,
                                     void* userData)
     {
-        if (!owner || !callback || (repeating && intervalMs == 0))
+        if (!owner || !callback || !IsSupportedDuration(delayMs) ||
+            (repeating && !IsSupportedDuration(intervalMs)) ||
+            (!repeating && intervalMs != 0))
             return 0;
 
         TimerState& state = State();

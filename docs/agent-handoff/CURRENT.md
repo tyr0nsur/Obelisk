@@ -13,6 +13,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
   them.
 - Treat player identity/principal, permissions/admin, command response, chat, inventory, structures, tribes, dinos, buffs, missions, transfers, timers, config/logging, economy/database, and admin tooling as module areas above the same core. Promote each only through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
+- Latest local hardening: offline workspace inventory now blocks non-default dumps roots
+  before walking, blocks symlink-component roots, and keeps raw/protected-path metadata as
+  candidate-only. Timer registration now rejects unsupported `steady_clock` durations in
+  both `PluginManager` and `TimerManager`; this is runtime safety only, not a new public
+  gameplay timer surface.
 
 ## Hard Overrides
 

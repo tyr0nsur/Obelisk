@@ -2069,10 +2069,20 @@ namespace Obelisk::Core
                 SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected zero delay.");
                 return 0;
             }
+            if (!TimerManager::IsSupportedDuration(delayMs))
+            {
+                SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected unsupported delay.");
+                return 0;
+            }
             const bool repeating = (flags & OBELISK_TIMER_FLAG_REPEATING) != 0;
             if (repeating && intervalMs == 0)
             {
                 SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected repeating timer with zero interval.");
+                return 0;
+            }
+            if (repeating && !TimerManager::IsSupportedDuration(intervalMs))
+            {
+                SafeLogWarnNoThrow("RegisterTimerWithOwnerTokenHandle rejected unsupported repeating interval.");
                 return 0;
             }
             if (!repeating && intervalMs != 0)

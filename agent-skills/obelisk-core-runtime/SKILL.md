@@ -89,6 +89,10 @@ Own these areas:
   based, process-local only, and independent of UE4/server state. Plugin unload/init
   failure must remove owner timers before `dlclose` and wait for in-flight callbacks from
   other threads; if timer cleanup fails, retain the plugin mapped for retry.
+- Timer durations must be validated before converting to `std::chrono` durations or
+  adding them to `steady_clock::now()`. Reject zero delays, invalid interval/flag mixes,
+  and values outside the supported `steady_clock` range at both the public ABI wrapper and
+  `TimerManager::Register`.
 - Reject plugin callback registrations that cannot be attributed to the currently
   initializing plugin or an already-loaded plugin owner. Do not allow ownerless callbacks
   through the public plugin API.

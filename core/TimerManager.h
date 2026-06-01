@@ -11,6 +11,7 @@ namespace Obelisk::Core
     {
     public:
         static TimerManager& Get();
+        static bool IsSupportedDuration(uint64_t durationMs);
 
         uint64_t Register(void* owner,
                           uint64_t delayMs,

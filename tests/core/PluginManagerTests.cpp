@@ -2664,6 +2664,14 @@ namespace
                 "zero-delay timer was registered");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
+                    std::numeric_limits<uint64_t>::max(),
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "unsupported timer delay was registered");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
                     10,
                     10,
                     0,
@@ -2678,6 +2686,14 @@ namespace
                     FakeTimerCallback,
                     &plugin) == 0,
                 "repeating timer with zero interval was registered");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    10,
+                    std::numeric_limits<uint64_t>::max(),
+                    OBELISK_TIMER_FLAG_REPEATING,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "unsupported repeating timer interval was registered");
         Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
                     plugin.initOwnerToken,
                     10,

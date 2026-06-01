@@ -120,6 +120,27 @@ namespace
                 "timer registration accepted null callback");
         Require(TimerManager::Get().Register(&owner, 1, 0, true, CountCallback, &state) == 0,
                 "timer registration accepted repeating timer with zero interval");
+        Require(TimerManager::Get().Register(&owner,
+                                             std::numeric_limits<uint64_t>::max(),
+                                             0,
+                                             false,
+                                             CountCallback,
+                                             &state) == 0,
+                "timer registration accepted unsupported delay");
+        Require(TimerManager::Get().Register(&owner,
+                                             1,
+                                             std::numeric_limits<uint64_t>::max(),
+                                             false,
+                                             CountCallback,
+                                             &state) == 0,
+                "timer registration accepted one-shot timer with non-zero interval");
+        Require(TimerManager::Get().Register(&owner,
+                                             1,
+                                             std::numeric_limits<uint64_t>::max(),
+                                             true,
+                                             CountCallback,
+                                             &state) == 0,
+                "timer registration accepted unsupported repeating interval");
         Require(!TimerManager::Get().Unregister(&owner, 0), "timer unregister accepted zero handle");
     }
 

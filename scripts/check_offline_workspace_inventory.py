@@ -45,6 +45,11 @@ JSON_NAME_FRAGMENTS = (
     "readiness",
     "summary",
 )
+RAW_WORKSPACE_PARTS = {
+    "raw",
+    "dumps",
+    "dump",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -109,13 +114,35 @@ def is_interesting_json(path: Path) -> bool:
     return any(fragment in lower_name for fragment in JSON_NAME_FRAGMENTS)
 
 
-def artifact_bucket(payload: dict[str, Any], *, raw_dumps_root: bool) -> tuple[str, str]:
+def has_protected_path_reference(value: Any) -> bool:
+    if isinstance(value, str):
+        if not value.startswith("/servidor/ark"):
+            return False
+        try:
+            return protected_paths.protected_path_status(Path(value)).protected
+        except OSError:
+            return True
+    if isinstance(value, dict):
+        return any(has_protected_path_reference(child) for child in value.values())
+    if isinstance(value, list):
+        return any(has_protected_path_reference(child) for child in value)
+    return False
+
+
+def artifact_bucket(payload: dict[str, Any], *, rel_path: str, raw_dumps_root: bool) -> tuple[str, str]:
     if raw_dumps_root:
         return "blocked", "raw_dumps_root_requires_workspace_manifest_before_reuse"
+
+    rel_parts = set(Path(rel_path).parts)
+    if rel_parts & RAW_WORKSPACE_PARTS:
+        return "candidate", "raw_workspace_metadata_requires_gate_before_reuse"
 
     schema = payload.get("schema")
     if not isinstance(schema, str) or not schema:
         return "blocked", "missing_schema"
+
+    if has_protected_path_reference(payload):
+        return "candidate", "protected_path_reference_requires_manual_review"
 
     blockers = payload.get("blockers")
     if isinstance(blockers, list) and blockers:
@@ -199,7 +226,7 @@ def inspect_json(path: Path, root: Path, *, max_json_bytes: int, raw_dumps_root:
             "size_bytes": st.st_size,
         }
 
-    bucket, reason = artifact_bucket(payload, raw_dumps_root=raw_dumps_root)
+    bucket, reason = artifact_bucket(payload, rel_path=rel, raw_dumps_root=raw_dumps_root)
     return {
         "path": rel,
         "bucket": bucket,
@@ -263,6 +290,15 @@ def inspect_root(
         "blockers": blockers,
     }
     if kind == "blocked_protected_path":
+        return root_report
+    symlink_component = protected_paths.first_symlink_component(root)
+    if symlink_component is not None:
+        root_report["blockers"] = sorted(
+            set(root_report["blockers"] + ["root_has_symlink_component"])
+        )
+        root_report["symlinks_blocked"].append(path_text(symlink_component))
+        return root_report
+    if root_report["blockers"]:
         return root_report
     if root.is_symlink():
         root_report["blockers"] = sorted(set(root_report["blockers"] + ["root_is_symlink"]))

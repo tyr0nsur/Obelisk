@@ -95,7 +95,7 @@ class OfflineWorkspaceInventoryTests(unittest.TestCase):
             artifact_paths = [artifact["path"] for artifact in report["roots"][0]["artifacts"]]
             self.assertEqual(["target/ok.manifest.json"], artifact_paths)
 
-    def test_dumps_root_entries_are_blocked_metadata_only(self) -> None:
+    def test_non_default_dumps_root_is_blocked_without_reading_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp) / "workspace"
             dumps = Path(tmp) / "dumps"
@@ -115,10 +115,97 @@ class OfflineWorkspaceInventoryTests(unittest.TestCase):
 
             self.assertEqual(2, result.returncode)
             self.assertEqual(1, report["summary"]["artifacts_by_bucket"]["reusable"])
-            self.assertEqual(1, report["summary"]["artifacts_by_bucket"]["blocked"])
-            self.assertEqual(1, report["summary"]["heavy_files_skipped"])
-            dumps_artifact = report["roots"][1]["artifacts"][0]
-            self.assertEqual("raw_dumps_root_requires_workspace_manifest_before_reuse", dumps_artifact["reason"])
+            self.assertNotIn("blocked", report["summary"]["artifacts_by_bucket"])
+            self.assertEqual(0, report["summary"]["heavy_files_skipped"])
+            dumps_root = report["roots"][1]
+            self.assertEqual(["include_dumps_root_not_default_dumps_path"], dumps_root["blockers"])
+            self.assertEqual([], dumps_root["artifacts"])
+            self.assertEqual(0, dumps_root["files_seen"])
+
+    def test_non_default_include_dumps_root_does_not_walk_or_read(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "workspace"
+            dumps = Path(tmp) / "not-default-dumps"
+            self.write_json(workspace / "ok.manifest.json", {"schema": "obelisk.example.v1", "valid": True})
+            self.write_json(dumps / "raw.manifest.json", {"schema": "obelisk.example.v1", "valid": True})
+
+            result = self.run_checker(
+                "--root",
+                str(workspace),
+                "--include-dumps-root",
+                str(dumps),
+                "--json",
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+            self.assertEqual(2, result.returncode)
+            dumps_root = report["roots"][1]
+            self.assertEqual(["include_dumps_root_not_default_dumps_path"], dumps_root["blockers"])
+            self.assertEqual([], dumps_root["artifacts"])
+            self.assertEqual(0, dumps_root["files_seen"])
+
+    def test_include_dumps_root_blocks_symlink_component_before_walk(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = root / "workspace"
+            real_dumps = root / "real-dumps"
+            link = root / "linked-dumps"
+            self.write_json(workspace / "ok.manifest.json", {"schema": "obelisk.example.v1", "valid": True})
+            self.write_json(real_dumps / "raw.manifest.json", {"schema": "obelisk.example.v1", "valid": True})
+            link.symlink_to(real_dumps, target_is_directory=True)
+
+            result = self.run_checker(
+                "--root",
+                str(workspace),
+                "--include-dumps-root",
+                str(link / "nested"),
+                "--json",
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+            self.assertEqual(2, result.returncode)
+            dumps_root = report["roots"][1]
+            self.assertIn("root_has_symlink_component", dumps_root["blockers"])
+            self.assertEqual([], dumps_root["artifacts"])
+            self.assertEqual(0, dumps_root["files_seen"])
+
+    def test_raw_workspace_metadata_is_candidate_not_reusable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_json(root / "raw" / "raw.manifest.json", {"schema": "obelisk.example.v1", "valid": True})
+            (root / "raw" / "core").write_bytes(b"not-read")
+            (root / "raw" / "ShooterGameServer").write_bytes(b"not-read")
+
+            result = self.run_checker("--root", str(root), "--json", check=False)
+            report = json.loads(result.stdout)
+
+            self.assertEqual(0, result.returncode)
+            self.assertEqual({"candidate": 1}, report["summary"]["artifacts_by_bucket"])
+            self.assertEqual(2, report["summary"]["heavy_files_skipped"])
+            artifact = report["roots"][0]["artifacts"][0]
+            self.assertEqual("raw_workspace_metadata_requires_gate_before_reuse", artifact["reason"])
+
+    def test_protected_path_reference_is_candidate_not_reusable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_json(
+                root / "ok.manifest.json",
+                {
+                    "schema": "obelisk.example.v1",
+                    "valid": True,
+                    "source": {"path": "/servidor/ark/obelisk/dumps/core"},
+                },
+            )
+
+            result = self.run_checker("--root", str(root), "--json", check=False)
+            report = json.loads(result.stdout)
+
+            self.assertEqual(0, result.returncode)
+            self.assertEqual({"candidate": 1}, report["summary"]["artifacts_by_bucket"])
+            artifact = report["roots"][0]["artifacts"][0]
+            self.assertEqual("protected_path_reference_requires_manual_review", artifact["reason"])
 
 
 if __name__ == "__main__":
