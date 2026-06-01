@@ -104,8 +104,23 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("mission-copied-bool-policy-slice", accounting["planning_target_sets"])
         self.assertIn("public_mission_sdk_abi", accounting["leaf_family_gaps"]["mission"]["missing_public_gates"])
         self.assertIn("cross_map_state_correlation", accounting["leaf_family_gaps"]["transfer"]["missing_public_gates"])
+        self.assertIn("lookup_ownership_lifetime", accounting["leaf_family_gaps"]["dino_policy"]["missing_public_gates"])
+        self.assertIn("privacy_redaction_contract", accounting["leaf_family_gaps"]["tribe_policy"]["missing_public_gates"])
         self.assertIn("buff_class_object_redaction_contract", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertFalse(accounting["leaf_family_gaps"]["tribe_policy"]["v1_accounted"])
+
+        priority = report["leaf_priority"]
+        self.assertEqual(priority["schema"], "obelisk.mission-transfer-dino-tribe-v1-leaf-priority.v1")
+        self.assertEqual(priority["recommended_leaf"], "mission")
+        self.assertEqual(priority["recommended_scope"], "internal_reusable_evidence_only")
+        self.assertEqual(
+            [item["leaf"] for item in priority["ranked_leaves"]],
+            ["mission", "dino_policy", "transfer", "buff_status", "tribe_policy"],
+        )
+        self.assertEqual(priority["ranked_leaves"][0]["missing_public_gate_count"], 6)
+        self.assertFalse(any(item["public_sdk_ready"] for item in priority["ranked_leaves"]))
+        self.assertFalse(any(item["runtime_ready"] for item in priority["ranked_leaves"]))
+        self.assertFalse(any(item["promotion_ready"] for item in priority["ranked_leaves"]))
 
     def test_release_statement_accepts_umbrella_excluded_with_all_leaf_exclusions(self) -> None:
         result = self.run_checker(statement=excluded_release_statement())
@@ -242,6 +257,21 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("leaf_decision_units_mismatch", report["blockers"])
+
+    def test_priority_rejects_stale_leaf_evidence_profile(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["mission"]["current_evidence"] = ["mission-compact-intake"]
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_priority_required_evidence_missing", report["blockers"])
+        details = [item for item in report["blocker_details"] if item["reason"] == "leaf_priority_required_evidence_missing"]
+        self.assertEqual(details[0]["leaf"], "mission")
+        self.assertEqual(details[0]["missing"], ["mission-copied-bool-policy-slice"])
 
 
 if __name__ == "__main__":

@@ -1264,6 +1264,43 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, forbidden_claims)
 
+    def test_release_statement_rejects_without_prefixed_affirmative_claims(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement += (
+            "Without promotion, Inventory SDK is ready in v1.\n"
+            "Without promoted dependencies, command router support is available in v1.\n"
+            "Without evidence, Candidate evidence proves a complete SDK for v1 plugin authors.\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_broad_claims", payload["blockers"])
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "Without promotion, Inventory SDK is ready in v1.",
+            "Without evidence, Candidate evidence proves a complete SDK for v1 plugin authors.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertIn(
+            "obelisk.commands_replies.v1",
+            payload["release_statement_missing_exclusion_contracts"],
+        )
+
     def test_release_statement_allows_negated_non_promotional_evidence_boundaries(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         release_statement += (
@@ -1271,6 +1308,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "Static orientation readiness is not public SDK readiness.\n"
             "Consume-only planning evidence does not validate v1.0 stable.\n"
             "Foundation package shape support is not production-ready SDK support.\n"
+            "Without promoted demand families, no complete SDK claim is allowed.\n"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"

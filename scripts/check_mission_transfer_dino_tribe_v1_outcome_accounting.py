@@ -88,6 +88,105 @@ LEAF_MISSING_PUBLIC_GATES = {
         "mutation_return_override_policy",
     ),
 }
+LEAF_PRIORITY_PROFILES = {
+    "mission": {
+        "base_score": 80,
+        "required_evidence": ("mission-compact-intake", "mission-copied-bool-policy-slice"),
+        "reusable_evidence": (
+            "focused copied-bool readiness checker",
+            "fixture-backed exact Mission metadata",
+            "five canonical copied bool fields",
+            "recognition-only redaction for object and array fields",
+        ),
+        "blocking_risk": (
+            "runtime observer approval",
+            "dispatcher lifecycle",
+            "public ABI and SDK consumer coverage",
+            "mission/player identity and reward authority",
+        ),
+        "next_v1_reuse_step": (
+            "Harden the internal copied-bool fail-closed contract and keep object, "
+            "identity, array, mutation, and return-override claims excluded."
+        ),
+    },
+    "dino_policy": {
+        "base_score": 72,
+        "required_evidence": ("dino-compact-intake",),
+        "reusable_evidence": (
+            "focused scalar readiness checker",
+            "accepted compact passenger/carry layout evidence",
+            "pre-call scalar-only planning path",
+            "explicit return-value deferral",
+        ),
+        "blocking_risk": (
+            "dino/player/passenger identity",
+            "lookup and lifetime ownership",
+            "post-call return semantics",
+            "runtime privacy and dispatcher lifecycle",
+        ),
+        "next_v1_reuse_step": (
+            "Reuse the scalar-only redaction model after Mission; keep dino/player "
+            "object references and return values recognition-only."
+        ),
+    },
+    "transfer": {
+        "base_score": 68,
+        "required_evidence": ("transfer-ufunction-intake", "transfer-baccept-only-policy-slice"),
+        "reusable_evidence": (
+            "focused bAccept copied-bool checker",
+            "complete transfer intake provenance",
+            "explicit consume-only promote gate",
+        ),
+        "blocking_risk": (
+            "payload ownership",
+            "downloaded character and dino payload contracts",
+            "player identity and cross-map correlation",
+            "teleport/spawn authority",
+        ),
+        "next_v1_reuse_step": (
+            "Reuse only the single copied-bool consume gate; defer transfer payloads, "
+            "identity, ownership, cross-map state, teleport/spawn, mutation, and return override."
+        ),
+    },
+    "buff_status": {
+        "base_score": 58,
+        "required_evidence": ("buff-compact-intake", "buff-breadth-intake"),
+        "reusable_evidence": (
+            "compact and breadth layout evidence",
+            "existing internal recognizer coverage",
+            "clear object/class redaction boundary to define",
+        ),
+        "blocking_risk": (
+            "class/object redaction contract",
+            "copied payload policy",
+            "lifecycle, stacking, and invalidation semantics",
+            "fresh compact BoolProperty tail evidence",
+        ),
+        "next_v1_reuse_step": (
+            "Refresh compact evidence before treating Buff as a scalar/status lane; "
+            "keep class/object pointers, lifecycle claims, ResourceHandle, mutation, and return override excluded."
+        ),
+    },
+    "tribe_policy": {
+        "base_score": 52,
+        "required_evidence": ("tribe-compact-intake",),
+        "reusable_evidence": (
+            "compact layout evidence",
+            "permission/log/online-list target vocabulary",
+            "candidate split between scalar permission and array/string payload work",
+        ),
+        "blocking_risk": (
+            "tribe/player identity",
+            "permission semantics",
+            "log, string, and array payload ownership",
+            "privacy redaction and runtime observation",
+        ),
+        "next_v1_reuse_step": (
+            "Split any future work into a narrow scalar permission/log-request intake and "
+            "a separately blocked array/string payload lane before public discussion."
+        ),
+    },
+}
 NEGATIVE_EVIDENCE_RE = re.compile(
     r"\b(?:candidate[- ]?only|consume[- ]?only|planning[- ]?only|not promoted|"
     r"promotion[_ -]?ready\s*[:=]\s*false|public[_ -]?sdk[_ -]?ready\s*[:=]\s*false|"
@@ -439,6 +538,96 @@ def build_leaf_family_accounting(
     }
 
 
+def validate_leaf_priority_profiles(blockers: list[dict[str, Any]]) -> None:
+    observed = set(LEAF_PRIORITY_PROFILES)
+    required = set(REQUIRED_LEAVES)
+    if observed != required:
+        add(
+            blockers,
+            "leaf_priority_profiles_mismatch",
+            "$.checker.leaf_priority_profiles",
+            missing=sorted(required - observed),
+            extra=sorted(observed - required),
+        )
+    for leaf_id, profile in LEAF_PRIORITY_PROFILES.items():
+        if not isinstance(profile.get("base_score"), int):
+            add(blockers, "leaf_priority_base_score_missing", f"$.checker.leaf_priority_profiles[{leaf_id}].base_score")
+        for key in ("required_evidence", "reusable_evidence", "blocking_risk"):
+            values = profile.get(key)
+            if not isinstance(values, tuple) or not all(isinstance(item, str) and item for item in values):
+                add(blockers, "leaf_priority_profile_list_invalid", f"$.checker.leaf_priority_profiles[{leaf_id}].{key}")
+        if not isinstance(profile.get("next_v1_reuse_step"), str) or not profile["next_v1_reuse_step"]:
+            add(blockers, "leaf_priority_next_step_missing", f"$.checker.leaf_priority_profiles[{leaf_id}].next_v1_reuse_step")
+
+
+def build_leaf_priority(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    validate_leaf_priority_profiles(blockers)
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    if not isinstance(gaps, dict):
+        gaps = {}
+
+    ranked: list[dict[str, Any]] = []
+    for leaf_id in REQUIRED_LEAVES:
+        if leaf_id not in leaves:
+            continue
+        leaf = leaves[leaf_id]
+        profile = LEAF_PRIORITY_PROFILES.get(leaf_id, {})
+        current_evidence = string_list(leaf.get("current_evidence"))
+        missing_required_evidence = sorted(set(profile.get("required_evidence", ())) - set(current_evidence))
+        if missing_required_evidence:
+            add(
+                blockers,
+                "leaf_priority_required_evidence_missing",
+                f"$.leaf_decision_units[{leaf_id}].current_evidence",
+                leaf=leaf_id,
+                missing=missing_required_evidence,
+            )
+        gap = gaps.get(leaf_id) if isinstance(gaps.get(leaf_id), dict) else {}
+        missing_public_gates = string_list(gap.get("missing_public_gates"))
+        score = int(profile.get("base_score", 0)) + (2 * len(current_evidence)) - len(missing_public_gates)
+        ranked.append(
+            {
+                "leaf": leaf_id,
+                "priority_score": score,
+                "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+                "current_evidence": current_evidence,
+                "reusable_evidence": list(profile.get("reusable_evidence", ())),
+                "blocking_risk": list(profile.get("blocking_risk", ())),
+                "missing_public_gate_count": len(missing_public_gates),
+                "v1_accounted": bool(gap.get("v1_accounted")),
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "promotion_ready": False,
+                "next_v1_reuse_step": profile.get("next_v1_reuse_step"),
+            }
+        )
+
+    ranked.sort(key=lambda item: (-item["priority_score"], REQUIRED_LEAVES.index(item["leaf"])))
+    for index, item in enumerate(ranked, start=1):
+        item["rank"] = index
+
+    recommended = ranked[0]["leaf"] if ranked else None
+    return {
+        "schema": "obelisk.mission-transfer-dino-tribe-v1-leaf-priority.v1",
+        "recommended_leaf": recommended,
+        "recommended_scope": "internal_reusable_evidence_only" if recommended else None,
+        "basis": (
+            "Scores reward focused copied-scalar/checker evidence and penalize unresolved "
+            "public SDK, runtime, identity, lookup, payload, mutation, return-override, "
+            "ResourceHandle, and teleport/spawn gates."
+        ),
+        "ranked_leaves": ranked,
+        "non_claims": [
+            "leaf priority does not promote a public SDK or runtime observer",
+            "leaf priority does not add identity, lookup, mutation, return override, ResourceHandle, teleport/spawn, or payload ownership",
+        ],
+    }
+
+
 def build_report(manifest_path: Path, split_note_path: Path, release_statement_path: Path | None = None) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     manifest = load_json(manifest_path, "manifest")
@@ -491,6 +680,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
     else:
         route = "candidate_only"
     leaf_family_accounting = build_leaf_family_accounting(surface, leaves, outcome, route, blockers)
+    leaf_priority = build_leaf_priority(leaves, leaf_family_accounting, blockers)
 
     return {
         "schema": REPORT_SCHEMA,
@@ -506,6 +696,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         "observed_leaves": [leaf_id for leaf_id in REQUIRED_LEAVES if leaf_id in leaves],
         "leaf_statuses": {leaf_id: leaves.get(leaf_id, {}).get("status") for leaf_id in REQUIRED_LEAVES},
         "candidate_only_accounting": leaf_family_accounting,
+        "leaf_priority": leaf_priority,
         "missing_leaf_families": leaf_family_accounting["missing_leaf_families"],
         "release_statement": outcome,
         "blockers": [blocker["reason"] for blocker in blockers],

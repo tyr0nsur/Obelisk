@@ -273,6 +273,22 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime_summary_required_observed_event_cases_missing", report["blockers"])
 
+    def test_rejects_out_of_order_observed_lifecycle_cases(self) -> None:
+        payload = manifest()
+        module = payload["source_summary"]["modules"]["player_principal_lifecycle"]
+        cases = module["observed_event_cases"]
+        module["observed_event_cases"] = [
+            {**cases[2], "sequence": 1},
+            {**cases[0], "sequence": 2},
+            {**cases[1], "sequence": 3},
+        ]
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime_summary_observed_event_case_order_mismatch", report["blockers"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
     def test_rejects_extra_lifecycle_detail_values(self) -> None:
         payload = manifest()
         details = payload["source_summary"]["modules"]["player_principal_lifecycle"]["functions"][

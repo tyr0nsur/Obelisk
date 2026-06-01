@@ -42,6 +42,8 @@ REQUIRED_GATE_ARGS = [
     "2651",
     "--dispatch-budget",
     "0",
+    "--observation-budget",
+    "1",
 ]
 
 
@@ -89,6 +91,11 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         )
         self.assertEqual([2651, 2652], payload["gate"]["allowed_fname_indices"])
         self.assertEqual(0, payload["gate"]["dispatch_budget"])
+        self.assertEqual(1, payload["gate"]["observation_budget"])
+        self.assertTrue(payload["gate"]["cheap_gate_passed"])
+        self.assertTrue(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
+        self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
         self.assertEqual(
             ["ShooterPlayerController.ServerRequestInventoryUseItemWithActor.AdditionalData"],
             payload["fixture_summary"]["copied_integer_fields"],
@@ -122,6 +129,11 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("missing_supported_sha", reasons)
         self.assertIn("missing_fname_index", reasons)
         self.assertIn("missing_dispatch_budget", reasons)
+        self.assertIn("missing_observation_budget", reasons)
+        self.assertFalse(payload["gate"]["cheap_gate_passed"])
+        self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+        self.assertFalse(payload["gate"]["runtime_param_read_before_cheap_gate_allowed"])
+        self.assertFalse(payload["gate"]["dispatch_budget_reservation_allowed"])
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["promotion_ready"])
 
@@ -151,6 +163,8 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("unsupported_sha", reasons)
         self.assertIn("non_target_fname", reasons)
+        self.assertFalse(payload["gate"]["cheap_gate_passed"])
+        self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
 
     def test_nonzero_dispatch_budget_fails_closed(self) -> None:
         args = list(REQUIRED_GATE_ARGS)
@@ -162,6 +176,32 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("dispatch_budget_not_zero", reasons)
+
+    def test_missing_or_zero_observation_budget_fails_closed_without_budget_reservation(self) -> None:
+        args = list(REQUIRED_GATE_ARGS)
+        observation_budget_index = args.index("--observation-budget")
+        del args[observation_budget_index : observation_budget_index + 2]
+
+        result = self.run_checker("--json", *args, check=False)
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("missing_observation_budget", reasons)
+        self.assertTrue(payload["gate"]["cheap_gate_passed"])
+        self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
+
+        args = list(REQUIRED_GATE_ARGS)
+        args[args.index("1")] = "0"
+
+        result = self.run_checker("--json", *args, check=False)
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("observation_budget_not_positive", reasons)
+        self.assertTrue(payload["gate"]["cheap_gate_passed"])
+        self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
 
     def test_public_contract_leak_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -276,6 +316,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
             ark_binary_sha256=SUPPORTED_SHA,
             fname_index=2651,
             dispatch_budget=0,
+            observation_budget=1,
             fixture_report=mutated,
         )
         reasons = {blocker["reason"] for blocker in payload["blockers"]}
@@ -285,6 +326,7 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertIn("redaction_contract_mismatch", reasons)
         self.assertIn("scalar_contract_mismatch", reasons)
         self.assertIn("public_or_runtime_flag_promoted", reasons)
+        self.assertFalse(payload["gate"]["observation_budget_reservation_allowed"])
 
 
 if __name__ == "__main__":

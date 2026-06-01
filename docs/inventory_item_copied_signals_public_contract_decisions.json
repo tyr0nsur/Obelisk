@@ -179,11 +179,13 @@
       "unblocks": "future inventory/item mutation, lookup, grants, removal, kits, rewards, engrams, or return override only after separate promotion",
       "requires": [
         "promoted player, inventory, and item identity semantics for each audit unit or an explicit no-handle design that avoids object identity",
+        "mutation requests must not consume resource_kind metadata, copied signal sequence/log entries, or observer fname matches as identity; ResourceHandle remains unavailable until separate ResourceHandle promotion",
         "append-only POD C ABI with capability gate, owner-scoped cleanup, SDK consumer tests, and privacy/abuse controls",
         "rollback and failure semantics for grants, removals, progression, and multi-instance ownership"
       ],
       "must_not_unlock": [
         "resource_kind as identity",
+        "copied signal sequence as identity",
         "lookup",
         "mutation",
         "return override",

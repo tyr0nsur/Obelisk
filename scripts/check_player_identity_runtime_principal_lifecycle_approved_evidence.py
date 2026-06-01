@@ -361,6 +361,14 @@ def validate_observed_event_cases(module: dict[str, Any], blockers: list[dict[st
         compact_case = case_without_sequence(case)
         case_is_required_shape = freeze_case(compact_case) in REQUIRED_OBSERVED_EVENT_CASE_SET
         case_matches_remaining_required = compact_case in remaining_expected
+        if case_is_required_shape and remaining_expected and compact_case != remaining_expected[0]:
+            add(
+                blockers,
+                "runtime_summary_observed_event_case_order_mismatch",
+                case_label,
+                expected=remaining_expected[0],
+                observed=compact_case,
+            )
         if not case_is_required_shape or not case_matches_remaining_required:
             add(
                 blockers,

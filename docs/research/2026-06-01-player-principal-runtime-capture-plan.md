@@ -502,6 +502,12 @@ The local checker reports now expose the next gate explicitly:
 - accepted approved runtime evidence report:
   `next_blocker=identity_public_contract_gate_missing`.
 
+Offline audit tightening on 2026-06-01: the approved runtime evidence checker now also
+requires the copied `observed_event_cases` to appear in the documented lifecycle order:
+`session_start` -> `session_start_rejected` -> `session_end`. A bundle that contains all
+three shapes but observes logout/invalidation before the start anchor is
+`approved_runtime_evidence_not_accepted`, not lifecycle evidence.
+
 These are diagnostic labels only. They do not authorize server work, promotion, public
 readiness, plugin delivery, identity lookup, mutation, return override, or SDK claims.
 

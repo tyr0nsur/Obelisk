@@ -275,7 +275,7 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
     r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|limited|"
-    r"must\s+not|no|not|post-v1|post v1|without)\b",
+    r"must\s+not|no|not|post-v1|post v1)\b",
     re.IGNORECASE,
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER = re.compile(
@@ -835,13 +835,13 @@ def text_has_affirmative_release_claim(text: str) -> bool:
             for boundary in CLAUSE_START_PATTERN.finditer(prefix):
                 clause_start = boundary.end()
             claim_prefix = lowered[clause_start : match.start()]
-            if re.search(r"\b(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_prefix):
+            if re.search(r"\b(?:no|not|never|excluded|post-v1|post v1)\b", claim_prefix):
                 continue
             claim_clause = lowered[clause_start : match.end()]
-            if re.match(r"\s*(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_clause):
+            if re.match(r"\s*(?:no|not|never|excluded|post-v1|post v1)\b", claim_clause):
                 continue
             claim_match = lowered[match.start() : match.end()]
-            if re.match(r"\s*(?:no|not|never|without|excluded|post-v1|post v1)\b", claim_match):
+            if re.match(r"\s*(?:no|not|never|excluded|post-v1|post v1)\b", claim_match):
                 continue
             return True
     return False
@@ -872,7 +872,7 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                     continue
                 if re.match(
                     r"\s*(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|"
-                    r"limited|must\s+not|no|not|post-v1|post v1|without)\b",
+                    r"limited|must\s+not|no|not|post-v1|post v1)\b",
                     claim_clause,
                 ):
                     continue

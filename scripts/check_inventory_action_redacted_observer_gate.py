@@ -59,6 +59,7 @@ REQUIRED_PROMOTION_BLOCKERS: dict[str, dict[str, Any]] = {
         "status": "blocked",
         "required_tokens": (
             "identity semantics",
+            "copied signal sequence",
             "append-only POD C ABI",
             "owner-scoped cleanup",
             "rollback",
@@ -160,6 +161,11 @@ def parse_args() -> argparse.Namespace:
         "--dispatch-budget",
         type=int,
         help="Modeled dispatch budget. Must be explicitly 0 for this redacted observer.",
+    )
+    parser.add_argument(
+        "--observation-budget",
+        type=int,
+        help="Modeled log/observation budget. Must be positive and reserved only after cheap gates pass.",
     )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
@@ -460,6 +466,7 @@ def validate_gate_inputs(
     ark_binary_sha256: str | None,
     fname_index: int | None,
     dispatch_budget: int | None,
+    observation_budget: int | None,
     snapshot_identity: dict[str, Any],
     blockers: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -487,6 +494,27 @@ def validate_gate_inputs(
         append_blocker(blockers, "missing_dispatch_budget")
     elif dispatch_budget != 0:
         append_blocker(blockers, "dispatch_budget_not_zero", expected=0, value=dispatch_budget)
+    if observation_budget is None:
+        append_blocker(blockers, "missing_observation_budget")
+    elif observation_budget <= 0:
+        append_blocker(blockers, "observation_budget_not_positive", minimum=1, value=observation_budget)
+
+    cheap_gate_passed = (
+        gate_enabled
+        and observer_profile == REQUIRED_PROFILE
+        and not missing_markers
+        and ark_binary_sha256 is not None
+        and ark_binary_sha256 in supported_shas
+        and fname_index is not None
+        and fname_index in allowed_fname_indices
+    )
+    observation_budget_reservation_allowed = (
+        cheap_gate_passed
+        and observation_budget is not None
+        and observation_budget > 0
+        and dispatch_budget == 0
+        and not blockers
+    )
 
     return {
         "gate_enabled": gate_enabled,
@@ -499,6 +527,11 @@ def validate_gate_inputs(
         "fname_index": fname_index,
         "allowed_fname_indices": allowed_fname_indices,
         "dispatch_budget": dispatch_budget,
+        "observation_budget": observation_budget,
+        "cheap_gate_passed": cheap_gate_passed,
+        "observation_budget_reservation_allowed": observation_budget_reservation_allowed,
+        "runtime_param_read_before_cheap_gate_allowed": False,
+        "dispatch_budget_reservation_allowed": False,
     }
 
 
@@ -513,6 +546,7 @@ def build_check(
     ark_binary_sha256: str | None = None,
     fname_index: int | None = None,
     dispatch_budget: int | None = None,
+    observation_budget: int | None = None,
     fixture_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
@@ -528,6 +562,7 @@ def build_check(
         ark_binary_sha256=ark_binary_sha256,
         fname_index=fname_index,
         dispatch_budget=dispatch_budget,
+        observation_budget=observation_budget,
         snapshot_identity=snapshot_identity,
         blockers=blockers,
     )
@@ -573,6 +608,7 @@ def main() -> int:
         ark_binary_sha256=args.ark_binary_sha256,
         fname_index=args.fname_index,
         dispatch_budget=args.dispatch_budget,
+        observation_budget=args.observation_budget,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["ready"] else 1
