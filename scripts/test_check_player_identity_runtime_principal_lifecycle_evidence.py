@@ -40,10 +40,71 @@ def manifest() -> dict:
         "raw_params",
     ]
     observations = [
-        ("session_start_anchor", "ShooterGameMode.HandleNewPlayer", ["bIsFromLogin", "ReturnValue"]),
-        ("session_end_anchor", "ShooterGameMode.OnLogout", []),
-        ("stale_after_logout", "post_logout_consumer_check", ["generation_state"]),
-        ("malformed_or_unsupported_evidence", "principal_consumer_boundary", []),
+        {
+            "case": "session_start_anchor",
+            "target": "ShooterGameMode.HandleNewPlayer",
+            "copied_fields": ["bIsFromLogin", "ReturnValue"],
+            "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+            "copied_bool_values": ["1", "1"],
+            "redacted_count": 3,
+            "redacted_fields": ["NewPlayer", "PlayerData", "PlayerCharacter"],
+            "post_original": True,
+            "role": "session_start",
+            "principal_action": "candidate_created",
+            "delivery_claim": "none",
+        },
+        {
+            "case": "session_start_rejected_anchor",
+            "target": "ShooterGameMode.HandleNewPlayer",
+            "copied_fields": ["bIsFromLogin", "ReturnValue"],
+            "copied_bool_fields": ["bIsFromLogin", "ReturnValue"],
+            "copied_bool_values": ["0", "1"],
+            "redacted_count": 3,
+            "redacted_fields": ["NewPlayer", "PlayerData", "PlayerCharacter"],
+            "post_original": True,
+            "role": "session_start_rejected",
+            "principal_action": "none",
+            "delivery_claim": "none",
+        },
+        {
+            "case": "session_end_anchor",
+            "target": "ShooterGameMode.OnLogout",
+            "copied_fields": [],
+            "copied_bool_fields": [],
+            "copied_bool_values": [],
+            "redacted_count": 1,
+            "redacted_fields": ["Exiting"],
+            "post_original": True,
+            "role": "session_end",
+            "principal_action": "candidate_invalidated",
+            "delivery_claim": "none",
+        },
+        {
+            "case": "stale_after_logout",
+            "target": "post_logout_consumer_check",
+            "copied_fields": ["generation_state"],
+            "copied_bool_fields": [],
+            "copied_bool_values": [],
+            "redacted_count": 0,
+            "redacted_fields": [],
+            "post_original": False,
+            "role": "none",
+            "principal_action": "none",
+            "delivery_claim": "none",
+        },
+        {
+            "case": "malformed_or_unsupported_evidence",
+            "target": "principal_consumer_boundary",
+            "copied_fields": [],
+            "copied_bool_fields": [],
+            "copied_bool_values": [],
+            "redacted_count": 0,
+            "redacted_fields": [],
+            "post_original": False,
+            "role": "none",
+            "principal_action": "none",
+            "delivery_claim": "none",
+        },
     ]
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1",
@@ -64,17 +125,25 @@ def manifest() -> dict:
         },
         "observations": [
             {
-                "case": case,
-                "target": target,
+                "case": observation["case"],
+                "target": observation["target"],
                 "synthetic": True,
                 "redacted": True,
                 "runtime_observed": False,
                 "result": "shape_only",
                 "consumer_result": "deny_or_invalidate_only",
-                "copied_fields": copied_fields,
+                "copied_fields": observation["copied_fields"],
+                "copied_bool_fields": observation["copied_bool_fields"],
+                "copied_bool_values": observation["copied_bool_values"],
+                "redacted_count": observation["redacted_count"],
+                "redacted_fields": observation["redacted_fields"],
+                "post_original": observation["post_original"],
+                "role": observation["role"],
+                "principal_action": observation["principal_action"],
+                "delivery_claim": observation["delivery_claim"],
                 "raw_payload_retained": False,
             }
-            for case, target, copied_fields in observations
+            for observation in observations
         ],
         "privacy_boundary": {
             "copied_opaque_principal_only": True,
@@ -132,6 +201,7 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             set(report["observed_cases"]),
             {
                 "session_start_anchor",
+                "session_start_rejected_anchor",
                 "session_end_anchor",
                 "stale_after_logout",
                 "malformed_or_unsupported_evidence",
@@ -185,6 +255,27 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertIn("observation_copied_fields_mismatch", report["blockers"])
         self.assertEqual(report["blockers"].count("observation_copied_fields_mismatch"), 2)
+
+    def test_rejects_unsafe_observer_semantics(self) -> None:
+        payload = copy.deepcopy(manifest())
+        payload["observations"][0]["post_original"] = False
+        payload["observations"][0]["role"] = "session_end"
+        payload["observations"][0]["copied_bool_fields"] = ["ReturnValue", "bIsFromLogin"]
+        payload["observations"][0]["copied_bool_values"] = ["1", "2"]
+        payload["observations"][0]["redacted_fields"] = ["NewPlayer", "PlayerData"]
+        payload["observations"][1]["principal_action"] = "candidate_created"
+        payload["observations"][1]["delivery_claim"] = "delivered"
+        result = self.run_checker(payload, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("observation_post_original_mismatch", report["blockers"])
+        self.assertIn("observation_role_mismatch", report["blockers"])
+        self.assertIn("observation_copied_bool_fields_mismatch", report["blockers"])
+        self.assertIn("observation_copied_bool_values_mismatch", report["blockers"])
+        self.assertIn("observation_redacted_fields_mismatch", report["blockers"])
+        self.assertIn("observation_principal_action_mismatch", report["blockers"])
+        self.assertIn("observation_delivery_claim_not_none", report["blockers"])
 
     def test_rejects_duplicate_or_reordered_lifecycle_cases(self) -> None:
         payload = copy.deepcopy(manifest())

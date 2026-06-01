@@ -24,6 +24,7 @@ REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence-c
 REQUIRED_CASES = frozenset(
     (
         "session_start_anchor",
+        "session_start_rejected_anchor",
         "session_end_anchor",
         "stale_after_logout",
         "malformed_or_unsupported_evidence",
@@ -31,21 +32,66 @@ REQUIRED_CASES = frozenset(
 )
 REQUIRED_CASE_SEQUENCE = (
     "session_start_anchor",
+    "session_start_rejected_anchor",
     "session_end_anchor",
     "stale_after_logout",
     "malformed_or_unsupported_evidence",
 )
 REQUIRED_TARGETS = {
     "session_start_anchor": "ShooterGameMode.HandleNewPlayer",
+    "session_start_rejected_anchor": "ShooterGameMode.HandleNewPlayer",
     "session_end_anchor": "ShooterGameMode.OnLogout",
     "stale_after_logout": "post_logout_consumer_check",
     "malformed_or_unsupported_evidence": "principal_consumer_boundary",
 }
 REQUIRED_COPIED_FIELDS = {
     "session_start_anchor": ("bIsFromLogin", "ReturnValue"),
+    "session_start_rejected_anchor": ("bIsFromLogin", "ReturnValue"),
     "session_end_anchor": (),
     "stale_after_logout": ("generation_state",),
     "malformed_or_unsupported_evidence": (),
+}
+REQUIRED_COPIED_BOOL_FIELDS = {
+    "session_start_anchor": ("bIsFromLogin", "ReturnValue"),
+    "session_start_rejected_anchor": ("bIsFromLogin", "ReturnValue"),
+    "session_end_anchor": (),
+    "stale_after_logout": (),
+    "malformed_or_unsupported_evidence": (),
+}
+REQUIRED_COPIED_BOOL_VALUES = {
+    "session_start_anchor": ("1", "1"),
+    "session_start_rejected_anchor": ("0", "1"),
+    "session_end_anchor": (),
+    "stale_after_logout": (),
+    "malformed_or_unsupported_evidence": (),
+}
+REQUIRED_OBSERVATION_REDACTIONS = {
+    "session_start_anchor": ("NewPlayer", "PlayerData", "PlayerCharacter"),
+    "session_start_rejected_anchor": ("NewPlayer", "PlayerData", "PlayerCharacter"),
+    "session_end_anchor": ("Exiting",),
+    "stale_after_logout": (),
+    "malformed_or_unsupported_evidence": (),
+}
+REQUIRED_POST_ORIGINAL = {
+    "session_start_anchor": True,
+    "session_start_rejected_anchor": True,
+    "session_end_anchor": True,
+    "stale_after_logout": False,
+    "malformed_or_unsupported_evidence": False,
+}
+REQUIRED_ROLE = {
+    "session_start_anchor": "session_start",
+    "session_start_rejected_anchor": "session_start_rejected",
+    "session_end_anchor": "session_end",
+    "stale_after_logout": "none",
+    "malformed_or_unsupported_evidence": "none",
+}
+REQUIRED_PRINCIPAL_ACTION = {
+    "session_start_anchor": "candidate_created",
+    "session_start_rejected_anchor": "none",
+    "session_end_anchor": "candidate_invalidated",
+    "stale_after_logout": "none",
+    "malformed_or_unsupported_evidence": "none",
 }
 REQUIRED_REDACTED_FIELDS = frozenset(
     (
@@ -308,6 +354,74 @@ def validate_observations(observations: Any, blockers: list[dict[str, Any]]) -> 
                 case=case,
                 expected=list(REQUIRED_COPIED_FIELDS.get(case, ())),
             )
+        copied_bool_fields = observation.get("copied_bool_fields")
+        if not isinstance(copied_bool_fields, list):
+            add(blockers, "observation_copied_bool_fields_not_list", f"{label}.copied_bool_fields", case=case)
+        elif tuple(copied_bool_fields) != REQUIRED_COPIED_BOOL_FIELDS.get(case, ()):
+            add(
+                blockers,
+                "observation_copied_bool_fields_mismatch",
+                f"{label}.copied_bool_fields",
+                case=case,
+                expected=list(REQUIRED_COPIED_BOOL_FIELDS.get(case, ())),
+            )
+        copied_bool_values = observation.get("copied_bool_values")
+        if not isinstance(copied_bool_values, list):
+            add(blockers, "observation_copied_bool_values_not_list", f"{label}.copied_bool_values", case=case)
+        elif tuple(copied_bool_values) != REQUIRED_COPIED_BOOL_VALUES.get(case, ()):
+            add(
+                blockers,
+                "observation_copied_bool_values_mismatch",
+                f"{label}.copied_bool_values",
+                case=case,
+                expected=list(REQUIRED_COPIED_BOOL_VALUES.get(case, ())),
+            )
+        redacted_fields = observation.get("redacted_fields")
+        expected_redacted_fields = REQUIRED_OBSERVATION_REDACTIONS.get(case, ())
+        if not isinstance(redacted_fields, list):
+            add(blockers, "observation_redacted_fields_not_list", f"{label}.redacted_fields", case=case)
+        elif tuple(redacted_fields) != expected_redacted_fields:
+            add(
+                blockers,
+                "observation_redacted_fields_mismatch",
+                f"{label}.redacted_fields",
+                case=case,
+                expected=list(expected_redacted_fields),
+            )
+        if observation.get("redacted_count") != len(expected_redacted_fields):
+            add(
+                blockers,
+                "observation_redacted_count_mismatch",
+                f"{label}.redacted_count",
+                case=case,
+                expected=len(expected_redacted_fields),
+            )
+        if observation.get("post_original") is not REQUIRED_POST_ORIGINAL.get(case):
+            add(
+                blockers,
+                "observation_post_original_mismatch",
+                f"{label}.post_original",
+                case=case,
+                expected=REQUIRED_POST_ORIGINAL.get(case),
+            )
+        if observation.get("role") != REQUIRED_ROLE.get(case):
+            add(
+                blockers,
+                "observation_role_mismatch",
+                f"{label}.role",
+                case=case,
+                expected=REQUIRED_ROLE.get(case),
+            )
+        if observation.get("principal_action") != REQUIRED_PRINCIPAL_ACTION.get(case):
+            add(
+                blockers,
+                "observation_principal_action_mismatch",
+                f"{label}.principal_action",
+                case=case,
+                expected=REQUIRED_PRINCIPAL_ACTION.get(case),
+            )
+        if observation.get("delivery_claim") != "none":
+            add(blockers, "observation_delivery_claim_not_none", f"{label}.delivery_claim", case=case)
         if observation.get("raw_payload_retained") is not False:
             add(blockers, "observation_raw_payload_retained", f"{label}.raw_payload_retained", case=case)
     missing = REQUIRED_CASES - set(seen)

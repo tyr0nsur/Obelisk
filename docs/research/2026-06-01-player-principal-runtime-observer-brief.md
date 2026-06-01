@@ -4,10 +4,13 @@ Date: 2026-06-01
 
 ## Scope
 
-This is a design brief for a future private player/principal lifecycle observer. It does
-not authorize runtime wiring, server access, marker changes, wrapper changes, restarts,
-Discord/community notices, GitHub actions, C++ implementation, public SDK work, mutation,
-return override, or runtime validation.
+This is a design and runbook brief for the private hook-side player/principal lifecycle
+observer now present in the current tree. The observer is default-off,
+observer-debug/env/marker/SHA/log-budget gated, redacted, dispatch-limit `0`, and
+plugin-invisible. This brief does not authorize server access, marker/env changes,
+wrapper changes, restarts, activation, runtime capture, runtime validation,
+Discord/community notices, GitHub actions, public SDK work, mutation, return override, or
+release claims.
 
 The observer's only first job is to prove that the already-reviewed lifecycle layout
 anchors can be observed through the normal `ProcessEvent` hook with copied, redacted,
@@ -47,18 +50,20 @@ Accepted shapes are exact:
   `Exiting:ObjectProperty@0/8`.
 
 `HandleNewPlayer` is a candidate `session_start` observation only when the call is seen
-after the original `ProcessEvent` returns and the copied `ReturnValue` byte is canonical
-`1`. A canonical `0` is an observed non-accepted result, not a principal start. A
+after the original `ProcessEvent` returns and the copied bool bytes are canonical
+`bIsFromLogin=1` and `ReturnValue=1`. Any other canonical bool combination is
+`session_start_rejected` with `principal_action=none`, not a principal start. A
 non-canonical bool byte rejects the record.
 
 `OnLogout` is a candidate `session_end` observation only after exact shape recognition.
-The first observer may log an invalidation-shaped event, but it must not claim complete
-logout ordering, reconnect behavior, transfer behavior, or public principal invalidation
-semantics.
+The observer logs an invalidation-shaped event, but it does not prove active-candidate
+state, complete logout ordering, reconnect behavior, transfer behavior, or public
+principal invalidation semantics.
 
-## Proposed Gates
+## Runtime Gates
 
-These names are proposed for implementation review. They are not active today.
+These names are implemented for the private default-off observer, but using them still
+requires a separate approved runtime window.
 
 Environment:
 
@@ -82,9 +87,9 @@ The dispatch limit is deliberately fixed at `0` for the first observer. Any non-
 dispatch limit must fail closed until a separate dispatcher, owner-token cleanup, ABI, and
 plugin privacy review exists.
 
-Stable posture must reject all proposed env names and the
-`enable-player-principal-lifecycle-observer` marker once implementation work begins. That
-is a required posture-check update before any runtime wiring can be considered complete.
+Stable posture must reject these env names and the
+`enable-player-principal-lifecycle-observer` marker outside an approved observer-debug
+window. That posture remains required before any runtime evidence can be accepted.
 
 ## Budget Model
 
@@ -134,10 +139,10 @@ Allowed redacted fields:
 - `ShooterGameMode.OnLogout.Exiting`
 
 `principal_action=candidate_created` is allowed only for post-original
-`HandleNewPlayer` with canonical `ReturnValue=1`. `principal_action=none` is required for
-`ReturnValue=0` or any rejected start candidate. `principal_action=candidate_invalidated`
-is allowed for exact `OnLogout`, but it remains private evidence and must not be consumed
-by public plugins.
+`HandleNewPlayer` with canonical `bIsFromLogin=1` and `ReturnValue=1`.
+`principal_action=none` is required for every `session_start_rejected` combination such
+as `0,1`, `1,0`, or `0,0`. `principal_action=candidate_invalidated` is allowed for exact
+`OnLogout`, but it remains private evidence and must not be consumed by public plugins.
 
 Do not log player names, Steam/EOS/platform ids, IP-like values, tribe ids, transfer ids,
 saved player data ids, controller identity, player-state identity, character identity,
@@ -168,7 +173,7 @@ The observer must fail closed for:
 - any object field not classified as redacted;
 - duplicate start, logout without active private candidate, reconnect, transfer, controller
   replacement, player-state replacement, restart, plugin reload, or stale generation case
-  that has not been explicitly modeled;
+  remains an interpretation/evidence blocker until explicitly modeled;
 - any attempt to derive principal identity from a pointer, object index, FName/GObjects
   value, platform id, name, text, saved player data field, transfer payload, or command
   payload.
@@ -207,21 +212,22 @@ Rollback must be defined before activation:
 - restart only the explicitly approved instance if the approved window requires restart;
 - copy logs to the approved offline evidence path before cleanup;
 - run stable posture verification for the same approved instance and map;
-- record whether any proposed env or marker survived rollback.
+- record whether any observer env or marker survived rollback.
 
 If stable posture cannot prove that the observer env and marker are gone, the runtime
 evidence remains operationally blocked even if the bounded observer lines look correct.
 
 ## Local Validation Floor
 
-Before runtime wiring review, local-only tests should prove:
+Before an approved runtime window or before accepting runtime evidence, local-only tests
+should prove:
 
 - gate-denied paths do not read metadata or params and do not reserve budget;
 - unsupported SHA, zero budget, non-target name, wrong shape, and non-canonical bools
   clear copied output;
 - exact `HandleNewPlayer` and `OnLogout` fixture shapes are the only accepted targets;
 - object fields are redacted and never copied, logged, hashed, or converted into identity;
-- stable posture rejects the proposed env and marker names;
+- stable posture rejects the observer env and marker names;
 - dispatch remains disabled and non-zero dispatch budget fails closed.
 
 This validation floor is not approval to run a server.
@@ -245,6 +251,6 @@ This brief does not claim:
   capability bits, or installed SDK consumer support;
 - mutation, return override, kicking/banning, permission checks, admin authority, chat
   sends, or manual `ProcessEvent` calls;
-- server access, restarts, marker changes, runtime observers, scanners, ptrace, `gcore`,
-  broad `ProcessEvent` tracing, Discord/community notices, GitHub publication, tags,
-  pushes, release readiness, or production validation.
+- approved runtime observer run, server access, restarts, marker changes, scanners,
+  ptrace, `gcore`, broad `ProcessEvent` tracing, Discord/community notices, GitHub
+  publication, tags, pushes, release readiness, or production validation.

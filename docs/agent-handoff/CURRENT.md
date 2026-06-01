@@ -107,6 +107,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   Runtime-log and evidence-shape analyzers reject identity/internals leaks, require the
   expected copied fields for each lifecycle case, and enforce lifecycle case order,
   duplicate rejection, gate log-budget bounds, and monotonic observer sequence quality.
+  The runtime principal lifecycle evidence shape also requires an explicit
+  `session_start_rejected_anchor` case, observer-safe `role`, `post_original`,
+  `copied_bool_fields`, `copied_bool_values`, redaction fields/count,
+  `principal_action`, and `delivery_claim=none` semantics.
 - Candidate lifecycle layouts are reproducible for all six
   `players-lifecycle-anchor-candidates` targets, but remain planning-only. The narrow
   candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
