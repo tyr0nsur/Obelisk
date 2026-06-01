@@ -228,6 +228,15 @@ lack `bool_field_size` and `bool_byte_offset` metadata. Treat this root as a use
 historical observer intake only, not as accepted second-source evidence for the aggregate
 census lane.
 
+A later 2026-06-01 local audit found regenerated `/tmp` snapshot roots with the missing
+bool-tail metadata. The root
+`/tmp/obelisk-head-rc-ufunction-second-source-root-20260530-offline-regenerated` compares
+against committed fixtures with `second_source_accepted=6`, `layout_ready=true`,
+`ready_scope=planning_only`, and `promotion_ready=false`. Because that root lives under
+`/tmp`, treat it as non-durable local planning evidence only. Before citing it in a
+promotion or release review, regenerate or materialize the same second-source snapshots
+under an approved artifact root with complete provenance.
+
 The same JSON includes machine-readable non-claims. These are intentional and must stay
 visible in future edits: no public `StructureEvents`, no public Structure SDK, no
 identity/lookup, no mutation, no return override, no enforcement, and no runtime claim.

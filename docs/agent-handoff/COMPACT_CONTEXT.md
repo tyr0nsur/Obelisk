@@ -372,6 +372,10 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots`
   has all six files but remains `second_source_inconclusive=6` because bool metadata is
   incomplete; do not treat it as accepted second-source evidence.
+  A regenerated `/tmp` root
+  `/tmp/obelisk-head-rc-ufunction-second-source-root-20260530-offline-regenerated`
+  compares 6/6 accepted for planning layout only, but it is non-durable local evidence
+  until materialized under an approved artifact root with provenance.
 - Inventory item return-only copied signals are the preferred no-core side lane because
   they already ride copied `GameplayPolicyEvent` evidence. They remain consume/evidence
   only and do not promote public Inventory SDK, public Items SDK, identity, lookup,

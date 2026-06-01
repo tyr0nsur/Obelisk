@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -64,9 +65,16 @@ class CheckTransferBacceptReadinessTests(unittest.TestCase):
         self.assertTrue(payload["ready"])
         self.assertTrue(payload["accepted_for_internal_planning"])
         self.assertTrue(payload["consume_only"])
+        self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["public_transfer_sdk_ready"])
         self.assertFalse(payload["public_abi_ready"])
         self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["transfer_payload_public_contract_ready"])
+        self.assertFalse(payload["downloaded_character_public_contract_ready"])
+        self.assertFalse(payload["dino_payload_public_contract_ready"])
+        self.assertFalse(payload["player_identity_public_contract_ready"])
+        self.assertFalse(payload["cross_map_state_public_contract_ready"])
+        self.assertFalse(payload["resource_handle_public_contract_ready"])
         self.assertFalse(payload["identity_ready"])
         self.assertFalse(payload["ownership_ready"])
         self.assertFalse(payload["mutation_ready"])
@@ -80,6 +88,41 @@ class CheckTransferBacceptReadinessTests(unittest.TestCase):
         )
         self.assertEqual(10, len(payload["summary"]["forbidden_fields"]))
 
+    def test_policy_fixture_requires_consume_accept_and_promote_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            gate_results = [
+                (0, {"status": "accepted"}, ""),
+                (
+                    1,
+                    {
+                        "status": "blocked",
+                        "blockers": [
+                            {"reason": "promote_mode_manifest_has_non_claims"},
+                            {"reason": "promote_mode_transfer_baccept_policy_slice_evidence_only"},
+                        ],
+                    },
+                    "",
+                ),
+            ]
+            with mock.patch.object(readiness, "run_gate", side_effect=gate_results) as run_gate:
+                report = readiness.build_report(root, manifest, sha256)
+
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["accepted_for_internal_planning"])
+        self.assertTrue(report["consume_only"])
+        self.assertEqual("accepted", report["consume_gate"]["status"])
+        self.assertEqual("blocked", report["promote_gate"]["status"])
+        self.assertIn("promote_mode_manifest_has_non_claims", report["promote_gate"]["blocker_reasons"])
+        self.assertIn("promote_mode_transfer_baccept_policy_slice_evidence_only", report["promote_gate"]["blocker_reasons"])
+        run_gate.assert_has_calls(
+            [
+                mock.call(root, manifest, "consume"),
+                mock.call(root, manifest, "promote"),
+            ]
+        )
+
     def test_policy_rejects_sdk_identity_ownership_runtime_abi_and_v1_claim_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
@@ -91,6 +134,7 @@ class CheckTransferBacceptReadinessTests(unittest.TestCase):
             payload["forbidden_transfer_fields"][0]["return_override"] = False
             payload["generated_from"]["v1_completion"] = "ready"
             payload["generated_from"]["input_snapshots"][0]["runtime_wiring"] = "hooked"
+            payload["generated_from"]["input_snapshots"][1]["resource_handle_public_contract"] = True
             manifest, sha256 = self.write_pack(root, payload)
             result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
 
@@ -104,6 +148,29 @@ class CheckTransferBacceptReadinessTests(unittest.TestCase):
         self.assertIn("forbidden_transfer_field_unexpected_field", reasons)
         self.assertIn("generated_from_unexpected_field", reasons)
         self.assertIn("input_snapshot_unexpected_field", reasons)
+
+    def test_policy_rejects_public_contract_claims_for_transfer_payload_surfaces(self) -> None:
+        public_contract_claims = (
+            "transfer payload is a public contract",
+            "downloaded characters are public API ready",
+            "dino payload decoding is available",
+            "player identity is exposed as a public contract",
+            "cross-map state is ready",
+            "ResourceHandle is available as a public contract",
+        )
+        for claim in public_contract_claims:
+            with self.subTest(claim=claim):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir) / "pack"
+                    payload = self.make_policy()
+                    payload["non_claims"].append(claim)
+                    manifest, sha256 = self.write_pack(root, payload)
+                    result = self.run_checker(*self.checker_args(root, manifest, sha256), check=False)
+
+                report = json.loads(result.stdout)
+                self.assertEqual(1, result.returncode)
+                reasons = {blocker["reason"] for blocker in report["blockers"]}
+                self.assertIn("forbidden_public_contract_claim_value", reasons)
 
     def test_policy_rejects_positive_transfer_sdk_claim_inside_non_claims(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

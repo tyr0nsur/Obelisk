@@ -59,9 +59,16 @@ The checker report intentionally returns:
 accepted_for_internal_planning=true
 consume_only=true
 not_artifact_gate=true
+public_sdk_ready=false
 public_transfer_sdk_ready=false
 public_abi_ready=false
 runtime_ready=false
+transfer_payload_public_contract_ready=false
+downloaded_character_public_contract_ready=false
+dino_payload_public_contract_ready=false
+player_identity_public_contract_ready=false
+cross_map_state_public_contract_ready=false
+resource_handle_public_contract_ready=false
 identity_ready=false
 ownership_ready=false
 mutation_ready=false
@@ -81,7 +88,7 @@ python3 -m unittest scripts/test_check_transfer_baccept_readiness.py
 Result:
 
 ```text
-Ran 4 tests in 0.249s
+Ran 6 tests in 0.745s
 OK
 ```
 
@@ -93,6 +100,32 @@ python3 scripts/check_transfer_baccept_readiness.py \
 ```
 
 Result:
+
+```text
+ready=true
+status=candidate_ready
+consume_gate.status=accepted
+promote_gate.status=blocked
+promote_gate.blocker_reasons=[
+  promote_mode_manifest_has_non_claims,
+  promote_mode_transfer_baccept_policy_slice_evidence_only
+]
+blockers=[]
+```
+
+## 2026-06-01 Boundary Hardening
+
+The checker now also reports `public_sdk_ready=false` and explicit false public-contract
+flags for transfer payloads, downloaded characters, dino payload, player identity,
+cross-map state, and `ResourceHandle`.
+
+Additional negative fixtures reject positive public-contract claims for those surfaces,
+including claims embedded in `non_claims`. A focused gate test also verifies the expected
+consume/promote boundary: consume must be accepted and promote must remain blocked with
+`promote_mode_manifest_has_non_claims` and
+`promote_mode_transfer_baccept_policy_slice_evidence_only`.
+
+The real artifact was rechecked on 2026-06-01 with the same command above:
 
 ```text
 ready=true

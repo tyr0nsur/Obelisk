@@ -113,12 +113,23 @@ INPUT_SNAPSHOT_ALLOWED_KEYS = {
 FORBIDDEN_CLAIM_FIELD_RE = re.compile(
     r"(?:transfer_?sdk|public_?sdk|public_?abi|identity|ownership|mutation|return_?overrides?|"
     r"runtime(?:_hook)?_?wiring|runtime_(?:ready|validated|validation)|dispatcher_(?:ready|wiring)|"
-    r"v1(?:_completion|_complete|_stable|_ready)?|completion)",
+    r"transfer_?payloads?|downloaded_?characters?|dino_?payload|cross_?map|resource_?handle|"
+    r"public_?contract|v1(?:_completion|_complete|_stable|_ready)?|completion)",
     re.IGNORECASE,
 )
 POSITIVE_CLAIM_VALUE_RE = re.compile(
     r"(?:public\s+Transfer\s+SDK|Transfer\s+SDK|public\s+ABI|identity|ownership|mutation|"
     r"return\s+override|runtime\s+(?:hook\s+)?wiring|dispatcher\s+wiring|v1\s+completion)",
+    re.IGNORECASE,
+)
+PUBLIC_CONTRACT_SURFACE_RE = re.compile(
+    r"(?:transfer\s+payloads?|downloaded\s+characters?|downloaded\s+character|dino\s+payload|"
+    r"player\s+identity|cross-map\s+state|cross\s+map\s+state|ResourceHandle|resource\s+handle)",
+    re.IGNORECASE,
+)
+PUBLIC_CONTRACT_CONTEXT_RE = re.compile(
+    r"(?:public\s+(?:contract|sdk|api)|contract\s+ready|ready|runtime\s+ready|promot(?:e|es|ed|ion)|"
+    r"expos(?:e|es|ed)|decod(?:e|es|ed|ing)|available)",
     re.IGNORECASE,
 )
 NEGATIVE_CLAIM_RE = re.compile(r"\b(?:does\s+not|not\s+promote|not\s+expose|not\s+copy|excluded)\b", re.IGNORECASE)
@@ -247,6 +258,26 @@ def reject_positive_claim_values(value: Any, blockers: list[dict[str, Any]], *, 
     if path.startswith("$.safety_summary.explicitly_excluded["):
         return
     append_blocker(blockers, "forbidden_positive_claim_value", path=path, value=value)
+
+
+def reject_public_contract_claim_values(value: Any, blockers: list[dict[str, Any]], *, path: str) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            reject_public_contract_claim_values(child, blockers, path=f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_public_contract_claim_values(child, blockers, path=f"{path}[{index}]")
+        return
+    if not isinstance(value, str):
+        return
+    if path.startswith("$.non_claims[") and NEGATIVE_CLAIM_RE.search(value) is not None:
+        return
+    if path.startswith("$.safety_summary.explicitly_excluded["):
+        return
+    if PUBLIC_CONTRACT_SURFACE_RE.search(value) is None or PUBLIC_CONTRACT_CONTEXT_RE.search(value) is None:
+        return
+    append_blocker(blockers, "forbidden_public_contract_claim_value", path=path, value=value)
 
 
 def validate_copied_bool(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -479,6 +510,7 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
             label=blocker.get("label"),
         )
     reject_positive_claim_values(policy, blockers, path="$")
+    reject_public_contract_claim_values(policy, blockers, path="$")
 
     return {
         "input_targets": sorted(input_targets),
@@ -559,11 +591,18 @@ def build_report(
         "accepted_for_internal_planning": ready,
         "not_artifact_gate": True,
         "consume_only": True,
+        "public_sdk_ready": False,
         "public_transfer_sdk_ready": False,
         "public_abi_ready": False,
         "runtime_ready": False,
         "runtime_hook_wiring_ready": False,
         "transfer_payload_decoding_ready": False,
+        "transfer_payload_public_contract_ready": False,
+        "downloaded_character_public_contract_ready": False,
+        "dino_payload_public_contract_ready": False,
+        "player_identity_public_contract_ready": False,
+        "cross_map_state_public_contract_ready": False,
+        "resource_handle_public_contract_ready": False,
         "identity_ready": False,
         "ownership_ready": False,
         "mutation_ready": False,
@@ -581,6 +620,7 @@ def build_report(
             "candidate readiness is internal planning evidence only",
             "does not promote Transfer SDK, public ABI, identity, ownership, mutation, return override, runtime hook wiring, dispatcher wiring, payload decoding, or v1 completion",
             "does not replace public SDK, runtime, ABI, ownership, privacy, second-source, or live-ops promotion gates",
+            "does not expose transfer payloads, downloaded characters, dino payload, player identity, cross-map state, or ResourceHandle as a public contract",
         ],
     }
 
