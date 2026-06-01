@@ -273,6 +273,12 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
             add(blockers, "permissions_admin_public_contract_gate_missing", "$.surfaces[permissions_admin].v1_decision_contract")
     if permissions.get("status") == "promoted" and not (isinstance(identity, dict) and identity.get("status") == "promoted"):
         add(blockers, "permissions_admin_promoted_before_player_identity", "$.surfaces[permissions_admin].status")
+    if isinstance(identity, dict) and identity.get("status") == "promoted":
+        add(
+            blockers,
+            "player_identity_evidence_not_approved",
+            "$.surfaces[player_identity].status",
+        )
 
 
 def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:

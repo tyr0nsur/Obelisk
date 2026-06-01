@@ -147,6 +147,21 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("permissions_admin_public_contract_not_empty", report["blockers"])
         self.assertIn("permissions_admin_promoted_before_player_identity", report["blockers"])
 
+    def test_rejects_manifest_only_player_identity_promotion_as_upstream_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("player_identity_evidence_not_approved", report["blockers"])
+
     def test_rejects_query_failclosed_artifact_readiness_overclaim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
