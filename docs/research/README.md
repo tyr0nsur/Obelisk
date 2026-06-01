@@ -28,7 +28,7 @@ still preserve durable evidence and should not be deleted only because they are 
 from this index.
 
 Published RC baseline evidence lane (historical release evidence, not current routing;
-current published tag: `v0.1.0-rc.2` at `1a7cd98`):
+current published tag: `v0.1.0-rc.2`; use the release evidence notes for ref details):
 
 - [2026-05-28-reversing-objective-map.md](2026-05-28-reversing-objective-map.md)
 - [2026-05-28-second-source-reversing-gap-matrix.md](2026-05-28-second-source-reversing-gap-matrix.md)
@@ -185,6 +185,8 @@ is SDK-complete first: player identity/principal evidence, permissions/admin que
 groundwork, then command response/commands. Plugin Hub notes are archived boundaries, not
 active priority before SDK completion. `GameplayPolicyEvent` backing evidence and mission
 copied-bool internal planning remain side lanes only.
+Next v1 research round: keep the complete-SDK blocker route first, not hub foundation
+first.
 Use [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md) for the
 selected Mission copied-bool internal lane,
 [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md)

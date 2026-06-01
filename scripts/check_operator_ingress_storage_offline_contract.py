@@ -36,6 +36,8 @@ REQUIRED_LANE_CHECKS = {
         "offline_only",
         "operator_owned_inputs",
         "no_runtime_entrypoint",
+        "no_identity_permissions_command_response_shortcut",
+        "operator_config_not_allow_capable",
     },
     "storage_migration": {
         "schema_versioned",
@@ -64,6 +66,9 @@ REQUIRED_LANE_FIELDS = {
         "candidate_ingress_transport",
         "trust_boundary",
         "authorization_source",
+        "upstream_dependency_chain",
+        "operator_config_allow_capable",
+        "command_response_dependency",
         "rate_limit",
         "backpressure_rule",
         "rejected_secret_classes",
@@ -106,10 +111,37 @@ REQUIRED_LANE_FIELDS = {
     },
 }
 
+REQUIRED_UPSTREAM_DEPENDENCY_CHAIN = (
+    "obelisk.player_identity.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1",
+)
+SHORTCUT_BARRIER_TRUE_FLAGS = (
+    "requires_promoted_player_identity",
+    "requires_promoted_permissions_admin",
+    "requires_promoted_command_response",
+)
+SHORTCUT_BARRIER_FALSE_FLAGS = (
+    "operator_config_allow_capable",
+    "operator_ingress_authorizes_commands",
+    "operator_ingress_targets_command_responses",
+)
+
 ALLOWED_REJECTION_CLASSIFICATION_FIELD = "rejected_secret_classes"
-ALLOWED_NEGATIVE_FIELD_NAMES = frozenset(("no_runtime_entrypoint",))
+ALLOWED_REQUIRED_FIELD_NAMES = frozenset(("operator_config_allow_capable",))
+ALLOWED_NEGATIVE_FIELD_NAMES = frozenset(
+    (
+        "no_runtime_entrypoint",
+        "no_identity_permissions_command_response_shortcut",
+        "operator_config_not_allow_capable",
+    )
+)
 CLAIM_KEY_EXEMPTIONS = frozenset(
     (
+        "blocked_dependency_chain",
+        "operator_shortcut_barrier",
+        *SHORTCUT_BARRIER_TRUE_FLAGS,
+        *SHORTCUT_BARRIER_FALSE_FLAGS,
         "public_abi_ready",
         "runtime",
         "runtime_ready",
@@ -128,6 +160,19 @@ PROHIBITED_CLAIM_RE = re.compile(
     r"\bruntime(?:[-_ ]?(?:ready|readiness|services?|validated|validation|entrypoint|"
     r"code|hook|wiring|implementation))?\b|public[_ -]?(?:c[_ -]?)?abi|"
     r"v1(?:[_ -]?sdk)?[_ -]?completion(?:[_ -]?required)?",
+    re.IGNORECASE,
+)
+PROHIBITED_SHORTCUT_CLAIM_RE = re.compile(
+    r"\boperator[-_ ]?(?:config|ingress|storage|owned[-_ ]?inputs?)\b.{0,80}\b"
+    r"(?:allow[-_ ]?capable|authori[sz](?:e|es|ed|ation|ing)|permission[-_ ]?allow|"
+    r"admin[-_ ]?actions?|command[-_ ]?(?:responses?|repl(?:y|ies)|dispatch|router|execution)|"
+    r"response[-_ ]?(?:delivery|target(?:s|ed|ing)?))\b|"
+    r"\b(?:allow[-_ ]?capable|authori[sz](?:e|es|ed|ation|ing)|permission[-_ ]?allow|"
+    r"admin[-_ ]?actions?|command[-_ ]?(?:responses?|repl(?:y|ies)|dispatch|router|execution)|"
+    r"response[-_ ]?(?:delivery|target(?:s|ed|ing)?))\b.{0,80}\b"
+    r"operator[-_ ]?(?:config|ingress|storage|owned[-_ ]?inputs?)\b|"
+    r"\b(?:bypass|shortcut|skip|replace|stand[-_ ]?in)\b.{0,80}\b"
+    r"(?:identity|principal|permissions?[-_ /]?admin|command[-_ ]?response)\b",
     re.IGNORECASE,
 )
 REQUIRED_FIELDS_PATH_RE = re.compile(r"^\$\.lanes\[\d+\]\.required_fields\[\d+\]$")
@@ -168,6 +213,17 @@ def _is_allowed_negative_field_name(path: str, value: str) -> bool:
     )
 
 
+def _is_allowed_required_field_name(path: str, value: str) -> bool:
+    return value in ALLOWED_REQUIRED_FIELD_NAMES and bool(
+        REQUIRED_FIELDS_PATH_RE.match(path)
+    )
+
+
+def _prohibited_shortcut_claim_match(value: str) -> re.Match[str] | None:
+    normalized = re.sub(r"[-_]+", " ", value)
+    return PROHIBITED_SHORTCUT_CLAIM_RE.search(normalized)
+
+
 def load_contract(path: pathlib.Path) -> dict[str, Any]:
     reject_symlink_component(path, "--contract")
     resolved = reject_protected_input_path(path, "--contract")
@@ -204,6 +260,29 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
             errors.append("promotion.public_sdk must remain false")
         if promotion.get("runtime") is not False:
             errors.append("promotion.runtime must remain false")
+
+    if contract.get("blocked_dependency_chain") != list(REQUIRED_UPSTREAM_DEPENDENCY_CHAIN):
+        errors.append(
+            "blocked_dependency_chain must remain "
+            f"{list(REQUIRED_UPSTREAM_DEPENDENCY_CHAIN)!r}"
+        )
+
+    shortcut_barrier = contract.get("operator_shortcut_barrier")
+    if not isinstance(shortcut_barrier, dict):
+        errors.append("operator_shortcut_barrier must be an object")
+    else:
+        expected_keys = set(SHORTCUT_BARRIER_TRUE_FLAGS) | set(SHORTCUT_BARRIER_FALSE_FLAGS)
+        actual_keys = set(shortcut_barrier)
+        for missing in sorted(expected_keys - actual_keys):
+            errors.append(f"operator_shortcut_barrier missing {missing}")
+        for extra in sorted(actual_keys - expected_keys):
+            errors.append(f"operator_shortcut_barrier unexpected key {extra}")
+        for key in SHORTCUT_BARRIER_TRUE_FLAGS:
+            if shortcut_barrier.get(key) is not True:
+                errors.append(f"operator_shortcut_barrier.{key} must remain true")
+        for key in SHORTCUT_BARRIER_FALSE_FLAGS:
+            if shortcut_barrier.get(key) is not False:
+                errors.append(f"operator_shortcut_barrier.{key} must remain false")
 
     lanes = contract.get("lanes")
     if not isinstance(lanes, list):
@@ -270,11 +349,18 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
                 f"required rejection/classification field at {path}"
             )
             continue
-        if _is_allowed_negative_field_name(path, value):
+        if _is_allowed_negative_field_name(path, value) or _is_allowed_required_field_name(
+            path, value
+        ):
             continue
         match = PROHIBITED_CLAIM_RE.search(value)
         if match:
             errors.append(f"prohibited claim {match.group(0)!r} at {path}")
+        shortcut_match = _prohibited_shortcut_claim_match(value)
+        if shortcut_match:
+            errors.append(
+                f"prohibited shortcut claim {shortcut_match.group(0)!r} at {path}"
+            )
 
     for path, key in _walk_json_keys(contract):
         if key in CLAIM_KEY_EXEMPTIONS:
@@ -288,6 +374,11 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         match = PROHIBITED_CLAIM_RE.search(key)
         if match:
             errors.append(f"prohibited claim {match.group(0)!r} at field {path}")
+        shortcut_match = _prohibited_shortcut_claim_match(key)
+        if shortcut_match:
+            errors.append(
+                f"prohibited shortcut claim {shortcut_match.group(0)!r} at field {path}"
+            )
 
     return errors
 

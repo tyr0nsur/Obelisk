@@ -132,6 +132,9 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
                             "public_sdk_ready=false",
                         ],
                     },
+                    "v1_decision_contract": {
+                        "must_remain_without_public_contract_until_promotion": True,
+                    },
                 }
             ]
         }
@@ -233,6 +236,49 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
                 self.assertFalse(payload["public_sdk_ready"])
                 self.assertFalse(payload["runtime_ready"])
                 self.assertFalse(payload["enforcement_ready"])
+
+    def test_unknown_nested_readiness_gate_overclaim_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_payload = self.readiness_payload()
+            readiness_payload["public_sdk_gate"] = {"ready": True}
+            manifest, _ = self.write_case(Path(temp_dir), readiness_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        self.assertIn("forbidden_readiness_true", {item["reason"] for item in payload["blockers"]})
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
+
+    def test_manifest_extra_promotion_alias_overclaim_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            readiness = root / "readiness.json"
+            readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+            manifest_payload = self.manifest_payload(
+                readiness,
+                hashlib.sha256(readiness.read_bytes()).hexdigest(),
+            )
+            candidate = manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"]
+            candidate["ready_for_promotion"] = True
+            candidate["sdk_ready"] = True
+            manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
+            result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["ready"])
+        blockers = {item["path"] for item in payload["blockers"] if item["reason"] == "forbidden_readiness_true"}
+        self.assertTrue(any(path.endswith(".ready_for_promotion") for path in blockers))
+        self.assertTrue(any(path.endswith(".sdk_ready") for path in blockers))
+        self.assertFalse(payload["promotion_ready"])
+        self.assertFalse(payload["public_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["enforcement_ready"])
 
 
 if __name__ == "__main__":

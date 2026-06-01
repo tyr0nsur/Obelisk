@@ -223,25 +223,16 @@ Operators should prefer the guarded helper instead of hand-written webhook calls
 run `scripts/send_discord_embed.py --dry-run` first and send one concise professional
 embed with title, description, status/scope, and 2-5 public-safe fields.
 
-```bash
-python3 scripts/send_discord_embed.py --channel community --title "..." \
-  --description "..." --status "..." --scope "..." \
-  --field "Cambio=..." --field "Impacto=..."
-```
+Example dry-run command: `python3 scripts/send_discord_embed.py --channel community --title "..." --description "..." --status "..." --scope "..." --field "Cambio=..." --field "Impacto=..."`.
+After current-turn approval and dry-run review, repeat with `--confirm-approved-send
+--approval-scope community` or `--approval-scope beta-test`; the approval scope must match `--channel`.
 
-After current-turn approval and dry-run review, repeat with
-`--confirm-approved-send --approval-scope community` or `--approval-scope beta-test`; the
-approval scope must match `--channel`.
+## Research And Skills
 
-## Research Notes
-
-Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation. Use
-`obelisk-continuous-learning` for research-note and skill-update criteria.
-
-## Skill Update Rules
-
-Use `obelisk-continuous-learning` for skill-update criteria. Keep this skill focused on
-lead-only integration, scoped delegation, publication boundaries, and handoff policy.
+Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation and
+`obelisk-continuous-learning` for research-note and skill-update criteria. Keep this
+skill focused on lead-only integration, scoped delegation, publication boundaries, and
+handoff policy.
 
 ## Release Promotion Gates
 

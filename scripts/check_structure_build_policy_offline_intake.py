@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,50 @@ FORBIDDEN_TRUE_READY_KEYS = {
     "v1_completion",
     "v1_ready",
 }
+FORBIDDEN_READY_DOMAINS = {
+    "api",
+    "buildpolicy",
+    "callback",
+    "completion",
+    "dispatch",
+    "dispatcher",
+    "enforcement",
+    "event",
+    "events",
+    "identity",
+    "lookup",
+    "mutation",
+    "observer",
+    "promotion",
+    "promote",
+    "promoted",
+    "public",
+    "release",
+    "return",
+    "runtime",
+    "sdk",
+    "stable",
+    "structure",
+    "structureevents",
+    "structuresdk",
+    "v1",
+}
+READY_TERMS = {
+    "complete",
+    "completion",
+    "done",
+    "promoted",
+    "promotion",
+    "readiness",
+    "ready",
+    "released",
+}
+NEGATED_TRUE_KEY_PREFIXES = (
+    "must_block_",
+    "must_remain_",
+    "no_",
+    "not_",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -165,6 +210,42 @@ def find_report_entry(surface: dict[str, Any], blockers: list[dict[str, Any]]) -
 def missing_tokens(text: str, tokens: tuple[str, ...]) -> list[str]:
     lowered = text.lower()
     return [token for token in tokens if token.lower() not in lowered]
+
+
+def key_tokens(value: str) -> set[str]:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    return {token for token in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if token}
+
+
+def compact_key_text(value: str) -> str:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    return "".join(token for token in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if token)
+
+
+def has_forbidden_ready_claim(key: str, path: str) -> bool:
+    if key.startswith(NEGATED_TRUE_KEY_PREFIXES):
+        return False
+    if key == "layout_ready":
+        return False
+    key_token_set = key_tokens(key)
+    path_token_set = key_tokens(path)
+    compact_key = compact_key_text(key)
+    compact_path = compact_key_text(path)
+    domain_in_key = bool(key_token_set & FORBIDDEN_READY_DOMAINS) or any(
+        domain in compact_key for domain in FORBIDDEN_READY_DOMAINS if len(domain) > 3
+    )
+    domain_in_path = bool(path_token_set & FORBIDDEN_READY_DOMAINS) or any(
+        domain in compact_path for domain in FORBIDDEN_READY_DOMAINS if len(domain) > 3
+    )
+    readiness_in_key = bool(key_token_set & READY_TERMS)
+
+    if key in FORBIDDEN_TRUE_READY_KEYS:
+        return True
+    if readiness_in_key and (domain_in_key or domain_in_path):
+        return True
+    if "ready" in key_token_set and domain_in_path:
+        return True
+    return False
 
 
 def validate_manifest_entry(entry: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -327,7 +408,7 @@ def scan_for_forbidden_true_ready(payload: Any, blockers: list[dict[str, Any]], 
     if isinstance(payload, dict):
         for key, value in payload.items():
             child_path = f"{path}.{key}"
-            if key in FORBIDDEN_TRUE_READY_KEYS and value is True:
+            if value is True and has_forbidden_ready_claim(key, path):
                 add(blockers, "forbidden_readiness_true", path=child_path, key=key)
             scan_for_forbidden_true_ready(value, blockers, child_path)
     elif isinstance(payload, list):

@@ -54,21 +54,34 @@ REQUIRED_AUDIT_UNITS = {
         "rewards API",
         "kits API",
         "stats API",
+        "balance API",
+        "currency mutation",
     },
     "mobility": {
         "homes API",
         "teleport API",
         "spawn API",
+        "movement service",
+        "location mutation",
     },
     "areas": {
         "safe-zone API",
         "area policy API",
+        "area membership API",
+        "area mutation",
     },
     "timed_notices": {
         "broadcast API",
         "timed notice service",
         "scheduled notices API",
+        "send-chat API",
     },
+}
+REQUIRED_NON_CLAIMS = {
+    "candidate-only pre-ABI planning contract for player services, economy, mobility, areas, and timed notices",
+    "does not add public headers, public ABI, runtime wiring, runtime services, storage, commands, replies, send-chat, broadcast, teleport, homes, shops, rewards, kits, stats, safe-zone, area-policy, mutation, lookup, ResourceHandle, UE pointers, raw params, or return override",
+    "identity, permissions/admin, command/chat response path, storage/persistence, audit, rollback, and abuse controls are all required before any audit unit can be promoted",
+    "each audit unit must be promoted as a separate narrow copied C ABI surface or explicitly excluded from v1",
 }
 ALLOWED_BLOCKED_TERMS_PATH_MARKERS = (
     ".forbidden_public_contract",
@@ -247,9 +260,13 @@ def _validate_audit_units(contract: dict[str, Any], errors: list[str]) -> None:
         if not isinstance(blocked_until, list) or not all(isinstance(item, str) for item in blocked_until):
             errors.append(f"{unit_id}.blocked_until_controls must be a list of strings")
         else:
-            missing_controls = REQUIRED_CONTROL_GATES - set(blocked_until)
+            blocked_until_set = set(blocked_until)
+            missing_controls = REQUIRED_CONTROL_GATES - blocked_until_set
             for missing in sorted(missing_controls):
                 errors.append(f"{unit_id}.blocked_until_controls missing {missing}")
+            unexpected_controls = blocked_until_set - REQUIRED_CONTROL_GATES
+            for unexpected in sorted(unexpected_controls):
+                errors.append(f"{unit_id}.blocked_until_controls unexpected {unexpected}")
         forbidden_public_contract = unit.get("forbidden_public_contract")
         if (
             not isinstance(forbidden_public_contract, list)
@@ -283,6 +300,16 @@ def _validate_no_overclaims(contract: dict[str, Any], errors: list[str]) -> None
             errors.append(f"public surface overclaim {public_match.group(0)!r} at {path}")
 
 
+def _validate_non_claims(contract: dict[str, Any], errors: list[str]) -> None:
+    non_claims = contract.get("non_claims")
+    if not isinstance(non_claims, list) or not all(isinstance(item, str) for item in non_claims):
+        errors.append("non_claims must be a list of strings")
+        return
+    actual = set(non_claims)
+    for missing in sorted(REQUIRED_NON_CLAIMS - actual):
+        errors.append(f"non_claims missing {missing}")
+
+
 def validate_contract(contract: dict[str, Any]) -> list[str]:
     errors: list[str] = []
 
@@ -296,6 +323,8 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
         errors.append("readiness_classification must be planning_only")
     if contract.get("pre_abi") is not True:
         errors.append("pre_abi must remain true")
+    if contract.get("status") != "offline_internal_contract":
+        errors.append("status must remain offline_internal_contract")
 
     for key in FALSE_ONLY_TOP_LEVEL_KEYS:
         if contract.get(key) is not False:
@@ -313,6 +342,7 @@ def validate_contract(contract: dict[str, Any]) -> list[str]:
     _validate_dependencies(contract, errors)
     _validate_control_gates(contract, errors)
     _validate_audit_units(contract, errors)
+    _validate_non_claims(contract, errors)
     _validate_no_overclaims(contract, errors)
 
     return errors

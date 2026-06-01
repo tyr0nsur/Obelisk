@@ -125,6 +125,20 @@ PROMOTION_EVIDENCE_REQUIRED_TERMS = {
         "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
         "promoted copied principal semantics",
     ),
+    "obelisk.command_chat_response_path.v1": (
+        "promoted player identity/principal semantics",
+        "promoted permission/authority checks for directed responses",
+        "copied append-only response ABI with capability gates and owner-scoped cleanup",
+        "privacy, redaction, rate-limit, abuse, audit, and cross-instance routing semantics for command/chat responses",
+        "no raw UE pointer, raw ProcessEvent parameter, or raw FString response API",
+    ),
+    "obelisk.commands_replies.v1": (
+        "promoted player identity/principal semantics",
+        "promoted permission/authority model",
+        "obelisk.command_chat_response_path.v1 dependency resolved through its own future promotion gate for replies/send-chat",
+        "command lifecycle, abuse, rate-limit, and moderation boundaries",
+        "copied append-only command/reply ABI with capability gates, owner-scoped cleanup, and SDK consumer tests",
+    ),
 }
 REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
     "obelisk.permissions_admin.v1": (
@@ -1325,8 +1339,12 @@ def evidence_value_contains_positive_term(
             text = json.dumps(value, sort_keys=True)
         except TypeError:
             text = str(value)
-    if term.lower() not in text.lower():
+    normalized_text = text.strip().lower()
+    normalized_term = term.strip().lower()
+    if normalized_term not in normalized_text:
         return False
+    if normalized_text == normalized_term:
+        return True
     return PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT.search(text) is None
 
 
@@ -1502,7 +1520,7 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         row["surface"]
         for row in rows
         if row["surface"] in CANONICAL_V1_DEPENDENCY_SEQUENCE
-        and row.get("manifest_outcome") != "promoted"
+        and row.get("unresolved_for_complete_sdk_claim") is True
     ]
     return {
         "total": len(rows),

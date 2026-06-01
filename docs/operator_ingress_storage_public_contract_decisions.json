@@ -15,6 +15,19 @@
     "public_sdk": false,
     "runtime": false
   },
+  "blocked_dependency_chain": [
+    "obelisk.player_identity.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1"
+  ],
+  "operator_shortcut_barrier": {
+    "requires_promoted_player_identity": true,
+    "requires_promoted_permissions_admin": true,
+    "requires_promoted_command_response": true,
+    "operator_config_allow_capable": false,
+    "operator_ingress_authorizes_commands": false,
+    "operator_ingress_targets_command_responses": false
+  },
   "lanes": [
     {
       "id": "ingress",
@@ -26,12 +39,17 @@
       "required_checks": [
         "offline_only",
         "operator_owned_inputs",
-        "no_runtime_entrypoint"
+        "no_runtime_entrypoint",
+        "no_identity_permissions_command_response_shortcut",
+        "operator_config_not_allow_capable"
       ],
       "required_fields": [
         "candidate_ingress_transport",
         "trust_boundary",
         "authorization_source",
+        "upstream_dependency_chain",
+        "operator_config_allow_capable",
+        "command_response_dependency",
         "rate_limit",
         "backpressure_rule",
         "rejected_secret_classes",

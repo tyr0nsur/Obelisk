@@ -338,6 +338,57 @@ class CheckInventoryActionRedactedObserverGateTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("decision_manifest_allowed_signals_mismatch", reasons)
 
+    def test_decision_manifest_public_contract_identity_drift_fails_closed(self) -> None:
+        decision_manifest = json.loads(checker.DECISION_MANIFEST.read_text(encoding="utf-8"))
+        decision_manifest["public_contract"]["public_fields"].append("ItemId")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "inventory_item_copied_signals_public_contract_decisions.json"
+            manifest.write_text(json.dumps(decision_manifest), encoding="utf-8")
+            result = self.run_checker(
+                "--json",
+                "--decision-manifest",
+                str(manifest),
+                *REQUIRED_GATE_ARGS,
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decision_manifest_public_contract_mismatch", reasons)
+        self.assertIn("decision_manifest_public_contract_forbidden_terms", reasons)
+        term_blocker = next(
+            blocker
+            for blocker in payload["blockers"]
+            if blocker["reason"] == "decision_manifest_public_contract_forbidden_terms"
+        )
+        self.assertIn("ItemId", term_blocker["tokens"])
+
+    def test_decision_manifest_standalone_sdk_flag_drift_fails_closed(self) -> None:
+        decision_manifest = json.loads(checker.DECISION_MANIFEST.read_text(encoding="utf-8"))
+        decision_manifest["blocked_public_contract"]["standalone_inventory_sdk_allowed"] = True
+        decision_manifest["blocked_public_contract"]["forbidden_terms"].remove("ItemID1")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest = Path(temp_dir) / "inventory_item_copied_signals_public_contract_decisions.json"
+            manifest.write_text(json.dumps(decision_manifest), encoding="utf-8")
+            result = self.run_checker(
+                "--json",
+                "--decision-manifest",
+                str(manifest),
+                *REQUIRED_GATE_ARGS,
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decision_manifest_blocked_contract_flag_mismatch", reasons)
+        self.assertIn("decision_manifest_blocked_contract_forbidden_terms_incomplete", reasons)
+
     def test_mutated_fixture_boundary_redaction_and_runtime_flags_fail_closed(self) -> None:
         fixture_report = fixture_boundary.build_check(
             fixture_boundary.DEFAULT_SNAPSHOT_ROOT,

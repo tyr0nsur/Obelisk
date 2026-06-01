@@ -381,6 +381,36 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             ["approved_runtime_evidence_public_sdk_ready_not_false"],
         )
 
+    def test_approved_runtime_report_accumulates_route_and_public_overclaims(self) -> None:
+        original_build_report = checker.approved_evidence.build_report
+
+        def mismatched_and_overclaiming_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["next_blocker"] = "runtime_ready"
+            report["promotion_ready"] = True
+            report["runtime_ready"] = True
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.object(
+                checker.approved_evidence,
+                "build_report",
+                side_effect=mismatched_and_overclaiming_report,
+            ):
+                checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertEqual(
+            [blocker["reason"] for blocker in blockers],
+            [
+                "approved_runtime_evidence_next_blocker_mismatch",
+                "approved_runtime_evidence_promotion_ready_not_false",
+                "approved_runtime_evidence_runtime_ready_not_false",
+            ],
+        )
+
     def test_missing_runtime_evidence_path_reports_json_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -418,6 +448,26 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+
+    def test_rejects_runtime_evidence_sufficiency_or_nonclaim_weakened(self) -> None:
+        decisions = self.decisions()
+        decisions["approved_runtime_evidence_not_sufficient"]["why"].remove(
+            "runtime evidence does not prove process-local scope, cross-instance isolation, or cluster identity semantics"
+        )
+        decisions["approved_runtime_evidence_not_sufficient"]["minimum_additional_gates"].remove(
+            "cross-instance/process-local scope decision resolved"
+        )
+        decisions["non_claims"].remove(
+            "This manifest does not make approved runtime evidence sufficient by itself."
+        )
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved_runtime_evidence_not_sufficient_why_missing", report["blockers"])
+        self.assertIn("approved_runtime_evidence_not_sufficient_minimum_gates_missing", report["blockers"])
+        self.assertIn("non_claims_missing_required", report["blockers"])
 
     def test_rejects_required_before_public_header_contract_weakened(self) -> None:
         decisions = self.decisions()
@@ -479,6 +529,37 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("contract_review_input_test_promotion_ready_not_false", report["blockers"])
         self.assertIn("pre_header_test_marked_ready_without_public_gate", report["blockers"])
+
+    def test_rejects_pre_header_required_coverage_weakened(self) -> None:
+        decisions = self.decisions()
+        tests = {
+            item["id"]: item
+            for item in decisions["required_tests_before_public_header"]
+        }
+        tests["sdk.consumer"]["required_coverage"].remove(
+            "consumer treats principal handles and registration handles as process-local and non-persistent"
+        )
+        tests["lifecycle.owner_cleanup"]["required_coverage"].remove(
+            "plugin unload drains in-flight callbacks"
+        )
+        tests["identity.fail_closed"]["required_coverage"].remove(
+            "cross-instance or cross-process handle reuse fails closed"
+        )
+        tests["runtime.evidence_intake"]["required_coverage"].remove(
+            "approved runtime evidence cannot set promotion_ready, public_sdk_ready, runtime_ready, or public_header_allowed"
+        )
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required_test_coverage_missing", report["blockers"])
+        coverage_blockers = [
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "required_test_coverage_missing"
+        ]
+        self.assertEqual(len(coverage_blockers), 4)
 
     def test_malformed_required_tests_reports_json_blocker(self) -> None:
         decisions = self.decisions()

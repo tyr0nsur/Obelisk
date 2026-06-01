@@ -47,11 +47,13 @@
       "runtime evidence can show login/logout ordering; it does not choose the copied opaque identifier form, generation rules, or scope flags",
       "runtime evidence can support internal lifecycle semantics; it does not prove owner-token registration, unregister, plugin unload cleanup, or in-flight callback drain",
       "runtime evidence does not provide ABI layout tests, SDK consumer tests, or append-only compatibility rules",
+      "runtime evidence does not prove process-local scope, cross-instance isolation, or cluster identity semantics",
       "runtime evidence does not authorize permissions/admin, command/chat response, player lookup, persistence, mutation, return override, or cross-process identity claims"
     ],
     "minimum_additional_gates": [
       "privacy and redaction decision resolved",
       "principal lifetime and invalidation decision resolved",
+      "cross-instance/process-local scope decision resolved",
       "candidate POD payload and descriptor contract reviewed",
       "named capability and owner-token lifecycle policy reviewed",
       "ABI layout and SDK consumer tests passing",
@@ -202,7 +204,8 @@
       "required_coverage": [
         "installed SDK consumer compiles against the promoted header",
         "consumer checks struct_size and capability before using identity fields",
-        "consumer treats callback payload storage as callback-local"
+        "consumer treats callback payload storage as callback-local",
+        "consumer treats principal handles and registration handles as process-local and non-persistent"
       ]
     },
     {
@@ -225,7 +228,8 @@
         "unsupported scope fails closed",
         "duplicate principal observation invalidates or quarantines according to policy",
         "reconnect creates a new generation unless continuity is proven",
-        "lookup-by-public-handle remains unavailable"
+        "lookup-by-public-handle remains unavailable",
+        "cross-instance or cross-process handle reuse fails closed"
       ]
     },
     {
@@ -254,6 +258,7 @@
       "required_coverage": [
         "approved runtime evidence is checked as an input to promotion",
         "approved runtime evidence alone leaves the public-header gate closed",
+        "approved runtime evidence cannot set promotion_ready, public_sdk_ready, runtime_ready, or public_header_allowed",
         "offline fixtures and second-source layout evidence remain separate from runtime lifecycle acceptance"
       ]
     }

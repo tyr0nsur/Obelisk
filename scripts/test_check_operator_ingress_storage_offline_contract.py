@@ -68,6 +68,35 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
         self.assertIn("promotion.public_sdk must remain false", errors)
         self.assertIn("promotion.runtime must remain false", errors)
 
+    def test_operator_shortcut_barrier_is_enforced(self) -> None:
+        contract = self.load_valid_contract()
+        contract["blocked_dependency_chain"] = [
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+        ]
+        contract["operator_shortcut_barrier"]["requires_promoted_player_identity"] = False
+        contract["operator_shortcut_barrier"]["operator_config_allow_capable"] = True
+        contract["operator_shortcut_barrier"]["operator_ingress_targets_command_responses"] = True
+
+        errors = checker.validate_contract(contract)
+
+        self.assertTrue(
+            any(error.startswith("blocked_dependency_chain must remain") for error in errors),
+            errors,
+        )
+        self.assertIn(
+            "operator_shortcut_barrier.requires_promoted_player_identity must remain true",
+            errors,
+        )
+        self.assertIn(
+            "operator_shortcut_barrier.operator_config_allow_capable must remain false",
+            errors,
+        )
+        self.assertIn(
+            "operator_shortcut_barrier.operator_ingress_targets_command_responses must remain false",
+            errors,
+        )
+
     def test_required_lanes_and_lane_checks_are_enforced(self) -> None:
         contract = self.load_valid_contract()
         contract["lanes"] = [
@@ -83,7 +112,11 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             }
         )
         contract["lanes"][0]["required_checks"].remove("offline_only")
+        contract["lanes"][0]["required_checks"].remove(
+            "no_identity_permissions_command_response_shortcut"
+        )
         contract["lanes"][0]["required_fields"].remove("candidate_ingress_transport")
+        contract["lanes"][0]["required_fields"].remove("operator_config_allow_capable")
         contract["lanes"][1]["decision_required"] = ""
 
         errors = checker.validate_contract(contract)
@@ -92,7 +125,15 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
         self.assertIn("unexpected lane: unexpected_lane", errors)
         self.assertIn("ingress.required_checks missing offline_only", errors)
         self.assertIn(
+            "ingress.required_checks missing no_identity_permissions_command_response_shortcut",
+            errors,
+        )
+        self.assertIn(
             "ingress.required_fields missing candidate_ingress_transport",
+            errors,
+        )
+        self.assertIn(
+            "ingress.required_fields missing operator_config_allow_capable",
             errors,
         )
         self.assertIn(
@@ -164,6 +205,24 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
                     errors,
                 )
 
+    def test_rejects_operator_authz_response_shortcuts(self) -> None:
+        prohibited_values = [
+            "operator config authorizes command response",
+            "operator ingress allow capable",
+            "operator storage targets command responses",
+            "bypass identity permissions/admin command response",
+            "operator-owned inputs authorize admin action",
+        ]
+        for value in prohibited_values:
+            with self.subTest(value=value):
+                contract = self.load_valid_contract()
+                contract["lanes"][0]["label"] = value
+                errors = checker.validate_contract(contract)
+                self.assertTrue(
+                    any("prohibited shortcut claim" in error for error in errors),
+                    errors,
+                )
+
     def test_rejects_prohibited_claims_in_field_names(self) -> None:
         prohibited_keys = [
             "storage_service",
@@ -171,6 +230,7 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
             "cross_instance_persistence",
             "public_c_abi",
             "runtime_storage_service",
+            "operator_ingress_authorizes_command_response",
         ]
         for key in prohibited_keys:
             with self.subTest(key=key):
@@ -178,7 +238,8 @@ class OperatorIngressStorageOfflineContractTests(unittest.TestCase):
                 contract["lanes"][0][key] = False
                 errors = checker.validate_contract(contract)
                 self.assertTrue(
-                    any("prohibited claim" in error for error in errors),
+                    any("prohibited claim" in error for error in errors)
+                    or any("prohibited shortcut claim" in error for error in errors),
                     errors,
                 )
 

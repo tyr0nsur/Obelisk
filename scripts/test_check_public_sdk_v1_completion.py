@@ -3298,6 +3298,226 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
         )
 
+    def test_promoted_command_response_requires_semantic_evidence_terms(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="CommandChatResponsePromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="command_chat_response_promotion",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            identity_abi_test = core_path / "PlayerIdentityPromotionTests.cpp"
+            identity_sdk_test = sdk_path / "player_identity_promotion_plugin.c"
+            permissions_abi_test = core_path / "PermissionsAdminPromotionTests.cpp"
+            permissions_sdk_test = sdk_path / "permissions_admin_promotion_plugin.c"
+            response_abi_test = core_path / "CommandChatResponsePromotionTests.cpp"
+            response_sdk_test = sdk_path / "command_chat_response_promotion_plugin.c"
+            for path in (
+                identity_abi_test,
+                identity_sdk_test,
+                permissions_abi_test,
+                permissions_sdk_test,
+                response_abi_test,
+                response_sdk_test,
+            ):
+                path.write_text("// synthetic promotion evidence fixture\n", encoding="utf-8")
+
+            manifest, release_statement = complete_excluded_manifest()
+            promoted_ids = {
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+            }
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(identity_abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(identity_sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "obelisk.core-dump-evidence-pack.v1",
+                            "obelisk.reflection-inventory-pack.v1",
+                            "ServerListPlayers",
+                            "ServerKickPlayer",
+                            "approved runtime principal lifecycle evidence",
+                            "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                            "principal privacy, invalidation, and cross-instance semantics",
+                            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
+                        ],
+                    }
+                if surface["id"] == "obelisk.permissions_admin.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.CheckPermissionWithCopiedPrincipal"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.permissions_admin.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(permissions_abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(permissions_sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "query-only fail-closed permission checks over copied principals",
+                            "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+                            "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+                            "promoted copied principal semantics",
+                        ],
+                    }
+                if surface["id"] == "obelisk.command_chat_response_path.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterCommandChatResponsePath"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.command_chat_response_path.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(response_abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(response_sdk_test.relative_to(REPO_ROOT))],
+                        "terms": ["nominal command/chat response ABI and SDK consumer tests"],
+                    }
+            for surface_id in promoted_ids:
+                if surface_id not in manifest["promoted_surfaces"]:
+                    manifest["promoted_surfaces"].append(surface_id)
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id not in promoted_ids
+            ]
+            release_statement = "\n".join(
+                (
+                    f"{surface_id}: promoted - reviewed ABI and SDK evidence."
+                    if surface_id in promoted_ids
+                    else line
+                )
+                for line in release_statement.splitlines()
+                for surface_id in [line.split(":", 1)[0]]
+            ) + "\n"
+            manifest_path = core_path / "public_sdk_surfaces.json"
+            statement_path = core_path / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertNotIn("promoted_surface_dependency_unresolved", payload["blockers"])
+        self.assertIn("promoted_surface_required_evidence_terms_missing", payload["blockers"])
+        self.assertEqual(
+            payload["promoted_surfaces_missing_required_evidence_terms"],
+            {
+                "obelisk.command_chat_response_path.v1": [
+                    "copied append-only response ABI with capability gates and owner-scoped cleanup",
+                    "no raw UE pointer, raw ProcessEvent parameter, or raw FString response API",
+                    "privacy, redaction, rate-limit, abuse, audit, and cross-instance routing semantics for command/chat responses",
+                    "promoted permission/authority checks for directed responses",
+                    "promoted player identity/principal semantics",
+                ]
+            },
+        )
+
+    def test_commands_replies_requires_response_path_semantic_evidence_terms(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        missing_terms = module.surface_missing_required_promotion_evidence(
+            {
+                "id": "obelisk.commands_replies.v1",
+                "status": "promoted",
+                "evidence": {
+                    "terms": [
+                        "promoted player identity/principal semantics",
+                        "promoted permission/authority model",
+                        "nominal command router ABI and SDK consumer tests",
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(
+            missing_terms,
+            [
+                "obelisk.command_chat_response_path.v1 dependency resolved through its own future promotion gate for replies/send-chat",
+                "command lifecycle, abuse, rate-limit, and moderation boundaries",
+                "copied append-only command/reply ABI with capability gates, owner-scoped cleanup, and SDK consumer tests",
+            ],
+        )
+
+    def test_dependency_chain_accounting_keeps_invalid_promoted_identity_visible(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["scripts/test_check_player_identity_first_evidence_readiness.py"],
+                    "sdk_consumer_tests": ["scripts/test_check_player_identity_first_evidence_readiness.py"],
+                }
+                break
+        if "obelisk.player_identity.v1" not in manifest["promoted_surfaces"]:
+            manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
+        manifest["post_v1_or_excluded_surfaces"] = [
+            surface_id
+            for surface_id in manifest["post_v1_or_excluded_surfaces"]
+            if surface_id != "obelisk.player_identity.v1"
+        ]
+        release_statement = "\n".join(
+            (
+                "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence."
+                if line.startswith("obelisk.player_identity.v1:")
+                else line
+            )
+            for line in release_statement.splitlines()
+        ) + "\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertIn(
+            "obelisk.player_identity.v1",
+            payload["v1_sdk_blocker_outcome_summary"]["dependency_chain_remaining"],
+        )
+        outcome_by_surface = {
+            row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
+        }
+        self.assertTrue(
+            outcome_by_surface["obelisk.player_identity.v1"]["unresolved_for_complete_sdk_claim"]
+        )
+
     def test_planning_completion_blocker_requires_exclusion_contract(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["v1_completion_required"] = False

@@ -57,6 +57,81 @@ CONTRACT_REVIEW_INPUT_ONLY_TESTS = {
         "scripts/test_player_identity_public_contract_decisions.py",
     },
 }
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_NOT_SUFFICIENT_WHY = {
+    "runtime evidence can prove a candidate lifecycle route was observed; it does not define a stable C ABI",
+    "runtime evidence can show login/logout ordering; it does not choose the copied opaque identifier form, generation rules, or scope flags",
+    "runtime evidence can support internal lifecycle semantics; it does not prove owner-token registration, unregister, plugin unload cleanup, or in-flight callback drain",
+    "runtime evidence does not provide ABI layout tests, SDK consumer tests, or append-only compatibility rules",
+    "runtime evidence does not prove process-local scope, cross-instance isolation, or cluster identity semantics",
+    "runtime evidence does not authorize permissions/admin, command/chat response, player lookup, persistence, mutation, return override, or cross-process identity claims",
+}
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
+    "privacy and redaction decision resolved",
+    "principal lifetime and invalidation decision resolved",
+    "cross-instance/process-local scope decision resolved",
+    "candidate POD payload and descriptor contract reviewed",
+    "named capability and owner-token lifecycle policy reviewed",
+    "ABI layout and SDK consumer tests passing",
+    "public docs state exact non-claims and downstream dependency order",
+}
+REQUIRED_NON_CLAIMS = {
+    "This manifest does not add public header symbols.",
+    "This manifest does not promote obelisk.player_identity.v1.",
+    "This manifest does not make approved runtime evidence sufficient by itself.",
+    "This manifest does not expose player lookup.",
+    "This manifest does not promote permissions/admin.",
+    "This manifest does not promote command/chat response or commands/replies.",
+    "This manifest does not authorize storage, persistence, cross-process identity, cluster-stable identity, mutation, return override, or send-chat identity.",
+}
+REQUIRED_TEST_COVERAGE_BY_ID = {
+    "manifest.guardrails": {
+        "decision gate remains blocked/planning until every blocker is resolved",
+        "public_header_allowed remains false while unresolved blockers exist",
+        "public_header_symbols_now remains empty",
+        "approved runtime evidence is documented as necessary but insufficient",
+        "non-claims forbid lookup, permissions/admin, command/chat response, persistence, mutation, and return override",
+    },
+    "abi.layout": {
+        "POD layout size and alignment tests",
+        "abi_version and struct_size validation",
+        "append-only field offset tests",
+        "old-plugin prefix compatibility or explicit major-version rejection",
+    },
+    "sdk.consumer": {
+        "installed SDK consumer compiles against the promoted header",
+        "consumer checks struct_size and capability before using identity fields",
+        "consumer treats callback payload storage as callback-local",
+        "consumer treats principal handles and registration handles as process-local and non-persistent",
+    },
+    "lifecycle.owner_cleanup": {
+        "owner-token registration rejects missing or zero owner tokens",
+        "unregister is owner-scoped",
+        "init failure removes callbacks before dlclose",
+        "plugin unload drains in-flight callbacks",
+        "self-unregister from callback is safe",
+        "callback exceptions do not cross the C ABI",
+    },
+    "identity.fail_closed": {
+        "stale generation fails closed",
+        "unsupported scope fails closed",
+        "duplicate principal observation invalidates or quarantines according to policy",
+        "reconnect creates a new generation unless continuity is proven",
+        "lookup-by-public-handle remains unavailable",
+        "cross-instance or cross-process handle reuse fails closed",
+    },
+    "privacy.redaction": {
+        "raw identity-like fields are classified before copying",
+        "platform ids, player names, tribe ids, network addresses, and object references are redacted",
+        "logs contain only allowed sanitized reason flags and handle presence",
+        "no persistence is possible through the identity ABI",
+    },
+    "runtime.evidence_intake": {
+        "approved runtime evidence is checked as an input to promotion",
+        "approved runtime evidence alone leaves the public-header gate closed",
+        "approved runtime evidence cannot set promotion_ready, public_sdk_ready, runtime_ready, or public_header_allowed",
+        "offline fixtures and second-source layout evidence remain separate from runtime lifecycle acceptance",
+    },
+}
 REQUIRED_BEFORE_PUBLIC_HEADER = {
     "evidence.complete_non_protected_pack",
     "evidence.accepted_session_start_anchor",
@@ -332,29 +407,29 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
             "$.approved_runtime_evidence",
             reasons=[blocker["reason"] for blocker in validation.blockers],
         )
-    elif report.get("next_blocker") != "identity_public_contract_gate_missing":
-        add(
-            blockers,
-            "approved_runtime_evidence_next_blocker_mismatch",
-            "$.approved_runtime_evidence.next_blocker",
-            value=report.get("next_blocker"),
-        )
-    elif report.get("approved_runtime_evidence_present") is not True:
-        add(
-            blockers,
-            "approved_runtime_evidence_presence_missing",
-            "$.approved_runtime_evidence.approved_runtime_evidence_present",
-        )
-    elif report.get("runtime_evidence_ready") is not True:
-        add(
-            blockers,
-            "approved_runtime_evidence_runtime_ready_missing",
-            "$.approved_runtime_evidence.runtime_evidence_ready",
-        )
     else:
-        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
-            if report.get(key) is not False:
-                add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
+        if report.get("next_blocker") != "identity_public_contract_gate_missing":
+            add(
+                blockers,
+                "approved_runtime_evidence_next_blocker_mismatch",
+                "$.approved_runtime_evidence.next_blocker",
+                value=report.get("next_blocker"),
+            )
+        if report.get("approved_runtime_evidence_present") is not True:
+            add(
+                blockers,
+                "approved_runtime_evidence_presence_missing",
+                "$.approved_runtime_evidence.approved_runtime_evidence_present",
+            )
+        if report.get("runtime_evidence_ready") is not True:
+            add(
+                blockers,
+                "approved_runtime_evidence_runtime_ready_missing",
+                "$.approved_runtime_evidence.runtime_evidence_ready",
+            )
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+        if key in report and report.get(key) is not False:
+            add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
     return report
 
 
@@ -733,6 +808,8 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         add(blockers, "decision_planning_stage_mismatch", "$.planning_stage")
     if decisions.get("public_header_allowed") is not False:
         add(blockers, "public_header_allowed_not_false", "$.public_header_allowed")
+    if decisions.get("public_header") != "include/obelisk/ObeliskApi.h":
+        add(blockers, "public_header_path_mismatch", "$.public_header")
     for key in ("public_header_symbols_now", "public_capability_bits_now", "public_callback_abi_now"):
         if decisions.get(key) != []:
             add(blockers, f"{key}_not_empty", f"$.{key}")
@@ -751,9 +828,40 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             if intake.get(key) is not False:
                 add(blockers, f"approved_runtime_evidence_intake_{key}_not_false", f"$.approved_runtime_evidence_intake.{key}")
 
+    not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
+    if not isinstance(not_sufficient, dict):
+        add(blockers, "approved_runtime_evidence_not_sufficient_missing", "$.approved_runtime_evidence_not_sufficient")
+    else:
+        if not_sufficient.get("decision") != "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.":
+            add(blockers, "approved_runtime_evidence_not_sufficient_decision_mismatch", "$.approved_runtime_evidence_not_sufficient.decision")
+        require_string_list_contains(
+            not_sufficient,
+            "why",
+            REQUIRED_APPROVED_RUNTIME_EVIDENCE_NOT_SUFFICIENT_WHY,
+            blockers,
+            "approved_runtime_evidence_not_sufficient_why_missing",
+            "$.approved_runtime_evidence_not_sufficient.why",
+        )
+        require_string_list_contains(
+            not_sufficient,
+            "minimum_additional_gates",
+            REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES,
+            blockers,
+            "approved_runtime_evidence_not_sufficient_minimum_gates_missing",
+            "$.approved_runtime_evidence_not_sufficient.minimum_additional_gates",
+        )
+
     forbidden = decisions.get("forbidden_public_contract")
     if not isinstance(forbidden, list) or not REQUIRED_FORBIDDEN.issubset(set(forbidden)):
         add(blockers, "forbidden_public_contract_missing_required", "$.forbidden_public_contract")
+
+    non_claims = decisions.get("non_claims")
+    if not isinstance(non_claims, list) or not all(isinstance(item, str) for item in non_claims):
+        add(blockers, "non_claims_not_string_list", "$.non_claims")
+    else:
+        missing_non_claims = missing_required(non_claims, REQUIRED_NON_CLAIMS)
+        if missing_non_claims:
+            add(blockers, "non_claims_missing_required", "$.non_claims", missing=missing_non_claims)
 
     validate_required_before_public_header(decisions, blockers)
     validate_candidate_only_pod_abi(decisions.get("proposed_public_pod_abi_candidate"), blockers)
@@ -801,6 +909,16 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                 add(blockers, "required_tests_before_public_header_entry_not_object", f"$.required_tests_before_public_header[{index}]")
                 continue
             test_id = item.get("id")
+            required_coverage = REQUIRED_TEST_COVERAGE_BY_ID.get(test_id)
+            if required_coverage is not None:
+                require_string_list_contains(
+                    item,
+                    "required_coverage",
+                    required_coverage,
+                    blockers,
+                    "required_test_coverage_missing",
+                    f"$.required_tests_before_public_header[{index}].required_coverage",
+                )
             if test_id in CONTRACT_REVIEW_INPUT_ONLY_TESTS:
                 if item.get("status") != "covered":
                     add(blockers, "contract_review_input_test_not_covered", f"$.required_tests_before_public_header[{index}].status", test_id=test_id)

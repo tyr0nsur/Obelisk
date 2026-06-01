@@ -48,6 +48,7 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
 
     def test_public_and_runtime_gates_must_remain_false(self) -> None:
         contract = self.load_valid_contract()
+        contract["status"] = "ready"
         contract["public_header_allowed"] = True
         contract["public_contract_allowed"] = True
         contract["public_sdk_ready"] = True
@@ -60,6 +61,7 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
 
         errors = checker.validate_contract(contract)
 
+        self.assertIn("status must remain offline_internal_contract", errors)
         self.assertIn("public_header_allowed must remain false", errors)
         self.assertIn("public_contract_allowed must remain false", errors)
         self.assertIn("public_sdk_ready must remain false", errors)
@@ -84,7 +86,9 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
             unit for unit in contract["audit_units"] if unit["id"] != "timed_notices"
         ]
         contract["audit_units"][0]["blocked_until_controls"].remove("abuse")
+        contract["audit_units"][1]["blocked_until_controls"].append("player_location_ready")
         contract["audit_units"][0]["forbidden_public_contract"].remove("shop API")
+        contract["audit_units"][2]["forbidden_public_contract"].remove("area membership API")
 
         errors = checker.validate_contract(contract)
 
@@ -92,7 +96,9 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
         self.assertIn("missing required control gate: rollback", errors)
         self.assertIn("missing required audit unit: timed_notices", errors)
         self.assertIn("economy.blocked_until_controls missing abuse", errors)
+        self.assertIn("mobility.blocked_until_controls unexpected player_location_ready", errors)
         self.assertIn("economy.forbidden_public_contract missing shop API", errors)
+        self.assertIn("areas.forbidden_public_contract missing area membership API", errors)
 
     def test_command_response_dependency_is_required_for_player_facing_notices(self) -> None:
         contract = self.load_valid_contract()
@@ -139,6 +145,26 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
         )
         self.assertFalse(
             any("public surface overclaim 'balance'" in error for error in errors),
+            errors,
+        )
+
+    def test_required_non_claims_preserve_non_promotional_boundary(self) -> None:
+        contract = self.load_valid_contract()
+        contract["non_claims"] = [
+            item
+            for item in contract["non_claims"]
+            if not item.startswith("identity, permissions/admin, command/chat response path")
+        ]
+
+        errors = checker.validate_contract(contract)
+
+        self.assertTrue(
+            any(
+                error.startswith(
+                    "non_claims missing identity, permissions/admin, command/chat response path"
+                )
+                for error in errors
+            ),
             errors,
         )
 

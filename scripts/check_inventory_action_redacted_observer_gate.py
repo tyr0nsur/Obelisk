@@ -41,6 +41,81 @@ EXPECTED_REDACTED_OBJECT_FIELDS = (
 DECISION_MANIFEST = REPO_ROOT / "docs" / "inventory_item_copied_signals_public_contract_decisions.json"
 DECISION_MANIFEST_SCHEMA = "obelisk.inventory-item-copied-signals-public-contract-decisions.v1"
 EXPECTED_DECISION_SURFACE = "obelisk.inventory_item_copied_signals.v1"
+EXPECTED_DECISION_STATUS = "promoted-experimental-only"
+EXPECTED_PUBLIC_CONTRACT: dict[str, Any] = {
+    "event_family": "GameplayPolicyEvent",
+    "capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS",
+    "descriptor_capability": "OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS",
+    "registration": "RegisterGameplayPolicyEventWithOwnerTokenHandle",
+    "unregister": "UnregisterGameplayPolicyEventWithOwnerToken",
+    "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+    "resource_contract": "category-only metadata; no identity, lookup, handle, persistence, or cross-event correlation",
+    "payload_contract": "copied POD scalar observation only",
+    "public_fields": [
+        "abi_version",
+        "struct_size",
+        "event_kind",
+        "resource_kind",
+        "flags",
+        "field_mask",
+        "bool_values",
+        "int32_values",
+    ],
+    "required_flags": [
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+    ],
+}
+REQUIRED_BLOCKED_CONTRACT_FLAGS = {
+    "standalone_inventory_sdk_allowed": False,
+    "standalone_items_sdk_allowed": False,
+}
+REQUIRED_BLOCKED_CONTRACT_TERMS = (
+    "Inventory SDK",
+    "Items SDK",
+    "item identity",
+    "inventory identity",
+    "ItemNetID identity",
+    "lookup",
+    "mutation",
+    "return override",
+    "ResourceHandle",
+    "CraftBlueprint",
+    "AdditionalData",
+    "ItemId",
+    "ItemID1",
+    "InventoryComp",
+    "anActor",
+    "action params",
+    "raw params",
+    "UObject pointers",
+    "UFunction pointers",
+    "FName/GObjects indices",
+)
+FORBIDDEN_DECISION_PUBLIC_CONTRACT_TOKENS = (
+    "Inventory SDK",
+    "Items SDK",
+    "item identity",
+    "inventory identity",
+    "ItemNetID",
+    "lookup",
+    "mutation",
+    "return override",
+    "ResourceHandle",
+    "CraftBlueprint",
+    "AdditionalData",
+    "ServerRequestInventoryUseItem",
+    "ServerRequestInventoryUseItemWithActor",
+    "ItemId",
+    "ItemID1",
+    "InventoryComp",
+    "anActor",
+    "action params",
+    "raw params",
+    "UObject",
+    "UFunction",
+    "FName/GObjects",
+)
 REQUIRED_PROMOTION_BLOCKERS: dict[str, dict[str, Any]] = {
     "copied_signal_stability_wording": {
         "status": "blocked",
@@ -419,8 +494,40 @@ def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> di
             expected=EXPECTED_DECISION_SURFACE,
             value=manifest.get("surface"),
         )
+    if manifest.get("status") != EXPECTED_DECISION_STATUS:
+        append_blocker(
+            blockers,
+            "decision_manifest_status_mismatch",
+            expected=EXPECTED_DECISION_STATUS,
+            value=manifest.get("status"),
+        )
     if manifest.get("decision") != "copied_signal_only":
         append_blocker(blockers, "decision_manifest_decision_mismatch", value=manifest.get("decision"))
+
+    public_contract = manifest.get("public_contract")
+    if public_contract != EXPECTED_PUBLIC_CONTRACT:
+        append_blocker(
+            blockers,
+            "decision_manifest_public_contract_mismatch",
+            expected=EXPECTED_PUBLIC_CONTRACT,
+            value=public_contract,
+        )
+    public_contract_scan = {}
+    if isinstance(public_contract, dict):
+        public_contract_scan = {
+            "public_fields": public_contract.get("public_fields"),
+            "required_flags": public_contract.get("required_flags"),
+        }
+    public_contract_text = json.dumps(public_contract_scan, sort_keys=True)
+    leaked_public_tokens = [
+        token for token in FORBIDDEN_DECISION_PUBLIC_CONTRACT_TOKENS if token in public_contract_text
+    ]
+    if leaked_public_tokens:
+        append_blocker(
+            blockers,
+            "decision_manifest_public_contract_forbidden_terms",
+            tokens=leaked_public_tokens,
+        )
 
     allowed_signals = manifest.get("allowed_signals")
     if not isinstance(allowed_signals, list):
@@ -434,6 +541,29 @@ def validate_decision_manifest(path: Path, blockers: list[dict[str, Any]]) -> di
         )
 
     blocked_contract = manifest.get("blocked_public_contract")
+    if not isinstance(blocked_contract, dict):
+        append_blocker(blockers, "decision_manifest_blocked_public_contract_missing")
+        blocked_contract = {}
+    for flag, expected in REQUIRED_BLOCKED_CONTRACT_FLAGS.items():
+        if blocked_contract.get(flag) is not expected:
+            append_blocker(
+                blockers,
+                "decision_manifest_blocked_contract_flag_mismatch",
+                flag=flag,
+                expected=expected,
+                value=blocked_contract.get(flag),
+            )
+    forbidden_terms = blocked_contract.get("forbidden_terms")
+    if not isinstance(forbidden_terms, list) or not all(isinstance(item, str) for item in forbidden_terms):
+        append_blocker(blockers, "decision_manifest_blocked_contract_forbidden_terms_missing")
+    else:
+        missing_forbidden_terms = [term for term in REQUIRED_BLOCKED_CONTRACT_TERMS if term not in forbidden_terms]
+        if missing_forbidden_terms:
+            append_blocker(
+                blockers,
+                "decision_manifest_blocked_contract_forbidden_terms_incomplete",
+                missing=missing_forbidden_terms,
+            )
     mutation_surface = (
         blocked_contract.get("inventory_mutation_surface") if isinstance(blocked_contract, dict) else None
     )

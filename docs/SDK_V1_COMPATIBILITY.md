@@ -171,6 +171,10 @@ The completion checker must also reject any promoted permissions/admin,
 command/chat response path, or commands/replies surface whose dependency rows are not
 already promoted, and player identity promotion must name the reviewed core/reflection
 evidence before it can support public permissions or command claims.
+Promoted command/chat response and commands/replies evidence must also name the promoted
+identity/principal and permissions prerequisites plus copied response/command ABI,
+owner-scoped lifecycle, privacy/redaction, abuse/rate-limit, audit, and command
+lifecycle boundaries before those rows can support v1 release-claim accounting.
 That ordering is a dependency guardrail, not a declaration that permissions/admin is the
 immediate next public slice; the only post-identity candidate inside permissions/admin is
 query-only fail-closed permission checks over copied principals. Before player identity
