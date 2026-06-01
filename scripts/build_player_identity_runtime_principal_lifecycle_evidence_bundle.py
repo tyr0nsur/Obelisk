@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,7 @@ EXPECTED_RUNTIME_LOG_POSTURE = {
     "reflection_scanner_disabled": True,
     "plugins_disabled": True,
 }
+RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 
 
 def sha256_file(path: Path) -> str:
@@ -71,12 +73,14 @@ def report_identity(report: dict[str, Any]) -> dict[str, str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--copied-log", required=True, type=Path, help="Copied/sanitized Obelisk log.")
-    parser.add_argument("--window-manifest", required=True, type=Path, help="Approved operational window manifest.")
-    parser.add_argument("--output-dir", required=True, type=Path, help="Bundle output directory.")
-    parser.add_argument("--obelisk-commit", required=True, help="Reviewed Obelisk commit recorded in evidence.")
-    parser.add_argument("--reviewed-by", required=True, help="Reviewer token/name for the approved manifest.")
-    parser.add_argument("--review-note", required=True, help="Short consume-only review note.")
+    parser.add_argument("--preflight-only", action="store_true", help="Classify evidence-dir inputs without writing a bundle.")
+    parser.add_argument("--evidence-dir", type=Path, help="live-validation-logs/<run-id> directory to classify.")
+    parser.add_argument("--copied-log", type=Path, help="Copied/sanitized Obelisk log.")
+    parser.add_argument("--window-manifest", type=Path, help="Approved operational window manifest.")
+    parser.add_argument("--output-dir", type=Path, help="Bundle output directory.")
+    parser.add_argument("--obelisk-commit", help="Reviewed Obelisk commit recorded in evidence.")
+    parser.add_argument("--reviewed-by", help="Reviewer token/name for the approved manifest.")
+    parser.add_argument("--review-note", help="Short consume-only review note.")
     return parser.parse_args()
 
 
@@ -158,6 +162,119 @@ def require_approved_copied_log(path: Path) -> Path:
     return status.resolved
 
 
+def add_blocker(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -> None:
+    blocker = {"reason": reason, "label": label}
+    blocker.update(extra)
+    blockers.append(blocker)
+
+
+def file_state(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    reject_symlink_component(path, label)
+    status = protected_paths.protected_path_status(
+        path.expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    state = {
+        "path": str(status.resolved),
+        "exists": status.resolved.is_file(),
+        "approved_offline_workspace": status.approved_offline_workspace,
+        "protected": status.protected,
+        "sha256": None,
+    }
+    if status.protected:
+        add_blocker(blockers, f"{label}_under_protected_server_root", label, path=str(status.resolved))
+    if not status.approved_offline_workspace:
+        add_blocker(blockers, f"{label}_not_approved_offline_workspace", label, path=str(status.resolved))
+    if not status.resolved.is_file():
+        add_blocker(blockers, f"{label}_missing", label, path=str(status.resolved))
+    else:
+        state["sha256"] = sha256_file(status.resolved)
+    return state
+
+
+def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
+    blockers: list[dict[str, Any]] = []
+    reject_symlink_component(evidence_dir, "--evidence-dir")
+    status = protected_paths.protected_path_status(
+        evidence_dir.expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    resolved = status.resolved
+    if status.protected:
+        add_blocker(blockers, "evidence_dir_under_protected_server_root", "--evidence-dir", path=str(resolved))
+    if not status.approved_offline_workspace:
+        add_blocker(blockers, "evidence_dir_not_approved_offline_workspace", "--evidence-dir", path=str(resolved))
+    if not resolved.is_dir():
+        add_blocker(blockers, "evidence_dir_missing", "--evidence-dir", path=str(resolved))
+    if len(resolved.parts) < 2 or resolved.parts[-2] != EXPECTED_COPIED_LOG_PARENT:
+        add_blocker(
+            blockers,
+            "evidence_dir_not_live_validation_logs_run",
+            "--evidence-dir",
+            expected=f"{EXPECTED_COPIED_LOG_PARENT}/<run-id>",
+            path=str(resolved),
+        )
+    run_id = resolved.name
+    if not RUN_ID_RE.fullmatch(run_id):
+        add_blocker(blockers, "evidence_dir_run_id_invalid", "--evidence-dir", run_id=run_id)
+
+    copied_log = file_state(resolved / "Obelisk.log", "copied_log", blockers)
+    window_manifest = file_state(resolved / "window-manifest.env", "window_manifest", blockers)
+    request_pack = file_state(resolved / "sidecars" / run_id / "window-request.json", "request_pack", blockers)
+    observer_env = file_state(resolved / "sidecars" / run_id / "observer-window.env", "observer_env", blockers)
+    preflight_pre = file_state(resolved / "sidecars" / run_id / "preflight-pre.txt", "preflight_pre", blockers)
+    preflight_post = file_state(resolved / "sidecars" / run_id / "preflight-post.txt", "preflight_post", blockers)
+
+    bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
+    approved_bundle = file_state(bundle_manifest, "approved_runtime_manifest", blockers)
+    input_ready = (
+        copied_log["exists"]
+        and window_manifest["exists"]
+        and copied_log["approved_offline_workspace"]
+        and window_manifest["approved_offline_workspace"]
+        and not copied_log["protected"]
+        and not window_manifest["protected"]
+    )
+    request_pack_ready = (
+        request_pack["exists"]
+        and observer_env["exists"]
+        and preflight_pre["exists"]
+        and preflight_post["exists"]
+    )
+    return {
+        "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
+        "ready": bool(input_ready),
+        "bundle_inputs_ready": bool(input_ready),
+        "request_pack_ready": bool(request_pack_ready),
+        "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
+        "next_blocker": (
+            "run_offline_evidence_bundle_builder"
+            if input_ready and not approved_bundle["exists"]
+            else "copied_log_and_window_manifest_required"
+        ),
+        "run_id": run_id,
+        "evidence_dir": str(resolved),
+        "inputs": {
+            "copied_log": copied_log,
+            "window_manifest": window_manifest,
+            "request_pack": request_pack,
+            "observer_env": observer_env,
+            "preflight_pre": preflight_pre,
+            "preflight_post": preflight_post,
+            "approved_runtime_manifest": approved_bundle,
+        },
+        "blockers": [blocker["reason"] for blocker in blockers],
+        "blocker_details": blockers,
+        "non_claims": [
+            "preflight-only filesystem classification; does not analyze logs, build approved evidence, authorize runtime capture, or promote player identity",
+            "request-pack readiness is preparation only and does not satisfy approved runtime evidence",
+            "ready means the offline bundle builder has the copied inputs it needs; it does not mean approved runtime evidence already exists",
+        ],
+    }
+
+
 def load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
@@ -230,6 +347,15 @@ def require_runtime_log_posture(summary: dict[str, Any], window: dict[str, Any])
 
 def main() -> int:
     args = parse_args()
+    if args.preflight_only:
+        if args.evidence_dir is None:
+            raise SystemExit("--evidence-dir is required with --preflight-only")
+        report = classify_preflight_evidence_dir(args.evidence_dir)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report["ready"] else 1
+    for name in ("copied_log", "window_manifest", "output_dir", "obelisk_commit", "reviewed_by", "review_note"):
+        if getattr(args, name) is None:
+            raise SystemExit(f"--{name.replace('_', '-')} is required unless --preflight-only is used")
     if not is_reviewed_obelisk_commit(args.obelisk_commit):
         raise SystemExit("--obelisk-commit must be a reviewed 40-character lowercase Git SHA")
     copied_log = require_approved_copied_log(args.copied_log)

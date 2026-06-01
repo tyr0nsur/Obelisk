@@ -157,6 +157,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             ]},
             {"id": "lifecycle.owner_scoped_unregister_and_drain", "status": "unresolved"},
             {"id": "privacy.redaction_and_targeting", "status": "unresolved", "required_behavior": [
+                "principal tuple source must be runtime-owned player identity observation before any directed response target is public",
+                "principal_handle, principal_generation, and principal_scope_flags must appear together before response targeting can consume player identity",
+                "plugin-supplied principal tuple fails closed",
+                "command-supplied principal tuple fails closed",
+                "operator-supplied principal tuple fails closed",
+                "missing principal provenance fails closed",
+                "server process epoch mismatch fails closed",
+                "permission allow cannot be consumed without policy provenance",
                 "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
                 "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
                 "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
@@ -451,7 +459,12 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         decisions = self.make_decisions()
         privacy = next(item for item in decisions["required_before_public_header"] if item["id"] == "privacy.redaction_and_targeting")
         privacy["required_behavior"] = [
-            item for item in privacy["required_behavior"] if not item.startswith("raw FString storage/data")
+            item
+            for item in privacy["required_behavior"]
+            if not item.startswith("raw FString storage/data")
+            and not item.startswith("principal tuple source must be runtime-owned")
+            and item != "plugin-supplied principal tuple fails closed"
+            and item != "permission allow cannot be consumed without policy provenance"
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
@@ -468,6 +481,15 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
         self.assertIn("privacy_redaction_behavior_missing", report["blockers"])
+        detail = next(
+            item for item in report["blocker_details"] if item["reason"] == "privacy_redaction_behavior_missing"
+        )
+        self.assertIn(
+            "principal tuple source must be runtime-owned player identity observation before any directed response target is public",
+            detail["missing"],
+        )
+        self.assertIn("plugin-supplied principal tuple fails closed", detail["missing"])
+        self.assertIn("permission allow cannot be consumed without policy provenance", detail["missing"])
 
     def test_rejects_missing_not_sufficient_shortcut_evidence(self) -> None:
         decisions = self.make_decisions()

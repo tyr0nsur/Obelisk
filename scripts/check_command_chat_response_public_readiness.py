@@ -100,6 +100,14 @@ REQUIRED_REDACTION_GUIDANCE_FRAGMENTS = (
 )
 REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
     (
+        "principal tuple source must be runtime-owned player identity observation before any directed response target is public",
+        "principal_handle, principal_generation, and principal_scope_flags must appear together before response targeting can consume player identity",
+        "plugin-supplied principal tuple fails closed",
+        "command-supplied principal tuple fails closed",
+        "operator-supplied principal tuple fails closed",
+        "missing principal provenance fails closed",
+        "server process epoch mismatch fails closed",
+        "permission allow cannot be consumed without policy provenance",
         "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
         "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
         "sender identity remains redacted and does not expose player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",

@@ -155,6 +155,25 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Static field-window evidence clears only the field-window packaging blocker, is not a `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are present as package-shape evidence only, not a `v1.0` completion marker.
 ## Priority Next Steps
 
+- 2026-06-01T17:07Z offline hardening checkpoint:
+  `scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py`
+  now has a `--preflight-only --evidence-dir` classifier for
+  `/servidor/ark/workspace-offline/live-validation-logs/<run-id>` directories. It
+  separates request-pack readiness, copied bundle inputs readiness, and produced
+  approved-runtime manifest presence. `ready=true` means only that copied `Obelisk.log`
+  plus `window-manifest.env` are present in the approved offline workspace and the offline
+  bundle builder can be run; it is not runtime approval, not approved evidence, and not
+  identity promotion. The current
+  `20260601T120000Z-player-principal-lifecycle` directory has `request_pack_ready=true`
+  but still lacks copied `Obelisk.log` and `window-manifest.env`.
+- 2026-06-01T17:07Z command downstream guardrail:
+  `command_chat_response_public_readiness` and `commands_replies_public_readiness` now
+  require the downstream planning contracts to preserve runtime-owned principal
+  provenance. Future command/response payloads may consume only a runtime-owned
+  player-identity principal tuple; plugin-, command-, or operator-supplied principal
+  tuples fail closed; missing provenance, server-process epoch mismatch, and permission
+  allow without policy provenance fail closed. This remains planning-only and adds no
+  public command, reply, send-chat, permissions, or identity ABI.
 - Primary v1 route: player identity has accepted offline/core/reflection inventory,
   12/12 candidate fixtures for the exact 12-target `players-identity-lifecycle-intake`
   set, distinct second-source layout evidence, consume-only lifecycle/principal manifests,

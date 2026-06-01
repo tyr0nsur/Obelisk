@@ -227,6 +227,75 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             env=env,
         )
 
+    def run_preflight(self, evidence_dir: Path) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+        return subprocess.run(
+            [
+                sys.executable,
+                str(BUNDLE),
+                "--preflight-only",
+                "--evidence-dir",
+                str(evidence_dir),
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+
+    def test_preflight_classifies_request_pack_only_directory_without_building(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            evidence_dir = temp_dir / "live-validation-logs" / RUN_ID
+            sidecar_dir = evidence_dir / "sidecars" / RUN_ID
+            sidecar_dir.mkdir(parents=True)
+            (sidecar_dir / "window-request.json").write_text("{}", encoding="utf-8")
+            (sidecar_dir / "observer-window.env").write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            (sidecar_dir / "preflight-pre.txt").write_text("preflight=ok\n", encoding="utf-8")
+            (sidecar_dir / "preflight-post.txt").write_text("preflight=ok\n", encoding="utf-8")
+
+            result = self.run_preflight(evidence_dir)
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertEqual(
+            report["schema"],
+            "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
+        )
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["bundle_inputs_ready"])
+        self.assertTrue(report["request_pack_ready"])
+        self.assertFalse(report["approved_runtime_manifest_present"])
+        self.assertEqual(report["next_blocker"], "copied_log_and_window_manifest_required")
+        self.assertIn("copied_log_missing", report["blockers"])
+        self.assertIn("window_manifest_missing", report["blockers"])
+        self.assertIn("approved_runtime_manifest_missing", report["blockers"])
+
+    def test_preflight_accepts_builder_inputs_before_approved_manifest(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            self.write_window_manifest(temp_dir, copied_log)
+
+            result = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertFalse(report["approved_runtime_manifest_present"])
+        self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
+        self.assertNotIn("copied_log_missing", report["blockers"])
+        self.assertNotIn("window_manifest_missing", report["blockers"])
+        self.assertIn(
+            "ready means the offline bundle builder has the copied inputs it needs; it does not mean approved runtime evidence already exists",
+            report["non_claims"],
+        )
+
     def test_builds_complete_consume_only_bundle(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

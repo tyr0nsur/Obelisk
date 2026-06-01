@@ -336,9 +336,13 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             for behavior in auth["required_behavior"]
             if behavior
             not in {
+                "principal tuple source must be runtime-owned player identity observation before any command payload can consume player identity",
                 "principal_handle, principal_generation, and principal_scope_flags must appear together in any future command payload that consumes player identity",
+                "plugin-supplied principal tuple fails closed",
                 "missing principal_handle fails closed",
                 "missing principal_scope_flags fails closed",
+                "server process epoch mismatch fails closed",
+                "permission allow cannot be consumed without policy provenance",
             }
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -359,8 +363,15 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         detail = next(
             item for item in report["blocker_details"] if item["reason"] == "auth_identity_permission_behavior_missing"
         )
+        self.assertIn(
+            "principal tuple source must be runtime-owned player identity observation before any command payload can consume player identity",
+            detail["missing"],
+        )
+        self.assertIn("plugin-supplied principal tuple fails closed", detail["missing"])
         self.assertIn("missing principal_handle fails closed", detail["missing"])
         self.assertIn("missing principal_scope_flags fails closed", detail["missing"])
+        self.assertIn("server process epoch mismatch fails closed", detail["missing"])
+        self.assertIn("permission allow cannot be consumed without policy provenance", detail["missing"])
 
     def test_rejects_missing_migration_vocabulary_guardrail(self) -> None:
         decisions = self.load_decisions()
