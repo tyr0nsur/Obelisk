@@ -135,10 +135,21 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "command text cannot establish principal identity",
                 "operator config enables surfaces only and cannot establish principal identity",
                 "response delivery never creates identity or permission claims",
+                "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
+                "commands/replies planning cannot bypass identity promotion",
             ]},
-            {"id": "dependency.promoted_permissions_admin", "status": "unresolved"},
+            {"id": "dependency.promoted_permissions_admin", "status": "unresolved", "required_behavior": [
+                "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
+                "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
+                "commands/replies planning cannot bypass permissions/admin promotion",
+            ]},
             {"id": "abi.copied_response_payload", "status": "unresolved"},
-            {"id": "abi.capability_and_owner_token", "status": "unresolved"},
+            {"id": "abi.capability_and_owner_token", "status": "unresolved", "required_behavior": [
+                "captured post-init debug CallProcessEvent tables do not authorize response delivery",
+                "minimal ChatMessageEvent registration does not authorize response delivery",
+                "raw ProcessEvent callbacks do not authorize response delivery",
+                "static thunk orientation does not authorize response delivery",
+            ]},
             {"id": "lifecycle.owner_scoped_unregister_and_drain", "status": "unresolved"},
             {"id": "privacy.redaction_and_targeting", "status": "unresolved", "required_behavior": [
                 "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
@@ -151,7 +162,15 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             {"id": "separation.no_commands_router_or_moderation", "status": "unresolved", "required_exclusions": [
                 "command router",
                 "command registration API",
+                "commands/replies shortcut before identity and permissions/admin",
+                "public response path through ChatMessageEvent",
+                "public response path through raw ProcessEvent",
+                "public response path through static thunk orientation",
+                "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
                 "moderation API",
+            ], "v1_sequence_gate": [
+                "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+                "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
             ]},
             {
                 "id": "evidence.layout_runtime_sdk_coverage",
@@ -159,12 +178,18 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "not_sufficient": [
                     "static thunk orientation",
                     "candidate vtable slots",
+                    "minimal ChatMessageEvent callback registration",
                     "passive ChatMessageEvent parsing",
+                    "commands/replies planning status",
                     "legacy CallProcessEvent debug gate",
                     "raw ProcessEvent callbacks",
                 ],
             },
-            {"id": "evidence.response_target_set_snapshot_second_source", "status": "unresolved", "required_targets": TARGETS},
+            {"id": "evidence.response_target_set_snapshot_second_source", "status": "unresolved", "required_targets": TARGETS, "not_sufficient": [
+                "minimal ChatMessageEvent callback registration",
+                "raw ProcessEvent callbacks",
+                "legacy CallProcessEvent debug gate",
+            ]},
         ]
         return {
             "schema": "obelisk.command-chat-response-public-contract-decisions.v1",
@@ -174,8 +199,16 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "public_header": "include/obelisk/ObeliskApi.h",
             "public_header_symbols_now": [],
             "legacy_call_process_event_public_response_allowed": False,
+            "minimal_chat_message_event_public_response_allowed": False,
+            "raw_process_event_public_response_allowed": False,
+            "static_thunk_orientation_public_response_allowed": False,
+            "commands_replies_shortcut_public_response_allowed": False,
             "forbidden_public_contract": [
                 "public CallProcessEvent response path",
+                "public minimal ChatMessageEvent response path",
+                "public raw ProcessEvent response path",
+                "public static thunk orientation response path",
+                "public commands/replies response shortcut before promoted identity and permissions/admin",
                 "reply API",
                 "send-chat API",
                 "broadcast/notices API",
@@ -448,6 +481,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             if item["reason"] == "evidence_not_sufficient_missing_required"
         )
         self.assertIn("passive ChatMessageEvent parsing", detail["missing"])
+        self.assertIn("minimal ChatMessageEvent callback registration", detail["missing"])
         self.assertIn("static thunk orientation", detail["missing"])
         self.assertIn("legacy CallProcessEvent debug gate", detail["missing"])
 

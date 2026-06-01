@@ -9,8 +9,8 @@ The machine-readable companion is [`public_sdk_surfaces.json`](public_sdk_surfac
 That manifest's `stable_release_contract.claim_allowed` field is the explicit
 machine-readable release switch for the stable SDK claim. It must remain `false` while
 `v1_completion_required` is `false`; a runtime/core-first gate, internal runtime
-stability, installed SDK package shape, Foundation seed, Plugin Hub seed, or any
-promoted-experimental copied-data seed cannot flip it.
+stability, installed SDK package shape, foundation examples, Plugin Hub packaging, or any
+promoted-experimental copied-data surface cannot flip it.
 The completion checker reports that raw switch as
 `stable_release_contract_claim_allowed` and reserves `stable_claim_allowed` for the final
 computed gate result after all blockers are applied.
@@ -74,7 +74,7 @@ owner-token callback lifetime, process-local timers, and descriptor metadata:
 - process-local `RegisterTimerWithOwnerTokenHandle` and `UnregisterTimerWithOwnerToken`;
 - `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`.
 
-These are release-supported foundation surfaces for the SDK package, not Plugin Hub seed
+These are release-supported foundation surfaces for the SDK package, not Plugin Hub
 priority. They do not imply hot reload of Obelisk itself, background ingress without
 shutdown proof, cluster scheduler state, gameplay timers, resource identity, lookup,
 mutation, or return override.
@@ -98,8 +98,8 @@ lib/cmake/Obelisk/ObeliskTargets.cmake
 ```
 
 That file set is package-shape evidence only, not a `v1.0` completion marker, and does
-not imply private runtime headers, vendored runtime dependencies, or any blocked gameplay
-module surface.
+not imply private runtime headers, vendored runtime dependencies, Plugin Hub package
+publication, or any blocked gameplay module surface.
 
 Lifecycle ownership is part of the promoted foundation contract: metadata string
 pointers must remain valid until the plugin shared object is closed; `ObeliskApi*` and
@@ -144,7 +144,7 @@ blocking API, permission API, or raw `FString`/UE payload.
 
 ## Candidate And Planning Lanes
 
-Plugin-local chat routing is experimental seed material only. A plugin may parse copied
+Plugin-local chat routing is experimental copied-pattern material only. A plugin may parse copied
 `ChatMessageEvent` bytes with `principal=unknown`, plugin-owned prefixes/tables,
 sanitized logs, and global plugin config. The current core-first RC surface does not
 promise a public command SDK/router, sender identity, permissions, replies, send-chat,
@@ -293,7 +293,7 @@ The shortest useful route toward a complete v1 SDK is:
    promoted copied ABI defines cadence, budget, lifecycle, shutdown, and hitch/backpressure
    behavior.
 
-This route keeps chat, gameplay-policy slices, descriptors, and timers as useful seed
+This route keeps chat, gameplay-policy slices, descriptors, and timers as useful copied
 surfaces while preventing them from being mistaken for a complete Obelisk SDK for
 familiar ARK server-modding demand.
 
@@ -320,7 +320,7 @@ promoted before the release is called `v1.0`.
 
 Before `stable_release_contract.claim_allowed=true`, the reviewed v1 release statement
 must have exactly one outcome record for every unresolved `.v1` blocker or experimental
-seed surface. Records use one of these exact forms:
+copied surface. Records use one of these exact forms:
 
 ```text
 surface-id: promoted - ...
@@ -358,7 +358,7 @@ approval and must not be cited as evidence that a surface is included in v1.
 | `obelisk.player_services_economy_mobility.v1` | `promoted`, `excluded`, or `post-v1` | identity, permissions/admin, storage/persistence, audit/rollback/abuse controls | Name economy, shops, rewards, kits, stats, homes, teleport, safe zones, area policy, timed notices, and cross-instance persistence. |
 | `obelisk.operator_ingress_storage.v1` | `promoted`, `excluded`, or `post-v1` | secret-safe ingress, storage schema/migration, queue drain, audit, encoding, lifecycle policy | Name RCON, operator reload command API, Unicode/operator text encoding, webhooks, database/storage, secret manager, external ingress, and cross-instance storage. |
 | `obelisk.gameplay_tick_callbacks.v1` | `promoted`, `excluded`, or `post-v1` | cadence, budget, threading, hitch/backpressure, lifecycle, shutdown semantics | Name server tick callbacks, UE gameplay tick callbacks, module/per-frame hooks, and gameplay timers. |
-| Promoted-experimental copied seeds | `promoted`, `excluded`, or `post-v1` | full public SDK promotion evidence for each seed | Name `GameplayPolicyEvent`, `ChatMessageEvent`, plugin-local chat routing, and inventory copied signals if they remain outside v1. |
+| Promoted-experimental copied surfaces | `promoted`, `excluded`, or `post-v1` | full public SDK promotion evidence for each surface | Name `GameplayPolicyEvent`, `ChatMessageEvent`, plugin-local chat routing, and inventory copied signals if they remain outside v1. |
 | `obelisk.lifecycle_ops_recovery.v1` | `promoted`, `excluded`, or `post-v1` | current foundation plus operator ingress for command-triggered reloads | State that lifecycle/config/logging/descriptors/timers are included, but plugin watchdogs, hot plugin reload, Obelisk hot reload, process restart, server recovery API, operator reload commands, detached-worker ingress, and restart-state recovery are excluded or post-v1 unless separately promoted. |
 
 ## v1.0 Release Bar
@@ -373,7 +373,7 @@ SDK compatibility statement based on `public_sdk_surfaces.json`. Any surface mar
 - explicit target-set or static/offline evidence where gameplay data is involved;
 - documentation that does not imply blocked categories are available.
 
-Surfaces marked `promoted-experimental-only` can be useful copied-data seed surfaces, but they
+Surfaces marked `promoted-experimental-only` can be useful copied-data surfaces, but they
 do not satisfy a complete v1 SDK claim by themselves. A complete `v1.0` release cannot
 leave `.v1` experimental contracts in that state; it must promote them to stable SDK
 surfaces, move them back to planning/post-v1, or explicitly exclude them in the release

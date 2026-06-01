@@ -252,6 +252,21 @@ assert_fail observer-window-duplicate-env "${CHECK}" \
 grep -F 'Env file contains duplicate key: OBELISK_PE_TRACE_LIMIT' \
     "${TMP_DIR}/observer-window-duplicate-env.err" >/dev/null
 
+future_observer_env="${TMP_DIR}/observer-window-future-observer.env"
+write_observer_env "${future_observer_env}" "${server_sha}"
+printf 'OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER=1\n' >> "${future_observer_env}"
+assert_fail observer-window-future-observer-env "${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${future_observer_env}" \
+    --allow-stopped
+grep -F 'Unexpected env key for exact player-principal preflight: OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER' \
+    "${TMP_DIR}/observer-window-future-observer-env.err" >/dev/null
+
 assert_fail bad-sha "${CHECK}" \
     --instance arkserver2 \
     --mode stable \

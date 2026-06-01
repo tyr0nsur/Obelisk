@@ -1,22 +1,24 @@
 ---
 name: obelisk-github-research-workflow
-description: "Use when leading Obelisk toward production stability through supervised agent coordination, GitHub checkpoints, skill updates, ARK reverse-engineering research, and durable docs/research handoff."
+description: "Use for Obelisk lead-owned integration policy, scoped sub-agent coordination, publication boundaries, skill updates, ARK reverse-engineering research, and durable docs/research handoff."
 ---
 
 # Obelisk GitHub Research Workflow
 
-Use this skill for lead-owned GitHub integration, supervised agent rounds, checkpointing,
-or handoff policy. For ordinary research-note capture, use `obelisk-continuous-learning`
-plus the relevant subsystem skill.
+Use this skill for lead-owned integration, scoped agent rounds, publication boundaries,
+or handoff policy. Do not hand it wholesale to sub-agents; pass only the rules that
+change their concrete task. For ordinary research-note capture, use
+`obelisk-continuous-learning` plus the relevant subsystem skill.
 
 ## Project Vision
 
 Obelisk is being built as a Linux runtime with gated API/SDK surfaces for ARK modding.
 Coordinate work toward a robust general modding substrate: UE4 reflection, safe runtime
 hooks, stable C ABI, plugin lifecycle, install layout, live-ops safety, reproducible
-reversing evidence, and public SDK promotion gates. Treat chat, inventory, structures,
-buffs, dinos, tribes, missions, transfers, and admin surfaces as module areas on top of
-the same core, not as the center of the project.
+reversing evidence, and public SDK promotion gates. Treat identity/principal,
+permissions/admin, command response, chat, inventory, structures, buffs, dinos, tribes,
+missions, transfers, and other module surfaces as areas on top of the same core, not as
+the center of the project.
 
 Treat `v1.0` stable as the complete public SDK contract for plugin authors, not just a
 stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
@@ -25,9 +27,9 @@ while remembering that those documents are a planning contract until a release g
 packages or supersedes them.
 Treat `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` as the lead-owned list
 of high-demand blockers that prevent a complete v1 SDK claim. Installed-SDK examples are
-contributor smoke/package-shape evidence only; they are not Plugin Hub seed work and
-cannot declare v1 complete while blockers remain planning or post-v1. Plugin Hub seed
-work remains post-SDK-complete. Explicitly excluded blockers require a reviewed v1 release
+contributor smoke/package-shape evidence only; they are not Plugin Hub work and cannot
+declare v1 complete while blockers remain planning or post-v1. Plugin Hub work remains
+post-SDK-complete. Explicitly excluded blockers require a reviewed v1 release
 statement with scoped wording; exclusions do not permit claiming a complete SDK for the
 excluded capability.
 
@@ -40,7 +42,7 @@ MSVC/Windows ABI assumptions, direct
 control flow, command parsers, return semantics, or algorithmic implementations; Linux
 support is rebuilt from Obelisk reflection and ProcessEvent copied-data evidence.
 Plugin Hub work is post-SDK-complete planning. Do not spend current rounds on Plugin Hub
-packaging, examples, intake tooling, or seed hardening while the complete SDK blocker
+packaging, examples, intake tooling, or package hardening while the complete SDK blocker
 chain remains open, unless the user explicitly asks to inspect archived planning. Current
 priority is the SDK itself: identity/principal, permissions/admin, command/response,
 storage/mutation, gameplay module surfaces, and their promotion evidence.
@@ -128,8 +130,8 @@ only the blocker context that changes the agent's concrete task.
 - Tell agents they must not manage GitHub. They may leave working-tree changes in their
   owned scope, but the lead is the only integration owner.
 - In agent prompts, prefer explicit wording: "leave changes unstaged/uncommitted and report
-  touched paths"; do not ask sub-agents to create "stable commits" unless delegating GitHub
-  for exactly that turn.
+  touched paths"; do not ask sub-agents to create integration checkpoints unless delegating
+  GitHub for exactly that turn.
 - Close old agents after their findings are integrated so stale context does not keep
   influencing new work.
 - Follow explicit lead-provided routing only when it is included in the current task
@@ -208,22 +210,18 @@ verification.
 - Prefer adding guardrail tests when fixing coordination drift so the same stale state does
   not return in later rounds.
 
-## Community Updates
+## Discord Boundary
 
 Do not draft or send Discord updates unless explicitly approved for the current turn.
-Do not draft or send community announcements unless explicitly delegated.
-Endpoints are operator secrets in ignored `local/discord-webhooks.env`; use only
-`OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and `OBELISK_BETA_TEST_WEBHOOK_URL` variable names
-in repo files, handoff notes, commits, and prompts. Use `--channel community` for major
-public, modder-facing milestones only, and `--channel beta-test` only for
-operator-approved in-game test windows. Community embeds should frame Obelisk as progress
-toward a Linux SDK for ARK modders: name the modder-facing milestone, current public
-boundary, and next SDK blocker. Avoid narrow-base framing, routine validation, or internal
-agent progress as the main message. Never use Discord for routine validations, internal
-agent status, speculative reversing notes, private live-ops detail, raw player text, or
-secrets. Operators should prefer the guarded helper instead of hand-written webhook calls.
-Always run `scripts/send_discord_embed.py --dry-run` first and send one concise
-professional embed with title, description, status/scope, and 2-5 public-safe fields.
+Do not draft or send community announcements unless explicitly delegated. Endpoints are
+operator secrets in ignored `local/discord-webhooks.env`; use only
+`OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` and `OBELISK_BETA_TEST_WEBHOOK_URL` variable
+names. Use Discord only for major public, modder-facing milestones or operator-approved
+beta-test windows. Never use Discord for routine validation, internal agent status,
+speculative reversing notes, private live-ops detail, raw player text, or secrets.
+Operators should prefer the guarded helper instead of hand-written webhook calls. Always
+run `scripts/send_discord_embed.py --dry-run` first and send one concise professional
+embed with title, description, status/scope, and 2-5 public-safe fields.
 
 ```bash
 python3 scripts/send_discord_embed.py --channel community --title "..." \
@@ -231,9 +229,9 @@ python3 scripts/send_discord_embed.py --channel community --title "..." \
   --field "Cambio=..." --field "Impacto=..."
 ```
 
-After the dry-run has been reviewed and the current turn explicitly approves a real send,
-repeat the command with `--confirm-approved-send --approval-scope community` or
-`--approval-scope beta-test`; the approval scope must match `--channel`.
+After current-turn approval and dry-run review, repeat with
+`--confirm-approved-send --approval-scope community` or `--approval-scope beta-test`; the
+approval scope must match `--channel`.
 
 ## Research Notes
 
@@ -243,7 +241,7 @@ Use `docs/research/YYYY-MM-DD-topic.md` for non-trivial investigation. Use
 ## Skill Update Rules
 
 Use `obelisk-continuous-learning` for skill-update criteria. Keep this skill focused on
-lead workflow, GitHub ownership, supervised agents, publication, and handoff policy.
+lead-only integration, scoped delegation, publication boundaries, and handoff policy.
 
 ## Release Promotion Gates
 

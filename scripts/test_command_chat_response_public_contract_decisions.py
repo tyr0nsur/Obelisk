@@ -89,6 +89,10 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         self.assertFalse(payload["public_header_allowed"])
         self.assertEqual(payload["public_header_symbols_now"], [])
         self.assertFalse(payload["legacy_call_process_event_public_response_allowed"])
+        self.assertFalse(payload["minimal_chat_message_event_public_response_allowed"])
+        self.assertFalse(payload["raw_process_event_public_response_allowed"])
+        self.assertFalse(payload["static_thunk_orientation_public_response_allowed"])
+        self.assertFalse(payload["commands_replies_shortcut_public_response_allowed"])
         recorded = {item["id"] for item in payload["required_before_public_header"]}
         self.assertEqual(recorded, REQUIRED_IDS)
         for forbidden in (
@@ -107,8 +111,22 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             "command text cannot establish principal identity",
             "operator config enables surfaces only and cannot establish principal identity",
             "response delivery never creates identity or permission claims",
+            "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
+            "commands/replies planning cannot bypass identity promotion",
         ):
             self.assertIn(behavior, identity["required_behavior"])
+
+        permissions = next(
+            item
+            for item in payload["required_before_public_header"]
+            if item["id"] == "dependency.promoted_permissions_admin"
+        )
+        for behavior in (
+            "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
+            "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
+            "commands/replies planning cannot bypass permissions/admin promotion",
+        ):
+            self.assertIn(behavior, permissions["required_behavior"])
 
     def test_copied_response_abi_blocks_raw_ue_and_legacy_debug_paths(self) -> None:
         payload = self.load_decisions()
@@ -146,6 +164,9 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             "missing capability fails closed",
             "missing or zero plugin_owner_token fails closed",
             "captured post-init debug CallProcessEvent tables do not authorize response delivery",
+            "minimal ChatMessageEvent registration does not authorize response delivery",
+            "raw ProcessEvent callbacks do not authorize response delivery",
+            "static thunk orientation does not authorize response delivery",
             "all response handles are owner-scoped",
         ):
             self.assertIn(behavior, capability["required_behavior"])
@@ -204,7 +225,9 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
         for insufficient in (
             "static thunk orientation",
             "candidate vtable slots",
+            "minimal ChatMessageEvent callback registration",
             "passive ChatMessageEvent parsing",
+            "commands/replies planning status",
             "legacy CallProcessEvent debug gate",
             "raw ProcessEvent callbacks",
         ):
@@ -230,6 +253,9 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             "candidate vtable slots",
             "historical chat FName indices",
             "metadata-only passive chat observations",
+            "minimal ChatMessageEvent callback registration",
+            "raw ProcessEvent callbacks",
+            "legacy CallProcessEvent debug gate",
             "ServerSendChatMessage chat-message-intake evidence",
         ):
             self.assertIn(insufficient, evidence["not_sufficient"])
@@ -247,7 +273,7 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
             self.assertEqual(payload["status"], "blocked", missing_evidence)
             self.assertFalse(payload["public_header_allowed"], missing_evidence)
             self.assertEqual(payload["public_header_symbols_now"], [], missing_evidence)
-            self.assertFalse(payload["legacy_call_process_event_public_response_allowed"], missing_evidence)
+        self.assertFalse(payload["legacy_call_process_event_public_response_allowed"], missing_evidence)
 
     def test_public_header_and_surface_manifest_stay_blocked(self) -> None:
         payload = self.load_decisions()
@@ -290,12 +316,19 @@ class CommandChatResponsePublicContractDecisionTests(unittest.TestCase):
                 "promoted player identity is required before command/chat response principals",
                 "promoted query-only permissions/admin is required before directed responses",
                 "copied command/chat response semantics may be defined only after identity and permissions/admin promotion",
+                "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+                "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
                 "commands/replies remains blocked until command_chat_response_path is promoted or explicitly excluded",
             ],
         )
         for exclusion in (
             "command router",
             "command registration API",
+            "commands/replies shortcut before identity and permissions/admin",
+            "public response path through ChatMessageEvent",
+            "public response path through raw ProcessEvent",
+            "public response path through static thunk orientation",
+            "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
             "console command API",
             "RCON command API",
             "moderation API",

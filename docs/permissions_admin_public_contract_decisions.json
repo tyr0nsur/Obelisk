@@ -50,6 +50,7 @@
       "required_behavior": [
         "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
         "player identity planning evidence alone cannot enable permissions/admin",
+        "runtime principal evidence alone is not public identity promotion",
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
@@ -245,6 +246,9 @@
         "missing runtime principal identity",
         "command text principal claim",
         "operator config principal claim",
+        "operator config permission claim",
+        "operator-config allow-capability claim",
+        "missing principal_generation",
         "principal_generation_mismatch",
         "unsupported principal_scope_flags",
         "unknown authority source",

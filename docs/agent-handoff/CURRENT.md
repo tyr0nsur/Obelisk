@@ -12,14 +12,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   not just a stable runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
   `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
   them.
-- Treat chat, inventory, structures, players, tribes, dinos, buffs, missions, transfers, commands, permissions, timers, config/logging, economy/database, and admin tooling as module areas above the same core. Promote each only through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
+- Treat player identity/principal, permissions/admin, command response, chat, inventory, structures, tribes, dinos, buffs, missions, transfers, timers, config/logging, economy/database, and admin tooling as module areas above the same core. Promote each only through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
 
 ## Hard Overrides
 
 - GitHub publication is lead-only. GitHub work may be delegated only for an evidenced, stable milestone; this handoff does not authorize push, tag, release-ref updates, rebase, or routine publication.
 - No tag or release-ref push may occur without release-manager/lead authorization for the current-turn release scope.
 - No server target has standing approval. Server-backed debug/beta work requires a current approved live-ops brief naming target instance/map, feature gates, marker/env changes, start/restart/stop window, notice path when players are involved, evidence capture, and rollback. Technical progress is only a reason to request a scoped run, not approval by itself.
-- No Discord for internal rounds or agent status. Discord drafts or sends require explicit current-turn approval for approved major public modder-facing milestones or operator-approved beta-test windows, must use `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL`, and must use embed shape through `scripts/send_discord_embed.py`. Always dry-run before any approved send. Never send routine validation notes, speculative reversing notes, or internal agent status.
+- no Discord for internal rounds or agent status; also no Discord for routine validation or speculative reversing notes. Discord drafts or sends require explicit current-turn approval for approved major public modder-facing milestones or operator-approved beta-test windows, must use `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL`, and must dry-run through `scripts/send_discord_embed.py` before any approved send. Always dry-run before any approved send.
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug controls, and observers unless the matching approved env+marker pair is enabled for a scoped debug window.
 - PluginManager unload cleanup skips `dlclose`, retains the plugin for retry, and does not repeat plugin shutdown when plugin-owned callback cleanup fails.
 - `CallProcessEvent` remains an init-window debug escape hatch only: the current plugin owner is inside `ObeliskPlugin_Init`, has `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and Post-init calls through captured API tables are unsupported until a future replacement must carry an owner token.
@@ -35,8 +35,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `ChatMessageEvent`, `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and
   process-local owner-token timers with explicit unregister; this is not a gameplay/module timer API, shared scheduler state, UE identity, or persistent handles. It is not a production-stable `v1.0` claim.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim; all blocker rows remain unresolved unless promoted or explicitly excluded/post-v1 where the reviewed v1 release statement and surface contract allow it.
-- `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or `production SDK` in public sinks unless that gate allows the stable SDK claim. The checker also enforces canonical `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data seeds cannot become sufficient evidence by manifest drift.
-- Plugin Hub work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 contributor/package-shape evidence only and are not Plugin Hub seeds.
+- `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or `production SDK` in public sinks unless that gate allows the stable SDK claim. The checker also enforces canonical `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data surfaces cannot become sufficient evidence by manifest drift.
+- Plugin Hub work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or package hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 contributor/package-shape evidence only and are not Plugin Hub inputs.
 - `obelisk.command_chat_response_path.v1` and `obelisk.commands_replies.v1` remain
   blocked/planning-only until promoted player identity and permissions/admin exist. Their
   checkers must keep public header, ABI, runtime, SDK, reply/send/broadcast/moderation, and
@@ -188,25 +188,25 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   permissions/admin -> command response.
   `scripts/check_operator_ingress_storage_offline_contract.py` validates only this
   offline planning contract and does not create public SDK, runtime, or promotion evidence.
-- Plugin Hub seed review is parked until SDK completion. Current rounds should keep
-  Plugin Hub docs non-promotional and focus on SDK blockers.
-- Revalidate before any checkpoint: with the vanilla-gdb candidate root plus
+- Plugin Hub review is parked until SDK completion; keep any Plugin Hub wording
+  non-promotional and route active work to SDK blockers.
+- Revalidate before lead integration: with the vanilla-gdb candidate root plus
   consume-only lifecycle-anchor and principal-invalidation manifests, identity readiness
   stays blocked on approved runtime principal lifecycle evidence. Public SDK v1
-  completion stays blocked, Plugin Hub docs stay non-promotional, and `git diff --check`
-  must be rerun before checkpoint.
+  completion stays blocked, and Plugin Hub docs stay non-promotional.
 - Do not rerun the completed admin snapshot, second-source layout, or lifecycle layout
   routes; the next identity blocker is approved runtime principal lifecycle evidence.
   Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`
-- Start every supervised round by verifying no stale stand-by sub-agent remains open.
-  Assign scoped objective, safety baseline, allowed paths, required skills, expert role,
-  expected decision, and edit permission. Pass only the skills needed for that task, and
-  do not pass leader-only strategy/cadence or active goal framing unless it changes the
-  task. The lead retains server-safety decisions.
+
 ## Agent Protocol
-- The lead owns integration. Sub-agents must not commit, amend, rebase, tag, push, update GitHub state, touch servers, send Discord updates, or broaden live-ops scope.
-- Use expert roles with disjoint ownership: ABI/API, build/SDK, UE4 reflection, static binary analysis, live-ops, release audit, or docs/skills.
-- Tell workers they are not alone in the codebase. They must not revert unrelated changes and must leave changes unstaged/uncommitted with touched paths and tests run.
-- Read-only explorers answer concrete questions with file/line evidence and no edits.
-- Close old agents after integrating findings; do not leave active agents without a plan.
+- Delegated sub-agents get only the scoped objective, safety baseline, allowed paths,
+  required skills, expert role, expected decision, and edit permission needed for their
+  task; pass only the skills needed for that scope. Do not pass leader-only cadence,
+  active-goal framing, community policy, or
+  unrelated module history unless it changes the worker's concrete task.
+- The lead retains server-safety decisions. Sub-agents must not commit, amend, rebase,
+  tag, push, update GitHub state, touch servers, send Discord updates, or broaden live-ops
+  scope unless explicitly delegated for the current turn.
+- Sub-agents are not alone in the codebase: do not revert unrelated changes; leave edits
+  unstaged/uncommitted and report touched paths, validations, and risks.

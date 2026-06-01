@@ -87,15 +87,24 @@ REQUIRED_FAIL_CLOSED_NEVER_ALLOW = frozenset(
     (
         "principal_generation_mismatch",
         "missing principal_handle",
+        "missing principal_generation",
+        "missing principal_scope_flags",
         "stale principal",
         "scope mismatch",
+        "unsupported principal_scope_flags",
+        "operator config permission claim",
+        "operator-config allow-capability claim",
         "operator-config authority before separate allow-capable promotion",
         "runtime-local authority without runtime-owned provenance",
     )
 )
 REQUIRED_FAIL_CLOSED_DENY_OR_UNKNOWN = frozenset(
     (
+        "missing principal_handle",
+        "missing principal_generation",
+        "missing principal_scope_flags",
         "mismatched principal_generation",
+        "unsupported principal_scope_flags",
         "missing_authority_generation",
         "authority_generation_mismatch",
         "missing policy_epoch provenance",
@@ -109,6 +118,7 @@ REQUIRED_DEPENDENCY_BEHAVIOR = frozenset(
     (
         "before player identity is promoted, permissions/admin exposes no public ABI, callbacks, cache ABI, command/reply implication, or header symbols",
         "player identity planning evidence alone cannot enable permissions/admin",
+        "runtime principal evidence alone is not public identity promotion",
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
@@ -116,6 +126,58 @@ REQUIRED_DEPENDENCY_BEHAVIOR = frozenset(
         "operator config enables surfaces or policy inputs only and cannot establish principal identity",
         "command text cannot establish principal identity",
         "permissions/admin remains post-v1 or excluded until this dependency is promoted or explicitly excluded",
+    )
+)
+REQUIRED_PRINCIPAL_GENERATION_BEHAVIOR = frozenset(
+    (
+        "principal_handle alone never authorizes",
+        "missing principal_handle fails closed",
+        "missing generation fails closed",
+        "stale generation fails closed",
+        "generation mismatch returns deny or unknown, never allow",
+    )
+)
+REQUIRED_PRINCIPAL_SCOPE_ALLOWED_INITIAL = frozenset(("callback-local", "process-local"))
+REQUIRED_PRINCIPAL_SCOPE_FORBIDDEN = frozenset(("cluster-stable", "persistent", "cross-map shared"))
+REQUIRED_PRINCIPAL_SCOPE_BEHAVIOR = frozenset(
+    (
+        "missing principal_scope_flags fails closed",
+        "unsupported principal scope fails closed",
+        "process mismatch fails closed",
+        "restart-local or wider scope requires an explicit promoted identity contract",
+    )
+)
+REQUIRED_PERMISSION_QUERY_FIELDS = frozenset(
+    (
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "action",
+        "action_size",
+        "resource_scope",
+        "resource_scope_size",
+    )
+)
+REQUIRED_POLICY_PROVENANCE_FIELDS = frozenset(
+    (
+        "policy_source_id",
+        "policy_source_generation",
+        "authority_kind",
+        "authority_generation",
+        "policy_epoch",
+    )
+)
+REQUIRED_RECOGNIZED_AUTHORITY_KINDS = frozenset(("operator-config", "runtime-local"))
+REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS = frozenset(("runtime-local",))
+REQUIRED_POLICY_AUTHORITY_BEHAVIOR = frozenset(
+    (
+        "operator-config authority is recognized but not allow-capable until separately promoted",
+        "operator-config authority can provide runtime-owned policy inputs only and cannot produce allow",
+        "runtime-local authority must be runtime-owned before it can produce allow",
+        "runtime-local authority without runtime-owned provenance fails closed",
+        "operator-config cannot establish principal identity or permission claims before runtime principal observation",
+        "permission authority derives only from an established runtime principal plus runtime-owned provenance",
+        "plugin input cannot self-attest authority provenance",
     )
 )
 REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT = frozenset(
@@ -219,6 +281,12 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         add(blockers, "public_command_reply_contract_not_none", "$.public_command_reply_contract")
     if payload.get("public_admin_mutation_contract") != "none":
         add(blockers, "public_admin_mutation_contract_not_none", "$.public_admin_mutation_contract")
+    if payload.get("allow_capable_authority_ownership") != "runtime-local/runtime-owned-only":
+        add(
+            blockers,
+            "allow_capable_authority_ownership_not_runtime_local_owned_only",
+            "$.allow_capable_authority_ownership",
+        )
     if payload.get("operator_config_allow_capable") is not False:
         add(blockers, "operator_config_allow_capable_not_false", "$.operator_config_allow_capable")
     if payload.get("allowed_public_surface_after_player_identity") != [
@@ -242,6 +310,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     missing_ids = REQUIRED_DECISION_IDS - ids
     if missing_ids:
         add(blockers, "required_decision_ids_missing", "$.required_before_public_header", missing=sorted(missing_ids))
+    by_id = {item.get("id"): item for item in required if isinstance(item, dict)}
     dependency = next(
         (
             item
@@ -259,17 +328,116 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
             "dependency_player_identity_public_contract_requirements_missing",
             "$.required_before_public_header[dependency.promoted_player_identity].required_behavior",
         )
-    abi = next(
-        (
-            item
-            for item in required
-            if isinstance(item, dict) and item.get("id") == "abi.permission_query_identity_fields"
-        ),
-        None,
-    )
+    generation = by_id.get("identity.principal_generation_required")
+    generation_behavior = generation.get("required_behavior") if isinstance(generation, dict) else None
+    if not isinstance(generation_behavior, list) or not REQUIRED_PRINCIPAL_GENERATION_BEHAVIOR.issubset(
+        set(generation_behavior)
+    ):
+        add(
+            blockers,
+            "principal_generation_fail_closed_requirements_missing",
+            "$.required_before_public_header[identity.principal_generation_required].required_behavior",
+        )
+    scope = by_id.get("identity.principal_scope_compatibility")
+    if not isinstance(scope, dict):
+        add(
+            blockers,
+            "principal_scope_compatibility_requirements_missing",
+            "$.required_before_public_header[identity.principal_scope_compatibility]",
+        )
+    else:
+        allowed_scopes = scope.get("allowed_initial_scopes")
+        if not isinstance(allowed_scopes, list) or set(allowed_scopes) != REQUIRED_PRINCIPAL_SCOPE_ALLOWED_INITIAL:
+            add(
+                blockers,
+                "principal_scope_allowed_initial_scopes_unexpected",
+                "$.required_before_public_header[identity.principal_scope_compatibility].allowed_initial_scopes",
+            )
+        forbidden_scopes = scope.get("forbidden_until_separate_promotion")
+        if not isinstance(forbidden_scopes, list) or not REQUIRED_PRINCIPAL_SCOPE_FORBIDDEN.issubset(
+            set(forbidden_scopes)
+        ):
+            add(
+                blockers,
+                "principal_scope_forbidden_wider_scopes_missing",
+                "$.required_before_public_header[identity.principal_scope_compatibility].forbidden_until_separate_promotion",
+            )
+        scope_behavior = scope.get("required_behavior")
+        if not isinstance(scope_behavior, list) or not REQUIRED_PRINCIPAL_SCOPE_BEHAVIOR.issubset(
+            set(scope_behavior)
+        ):
+            add(
+                blockers,
+                "principal_scope_fail_closed_requirements_missing",
+                "$.required_before_public_header[identity.principal_scope_compatibility].required_behavior",
+            )
+    abi = by_id.get("abi.permission_query_identity_fields")
+    abi_fields = abi.get("required_fields_or_equivalent") if isinstance(abi, dict) else None
+    if not isinstance(abi_fields, list) or set(abi_fields) != REQUIRED_PERMISSION_QUERY_FIELDS:
+        add(
+            blockers,
+            "permission_query_identity_fields_unexpected",
+            "$.required_before_public_header[abi.permission_query_identity_fields].required_fields_or_equivalent",
+        )
     properties = abi.get("required_properties") if isinstance(abi, dict) else None
     if not isinstance(properties, list) or not REQUIRED_QUERY_TEXT_FRAGMENTS.issubset(set(properties)):
         add(blockers, "query_text_boundary_properties_missing", "$.required_before_public_header")
+    policy = by_id.get("policy.authority_provenance_required")
+    if not isinstance(policy, dict):
+        add(
+            blockers,
+            "policy_authority_provenance_requirements_missing",
+            "$.required_before_public_header[policy.authority_provenance_required]",
+        )
+    else:
+        policy_fields = policy.get("required_fields_or_equivalent")
+        if not isinstance(policy_fields, list) or set(policy_fields) != REQUIRED_POLICY_PROVENANCE_FIELDS:
+            add(
+                blockers,
+                "policy_authority_provenance_fields_unexpected",
+                "$.required_before_public_header[policy.authority_provenance_required].required_fields_or_equivalent",
+            )
+        recognized = policy.get("recognized_authority_kinds")
+        if not isinstance(recognized, list) or set(recognized) != REQUIRED_RECOGNIZED_AUTHORITY_KINDS:
+            add(
+                blockers,
+                "policy_recognized_authority_kinds_unexpected",
+                "$.required_before_public_header[policy.authority_provenance_required].recognized_authority_kinds",
+            )
+        allow_capable = policy.get("allow_capable_authority_kinds")
+        if not isinstance(allow_capable, list) or set(allow_capable) != REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS:
+            add(
+                blockers,
+                "policy_allow_capable_authority_kinds_unexpected",
+                "$.required_before_public_header[policy.authority_provenance_required].allow_capable_authority_kinds",
+            )
+        if policy.get("allow_capable_authority_ownership") != "runtime-owned":
+            add(
+                blockers,
+                "policy_allow_capable_authority_ownership_not_runtime_owned",
+                "$.required_before_public_header[policy.authority_provenance_required].allow_capable_authority_ownership",
+            )
+        if policy.get("operator_config_allow_capable") is not False:
+            add(
+                blockers,
+                "policy_operator_config_allow_capable_not_false",
+                "$.required_before_public_header[policy.authority_provenance_required].operator_config_allow_capable",
+            )
+        if policy.get("runtime_local_authority_must_be_runtime_owned") is not True:
+            add(
+                blockers,
+                "policy_runtime_local_authority_not_required_runtime_owned",
+                "$.required_before_public_header[policy.authority_provenance_required].runtime_local_authority_must_be_runtime_owned",
+            )
+        authority_behavior = policy.get("required_behavior")
+        if not isinstance(authority_behavior, list) or not REQUIRED_POLICY_AUTHORITY_BEHAVIOR.issubset(
+            set(authority_behavior)
+        ):
+            add(
+                blockers,
+                "policy_authority_fail_closed_requirements_missing",
+                "$.required_before_public_header[policy.authority_provenance_required].required_behavior",
+            )
     fail_closed = next(
         (
             item

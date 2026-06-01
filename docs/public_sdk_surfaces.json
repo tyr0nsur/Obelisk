@@ -37,6 +37,7 @@
     "not_sufficient_for": [
       "v1_completion_required",
       "stable_release_contract.claim_allowed",
+      "Plugin Hub seed/package publication",
       "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces"
     ]
   },

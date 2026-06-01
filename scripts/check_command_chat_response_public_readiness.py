@@ -57,6 +57,10 @@ REQUIRED_DECISION_IDS = frozenset(
 REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
     (
         "public CallProcessEvent response path",
+        "public minimal ChatMessageEvent response path",
+        "public raw ProcessEvent response path",
+        "public static thunk orientation response path",
+        "public commands/replies response shortcut before promoted identity and permissions/admin",
         "raw UE pointers",
         "raw ProcessEvent params",
         "raw FString storage",
@@ -106,7 +110,9 @@ REQUIRED_LAYOUT_RUNTIME_SDK_NOT_SUFFICIENT = frozenset(
     (
         "static thunk orientation",
         "candidate vtable slots",
+        "minimal ChatMessageEvent callback registration",
         "passive ChatMessageEvent parsing",
+        "commands/replies planning status",
         "legacy CallProcessEvent debug gate",
         "raw ProcessEvent callbacks",
     )
@@ -171,6 +177,10 @@ FALSE_ONLY_KEYS = frozenset(
         "public_header_ready",
         "public_headers_ready",
         "public_reply_api",
+        "minimal_chat_message_event_public_response_allowed",
+        "raw_process_event_public_response_allowed",
+        "static_thunk_orientation_public_response_allowed",
+        "commands_replies_shortcut_public_response_allowed",
         "public_response_path_ready",
         "public_sdk_ready",
         "public_send_chat_api",
@@ -456,6 +466,10 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     require_equal(payload, "status", "blocked", "$.decisions", blockers)
     require_false(payload, "public_header_allowed", "$.decisions", blockers)
     require_false(payload, "legacy_call_process_event_public_response_allowed", "$.decisions", blockers)
+    require_false(payload, "minimal_chat_message_event_public_response_allowed", "$.decisions", blockers)
+    require_false(payload, "raw_process_event_public_response_allowed", "$.decisions", blockers)
+    require_false(payload, "static_thunk_orientation_public_response_allowed", "$.decisions", blockers)
+    require_false(payload, "commands_replies_shortcut_public_response_allowed", "$.decisions", blockers)
     if payload.get("public_header_symbols_now") != []:
         add(blockers, "public_header_symbols_now_not_empty", "$.decisions.public_header_symbols_now", value=payload.get("public_header_symbols_now"))
 
@@ -499,13 +513,52 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "command text cannot establish principal identity",
         "operator config enables surfaces only and cannot establish principal identity",
         "response delivery never creates identity or permission claims",
+        "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
+        "commands/replies planning cannot bypass identity promotion",
     ):
         if required not in behaviors:
             add(blockers, "identity_dependency_behavior_missing", "$.decisions.required_before_public_header", behavior=required)
 
+    permissions = by_id.get("dependency.promoted_permissions_admin", {})
+    permission_behaviors = string_set(permissions.get("required_behavior"))
+    for required in (
+        "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
+        "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
+        "commands/replies planning cannot bypass permissions/admin promotion",
+    ):
+        if required not in permission_behaviors:
+            add(blockers, "permissions_dependency_behavior_missing", "$.decisions.required_before_public_header", behavior=required)
+
+    capability = by_id.get("abi.capability_and_owner_token", {})
+    capability_behaviors = string_set(capability.get("required_behavior"))
+    for required in (
+        "captured post-init debug CallProcessEvent tables do not authorize response delivery",
+        "minimal ChatMessageEvent registration does not authorize response delivery",
+        "raw ProcessEvent callbacks do not authorize response delivery",
+        "static thunk orientation does not authorize response delivery",
+    ):
+        if required not in capability_behaviors:
+            add(blockers, "capability_behavior_missing", "$.decisions.required_before_public_header", behavior=required)
+
     separation = by_id.get("separation.no_commands_router_or_moderation", {})
+    sequence_gate = string_set(separation.get("v1_sequence_gate"))
+    for required in (
+        "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+        "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
+    ):
+        if required not in sequence_gate:
+            add(blockers, "separation_sequence_gate_missing", "$.decisions.required_before_public_header", gate=required)
     exclusions = string_set(separation.get("required_exclusions"))
-    for required in ("command router", "command registration API", "moderation API"):
+    for required in (
+        "command router",
+        "command registration API",
+        "commands/replies shortcut before identity and permissions/admin",
+        "public response path through ChatMessageEvent",
+        "public response path through raw ProcessEvent",
+        "public response path through static thunk orientation",
+        "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
+        "moderation API",
+    ):
         if required not in exclusions:
             add(blockers, "separation_exclusion_missing", "$.decisions.required_before_public_header", exclusion=required)
 
@@ -523,6 +576,14 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     evidence = by_id.get("evidence.response_target_set_snapshot_second_source", {})
     if string_set(evidence.get("required_targets")) != TARGETS:
         add(blockers, "decision_response_targets_mismatch", "$.decisions.required_before_public_header", value=evidence.get("required_targets"))
+    response_not_sufficient = string_set(evidence.get("not_sufficient"))
+    for required in (
+        "minimal ChatMessageEvent callback registration",
+        "raw ProcessEvent callbacks",
+        "legacy CallProcessEvent debug gate",
+    ):
+        if required not in response_not_sufficient:
+            add(blockers, "response_target_not_sufficient_missing", "$.decisions.required_before_public_header", evidence=required)
 
     coverage = by_id.get("evidence.layout_runtime_sdk_coverage", {})
     not_sufficient = string_set(coverage.get("not_sufficient"))

@@ -237,3 +237,34 @@ blocks with `runtime_evidence_pair_missing`; the accepted consume-mode path must
 both manifests together. This still does not promote `ResourceHandle`, authorize runtime
 work, or make the pair public evidence. It only prevents a single candidate runtime
 artifact from passing as if the minimum runtime package were complete.
+
+## 2026-06-01 ResourceHandle Runtime-Pair Intake Recheck
+
+Focused offline intake after the runtime-pair gate audit found no additional small
+template or consume-checker gap to close for the future rejected-runtime-object-samples
+and serial-reuse/wraparound blocker. The existing gate already requires the two future
+runtime schemas to be supplied together, keeps each schema candidate-only, verifies
+redacted run identity and source serial-policy identity, rejects raw UE/object/serial
+disclosures, blocks protected-path strings, rejects broad tracing/scanner/core-capture
+claims, and fails promote mode.
+
+The rejected hypothesis for this pass is that another offline zero-serial, GObjects,
+FName, core, or serial artifact would advance the blocker. It would not. The current
+offline scaffolding can only consume a future approved runtime pair; it cannot synthesize
+the missing runtime observations.
+
+Exact next evidence needed remains unchanged:
+
+- one consume-accepted
+  `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1` manifest with an
+  object-present rejected row, redacted run identity, accepted source serial-policy
+  identity, `FUObjectItem+0x8` recorded only as match status, `FUObjectItem+0xC` recorded
+  only as unknown dword present, candidate `UObject+0x8` reject bits as booleans, and
+  `accepted_rows=0`;
+- one consume-accepted
+  `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1` manifest from the
+  same redacted runtime window and source policy, with at least one fresh same-frame
+  nonzero-match frame-local allow row, at least one negative reject row, cross-frame
+  lookup rejected, and `unknown_wraparound_reject=true`;
+- both manifests must be validated together in one consume-mode gate run and must still
+  fail promote mode as candidate-only.

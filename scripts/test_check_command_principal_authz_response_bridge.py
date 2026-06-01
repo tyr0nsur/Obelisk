@@ -152,6 +152,13 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
             "permission unknown result",
             "rate limit exceeded",
             "malformed UTF-8",
+            "minimal ChatMessageEvent response shortcut",
+            "raw ProcessEvent response shortcut",
+            "legacy CallProcessEvent response shortcut",
+            "static thunk orientation response shortcut",
+            "commands/replies response shortcut before promoted identity and permissions/admin",
+            "missing promoted player identity",
+            "missing promoted permissions/admin",
             "missing command_chat_response_path promotion",
             "missing commands_replies promotion",
         ):
@@ -176,7 +183,9 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         self.assertIn("permission_policy_epoch", flow["copied command payload"])
         self.assertIn("fail closed", flow["permission query"])
         self.assertIn("copied intent only", flow["response request"])
-        self.assertIn("command_chat_response_path is separately promoted", flow["response request"])
+        self.assertIn("promoted player identity", flow["response request"])
+        self.assertIn("promoted permissions/admin", flow["response request"])
+        self.assertIn("command_chat_response_path are separately promoted", flow["response request"])
 
     def test_rejects_missing_or_incomplete_bridge_ergonomics_flow(self) -> None:
         decisions = self.load_json(DECISIONS)

@@ -86,6 +86,13 @@
     "oversize response message",
     "oversize command",
     "unsupported source kind",
+    "minimal ChatMessageEvent response shortcut",
+    "raw ProcessEvent response shortcut",
+    "legacy CallProcessEvent response shortcut",
+    "static thunk orientation response shortcut",
+    "commands/replies response shortcut before promoted identity and permissions/admin",
+    "missing promoted player identity",
+    "missing promoted permissions/admin",
     "missing command_chat_response_path promotion",
     "missing commands_replies promotion"
   ],
@@ -98,8 +105,12 @@
     "plugin input and command callbacks cannot self-attest permission authority or policy provenance",
     "command/chat response targeting cannot create principal or permission claims",
     "command/chat response path requires copied response payload, nonzero plugin_owner_token, owner-scoped handles, and promoted identity/permissions before any directed response",
+    "minimal ChatMessageEvent is passive copied input only and cannot authorize replies, send-chat, broadcast, moderation, identity, permissions, or response delivery",
+    "raw ProcessEvent callbacks cannot authorize replies, send-chat, broadcast, moderation, identity, permissions, or response delivery",
+    "static thunk orientation cannot authorize replies, send-chat, broadcast, moderation, identity, permissions, or response delivery",
     "commands/replies cannot dispatch when permission result is deny or unknown",
     "commands/replies cannot dispatch from missing permission policy_epoch or missing command_chat_response_path promotion",
+    "commands/replies planning cannot bypass promoted player identity, promoted permissions/admin, or promoted command_chat_response_path",
     "commands/replies cannot imply replies, send-chat, broadcast, moderation, storage, or admin mutation",
     "permission or command rate-limit exhaustion fails closed",
     "malformed UTF-8, oversize messages or commands, and unsupported command source kinds fail closed",
@@ -111,7 +122,7 @@
   "bridge_ergonomics_flow": [
     {
       "step": "copied chat text",
-      "required_boundary": "copied ChatMessageEvent text is request input only and cannot establish principal identity, permission authority, dispatch authority, or response delivery"
+      "required_boundary": "copied ChatMessageEvent text is request input only and cannot establish principal identity, permission authority, dispatch authority, reply/send-chat/broadcast/moderation authority, or response delivery"
     },
     {
       "step": "plugin-local parse",
@@ -127,7 +138,7 @@
     },
     {
       "step": "response request",
-      "required_boundary": "future response request remains copied intent only and cannot imply reply/send-chat/broadcast/moderation delivery until command_chat_response_path is separately promoted"
+      "required_boundary": "future response request remains copied intent only and cannot imply reply/send-chat/broadcast/moderation delivery until promoted player identity, promoted permissions/admin, and command_chat_response_path are separately promoted"
     }
   ],
   "forbidden_public_contract": [
@@ -138,6 +149,10 @@
     "public command_chat_response_path ABI",
     "public CallProcessEvent response path",
     "public CallProcessEvent command or reply path",
+    "public minimal ChatMessageEvent response path",
+    "public raw ProcessEvent response path",
+    "public static thunk orientation response path",
+    "public commands/replies response shortcut before promoted identity and permissions/admin",
     "response ABI",
     "reply ABI",
     "send-chat ABI",

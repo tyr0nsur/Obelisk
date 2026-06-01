@@ -118,7 +118,9 @@ The env snapshot must contain the exact player-principal lifecycle window postur
 `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10`,
 `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0`, and
 `OBELISK_PE_TRACE_LIMIT=0`. Duplicate keys, missing keys, alternate observer env, or
-debug/callback escape env fail closed.
+debug/callback escape env fail closed. The preflight also rejects unapproved extra
+Obelisk gate/control/observer env keys, including future observer-family keys that are
+not individually listed in this note.
 
 The future observer-window launch must use only these env gates:
 

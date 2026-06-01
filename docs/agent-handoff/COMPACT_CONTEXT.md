@@ -29,15 +29,11 @@ priorities, and do not use history files as the active source of truth.
   rollback. Technical progress alone is not approval to restart; request an exact run only
   after a concrete offline/code advance genuinely needs new runtime logs.
 - Community updates are for major public modder-facing milestones only; beta-test
-  activation notices are separate operational live-ops messages. Discord URLs are ignored
-  local secrets in `local/discord-webhooks.env`; use only
+  activation notices are separate operational live-ops messages. Use only
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL` by variable
-  name, and send concise professional embeds without raw logs, player text, secrets, or
-  speculative reversing notes. Use `community` only for stable modder-facing milestones,
-  `beta-test` only for approved player action windows, and no Discord for internal rounds
-  or agent status. Explicit current-turn approval is required for every Discord send;
-  publication approval does not imply Discord approval. Always dry-run the embed first and
-  verify a public-safe title, description, status/scope, and 2-5 useful fields.
+  name. No Discord for routine validation, internal rounds, speculative reversing notes,
+  private live-ops detail, raw player text, secrets, or agent status. Explicit
+  current-turn approval and a guarded dry-run are required for every send.
 - `ArkServerApi/AseApi` and local `NextGenPlugins` clones may be used only as names and
   demand signals for familiar ArkApi-style plugin concepts. Do not treat them as
   architecture or ergonomics sources, and do not import offsets, vtables, layouts, `.lib` artifacts,
@@ -66,7 +62,7 @@ priorities, and do not use history files as the active source of truth.
   identity must name the reviewed core/reflection evidence terms before supporting public
   permissions or command claims. It must also enforce the canonical
   `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub
-  package shape, RC package readiness, and copied event seeds remain non-sufficient for a
+  package shape, RC package readiness, and copied event surfaces remain non-sufficient for a
   stable SDK claim.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   After player identity/principal, the permissions/admin candidate is query-only
@@ -162,12 +158,12 @@ priorities, and do not use history files as the active source of truth.
   richer chat APIs beyond minimal `ChatMessageEvent`, HTTP/threads/file-reader plugin
   ingress, and lifecycle-unsafe plugins.
 - Plugin Hub work is post-SDK-complete planning only. Do not spend current rounds on
-  Plugin Hub examples, packaging, intake tooling, or seed hardening while the complete SDK
-  blocker chain remains open. Historical seed docs may be read as boundaries only; they
-  do not replace identity/principal, permissions/admin, command/response, storage,
+  Plugin Hub examples, packaging, intake tooling, or package hardening while the complete SDK
+  blocker chain remains open. Historical Plugin Hub docs may be read as boundaries only;
+  they do not replace identity/principal, permissions/admin, command/response, storage,
   mutation, or gameplay module promotion work. Passive copied chat parsing and copied
   policy auditing remain experimental pattern examples only;
-  demand-map or `NextGenPlugins` dictionary entries do not make a seed release-ready and
+  demand-map or `NextGenPlugins` dictionary entries do not make an idea release-ready and
   do not promote permissions, RCON, economy, homes/safe zones, structure enforcement,
   dinos, tribes, transfers, inventory, item mutation, identity, lookup, replies,
   send-chat, moderation, or ArkApi portability.
@@ -355,10 +351,10 @@ priorities, and do not use history files as the active source of truth.
   remains blocked until `policy_epoch` plus full generation/scope keying is promoted.
   No `allow` decision is valid without runtime-owned policy source/authority provenance,
   and public permission queries need owner-scoped rate-limit/audit gates.
-- Plugin Hub seed guardrails are archived boundaries only until SDK completion: seed docs
-  must stay non-promotional and must not reopen examples, packaging, intake tooling, or
-  seed review while identity/principal, permissions/admin, command/response, storage,
-  mutation, ResourceHandle, and gameplay module blockers remain open.
+- Plugin Hub guardrails are archived boundaries only until SDK completion: keep them
+  non-promotional and do not reopen examples, packaging, intake tooling, or review while
+  identity/principal, permissions/admin, command/response, storage, mutation,
+  ResourceHandle, and gameplay module blockers remain open.
 - Public v1 completion evidence rejects strict blocker evidence paths or schema/status
   fields that are candidate/planning/orientation/preflight/readiness/consume-only/
   evidence-only. Do not let static orientation, planning docs, or candidate reports
@@ -594,9 +590,10 @@ priorities, and do not use history files as the active source of truth.
 - Use `obelisk-github-research-workflow` as the canonical coordination rule set. Repo-local
   JSON queue coordination stays out of active prompts, handoff, and checkpoint planning.
 - Sub-agent prompts still need scoped objective, safety baseline, allowed paths,
-  required skills, expert role, and expected decision; pass only the skills needed for
-  that scope, omit leader-only strategy/cadence and active goal framing, and close
-  completed sub-agents before the next round.
+  required skills, expert role, expected decision, and edit permission. Pass only the skills
+  needed for that scope, and omit leader-only cadence, active-goal framing,
+  community policy, and unrelated module history unless it changes the concrete task.
+  Treat sub-agents as scope experts, not generic workers.
 
 ## Canonical References
 

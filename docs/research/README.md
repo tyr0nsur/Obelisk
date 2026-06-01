@@ -180,10 +180,10 @@ internal/test-only copied-bool planning. Neither lane is a public Inventory SDK,
 Mission SDK, new capability family, identity/lookup contract, mutation path, return
 override, or server-observation approval.
 
-Next v1 research round remains broad, but the active order is complete-SDK-first:
-player identity/principal evidence, permissions/admin query-only groundwork, then command
-response/commands. Hub foundation notes are archived Plugin Hub planning, not the active
-priority before SDK completion. `GameplayPolicyEvent` backing evidence and mission
+Current v1 research indexing keeps the full modding surface visible, but the active order
+is SDK-complete first: player identity/principal evidence, permissions/admin query-only
+groundwork, then command response/commands. Plugin Hub notes are archived boundaries, not
+active priority before SDK completion. `GameplayPolicyEvent` backing evidence and mission
 copied-bool internal planning remain side lanes only.
 Use [2026-05-31-v02-module-priority.md](2026-05-31-v02-module-priority.md) for the
 selected Mission copied-bool internal lane,
@@ -206,20 +206,19 @@ mutation, return override, runtime observation, or raw UE parameter access.
 
 Plugin Hub contributor intake uses the same three buckets as the public matrix, but it is
 parked until SDK completion. Its archived buckets remain: future release-supported seed
-after SDK completion for lifecycle/config/logging, descriptor/catalog, timer, packaging,
-and fail-closed capability work; experimental pattern only for passive copied chat or
-copied policy examples; blocked backlog for commands, identity, persistence, operator
-ingress, mutation, enforcement, `ResourceHandle`, raw UE access, or cross-instance state.
-ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change
-the support tier without a named promotion gate.
+after SDK completion for lifecycle/config/logging, descriptor/catalog, timer, packaging;
+experimental pattern only for passive copied chat or copied policy examples; blocked
+backlog for commands, identity, persistence, operator ingress, mutation, enforcement,
+`ResourceHandle`, raw UE access, or cross-instance state. ArkApi/AseApi/NextGenPlugins
+demand can keep a blocked idea visible, but it cannot change the support tier without a
+named promotion gate.
 
 Current v1 research lane snapshot from the current notes:
 
 | Lane | Current state | Use next |
 | --- | --- | --- |
-| hub foundation first | Archived Plugin Hub planning phrase only, not active engineering priority while complete-SDK blockers remain open. | Keep it parked until identity/principal, permissions/admin, command response, and commands/replies have a stronger SDK path. |
-| Complete-SDK route: identity -> permissions/admin -> command response | Fact: current blocker chain requires player identity before permissions and commands. | Keep active rounds on SDK blockers; Plugin Hub seed work stays parked. |
-| Passive copied chat notification/parsing | Fact: minimal copied `ChatMessageEvent` exists; hypothesis: passive parser/auditor is a narrow release-facing seed if only release-scope examples are counted. | Treat chat as one small copied notification lane, not the v1 module center. Keep sender identity, permissions, replies/send-chat, moderation, and command SDK blocked until copied identity and authority are promoted. |
+| Complete-SDK route: identity -> permissions/admin -> command response | Fact: current blocker chain requires player identity before permissions and commands. | Keep active rounds on SDK blockers; Plugin Hub work stays parked. |
+| Passive copied chat notification/parsing | Fact: minimal copied `ChatMessageEvent` exists; plugin-local parsing is only an experimental copied-pattern lane. | Treat chat as one small copied notification lane, not the v1 module center. Keep sender identity, permissions, replies/send-chat, moderation, and command SDK blocked until copied identity and authority are promoted. |
 | Inventory lane | Fact: current inventory evidence is promoted publicly only through copied/redacted `GameplayPolicyEvent` fields. | Preserve copied scalar observation and fixture gates without publishing a public Inventory SDK, item identity, lookup, mutation, return override, or `ResourceHandle`. |
 | Structures lane | Fact: structure access/demolish/variant/activation/PIN/seat policy slices back current copied gameplay policy. Build placement remains second-wave. | Keep structure target sets layout-only unless a strict readiness note promotes a named copied surface; do not publish StructureEvents, build-policy SDKs, return override, identity, lookup, or raw params. |
 | Items lane | Fact: item return-only evidence supports three copied `GameplayPolicyEvent` kinds; item detail remains internal/evidence-only. | Preserve item return-only evidence without publishing Items SDKs, Inventory SDKs, item identity, mutation, return override, or `ResourceHandle`. |
@@ -329,8 +328,8 @@ when a task explicitly targets that module.
 | [2026-05-30-transfer-scriptstruct-booltail-refresh.md](2026-05-30-transfer-scriptstruct-booltail-refresh.md) | Transfer ScriptStruct bool-tail refresh | Regenerates current `transfer-scriptstruct` second-source snapshots with bool-tail metadata preserved and accepts 2/2 targets as layout-only evidence. |
 | [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md) | Transfer copied-scalar feasibility | Ranks post-RC transfer copied-scalar candidates, with `ServerTransferredPlayerConfirmationResult.bAccept` as the only clean first internal candidate and no RC/public Transfer SDK claim. |
 | [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md) | Redacted ScriptStruct signatures | Adds candidate-only redacted ScriptStruct signature summaries from sanitized snapshots without replacing second-source readiness, payload decoding, runtime promotion, or SDK gates. |
-| [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md) | Structure build-policy triage | Records `APrimalStructure.IsAllowedToBuild` as a high-demand NextGenPlugins dictionary seed, but keeps it second-wave until sanitized snapshots, second-source evidence, redaction policy, and mutation/return-override blockers are resolved. |
-| [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md) | Player identity lifecycle plan | Defines the first docs-only `players_identity_lifecycle` seed set from existing target names, with copied/redacted fields only and no ResourceHandle, lookup, SDK, runtime, mutation, or return override. |
+| [2026-05-30-structure-build-policy-triage.md](2026-05-30-structure-build-policy-triage.md) | Structure build-policy triage | Records `APrimalStructure.IsAllowedToBuild` as a high-demand NextGenPlugins dictionary signal, but keeps it second-wave until sanitized snapshots, second-source evidence, redaction policy, and mutation/return-override blockers are resolved. |
+| [2026-05-30-player-identity-lifecycle-plan.md](2026-05-30-player-identity-lifecycle-plan.md) | Player identity lifecycle plan | Defines the first docs-only `players_identity_lifecycle` target set from existing target names, with copied/redacted fields only and no ResourceHandle, lookup, SDK, runtime, mutation, or return override. |
 | [2026-05-31-player-identity-first-evidence.md](2026-05-31-player-identity-first-evidence.md) | Player identity first evidence | Defines the smallest candidate-only identity evidence package needed before public permissions, commands, or economy SDK design can start. |
 | [2026-05-31-player-identity-targetset-gap.md](2026-05-31-player-identity-targetset-gap.md) | Player identity target-set gap | Historical gap note: the missing `ServerListPlayers`/`ServerKickPlayer` snapshot gap is now closed; lifecycle/runtime evidence remains the active blocker. |
 | [2026-05-31-player-identity-privacy-invalidation-contract.md](2026-05-31-player-identity-privacy-invalidation-contract.md) | Player identity privacy invalidation contract | Defines the candidate-only future principal contract: opaque copied principal plus generation, lifecycle invalidation, process-local multi-instance limits, and explicit non-claims for SDK/runtime/lookup. |

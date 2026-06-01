@@ -6,8 +6,16 @@
   "public_header": "include/obelisk/ObeliskApi.h",
   "public_header_symbols_now": [],
   "legacy_call_process_event_public_response_allowed": false,
+  "minimal_chat_message_event_public_response_allowed": false,
+  "raw_process_event_public_response_allowed": false,
+  "static_thunk_orientation_public_response_allowed": false,
+  "commands_replies_shortcut_public_response_allowed": false,
   "forbidden_public_contract": [
     "public CallProcessEvent response path",
+    "public minimal ChatMessageEvent response path",
+    "public raw ProcessEvent response path",
+    "public static thunk orientation response path",
+    "public commands/replies response shortcut before promoted identity and permissions/admin",
     "raw UE pointers",
     "raw ProcessEvent params",
     "raw FString storage",
@@ -35,14 +43,21 @@
         "runtime observation establishes principal identity before command/chat response can consume it",
         "command text cannot establish principal identity",
         "operator config enables surfaces only and cannot establish principal identity",
-        "response delivery never creates identity or permission claims"
+        "response delivery never creates identity or permission claims",
+        "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
+        "commands/replies planning cannot bypass identity promotion"
       ]
     },
     {
       "id": "dependency.promoted_permissions_admin",
       "category": "dependency",
       "status": "unresolved",
-      "decision_required": "Promote query-only fail-closed permissions/admin before command/chat responses can target principals."
+      "decision_required": "Promote query-only fail-closed permissions/admin before command/chat responses can target principals.",
+      "required_behavior": [
+        "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
+        "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
+        "commands/replies planning cannot bypass permissions/admin promotion"
+      ]
     },
     {
       "id": "abi.copied_response_payload",
@@ -82,6 +97,9 @@
         "missing capability fails closed",
         "missing or zero plugin_owner_token fails closed",
         "captured post-init debug CallProcessEvent tables do not authorize response delivery",
+        "minimal ChatMessageEvent registration does not authorize response delivery",
+        "raw ProcessEvent callbacks do not authorize response delivery",
+        "static thunk orientation does not authorize response delivery",
         "all response handles are owner-scoped"
       ]
     },
@@ -141,11 +159,18 @@
         "promoted player identity is required before command/chat response principals",
         "promoted query-only permissions/admin is required before directed responses",
         "copied command/chat response semantics may be defined only after identity and permissions/admin promotion",
+        "minimal ChatMessageEvent remains passive input and cannot route replies/send-chat/broadcast/moderation",
+        "raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot bypass identity and permissions/admin",
         "commands/replies remains blocked until command_chat_response_path is promoted or explicitly excluded"
       ],
       "required_exclusions": [
         "command router",
         "command registration API",
+        "commands/replies shortcut before identity and permissions/admin",
+        "public response path through ChatMessageEvent",
+        "public response path through raw ProcessEvent",
+        "public response path through static thunk orientation",
+        "reply/send-chat/broadcast/moderation through legacy CallProcessEvent",
         "console command API",
         "RCON command API",
         "moderation API",
@@ -170,7 +195,9 @@
       "not_sufficient": [
         "static thunk orientation",
         "candidate vtable slots",
+        "minimal ChatMessageEvent callback registration",
         "passive ChatMessageEvent parsing",
+        "commands/replies planning status",
         "legacy CallProcessEvent debug gate",
         "raw ProcessEvent callbacks"
       ]
@@ -195,6 +222,9 @@
         "candidate vtable slots",
         "historical chat FName indices",
         "metadata-only passive chat observations",
+        "minimal ChatMessageEvent callback registration",
+        "raw ProcessEvent callbacks",
+        "legacy CallProcessEvent debug gate",
         "ServerSendChatMessage chat-message-intake evidence"
       ]
     }

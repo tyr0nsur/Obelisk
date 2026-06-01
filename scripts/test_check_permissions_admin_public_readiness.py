@@ -362,6 +362,83 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("fail_closed_never_allow_cases_missing", report["blockers"])
         self.assertIn("fail_closed_deny_or_unknown_cases_missing", report["blockers"])
 
+    def test_rejects_missing_generation_scope_dependency_requirements(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            requirements = {
+                item["id"]: item
+                for item in decisions["required_before_public_header"]
+            }
+            requirements["identity.principal_generation_required"]["required_behavior"].remove(
+                "missing generation fails closed"
+            )
+            requirements["identity.principal_scope_compatibility"]["required_behavior"].remove(
+                "missing principal_scope_flags fails closed"
+            )
+            requirements["abi.permission_query_identity_fields"]["required_fields_or_equivalent"].remove(
+                "principal_scope_flags"
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_generation_fail_closed_requirements_missing", report["blockers"])
+        self.assertIn("principal_scope_fail_closed_requirements_missing", report["blockers"])
+        self.assertIn("permission_query_identity_fields_unexpected", report["blockers"])
+
+    def test_rejects_operator_config_allow_capable_or_runtime_owned_provenance_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["allow_capable_authority_ownership"] = "operator-config"
+            policy = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "policy.authority_provenance_required"
+            )
+            policy["allow_capable_authority_kinds"].append("operator-config")
+            policy["allow_capable_authority_ownership"] = "operator-config"
+            policy["operator_config_allow_capable"] = True
+            policy["runtime_local_authority_must_be_runtime_owned"] = False
+            policy["required_behavior"].remove(
+                "operator-config authority can provide runtime-owned policy inputs only and cannot produce allow"
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("allow_capable_authority_ownership_not_runtime_local_owned_only", report["blockers"])
+        self.assertIn("policy_allow_capable_authority_kinds_unexpected", report["blockers"])
+        self.assertIn("policy_allow_capable_authority_ownership_not_runtime_owned", report["blockers"])
+        self.assertIn("policy_operator_config_allow_capable_not_false", report["blockers"])
+        self.assertIn("policy_runtime_local_authority_not_required_runtime_owned", report["blockers"])
+        self.assertIn("policy_authority_fail_closed_requirements_missing", report["blockers"])
+
+    def test_rejects_runtime_principal_evidence_as_identity_promotion_dependency_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            dependency = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "dependency.promoted_player_identity"
+            )
+            dependency["required_behavior"].remove(
+                "runtime principal evidence alone is not public identity promotion"
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("dependency_player_identity_public_contract_requirements_missing", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

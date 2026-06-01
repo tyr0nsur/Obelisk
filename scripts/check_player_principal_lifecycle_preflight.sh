@@ -283,6 +283,69 @@ forbid_env_key() {
     fi
 }
 
+env_key_is_allowed_window_posture() {
+    local key="$1"
+
+    case "${key}" in
+        OBELISK_INSTANCE_ID|\
+        OBELISK_ENABLE_PROCESS_EVENT_HOOK|\
+        OBELISK_DISABLE_PLUGINS|\
+        OBELISK_WRAPPER_PROFILE|\
+        OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER|\
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256|\
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT|\
+        OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT|\
+        OBELISK_PE_TRACE_LIMIT)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+env_key_is_gate_or_observer_control() {
+    local key="$1"
+
+    case "${key}" in
+        OBELISK_ENABLE_*|\
+        OBELISK_ALLOW_*|\
+        OBELISK_DEBUG_*|\
+        OBELISK_PE_TRACE_LIMIT|\
+        OBELISK_*_BINARY_SHA256|\
+        OBELISK_*_LOG_LIMIT|\
+        OBELISK_*_DISPATCH_LIMIT|\
+        OBELISK_*_LIMIT|\
+        OBELISK_*OBSERVER*|\
+        OBELISK_*REFLECTION*|\
+        OBELISK_*PROCESS_EVENT*|\
+        OBELISK_*TRACE*|\
+        OBELISK_*SCANNER*|\
+        OBELISK_*PTRACE*|\
+        OBELISK_*NATIVE_EXEC*|\
+        OBELISK_*PLAYER_PRINCIPAL*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+require_no_extra_gate_env_keys() {
+    local key
+
+    for key in "${ENV_KEYS[@]}"; do
+        if env_key_is_allowed_window_posture "${key}"; then
+            continue
+        fi
+        if env_key_is_gate_or_observer_control "${key}"; then
+            echo "Unexpected env key for exact player-principal preflight: ${key}" >&2
+            exit 1
+        fi
+    done
+}
+
 require_observer_window_env() {
     [[ -n "${ENV_FILE}" ]] || {
         echo "--mode observer-window requires --env-file with the exact effective window env posture." >&2
@@ -334,6 +397,8 @@ require_observer_window_env() {
     do
         forbid_env_key "${key}"
     done
+
+    require_no_extra_gate_env_keys
 }
 
 find_shooter_pid_for_map() {

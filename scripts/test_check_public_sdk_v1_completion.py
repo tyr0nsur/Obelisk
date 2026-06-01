@@ -848,6 +848,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertFalse(payload["stable_claim_allowed"])
         self.assertTrue(payload["stable_release_contract_claim_allowed"])
+        self.assertEqual(payload["installed_sdk_package_shape_guardrail_drift"], [])
         self.assertIn("complete_sdk_claim_requires_promoted_demand_families", payload["blockers"])
         self.assertEqual(
             payload["minimum_promoted_demand_family_gaps"],
@@ -961,6 +962,43 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["stable_release_contract_missing_not_sufficient"],
             ["Foundation/Plugin Hub seed package shape"],
         )
+
+    def test_installed_sdk_package_shape_must_remain_non_claim_evidence(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        manifest["installed_sdk_package_shape"]["status"] = "plugin-hub-seed-ready"
+        manifest["installed_sdk_package_shape"]["not_sufficient_for"] = [
+            item
+            for item in manifest["installed_sdk_package_shape"]["not_sufficient_for"]
+            if item != "Plugin Hub seed/package publication"
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("installed_sdk_package_shape_guardrail_incomplete", payload["blockers"])
+        self.assertIn("status", payload["installed_sdk_package_shape_guardrail_drift"])
+        self.assertIn(
+            "not_sufficient_for:Plugin Hub seed/package publication",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+
+    def test_installed_sdk_package_shape_canonical_files_are_required(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        manifest["installed_sdk_package_shape"]["installed_files"].append(
+            "lib/cmake/Obelisk/PluginHubTargets.cmake"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("installed_sdk_package_shape_guardrail_incomplete", payload["blockers"])
+        self.assertIn("installed_files", payload["installed_sdk_package_shape_guardrail_drift"])
 
     def test_release_statement_must_name_non_promoted_blockers(self) -> None:
         manifest = {

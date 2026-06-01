@@ -10,8 +10,8 @@ engineering work, or failed attempts that teach something useful.
 
 ## Learning Loop
 
-Every serious lead-owned investigation, or docs/research task explicitly assigned to a
-worker, should end with one of these outcomes:
+Every serious investigation or explicitly assigned docs/research task should end with one
+of these outcomes:
 
 - Code change with tests or live validation.
 - Research note under `docs/research/`.
@@ -31,16 +31,17 @@ smallest durable place that will help the next worker:
 - research note when it records evidence, rejected hypotheses, or a design investigation;
 - active handoff only when it changes the next turn's routing or immediate priorities.
 
-Commits are local checkpoints only unless the current turn explicitly authorizes GitHub
-publication. Do not push, tag, or publish release refs from a learning/documentation round
-without current lead/release-manager direction and the matching validation evidence.
+Learning/documentation rounds leave changes local and unpublished unless the current turn
+explicitly authorizes publication. Do not push, tag, or publish release refs without
+current lead/release-manager direction and matching validation evidence.
 
 Keep the promoted form concise. Avoid copying full agent transcripts, leader cadence, or
 coordination chatter into skills or contributor docs.
 
 Sub-agents may recommend skill changes in their final report or in an assigned research
-note, but the team lead owns skill edits, commits, pushes, and handoff updates. Do not let
-worker agents silently change project process rules while implementing subsystem code.
+note. An explicitly assigned docs/skills worker may edit the named skill files; otherwise
+the lead owns process-rule edits and publication. Leave changes unstaged/uncommitted
+unless the current turn says otherwise.
 
 ## What To Capture
 
@@ -99,7 +100,8 @@ research result changes future behavior:
   contexts.
 - `obelisk-reversing-research`: active research strategy and unsafe experiments.
 - `obelisk-live-ops`: production server operation and rollback.
-- `obelisk-github-research-workflow`: commit, push, agent handoff, documentation flow.
+- `obelisk-github-research-workflow`: lead-only integration, scoped delegation,
+  publication boundaries, and handoff policy.
 
 Keep skills operational and short. Move detailed experiment logs to `docs/research/`.
 
@@ -130,7 +132,7 @@ starting a new round.
 - [ ] Did this work produce a reusable fact?
 - [ ] Did any previous instruction become unsafe, stale, or false?
 - [ ] Is there a rejected hypothesis worth saving?
-- [ ] Did a sub-agent suggest a skill update that the lead must accept, reject, or defer?
+- [ ] Did a sub-agent suggest a skill update that must be accepted, rejected, or deferred?
 - [ ] Did a live-server rule change?
 - [ ] Did a release, publication, safety, or promotion policy skill change also update a
       guardrail test, or record why no machine check applies?

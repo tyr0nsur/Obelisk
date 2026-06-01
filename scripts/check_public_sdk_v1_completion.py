@@ -82,6 +82,22 @@ CANONICAL_STABLE_RELEASE_NOT_SUFFICIENT = (
     "Foundation/Plugin Hub seed package shape",
     "GameplayPolicyEvent, ChatMessageEvent, and inventory item copied-signal seeds",
 )
+CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE = {
+    "component": "SDK",
+    "status": "package-shape-evidence-only",
+    "installed_files": (
+        "include/obelisk/ObeliskApi.h",
+        "lib/cmake/Obelisk/ObeliskConfig.cmake",
+        "lib/cmake/Obelisk/ObeliskConfigVersion.cmake",
+        "lib/cmake/Obelisk/ObeliskTargets.cmake",
+    ),
+    "not_sufficient_for": (
+        "v1_completion_required",
+        "stable_release_contract.claim_allowed",
+        "Plugin Hub seed/package publication",
+        "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces",
+    ),
+}
 SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
     "complete_sdk_claim_requires_promoted_demand_families",
     "stable_release_contract_claim_not_allowed",
@@ -1254,6 +1270,29 @@ def complete_sdk_minimum_promoted_demand_family_gaps(
     return gaps, satisfied_by
 
 
+def installed_sdk_package_shape_guardrail_drift(manifest: dict[str, Any]) -> list[str]:
+    installed_shape = manifest.get("installed_sdk_package_shape")
+    if not isinstance(installed_shape, dict):
+        return ["installed_sdk_package_shape_missing"]
+
+    drift: list[str] = []
+    if installed_shape.get("component") != CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE["component"]:
+        drift.append("component")
+    if installed_shape.get("status") != CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE["status"]:
+        drift.append("status")
+
+    installed_files = as_string_list(installed_shape.get("installed_files"))
+    expected_installed_files = list(CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE["installed_files"])
+    if installed_files != expected_installed_files:
+        drift.append("installed_files")
+
+    not_sufficient_for = set(as_string_list(installed_shape.get("not_sufficient_for")))
+    for item in CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE["not_sufficient_for"]:
+        if item not in not_sufficient_for:
+            drift.append(f"not_sufficient_for:{item}")
+    return drift
+
+
 def promotion_evidence_key_is_negative_context(parent_key: str | None) -> bool:
     if parent_key is None:
         return False
@@ -1758,6 +1797,10 @@ def build_report(
     if manifest.get("v1_completion_required") is not True:
         blockers.append("v1_completion_required_false")
 
+    installed_sdk_package_shape_drift = installed_sdk_package_shape_guardrail_drift(manifest)
+    if installed_sdk_package_shape_drift:
+        blockers.append("installed_sdk_package_shape_guardrail_incomplete")
+
     minimum_promoted_demand_family_gaps, minimum_promoted_demand_family_equivalents = (
         complete_sdk_minimum_promoted_demand_family_gaps(
             surfaces_by_id,
@@ -2096,6 +2139,7 @@ def build_report(
         "stable_release_contract_claim_allowed": manifest_stable_claim_allowed,
         "stable_release_contract_missing_claim_requires": missing_stable_claim_requires,
         "stable_release_contract_missing_not_sufficient": missing_stable_not_sufficient,
+        "installed_sdk_package_shape_guardrail_drift": installed_sdk_package_shape_drift,
         "minimum_promoted_demand_families": sorted(CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES),
         "minimum_promoted_demand_family_gaps": minimum_promoted_demand_family_gaps,
         "minimum_promoted_demand_family_equivalents": minimum_promoted_demand_family_equivalents,
@@ -2243,6 +2287,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "stable_release_contract_not_sufficient_incomplete": [
             "stable_release_contract.not_sufficient is missing non-claim boundaries.",
             f"Missing: {format_human_list(report.get('stable_release_contract_missing_not_sufficient'))}.",
+        ],
+        "installed_sdk_package_shape_guardrail_incomplete": [
+            "installed_sdk_package_shape must remain package-shape evidence only.",
+            f"Drift: {format_human_list(report.get('installed_sdk_package_shape_guardrail_drift'))}.",
+            "Action: do not use installed SDK/package-shape evidence for Plugin Hub publication, v1 completion, or stable SDK wording.",
         ],
         "promoted_experimental_surfaces_unresolved": [
             "Experimental copied-data seeds still need an explicit v1 outcome.",
