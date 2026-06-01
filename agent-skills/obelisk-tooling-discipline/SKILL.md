@@ -48,6 +48,12 @@ Development-server gated:
   small log limit, plugins disabled, and a post-change stable posture check for the exact
   approved target. Do not rely on posture-check defaults in agent rounds; pass explicit
   `--map <map> --instance <instance-id>` for the operator-approved target.
+- Player-principal lifecycle evidence is a consume-only copied-log route, not a public
+  identity route. It requires an exact single observer window with dispatch limit `0`,
+  plugins disabled, no scanner/debug/callback escape markers, and an analyzed summary
+  containing only the `player_principal_lifecycle` module. It must not be mixed with
+  broad tracing, ReflectionScanner, ptrace/gcore, raw parameter exploration, plugin
+  callbacks, or any public identity/lookup/promotion claim.
 
 Forbidden on live/shared instances:
 

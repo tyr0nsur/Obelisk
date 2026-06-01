@@ -254,6 +254,14 @@ assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_CHAT_ROUTE_OB
 assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_INVENTORY_REFLECTION='
 assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_STRUCTURE_REFLECTION='
 assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_ITEM_RETURN_EVENTS='
+assert_not_contains "${capture_player_principal}" '^OBELISK_DEBUG_ALLOW_PTRACE='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_DEBUG_CONTROL='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_REFLECTION_SCANNER='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ENABLE_NATIVE_EXEC_PROBES='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ALLOW_GLOBAL_PROCESS_EVENT_CALLBACKS='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ALLOW_FILTERED_PROCESS_EVENT_CALLBACKS='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ALLOW_CALL_PROCESS_EVENT='
+assert_not_contains "${capture_player_principal}" '^OBELISK_ALLOW_PROCESS_EVENT_BLOCKING='
 
 for residual_observer_marker in \
     enable-chat-events \
@@ -261,7 +269,15 @@ for residual_observer_marker in \
     enable-chat-route-observer \
     enable-inventory-reflection \
     enable-structure-reflection \
-    enable-item-return-events
+    enable-item-return-events \
+    allow-ptrace \
+    enable-debug-control \
+    enable-reflection-scanner \
+    enable-native-exec-probes \
+    allow-global-process-event-callbacks \
+    allow-filtered-process-event-callbacks \
+    allow-call-process-event \
+    allow-process-event-blocking
 do
     root_player_principal_residual="${TMP_DIR}/root-player-principal-residual-${residual_observer_marker}"
     prepare_root "${root_player_principal_residual}"

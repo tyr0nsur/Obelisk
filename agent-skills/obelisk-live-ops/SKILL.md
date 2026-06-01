@@ -113,6 +113,13 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   - `enable-inventory-reflection`
   - `enable-item-return-events`
   - `enable-player-principal-lifecycle-observer`
+- The player-principal lifecycle evidence window is stricter than a normal observer
+  window: plugins disabled, `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0`,
+  log limit `1..10`, exact observer exclusivity, and no debug/scanner/callback escape
+  markers. The wrapper must reject residual observer markers or symlink marker entries
+  on the same instance, and approved evidence must be copied/analyzed as a single-module
+  `player_principal_lifecycle` summary only. This remains consume-only and does not
+  promote public player identity, lookup, permissions, commands, or SDK completion.
 - Runtime debug/scanner gates also require both env and instance markers:
   - `allow-ptrace`
   - `enable-debug-control`

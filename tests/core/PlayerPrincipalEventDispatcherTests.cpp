@@ -351,6 +351,120 @@ namespace
         Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 0, "self-unregistered callback ran twice");
     }
 
+    struct OwnerScopedSelfUnregisterCapture
+    {
+        PlayerPrincipalEventDispatcher* Dispatcher = nullptr;
+        void* Owner = nullptr;
+        uint64_t RegistrationId = 0;
+        int Calls = 0;
+        int Destroyed = 0;
+    };
+
+    void OwnerScopedSelfUnregisterCallback(const PlayerPrincipalEventView&, void* userData)
+    {
+        auto* capture = static_cast<OwnerScopedSelfUnregisterCapture*>(userData);
+        ++capture->Calls;
+        Require(capture->Destroyed == 0,
+                "owner-scoped self-unregister destroyed user data before callback body");
+        Require(capture->Dispatcher != nullptr, "owner-scoped self-unregister callback had no dispatcher");
+        Require(capture->Dispatcher->UnregisterCallbackForOwner(capture->Owner, capture->RegistrationId),
+                "owner-scoped self-unregister from callback failed");
+        Require(capture->Destroyed == 0,
+                "owner-scoped self-unregister destroyed user data before callback returned");
+    }
+
+    void CountOwnerScopedSelfUnregisterDestroyed(void* userData)
+    {
+        auto* capture = static_cast<OwnerScopedSelfUnregisterCapture*>(userData);
+        ++capture->Destroyed;
+    }
+
+    void TestOwnerScopedCallbackCanUnregisterItselfAndDefersDestroy()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        OwnerScopedSelfUnregisterCapture capture{&dispatcher, &owner, 0, 0, 0};
+        const std::vector<PlayerPrincipalBoolValue> bools = MakeStartBools();
+
+        capture.RegistrationId = dispatcher.Register(
+            &owner,
+            {OwnerScopedSelfUnregisterCallback, &capture, CountOwnerScopedSelfUnregisterDestroyed});
+        Require(capture.RegistrationId != 0, "owner-scoped self-unregister registration id was not assigned");
+        Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 1,
+                "owner-scoped self-unregister callback did not run");
+        Require(capture.Calls == 1,
+                "owner-scoped self-unregister callback ran wrong number of times");
+        Require(capture.Destroyed == 1,
+                "owner-scoped self-unregister user data was not destroyed after callback");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner-scoped self-unregister callback remained registered");
+        Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 0,
+                "owner-scoped self-unregistered callback ran twice");
+    }
+
+    struct OwnerCleanupDuringDispatchState
+    {
+        PlayerPrincipalEventDispatcher* Dispatcher = nullptr;
+        void* Owner = nullptr;
+        int FirstCalls = 0;
+        int SecondCalls = 0;
+        int Destroyed = 0;
+        size_t Removed = 99;
+    };
+
+    void OwnerCleanupFirstCallback(const PlayerPrincipalEventView&, void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupDuringDispatchState*>(userData);
+        ++state->FirstCalls;
+        Require(state->Destroyed == 0,
+                "player principal owner cleanup destroyed user data before callback body");
+        Require(state->Dispatcher != nullptr, "owner cleanup callback had no dispatcher");
+        state->Removed = state->Dispatcher->UnregisterCallbacksForOwner(state->Owner);
+        Require(state->Removed == 2, "owner cleanup during player principal dispatch removed wrong count");
+        Require(state->Destroyed == 0,
+                "player principal owner cleanup destroyed user data before callback returned");
+    }
+
+    void OwnerCleanupSecondCallback(const PlayerPrincipalEventView&, void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupDuringDispatchState*>(userData);
+        ++state->SecondCalls;
+    }
+
+    void CountOwnerCleanupDestroyed(void* userData)
+    {
+        auto* state = static_cast<OwnerCleanupDuringDispatchState*>(userData);
+        ++state->Destroyed;
+    }
+
+    void TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        OwnerCleanupDuringDispatchState state{&dispatcher, &owner, 0, 0, 0, 99};
+        const std::vector<PlayerPrincipalBoolValue> bools = MakeStartBools();
+
+        const uint64_t firstId =
+            dispatcher.Register(&owner, {OwnerCleanupFirstCallback, &state, CountOwnerCleanupDestroyed});
+        const uint64_t secondId =
+            dispatcher.Register(&owner, {OwnerCleanupSecondCallback, &state, CountOwnerCleanupDestroyed});
+        Require(firstId != 0 && secondId != 0,
+                "owner cleanup during player principal dispatch registrations failed");
+
+        Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 1,
+                "owner cleanup during player principal dispatch ran removed callback");
+        Require(state.FirstCalls == 1, "owner cleanup first player principal callback did not run");
+        Require(state.SecondCalls == 0, "cleaned player principal callback ran from stale snapshot");
+        Require(state.Destroyed == 2,
+                "player principal owner cleanup did not destroy user data after dispatch");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup during player principal dispatch left callbacks registered");
+        Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 0,
+                "owner-cleaned player principal callback ran in a later dispatch");
+        Require(state.FirstCalls == 1 && state.SecondCalls == 0,
+                "owner-cleaned player principal callbacks changed after later dispatch");
+    }
+
     struct UnregisterOtherCapture
     {
         PlayerPrincipalEventDispatcher* Dispatcher = nullptr;
@@ -530,6 +644,121 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "owner callback survived cleanup after dispatch");
     }
 
+    struct DeferredDestroyState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        bool CallbackEntered = false;
+        bool DestroyEntered = false;
+        bool ReleaseCallback = false;
+        bool ReleaseDestroy = false;
+    };
+
+    void BlockingDestroyCallback(const PlayerPrincipalEventView&, void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->CallbackEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseCallback; });
+    }
+
+    void BlockingDestroy(void* userData)
+    {
+        auto* state = static_cast<DeferredDestroyState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        state->DestroyEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [&state]() { return state->ReleaseDestroy; });
+    }
+
+    void TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        DeferredDestroyState state;
+        std::atomic<bool> cleanupFinished{false};
+        std::atomic<bool> secondCleanupFinished{false};
+        size_t secondRemoved = 99;
+        const std::vector<PlayerPrincipalBoolValue> bools = MakeStartBools();
+
+        const uint64_t id = dispatcher.Register(&owner, {BlockingDestroyCallback, &state, BlockingDestroy});
+        Require(id != 0, "deferred destroy player principal callback registration failed");
+
+        std::thread dispatchThread([&]() {
+            Require(dispatcher.Dispatch(MakeStartEvent(bools)) == 1,
+                    "deferred destroy player principal callback did not dispatch");
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock,
+                                      std::chrono::seconds(2),
+                                      [&state]() { return state.CallbackEntered; }),
+                    "deferred destroy player principal callback did not enter");
+        }
+
+        std::thread cleanupThread([&]() {
+            Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 1,
+                    "owner cleanup removed wrong deferred destroy player principal callback count");
+            cleanupFinished.store(true, std::memory_order_release);
+        });
+
+        const auto cleanupDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (dispatcher.SubscriptionCount() != 0 && std::chrono::steady_clock::now() < cleanupDeadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup did not remove deferred destroy player principal callback during dispatch");
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed before deferred destroy player principal dispatch was released");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseCallback = true;
+        }
+        state.Cv.notify_all();
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock,
+                                      std::chrono::seconds(2),
+                                      [&state]() { return state.DestroyEntered; }),
+                    "deferred destroy player principal cleanup did not run");
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup completed while deferred destroy player principal cleanup was still running");
+
+        std::thread secondCleanupThread([&]() {
+            secondRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+            secondCleanupFinished.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup completed while deferred destroy player principal cleanup was still running");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.ReleaseDestroy = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        cleanupThread.join();
+        secondCleanupThread.join();
+
+        Require(cleanupFinished.load(std::memory_order_acquire),
+                "owner cleanup did not complete after deferred destroy player principal cleanup");
+        Require(secondCleanupFinished.load(std::memory_order_acquire),
+                "no-op owner cleanup did not complete after deferred destroy player principal cleanup");
+        Require(secondRemoved == 0,
+                "no-op owner cleanup removed callbacks after deferred destroy player principal cleanup");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "deferred destroy player principal callback survived cleanup");
+    }
+
     void TestCrossFamilyCallbackSuppressesDeferredCleanupWait()
     {
         PlayerPrincipalEventDispatcher dispatcher;
@@ -659,9 +888,12 @@ int main()
         TestUnregisterForOwnerRequiresMatchingOwner();
         TestRegistrationIdsSkipZeroAndLiveIdsAfterWrap();
         TestCallbackCanUnregisterItselfAndDefersDestroy();
+        TestOwnerScopedCallbackCanUnregisterItselfAndDefersDestroy();
+        TestOwnerCleanupDuringDispatchDefersDestroyAndSkipsRemovedCallbacks();
         TestReentrantUnregisterSkipsRemovedSnapshotCallback();
         TestReusedRegistrationIdDoesNotReactivateStaleSnapshot();
         TestOwnerCleanupWaitsForInFlightDispatch();
+        TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
         TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
         TestOwnerCleanupRemovesOnlyMatchingOwner();
         TestCallbackExceptionsAreContained();

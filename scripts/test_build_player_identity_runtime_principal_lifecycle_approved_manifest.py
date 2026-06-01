@@ -191,6 +191,24 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertIn("must point to copied/offline evidence", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_rejects_summary_with_mixed_observer_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["modules"]["chat"] = {
+                "accepted_count": 0,
+                "functions": {},
+            }
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            output = temp_dir / "manifest.json"
+
+            result = self.run_builder(summary_path, output)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("modules must contain only player_principal_lifecycle", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_rejects_review_text_that_would_trip_privacy_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)

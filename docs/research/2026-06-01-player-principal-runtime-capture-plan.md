@@ -72,11 +72,22 @@ Before any future activation:
   plugins disabled, scanner/native-exec/ptrace/gcore/broad tracing off.
 - `disable-plugins` must remain present for this first observer window.
 - No experimental observer family other than player-principal lifecycle may be enabled.
+  Wrapper launch must fail closed if any residual observer marker entry exists for the
+  instance, including symlinks.
+- No debug/scanner/callback escape markers may be present for the instance during this
+  evidence window: `allow-ptrace`, `enable-debug-control`,
+  `enable-reflection-scanner`, `enable-native-exec-probes`,
+  `allow-global-process-event-callbacks`,
+  `allow-filtered-process-event-callbacks`, `allow-call-process-event`, and
+  `allow-process-event-blocking` are all incompatible with approved principal lifecycle
+  evidence.
 - The approved window must identify whether regular users are connected. If regular users
   are active, no-go unless the operator explicitly chooses a user-facing beta window,
   defines privacy bounds, and approves the notice path for that same turn.
 - The log copy destination must be outside live logs, normally:
   `/servidor/ark/workspace-offline/live-validation-logs/<run-id>/`.
+- The copied/analyzed runtime summary must contain exactly one observer module:
+  `player_principal_lifecycle`.
 
 ## Markers And Environment
 

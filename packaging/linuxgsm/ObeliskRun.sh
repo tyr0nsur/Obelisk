@@ -230,10 +230,18 @@ validate_player_principal_lifecycle_window_exclusive() {
         enable-chat-route-observer \
         enable-inventory-reflection \
         enable-structure-reflection \
-        enable-item-return-events
+        enable-item-return-events \
+        allow-ptrace \
+        enable-debug-control \
+        enable-reflection-scanner \
+        enable-native-exec-probes \
+        allow-global-process-event-callbacks \
+        allow-filtered-process-event-callbacks \
+        allow-call-process-event \
+        allow-process-event-blocking
     do
         if marker_entry_exists "${marker}"; then
-            echo "Player principal lifecycle observer window must be exact; experimental observer marker ${marker} is also present for ${OBELISK_INSTANCE_ID}." >&2
+            echo "Player principal lifecycle observer window must be exact; incompatible marker ${marker} is also present for ${OBELISK_INSTANCE_ID}." >&2
             exit 1
         fi
     done

@@ -204,6 +204,18 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("source_summary_source_path_not_copied_or_offline", report["blockers"])
 
+    def test_rejects_mixed_observer_modules(self) -> None:
+        payload = manifest()
+        payload["source_summary"]["modules"]["chat"] = {
+            "accepted_count": 0,
+            "functions": {},
+        }
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_unexpected_modules_present", report["blockers"])
+
     def test_rejects_missing_rejected_start_or_fail_closed_consumer_case(self) -> None:
         payload = copy.deepcopy(manifest())
         details = payload["source_summary"]["modules"]["player_principal_lifecycle"]["functions"][

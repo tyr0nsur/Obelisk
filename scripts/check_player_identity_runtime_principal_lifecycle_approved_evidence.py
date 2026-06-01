@@ -224,6 +224,15 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
     if not isinstance(modules, dict) or MODULE not in modules:
         add(blockers, "player_principal_lifecycle_module_missing", "$.source_summary.modules")
         return []
+    module_names = set(modules)
+    if module_names != {MODULE}:
+        add(
+            blockers,
+            "source_summary_unexpected_modules_present",
+            "$.source_summary.modules",
+            expected=[MODULE],
+            observed=sorted(module_names),
+        )
     module = modules[MODULE]
     if not isinstance(module, dict):
         add(blockers, "player_principal_lifecycle_module_invalid", f"$.source_summary.modules.{MODULE}")

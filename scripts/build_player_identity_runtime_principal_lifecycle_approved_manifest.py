@@ -19,6 +19,7 @@ from typing import Any
 
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
+EXPECTED_MODULE = "player_principal_lifecycle"
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 FORBIDDEN_REVIEW_TEXT_RE = re.compile(
@@ -160,6 +161,16 @@ def validate_source_summary(summary: dict[str, Any]) -> None:
                 "--source-summary evidence.sources "
                 f"[{index}].path must point to copied/offline evidence, not a protected server path"
             )
+    modules = summary.get("modules")
+    if not isinstance(modules, dict):
+        raise SystemExit("--source-summary must include modules object")
+    module_names = set(modules)
+    if module_names != {EXPECTED_MODULE}:
+        observed = ", ".join(sorted(module_names)) or "<none>"
+        raise SystemExit(
+            "--source-summary modules must contain only "
+            f"{EXPECTED_MODULE}; observed: {observed}"
+        )
 
 
 def build_manifest(summary: dict[str, Any], *, reviewed_by: str, review_note: str) -> dict[str, Any]:
