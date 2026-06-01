@@ -7,9 +7,10 @@ Date: 2026-05-30
 `/home/flowcommunity-ark/NextGenPlugins` is an operator-provided local clone of popular
 ArkApi/Windows plugin sources for future Obelisk Plugin Hub planning.
 
-Use this material only as a names and demand dictionary. Do not copy Windows ArkApi code,
-offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API patterns,
-constants, schemas, control flow, command parsers, or implementation details into Obelisk.
+Use this material only as a names, demand, conceptual architecture, and migration
+ergonomics reference. Do not copy Windows ArkApi code, offsets, MSVC ABI assumptions,
+vtables, memory layouts, direct UE pointer API patterns, constants, schemas, control flow,
+command parsers, or implementation details into Obelisk.
 
 This note intentionally records demand categories and visible plugin-family names only.
 It is not a source-mining checklist: do not use the clone to import signatures, constants,
@@ -65,8 +66,9 @@ assumptions, or ArkApi compatibility claims.
 
 ## Value For Obelisk
 
-This repository is useful after the Obelisk core API is stable enough to model plugin
-replacement work. It can help rank public SDK surfaces by real plugin demand:
+This repository is useful after the Obelisk core API is stable enough to model native
+Linux replacement work. It can help rank public SDK surfaces by real plugin demand and
+keep migration ergonomics familiar:
 
 - permissions and admin capability model;
 - economy/shop/rewards primitives;
@@ -75,6 +77,9 @@ replacement work. It can help rank public SDK surfaces by real plugin demand:
 - tribe, structure, dino, and inventory policy use cases;
 - RCON/operator integration;
 - plugin crash/recovery and lifecycle expectations.
+- package layout and documentation expectations for plugin owners;
+- capability grouping that lets ArkApi-experienced authors recognize where an Obelisk
+  module belongs without inheriting ArkApi internals.
 
 The visible demand clusters from the local clone are:
 
@@ -111,7 +116,7 @@ chat/server messages; permissions; and save/respawn/build/damage-style demand.
 build-placement policy lane, but they do not promote `APrimalStructure.IsAllowedToBuild`
 or any return-code semantics today.
 
-Use this clone as a names/demand dictionary, not as source code to port.
+Use this clone as a names/demand/architecture reference, not as source code to port.
 Do not trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe
 public API shape, or ArkApi return constants as accepted Linux ARK behavior.
 

@@ -23,9 +23,9 @@ identity, lookup API, or ArkApi/NextGenPlugins compatibility target.
 - `docs/research/2026-05-30-player-identity-lifecycle-plan.md`
 - `docs/research/2026-05-31-structure-build-policy-focal-snapshot-planner.md`
 
-ArkServerApi/AseApi and NextGenPlugins are treated only as names and demand dictionaries.
-No offsets, layouts, wrappers, ABI choices, behavior, control flow, or source-derived
-implementation guidance are used here.
+ArkServerApi/AseApi and NextGenPlugins are treated only as names, demand, conceptual
+architecture, and migration-ergonomics references. No offsets, layouts, wrappers, ABI
+choices, behavior, control flow, or source-derived implementation guidance are used here.
 
 ## Matrix And README Alignment
 

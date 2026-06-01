@@ -23,8 +23,9 @@ commands/replies/send-chat/broadcast, economy, kits, homes, teleport, and item g
 remain blocked until Obelisk promotes the required identity/principal, permissions/admin,
 command routing, response path, persistence/storage, and safe mutation/grant surfaces.
 
-Names from ArkApi, AseApi, or popular plugin families can justify demand notes, but they
-do not change the tier and must not be copied as implementation patterns.
+Names from ArkApi, AseApi, or popular plugin families can justify demand notes and inform
+familiar category/workflow shape, but they do not change the tier and must not be copied
+as implementation patterns.
 
 ## 2. Copy The Closest Example
 

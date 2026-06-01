@@ -85,7 +85,7 @@ identity, permissions, economy/config, commands, and visible responses.
 
 This does not authorize copying ArkServerApi/AseApi or NextGenPlugins code, offsets,
 layouts, constants, parsers, ABI assumptions, or implementation behavior. They remain
-name and demand dictionaries only.
+names, demand, conceptual architecture, and migration ergonomics references only.
 
 ## Current Offline Policy Artifact
 

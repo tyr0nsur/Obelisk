@@ -12,12 +12,12 @@ It is a boundary document, not a roadmap freeze. It does not add public symbols,
 callbacks, capabilities, or gameplay modules. More specifically, it does not add public
 contract structs/events/descriptors/API tables. It does not promise ArkApi/AseApi
 compatibility, Windows/MSVC portability, source parity, behavior parity, or direct plugin
-portability. ArkApi, AseApi, and local NextGenPlugins clones are demand dictionaries only
-for support-tier decisions; they are also conceptual architecture, naming, and
-migration-ergonomics references, not porting or copying sources. Every Obelisk surface
-must be rebuilt through Obelisk
-reflection, copied C ABI contracts, explicitly named second-source target sets, and
-runtime safety gates.
+portability. ArkApi, AseApi, and local NextGenPlugins clones are names, demand,
+conceptual architecture, and migration-ergonomics references for support-tier decisions:
+they can guide familiar grouping, package expectations, operator workflows, config/logging
+posture, and Plugin Hub priority. They are not porting or copying sources. Every Obelisk
+surface must be rebuilt through Obelisk reflection, copied C ABI contracts, explicitly
+named second-source target sets, and runtime safety gates.
 
 This foundation is a post-RC contributor seed for the current ABI, not a change to the
 published `v0.1.0-rc.2` tag. It explains what small native examples can honestly teach

@@ -13,13 +13,14 @@ not a replacement for promotion gates. If a row says "not ready", plugins must n
 around the gap with raw UE pointers, `ProcessEvent` mutation, object lookup, or copied
 ArkApi implementation patterns.
 
-ArkApi/AseApi names and the local `NextGenPlugins` clones are demand dictionaries for
-future Plugin Hub categories only. Treat those plugin families as evidence of operator
-needs, not as
-portable behavior, source, ABI, constants, schemas, command parsers, or implementation
-patterns. They are also not sources for public contract structs/events/descriptors/API
-tables. Rebuild every promoted surface through Obelisk reflection, explicitly named
-second-source target sets, copied C ABI contracts, and runtime safety gates.
+ArkApi/AseApi names and the local `NextGenPlugins` clones are names, demand, conceptual
+architecture, and migration-ergonomics references for future Plugin Hub categories only.
+Treat those plugin families as evidence of operator needs and familiar modder workflows,
+not as portable behavior, source, ABI, constants, schemas, command parsers, or
+implementation patterns. They are also not sources for public contract
+structs/events/descriptors/API tables. Rebuild every promoted surface through Obelisk
+reflection, explicitly named second-source target sets, copied C ABI contracts, and
+runtime safety gates.
 The detailed local inventory lives in
 `docs/research/2026-05-30-nextgenplugins-reference-inventory.md` and records provenance for
 demand analysis only; it is not license clearance, runtime evidence, an ArkApi
@@ -120,9 +121,9 @@ parsing needs could be demonstrated by a core primitive.
 ## NextGenPlugins Demand Snapshot
 
 The local dictionary currently points to these high-demand Plugin Hub categories.
-ArkApi/AseApi names corroborate the same broad families for demand analysis only. The
-status below describes only what Obelisk can expose safely today or after promotion gates;
-it does not promise ArkApi plugin compatibility.
+ArkApi/AseApi names corroborate the same broad families for demand and migration
+ergonomics analysis only. The status below describes only what Obelisk can expose safely
+today or after promotion gates; it does not promise ArkApi plugin compatibility.
 
 | Priority | Category | Post-RC support tier | Safe interpretation |
 | --- | --- | --- | --- |

@@ -50,9 +50,9 @@ existing examples unless a separate copied-data surface has passed the capabilit
 evidence gate.
 
 If an example request is motivated by ArkApi, AseApi, NextGenPlugins, or another
-popular-plugin family, treat that input as names/demand signals only. It is not a
-compatibility target, source reference, ABI reference, schema, command parser, or
-implementation pattern.
+popular-plugin family, treat that input as names, demand, conceptual architecture, and
+migration-ergonomics signals only. It is not a compatibility target, source reference, ABI
+reference, schema, command parser, or implementation pattern.
 
 Do not add a first-party example that implies commands, permissions, economy, homes, RCON,
 storage/database services, webhooks, inventory/item mutation, dino tools, tribe tools,

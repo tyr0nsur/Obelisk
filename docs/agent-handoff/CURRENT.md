@@ -44,8 +44,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   owner is inside `ObeliskPlugin_Init`, has
   `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT`, and Post-init calls through captured API
   tables are unsupported until a future replacement must carry an owner token.
-- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand dictionaries
-  only, not a behavior map, not a porting target, and not a copying source.
+- ArkServerApi/AseApi and local `NextGenPlugins` clones are names, demand, conceptual
+  architecture, and migration-ergonomics references only, not a behavior map, not a
+  porting target, and not a copying source.
   Do not copy code, offsets, layouts, vtables, ABI assumptions. Do not copy wrappers, raw UE pointer
   APIs, constants, schemas, control flow, command parsers, return constants, return
   semantics, or implementations.

@@ -28,7 +28,7 @@ Use AseApi for:
 - Demand taxonomy for future Obelisk design discussions: chat commands, console/RCON
   commands, tick callbacks, timers, plugin lifecycle commands, logging/config helpers,
   permissions, and common ArkApi-style plugin expectations.
-- Compatibility-oriented product design: familiar capability grouping, command/plugin
+- Migration-oriented product design: familiar capability grouping, command/plugin
   administration expectations, config/logging conventions, and migration priorities that
   reduce friction for AseApi plugin authors moving to Linux.
 - Candidate name discovery only, before running Obelisk's own snapshot/second-source

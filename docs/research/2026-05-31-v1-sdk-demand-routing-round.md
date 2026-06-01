@@ -4,7 +4,7 @@ Date: 2026-05-31
 
 Scope: read-only demand and route audit for moving Obelisk from the core-first RC toward
 a complete v1 SDK. Local ArkApi/AseApi and NextGenPlugins material is treated only as a
-names/demand dictionary; no source, offsets, layouts, ABI assumptions, command parsers,
+names/demand/architecture reference; no source, offsets, layouts, ABI assumptions, command parsers,
 schemas, constants, or implementations are copied.
 
 ## Demand Map

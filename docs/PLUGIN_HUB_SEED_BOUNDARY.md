@@ -48,11 +48,11 @@ missions, transfers, buffs, player services, persistence, and gameplay/module ti
 
 ## Demand Dictionaries
 
-ArkApi/AseApi names and local `NextGenPlugins` clones can justify priority. They do not
-provide compatibility, source clearance, ABI, schemas, parsers, constants, offsets,
-layouts, vtables, control flow, return semantics, or implementations. Obelisk surfaces
-must be rebuilt through Linux-native reflection evidence, copied C ABI contracts, and
-runtime safety gates.
+ArkApi/AseApi names and local `NextGenPlugins` clones can justify priority and inform
+familiar category/workflow shape. They do not provide compatibility, source clearance,
+ABI, schemas, parsers, constants, offsets, layouts, vtables, control flow, return
+semantics, or implementations. Obelisk surfaces must be rebuilt through Linux-native
+reflection evidence, copied C ABI contracts, and runtime safety gates.
 
 ## v1 Rule
 
