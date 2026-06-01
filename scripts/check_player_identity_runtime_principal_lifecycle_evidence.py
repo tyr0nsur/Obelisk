@@ -35,6 +35,12 @@ REQUIRED_TARGETS = {
     "stale_after_logout": "post_logout_consumer_check",
     "malformed_or_unsupported_evidence": "principal_consumer_boundary",
 }
+REQUIRED_COPIED_FIELDS = {
+    "session_start_anchor": ("bIsFromLogin", "ReturnValue"),
+    "session_end_anchor": (),
+    "stale_after_logout": ("generation_state",),
+    "malformed_or_unsupported_evidence": (),
+}
 REQUIRED_REDACTED_FIELDS = frozenset(
     (
         "SteamID",
@@ -285,8 +291,17 @@ def validate_observations(observations: Any, blockers: list[dict[str, Any]]) -> 
             add(blockers, "observation_result_not_shape_only", f"{label}.result", case=case)
         if observation.get("consumer_result") != "deny_or_invalidate_only":
             add(blockers, "observation_consumer_result_not_fail_closed", f"{label}.consumer_result", case=case)
-        if not isinstance(observation.get("copied_fields"), list):
+        copied_fields = observation.get("copied_fields")
+        if not isinstance(copied_fields, list):
             add(blockers, "observation_copied_fields_not_list", f"{label}.copied_fields", case=case)
+        elif tuple(copied_fields) != REQUIRED_COPIED_FIELDS.get(case, ()):
+            add(
+                blockers,
+                "observation_copied_fields_mismatch",
+                f"{label}.copied_fields",
+                case=case,
+                expected=list(REQUIRED_COPIED_FIELDS.get(case, ())),
+            )
         if observation.get("raw_payload_retained") is not False:
             add(blockers, "observation_raw_payload_retained", f"{label}.raw_payload_retained", case=case)
     missing = REQUIRED_CASES - set(seen)

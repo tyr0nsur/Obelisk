@@ -163,10 +163,28 @@ namespace
         RequireDecision(EvaluatePermissionQuery(unknownAuthority),
                         Decision::Unknown,
                         "unknown provenance authority returned allow");
+
+        PermissionQuery remoteAuthority = CompleteRuntimeOwnedQuery();
+        remoteAuthority.Provenance.Authority = PolicyAuthority::RemoteService;
+        RequireDecision(EvaluatePermissionQuery(remoteAuthority),
+                        Decision::Unknown,
+                        "remote-service authority returned allow");
     }
 
     void TestPrincipalGenerationFailsClosed()
     {
+        PermissionQuery notCopied = CompleteRuntimeOwnedQuery();
+        notCopied.PrincipalValue.Copied = false;
+        RequireDecision(EvaluatePermissionQuery(notCopied),
+                        Decision::Deny,
+                        "borrowed principal returned allow");
+
+        PermissionQuery missingHandle = CompleteRuntimeOwnedQuery();
+        missingHandle.PrincipalValue.Handle = 0;
+        RequireDecision(EvaluatePermissionQuery(missingHandle),
+                        Decision::Deny,
+                        "missing principal handle returned allow");
+
         PermissionQuery missingGeneration = CompleteRuntimeOwnedQuery();
         missingGeneration.PrincipalValue.HasGeneration = false;
         RequireDecision(EvaluatePermissionQuery(missingGeneration),
@@ -193,6 +211,12 @@ namespace
         RequireDecision(EvaluatePermissionQuery(crossMap),
                         Decision::Unknown,
                         "cross-map principal scope returned allow");
+
+        PermissionQuery persistent = CompleteRuntimeOwnedQuery();
+        persistent.PrincipalValue.Scope = PrincipalScope::Persistent;
+        RequireDecision(EvaluatePermissionQuery(persistent),
+                        Decision::Unknown,
+                        "persistent principal scope returned allow");
 
         PermissionQuery processMismatch = CompleteRuntimeOwnedQuery();
         processMismatch.PrincipalValue.SameProcess = false;

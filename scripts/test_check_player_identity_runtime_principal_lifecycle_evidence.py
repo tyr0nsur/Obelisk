@@ -175,6 +175,17 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertIn("observations_missing_required_cases", report["blockers"])
 
+    def test_rejects_mismatched_or_extra_copied_fields(self) -> None:
+        payload = copy.deepcopy(manifest())
+        payload["observations"][0]["copied_fields"] = ["ReturnValue", "bIsFromLogin"]
+        payload["observations"][1]["copied_fields"] = ["Exiting"]
+        result = self.run_checker(payload, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("observation_copied_fields_mismatch", report["blockers"])
+        self.assertEqual(report["blockers"].count("observation_copied_fields_mismatch"), 2)
+
     def test_rejects_raw_logs_and_dump_paths_as_manifest_evidence(self) -> None:
         payload = manifest()
         payload["raw_log_path"] = "/tmp/obelisk-runtime.log"

@@ -101,6 +101,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   plugin-invisible. This is a runtime-evidence collection path only; it does not promote
   player identity/principal, lookup, permissions/admin, commands/replies, runtime
   readiness, public SDK readiness, or v1 SDK completion.
+- Player-principal lifecycle observer semantics are strict: `session_start` and
+  `candidate_created` require copied `bIsFromLogin=1` and `ReturnValue=1`; other
+  canonical bool combinations remain `session_start_rejected` with no principal action.
+  Runtime-log and evidence-shape analyzers reject identity/internals leaks and require the
+  expected copied fields for each lifecycle case.
 - Candidate lifecycle layouts are reproducible for all six
   `players-lifecycle-anchor-candidates` targets, but remain planning-only. The narrow
   candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
