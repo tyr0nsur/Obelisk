@@ -604,12 +604,54 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
 
         text_result = run_compare_raw("--list-target-guidance")
         self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
-        self.assertIn("target_guidance count=2 scope=offline_planning_only", text_result.stdout)
+        self.assertIn("target_guidance count=3 scope=offline_planning_only", text_result.stdout)
         self.assertIn(
             "target=obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
             text_result.stdout,
         )
         self.assertIn("snapshot_prep_checks=7", text_result.stdout)
+
+    def test_player_join_admission_candidate_guidance_can_be_listed_without_snapshots(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target",
+            "ShooterGameMode.CheckJoinInProgress",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["schema"], "obelisk.reflection-target-guidance.v1")
+        self.assertEqual(report["guidance_scope"], "offline_planning_only")
+        self.assertEqual(report["target_filters"], ["ShooterGameMode.CheckJoinInProgress"])
+        self.assertEqual(len(report["targets"]), 1)
+        guidance = report["targets"][0]
+        self.assertEqual(
+            guidance["target"],
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress",
+        )
+        self.assertEqual(guidance["classification"], "p0_adjacent_player_join_admission_candidate")
+        self.assertIn("candidate_only_layout_evidence", guidance["why_blocked"])
+        self.assertIn("not_identity_anchor", guidance["why_blocked"])
+        self.assertIn("runtime_ordering_unproven", guidance["why_blocked"])
+        self.assertIn("NumParms=3, ParmsSize=17, ReturnValueOffset=0x10", "\n".join(guidance["snapshot_prep_checks"]))
+        self.assertIn(
+            "bIsFromLogin:BoolProperty@0, NewPlayer:ObjectProperty@8, ReturnValue:BoolProperty@16",
+            "\n".join(guidance["snapshot_prep_checks"]),
+        )
+        self.assertIn("NewPlayer redacted or recognition-only", "\n".join(guidance["snapshot_prep_checks"]))
+        self.assertIn("return override", guidance["non_claim"])
+        self.assertIn("v1 completion", guidance["non_claim"])
+
+        text_result = run_compare_raw(
+            "--list-target-guidance",
+            "--target",
+            "ShooterGameMode.CheckJoinInProgress",
+        )
+        self.assertEqual(text_result.returncode, 0, text_result.stderr + text_result.stdout)
+        self.assertIn("target_guidance count=1 scope=offline_planning_only", text_result.stdout)
+        self.assertIn("classification=p0_adjacent_player_join_admission_candidate", text_result.stdout)
+        self.assertIn("not_identity_anchor", text_result.stdout)
 
     def test_mission_transfer_target_set_guidance_can_be_listed_without_snapshots(self) -> None:
         result = run_compare_raw(

@@ -97,6 +97,22 @@ Do not cite the wrapper `artifact-pack.manifest.json` as the consume input for t
 it includes prior gate-result JSON files and protected-root strings, so the offline
 artifact gate blocks it. The direct policy manifest is the durable clean consume target.
 
+Reusable offline attestation is now available through:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_copied_bool_readiness.py --json
+```
+
+The attestation schema is `obelisk.mission-copied-bool-offline-attestation.v1`. On the
+reviewed durable pack it must report `status=attested`, pin the direct policy manifest
+hash `f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945`, prove
+consume-mode `accepted`, prove promote-mode `blocked`, and prove fixture regeneration from
+`tests/fixtures/ufunction_snapshots` still preserves exactly three copied targets, five
+copied bool fields, six redacted fields, and recognition-only
+`MissionType.GetPlayerUsableItems`. The attestation flags for Mission SDK, public ABI,
+public SDK, runtime observer approval, runtime readiness, identity, lookup, mutation,
+promotion, return override, and v1 completion must remain `false`.
+
 The next validation step is local-only review of the internal copied-bool bridge lifecycle:
 prove gate-denied paths perform no metadata/parameter reads and reserve no budget, prove
 all rejection paths clear copied output, prove non-canonical bool bytes greater than `1`

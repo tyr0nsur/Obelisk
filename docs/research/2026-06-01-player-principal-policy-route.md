@@ -52,6 +52,33 @@ Additional offline candidates to investigate before a stronger lifecycle claim:
   `ServerRequestSpawnPointsForDownloadedCharacters`: out of the minimum gate unless the
   claim includes character restoration or transfers.
 
+## CheckJoinInProgress Offline Candidate
+
+`ShooterGameMode.CheckJoinInProgress` now has explicit offline guidance as a P0-adjacent
+join-admission shape candidate, not as a player identity or lifecycle promotion. Existing
+base and vanilla lifecycle snapshots compare accepted for the exact target:
+
+```text
+scripts/compare_reflection_snapshots.py --base-root /tmp/obelisk-lifecycle-snapshot-probe/base --candidate-root /tmp/obelisk-lifecycle-snapshot-probe/vanilla --target obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress --json
+```
+
+Observed candidate layout:
+
+- `FunctionFlags=0xc080c00`
+- `NumParms=3`
+- `ParmsSize=17`
+- `ReturnValueOffset=0x10`
+- property order: `bIsFromLogin:BoolProperty@0/1`,
+  `NewPlayer:ObjectProperty@8/8`, `ReturnValue:BoolProperty@16/1`
+
+This is candidate-only evidence for an admission-shaped bool route. `NewPlayer` remains
+redacted/recognition-only. `bIsFromLogin` and `ReturnValue` are copied-scalar candidates
+only; they are not a return-override, admission policy, public player identity, public
+Player SDK, permissions/admin, command response, runtime ordering, lookup,
+`ResourceHandle`, runtime readiness, public SDK readiness, or v1 completion claim. Any
+stronger claim still needs approved runtime ordering evidence and a reviewed principal
+privacy/invalidation policy.
+
 ## Principal Shape Direction
 
 The minimum future plugin-facing subject should be a copied opaque principal, not a UE

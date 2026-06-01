@@ -92,6 +92,40 @@ MISSION_CONSUME_ONLY_TARGET_SETS = frozenset(
     )
 )
 TARGET_BLOCKER_GUIDANCE = {
+    "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress": {
+        "classification": "p0_adjacent_player_join_admission_candidate",
+        "why_blocked": [
+            "candidate_only_layout_evidence",
+            "not_release_readiness_target",
+            "not_identity_anchor",
+            "runtime_ordering_unproven",
+            "principal_privacy_policy_unproven",
+            "public_player_sdk_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "reuse the existing distinct sanitized base and vanilla lifecycle snapshots for "
+            "ShooterGameMode.CheckJoinInProgress, or regenerate this exact target only from "
+            "reviewed non-protected offline evidence; compare with --target "
+            "obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress "
+            "for candidate-only P0-adjacent admission-shape review"
+        ),
+        "snapshot_prep_checks": [
+            "require exact target obelisk.ufunction-chain.snapshot.v1:ShooterGameMode.CheckJoinInProgress",
+            "expected observed shape is NumParms=3, ParmsSize=17, ReturnValueOffset=0x10",
+            "require property order bIsFromLogin:BoolProperty@0, NewPlayer:ObjectProperty@8, ReturnValue:BoolProperty@16",
+            "keep NewPlayer redacted or recognition-only; no controller/player object identity, lookup, ResourceHandle, UE pointer, raw params, FName, or GObjects exposure",
+            "treat bIsFromLogin and ReturnValue as admission-shape copied-scalar candidates only, not return override or public policy decisions",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target as a session-start/session-end lifecycle anchor without separate approved runtime ordering evidence",
+        ],
+        "non_claim": (
+            "does not promote public player identity, Player SDK, join admission API, "
+            "permissions, commands/replies, runtime ordering, lookup, ResourceHandle, "
+            "mutation, return override, runtime hooks, release readiness, public SDK "
+            "readiness, or v1 completion"
+        ),
+    },
     "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild": {
         "classification": "second_wave_structure_build_policy_candidate",
         "why_blocked": [

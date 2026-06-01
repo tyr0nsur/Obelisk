@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import build_redacted_ufunction_signatures as redacted_ufunction_signatures
 import validate_offline_artifact_gate as offline_gate
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
@@ -24,9 +25,11 @@ DEFAULT_ROOT = Path(
 DEFAULT_MANIFEST_NAME = "mission-copied-bool-policy-slice.json"
 EXPECTED_MANIFEST_SHA256 = "f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945"
 REPORT_SCHEMA = "obelisk.mission-copied-bool-readiness-check.v1"
+ATTESTATION_SCHEMA = "obelisk.mission-copied-bool-offline-attestation.v1"
 POLICY_SCHEMA = "obelisk.mission-copied-bool-policy-slice.v1"
 INPUT_TARGET_SET = "mission-compact-intake"
 OUTPUT_TARGET_SET = "mission-copied-bool-policy-slice"
+FIXTURE_SNAPSHOT_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 EXPECTED_INPUT_TARGETS = {
     "MissionType.AddPlayerToMission",
     "MissionType.BPAllowPlayerToLeaveMission",
@@ -206,6 +209,7 @@ def read_policy(manifest: Path, blockers: list[dict[str, Any]], expected_sha256:
             expected=expected_sha256,
             value=manifest_sha256,
         )
+    parsed["_obelisk_manifest_sha256"] = manifest_sha256
     return parsed
 
 
@@ -536,6 +540,139 @@ def validate_policy(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         "copied_fields": sorted(copied_fields),
         "redacted_fields": sorted(redacted_fields),
         "copied_bool_count": len(policy.get("copied_bools", [])) if isinstance(policy.get("copied_bools"), list) else 0,
+        "redacted_field_count": (
+            len(policy.get("redacted_mission_fields", []))
+            if isinstance(policy.get("redacted_mission_fields"), list)
+            else 0
+        ),
+        "get_player_usable_items_recognition_only": (
+            "MissionType.GetPlayerUsableItems" in input_targets
+            and "MissionType.GetPlayerUsableItems" not in copied_targets
+            and not any(field.startswith("MissionType.GetPlayerUsableItems.") for field in copied_fields)
+            and {
+                "MissionType.GetPlayerUsableItems.Character",
+                "MissionType.GetPlayerUsableItems.OutItemIDs",
+            }.issubset(redacted_fields)
+        ),
+    }
+
+
+def validate_regenerated_fixture_policy(blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    try:
+        policy = redacted_ufunction_signatures.build_mission_copied_bool_policy_slice(
+            snapshot_root=FIXTURE_SNAPSHOT_ROOT,
+        )
+    except SystemExit as exc:
+        append_blocker(blockers, "fixture_policy_regeneration_failed", detail=str(exc))
+        return {"status": "blocked", "blocker": str(exc)}
+
+    fixture_blockers: list[dict[str, Any]] = []
+    summary = validate_policy(policy, fixture_blockers)
+    if fixture_blockers:
+        blockers.extend(
+            {
+                "reason": "fixture_policy_regeneration_boundary_drift",
+                "source_reason": blocker.get("reason"),
+                "detail": blocker,
+            }
+            for blocker in fixture_blockers
+        )
+    policy_sha256 = hashlib.sha256(
+        json.dumps(policy, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {
+        "status": "accepted" if not fixture_blockers else "blocked",
+        "schema": policy.get("schema"),
+        "policy_sha256": policy_sha256,
+        "snapshot_root": "tests/fixtures/ufunction_snapshots",
+        "summary": summary,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "promotion_ready": False,
+        "v1_completion": False,
+    }
+
+
+def build_attestation(
+    *,
+    ready: bool,
+    policy: dict[str, Any] | None,
+    expected_manifest_sha256: str,
+    summary: dict[str, Any],
+    consume_gate: dict[str, Any],
+    promote_gate: dict[str, Any],
+    fixture_regeneration: dict[str, Any],
+) -> dict[str, Any]:
+    promote_reasons = set(promote_gate.get("blocker_reasons") or [])
+    consume_proven = consume_gate.get("status") == "accepted" and consume_gate.get("returncode") == 0
+    promote_block_proven = (
+        promote_gate.get("status") == "blocked"
+        and promote_gate.get("returncode") not in (None, 0)
+        and {
+            "promote_mode_mission_copied_bool_policy_slice_evidence_only",
+            "promote_mode_manifest_has_non_claims",
+        }.issubset(promote_reasons)
+    )
+    fixture_proven = fixture_regeneration.get("status") == "accepted"
+    actual_manifest_sha256 = policy.get("_obelisk_manifest_sha256") if isinstance(policy, dict) else None
+    reviewed_hash_pinned = (
+        expected_manifest_sha256 == EXPECTED_MANIFEST_SHA256
+        and actual_manifest_sha256 == EXPECTED_MANIFEST_SHA256
+    )
+    frontier_proven = (
+        summary.get("copied_targets") == sorted(EXPECTED_COPIED_TARGETS)
+        and summary.get("copied_fields") == sorted(EXPECTED_COPIED_FIELDS)
+        and summary.get("redacted_fields") == sorted(EXPECTED_REDACTED_FIELDS)
+        and summary.get("copied_bool_count") == len(EXPECTED_COPIED_FIELDS)
+        and summary.get("redacted_field_count") == len(EXPECTED_REDACTED_FIELDS)
+        and summary.get("get_player_usable_items_recognition_only") is True
+    )
+    attestation_ready = (
+        ready
+        and reviewed_hash_pinned
+        and consume_proven
+        and promote_block_proven
+        and fixture_proven
+        and frontier_proven
+    )
+    return {
+        "schema": ATTESTATION_SCHEMA,
+        "status": "attested" if attestation_ready else "not_attested",
+        "attestation_ready": attestation_ready,
+        "consume_only": True,
+        "internal_reusable_evidence_only": True,
+        "reviewed_direct_policy_manifest_sha256": EXPECTED_MANIFEST_SHA256,
+        "expected_manifest_sha256": expected_manifest_sha256,
+        "actual_manifest_sha256": actual_manifest_sha256,
+        "reviewed_hash_pinned": reviewed_hash_pinned,
+        "consume_gate_proven": consume_proven,
+        "promote_block_proven": promote_block_proven,
+        "fixture_policy_regeneration_proven": fixture_proven,
+        "frontier_proven": frontier_proven,
+        "frontier": {
+            "input_target_count": len(summary.get("input_targets", [])),
+            "copied_target_count": len(summary.get("copied_targets", [])),
+            "copied_bool_count": summary.get("copied_bool_count"),
+            "redacted_field_count": summary.get("redacted_field_count"),
+            "copied_targets": summary.get("copied_targets", []),
+            "copied_fields": summary.get("copied_fields", []),
+            "redacted_fields": summary.get("redacted_fields", []),
+            "get_player_usable_items_recognition_only": summary.get(
+                "get_player_usable_items_recognition_only", False
+            ),
+        },
+        "fixture_policy_regeneration": fixture_regeneration,
+        "mission_sdk_ready": False,
+        "public_abi_ready": False,
+        "public_sdk_ready": False,
+        "runtime_observer_approved": False,
+        "runtime_ready": False,
+        "identity_ready": False,
+        "lookup_ready": False,
+        "mutation_ready": False,
+        "promotion_ready": False,
+        "return_override_ready": False,
+        "v1_completion": False,
     }
 
 
@@ -548,6 +685,7 @@ def build_report(
     manifest = safe_path(manifest_path, "--manifest", blockers)
 
     summary: dict[str, Any] = {}
+    policy: dict[str, Any] | None = None
     consume_gate: dict[str, Any] = {"returncode": None, "status": None}
     promote_gate: dict[str, Any] = {"returncode": None, "status": None}
     if root is not None and manifest is not None:
@@ -596,7 +734,17 @@ def build_report(
                     missing=sorted(required_promote_reasons - set(promote_reasons)),
                 )
 
+    fixture_regeneration = validate_regenerated_fixture_policy(blockers)
     ready = not blockers
+    attestation = build_attestation(
+        ready=ready,
+        policy=policy,
+        expected_manifest_sha256=expected_manifest_sha256,
+        summary=summary,
+        consume_gate=consume_gate,
+        promote_gate=promote_gate,
+        fixture_regeneration=fixture_regeneration,
+    )
     return {
         "schema": REPORT_SCHEMA,
         "status": "candidate_ready" if ready else "blocked",
@@ -621,6 +769,8 @@ def build_report(
         "expected_manifest_sha256": expected_manifest_sha256,
         "consume_gate": consume_gate,
         "promote_gate": promote_gate,
+        "fixture_policy_regeneration": fixture_regeneration,
+        "attestation": attestation,
         "summary": summary,
         "blockers": blockers,
         "non_claims": [

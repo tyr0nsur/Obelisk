@@ -10,11 +10,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_mission_copied_bool_readiness.py"
+sys.path.insert(0, str(SCRIPT_DIR))
+import check_mission_copied_bool_readiness as checker  # noqa: E402
 
 
 class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
@@ -304,13 +307,85 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         self.assertFalse(payload["v1_completion"])
         self.assertEqual(payload["consume_gate"]["status"], "skipped")
         self.assertEqual(payload["promote_gate"]["status"], "skipped")
+        self.assertEqual(payload["fixture_policy_regeneration"]["status"], "accepted")
+        self.assertTrue(payload["fixture_policy_regeneration"]["summary"]["get_player_usable_items_recognition_only"])
+        self.assertEqual(payload["attestation"]["schema"], "obelisk.mission-copied-bool-offline-attestation.v1")
+        self.assertEqual(payload["attestation"]["status"], "not_attested")
+        self.assertFalse(payload["attestation"]["attestation_ready"])
+        self.assertFalse(payload["attestation"]["consume_gate_proven"])
+        self.assertFalse(payload["attestation"]["promote_block_proven"])
+        self.assertTrue(payload["attestation"]["fixture_policy_regeneration_proven"])
+        self.assertTrue(payload["attestation"]["frontier_proven"])
+        self.assertFalse(payload["attestation"]["mission_sdk_ready"])
+        self.assertFalse(payload["attestation"]["public_abi_ready"])
+        self.assertFalse(payload["attestation"]["public_sdk_ready"])
+        self.assertFalse(payload["attestation"]["runtime_ready"])
+        self.assertFalse(payload["attestation"]["v1_completion"])
         self.assertEqual(len(payload["summary"]["input_targets"]), 4)
         self.assertEqual(len(payload["summary"]["copied_targets"]), 3)
         self.assertEqual(len(payload["summary"]["copied_fields"]), 5)
         self.assertEqual(len(payload["summary"]["redacted_fields"]), 6)
         self.assertEqual(payload["summary"]["copied_bool_count"], 5)
+        self.assertEqual(payload["summary"]["redacted_field_count"], 6)
+        self.assertTrue(payload["summary"]["get_player_usable_items_recognition_only"])
         self.assertIn("candidate readiness is exactly consume-only internal reusable evidence", " ".join(payload["non_claims"]))
         self.assertIn("candidate readiness is internal planning evidence only", " ".join(payload["non_claims"]))
+
+    def test_attestation_proves_consume_promote_and_fixture_frontier_when_hash_pin_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest, sha256 = self.write_pack(root)
+            with mock.patch.object(checker, "EXPECTED_MANIFEST_SHA256", sha256):
+                payload = checker.build_report(root, manifest, sha256)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["consume_gate"]["status"], "accepted")
+        self.assertEqual(payload["promote_gate"]["status"], "blocked")
+        self.assertIn(
+            "promote_mode_mission_copied_bool_policy_slice_evidence_only",
+            payload["promote_gate"]["blocker_reasons"],
+        )
+        self.assertIn("promote_mode_manifest_has_non_claims", payload["promote_gate"]["blocker_reasons"])
+
+        attestation = payload["attestation"]
+        self.assertEqual(attestation["status"], "attested")
+        self.assertTrue(attestation["attestation_ready"])
+        self.assertTrue(attestation["reviewed_hash_pinned"])
+        self.assertTrue(attestation["consume_gate_proven"])
+        self.assertTrue(attestation["promote_block_proven"])
+        self.assertTrue(attestation["fixture_policy_regeneration_proven"])
+        self.assertTrue(attestation["frontier_proven"])
+        self.assertEqual(attestation["actual_manifest_sha256"], sha256)
+        self.assertEqual(attestation["reviewed_direct_policy_manifest_sha256"], sha256)
+        self.assertEqual(attestation["frontier"]["copied_target_count"], 3)
+        self.assertEqual(attestation["frontier"]["copied_bool_count"], 5)
+        self.assertEqual(attestation["frontier"]["redacted_field_count"], 6)
+        self.assertTrue(attestation["frontier"]["get_player_usable_items_recognition_only"])
+        self.assertEqual(
+            attestation["frontier"]["copied_targets"],
+            [
+                "MissionType.AddPlayerToMission",
+                "MissionType.BPAllowPlayerToLeaveMission",
+                "MissionType.BPOnPlayerRemovedFromMission",
+            ],
+        )
+        self.assertNotIn(
+            "MissionType.GetPlayerUsableItems",
+            attestation["frontier"]["copied_targets"],
+        )
+        self.assertTrue(attestation["consume_only"])
+        self.assertTrue(attestation["internal_reusable_evidence_only"])
+        self.assertFalse(attestation["mission_sdk_ready"])
+        self.assertFalse(attestation["public_abi_ready"])
+        self.assertFalse(attestation["public_sdk_ready"])
+        self.assertFalse(attestation["runtime_observer_approved"])
+        self.assertFalse(attestation["runtime_ready"])
+        self.assertFalse(attestation["identity_ready"])
+        self.assertFalse(attestation["lookup_ready"])
+        self.assertFalse(attestation["mutation_ready"])
+        self.assertFalse(attestation["promotion_ready"])
+        self.assertFalse(attestation["return_override_ready"])
+        self.assertFalse(attestation["v1_completion"])
 
     def test_get_player_usable_items_copied_field_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
