@@ -285,6 +285,8 @@ namespace Obelisk::Core
         }
         for (const InventoryPolicyEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
+        if (deferredFailure)
+            std::rethrow_exception(deferredFailure);
         return after != before;
     }
 
@@ -363,6 +365,8 @@ namespace Obelisk::Core
         }
         for (const InventoryPolicyEventSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
+        if (deferredFailure)
+            std::rethrow_exception(deferredFailure);
         return after != before;
     }
 
@@ -515,23 +519,35 @@ namespace Obelisk::Core
             {
                 if (item.CleanupBatchId == 0)
                     continue;
-                const bool alreadyCaptured = std::any_of(
-                    failures.begin(),
-                    failures.end(),
-                    [&item](const DeferredDestroyFailure& failure) {
-                        return failure.CleanupBatchId == item.CleanupBatchId;
-                    });
-                if (!alreadyCaptured)
-                    failures.push_back({item.CleanupBatchId, std::current_exception()});
+                try
+                {
+                    const bool alreadyCaptured = std::any_of(
+                        failures.begin(),
+                        failures.end(),
+                        [&item](const DeferredDestroyFailure& failure) {
+                            return failure.CleanupBatchId == item.CleanupBatchId;
+                        });
+                    if (!alreadyCaptured)
+                        failures.push_back({item.CleanupBatchId, std::current_exception()});
+                }
+                catch (...)
+                {
+                }
             }
         }
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_PendingDestroyInProgress -= pending.size();
-            m_DeferredDestroyFailures.insert(
-                m_DeferredDestroyFailures.end(),
-                failures.begin(),
-                failures.end());
+            try
+            {
+                m_DeferredDestroyFailures.insert(
+                    m_DeferredDestroyFailures.end(),
+                    failures.begin(),
+                    failures.end());
+            }
+            catch (...)
+            {
+            }
         }
         m_DispatchCv.notify_all();
     }

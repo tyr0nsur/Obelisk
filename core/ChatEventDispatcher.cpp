@@ -166,6 +166,7 @@ namespace Obelisk::Core
             return false;
 
         std::vector<ChatMessageSubscription> removed;
+        std::exception_ptr deferredFailure;
         size_t before = 0;
         size_t after = 0;
         try
@@ -203,8 +204,18 @@ namespace Obelisk::Core
             after = m_Registrations.size();
             if (before > after)
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+            }
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
@@ -224,6 +235,8 @@ namespace Obelisk::Core
         }
         for (const ChatMessageSubscription& subscription : removed)
             DestroySubscriptionUserData(subscription);
+        if (deferredFailure)
+            std::rethrow_exception(deferredFailure);
         return after != before;
     }
 
@@ -384,23 +397,35 @@ namespace Obelisk::Core
             {
                 if (item.CleanupBatchId == 0)
                     continue;
-                const bool alreadyCaptured = std::any_of(
-                    failures.begin(),
-                    failures.end(),
-                    [&item](const DeferredDestroyFailure& failure) {
-                        return failure.CleanupBatchId == item.CleanupBatchId;
-                    });
-                if (!alreadyCaptured)
-                    failures.push_back({item.CleanupBatchId, std::current_exception()});
+                try
+                {
+                    const bool alreadyCaptured = std::any_of(
+                        failures.begin(),
+                        failures.end(),
+                        [&item](const DeferredDestroyFailure& failure) {
+                            return failure.CleanupBatchId == item.CleanupBatchId;
+                        });
+                    if (!alreadyCaptured)
+                        failures.push_back({item.CleanupBatchId, std::current_exception()});
+                }
+                catch (...)
+                {
+                }
             }
         }
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_PendingDestroyInProgress -= pending.size();
-            m_DeferredDestroyFailures.insert(
-                m_DeferredDestroyFailures.end(),
-                failures.begin(),
-                failures.end());
+            try
+            {
+                m_DeferredDestroyFailures.insert(
+                    m_DeferredDestroyFailures.end(),
+                    failures.begin(),
+                    failures.end());
+            }
+            catch (...)
+            {
+            }
         }
         m_DispatchCv.notify_all();
     }

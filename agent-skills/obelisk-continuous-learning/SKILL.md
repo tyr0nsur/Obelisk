@@ -56,6 +56,9 @@ Capture facts that are expensive to rediscover:
 - Obelisk commit.
 - Environment variables and state markers.
 - Exact addresses, signatures, offsets, and why they are trusted or rejected.
+- For ArkServerApi/AseApi/NextGenPlugins, capture names and demand signals only; never
+  treat them as valid sources for offsets, layouts, behavior, ergonomics, porting, or
+  implementation.
 - Logs that prove a hook loaded, a plugin crashed, or an event was observed.
 - Negative results, especially false positives like bad ProcessEvent candidates.
 

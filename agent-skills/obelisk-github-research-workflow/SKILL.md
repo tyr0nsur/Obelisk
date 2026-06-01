@@ -205,7 +205,7 @@ verification.
   planning must not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or
   `production SDK` unless `scripts/check_public_sdk_v1_completion.py --json` reports the
   stable SDK claim is allowed. Otherwise the wording must be explicitly scoped as
-  candidate, planning, RC, foundation, or post-v1.
+  candidate, planning, RC, SDK-foundation-only, or post-v1.
 - A local or unpublished RC tag does not validate publication. Before pushing a release
   tag, rerun the release gate on the intended ref and verify the tag dereferences exactly
   to that ref; resolve stale local tags instead of reusing or pushing them.

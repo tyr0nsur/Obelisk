@@ -50,6 +50,27 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             report["dependency_chain"],
         )
         self.assertEqual(8, len(report["checks"]))
+        self.assertEqual(
+            {
+                "current_surface": "obelisk.player_identity.v1",
+                "current_blocker": "approved_runtime_evidence_missing",
+                "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
+                "next_after_runtime_evidence": "identity_public_contract_gate_missing",
+                "permissions_admin_unlocked": False,
+                "command_response_unlocked": False,
+                "commands_replies_unlocked": False,
+                "source_checker": "check_player_identity_first_evidence_readiness.py",
+                "source_checker_exit_code": 1,
+                "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                "source_checker_parse_error": None,
+                "planning_only": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+            },
+            report["critical_path_phase"],
+        )
         check_names = {check["name"] for check in report["checks"]}
         self.assertIn("player_identity_public_contract_gap", check_names)
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)

@@ -709,6 +709,41 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn("deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)", body)
                 self.assertIn("std::rethrow_exception(deferredFailure)", body)
 
+    def test_deferred_event_dispatcher_granular_cleanup_failures_are_visible(self) -> None:
+        signatures = (
+            r"bool \w+EventDispatcher::Unregister\(uint64_t registrationId\)",
+            r"bool \w+EventDispatcher::UnregisterCallbackForOwner\(void\* owner, uint64_t registrationId\)",
+        )
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "TakeDeferredDestroyFailure" not in text:
+                continue
+            for signature in signatures:
+                try:
+                    body = extract_function_body(text, signature)
+                except AssertionError:
+                    continue
+                if "std::exception_ptr deferredFailure" not in body:
+                    continue
+                with self.subTest(source=source.name, signature=signature):
+                    self.assertIn("uint64_t cleanupBatchId = 0", body)
+                    self.assertIn("QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId)", body)
+                    self.assertIn("deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)", body)
+                    self.assertIn("std::rethrow_exception(deferredFailure)", body)
+
+    def test_deferred_event_dispatcher_finish_dispatch_does_not_throw_before_notify(self) -> None:
+        for source in CORE_DIR.glob("*EventDispatcher.cpp"):
+            text = source.read_text(encoding="utf-8")
+            if "m_DeferredDestroyFailures" not in text:
+                continue
+            body = extract_function_body(text, r"void \w+EventDispatcher::FinishDispatch\(\)")
+            with self.subTest(source=source.name):
+                self.assertIn("try\n                {\n                    const bool alreadyCaptured", body)
+                self.assertIn("failures.push_back({item.CleanupBatchId, std::current_exception()})", body)
+                self.assertIn("try\n            {\n                m_DeferredDestroyFailures.insert", body)
+                self.assertLess(body.index("m_PendingDestroyInProgress -= pending.size()"),
+                                body.index("m_DispatchCv.notify_all()"))
+
     def test_plugin_boundary_catches_use_no_throw_logging(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         for function_name in ("InvokeGameplayPolicyEventCallback", "InvokeChatMessageEventCallback"):

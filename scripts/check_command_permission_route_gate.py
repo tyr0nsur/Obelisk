@@ -187,6 +187,54 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
     }
 
 
+def build_critical_path_phase() -> dict[str, Any]:
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_DIR / "check_player_identity_first_evidence_readiness.py"), "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    report: dict[str, Any] | None = None
+    parse_error = None
+    try:
+        loaded = json.loads(result.stdout)
+        if isinstance(loaded, dict):
+            report = loaded
+        else:
+            parse_error = "stdout_json_not_object"
+    except json.JSONDecodeError as exc:
+        parse_error = f"stdout_json_decode_error: {exc}"
+
+    current_blocker = "approved_runtime_evidence_missing"
+    if report is not None:
+        current_blocker = (
+            report.get("primary_blocker")
+            or report.get("next_blocker")
+            or current_blocker
+        )
+
+    return {
+        "current_surface": "obelisk.player_identity.v1",
+        "current_blocker": current_blocker,
+        "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
+        "next_after_runtime_evidence": "identity_public_contract_gate_missing",
+        "permissions_admin_unlocked": False,
+        "command_response_unlocked": False,
+        "commands_replies_unlocked": False,
+        "source_checker": "check_player_identity_first_evidence_readiness.py",
+        "source_checker_exit_code": result.returncode,
+        "source_checker_schema": report.get("schema") if report is not None else None,
+        "source_checker_parse_error": parse_error,
+        "planning_only": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "runtime_ready": False,
+    }
+
+
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     checks = [run_check(name, argv) for name, argv in route_checks(args)]
     blockers = []
@@ -217,6 +265,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "obelisk.command_chat_response_path.v1",
             "obelisk.commands_replies.v1",
         ],
+        "critical_path_phase": build_critical_path_phase(),
         "checks": checks,
         "blockers": blockers,
     }
