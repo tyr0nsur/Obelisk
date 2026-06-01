@@ -151,6 +151,18 @@ write_proc_fixture 116 "${stable_maps}" \
 expect_failure item-return-events-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 116 --expect-stable --instance arkserver
 
+write_proc_fixture 117 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1" \
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520" \
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10" \
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0"
+expect_failure player-principal-lifecycle-observer-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 117 --expect-stable --instance arkserver
+
 write_proc_fixture 121 "${stable_maps}" \
     "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
     "OBELISK_INSTANCE_ID=arkserver" \
@@ -350,6 +362,7 @@ for marker in \
     enable-inventory-reflection \
     enable-structure-reflection \
     enable-item-return-events \
+    enable-player-principal-lifecycle-observer \
     enable-reflection-scanner
 do
     : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/${marker}"
@@ -385,6 +398,13 @@ rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-chat-events"
 expect_failure item-return-events-marker-forbidden-for-stable \
     "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
 rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-item-return-events"
+
+: > "${TMP_DIR}/external-player-principal-lifecycle-marker"
+ln -s "${TMP_DIR}/external-player-principal-lifecycle-marker" \
+    "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-player-principal-lifecycle-observer"
+expect_failure player-principal-lifecycle-marker-symlink-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
+rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/enable-player-principal-lifecycle-observer"
 
 : > "${TMP_DIR}/external-chat-route-marker"
 ln -s "${TMP_DIR}/external-chat-route-marker" \

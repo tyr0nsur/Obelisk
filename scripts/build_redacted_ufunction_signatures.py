@@ -3460,7 +3460,7 @@ def build_players_identity_first_evidence(*, snapshot_root: Path = DEFAULT_SNAPS
                 *lifecycle_blockers,
                 "identity-like fields are force-redacted",
                 "forbidden FName/GObjects/UE pointer/raw-param coordinates are not public identity",
-                "no public API, ABI, dispatcher, runtime hook, lookup, persistence, mutation, or return override is promoted",
+                "plugin-facing surface, ABI, dispatcher, runtime hook, lookup, persistence, mutation, and return override remain unpromoted",
             ],
         },
         "safety_summary": {

@@ -1628,6 +1628,21 @@ def collect_candidate_public_overclaims(
     return found
 
 
+def collect_source_artifact_id_values(source_artifact_ids: list[object]) -> tuple[dict[str, list[str]], list[dict[str, Any]]]:
+    parsed_source_ids: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
+    blockers: list[dict[str, Any]] = []
+    for index, item in enumerate(source_artifact_ids):
+        if not isinstance(item, str) or ":" not in item:
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_id_invalid", "index": index})
+            continue
+        key, _, value = item.partition(":")
+        if key not in parsed_source_ids:
+            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_id_key_unknown", "index": index})
+            continue
+        parsed_source_ids[key].append(value)
+    return parsed_source_ids, blockers
+
+
 def is_safe_semantic_input_name(value: object) -> bool:
     if not isinstance(value, str) or not value:
         return False
@@ -5802,38 +5817,38 @@ def validate_players_identity_first_evidence_manifest(payload: dict[str, Any], *
             blockers.append({"reason": "players_identity_first_evidence_artifact_identity_obelisk_commit_invalid", "label": f"{label}:$.artifact_identity.obelisk_commit"})
 
         source_artifact_ids = artifact_identity.get("source_artifact_ids")
-        parsed_source_ids: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
         if not isinstance(source_artifact_ids, list):
             blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_ids_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids"})
         else:
-            for index, item in enumerate(source_artifact_ids):
-                item_label = f"{label}:$.artifact_identity.source_artifact_ids[{index}]"
-                if not isinstance(item, str) or ":" not in item:
-                    blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_id_invalid", "label": item_label})
-                    continue
-                key, _, value = item.partition(":")
-                if key not in parsed_source_ids:
-                    blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_id_key_unknown", "label": item_label})
-                    continue
-                parsed_source_ids[key].append(value)
+            parsed_source_ids, source_id_blockers = collect_source_artifact_id_values(source_artifact_ids)
+            for source_id_blocker in source_id_blockers:
+                blocker = dict(source_id_blocker)
+                index = blocker.pop("index")
+                blocker["label"] = f"{label}:$.artifact_identity.source_artifact_ids[{index}]"
+                blockers.append(blocker)
 
-            for key, values in parsed_source_ids.items():
-                if len(values) != 1:
+            source_id_counts = {key: len(values) for key, values in parsed_source_ids.items()}
+            source_id_count_values = set(source_id_counts.values())
+            if source_id_count_values != {next(iter(source_id_count_values), 0)} or next(iter(source_id_count_values), 0) < 1:
+                for key, count in source_id_counts.items():
                     blockers.append(
                         {
                             "reason": "players_identity_first_evidence_artifact_identity_source_id_count_mismatch",
                             "label": f"{label}:$.artifact_identity.source_artifact_ids",
                             "field": key,
-                            "recorded_count": len(values),
+                            "recorded_count": count,
                         }
                     )
-                    continue
-                value = values[0]
-                if key == "artifact_sha256":
-                    if SHA256_RE.fullmatch(value) is None:
-                        blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_sha_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids"})
-                elif not is_safe_artifact_id(value):
-                    blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_id_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids", "field": key})
+            for key, values in parsed_source_ids.items():
+                for value in values:
+                    if not value:
+                        blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_id_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids", "field": key})
+                        continue
+                    if key == "artifact_sha256":
+                        if SHA256_RE.fullmatch(value) is None:
+                            blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_sha_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids"})
+                    elif not is_safe_artifact_id(value):
+                        blockers.append({"reason": "players_identity_first_evidence_artifact_identity_source_artifact_id_invalid", "label": f"{label}:$.artifact_identity.source_artifact_ids", "field": key})
 
     generated_from = payload.get("generated_from")
     if not isinstance(generated_from, dict):

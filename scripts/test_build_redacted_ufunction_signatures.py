@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import argparse
+import collections
 import contextlib
 import io
 import shutil
@@ -16,6 +18,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_redacted_ufunction_signatures as tool
+import validate_offline_artifact_gate as gate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -392,6 +395,15 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertTrue(report["artifact_identity"]["path_redacted"])
         self.assertEqual("7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520", report["artifact_identity"]["ark_binary_sha256"])
         self.assertEqual("mixed_or_unknown", report["artifact_identity"]["obelisk_commit"])
+        source_ids = report["artifact_identity"]["source_artifact_ids"]
+        source_counts = collections.Counter(entry.partition(":")[0] for entry in source_ids)
+        self.assertEqual(source_counts["artifact_sha256"], source_counts["capture_id"])
+        self.assertEqual(source_counts["artifact_sha256"], source_counts["evidence_pack_id"])
+        self.assertGreaterEqual(source_counts["artifact_sha256"], 1)
+        for entry in source_ids:
+            key, _, value = entry.partition(":")
+            if key == "artifact_sha256":
+                self.assertRegex(value, r"^[0-9a-f]{64}$")
 
         target_roles = {entry["target"]: entry["lifecycle_anchor_role"] for entry in report["targets"]}
         self.assertEqual(
@@ -445,6 +457,31 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertNotIn("name_index", serialized)
         self.assertNotIn("object_index", serialized)
         self.assertNotIn('"PlayerSteamID", "classification": "copied_candidate"', serialized)
+
+    def test_players_identity_first_evidence_fixture_manifest_passes_consume_gate(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            protected_root = Path(temp_dir) / "server"
+            workspace = protected_root / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            report = tool.build_players_identity_first_evidence(snapshot_root=fixture_root)
+            write_json(manifest, report)
+
+            result = gate.build_result(
+                argparse.Namespace(
+                    root=workspace,
+                    protected_root=protected_root,
+                    manifest=[manifest],
+                    artifact=[],
+                    expected_binary_sha256=None,
+                    mode="consume",
+                    strict_target_set_coverage=True,
+                    json=True,
+                )
+            )
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
 
     def test_players_identity_first_evidence_cli_mode_returns_success(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"

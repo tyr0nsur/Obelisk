@@ -23,6 +23,7 @@ import check_player_identity_first_evidence_readiness as checker
 from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
 from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
 from test_check_player_identity_runtime_principal_lifecycle_evidence import manifest as runtime_principal_lifecycle_manifest
+from test_validate_offline_artifact_gate import players_identity_first_evidence_manifest
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
@@ -266,20 +267,20 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         consume_gate = payload["first_evidence"]["consume_gate"]
         self.assertTrue(consume_gate["evaluated"])
         self.assertEqual(consume_gate["mode"], "consume")
-        self.assertEqual(consume_gate["status"], "blocked")
-        self.assertFalse(consume_gate["ready"])
+        self.assertEqual(consume_gate["status"], "accepted")
+        self.assertTrue(consume_gate["ready"])
         self.assertFalse(consume_gate["promotion_ready"])
         self.assertFalse(consume_gate["public_sdk_ready"])
         self.assertFalse(consume_gate["runtime_ready"])
-        self.assertIn(
+        self.assertNotIn(
             "players_identity_first_evidence_artifact_identity_source_id_count_mismatch",
             consume_gate["blocker_reasons"],
         )
-        self.assertIn(
+        self.assertNotIn(
             "players_identity_first_evidence_public_overclaim_public_api",
             consume_gate["blocker_reasons"],
         )
-        self.assertIn(
+        self.assertNotIn(
             "players_identity_first_evidence_consume_gate_blocked",
             payload["deferred_until_reflection_inventory_ready"],
         )
@@ -575,19 +576,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                     "second_source_status": "compared",
                 }
             if "build_redacted_ufunction_signatures.py" in command:
-                return ok, {
-                    "schema": "obelisk.players-identity-first-evidence.v1",
-                    "lifecycle_anchors": {
-                        "session_start_accepted": False,
-                        "session_end_accepted": False,
-                        "accepted_start_targets": [],
-                        "accepted_end_targets": [],
-                        "blockers": [
-                            "accepted_session_start_anchor_missing",
-                            "accepted_session_end_anchor_missing",
-                        ],
-                    },
-                }
+                return ok, players_identity_first_evidence_manifest()
             if "check_player_identity_static_orientation.py" in command:
                 return ok, {
                     "valid": True,
@@ -678,19 +667,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                     "second_source_status": "compared",
                 }
             if "build_redacted_ufunction_signatures.py" in command:
-                return ok, {
-                    "schema": "obelisk.players-identity-first-evidence.v1",
-                    "lifecycle_anchors": {
-                        "session_start_accepted": False,
-                        "session_end_accepted": False,
-                        "accepted_start_targets": [],
-                        "accepted_end_targets": [],
-                        "blockers": [
-                            "accepted_session_start_anchor_missing",
-                            "accepted_session_end_anchor_missing",
-                        ],
-                    },
-                }
+                return ok, players_identity_first_evidence_manifest()
             if "check_player_identity_static_orientation.py" in command:
                 return ok, {
                     "valid": True,
@@ -762,19 +739,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                     "second_source_status": "compared",
                 }
             if "build_redacted_ufunction_signatures.py" in command:
-                return ok, {
-                    "schema": "obelisk.players-identity-first-evidence.v1",
-                    "lifecycle_anchors": {
-                        "session_start_accepted": False,
-                        "session_end_accepted": False,
-                        "accepted_start_targets": [],
-                        "accepted_end_targets": [],
-                        "blockers": [
-                            "accepted_session_start_anchor_missing",
-                            "accepted_session_end_anchor_missing",
-                        ],
-                    },
-                }
+                return ok, players_identity_first_evidence_manifest()
             if "check_player_identity_static_orientation.py" in command:
                 return ok, {
                     "valid": True,
@@ -816,6 +781,16 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
         self.assertIn("approved_runtime_evidence_missing", payload["blockers"])
+        consume_gate = payload["first_evidence"]["consume_gate"]
+        self.assertTrue(consume_gate["evaluated"])
+        self.assertEqual(consume_gate["mode"], "consume")
+        self.assertEqual(consume_gate["status"], "accepted")
+        self.assertTrue(consume_gate["ready"])
+        self.assertEqual(consume_gate["blocker_reasons"], [])
+        self.assertFalse(consume_gate["promotion_ready"])
+        self.assertFalse(consume_gate["public_sdk_ready"])
+        self.assertFalse(consume_gate["runtime_ready"])
+        self.assertNotIn("players_identity_first_evidence_consume_gate_blocked", payload["blockers"])
         policy = payload["first_evidence"]["principal_invalidation_policy"]
         self.assertTrue(policy["policy_consume_ready"])
         self.assertFalse(policy["runtime_evidence_ready"])

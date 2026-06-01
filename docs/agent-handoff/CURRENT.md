@@ -100,17 +100,15 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
   the other four targets do not prove runtime ordering. Details:
   `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.
-- `scripts/check_player_identity_first_evidence_readiness.py` now runs a schema-specific
+- `scripts/check_player_identity_first_evidence_readiness.py` runs a schema-specific
   consume-gate diagnostic for the generated `obelisk.players-identity-first-evidence.v1`
-  payload. With the consume-only lifecycle and principal-policy manifests from
-  `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`,
-  the primary blocker is currently `players_identity_first_evidence_consume_gate_blocked`
-  because the generated first-evidence payload is rejected for
-  `players_identity_first_evidence_artifact_identity_source_id_count_mismatch` and
-  `players_identity_first_evidence_public_overclaim_public_api`. Fix that offline artifact
-  shape before treating approved runtime evidence as the immediate blocker again. The
-  emitted `first_evidence.runtime_principal_lifecycle_evidence` block is requirements-only,
-  not accepted evidence or promotion. The optional
+  payload. The generated first-evidence payload now accepts in consume mode with strict
+  target-set coverage, including multiple complete source artifact id triples. With the
+  consume-only lifecycle/principal-policy manifests supplied, the primary blocker is
+  `approved_runtime_evidence_missing`, while `promotion_ready`, `public_sdk_ready`, and
+  `runtime_ready` remain false. The emitted
+  `first_evidence.runtime_principal_lifecycle_evidence` block is requirements-only, not
+  accepted evidence or promotion. The optional
   `--runtime-principal-lifecycle-evidence-manifest` input accepts only a synthetic/redacted
   shape fixture; it still leaves runtime promotion blocked.
 - Static orientation reports for identity/lifecycle/admin and command response are
@@ -118,7 +116,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - The current artifact-root audit is summarized in
   `docs/research/2026-05-31-offline-artifact-inventory-audit.md`; the active
   `/servidor/ark/workspace-offline` player-identity run has passed the old artifact-root
-  stage and is blocked only on approved runtime principal lifecycle evidence.
+  stage. First-evidence consume-gate acceptance is restored; runtime principal lifecycle
+  evidence is the next promotion blocker.
 - Inventory, structures, missions, transfers, dinos, buffs, tribes, ResourceHandle, and
   GObjects remain internal/candidate. ResourceHandle/public GObjects remain blocked. The
   old flag-policy artifact is obsolete; the durable rich-provenance refresh is preserved,
@@ -140,9 +139,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Primary v1 route: player identity has accepted offline/core/reflection inventory,
   12/12 candidate fixtures for the exact 12-target `players-identity-lifecycle-intake`
   set, distinct second-source layout evidence, and consume-only lifecycle/principal
-  manifests. Immediate blocker: make the generated first-evidence payload pass the offline
-  artifact consume gate without promoting identity. Next blocker after that: approved
-  runtime principal lifecycle evidence. Do not rerun the completed admin snapshot,
+  manifests. Current blocker: approved runtime principal lifecycle evidence, still with
+  no identity promotion, public SDK readiness, or runtime readiness. Do not rerun the completed admin snapshot,
   second-source layout, lifecycle layout, or broad discovery routes unless a new binary
   hash or rejected evidence requires it.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0 principal ->

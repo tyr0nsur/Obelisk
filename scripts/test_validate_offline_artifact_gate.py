@@ -6763,6 +6763,42 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in result["blockers"]}
         self.assertIn("players_identity_first_evidence_artifact_identity_fields_mismatch", reasons)
 
+    def test_accepts_players_identity_first_evidence_multiple_complete_source_artifact_id_triples(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            payload["artifact_identity"]["source_artifact_ids"] = [
+                f"artifact_sha256:{'1' * 64}",
+                "capture_id:primary-core",
+                "evidence_pack_id:primary-pack",
+                f"artifact_sha256:{'2' * 64}",
+                "capture_id:admin-core",
+                "evidence_pack_id:admin-pack",
+            ]
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
+    def test_blocks_players_identity_first_evidence_mismatched_source_artifact_id_triples(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "players-identity-first-evidence.json"
+            payload = players_identity_first_evidence_manifest()
+            payload["artifact_identity"]["source_artifact_ids"].append(f"artifact_sha256:{'3' * 64}")
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        self.assertEqual("blocked", result["status"])
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("players_identity_first_evidence_artifact_identity_source_id_count_mismatch", reasons)
+
     def test_blocks_players_identity_first_evidence_overclaims_or_target_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -6842,6 +6878,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
             payload["target_set_coverage"] = {"status": "complete"}
             payload["privacy_policy"]["lookup_ready"] = True
             payload["promotion_gate"]["claim"] = "public SDK ready"
+            payload["promotion_gate"]["blockers"].append("public API ready")
             payload["non_claims"] = payload["non_claims"][:-1]
             write_json(manifest, payload)
 
@@ -6851,6 +6888,7 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_first_evidence_target_set_coverage_schema_mismatch", reasons)
         self.assertIn("players_identity_first_evidence_readiness_overclaim", reasons)
         self.assertIn("players_identity_first_evidence_public_overclaim_public_sdk", reasons)
+        self.assertIn("players_identity_first_evidence_public_overclaim_public_api", reasons)
         self.assertIn("players_identity_first_evidence_non_claims_missing_required_boundaries", reasons)
 
     def test_blocks_players_identity_first_evidence_declared_coverage_drift_and_nested_public_sdk_ready(self) -> None:
