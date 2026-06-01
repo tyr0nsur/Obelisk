@@ -72,7 +72,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   source paths are rejected. The effective env snapshot must fail closed on missing or
   duplicate required keys, unsupported SHA, `OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT`
   other than `10`, nonzero dispatch or PE trace, wrong instance, alternate observer env,
-  or callback/debug escape env. Analyzer rules remain strict: copied bool cases,
+  or callback/debug escape env. Request packs, `operator-approval-request.md`,
+  `observer-window.env`, and `preflight=ok` are preparation/posture checks only; they do
+  not authorize marker/env changes, starts/restarts/stops, runtime capture, Discord,
+  runtime readiness, public SDK readiness, or v1 completion. Analyzer rules remain strict: copied bool cases,
   redaction, lifecycle order, post-gate events, log-budget bounds, monotonic sequence
   quality, stable posture, rollback, no private identity/UE terms in keys or values, and
   no-claim/no-public-readiness semantics.

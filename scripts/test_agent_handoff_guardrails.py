@@ -14,6 +14,7 @@ CURRENT = HANDOFF_DIR / "CURRENT.md"
 README = HANDOFF_DIR / "README.md"
 COMPACT_CONTEXT = HANDOFF_DIR / "COMPACT_CONTEXT.md"
 GITHUB_WORKFLOW_SKILL = REPO_ROOT / "agent-skills" / "obelisk-github-research-workflow" / "SKILL.md"
+LIVE_OPS_SKILL = REPO_ROOT / "agent-skills" / "obelisk-live-ops" / "SKILL.md"
 REVERSING_RESEARCH_SKILL = REPO_ROOT / "agent-skills" / "obelisk-reversing-research" / "SKILL.md"
 MAX_CURRENT_LINES = 220
 MAX_SKILL_LINES = 260
@@ -193,6 +194,27 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("No run is approved by this note", mission_plan)
         self.assertIn("This plan is not approval to add or enable gates", mission_plan)
         self.assertNotIn("arkserver " + "ventana aprobada", send_discord_tests)
+
+    def test_preflight_and_planning_acceptance_are_not_runtime_approval_or_readiness(self) -> None:
+        files = {
+            "CURRENT.md": normalized(CURRENT.read_text(encoding="utf-8")),
+            "COMPACT_CONTEXT.md": normalized(COMPACT_CONTEXT.read_text(encoding="utf-8")),
+            "obelisk-github-research-workflow": normalized(GITHUB_WORKFLOW_SKILL.read_text(encoding="utf-8")),
+            "obelisk-live-ops": normalized(LIVE_OPS_SKILL.read_text(encoding="utf-8")),
+        }
+        for label, text in files.items():
+            with self.subTest(file=label):
+                self.assertRegex(text.lower(), r"request[- ]?pack|preflight")
+                self.assertRegex(text.lower(), r"not .*approval|do not authorize|does not authorize|not runtime approval")
+                self.assertIn("public SDK readiness", text)
+                self.assertIn("runtime readiness", text)
+
+        compact = files["COMPACT_CONTEXT.md"]
+        workflow = files["obelisk-github-research-workflow"]
+        for text in (compact, workflow):
+            self.assertIn("planning_layout_gate.ready=true", text)
+            self.assertIn("reply/send-chat ABI", text)
+            self.assertIn("command router", text)
 
     def test_call_process_event_handoff_stays_owner_scoped_init_window_only(self) -> None:
         for path in (CURRENT, COMPACT_CONTEXT):

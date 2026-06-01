@@ -27,7 +27,10 @@ priorities, and do not use history files as the active source of truth.
   live-ops brief for that turn naming the target, feature gates, marker/env changes,
   restart/start window, notice path when players are involved, evidence capture, and
   rollback. Technical progress alone is not approval to restart; request an exact run only
-  after a concrete offline/code advance genuinely needs new runtime logs.
+  after a concrete offline/code advance genuinely needs new runtime logs. Request packs
+  and preflight acceptance prepare or validate a future window only; they are not runtime
+  approval, public SDK readiness, runtime readiness, release readiness, or permission to
+  change markers/env/restart without a current-turn live-ops brief.
 - Community updates are for major public modder-facing milestones only; beta-test
   activation notices are separate operational live-ops messages. Use only
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL` by variable
@@ -376,7 +379,8 @@ priorities, and do not use history files as the active source of truth.
   reports `targets=3`, `second_source_accepted=3`, `second_source_inconclusive=0`,
   `planning_layout_gate.ready=true`, `promotion_ready=false`, `public_sdk_ready=false`,
   and `runtime_ready=false`. This closes response-route planning evidence identity only;
-  it is not ABI/runtime wiring.
+  accepted planning is not public SDK readiness, runtime readiness, reply/send-chat ABI,
+  command router, or ABI/runtime wiring.
 - Mission copied-bool is the selected v0.2 internal hardening lane only. Keep it
   internal/test-only and default-off; it does not promote a Mission SDK, runtime observer,
   public callback ABI, authority, identity, mutation, return override, or v1 completion.

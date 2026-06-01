@@ -48,7 +48,10 @@ text/gameplay-payload logging, beta/community notices, and player-facing validat
 require explicit current-turn operator approval for the exact scoped run. Approval must
 name the target instance, marker/env gates, start/stop/restart window, rollback plan,
 evidence paths, notice path when applicable, and shutdown/posture expectation. Agents may
-use only that current-turn approved scope. Do not write or execute an operational runbook
+use only that current-turn approved scope. Request packs, preflight outputs, and accepted
+planning artifacts can support an approval request, but they do not authorize markers,
+env changes, runtime observation, starts, stops, restarts, Discord, runtime readiness, or
+public SDK readiness. Do not write or execute an operational runbook
 unless those details are named for the current turn.
 
 ## Production Baseline

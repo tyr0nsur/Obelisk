@@ -54,6 +54,10 @@ build-policy work defaults to offline snapshot/intake evidence before any runtim
 release-policy claim. Treat `ResourceHandle` and object identity/lifetime as a
 cross-cutting SDK blocker for any surface that needs post-callback object correlation,
 lookup, mutation, or persistent handles.
+Do not interpret request-pack prepared, `preflight=ok`, `accepted_for_planning`,
+`planning_layout_gate.ready=true`, or command response route planning as runtime approval,
+public SDK readiness, runtime readiness, release readiness, reply/send-chat ABI, command
+router, or v1 completion.
 
 Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts. Pass
 only the blocker context that changes the agent's concrete task.
