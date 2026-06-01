@@ -287,6 +287,20 @@ The SHA256 is versioned in the checker. If the offline workspace report drifts, 
 readiness check fails closed with `second_source_readiness_sha256_mismatch` rather than
 silently accepting a new unreviewed JSON.
 
+## v1 Accounting Outcome
+
+The readiness checker now exposes explicit release/accounting fields for this asymmetry:
+`outcome=candidate-only`, `accounting_mode=candidate-only`, and
+`candidate_only_accounting.result=second-source-accepted-without-public-structure-sdk-identity-build-policy`
+when the hash-pinned second-source planning evidence is accepted.
+
+This field is descriptive only. It records that second-source layout accounting is
+accepted for internal planning while `public_sdk_ready=false`, `runtime_ready=false`,
+`promotion_ready=false`, `public_structure_sdk_ready=false`,
+`structure_identity_ready=false`, and `build_policy_ready=false`. It does not promote a
+public Structure SDK, Structure identity/lookup, build placement or no-collision policy,
+runtime wiring, or v1 completion.
+
 ## Internal Accumulator Checkpoint
 
 The first internal C++ accumulator now exists as `core/StructureAggregateCensus.*`, with

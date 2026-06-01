@@ -106,8 +106,31 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
 
         self.assertEqual(payload["schema"], "obelisk.structure-census-readiness-check.v1")
         self.assertEqual(payload["status"], "candidate_ready")
+        self.assertEqual(payload["outcome"], "candidate-only")
+        self.assertEqual(payload["accounting_mode"], "candidate-only")
         self.assertTrue(payload["ready"])
         self.assertTrue(payload["accepted_for_internal_planning"])
+        self.assertEqual(payload["candidate_only_accounting"]["mode"], "candidate-only")
+        self.assertEqual(
+            payload["candidate_only_accounting"]["result"],
+            "second-source-accepted-without-public-structure-sdk-identity-build-policy",
+        )
+        self.assertTrue(payload["candidate_only_accounting"]["second_source_accepted"])
+        self.assertFalse(payload["candidate_only_accounting"]["public_structure_sdk_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["structure_identity_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["build_policy_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["runtime_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["promotion_ready"])
+        self.assertEqual(
+            payload["candidate_only_accounting"]["missing_public_gates"],
+            [
+                "public_structure_sdk",
+                "structure_identity",
+                "build_policy",
+                "runtime_wiring",
+                "promotion_gate",
+            ],
+        )
         self.assertTrue(payload["not_artifact_gate"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
@@ -172,7 +195,17 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         payload = json.loads(result.stdout)
 
         self.assertEqual(payload["status"], "candidate_ready")
+        self.assertEqual(payload["outcome"], "candidate-only")
+        self.assertEqual(payload["accounting_mode"], "candidate-only")
         self.assertTrue(payload["ready"])
+        self.assertEqual(
+            payload["candidate_only_accounting"]["result"],
+            "candidate-without-second-source",
+        )
+        self.assertFalse(payload["candidate_only_accounting"]["second_source_accepted"])
+        self.assertFalse(payload["candidate_only_accounting"]["public_structure_sdk_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["structure_identity_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["build_policy_ready"])
         self.assertEqual(payload["target_readiness"]["status"], "second-source-missing")
         self.assertEqual(payload["target_readiness"]["status_counts"], {"second-source-missing": 6})
         self.assertEqual(payload["target_readiness"]["second_source"]["status"], "missing")
@@ -199,10 +232,20 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "candidate_ready")
+        self.assertEqual(payload["outcome"], "candidate-only")
+        self.assertEqual(payload["accounting_mode"], "candidate-only")
         self.assertTrue(payload["ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
         self.assertFalse(payload["promotion_ready"])
+        self.assertEqual(
+            payload["candidate_only_accounting"]["result"],
+            "second-source-accepted-without-public-structure-sdk-identity-build-policy",
+        )
+        self.assertTrue(payload["candidate_only_accounting"]["second_source_accepted"])
+        self.assertFalse(payload["candidate_only_accounting"]["public_structure_sdk_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["structure_identity_ready"])
+        self.assertFalse(payload["candidate_only_accounting"]["build_policy_ready"])
         self.assertEqual(payload["second_source_readiness"]["status"], "accepted")
         self.assertFalse(payload["second_source_readiness"]["promotion_ready"])
         self.assertFalse(payload["second_source_readiness"]["public_sdk_ready"])
@@ -249,6 +292,10 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
+        self.assertEqual(report["outcome"], "blocked")
+        self.assertEqual(report["accounting_mode"], "blocked")
+        self.assertEqual(report["candidate_only_accounting"]["mode"], "blocked")
+        self.assertEqual(report["candidate_only_accounting"]["result"], "blocked")
         reasons = {blocker["reason"] for blocker in report["blockers"]}
         self.assertIn("second_source_readiness_total_mismatch", reasons)
         self.assertIn("second_source_readiness_planning_layout_gate_not_ready", reasons)

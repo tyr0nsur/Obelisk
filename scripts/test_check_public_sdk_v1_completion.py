@@ -163,10 +163,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "obelisk.permissions_admin.v1",
             progress["completion_blockers_with_post_v1_or_excluded_outcome"],
         )
+        self.assertEqual(
+            progress["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
+            progress["completion_blockers_with_post_v1_or_excluded_outcome"],
+        )
+        self.assertEqual(
+            progress["completion_blockers_with_release_statement_post_v1_or_excluded_outcome"],
+            [],
+        )
+        self.assertEqual(
+            progress["completion_blockers_with_release_statement_post_v1_or_excluded_outcome_count"],
+            0,
+        )
         self.assertIn("obelisk.player_identity.v1", progress["completion_blockers_without_manifest_outcome"])
         self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 3)
         self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 3)
         self.assertFalse(progress["stable_claim_allowed"])
+        self.assertIn("status accounting", progress["outcome_accounting_note"])
         self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
 
@@ -480,6 +493,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertTrue(payload["scoped_release_statement"]["ready"])
         self.assertFalse(payload["scoped_release_statement"]["stable_v1_sdk_claim_allowed"])
+        self.assertEqual(
+            payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
+            [
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+                "obelisk.gameplay_tick_callbacks.v1",
+                "obelisk.inventory_items_mutation.v1",
+                "obelisk.lifecycle_ops_recovery.v1",
+                "obelisk.operator_ingress_storage.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.player_services_economy_mobility.v1",
+            ],
+        )
+        self.assertEqual(
+            payload["v1_sdk_progress"]["completion_blockers_with_release_statement_post_v1_or_excluded_outcome"],
+            payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
+        )
         self.assertNotIn("release_statement_missing_non_promoted_blocker_outcomes", payload["blockers"])
         self.assertEqual(payload["release_statement_missing_blocker_outcomes"], [])
         self.assertIn("stable_release_contract_claim_not_allowed", payload["blockers"])

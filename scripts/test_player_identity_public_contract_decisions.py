@@ -150,6 +150,67 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
 
+    def test_proposed_public_pod_abi_candidate_is_candidate_only(self) -> None:
+        payload = self.load_decisions()
+        candidate = payload["proposed_public_pod_abi_candidate"]
+
+        self.assertEqual(candidate["status"], "proposal_only_not_public")
+        self.assertTrue(candidate["candidate_only"])
+        self.assertFalse(candidate["public_header_allowed"])
+        self.assertFalse(candidate["promotion_ready"])
+        self.assertFalse(candidate["public_sdk_ready"])
+        self.assertFalse(candidate["runtime_ready"])
+        self.assertEqual(
+            set(candidate["candidate_event_payload_fields_or_equivalent"]),
+            {
+                "abi_version",
+                "struct_size",
+                "event_kind",
+                "principal_handle",
+                "principal_generation",
+                "principal_scope_flags",
+                "principal_state_flags",
+                "invalidation_reason_flags",
+                "event_sequence",
+                "server_process_epoch",
+                "reserved",
+            },
+        )
+        for forbidden in (
+            "lookup_handle",
+            "resolve_player",
+            "get_player_name",
+            "raw_ue_pointer",
+            "private_identity",
+            "platform_id",
+            "player_name",
+            "tribe_id",
+            "ip_address",
+            "fname_index",
+            "gobjects_index",
+            "resource_handle",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, {field.lower() for field in candidate["candidate_event_payload_fields_or_equivalent"]})
+
+    def test_candidate_owner_token_cleanup_remains_fail_closed(self) -> None:
+        payload = self.load_decisions()
+        candidate = payload["proposed_public_pod_abi_candidate"]
+
+        registration = set(candidate["candidate_registration_shape_or_equivalent"])
+        for required in (
+            "nonzero plugin_owner_token required",
+            "owner-token unregister required",
+            "plugin init failure removes registrations",
+            "plugin unload removes registrations and drains in-flight callbacks",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, registration)
+
+        policy = set(candidate["candidate_capability_policy"])
+        self.assertIn("missing capability fails closed", policy)
+        self.assertIn("missing or zero owner token fails closed", policy)
+
     def test_surface_manifest_still_has_no_public_identity_contract(self) -> None:
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
         by_id = {surface["id"]: surface for surface in surfaces["surfaces"]}

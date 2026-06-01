@@ -87,6 +87,13 @@ REPORT_NON_CLAIMS = [
     "does not claim v1 completion or production readiness",
     "does not replace player identity, privacy, lifecycle, SDK consumer, public ABI, second-source, or live-ops promotion gates",
 ]
+CANDIDATE_ONLY_MISSING_PUBLIC_GATES = [
+    "public_structure_sdk",
+    "structure_identity",
+    "build_policy",
+    "runtime_wiring",
+    "promotion_gate",
+]
 STRUCTURE_CENSUS_ALLOWED_BOUNDARY_PREFIXES = (
     "$.non_claims",
     "$.safety_summary.explicitly_excluded",
@@ -801,6 +808,47 @@ def validate_source_isolation(repo_root: Path, blockers: list[dict[str, Any]]) -
     }
 
 
+def build_candidate_only_accounting(
+    *,
+    ready: bool,
+    second_source_summary: dict[str, Any],
+) -> dict[str, Any]:
+    second_source_accepted = second_source_summary.get("status") == "accepted"
+    if not ready:
+        result = "blocked"
+        reason = "readiness blockers are present; no Structure census accounting outcome is accepted"
+        mode = "blocked"
+    elif second_source_accepted:
+        result = "second-source-accepted-without-public-structure-sdk-identity-build-policy"
+        reason = (
+            "second-source layout evidence is accepted for internal planning only; "
+            "public Structure SDK, identity, build-policy, runtime, and promotion gates remain false"
+        )
+        mode = "candidate-only"
+    else:
+        result = "candidate-without-second-source"
+        reason = (
+            "candidate fixture evidence is accepted for internal planning only; "
+            "second-source, public Structure SDK, identity, build-policy, runtime, and promotion gates remain absent"
+        )
+        mode = "candidate-only"
+
+    return {
+        "mode": mode,
+        "result": result,
+        "second_source_accepted": second_source_accepted,
+        "accepted_for_internal_planning": ready,
+        "public_sdk_ready": False,
+        "public_structure_sdk_ready": False,
+        "structure_identity_ready": False,
+        "build_policy_ready": False,
+        "runtime_ready": False,
+        "promotion_ready": False,
+        "missing_public_gates": CANDIDATE_ONLY_MISSING_PUBLIC_GATES,
+        "reason": reason,
+    }
+
+
 def build_report(root_arg: Path, manifest_arg: Path | None, second_source_arg: Path | None = None) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     root = safe_path(root_arg, "--root", blockers)
@@ -888,11 +936,19 @@ def build_report(root_arg: Path, manifest_arg: Path | None, second_source_arg: P
             )
 
     ready = not blockers
+    accounting_mode = "candidate-only" if ready else "blocked"
+    candidate_only_accounting = build_candidate_only_accounting(
+        ready=ready,
+        second_source_summary=second_source_summary,
+    )
     return {
         "schema": REPORT_SCHEMA,
         "status": "candidate_ready" if ready else "blocked",
+        "outcome": accounting_mode,
+        "accounting_mode": accounting_mode,
         "ready": ready,
         "accepted_for_internal_planning": ready,
+        "candidate_only_accounting": candidate_only_accounting,
         "not_artifact_gate": True,
         "public_sdk_ready": False,
         "runtime_ready": False,

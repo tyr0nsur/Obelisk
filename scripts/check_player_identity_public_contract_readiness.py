@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,73 @@ CONTRACT_REVIEW_INPUT_ONLY_TESTS = {
         "scripts/test_player_identity_public_contract_decisions.py",
     },
 }
+REQUIRED_CANDIDATE_PAYLOAD_FIELDS = {
+    "abi_version",
+    "struct_size",
+    "event_kind",
+    "principal_handle",
+    "principal_generation",
+    "principal_scope_flags",
+    "principal_state_flags",
+    "invalidation_reason_flags",
+    "event_sequence",
+    "server_process_epoch",
+    "reserved",
+}
+REQUIRED_CANDIDATE_DESCRIPTOR_FIELDS = {
+    "abi_version",
+    "struct_size",
+    "supported_event_kind_mask",
+    "supported_scope_flags",
+    "supported_state_flags",
+    "supported_invalidation_reason_flags",
+    "contract_flags",
+}
+REQUIRED_CANDIDATE_PAYLOAD_PROPERTIES = {
+    "POD C ABI only",
+    "front-loaded abi_version and struct_size",
+    "append-only fields after promotion",
+    "copied Obelisk-owned storage",
+    "no UE pointers",
+    "no raw ProcessEvent params",
+    "no FString or raw string ownership crossing the ABI",
+    "no FName/GObjects indices",
+    "no platform account ids",
+    "no player names",
+    "no tribe ids",
+    "no network addresses",
+    "no lookup handle",
+    "no mutation or return override authority",
+}
+REQUIRED_CANDIDATE_OWNER_TOKEN_REQUIREMENTS = {
+    "nonzero plugin_owner_token required",
+    "event-kind mask required",
+    "opaque uint64 registration handle returned on success",
+    "owner-token unregister required",
+    "plugin init failure removes registrations",
+    "plugin unload removes registrations and drains in-flight callbacks",
+    "callback payload storage is valid only for the callback",
+}
+REQUIRED_CANDIDATE_FAIL_CLOSED_POLICY = {
+    "capability must be captured in the init-time API table",
+    "missing capability fails closed",
+    "missing or zero owner token fails closed",
+    "later marker or env changes cannot widen a plugin's captured capability",
+}
+FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
+    "lookup": re.compile(r"lookup", re.IGNORECASE),
+    "resolve": re.compile(r"resolve", re.IGNORECASE),
+    "get": re.compile(r"(?:^|[_\W])get(?:$|[_\W])|Get[A-Z_]", re.IGNORECASE),
+    "raw_ue": re.compile(r"raw.*ue|ue.*raw", re.IGNORECASE),
+    "private_identity": re.compile(r"private.*identity|identity.*private", re.IGNORECASE),
+    "platform": re.compile(r"platform", re.IGNORECASE),
+    "player_name": re.compile(r"player[_\s-]*names?", re.IGNORECASE),
+    "tribe": re.compile(r"tribe", re.IGNORECASE),
+    "ip": re.compile(r"\bIP\b|ip[_\s-]*address(?:es)?|network[_\s-]*address(?:es)?", re.IGNORECASE),
+    "fname_gobjects": re.compile(r"FName|GObjects", re.IGNORECASE),
+    "resource_handle": re.compile(r"ResourceHandle|resource[_\s-]*handle", re.IGNORECASE),
+}
+PUBLIC_CLAIM_KEYS = ("public_header_allowed", "promotion_ready", "public_sdk_ready", "runtime_ready")
 
 
 def parse_args() -> argparse.Namespace:
@@ -134,6 +202,122 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
     return report
 
 
+def string_list(value: Any) -> list[str] | None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return None
+    return value
+
+
+def missing_required(observed: list[str] | None, required: set[str]) -> list[str]:
+    return sorted(required - set(observed or []))
+
+
+def forbidden_candidate_strings(values: list[str]) -> dict[str, list[str]]:
+    observed: dict[str, list[str]] = {}
+    for value in values:
+        for token, pattern in FORBIDDEN_CANDIDATE_FIELD_PATTERNS.items():
+            if pattern.search(value):
+                observed.setdefault(token, []).append(value)
+    return observed
+
+
+def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any]]) -> None:
+    if not isinstance(candidate, dict):
+        add(blockers, "candidate_public_pod_abi_missing", "$.proposed_public_pod_abi_candidate")
+        return
+
+    if candidate.get("status") != "proposal_only_not_public":
+        add(blockers, "candidate_status_not_proposal_only", "$.proposed_public_pod_abi_candidate.status")
+    if candidate.get("candidate_only") is not True:
+        add(blockers, "candidate_only_not_true", "$.proposed_public_pod_abi_candidate.candidate_only")
+    if candidate.get("public_header_allowed") is not False:
+        add(blockers, "candidate_public_header_allowed_not_false", "$.proposed_public_pod_abi_candidate.public_header_allowed")
+    for key in PUBLIC_CLAIM_KEYS:
+        if key in candidate and candidate.get(key) is not False:
+            add(blockers, f"candidate_{key}_claim_not_false", f"$.proposed_public_pod_abi_candidate.{key}")
+
+    payload_properties = string_list(candidate.get("required_payload_properties"))
+    if payload_properties is None:
+        add(blockers, "candidate_required_payload_properties_not_string_list", "$.proposed_public_pod_abi_candidate.required_payload_properties")
+    else:
+        missing = missing_required(payload_properties, REQUIRED_CANDIDATE_PAYLOAD_PROPERTIES)
+        if missing:
+            add(
+                blockers,
+                "candidate_required_payload_properties_missing",
+                "$.proposed_public_pod_abi_candidate.required_payload_properties",
+                missing=missing,
+            )
+
+    event_fields = string_list(candidate.get("candidate_event_payload_fields_or_equivalent"))
+    if event_fields is None:
+        add(blockers, "candidate_event_payload_fields_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_event_payload_fields_or_equivalent")
+    else:
+        missing = missing_required(event_fields, REQUIRED_CANDIDATE_PAYLOAD_FIELDS)
+        if missing:
+            add(
+                blockers,
+                "candidate_event_payload_fields_missing",
+                "$.proposed_public_pod_abi_candidate.candidate_event_payload_fields_or_equivalent",
+                missing=missing,
+            )
+        forbidden = forbidden_candidate_strings(event_fields)
+        if forbidden:
+            add(
+                blockers,
+                "candidate_event_payload_fields_forbidden_identity_or_lookup",
+                "$.proposed_public_pod_abi_candidate.candidate_event_payload_fields_or_equivalent",
+                forbidden=forbidden,
+            )
+
+    descriptor_fields = string_list(candidate.get("candidate_descriptor_fields_or_equivalent"))
+    if descriptor_fields is None:
+        add(blockers, "candidate_descriptor_fields_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_descriptor_fields_or_equivalent")
+    else:
+        missing = missing_required(descriptor_fields, REQUIRED_CANDIDATE_DESCRIPTOR_FIELDS)
+        if missing:
+            add(
+                blockers,
+                "candidate_descriptor_fields_missing",
+                "$.proposed_public_pod_abi_candidate.candidate_descriptor_fields_or_equivalent",
+                missing=missing,
+            )
+        forbidden = forbidden_candidate_strings(descriptor_fields)
+        if forbidden:
+            add(
+                blockers,
+                "candidate_descriptor_fields_forbidden_identity_or_lookup",
+                "$.proposed_public_pod_abi_candidate.candidate_descriptor_fields_or_equivalent",
+                forbidden=forbidden,
+            )
+
+    registration = string_list(candidate.get("candidate_registration_shape_or_equivalent"))
+    if registration is None:
+        add(blockers, "candidate_registration_shape_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_registration_shape_or_equivalent")
+    else:
+        missing = missing_required(registration, REQUIRED_CANDIDATE_OWNER_TOKEN_REQUIREMENTS)
+        if missing:
+            add(
+                blockers,
+                "candidate_owner_token_cleanup_requirements_missing",
+                "$.proposed_public_pod_abi_candidate.candidate_registration_shape_or_equivalent",
+                missing=missing,
+            )
+
+    capability_policy = string_list(candidate.get("candidate_capability_policy"))
+    if capability_policy is None:
+        add(blockers, "candidate_capability_policy_not_string_list", "$.proposed_public_pod_abi_candidate.candidate_capability_policy")
+    else:
+        missing = missing_required(capability_policy, REQUIRED_CANDIDATE_FAIL_CLOSED_POLICY)
+        if missing:
+            add(
+                blockers,
+                "candidate_fail_closed_policy_missing",
+                "$.proposed_public_pod_abi_candidate.candidate_capability_policy",
+                missing=missing,
+            )
+
+
 def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     if decisions.get("schema") != DECISION_SCHEMA:
         add(blockers, "decision_schema_mismatch", "$.schema")
@@ -166,6 +350,8 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
     forbidden = decisions.get("forbidden_public_contract")
     if not isinstance(forbidden, list) or not REQUIRED_FORBIDDEN.issubset(set(forbidden)):
         add(blockers, "forbidden_public_contract_missing_required", "$.forbidden_public_contract")
+
+    validate_candidate_only_pod_abi(decisions.get("proposed_public_pod_abi_candidate"), blockers)
 
     blockers_list = decisions.get("promotion_blockers")
     observed_ids = {

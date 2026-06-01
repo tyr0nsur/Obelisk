@@ -1564,6 +1564,17 @@ def build_report(
         for surface_id, status in completion_blocker_statuses.items()
         if status in {"post-v1", "excluded"}
     )
+    completion_blockers_with_release_statement_post_v1_or_excluded_outcome = sorted(
+        surface_id
+        for surface_id in completion_blockers_with_post_v1_or_excluded_outcome
+        if release_statement_text is not None
+        and surface_id in post_v1_or_excluded
+        and not release_statement_duplicate_or_mixed_records(release_statement_text, surface_id)
+        and release_statement_satisfies_exclusion_contract(
+            release_statement_text,
+            surfaces_by_id.get(surface_id, {}),
+        )
+    )
     completion_blockers_without_manifest_outcome = sorted(
         surface_id
         for surface_id, status in completion_blocker_statuses.items()
@@ -1630,6 +1641,15 @@ def build_report(
             "completion_blockers_with_post_v1_or_excluded_outcome": (
                 completion_blockers_with_post_v1_or_excluded_outcome
             ),
+            "completion_blockers_with_manifest_post_v1_or_excluded_outcome": (
+                completion_blockers_with_post_v1_or_excluded_outcome
+            ),
+            "completion_blockers_with_release_statement_post_v1_or_excluded_outcome": (
+                completion_blockers_with_release_statement_post_v1_or_excluded_outcome
+            ),
+            "completion_blockers_with_release_statement_post_v1_or_excluded_outcome_count": len(
+                completion_blockers_with_release_statement_post_v1_or_excluded_outcome
+            ),
             "completion_blockers_without_manifest_outcome": completion_blockers_without_manifest_outcome,
             "completion_blockers_without_manifest_outcome_count": len(
                 completion_blockers_without_manifest_outcome
@@ -1639,6 +1659,11 @@ def build_report(
             "minimum_promoted_demand_family_gap_count": len(minimum_promoted_demand_family_gaps),
             "release_statement_required_for_completion_claim": release_statement_text is None,
             "stable_claim_allowed": stable_claim_allowed,
+            "outcome_accounting_note": (
+                "Manifest post-v1/excluded outcomes are only status accounting; release statement "
+                "outcomes are counted separately after exact statement wording and exclusion-contract "
+                "validation."
+            ),
             "non_claim": (
                 "This is accounting only; it does not authorize broad stable SDK release wording."
             ),
