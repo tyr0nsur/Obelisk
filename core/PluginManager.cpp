@@ -2626,6 +2626,47 @@ namespace Obelisk::Core
                         return;
                     }
 
+                    if (!SafeCloseLibrary(*m_Loader, handle, pluginName))
+                    {
+                        handleCleanup.Dismiss();
+                        ownerTokenCleanup.Dismiss();
+                        initializingOwnerCleanup.Dismiss();
+                        try
+                        {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                            if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
+                                throw std::runtime_error("injected plugin retention failure");
+#endif
+                            m_LoadedPlugins.push_back({
+                                pluginName,
+                                metadata.plugin_id,
+                                handle,
+                                pluginOwner,
+                                pluginOwnerToken,
+                                shutdownFunc,
+                                true,
+                            });
+                        }
+                        catch (const std::exception& e)
+                        {
+                            SafeLogErrorNoThrow(
+                                "Plugin library close failed after init failure and retention tracking failed; leaving library mapped without dlclose",
+                                e.what());
+                            return;
+                        }
+                        catch (...)
+                        {
+                            SafeLogErrorNoThrow(
+                                "Plugin library close failed after init failure and retention tracking failed with unknown exception; leaving library mapped without dlclose");
+                            return;
+                        }
+                        SafeLogErrorNoThrow(
+                            "Plugin library close failed after init failure; retaining plugin for retry",
+                            pluginName.c_str());
+                        return;
+                    }
+                    handleCleanup.Dismiss();
+
                     try
                     {
                         RemovePluginOwnerToken(pluginOwnerToken);

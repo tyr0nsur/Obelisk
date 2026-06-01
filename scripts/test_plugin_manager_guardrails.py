@@ -317,7 +317,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIsNotNone(match)
         body = extract_braced_body(text, match)
         failure_match = re.search(
-            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*try\s*\{\s*RemovePluginOwnerToken",
+            r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
             body,
             re.S,
         )

@@ -208,6 +208,23 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
             )
 
+    def test_rejects_generated_manifest_that_fails_consume_checker(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["modules"]["player_principal_lifecycle"].pop("observed_event_cases")
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            manifest_path = temp_dir / "approved-manifest.json"
+
+            result = self.run_builder(summary_path, window_check, manifest_path)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("generated approved manifest failed consume checker", result.stderr)
+            self.assertIn("runtime_summary_observed_event_cases_missing", result.stderr)
+            self.assertFalse(manifest_path.exists())
+
     def test_generated_manifest_still_fails_closed_for_promote_mode(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

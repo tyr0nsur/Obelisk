@@ -5528,6 +5528,35 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestInitFailureRetainsPluginWhenCloseFailsAndRetries()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_fail_close_throw");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "init_fail_close_throw.so",
+            .pluginId = "init_fail_close_throw",
+            .initResult = false,
+            .throwOnClose = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+        plugin.throwOnClose = false;
+        manager.UnloadAll();
+
+        Require(plugin.initCalls == 1, "close-throw init-fail plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "close-throw init-fail plugin shutdown was not called once");
+        Require(plugin.closeCalls == 2, "init-failure close error was not retained for retry");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestMultiplePluginsLoadSortedAndUnloadReverse()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_multi");
@@ -6080,6 +6109,7 @@ int main()
     TestInitFailureCleansCallbacksAndCloses();
     TestInitExceptionCleansCallbacksAndCloses();
     TestInitFailureRejectsOwnerTokenTimerRegistrationDuringClose();
+    TestInitFailureRetainsPluginWhenCloseFailsAndRetries();
     TestMultiplePluginsLoadSortedAndUnloadReverse();
     TestPluginApiMutationDoesNotPoisonLaterPlugins();
     TestUnloadAllContinuesAfterCloseException();

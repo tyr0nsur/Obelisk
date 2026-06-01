@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence_checker
 from artifact_identity import canonical_json_bytes
 
 
@@ -381,6 +382,16 @@ def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
                 pass
 
 
+def validate_built_manifest_with_consume_checker(manifest: dict[str, Any]) -> None:
+    validation = approved_evidence_checker.validate_manifest(manifest, check_mode="consume")
+    if validation.blockers:
+        reasons = sorted({str(blocker.get("reason")) for blocker in validation.blockers})
+        raise SystemExit(
+            "generated approved manifest failed consume checker: "
+            + ", ".join(reasons)
+        )
+
+
 def main() -> int:
     args = parse_args()
     reject_if_forbidden_review_text(args.reviewed_by, "--reviewed-by")
@@ -395,6 +406,7 @@ def main() -> int:
         reviewed_by=args.reviewed_by.strip(),
         review_note=args.review_note.strip(),
     )
+    validate_built_manifest_with_consume_checker(manifest)
     write_json_atomic(args.output, manifest)
     return 0
 
