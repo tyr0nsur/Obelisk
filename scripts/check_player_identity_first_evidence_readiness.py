@@ -17,6 +17,7 @@ import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_can
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence
 import check_player_identity_runtime_principal_lifecycle_evidence as runtime_principal_lifecycle_evidence
+import check_player_principal_lifecycle_window_request as player_principal_lifecycle_window_request
 import validate_offline_artifact_gate as offline_artifact_gate
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
@@ -132,6 +133,19 @@ def parse_args() -> argparse.Namespace:
             "the runtime-evidence blocker only; it cannot promote public identity, runtime "
             "readiness, or public SDK readiness."
         ),
+    )
+    parser.add_argument(
+        "--player-principal-lifecycle-window-request",
+        type=Path,
+        help=(
+            "Optional pre-window request pack JSON. This records request-pack readiness only; "
+            "it cannot satisfy approved runtime evidence or authorize server operations."
+        ),
+    )
+    parser.add_argument(
+        "--player-principal-lifecycle-window-env",
+        type=Path,
+        help="observer-window.env paired with --player-principal-lifecycle-window-request.",
     )
     parser.add_argument(
         "--json",
@@ -1167,6 +1181,58 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
     }
 
 
+def player_principal_lifecycle_window_request_diagnosis(
+    request_path: Path | None,
+    env_path: Path | None,
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "provided": request_path is not None or env_path is not None,
+        "request_path": str(request_path) if request_path is not None else None,
+        "env_path": str(env_path) if env_path is not None else None,
+        "ready": False,
+        "request_pack_ready": False,
+        "operator_current_turn_runtime_window_approval_required": False,
+        "approved_runtime_evidence_present": False,
+        "runtime_evidence_ready": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "blockers": [],
+        "remaining_blockers": ["approved_runtime_evidence_missing"],
+        "non_claims": [
+            "pre-window request-pack diagnosis only; does not authorize server operations, runtime capture, Discord, GitHub publication, public SDK readiness, or v1 completion",
+        ],
+    }
+    if request_path is None and env_path is None:
+        return base
+    blockers: list[str] = []
+    if request_path is None:
+        blockers.append("player_principal_lifecycle_window_request_missing")
+    if env_path is None:
+        blockers.append("player_principal_lifecycle_window_env_missing")
+    if blockers:
+        return {**base, "blockers": blockers}
+    try:
+        payload = player_principal_lifecycle_window_request.read_json(request_path)
+        env = player_principal_lifecycle_window_request.read_env(env_path, [])
+    except SystemExit as exc:
+        return {**base, "blockers": ["player_principal_lifecycle_window_request_unreadable"], "error": str(exc)}
+    validation = player_principal_lifecycle_window_request.validate_payload(payload, env)
+    report = player_principal_lifecycle_window_request.build_report(validation)
+    blockers = [blocker["reason"] for blocker in validation.blockers]
+    ready = not blockers and report.get("request_pack_ready") is True
+    return {
+        **base,
+        "ready": ready,
+        "request_pack_ready": ready,
+        "operator_current_turn_runtime_window_approval_required": ready,
+        "blockers": blockers,
+        "next_blocker": report.get("next_blocker"),
+        "target": report.get("target"),
+        "run_id": report.get("run_id"),
+    }
+
+
 def runtime_principal_lifecycle_evidence_requirements() -> dict[str, Any]:
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.requirements.v1",
@@ -1924,6 +1990,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     approved_runtime_evidence_manifest_diagnosis = approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
         getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None)
     )
+    window_request_diagnosis = player_principal_lifecycle_window_request_diagnosis(
+        getattr(args, "player_principal_lifecycle_window_request", None),
+        getattr(args, "player_principal_lifecycle_window_env", None),
+    )
     approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True
     runtime_evidence_requirements = runtime_principal_lifecycle_evidence_requirements()
     lifecycle_ready = (
@@ -2140,13 +2210,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             else None
         ),
         "runtime_principal_lifecycle_evidence_manifest": (
-            str(args.runtime_principal_lifecycle_evidence_manifest)
+            str(getattr(args, "runtime_principal_lifecycle_evidence_manifest", None))
             if getattr(args, "runtime_principal_lifecycle_evidence_manifest", None)
             else None
         ),
         "approved_runtime_principal_lifecycle_evidence_manifest": (
-            str(args.approved_runtime_principal_lifecycle_evidence_manifest)
+            str(getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None))
             if getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None)
+            else None
+        ),
+        "player_principal_lifecycle_window_request": (
+            str(getattr(args, "player_principal_lifecycle_window_request", None))
+            if getattr(args, "player_principal_lifecycle_window_request", None)
+            else None
+        ),
+        "player_principal_lifecycle_window_env": (
+            str(getattr(args, "player_principal_lifecycle_window_env", None))
+            if getattr(args, "player_principal_lifecycle_window_env", None)
             else None
         ),
         "target_set": PLAYER_IDENTITY_TARGET_SET,
@@ -2279,6 +2359,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "runtime_principal_lifecycle_evidence": runtime_evidence_requirements,
             "runtime_principal_lifecycle_evidence_manifest": runtime_evidence_manifest_diagnosis,
             "approved_runtime_principal_lifecycle_evidence_manifest": approved_runtime_evidence_manifest_diagnosis,
+            "player_principal_lifecycle_window_request": window_request_diagnosis,
             "stderr": first_evidence_result.stderr.strip(),
         },
         "next_step": next_step,

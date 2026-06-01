@@ -27,6 +27,7 @@ from test_check_player_identity_runtime_principal_lifecycle_approved_evidence im
 )
 from test_check_player_identity_runtime_principal_lifecycle_evidence import manifest as runtime_principal_lifecycle_manifest
 from test_validate_offline_artifact_gate import players_identity_first_evidence_manifest
+import prepare_player_principal_lifecycle_window_request as prepare_window_request
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
@@ -1210,6 +1211,45 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
+
+    def test_window_request_pack_is_reported_without_clearing_runtime_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            request_path = Path(tmp) / "window-request.json"
+            env_path = Path(tmp) / "observer-window.env"
+            request_args = SimpleNamespace(
+                instance="arkserver2",
+                map_name="TheIsland",
+                run_id="20260601T120000Z-player-principal-lifecycle",
+                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                approved_window_start_utc="2026-06-01T12:00:00Z",
+                approved_window_end_utc="2026-06-01T12:10:00Z",
+                binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                restart_expectation="restart",
+                final_posture="stable",
+                user_policy="no_regular_users",
+                notice_path="not_applicable",
+                rollback_owner="operator",
+                output_dir=Path(tmp),
+                json=True,
+            )
+            request_path.write_text(
+                json.dumps(prepare_window_request.request_payload(request_args)),
+                encoding="utf-8",
+            )
+            env_path.write_text(
+                "\n".join(prepare_window_request.env_lines(request_args)) + "\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = checker.player_principal_lifecycle_window_request_diagnosis(request_path, env_path)
+
+        self.assertTrue(diagnosis["ready"])
+        self.assertTrue(diagnosis["request_pack_ready"])
+        self.assertTrue(diagnosis["operator_current_turn_runtime_window_approval_required"])
+        self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+        self.assertFalse(diagnosis["runtime_evidence_ready"])
+        self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertEqual(diagnosis["next_blocker"], "operator_current_turn_runtime_window_approval_required")
 
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

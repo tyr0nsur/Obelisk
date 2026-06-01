@@ -252,6 +252,22 @@ class CheckInventoryActionFixtureBoundaryTests(unittest.TestCase):
         self.assertIn("param_type_mismatch", reasons)
         self.assertIn("copied_scalar_redaction_mismatch", reasons)
 
+    def test_function_and_param_shape_drift_fails_closed(self) -> None:
+        report = checker.build_fixture_report()
+        mutated = copy.deepcopy(report)
+        mutated["signatures"][0]["function_flags"] = "0x0"
+        mutated["signatures"][0]["num_parms"] = 3
+        mutated["signatures"][0]["params"][1]["offset"] = 16
+        mutated["signatures"][1]["params"][3]["element_size"] = 8
+        mutated["signatures"][1]["params"][3]["property_flags"] = "0x0"
+
+        blockers: list[dict] = []
+        checker.validate_report(mutated, blockers)
+        reasons = [blocker["reason"] for blocker in blockers]
+
+        self.assertIn("function_shape_mismatch", reasons)
+        self.assertGreaterEqual(reasons.count("param_shape_mismatch"), 3)
+
     def test_object_reference_redaction_mutation_fails_closed(self) -> None:
         report = checker.build_fixture_report()
         mutated = copy.deepcopy(report)

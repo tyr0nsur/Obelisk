@@ -43,14 +43,32 @@ EXPECTED_COPIED_SCALAR_BY_KIND = {"integer": 1}
 EXPECTED_REDACTED_BY_REASON = {"object_ref": 3, "struct": 2}
 EXPECTED_PARAM_BOUNDARY = {
     "ShooterPlayerController.ServerRequestInventoryUseItem": {
-        "InventoryComp": ("redacted_uobject_ref", "ObjectProperty"),
-        "ItemId": ("redacted_struct", "StructProperty"),
+        "InventoryComp": ("redacted_uobject_ref", "ObjectProperty", 0, 8, 1, "0x1044080280", "in"),
+        "ItemId": ("redacted_struct", "StructProperty", 8, 8, 1, "0x1040000280", "in"),
     },
     "ShooterPlayerController.ServerRequestInventoryUseItemWithActor": {
-        "anActor": ("redacted_uobject_ref", "ObjectProperty"),
-        "InventoryComp": ("redacted_uobject_ref", "ObjectProperty"),
-        "ItemID1": ("redacted_struct", "StructProperty"),
-        "AdditionalData": ("int32", "IntProperty"),
+        "anActor": ("redacted_uobject_ref", "ObjectProperty", 0, 8, 1, "0x1040000280", "in"),
+        "InventoryComp": ("redacted_uobject_ref", "ObjectProperty", 8, 8, 1, "0x1044080280", "in"),
+        "ItemID1": ("redacted_struct", "StructProperty", 16, 8, 1, "0x1040000280", "in"),
+        "AdditionalData": ("int32", "IntProperty", 24, 4, 1, "0x1040000280", "in"),
+    },
+}
+EXPECTED_FUNCTION_SHAPE = {
+    "ShooterPlayerController.ServerRequestInventoryUseItem": {
+        "function_flags": "0x220cc0",
+        "num_parms": 2,
+        "parms_size": 16,
+        "return_value_offset": "0xffff",
+        "signature_status": "candidate-only",
+        "blocked_properties": [],
+    },
+    "ShooterPlayerController.ServerRequestInventoryUseItemWithActor": {
+        "function_flags": "0x220cc0",
+        "num_parms": 4,
+        "parms_size": 28,
+        "return_value_offset": "0xffff",
+        "signature_status": "candidate-only",
+        "blocked_properties": [],
     },
 }
 PUBLIC_CONTRACT_KEYS = ("public_contract", "payload_contract")
@@ -224,6 +242,16 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
         if not isinstance(signature, dict):
             append_blocker(blockers, "expected_signature_missing", target=target)
             continue
+        for field, expected in EXPECTED_FUNCTION_SHAPE[target].items():
+            if signature.get(field) != expected:
+                append_blocker(
+                    blockers,
+                    "function_shape_mismatch",
+                    target=target,
+                    field=field,
+                    expected=expected,
+                    value=signature.get(field),
+                )
         params = signature.get("params")
         if not isinstance(params, list):
             append_blocker(blockers, "params_missing", target=target)
@@ -237,7 +265,15 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
                 expected=list(expected_params),
                 value=list(params_by_name),
             )
-        for name, (expected_type, expected_class) in expected_params.items():
+        for name, (
+            expected_type,
+            expected_class,
+            expected_offset,
+            expected_element_size,
+            expected_array_dim,
+            expected_property_flags,
+            expected_direction,
+        ) in expected_params.items():
             param = params_by_name.get(name)
             if not isinstance(param, dict):
                 append_blocker(blockers, "expected_param_missing", target=target, param=name)
@@ -260,6 +296,23 @@ def validate_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> d
                     expected=expected_class,
                     value=param.get("source_property_class"),
                 )
+            for field, expected in (
+                ("offset", expected_offset),
+                ("element_size", expected_element_size),
+                ("array_dim", expected_array_dim),
+                ("property_flags", expected_property_flags),
+                ("direction", expected_direction),
+            ):
+                if param.get(field) != expected:
+                    append_blocker(
+                        blockers,
+                        "param_shape_mismatch",
+                        target=target,
+                        param=name,
+                        field=field,
+                        expected=expected,
+                        value=param.get(field),
+                    )
             if param.get("status") != "candidate":
                 append_blocker(blockers, "param_status_not_candidate", target=target, param=name, value=param.get("status"))
             field = f"{target}.{name}"

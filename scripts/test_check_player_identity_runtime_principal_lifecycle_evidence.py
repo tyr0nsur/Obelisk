@@ -324,6 +324,34 @@ class RuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertIn("ue_coordinate_or_pointer_leakage", report["blockers"])
 
+    def test_rejects_window_request_pack_as_runtime_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+            "status": "candidate_only_request_pack",
+        }
+        result = self.run_checker(payload, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("schema_mismatch", report["blockers"])
+        self.assertIn("request_pack_is_not_runtime_evidence", report["blockers"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
+
+    def test_rejects_window_manifest_check_as_runtime_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1",
+            "ready": True,
+        }
+        result = self.run_checker(payload, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn("schema_mismatch", report["blockers"])
+        self.assertIn("window_manifest_check_is_not_runtime_evidence", report["blockers"])
+        self.assertFalse(report["runtime_evidence_ready"])
+        self.assertEqual(report["remaining_blockers"], ["approved_runtime_evidence_missing"])
+
 
 if __name__ == "__main__":
     unittest.main()

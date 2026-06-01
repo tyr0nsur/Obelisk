@@ -13,15 +13,14 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
   them.
 - Treat player identity/principal, permissions/admin, command response, chat, inventory, structures, tribes, dinos, buffs, missions, transfers, timers, config/logging, economy/database, and admin tooling as module areas above the same core. Promote each only through copied-data ABI, privacy, lifecycle, and second-source/static evidence gates.
-- Latest local hardening: offline workspace inventory now blocks non-default dumps roots
-  before walking, blocks symlink-component roots, and keeps raw/protected-path metadata as
-  candidate-only. Timer registration now rejects unsupported `steady_clock` durations in
-  both `PluginManager` and `TimerManager`; this is runtime safety only, not a new public
-  gameplay timer surface. Command response planning now includes
-  `obelisk.command_copied_response_intent_lifecycle.planning.v1` as a route guardrail for
-  owner-scoped create/cancel/drain/expire/unload-cleanup vocabulary; it remains planning
-  only and does not promote command response, replies, send-chat, runtime delivery, public
-  ABI, public SDK readiness, or v1 completion.
+- Latest local hardening: player-identity first-evidence reporting can now include an
+  accepted player-principal lifecycle request-pack/observer env pair while keeping
+  `approved_runtime_evidence_missing` as the blocker; request packs and window-manifest
+  checks are explicitly rejected as runtime principal lifecycle evidence. Inventory-action
+  fixture boundary now locks exact function flags, param counts/sizes, return offset,
+  field offsets, element sizes, array dims, property flags, and direction for the two
+  redacted action fixtures. These are guardrails only and do not promote identity,
+  Inventory SDK, runtime readiness, public SDK readiness, or v1 completion.
 
 ## Hard Overrides
 
@@ -101,7 +100,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.
 - `scripts/check_player_identity_first_evidence_readiness.py` accepts current consume-only
   first evidence and leaves `approved_runtime_evidence_missing` as the blocker; promotion,
-  public SDK, and runtime readiness stay false.
+  public SDK, and runtime readiness stay false. If passed the current request-pack and
+  observer env, it reports `request_pack_ready=true` only as pre-window planning state;
+  the missing runtime artifacts remain copied `Obelisk.log`, checked `window-manifest.env`,
+  runtime observer summary, and approved evidence manifest.
 - Static orientation reports for identity/lifecycle/admin and command response are
   navigation clues only, not consume/promote evidence packs or artifact-gate schemas.
 - The current artifact-root audit is summarized in
@@ -130,7 +132,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `ue/InventoryReflection` recognizes the two inventory-action targets by exact metadata
   only; all fields, including `AdditionalData`, keep `ExposesRange=false`, and
   `ProcessEventInventoryReflection` must continue rejecting their FName indices before
-  reading UFunction memory or dispatching callbacks.
+  reading UFunction memory or dispatching callbacks. The fixture boundary checker also
+  fails closed on exact metadata drift for function flags, param counts/sizes, return
+  offset, offsets, element sizes, array dims, property flags, and direction.
 - Static field-window evidence clears only the field-window packaging blocker, is not a `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are present as package-shape evidence only, not a `v1.0` completion marker.
 ## Priority Next Steps
 

@@ -21,6 +21,8 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_c
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
 REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence-check.v1"
 NEXT_BLOCKER = "approved_runtime_evidence_missing"
+REQUEST_PACK_SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
+WINDOW_MANIFEST_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 
 REQUIRED_CASES = frozenset(
     (
@@ -549,6 +551,10 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
+        if payload.get("schema") == REQUEST_PACK_SCHEMA:
+            add(blockers, "request_pack_is_not_runtime_evidence", "$.schema")
+        elif payload.get("schema") == WINDOW_MANIFEST_CHECK_SCHEMA:
+            add(blockers, "window_manifest_check_is_not_runtime_evidence", "$.schema")
         return Validation(blockers, [])
     keys = set(payload)
     missing = REQUIRED_TOP_LEVEL_KEYS - keys
