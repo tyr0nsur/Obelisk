@@ -17,6 +17,7 @@ SCRIPT = SCRIPT_DIR / "check_command_copied_response_intent_planning.py"
 QUERY_CHECKER = SCRIPT_DIR / "check_permissions_admin_query_failclosed_contract.py"
 DECISIONS = REPO_ROOT / "docs" / "command_copied_response_intent_planning_decisions.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+CANONICAL_QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
 
 
 def write_json(root: Path, name: str, payload: dict) -> Path:
@@ -74,6 +75,23 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
         self.assertIn("plugin_owner_token", report["intent_fields"])
         self.assertIn("policy_source_id", report["intent_fields"])
         self.assertIn("redaction_flags", report["intent_fields"])
+
+    def test_accepts_canonical_query_failclosed_manifest_for_crosswalk(self) -> None:
+        result = run_checker("--query-failclosed-artifact", str(CANONICAL_QUERY_CONTRACT))
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertTrue(report["permission_query_crosswalk_checked"])
+        self.assertEqual(
+            report["query_failclosed_artifact_schema"],
+            "obelisk.permissions-admin-query-failclosed-contract.v1",
+        )
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_rejects_missing_query_failclosed_artifact(self) -> None:
         result = run_checker(check=False)

@@ -510,7 +510,7 @@
       "current_reference_limits": [
         "disabled by default",
         "plugin-owned prefix only",
-        "one local help command only",
+        "one plugin-local help text trigger only, not a public command API",
         "principal=unknown",
         "sanitized metadata logs only"
       ],

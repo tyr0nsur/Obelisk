@@ -11,6 +11,17 @@ pre-ABI contract, not public SDK surface. The intended schema name is:
 obelisk.permissions-admin-query-failclosed-contract.v1
 ```
 
+The canonical consume-only planning artifact is:
+
+```text
+docs/permissions_admin_query_failclosed_contract.json
+```
+
+It is accepted only as candidate planning input for permissions/admin and command
+response intent crosswalk checks. It is not a public header, ABI, runtime permission
+service, command response implementation, public SDK readiness, or v1 completion
+artifact.
+
 This artifact should validate the shape of a future query-only permission decision over a
 copied opaque principal. It must not add `ObeliskApi.h` symbols, public callbacks,
 permission groups, grants, admin mutation, command routing, replies/send-chat, storage,

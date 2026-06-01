@@ -18,6 +18,7 @@ DECISIONS = REPO_ROOT / "docs" / "permissions_admin_public_contract_decisions.js
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 QUERY_CHECKER = SCRIPT_DIR / "check_permissions_admin_query_failclosed_contract.py"
+CANONICAL_QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
 
 
 def run_checker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -93,6 +94,22 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
                 report["query_failclosed_artifact_schema"],
                 "obelisk.permissions-admin-query-failclosed-contract-check.v1",
             )
+
+    def test_accepts_canonical_query_failclosed_manifest_as_planning_only(self) -> None:
+        result = run_checker("--query-failclosed-artifact", str(CANONICAL_QUERY_CONTRACT))
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertEqual(
+            report["query_failclosed_artifact_schema"],
+            "obelisk.permissions-admin-query-failclosed-contract.v1",
+        )
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_rejects_missing_abuse_rate_limit_audit_requirements(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
