@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Validate player identity public-contract review readiness.
+
+This checker joins the approved runtime principal lifecycle evidence with the public
+contract decision manifest. Acceptance means the runtime lifecycle blocker is ready for
+contract review only; it does not promote public identity or open the SDK ABI.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence
+
+
+DECISION_SCHEMA = "obelisk.player-identity-public-contract-decisions.v1"
+REPORT_SCHEMA = "obelisk.player-identity-public-contract-readiness-check.v1"
+SURFACE = "obelisk.player_identity.v1"
+REQUIRED_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
+REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
+REQUIRED_FORBIDDEN = {
+    "UE pointers",
+    "raw params",
+    "FName/GObjects indices",
+    "ResourceHandle",
+    "pointer-derived identity",
+    "lookup",
+    "mutation",
+    "return override",
+}
+REQUIRED_BLOCKERS = {
+    "runtime.lifecycle_evidence",
+    "privacy.identifier_redaction",
+    "lifetime.generation_scope_invalidation",
+    "abi.public_pod_contract",
+    "lifecycle.owner_cleanup",
+    "separation.downstream_surfaces",
+}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--decisions",
+        type=Path,
+        default=Path("docs/player_identity_public_contract_decisions.json"),
+        help="Player identity public contract decision manifest.",
+    )
+    parser.add_argument(
+        "--approved-runtime-evidence",
+        type=Path,
+        required=True,
+        help="Approved runtime principal lifecycle evidence manifest.",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON report.")
+    parser.add_argument("--promote", action="store_true", help="Fail closed for promotion checks.")
+    parser.add_argument("--public-readiness", action="store_true", help="Fail closed for public SDK readiness checks.")
+    parser.add_argument("--runtime-readiness", action="store_true", help="Fail closed for runtime readiness checks.")
+    return parser.parse_args()
+
+
+def mode(args: argparse.Namespace) -> str:
+    requested = [
+        name
+        for name, enabled in (
+            ("promote", args.promote),
+            ("public_readiness", args.public_readiness),
+            ("runtime_readiness", args.runtime_readiness),
+        )
+        if enabled
+    ]
+    if len(requested) > 1:
+        raise SystemExit("--promote, --public-readiness, and --runtime-readiness are mutually exclusive")
+    return requested[0] if requested else "consume"
+
+
+def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -> None:
+    blocker = {"reason": reason, "label": label}
+    blocker.update(extra)
+    blockers.append(blocker)
+
+
+def load_json(path: Path, label: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{label}: invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{label}: top-level JSON must be an object")
+    return payload
+
+
+def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    try:
+        payload = approved_evidence.load_json(path)
+    except SystemExit as exc:
+        add(blockers, "approved_runtime_evidence_unreadable", "$.approved_runtime_evidence", error=str(exc))
+        return {
+            "ready": False,
+            "approved_runtime_evidence_present": False,
+            "runtime_evidence_ready": False,
+            "remaining_blockers": ["approved_runtime_evidence_missing"],
+        }
+
+    validation = approved_evidence.validate_manifest(payload, check_mode="consume")
+    report = approved_evidence.build_report(payload, validation, check_mode="consume")
+    if validation.blockers:
+        add(
+            blockers,
+            "approved_runtime_evidence_not_accepted",
+            "$.approved_runtime_evidence",
+            reasons=[blocker["reason"] for blocker in validation.blockers],
+        )
+    return report
+
+
+def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    if decisions.get("schema") != DECISION_SCHEMA:
+        add(blockers, "decision_schema_mismatch", "$.schema")
+    if decisions.get("surface") != SURFACE:
+        add(blockers, "decision_surface_mismatch", "$.surface")
+    if decisions.get("status") != "blocked":
+        add(blockers, "decision_status_not_blocked", "$.status")
+    if decisions.get("planning_stage") != "identity_public_contract_gate":
+        add(blockers, "decision_planning_stage_mismatch", "$.planning_stage")
+    if decisions.get("public_header_allowed") is not False:
+        add(blockers, "public_header_allowed_not_false", "$.public_header_allowed")
+    for key in ("public_header_symbols_now", "public_capability_bits_now", "public_callback_abi_now"):
+        if decisions.get(key) != []:
+            add(blockers, f"{key}_not_empty", f"$.{key}")
+
+    intake = decisions.get("approved_runtime_evidence_intake")
+    if not isinstance(intake, dict):
+        add(blockers, "approved_runtime_evidence_intake_missing", "$.approved_runtime_evidence_intake")
+    else:
+        if intake.get("id") != REQUIRED_INTAKE_ID:
+            add(blockers, "approved_runtime_evidence_intake_id_mismatch", "$.approved_runtime_evidence_intake.id")
+        if intake.get("status") != "external_manifest_required":
+            add(blockers, "approved_runtime_evidence_intake_status_mismatch", "$.approved_runtime_evidence_intake.status")
+        if intake.get("resolved_input") != REQUIRED_RESOLVED_INPUT:
+            add(blockers, "approved_runtime_evidence_intake_resolved_input_mismatch", "$.approved_runtime_evidence_intake.resolved_input")
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+            if intake.get(key) is not False:
+                add(blockers, f"approved_runtime_evidence_intake_{key}_not_false", f"$.approved_runtime_evidence_intake.{key}")
+
+    forbidden = decisions.get("forbidden_public_contract")
+    if not isinstance(forbidden, list) or not REQUIRED_FORBIDDEN.issubset(set(forbidden)):
+        add(blockers, "forbidden_public_contract_missing_required", "$.forbidden_public_contract")
+
+    blockers_list = decisions.get("promotion_blockers")
+    observed_ids = {
+        item.get("id")
+        for item in blockers_list
+        if isinstance(blockers_list, list) and isinstance(item, dict)
+    }
+    if observed_ids != REQUIRED_BLOCKERS:
+        add(
+            blockers,
+            "promotion_blockers_mismatch",
+            "$.promotion_blockers",
+            expected=sorted(REQUIRED_BLOCKERS),
+            observed=sorted(str(item) for item in observed_ids),
+        )
+    if isinstance(blockers_list, list):
+        for index, item in enumerate(blockers_list):
+            if isinstance(item, dict) and item.get("status") == "resolved":
+                add(blockers, "promotion_blocker_resolved_without_public_gate", f"$.promotion_blockers[{index}]")
+
+
+def build_report(decisions: dict[str, Any], runtime_report: dict[str, Any], blockers: list[dict[str, Any]], check_mode: str) -> dict[str, Any]:
+    runtime_ready = (
+        runtime_report.get("approved_runtime_evidence_present") is True
+        and runtime_report.get("runtime_evidence_ready") is True
+        and runtime_report.get("promotion_ready") is False
+        and runtime_report.get("public_sdk_ready") is False
+        and runtime_report.get("runtime_ready") is False
+    )
+    if not runtime_ready:
+        add(blockers, "approved_runtime_evidence_missing_or_not_ready", "$.approved_runtime_evidence")
+    if check_mode != "consume":
+        add(blockers, f"{check_mode}_blocked_until_player_identity_public_contract_promotion", "$.promotion_blockers")
+
+    evidence_blockers = [
+        blocker
+        for blocker in blockers
+        if not blocker["reason"].endswith("_blocked_until_player_identity_public_contract_promotion")
+    ]
+    accepted_for_contract_review = not evidence_blockers
+    return {
+        "schema": REPORT_SCHEMA,
+        "surface": decisions.get("surface"),
+        "mode": check_mode,
+        "ready": accepted_for_contract_review and check_mode == "consume",
+        "accepted_for_contract_review": accepted_for_contract_review,
+        "resolved_inputs": [REQUIRED_RESOLVED_INPUT] if accepted_for_contract_review else [],
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "public_header_symbols_now": decisions.get("public_header_symbols_now"),
+        "public_capability_bits_now": decisions.get("public_capability_bits_now"),
+        "public_callback_abi_now": decisions.get("public_callback_abi_now"),
+        "remaining_blockers": [
+            blocker["id"]
+            for blocker in decisions.get("promotion_blockers", [])
+            if isinstance(blocker, dict)
+        ],
+        "blockers": [blocker["reason"] for blocker in blockers],
+        "blocker_details": blockers,
+        "approved_runtime_evidence": {
+            "approved_runtime_evidence_present": runtime_report.get("approved_runtime_evidence_present") is True,
+            "runtime_evidence_ready": runtime_report.get("runtime_evidence_ready") is True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+        },
+        "non_claims": [
+            "approved runtime evidence intake does not add public header symbols, capability bits, callbacks, lookup, mutation, return override, or v1 SDK readiness",
+        ],
+    }
+
+
+def main() -> int:
+    args = parse_args()
+    check_mode = mode(args)
+    blockers: list[dict[str, Any]] = []
+    decisions = load_json(args.decisions, "decisions")
+    validate_decisions(decisions, blockers)
+    runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
+    report = build_report(decisions, runtime_report, blockers, check_mode)
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    elif blockers:
+        for blocker in blockers:
+            print(f"{blocker['reason']}: {blocker['label']}", file=sys.stderr)
+    return 0 if report["ready"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -29,6 +29,17 @@
   "public_header_symbols_now": [],
   "public_capability_bits_now": [],
   "public_callback_abi_now": [],
+  "approved_runtime_evidence_intake": {
+    "id": "approved_runtime_principal_lifecycle_evidence",
+    "status": "external_manifest_required",
+    "resolved_input": "runtime.lifecycle_evidence",
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false,
+    "public_header_allowed": false,
+    "required_checker": "scripts/check_player_identity_public_contract_readiness.py",
+    "non_claim": "A valid approved runtime evidence manifest can resolve only the runtime lifecycle evidence input for contract review; it does not promote public player identity or open ABI."
+  },
   "approved_runtime_evidence_not_sufficient": {
     "decision": "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.",
     "why": [

@@ -158,6 +158,22 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         self.assertEqual(identity["public_contract"], [])
         self.assertIn("obelisk.player_identity.v1", surfaces["v1_sdk_completion_blockers"])
 
+    def test_approved_runtime_evidence_intake_is_machine_readable_but_not_promoting(self) -> None:
+        payload = self.load_decisions()
+        intake = payload["approved_runtime_evidence_intake"]
+
+        self.assertEqual(intake["id"], "approved_runtime_principal_lifecycle_evidence")
+        self.assertEqual(intake["status"], "external_manifest_required")
+        self.assertEqual(intake["resolved_input"], "runtime.lifecycle_evidence")
+        self.assertFalse(intake["promotion_ready"])
+        self.assertFalse(intake["public_sdk_ready"])
+        self.assertFalse(intake["runtime_ready"])
+        self.assertFalse(intake["public_header_allowed"])
+        self.assertEqual(
+            intake["required_checker"],
+            "scripts/check_player_identity_public_contract_readiness.py",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
