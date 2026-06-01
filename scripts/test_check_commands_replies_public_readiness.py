@@ -161,6 +161,41 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("response_path_planning_evidence_treated_as_promoted", report["blockers"])
 
+    def test_rejects_dependency_sequence_and_post_v1_surface_drift(self) -> None:
+        surfaces = self.load_surfaces()
+        surfaces["v1_dependency_sequence"] = [
+            "obelisk.player_identity.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.commands_replies.v1",
+        ]
+        surfaces["post_v1_or_excluded_surfaces"] = [
+            surface
+            for surface in surfaces["post_v1_or_excluded_surfaces"]
+            if surface
+            not in {
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), surfaces=surfaces)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("v1_dependency_sequence_mismatch", report["blockers"])
+        self.assertIn("commands_replies_missing_from_post_v1_or_excluded", report["blockers"])
+        self.assertIn("response_path_missing_from_post_v1_or_excluded", report["blockers"])
+
     def test_rejects_public_header_command_reply_and_parser_symbols(self) -> None:
         header = (
             HEADER.read_text(encoding="utf-8")

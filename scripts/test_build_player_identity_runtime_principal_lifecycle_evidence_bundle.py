@@ -13,6 +13,10 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+import check_player_identity_first_evidence_readiness as first_evidence_checker
+
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
@@ -182,6 +186,66 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertTrue((output_dir / "evidence-bundle-report.json").is_file())
             self.assertTrue(report["operational_window"]["manifest_ready"])
             self.assertEqual(report["operational_window"]["obelisk_commit"], "test-commit")
+
+    def test_generated_bundle_manifest_clears_first_evidence_runtime_blocker_only(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+
+            result = self.run_bundle(copied_log, output_dir)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            diagnosis = first_evidence_checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                output_dir / "approved-runtime-principal-lifecycle-evidence.json"
+            )
+            if not (
+                first_evidence_checker.APPROVED_CANDIDATE_ROOT_FALLBACK.is_dir()
+                and first_evidence_checker.APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK.is_file()
+                and first_evidence_checker.APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK.is_file()
+            ):
+                self.skipTest("approved workspace first-evidence fallbacks are not available")
+            preflight = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "check_player_identity_first_evidence_readiness.py"),
+                    "--json",
+                    "--approved-runtime-principal-lifecycle-evidence-manifest",
+                    str(output_dir / "approved-runtime-principal-lifecycle-evidence.json"),
+                ],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertTrue(diagnosis["ready"])
+        self.assertTrue(diagnosis["approved_runtime_evidence_present"])
+        self.assertTrue(diagnosis["runtime_evidence_ready"])
+        self.assertFalse(diagnosis["promotion_ready"])
+        self.assertFalse(diagnosis["public_sdk_ready"])
+        self.assertFalse(diagnosis["runtime_ready"])
+        self.assertEqual(diagnosis["remaining_blockers"], [])
+        self.assertEqual(
+            diagnosis["observed_runtime_cases"],
+            ["session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+        )
+        self.assertEqual(
+            diagnosis["consumer_cases"],
+            ["malformed_or_unsupported_evidence", "stale_after_logout"],
+        )
+        report = json.loads(preflight.stdout)
+        approved = report["first_evidence"]["approved_runtime_principal_lifecycle_evidence_manifest"]
+        self.assertTrue(approved["ready"])
+        self.assertTrue(approved["approved_runtime_evidence_present"])
+        self.assertTrue(approved["runtime_evidence_ready"])
+        self.assertEqual(approved["remaining_blockers"], [])
+        self.assertNotIn("approved_runtime_evidence_missing", report["blockers"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_fails_closed_for_live_server_log_path(self) -> None:
         with self.temp_offline_workspace() as temp:

@@ -545,6 +545,14 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
 def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     require_equal(payload, "schema", SURFACES_SCHEMA, "$.surfaces", blockers)
     require_equal(payload, "v1_completion_required", False, "$.surfaces", blockers)
+    if payload.get("v1_dependency_sequence") != list(DEPENDENCY_CHAIN):
+        add(
+            blockers,
+            "v1_dependency_sequence_mismatch",
+            "$.surfaces.v1_dependency_sequence",
+            expected=list(DEPENDENCY_CHAIN),
+            value=payload.get("v1_dependency_sequence"),
+        )
 
     promoted = string_set(payload.get("promoted_surfaces"))
     if SURFACE in promoted:
@@ -552,9 +560,15 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if RESPONSE_PATH_SURFACE in promoted:
         add(blockers, "response_path_planning_evidence_treated_as_promoted", "$.surfaces.promoted_surfaces")
 
+    post_v1_or_excluded = string_set(payload.get("post_v1_or_excluded_surfaces"))
+    if SURFACE not in post_v1_or_excluded:
+        add(blockers, "commands_replies_missing_from_post_v1_or_excluded", "$.surfaces.post_v1_or_excluded_surfaces")
+    if RESPONSE_PATH_SURFACE not in post_v1_or_excluded:
+        add(blockers, "response_path_missing_from_post_v1_or_excluded", "$.surfaces.post_v1_or_excluded_surfaces")
+
     blockers_set = string_set(payload.get("v1_sdk_completion_blockers"))
     for surface in DEPENDENCY_CHAIN:
-        if surface not in blockers_set and surface not in string_set(payload.get("post_v1_or_excluded_surfaces")):
+        if surface not in blockers_set and surface not in post_v1_or_excluded:
             add(blockers, "dependency_chain_surface_missing_from_blockers_or_post_v1", "$.surfaces", surface=surface)
 
     surfaces = payload.get("surfaces")
@@ -600,7 +614,7 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
     if not isinstance(response_path, dict):
         add(blockers, "response_path_surface_missing", "$.surfaces.surfaces")
     else:
-        if response_path.get("status") == "promoted":
+        if response_path.get("status") != "post-v1":
             add(blockers, "response_path_planning_evidence_treated_as_promoted", "$.surfaces.surfaces.status")
         if response_path.get("public_contract") not in ([], None) and response_path.get("status") != "promoted":
             add(blockers, "response_path_public_contract_not_empty_while_unpromoted", "$.surfaces.surfaces.public_contract")
