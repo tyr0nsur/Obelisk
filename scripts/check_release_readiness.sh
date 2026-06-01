@@ -329,7 +329,7 @@ Usage: scripts/check_release_readiness.sh [--allow-dirty] [--require-second-sour
                                           [--scriptstruct-second-source-target-set <name>]
                                           [--second-source-report-dir <path>]
 
-Runs the local first-stable core release gate. It owns build, CTest, script tests,
+Runs the local release-readiness baseline gate. It owns build, CTest, script tests,
 production libobelisk.so symbol surface checks, install/SDK dry-runs, read-only CLI
 status, and clean-tree validation. By default the command fails if tracked or untracked
 non-ignored files are present before or after validation. Ignored build/cache directories
@@ -346,7 +346,7 @@ Options:
   --require-second-source-readiness Fail if focused reflection promotion target sets lack complete
                                     second-source evidence.
   --require-v1-sdk-completion       Fail unless docs/public_sdk_surfaces.json allows a complete
-                                    v1.0 SDK claim. This is separate from the core-first gate.
+                                    v1.0 SDK claim. This is separate from baseline release readiness.
   --v1-sdk-release-statement        Reviewed v1 SDK release statement naming excluded/post-v1 blockers.
   --ufunction-second-source-root    Candidate UFunction snapshot root for second-source promotion.
   --scriptstruct-second-source-root Candidate ScriptStruct snapshot root for second-source promotion.
@@ -827,9 +827,9 @@ git status --short --ignored
 check_clean_tree
 
 if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
-    printf '\nCore-first release readiness and gameplay/module second-source promotion checks completed.\n'
+    printf '\nRelease readiness baseline and gameplay/module second-source promotion checks completed.\n'
 else
-    printf '\nCore-first release readiness checks completed; gameplay/module second-source promotion gate was not run.\n'
+    printf '\nRelease readiness baseline checks completed; gameplay/module second-source promotion gate was not run.\n'
 fi
 if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
     printf 'Public SDK v1 completion gate completed.\n'

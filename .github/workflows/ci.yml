@@ -108,8 +108,8 @@ jobs:
               sys.exit(1)
           PY
 
-  core-first-release-readiness:
-    name: Core-first release readiness
+  release-readiness:
+    name: Release readiness
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -127,7 +127,7 @@ jobs:
             git \
             ninja-build
 
-      - name: Run first-stable core release gate
+      - name: Run release-readiness baseline gate
         # Canonical gate owns production libobelisk.so test-only symbol checks plus install/SDK dry-runs.
         # Gameplay/module promotion requires scripts/check_release_readiness.sh --require-second-source-readiness.
         run: scripts/check_release_readiness.sh

@@ -155,6 +155,38 @@ TARGET_BLOCKER_GUIDANCE = {
     },
 }
 TARGET_SET_BLOCKER_GUIDANCE = {
+    "buff-compact-intake": {
+        "classification": "internal_buff_layout_only_candidate",
+        "why_blocked": [
+            "internal_layout_evidence_only",
+            "not_release_readiness_target",
+            "missing_distinct_second_source_layout",
+            "copied_data_policy_unproven",
+            "lifecycle_privacy_policy_unproven",
+            "promotion_gate_blocked",
+            "public_buff_sdk_blocked",
+            "runtime_observation_requires_separate_approval",
+        ],
+        "next_offline_input": (
+            "sanitized AllowPostProcessEffect, BPBuffPreventUploading, and "
+            "BP_OnBuffLifetimeUpdated snapshots from a distinct non-protected "
+            "offline artifact with complete artifact identity"
+        ),
+        "snapshot_prep_checks": [
+            "compare only AllowPostProcessEffect, BPBuffPreventUploading, and BP_OnBuffLifetimeUpdated through --target-set buff-compact-intake",
+            "require AllowPostProcessEffect and BPBuffPreventUploading to expose copied ReturnValue BoolProperty only",
+            "require BP_OnBuffLifetimeUpdated to remain a zero-param recognition-only layout with no ReturnValue copy",
+            "keep buff payloads, inventory context, object refs, strings, arrays, raw params, and UE pointers redacted or recognition-only",
+            "keep evidence internal until copied-data, lifecycle, privacy, and promotion gates pass",
+            "require target, class, outer, every property, and nested struct/array candidates to be candidate-uobject",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ],
+        "non_claim": (
+            "does not promote Buff SDK, buff identity, lookup, mutation, return override, "
+            "runtime hooks, release readiness, or public SDK readiness"
+        ),
+    },
     "minimal-second-source-intake": {
         "classification": "release_compact_inventory_structure_layout_evidence",
         "why_blocked": [

@@ -708,6 +708,41 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 )
                 self.assertIn(f"does not promote {module} SDK", item["non_claim"])
 
+    def test_buff_compact_guidance_names_exact_layout_readiness_gap(self) -> None:
+        result = run_compare_raw(
+            "--list-target-guidance",
+            "--target-set",
+            "buff-compact-intake",
+            "--json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        guidance = report["target_set_guidance"][0]
+        self.assertEqual(guidance["target_set"], "buff-compact-intake")
+        self.assertEqual(guidance["classification"], "internal_buff_layout_only_candidate")
+        self.assertIn("missing_distinct_second_source_layout", guidance["why_blocked"])
+        self.assertIn("public_buff_sdk_blocked", guidance["why_blocked"])
+        self.assertIn("runtime_observation_requires_separate_approval", guidance["why_blocked"])
+        self.assertIn(
+            "sanitized AllowPostProcessEffect, BPBuffPreventUploading, and BP_OnBuffLifetimeUpdated snapshots",
+            guidance["next_offline_input"],
+        )
+        for required in (
+            "compare only AllowPostProcessEffect, BPBuffPreventUploading, and BP_OnBuffLifetimeUpdated",
+            "ReturnValue BoolProperty only",
+            "zero-param recognition-only layout with no ReturnValue copy",
+            "require distinct artifact identity before any second-source layout claim",
+            "do not use this target set for release/readiness or public SDK promotion gates",
+        ):
+            self.assertTrue(
+                any(required in item for item in guidance["snapshot_prep_checks"]),
+                f"missing buff compact guidance term: {required}",
+            )
+        self.assertIn("Buff SDK", guidance["non_claim"])
+        self.assertIn("return override", guidance["non_claim"])
+        self.assertIn("public SDK readiness", guidance["non_claim"])
+
     def test_item_return_target_set_guidance_keeps_release_scope_narrow(self) -> None:
         result = run_compare_raw(
             "--list-target-guidance",

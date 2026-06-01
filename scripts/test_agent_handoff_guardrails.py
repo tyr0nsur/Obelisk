@@ -142,6 +142,7 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
             with self.subTest(file=path, item="approval scope"):
                 self.assertIn("approved", text)
                 self.assertIn("public", text)
+                self.assertIn("modder-facing", text)
                 self.assertIn("milestones", text)
                 self.assertIn("beta-test", text)
             with self.subTest(file=path, item="embed shape"):
