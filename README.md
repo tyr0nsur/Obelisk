@@ -52,6 +52,10 @@ v1 SDK direction:
 - RC and post-RC surfaces improve plugin-author readiness, but they do not
   replace the complete v1 SDK blocker track or authorize `v1.0 stable`,
   complete, full, or production SDK wording.
+- Current blockers stay exact: player identity needs approved copied runtime
+  principal lifecycle evidence, and ResourceHandle needs rejected runtime object
+  samples plus runtime serial reuse/wraparound semantics. Plugin Hub remains
+  post-SDK-complete planning only.
 
 v0.1-rc public C ABI slices:
 

@@ -2180,6 +2180,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "not_ready",
                 "layout_ready": False,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "missing_second_source", "count": 1}],
             },
         )
@@ -2257,6 +2259,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("second_source=accepted:1", result.stdout)
         self.assertIn("gate_mode=informational_gap_report", result.stdout)
         self.assertIn("promotion_gate ready=false blockers=not_second_source_promotion_gate:1", result.stdout)
+        self.assertIn("public_sdk_ready=false runtime_ready=false", result.stdout)
         self.assertNotIn("target=obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse", result.stdout)
 
     def test_readiness_report_blocks_empty_snapshot_roots(self) -> None:
@@ -2284,6 +2287,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "not_ready",
                 "layout_ready": False,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "no_targets", "count": 1}],
             },
         )
@@ -2351,6 +2356,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "layout_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "promotion_requires_target_set", "count": 1}],
             },
         )
@@ -2381,6 +2388,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "layout_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [],
             },
         )
@@ -2626,6 +2635,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "not_ready",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [
                     {
                         "reason": "ambiguous_target_set_coverage",
@@ -2737,6 +2748,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "planning_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
@@ -2771,6 +2784,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "planning_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
@@ -2868,6 +2883,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "planning_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
@@ -2916,6 +2933,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "not_ready",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "explicit_target_not_in_named_target_set", "count": 1}],
             },
         )
@@ -2967,6 +2986,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "internal_layout_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
@@ -2981,6 +3002,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "layout_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [],
             },
         }
@@ -2996,6 +3019,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "planning_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
             },
         )
@@ -3037,6 +3062,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                         "ready_scope": expected_scope,
                         "layout_ready": True,
                         "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
                         "blockers": [{"reason": "target_set_not_release_readiness", "count": 1}],
                     },
                 )
@@ -3165,6 +3192,8 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
                 "ready_scope": "layout_only",
                 "layout_ready": True,
                 "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
                 "blockers": [{"reason": "not_second_source_promotion_gate", "count": 1}],
             },
         )

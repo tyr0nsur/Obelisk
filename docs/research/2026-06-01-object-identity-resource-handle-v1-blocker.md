@@ -128,3 +128,28 @@ This does not supply runtime rejected-object samples or runtime serial reuse/wra
 semantics. It only makes the existing offline zero-serial cohort reproducible and
 gate-checkable without turning it into object identity or public `ResourceHandle`
 evidence.
+
+## 2026-06-01 Evaluator Non-Substitution Hardening
+
+`scripts/evaluate_resource_handle_revalidation.py` now accepts optional
+`--zero-serial-negative-samples` inputs for
+`obelisk.resource-handle-zero-serial-negative-samples.v1`. The evaluator validates the
+artifact as candidate-only offline evidence, reports only counts and artifact hashes, and
+emits `offline_zero_serial_negative_samples_summary` with explicit non-substitution rows:
+
+- zero-serial offline samples do not satisfy
+  `obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1`;
+- zero-serial offline samples do not satisfy
+  `obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1`.
+
+The runtime evidence booleans remain false:
+`runtime_rejection_samples_present=false`,
+`runtime_serial_semantics_present=false`, and
+`runtime_resourcehandle_promotion_evidence_complete=false`. The top-level blockers remain
+the exact blockers needed for future approved runtime work:
+`no_rejected_runtime_object_samples` and `no_serial_reuse_or_wraparound_policy`.
+
+Invalid zero-serial inputs are named separately with
+`invalid_zero_serial_negative_samples_candidate`, so a malformed or overclaiming offline
+cohort cannot mask the runtime blockers or look like accepted rejected-object runtime
+evidence.

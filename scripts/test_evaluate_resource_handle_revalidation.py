@@ -242,6 +242,109 @@ def uobject_flag_policy_report(
     return payload
 
 
+def zero_serial_negative_samples_report(
+    *,
+    artifact_identity: bool = True,
+    artifact_identity_sha256: str | None = None,
+    schema: str | None = None,
+    promotion_ready: bool = False,
+    public_resource_handle_ready: bool = False,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema": schema or evaluator.ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+        "status": "candidate_blocked",
+        "evidence_kind": "internal_offline_zero_serial_negative_samples",
+        "deterministic_negative_cohort": True,
+        "sources": [
+            {
+                "source_label": "vanilla",
+                "core_path_redacted": True,
+                "core_sha256": "1" * 64,
+                "core_sha256_verified": True,
+                "metadata": {
+                    "gobjects": "0x595b7e0",
+                    "fname_root_slot": "0x5956f30",
+                    "fname_table": "0x5a94660",
+                    "chunks": "0x1111222233334444",
+                    "object_count": 50835,
+                    "anchor_index": 50834,
+                    "max_scan_index": 50834,
+                    "name_resolution": "enabled",
+                },
+                "scan_totals": {
+                    "indices_scanned": 50835,
+                    "nonnull_items_seen": 50835,
+                    "candidate_uobjects_seen": 50835,
+                },
+                "zero_serial_negative_samples": [
+                    {
+                        "index": 0,
+                        "address": "0x5555666677778888",
+                        "class_name": "Package",
+                        "name": "/Script/CoreUObject",
+                        "flags": 0,
+                        "fuobject_item": "0x1111222233334444",
+                        "item_dword_0x8": 0,
+                        "item_dword_0xC": 0,
+                        "internal_index": 0,
+                        "internal_index_matches": True,
+                        "membership": "candidate-uobject",
+                        "membership_pass": True,
+                    }
+                ],
+                "positive_anchor": {
+                    "index": 50834,
+                    "address": "0x9999aaaabbbbcccc",
+                    "class_name": "LinkerLoad",
+                    "name": "LinkerLoad",
+                    "flags": 0,
+                    "fuobject_item": "0x1111222233335555",
+                    "item_dword_0x8": 1001,
+                    "item_dword_0xC": 116,
+                    "internal_index": 50834,
+                    "internal_index_matches": True,
+                    "membership": "candidate-uobject",
+                    "membership_pass": True,
+                },
+                "deterministic_negative_cohort": True,
+                "blockers": [],
+            }
+        ],
+        "serial_candidate_field": {
+            "offset": "FUObjectItem+0x8",
+            "width": "uint32",
+            "accepted_positive_anchor": "index 50834 nonzero serial",
+        },
+        "non_claims": list(evaluator.ZERO_SERIAL_NEGATIVE_SAMPLE_NON_CLAIMS),
+        "promotion_ready": promotion_ready,
+        "public_resource_handle_ready": public_resource_handle_ready,
+        "post_callback_resource_handle_ready": False,
+        "promotion_gate": {
+            "ready": False,
+            "blockers": ["candidate_only_zero_serial_negative_samples"],
+        },
+    }
+    if artifact_identity:
+        identity_without_hash = {
+            "artifact_kind": evaluator.ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+            "capture_id": "zero-serial-capture",
+            "evidence_pack_id": "zero-serial-pack",
+        }
+        expected_hash = hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "artifact_identity": identity_without_hash,
+                    "report": evaluator.zero_serial_negative_samples_canonical_report(payload),
+                }
+            )
+        ).hexdigest()
+        payload["output_artifact_identity"] = {
+            **identity_without_hash,
+            "artifact_sha256": artifact_identity_sha256 or expected_hash,
+        }
+    return payload
+
+
 class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
     def test_fail_closed_with_current_style_zero_serials_and_missing_static_evidence(self) -> None:
         report = reconciliation_report(serial_values=[0, 0, 0])
@@ -859,6 +962,153 @@ class ResourceHandleRevalidationEvaluatorTests(unittest.TestCase):
                 },
             ],
         )
+
+    def test_zero_serial_negative_samples_are_reported_but_do_not_satisfy_runtime_blockers(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64)],
+            static_evidence(coherent=True, artifact_identity_sha256="b" * 64),
+            require_artifact_identity=True,
+            uobject_flag_policy=uobject_flag_policy_report(artifact_identity_sha256="c" * 64),
+            zero_serial_negative_samples=[zero_serial_negative_samples_report()],
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertTrue(payload["evidence_checks"]["offline_zero_serial_negative_samples_present"])
+        self.assertTrue(payload["evidence_checks"]["offline_zero_serial_negative_samples_accepted"])
+        self.assertFalse(payload["evidence_checks"]["zero_serial_negative_samples_satisfy_runtime_rejection_samples"])
+        self.assertFalse(payload["evidence_checks"]["zero_serial_negative_samples_satisfy_runtime_serial_semantics"])
+        self.assertFalse(payload["evidence_checks"]["runtime_rejection_samples_present"])
+        self.assertFalse(payload["evidence_checks"]["runtime_serial_semantics_present"])
+        self.assertIn("no_rejected_runtime_object_samples", payload["blockers"])
+        self.assertIn("no_serial_reuse_or_wraparound_policy", payload["blockers"])
+        self.assertNotIn(evaluator.BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES, payload["blockers"])
+        self.assertEqual(payload["artifact_identity"]["complete_input_count"], 4)
+        summary = payload["offline_zero_serial_negative_samples_summary"]
+        self.assertEqual(summary["accepted_report_count"], 1)
+        self.assertEqual(summary["zero_serial_sample_count"], 1)
+        self.assertEqual(summary["positive_anchor_count"], 1)
+        self.assertEqual(
+            summary["does_not_satisfy_runtime_requirements"],
+            list(evaluator.ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS),
+        )
+        self.assertEqual(
+            payload["lifetime_blocker_summary"]["offline_zero_serial_negative_samples_do_not_satisfy"],
+            list(evaluator.ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS),
+        )
+
+    def test_zero_serial_negative_samples_wrong_schema_is_invalid_and_not_runtime_evidence(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            zero_serial_negative_samples=[
+                zero_serial_negative_samples_report(schema=evaluator.RUNTIME_REJECTION_SAMPLES_SCHEMA)
+            ],
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["offline_zero_serial_negative_samples_accepted"])
+        self.assertFalse(payload["evidence_checks"]["runtime_rejection_samples_present"])
+        self.assertFalse(payload["evidence_checks"]["runtime_serial_semantics_present"])
+        self.assertIn(evaluator.BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES, payload["blockers"])
+        report_summary = payload["offline_zero_serial_negative_samples_summary"]["reports"][0]
+        self.assertFalse(report_summary["accepted"])
+        self.assertIn("zero_serial_negative_samples_schema_mismatch", report_summary["issues"])
+        self.assertIn("no_rejected_runtime_object_samples", payload["blockers"])
+
+    def test_zero_serial_negative_samples_rejects_mixed_runtime_fields(self) -> None:
+        report = zero_serial_negative_samples_report()
+        report["rows"] = [
+            {
+                "row_id": "runtime-like-row",
+                "decision": "reject",
+                "reject_reason": "zero_serial",
+            }
+        ]
+
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            zero_serial_negative_samples=[report],
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["offline_zero_serial_negative_samples_accepted"])
+        self.assertFalse(payload["evidence_checks"]["runtime_rejection_samples_present"])
+        self.assertIn(evaluator.BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES, payload["blockers"])
+        report_summary = payload["offline_zero_serial_negative_samples_summary"]["reports"][0]
+        self.assertIn("zero_serial_negative_samples_unexpected_top_level_field", report_summary["issues"])
+        self.assertIn("no_rejected_runtime_object_samples", payload["blockers"])
+
+    def test_zero_serial_negative_samples_overclaim_is_invalid_and_fail_closed(self) -> None:
+        payload = evaluator.build_evaluation(
+            [reconciliation_report(serial_values=[17])],
+            static_evidence(coherent=True),
+            zero_serial_negative_samples=[
+                zero_serial_negative_samples_report(
+                    promotion_ready=True,
+                    public_resource_handle_ready=True,
+                )
+            ],
+        )
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertFalse(payload["evidence_checks"]["offline_zero_serial_negative_samples_accepted"])
+        self.assertIn(evaluator.BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES, payload["blockers"])
+        report_summary = payload["offline_zero_serial_negative_samples_summary"]["reports"][0]
+        self.assertIn("zero_serial_negative_samples_promotion_ready_overclaim", report_summary["issues"])
+        self.assertIn("zero_serial_negative_samples_public_resourcehandle_overclaim", report_summary["issues"])
+
+    def test_cli_zero_serial_negative_samples_output_is_redacted_and_runtime_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            reconciliation = root / "reconciliation.json"
+            static = root / "static.json"
+            zero_serial = root / "zero-serial.json"
+            output = root / "resource-handle-readiness.json"
+            write_json(reconciliation, reconciliation_report(serial_values=[17], artifact_identity_sha256="a" * 64))
+            write_json(static, static_evidence(coherent=True, artifact_identity_sha256="b" * 64))
+            write_json(zero_serial, zero_serial_negative_samples_report())
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "evaluate_resource_handle_revalidation.py"),
+                    "--reconciliation",
+                    str(reconciliation),
+                    "--static-global-evidence",
+                    str(static),
+                    "--zero-serial-negative-samples",
+                    str(zero_serial),
+                    "--require-artifact-identity",
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            text = output.read_text(encoding="utf-8")
+            payload = json.loads(text)
+
+        assert_fail_closed_resource_handle_contract(self, payload)
+        self.assertTrue(payload["evidence_checks"]["offline_zero_serial_negative_samples_accepted"])
+        self.assertFalse(payload["evidence_checks"]["runtime_rejection_samples_present"])
+        self.assertFalse(payload["evidence_checks"]["runtime_serial_semantics_present"])
+        for forbidden in (
+            "0x5555666677778888",
+            "0x9999aaaabbbbcccc",
+            "Package",
+            "LinkerLoad",
+            "CoreUObject",
+            "/Script",
+            "50834",
+            "1001",
+            "fuobject_item",
+            "fname_root_slot",
+            "class_name",
+        ):
+            self.assertNotIn(forbidden, text)
 
 
 if __name__ == "__main__":

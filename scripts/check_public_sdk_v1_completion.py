@@ -51,6 +51,12 @@ CANONICAL_V1_COMPLETION_BLOCKERS = {
     "obelisk.operator_ingress_storage.v1",
     "obelisk.gameplay_tick_callbacks.v1",
 }
+CANONICAL_V1_DEPENDENCY_SEQUENCE = (
+    "obelisk.player_identity.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1",
+    "obelisk.commands_replies.v1",
+)
 CANONICAL_EXPERIMENTAL_SURFACE_IDS = {
     "obelisk.gameplay_policy_event.v1",
     "obelisk.chat_message.v1",
@@ -1231,6 +1237,52 @@ def unresolved_promoted_surface_dependencies(
     return unresolved
 
 
+def missing_required_dependency_declarations(
+    surfaces_by_id: dict[str, dict[str, Any]],
+) -> dict[str, list[str]]:
+    missing: dict[str, list[str]] = {}
+    for surface_id, required_dependency_ids in REQUIRED_PROMOTED_SURFACE_DEPENDENCIES.items():
+        surface = surfaces_by_id.get(surface_id)
+        if not isinstance(surface, dict):
+            continue
+        declared_dependency_ids = set(as_string_list(surface.get("depends_on")))
+        missing_dependencies = [
+            dependency_id
+            for dependency_id in required_dependency_ids
+            if dependency_id not in declared_dependency_ids
+        ]
+        if missing_dependencies:
+            missing[surface_id] = missing_dependencies
+    return missing
+
+
+def v1_dependency_sequence_mismatches(
+    manifest: dict[str, Any],
+    surfaces_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    mismatches: list[str] = []
+    declared_sequence = as_string_list(manifest.get("v1_dependency_sequence"))
+    chain_surfaces_present = all(surface_id in surfaces_by_id for surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE)
+
+    if declared_sequence or chain_surfaces_present:
+        if declared_sequence != list(CANONICAL_V1_DEPENDENCY_SEQUENCE):
+            mismatches.append("v1_dependency_sequence")
+
+    completion_blockers = as_string_list(manifest.get("v1_sdk_completion_blockers"))
+    completion_blocker_positions = {
+        surface_id: index for index, surface_id in enumerate(completion_blockers)
+    }
+    if all(surface_id in completion_blocker_positions for surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE):
+        ordered_positions = [
+            completion_blocker_positions[surface_id]
+            for surface_id in CANONICAL_V1_DEPENDENCY_SEQUENCE
+        ]
+        if ordered_positions != sorted(ordered_positions):
+            mismatches.append("v1_sdk_completion_blockers")
+
+    return mismatches
+
+
 def build_report(
     manifest_path: Path,
     release_statement_path: Path | None = None,
@@ -1332,6 +1384,8 @@ def build_report(
             stable_contract if isinstance(stable_contract, dict) else None,
         )
     )
+    missing_dependency_declarations = missing_required_dependency_declarations(surfaces_by_id)
+    dependency_sequence_mismatches = v1_dependency_sequence_mismatches(manifest, surfaces_by_id)
 
     promoted_surfaces = set(as_string_list(manifest.get("promoted_surfaces")))
     experimental_surfaces = set(as_string_list(manifest.get("experimental_surfaces")))
@@ -1539,6 +1593,10 @@ def build_report(
         blockers.append("promoted_surface_required_evidence_terms_missing")
     if promoted_dependency_failures:
         blockers.append("promoted_surface_dependency_unresolved")
+    if missing_dependency_declarations:
+        blockers.append("required_surface_dependency_declaration_missing")
+    if dependency_sequence_mismatches:
+        blockers.append("v1_dependency_sequence_mismatch")
     if non_promoted_with_contract:
         blockers.append("non_promoted_surface_has_public_contract")
     if non_promoted_with_public_abi:
@@ -1646,6 +1704,13 @@ def build_report(
             surface_id: sorted(set(dependencies))
             for surface_id, dependencies in sorted(promoted_dependency_failures.items())
         },
+        "surfaces_missing_required_dependency_declarations": {
+            surface_id: sorted(set(dependencies))
+            for surface_id, dependencies in sorted(missing_dependency_declarations.items())
+        },
+        "v1_dependency_sequence": as_string_list(manifest.get("v1_dependency_sequence")),
+        "v1_dependency_sequence_expected": list(CANONICAL_V1_DEPENDENCY_SEQUENCE),
+        "v1_dependency_sequence_mismatches": sorted(set(dependency_sequence_mismatches)),
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "non_promoted_with_public_abi": sorted(set(non_promoted_with_public_abi)),
@@ -1793,6 +1858,16 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "promoted_surface_dependency_unresolved": [
             "A public ABI surface is promoted while required dependency surfaces are not promoted.",
             "Action: promote the dependencies first, or keep the dependent surface non-promoted.",
+        ],
+        "required_surface_dependency_declaration_missing": [
+            "A permissions/admin or command surface row is missing a required depends_on declaration.",
+            f"Surfaces: {format_human_list(sorted(report.get('surfaces_missing_required_dependency_declarations', {}).keys()))}.",
+            "Action: keep identity/principal before permissions/admin, and keep command/chat response before commands/replies.",
+        ],
+        "v1_dependency_sequence_mismatch": [
+            "The manifest v1 dependency sequence no longer matches identity -> permissions -> command/chat response -> commands/replies.",
+            f"Mismatches: {format_human_list(report.get('v1_dependency_sequence_mismatches'))}.",
+            "Action: restore v1_dependency_sequence and v1_sdk_completion_blockers to the canonical dependency order.",
         ],
         "non_promoted_surface_has_public_contract": [
             "A non-promoted surface still lists public_contract entries.",

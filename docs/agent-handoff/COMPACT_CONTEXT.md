@@ -291,8 +291,9 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
   is accepted by the offline artifact gate. Passing both lifecycle-anchor and
   principal-invalidation manifests to the first-evidence readiness checker now keeps
-  consume-gate acceptance and exposes `approved_runtime_evidence_missing` as the primary
-  blocker. The report still carries a requirements-only
+  consume-gate acceptance and exposes approved copied runtime principal lifecycle
+  evidence, reported as `approved_runtime_evidence_missing`, as the primary blocker.
+  The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The
   optional runtime-principal lifecycle manifest checker accepts only a synthetic/redacted
@@ -345,10 +346,10 @@ priorities, and do not use history files as the active source of truth.
   remains blocked until `policy_epoch` plus full generation/scope keying is promoted.
   No `allow` decision is valid without runtime-owned policy source/authority provenance,
   and public permission queries need owner-scoped rate-limit/audit gates.
-- Plugin Hub seed review requires exactly one `Support tier: <tier>` declaration in seed
-  README/package/public docs and rejects unnegated claims for v1, ArkApi/AseApi
-  compatibility, commands, permissions, identity, send-chat/replies, mutation, storage,
-  inventory, or structure support outside that tier.
+- Plugin Hub seed guardrails are archived boundaries only until SDK completion: seed docs
+  must stay non-promotional and must not reopen examples, packaging, intake tooling, or
+  seed review while identity/principal, permissions/admin, command/response, storage,
+  mutation, ResourceHandle, and gameplay module blockers remain open.
 - Public v1 completion evidence rejects strict blocker evidence paths or schema/status
   fields that are candidate/planning/orientation/preflight/readiness/consume-only/
   evidence-only. Do not let static orientation, planning docs, or candidate reports

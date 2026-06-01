@@ -130,6 +130,12 @@ Items SDKs, `ItemNetID`, item/inventory/actor identity, `ResourceHandle`, mutati
 override, raw params, or runtime hooks. The safe model for `ItemId` and `ItemID1` remains:
 opaque 8-byte struct parameters used by these two inventory action calls.
 
+Current checker output must also be read through the explicit gate boundary fields:
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`. A passed
+layout comparison for `inventory-action-compact-intake` remains internal planning
+evidence and is not an Inventory/Items SDK, runtime observer, callback, identity, lookup,
+mutation, or return-override promotion.
+
 ## 2026-05-30 Strict Artifact Flow Recommendation
 
 The next offline artifact for `inventory-action-compact-intake` should regenerate the

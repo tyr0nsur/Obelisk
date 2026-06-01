@@ -74,13 +74,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `targets=12`, `comparable=12`, `second_source_accepted=12`, rejected/inconclusive/missing
   all zero, and promotion remains false. This is accepted distinct second-source layout
   evidence from the vanilla-gdb core.
-- Current identity next step is accepted login/logout lifecycle anchor evidence and
-  principal invalidation semantics. The
-  `obelisk.players-identity-principal-invalidation-policy.v1` schema is a
-  planning/candidate-only policy artifact and is not promoted. The lane remains
-  planning-only and candidate-only: no public identity, permissions, commands, runtime
-  lookup, ResourceHandle, mutation, return override, or v1 SDK completion claim is
-  promoted.
+- Current identity next blocker is approved copied runtime principal lifecycle evidence
+  for the accepted login/logout anchor route. Lifecycle-anchor and principal-invalidation
+  manifests are consume-only; no public identity, permissions, commands, runtime lookup,
+  ResourceHandle, mutation, return override, or v1 SDK completion claim is promoted.
 - Private hook-side player-principal lifecycle observer wiring now exists for
   `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`: it is default-off,
   observer-debug/env/marker/SHA/log-budget gated, redacted, dispatch-limit `0`, and
@@ -197,15 +194,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   offline planning contract and does not create public SDK, runtime, or promotion evidence.
 - Plugin Hub seed review is parked until SDK completion. Current rounds should keep
   Plugin Hub docs non-promotional and focus on SDK blockers.
-- Revalidate before any checkpoint: identity readiness with the vanilla-gdb candidate root
-  stays blocked on lifecycle-anchor evidence unless an explicit lifecycle-anchor candidate
-  manifest is provided; with both lifecycle-anchor and principal-invalidation policy
-  manifests it stays blocked on approved runtime evidence. Public SDK v1 completion stays
-  blocked, Plugin Hub docs stay non-promotional, and `git diff --check` must be rerun
-  before checkpoint.
-- lifecycle-anchor and principal-invalidation candidate manifests can now be consumed
-  together; the next blocker is approved runtime principal lifecycle evidence. Do not
-  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes.
+- Revalidate before any checkpoint: with the vanilla-gdb candidate root plus
+  consume-only lifecycle-anchor and principal-invalidation manifests, identity readiness
+  stays blocked on approved runtime principal lifecycle evidence. Public SDK v1
+  completion stays blocked, Plugin Hub docs stay non-promotional, and `git diff --check`
+  must be rerun before checkpoint.
+- Do not rerun the completed admin snapshot, second-source layout, or lifecycle layout
+  routes; the next identity blocker is approved runtime principal lifecycle evidence.
   Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`
 - Start every supervised round by verifying no stale stand-by sub-agent remains open.

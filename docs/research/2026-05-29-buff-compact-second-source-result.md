@@ -197,3 +197,12 @@ blocker=target_set_not_release_readiness
 internal-layout-only, not a release-readiness target set. The layout repair is accepted
 `3/3`; it does not promote public Buff SDK, runtime observation, callbacks, mutation,
 return override, raw params, object identity/lookup, or `ResourceHandle`.
+
+## 2026-06-01 Comparator Boundary Refresh
+
+Older snippets in this note preserve the historical comparator output where
+`promotion_gate.ready=true` meant only "layout comparison passed." The current checker
+must be read with the explicit boundary fields on `promotion_gate`:
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`. For
+internal Buff target sets, `layout_ready=true` is not a public/runtime SDK signal and
+`--fail-on-readiness-gaps` remains blocked by `target_set_not_release_readiness`.

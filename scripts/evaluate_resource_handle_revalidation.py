@@ -31,6 +31,7 @@ UOBJECT_FLAG_POLICY_REPORT_SCHEMA = "obelisk.uobject-flag-policy-report.v1"
 INTERNAL_UOBJECT_REVALIDATION_CANDIDATE_SCHEMA = "obelisk.internal-uobject-revalidation-candidate.v1"
 RUNTIME_REJECTION_SAMPLES_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-rejection-samples.v1"
 RUNTIME_SERIAL_SEMANTICS_SCHEMA = "obelisk.internal-uobject-revalidation-runtime-serial-semantics.v1"
+ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA = "obelisk.resource-handle-zero-serial-negative-samples.v1"
 
 STATUS_CANDIDATE_UOBJECT = "candidate-uobject"
 BLOCKER_ZERO_OR_MISSING_SERIAL = "zero_or_missing_fuobjectitem_serial_candidates"
@@ -39,6 +40,7 @@ BLOCKER_MISSING_COHERENT_WINDOW = "missing_gobjects_coherent_field_window"
 BLOCKER_MISSING_ARTIFACT_IDENTITY = "missing_or_partial_artifact_identity"
 BLOCKER_INVALID_ARTIFACT_IDENTITY = "invalid_artifact_identity"
 BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE = "invalid_uobject_flag_policy_candidate"
+BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES = "invalid_zero_serial_negative_samples_candidate"
 UOBJECT_FLAG_POLICY_REMAINING_BLOCKERS = (
     "static_only_evidence",
     "no_rejected_runtime_object_samples",
@@ -114,6 +116,24 @@ RESOURCE_HANDLE_RUNTIME_EVIDENCE_REQUIREMENTS = (
         "schema": RUNTIME_SERIAL_SEMANTICS_SCHEMA,
         "blocker": "no_serial_reuse_or_wraparound_policy",
         "present": False,
+    },
+)
+ZERO_SERIAL_NEGATIVE_SAMPLE_NON_CLAIMS = (
+    "candidate-only offline evidence",
+    "does not prove runtime reuse, wraparound, UObject flag validity, lookup, mutation, or public ResourceHandle",
+)
+ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS = (
+    {
+        "offline_schema": ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+        "required_runtime_schema": RUNTIME_REJECTION_SAMPLES_SCHEMA,
+        "blocker": "no_rejected_runtime_object_samples",
+        "satisfied": False,
+    },
+    {
+        "offline_schema": ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+        "required_runtime_schema": RUNTIME_SERIAL_SEMANTICS_SCHEMA,
+        "blocker": "no_serial_reuse_or_wraparound_policy",
+        "satisfied": False,
     },
 )
 
@@ -199,13 +219,17 @@ def add_output_artifact_identity(evaluation: dict[str, Any], identity: dict[str,
     return evaluation
 
 
-def classify_artifact_identity(report: dict[str, Any]) -> tuple[str, set[str]]:
-    identity = report.get("artifact_identity")
+def classify_artifact_identity(
+    report: dict[str, Any],
+    *,
+    container_key: str = "artifact_identity",
+) -> tuple[str, set[str]]:
+    identity = report.get(container_key)
     if not isinstance(identity, dict):
         return "missing", set()
     if not all(key in identity for key in ("artifact_kind", "artifact_sha256", "capture_id", "evidence_pack_id")):
         return "partial", set()
-    normalized, errors = complete_artifact_identity(report)
+    normalized, errors = complete_artifact_identity(report, container_key=container_key)
     if errors or normalized is None:
         return "invalid", set()
     if not is_safe_artifact_id(normalized["artifact_kind"]):
@@ -494,12 +518,224 @@ def build_internal_uobject_revalidation_candidate(report: dict[str, Any]) -> tup
     )
 
 
+def zero_serial_negative_samples_canonical_report(report: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": report.get("schema"),
+        "status": report.get("status"),
+        "evidence_kind": report.get("evidence_kind"),
+        "deterministic_negative_cohort": report.get("deterministic_negative_cohort"),
+        "sources": report.get("sources"),
+        "serial_candidate_field": report.get("serial_candidate_field"),
+        "non_claims": report.get("non_claims"),
+        "promotion_ready": report.get("promotion_ready"),
+        "public_resource_handle_ready": report.get("public_resource_handle_ready"),
+        "post_callback_resource_handle_ready": report.get("post_callback_resource_handle_ready"),
+        "promotion_gate": report.get("promotion_gate"),
+    }
+
+
+def validate_zero_serial_negative_samples_report(report: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    issues: list[str] = []
+    source_count = 0
+    zero_serial_sample_count = 0
+    positive_anchor_count = 0
+    verified_core_count = 0
+
+    allowed_top_level = {
+        "schema",
+        "status",
+        "evidence_kind",
+        "deterministic_negative_cohort",
+        "sources",
+        "serial_candidate_field",
+        "non_claims",
+        "promotion_ready",
+        "public_resource_handle_ready",
+        "post_callback_resource_handle_ready",
+        "promotion_gate",
+        "output_artifact_identity",
+    }
+    if set(report) - allowed_top_level:
+        issues.append("zero_serial_negative_samples_unexpected_top_level_field")
+
+    if report.get("schema") != ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA:
+        issues.append("zero_serial_negative_samples_schema_mismatch")
+    if report.get("status") != "candidate_blocked":
+        issues.append("zero_serial_negative_samples_status_mismatch")
+    if report.get("evidence_kind") != "internal_offline_zero_serial_negative_samples":
+        issues.append("zero_serial_negative_samples_evidence_kind_mismatch")
+    if report.get("deterministic_negative_cohort") is not True:
+        issues.append("zero_serial_negative_samples_not_deterministic")
+
+    identity, identity_errors = complete_artifact_identity(
+        report,
+        container_key="output_artifact_identity",
+        expected_artifact_kind=ZERO_SERIAL_NEGATIVE_SAMPLES_SCHEMA,
+    )
+    if identity_errors or identity is None:
+        issues.append("zero_serial_negative_samples_output_artifact_identity_invalid")
+    else:
+        identity_without_hash = {
+            key: identity[key]
+            for key in ("artifact_kind", "capture_id", "evidence_pack_id")
+        }
+        expected_hash = hashlib.sha256(
+            canonical_json_bytes(
+                {
+                    "artifact_identity": identity_without_hash,
+                    "report": zero_serial_negative_samples_canonical_report(report),
+                }
+            )
+        ).hexdigest()
+        if identity["artifact_sha256"] != expected_hash:
+            issues.append("zero_serial_negative_samples_output_artifact_identity_hash_mismatch")
+
+    field = report.get("serial_candidate_field")
+    if not isinstance(field, dict):
+        issues.append("zero_serial_negative_samples_serial_field_missing")
+    else:
+        if field.get("offset") != "FUObjectItem+0x8":
+            issues.append("zero_serial_negative_samples_serial_field_offset_mismatch")
+        if field.get("width") != "uint32":
+            issues.append("zero_serial_negative_samples_serial_field_width_mismatch")
+
+    sources = report.get("sources")
+    if not isinstance(sources, list) or not sources:
+        issues.append("zero_serial_negative_samples_sources_missing")
+    else:
+        source_count = len(sources)
+        source_labels: set[str] = set()
+        allowed_source_keys = {
+            "source_label",
+            "core_path_redacted",
+            "core_sha256",
+            "core_sha256_verified",
+            "metadata",
+            "scan_totals",
+            "zero_serial_negative_samples",
+            "positive_anchor",
+            "deterministic_negative_cohort",
+            "blockers",
+        }
+        allowed_sample_keys = {
+            "index",
+            "address",
+            "class_name",
+            "name",
+            "flags",
+            "fuobject_item",
+            "item_dword_0x8",
+            "item_dword_0xC",
+            "internal_index",
+            "internal_index_matches",
+            "membership",
+            "membership_pass",
+        }
+        for source in sources:
+            if not isinstance(source, dict):
+                issues.append("zero_serial_negative_samples_source_not_object")
+                continue
+            if set(source) - allowed_source_keys:
+                issues.append("zero_serial_negative_samples_source_unexpected_field")
+            label = source.get("source_label")
+            if not is_safe_artifact_id(label):
+                issues.append("zero_serial_negative_samples_source_label_invalid")
+            elif str(label) in source_labels:
+                issues.append("zero_serial_negative_samples_source_label_duplicate")
+            else:
+                source_labels.add(str(label))
+            if source.get("core_path_redacted") is not True:
+                issues.append("zero_serial_negative_samples_core_path_not_redacted")
+            if is_sha256(source.get("core_sha256")):
+                if source.get("core_sha256_verified") is True:
+                    verified_core_count += 1
+                else:
+                    issues.append("zero_serial_negative_samples_core_sha256_not_verified")
+            else:
+                issues.append("zero_serial_negative_samples_core_sha256_invalid")
+            if source.get("deterministic_negative_cohort") is not True:
+                issues.append("zero_serial_negative_samples_source_not_deterministic")
+            if source.get("blockers") not in ([], None):
+                issues.append("zero_serial_negative_samples_source_has_blockers")
+
+            rows = source.get("zero_serial_negative_samples")
+            if not isinstance(rows, list) or not rows:
+                issues.append("zero_serial_negative_samples_rows_missing")
+            else:
+                for row in rows:
+                    if not isinstance(row, dict):
+                        issues.append("zero_serial_negative_samples_row_not_object")
+                        continue
+                    if set(row) - allowed_sample_keys:
+                        issues.append("zero_serial_negative_samples_row_unexpected_field")
+                    if row.get("item_dword_0x8") != 0:
+                        issues.append("zero_serial_negative_samples_row_serial_not_zero")
+                    if row.get("membership") != STATUS_CANDIDATE_UOBJECT or row.get("membership_pass") is not True:
+                        issues.append("zero_serial_negative_samples_row_membership_not_candidate")
+                    if row.get("internal_index_matches") is not True:
+                        issues.append("zero_serial_negative_samples_row_internal_index_mismatch")
+                    if (
+                        row.get("item_dword_0x8") == 0
+                        and row.get("membership") == STATUS_CANDIDATE_UOBJECT
+                        and row.get("membership_pass") is True
+                        and row.get("internal_index_matches") is True
+                    ):
+                        zero_serial_sample_count += 1
+
+            anchor = source.get("positive_anchor")
+            if not isinstance(anchor, dict):
+                issues.append("zero_serial_negative_samples_positive_anchor_missing")
+            else:
+                if set(anchor) - allowed_sample_keys:
+                    issues.append("zero_serial_negative_samples_positive_anchor_unexpected_field")
+                anchor_serial = int_value(anchor.get("item_dword_0x8"))
+                if anchor_serial is None or anchor_serial <= 0:
+                    issues.append("zero_serial_negative_samples_positive_anchor_serial_not_nonzero")
+                if anchor.get("membership_pass") is not True:
+                    issues.append("zero_serial_negative_samples_positive_anchor_membership_not_candidate")
+                if anchor_serial is not None and anchor_serial > 0 and anchor.get("membership_pass") is True:
+                    positive_anchor_count += 1
+
+    if report.get("promotion_ready") is not False:
+        issues.append("zero_serial_negative_samples_promotion_ready_overclaim")
+    if report.get("public_resource_handle_ready") is not False:
+        issues.append("zero_serial_negative_samples_public_resourcehandle_overclaim")
+    if report.get("post_callback_resource_handle_ready") is not False:
+        issues.append("zero_serial_negative_samples_post_callback_resourcehandle_overclaim")
+
+    non_claims = report.get("non_claims")
+    if not isinstance(non_claims, list) or not set(ZERO_SERIAL_NEGATIVE_SAMPLE_NON_CLAIMS).issubset(set(non_claims)):
+        issues.append("zero_serial_negative_samples_non_claims_missing")
+    promotion_gate = report.get("promotion_gate")
+    if not isinstance(promotion_gate, dict) or promotion_gate.get("ready") is not False:
+        issues.append("zero_serial_negative_samples_promotion_gate_not_false")
+    elif "candidate_only_zero_serial_negative_samples" not in set(promotion_gate.get("blockers") or []):
+        issues.append("zero_serial_negative_samples_promotion_gate_blocker_missing")
+
+    accepted = not issues
+    return (
+        {
+            "accepted": accepted,
+            "schema": report.get("schema") if isinstance(report.get("schema"), str) else None,
+            "source_count": source_count,
+            "verified_core_count": verified_core_count,
+            "zero_serial_sample_count": zero_serial_sample_count,
+            "positive_anchor_count": positive_anchor_count,
+            "candidate_only": True,
+            "does_not_satisfy_runtime_requirements": list(ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS),
+            "issues": sorted(set(issues)),
+        },
+        sorted(set(issues)),
+    )
+
+
 def build_evaluation(
     reconciliation_reports: list[dict[str, Any]],
     static_global_evidence: dict[str, Any] | None,
     *,
     require_artifact_identity: bool = False,
     uobject_flag_policy: dict[str, Any] | None = None,
+    zero_serial_negative_samples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     blockers: list[str] = []
     collected_identity_hashes: set[str] = set()
@@ -595,6 +831,48 @@ def build_evaluation(
         if policy_issues:
             blockers.append(BLOCKER_INVALID_UOBJECT_FLAG_POLICY_CANDIDATE)
 
+    zero_serial_negative_samples_reports = zero_serial_negative_samples or []
+    zero_serial_negative_samples_summaries: list[dict[str, Any]] = []
+    accepted_zero_serial_negative_samples_count = 0
+    invalid_zero_serial_negative_samples_count = 0
+    zero_serial_source_count = 0
+    zero_serial_sample_count = 0
+    zero_serial_positive_anchor_count = 0
+    for report in zero_serial_negative_samples_reports:
+        zero_hashes = identity_hashes(report)
+        collected_identity_hashes.update(zero_hashes)
+        identity_status, strict_hashes = classify_artifact_identity(
+            report,
+            container_key="output_artifact_identity",
+        )
+        collected_identity_hashes.update(strict_hashes)
+        if identity_status == "complete":
+            complete_artifact_identity_report_count += 1
+        elif identity_status == "invalid":
+            invalid_artifact_identity_report_count += 1
+        else:
+            missing_or_partial_artifact_identity_report_count += 1
+        summary, issues = validate_zero_serial_negative_samples_report(report)
+        zero_serial_negative_samples_summaries.append(summary)
+        zero_serial_source_count += int(summary["source_count"])
+        zero_serial_sample_count += int(summary["zero_serial_sample_count"])
+        zero_serial_positive_anchor_count += int(summary["positive_anchor_count"])
+        if issues:
+            invalid_zero_serial_negative_samples_count += 1
+        else:
+            accepted_zero_serial_negative_samples_count += 1
+        if require_artifact_identity:
+            identity_issue = artifact_identity_issue(identity_status)
+            if identity_issue is not None and identity_issue not in summary["issues"]:
+                summary["accepted"] = False
+                summary["issues"] = sorted(set(summary["issues"]) | {identity_issue})
+                if not issues:
+                    invalid_zero_serial_negative_samples_count += 1
+                    accepted_zero_serial_negative_samples_count -= 1
+
+    if invalid_zero_serial_negative_samples_count:
+        blockers.append(BLOCKER_INVALID_ZERO_SERIAL_NEGATIVE_SAMPLES)
+
     blockers.append(BLOCKER_UOBJECT_FLAGS)
     if require_artifact_identity and missing_or_partial_artifact_identity_report_count:
         blockers.append(BLOCKER_MISSING_ARTIFACT_IDENTITY)
@@ -646,6 +924,13 @@ def build_evaluation(
         "runtime_rejection_samples_present": False,
         "runtime_serial_semantics_present": False,
         "runtime_resourcehandle_promotion_evidence_complete": False,
+        "offline_zero_serial_negative_samples_present": bool(zero_serial_negative_samples_reports),
+        "offline_zero_serial_negative_samples_accepted": (
+            bool(zero_serial_negative_samples_reports)
+            and invalid_zero_serial_negative_samples_count == 0
+        ),
+        "zero_serial_negative_samples_satisfy_runtime_rejection_samples": False,
+        "zero_serial_negative_samples_satisfy_runtime_serial_semantics": False,
         "version_matched_source_decompiler_correlation_for_public_lifecycle_names_present": False,
         "rejected_runtime_object_samples_present": False,
         "evidence_without_lifetime_flags_ready": evidence_without_lifetime_flags_ready,
@@ -669,6 +954,8 @@ def build_evaluation(
             "reconciliation": len(reconciliation_reports),
             "static_global_evidence": static_report_count,
             "uobject_flag_policy": uobject_flag_policy_report_count,
+            "zero_serial_negative_samples": len(zero_serial_negative_samples_reports),
+            "invalid_zero_serial_negative_samples": invalid_zero_serial_negative_samples_count,
             "invalid_reconciliation_schema": invalid_reconciliation_schema_count,
             "static_global_evidence_schema_valid": static_schema_valid,
         },
@@ -677,6 +964,17 @@ def build_evaluation(
         "static_global_evidence_summary": {
             "gobjects_candidate_count": static_gobjects_candidate_count,
             "coherent_field_window_proven": coherent_window_proven,
+        },
+        "offline_zero_serial_negative_samples_summary": {
+            "report_count": len(zero_serial_negative_samples_reports),
+            "accepted_report_count": accepted_zero_serial_negative_samples_count,
+            "invalid_report_count": invalid_zero_serial_negative_samples_count,
+            "source_count": zero_serial_source_count,
+            "zero_serial_sample_count": zero_serial_sample_count,
+            "positive_anchor_count": zero_serial_positive_anchor_count,
+            "candidate_only": True,
+            "does_not_satisfy_runtime_requirements": list(ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS),
+            "reports": zero_serial_negative_samples_summaries,
         },
         "evidence_checks": evidence_checks,
         "lifetime_blocker_summary": {
@@ -687,6 +985,8 @@ def build_evaluation(
             "runtime_rejection_samples_present": False,
             "runtime_serial_semantics_present": False,
             "required_runtime_artifact_schemas": list(RESOURCE_HANDLE_RUNTIME_EVIDENCE_REQUIREMENTS),
+            "offline_zero_serial_negative_samples_present": bool(zero_serial_negative_samples_reports),
+            "offline_zero_serial_negative_samples_do_not_satisfy": list(ZERO_SERIAL_RUNTIME_NON_SUBSTITUTIONS),
             "rejected_runtime_object_samples_present": False,
         },
         "non_claims": list(RESOURCE_HANDLE_NON_CLAIMS),
@@ -719,6 +1019,16 @@ def parse_args() -> argparse.Namespace:
         "--uobject-flag-policy",
         type=Path,
         help="Optional redacted UObject flag-policy candidate report JSON.",
+    )
+    parser.add_argument(
+        "--zero-serial-negative-samples",
+        action="append",
+        type=Path,
+        default=[],
+        help=(
+            "Optional candidate-only offline zero-serial negative-sample report. May be "
+            "repeated. This never satisfies runtime rejection or serial semantics blockers."
+        ),
     )
     parser.add_argument("--output", type=Path, help="Optional redacted JSON output path.")
     parser.add_argument(
@@ -763,6 +1073,10 @@ def main() -> int:
         if args.uobject_flag_policy
         else None
     )
+    zero_serial_negative_sample_paths = [
+        reject_protected_input_path(path, "--zero-serial-negative-samples")
+        for path in args.zero_serial_negative_samples
+    ]
     output_path = reject_protected_output_path(args.output, "--output") if args.output else None
 
     reconciliation_reports = [
@@ -775,11 +1089,16 @@ def main() -> int:
         if uobject_flag_policy_path is not None
         else None
     )
+    zero_serial_negative_sample_reports = [
+        load_json(path, "--zero-serial-negative-samples")
+        for path in zero_serial_negative_sample_paths
+    ]
     evaluation = build_evaluation(
         reconciliation_reports,
         static_report,
         require_artifact_identity=args.require_artifact_identity,
         uobject_flag_policy=uobject_flag_policy_report,
+        zero_serial_negative_samples=zero_serial_negative_sample_reports,
     )
     if output_identity_args is not None:
         add_output_artifact_identity(evaluation, output_identity_args)

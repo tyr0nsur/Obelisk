@@ -121,8 +121,12 @@
       "status": "unresolved",
       "decision_required": "Define identity, generation, scope, and permission provenance before any command can execute.",
       "required_behavior": [
+        "principal_handle, principal_generation, and principal_scope_flags must appear together in any future command payload that consumes player identity",
+        "principal_handle alone never authorizes command dispatch",
         "missing principal fails closed",
+        "missing principal_handle fails closed",
         "missing principal_generation fails closed",
+        "missing principal_scope_flags fails closed",
         "stale principal fails closed",
         "unsupported principal_scope_flags fails closed",
         "missing permission policy provenance fails closed",

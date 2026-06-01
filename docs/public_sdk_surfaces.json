@@ -84,6 +84,12 @@
     "obelisk.operator_ingress_storage.v1",
     "obelisk.gameplay_tick_callbacks.v1"
   ],
+  "v1_dependency_sequence": [
+    "obelisk.player_identity.v1",
+    "obelisk.permissions_admin.v1",
+    "obelisk.command_chat_response_path.v1",
+    "obelisk.commands_replies.v1"
+  ],
   "post_v1_or_excluded_surfaces": [
     "obelisk.permissions_admin.v1",
     "obelisk.command_chat_response_path.v1",

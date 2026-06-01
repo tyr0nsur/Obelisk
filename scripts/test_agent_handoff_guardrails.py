@@ -223,6 +223,35 @@ class AgentHandoffGuardrailsTests(unittest.TestCase):
         self.assertIn("rejected runtime object samples", reversing_skill)
         self.assertIn("runtime serial reuse/wraparound semantics", reversing_skill)
 
+    def test_release_handoff_routing_stays_post_f33dc34_aligned(self) -> None:
+        current = normalized(CURRENT.read_text(encoding="utf-8"))
+        compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))
+        readme = normalized((REPO_ROOT / "README.md").read_text(encoding="utf-8"))
+        status = normalized((REPO_ROOT / "docs" / "STATUS.md").read_text(encoding="utf-8"))
+
+        for text in (current, compact, readme, status):
+            self.assertIn("Plugin Hub", text)
+        for text in (current, readme, status):
+            self.assertRegex(text, r"v1(?:\.0)? .*complete|complete .*v1")
+            self.assertRegex(text, r"blocked|not .*claim|not .*authorize")
+
+        self.assertIn("post-SDK-complete planning only", current)
+        self.assertIn("post-SDK-complete planning only", readme)
+        self.assertIn("post-SDK-complete planning only", status)
+        self.assertIn("archived boundaries only until SDK completion", compact)
+        self.assertNotIn("Plugin Hub seed review requires", compact)
+
+        for text in (current, readme, status):
+            self.assertIn("approved copied runtime principal lifecycle evidence", text)
+        self.assertIn("approved copied runtime principal lifecycle evidence", compact)
+        self.assertNotIn("Current identity next step is accepted login/logout", current)
+        self.assertNotIn("stays blocked on lifecycle-anchor evidence unless", current)
+
+        for text in (current, readme):
+            self.assertIn("rejected runtime object samples", text)
+            self.assertIn("runtime serial reuse/wraparound semantics", text)
+        self.assertIn("rejected object samples plus runtime serial reuse/wraparound semantics", status)
+
     def test_player_identity_focal_plans_require_exact_targets(self) -> None:
         current = normalized(CURRENT.read_text(encoding="utf-8"))
         compact = normalized(COMPACT_CONTEXT.read_text(encoding="utf-8"))

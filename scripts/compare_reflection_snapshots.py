@@ -1256,6 +1256,8 @@ def readiness_report(
             "ready_scope": "layout_only" if not blockers else "not_ready",
             "layout_ready": not blockers,
             "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
             "blockers": blockers,
         }
 
@@ -1442,7 +1444,19 @@ def print_text(report: dict[str, Any]) -> None:
             if isinstance(blocker, dict)
         ]
         blockers = ",".join(blocker_reasons) if blocker_reasons else "none"
-        print(f"promotion_gate ready={str(promotion_gate['ready']).lower()} blockers={blockers}")
+        print(
+            "promotion_gate ready={ready} blockers={blockers} scope={scope} "
+            "layout_ready={layout_ready} promotion_ready={promotion_ready} "
+            "public_sdk_ready={public_sdk_ready} runtime_ready={runtime_ready}".format(
+                ready=str(promotion_gate["ready"]).lower(),
+                blockers=blockers,
+                scope=promotion_gate.get("ready_scope", "unknown"),
+                layout_ready=str(promotion_gate.get("layout_ready", False)).lower(),
+                promotion_ready=str(promotion_gate.get("promotion_ready", False)).lower(),
+                public_sdk_ready=str(promotion_gate.get("public_sdk_ready", False)).lower(),
+                runtime_ready=str(promotion_gate.get("runtime_ready", False)).lower(),
+            )
+        )
         for module in report["modules"]:
             second_source = module["second_source"]
             print(
@@ -1524,6 +1538,8 @@ def apply_readiness_gate_mode(report: dict[str, Any]) -> None:
     promotion_gate = report.get("promotion_gate")
     if not isinstance(promotion_gate, dict) or not promotion_gate.get("ready"):
         return
+    promotion_gate.setdefault("public_sdk_ready", False)
+    promotion_gate.setdefault("runtime_ready", False)
     promotion_gate["ready"] = False
     blockers = promotion_gate.setdefault("blockers", [])
     if isinstance(blockers, list):
@@ -1569,6 +1585,8 @@ def apply_planning_layout_intake_gate(report: dict[str, Any], target_sets: list[
         promotion_gate["ready"] = False
         promotion_gate["ready_scope"] = "planning_only"
         promotion_gate["promotion_ready"] = False
+        promotion_gate["public_sdk_ready"] = False
+        promotion_gate["runtime_ready"] = False
         promotion_blockers = promotion_gate.setdefault("blockers", [])
         if isinstance(promotion_blockers, list):
             promotion_blockers.append({"reason": "planning_layout_intake_not_promotion_gate", "count": 1})
@@ -1585,6 +1603,8 @@ def require_target_set_for_promotion(report: dict[str, Any], target_sets: list[s
     if not isinstance(promotion_gate, dict):
         return
     promotion_gate["ready"] = False
+    promotion_gate["public_sdk_ready"] = False
+    promotion_gate["runtime_ready"] = False
     blockers = promotion_gate.setdefault("blockers", [])
     if isinstance(blockers, list):
         blockers.append({"reason": "promotion_requires_target_set", "count": 1})
@@ -1617,6 +1637,8 @@ def block_explicit_targets_outside_named_target_sets(
         return
     promotion_gate["ready"] = False
     promotion_gate["ready_scope"] = "not_ready"
+    promotion_gate["public_sdk_ready"] = False
+    promotion_gate["runtime_ready"] = False
     blockers = promotion_gate.setdefault("blockers", [])
     if isinstance(blockers, list):
         blockers.append({"reason": "explicit_target_not_in_named_target_set", "count": len(outside)})
@@ -1635,6 +1657,8 @@ def block_non_release_target_set_promotion(report: dict[str, Any], target_sets: 
     if not isinstance(promotion_gate, dict):
         return
     promotion_gate["ready"] = False
+    promotion_gate["public_sdk_ready"] = False
+    promotion_gate["runtime_ready"] = False
     planning_only = sorted(requested & (PLANNING_ONLY_TARGET_SETS | MISSION_CONSUME_ONLY_TARGET_SETS))
     promotion_gate["ready_scope"] = (
         "planning_only" if planning_only and set(non_release) == set(planning_only) else "internal_layout_only"
@@ -1657,6 +1681,8 @@ def block_ambiguous_target_set_coverage(report: dict[str, Any], target_sets: lis
         return
     promotion_gate["ready"] = False
     promotion_gate["ready_scope"] = "not_ready"
+    promotion_gate["public_sdk_ready"] = False
+    promotion_gate["runtime_ready"] = False
     blockers = promotion_gate.setdefault("blockers", [])
     if isinstance(blockers, list):
         blockers.append(

@@ -205,6 +205,44 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_surface_overclaim", report["blockers"])
         self.assertIn("positive_public_surface_claim", report["blockers"])
 
+    def test_rejects_missing_bridge_principal_fail_closed_auth_behaviors(self) -> None:
+        decisions = self.load_decisions()
+        auth = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "auth.identity_permission_provenance"
+        )
+        auth["required_behavior"] = [
+            behavior
+            for behavior in auth["required_behavior"]
+            if behavior
+            not in {
+                "principal_handle, principal_generation, and principal_scope_flags must appear together in any future command payload that consumes player identity",
+                "missing principal_handle fails closed",
+                "missing principal_scope_flags fails closed",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("auth_identity_permission_behavior_missing", report["blockers"])
+        detail = next(
+            item for item in report["blocker_details"] if item["reason"] == "auth_identity_permission_behavior_missing"
+        )
+        self.assertIn("missing principal_handle fails closed", detail["missing"])
+        self.assertIn("missing principal_scope_flags fails closed", detail["missing"])
+
     def test_accepts_optional_response_path_planning_report_only(self) -> None:
         response_report = {
             "schema": "obelisk.command-chat-response-public-readiness-check.v1",

@@ -2891,6 +2891,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "obelisk.commands_replies.v1",
         )
         blocker_order = manifest["v1_sdk_completion_blockers"]
+        self.assertEqual(
+            manifest["v1_dependency_sequence"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+        )
         unresolved_statuses = {"planning", "post-v1", "promoted-experimental-only", "debug-only"}
         unresolved = [
             surface_id
@@ -9172,8 +9181,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(term), compact)
 
         for term in (
-            "lifecycle-anchor and principal-invalidation candidate manifests can now be consumed together",
-            "the next blocker is approved runtime principal lifecycle evidence",
+            "consume-only lifecycle-anchor and principal-invalidation manifests",
+            "the next identity blocker is approved runtime principal lifecycle evidence",
             "Do not\n  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
             "Current recipe:\n  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`",
         ):

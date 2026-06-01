@@ -61,6 +61,7 @@
       "decision_required": "Permission queries must carry principal_generation or be formally callback-local only.",
       "required_behavior": [
         "principal_handle alone never authorizes",
+        "missing principal_handle fails closed",
         "missing generation fails closed",
         "stale generation fails closed",
         "generation mismatch returns deny or unknown, never allow"
@@ -80,6 +81,7 @@
         "cross-map shared"
       ],
       "required_behavior": [
+        "missing principal_scope_flags fails closed",
         "unsupported principal scope fails closed",
         "process mismatch fails closed",
         "restart-local or wider scope requires an explicit promoted identity contract"
@@ -195,7 +197,9 @@
       "category": "fail_closed",
       "status": "unresolved",
       "deny_or_unknown_conditions": [
+        "missing principal_handle",
         "missing principal_generation",
+        "missing principal_scope_flags",
         "missing runtime principal identity",
         "command text principal claim",
         "operator config principal claim",
@@ -216,13 +220,16 @@
         "rate limit exceeded"
       ],
       "must_never_return_allow_for": [
+        "missing principal_handle",
         "stale principal",
         "scope mismatch",
+        "missing principal_scope_flags",
         "missing identity",
         "missing runtime principal identity",
         "command text principal claim",
         "operator config principal claim",
         "principal_generation_mismatch",
+        "unsupported principal_scope_flags",
         "unknown authority source",
         "missing policy source provenance",
         "allow without policy_epoch provenance",

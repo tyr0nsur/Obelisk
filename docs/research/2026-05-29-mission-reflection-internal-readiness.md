@@ -335,6 +335,12 @@ callback ABI, object/class identity, arrays, mutation, return override, or serve
 validation. The next Mission step remains an internal/test-only policy decision, not
 public API work.
 
+With the current comparator, Mission layout reports must also carry
+`promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false` on
+`promotion_gate`. Historical `promotion_gate.ready=true` snippets in this note are layout
+comparison results only; they are not public Mission SDK, runtime observer, dispatcher,
+callback, identity, mutation, return-override, or server-validation readiness.
+
 ## 2026-05-31 Offline Audit Checkpoint
 
 The compact Mission lane no longer needs another broad offline discovery pass to decide

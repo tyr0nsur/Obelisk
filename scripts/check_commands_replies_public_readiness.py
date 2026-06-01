@@ -74,6 +74,23 @@ REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
         "return override",
     )
 )
+REQUIRED_AUTH_BEHAVIORS = frozenset(
+    (
+        "principal_handle, principal_generation, and principal_scope_flags must appear together in any future command payload that consumes player identity",
+        "principal_handle alone never authorizes command dispatch",
+        "missing principal fails closed",
+        "missing principal_handle fails closed",
+        "missing principal_generation fails closed",
+        "missing principal_scope_flags fails closed",
+        "stale principal fails closed",
+        "unsupported principal_scope_flags fails closed",
+        "missing permission policy provenance fails closed",
+        "permission denial or unknown result never dispatches a command",
+        "command text remains copied request data only and cannot establish identity, permission authority, or policy provenance",
+        "operator config remains policy input only and cannot establish command identity, principal identity, permission authority, or policy provenance",
+        "command callbacks cannot self-attest permission authority",
+    )
+)
 REQUIRED_NOT_SUFFICIENT = frozenset(
     (
         "passive ChatMessageEvent parsing",
@@ -393,6 +410,16 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     ):
         if required not in no_symbol_behaviors:
             add(blockers, "no_public_symbols_behavior_missing", "$.decisions.required_before_public_header", behavior=required)
+
+    auth = by_id.get("auth.identity_permission_provenance", {})
+    missing_auth_behaviors = REQUIRED_AUTH_BEHAVIORS - string_set(auth.get("required_behavior"))
+    if missing_auth_behaviors:
+        add(
+            blockers,
+            "auth_identity_permission_behavior_missing",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_auth_behaviors),
+        )
 
     parser = by_id.get("parser.no_arkapi_copy", {})
     parser_behaviors = string_set(parser.get("required_behavior"))

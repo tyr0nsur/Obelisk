@@ -399,8 +399,8 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
         if not evidence.get("obelisk_commit"):
             add(blockers, "source_summary_obelisk_commit_missing", "$.source_summary.evidence.obelisk_commit")
         sources = evidence.get("sources")
-        if not isinstance(sources, list) or not sources:
-            add(blockers, "source_summary_sources_missing", "$.source_summary.evidence.sources")
+        if not isinstance(sources, list) or len(sources) != 1:
+            add(blockers, "source_summary_sources_not_exactly_one", "$.source_summary.evidence.sources")
         else:
             for index, source in enumerate(sources):
                 label = f"$.source_summary.evidence.sources[{index}]"

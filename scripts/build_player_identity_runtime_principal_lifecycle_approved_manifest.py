@@ -174,8 +174,8 @@ def validate_source_summary(summary: dict[str, Any]) -> None:
     if evidence.get("server_paths_allowed") is not False:
         raise SystemExit("--source-summary must be generated without --allow-server-path")
     sources = evidence.get("sources")
-    if not isinstance(sources, list) or not sources:
-        raise SystemExit("--source-summary evidence.sources must be a non-empty list")
+    if not isinstance(sources, list) or len(sources) != 1:
+        raise SystemExit("--source-summary evidence.sources must contain exactly one copied/offline log")
     for index, source in enumerate(sources):
         if not isinstance(source, dict) or not path_is_copied_or_offline(source.get("path")):
             raise SystemExit(

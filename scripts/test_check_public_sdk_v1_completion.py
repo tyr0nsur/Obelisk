@@ -2688,6 +2688,102 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     {surface_id: expected_dependencies},
                 )
 
+    def test_dependency_declarations_block_permissions_and_commands_sequence_drift(self) -> None:
+        cases = {
+            "obelisk.permissions_admin.v1": ["obelisk.player_identity.v1"],
+            "obelisk.commands_replies.v1": ["obelisk.command_chat_response_path.v1"],
+        }
+        for surface_id, removed_dependencies in cases.items():
+            with self.subTest(surface=surface_id):
+                manifest, release_statement = complete_excluded_manifest()
+                for surface in manifest["surfaces"]:
+                    if surface["id"] == surface_id:
+                        surface["depends_on"] = [
+                            dependency
+                            for dependency in surface.get("depends_on", [])
+                            if dependency not in removed_dependencies
+                        ]
+                        break
+
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+                    statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                    statement_path.write_text(release_statement, encoding="utf-8")
+                    result = self.run_checker(
+                        "--manifest",
+                        str(manifest_path),
+                        "--release-statement",
+                        str(statement_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("required_surface_dependency_declaration_missing", payload["blockers"])
+                self.assertEqual(
+                    payload["surfaces_missing_required_dependency_declarations"],
+                    {surface_id: removed_dependencies},
+                )
+
+    def test_v1_dependency_sequence_blocks_reordering_before_completion_claim(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        manifest["v1_dependency_sequence"] = [
+            "obelisk.permissions_admin.v1",
+            "obelisk.player_identity.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+        ]
+        manifest["v1_sdk_completion_blockers"] = [
+            "obelisk.permissions_admin.v1",
+            "obelisk.player_identity.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+            *[
+                surface_id
+                for surface_id in manifest["v1_sdk_completion_blockers"]
+                if surface_id
+                not in {
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                    "obelisk.command_chat_response_path.v1",
+                    "obelisk.commands_replies.v1",
+                }
+            ],
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("v1_dependency_sequence_mismatch", payload["blockers"])
+        self.assertEqual(
+            payload["v1_dependency_sequence_expected"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+        )
+        self.assertEqual(
+            payload["v1_dependency_sequence_mismatches"],
+            ["v1_dependency_sequence", "v1_sdk_completion_blockers"],
+        )
+
     def test_permissions_admin_public_cache_api_contract_blocks_until_player_identity_promoted(self) -> None:
         manifest, release_statement = complete_excluded_manifest()
         for surface in manifest["surfaces"]:

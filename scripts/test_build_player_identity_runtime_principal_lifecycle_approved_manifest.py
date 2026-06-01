@@ -260,6 +260,22 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertIn("must point to copied/offline evidence", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_rejects_summary_with_multiple_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["evidence"]["sources"].append(dict(summary["evidence"]["sources"][0]))
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            output = temp_dir / "manifest.json"
+
+            result = self.run_builder(summary_path, window_check, output)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("sources must contain exactly one copied/offline log", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_rejects_summary_with_mixed_observer_modules(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_dir = Path(temp)
