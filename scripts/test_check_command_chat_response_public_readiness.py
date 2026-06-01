@@ -15,6 +15,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_command_chat_response_public_readiness.py"
+SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 
 
 TARGETS = [
@@ -164,14 +165,18 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "public_header_symbols_now": [],
             "legacy_call_process_event_public_response_allowed": False,
             "forbidden_public_contract": [
+                "public CallProcessEvent response path",
                 "reply API",
                 "send-chat API",
+                "broadcast/notices API",
+                "moderation API",
                 "raw UE pointers",
                 "raw ProcessEvent params",
                 "raw FString storage",
                 "UObject pointers",
                 "UFunction pointers",
                 "FName/GObjects indices",
+                "direct native-call wrappers",
                 "principal or permission claims from command text",
                 "principal or permission claims from operator config",
                 "player lookup",
@@ -400,6 +405,71 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
         self.assertIn("privacy_redaction_behavior_missing", report["blockers"])
+
+    def test_rejects_missing_call_process_event_and_native_wrapper_forbidden_contracts(self) -> None:
+        decisions = self.make_decisions()
+        decisions["forbidden_public_contract"] = [
+            item
+            for item in decisions["forbidden_public_contract"]
+            if item
+            not in {
+                "public CallProcessEvent response path",
+                "direct native-call wrappers",
+                "broadcast/notices API",
+                "moderation API",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(
+                Path(temp_dir),
+                decisions=decisions,
+            )
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("forbidden_public_contract_missing_required", report["blockers"])
+
+    def test_rejects_surface_manifest_response_path_overclaim(self) -> None:
+        surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+        response = next(item for item in surfaces["surfaces"] if item["id"] == "obelisk.command_chat_response_path.v1")
+        response["status"] = "promoted"
+        response["public_abi"] = True
+        response["adds_obelisk_api"] = True
+        response["public_contract"] = ["ObeliskCommandChatResponse"]
+        response["depends_on"] = ["obelisk.player_identity.v1"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            surfaces_path = root / "public_sdk_surfaces.json"
+            surfaces_path.write_text(json.dumps(surfaces), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--surfaces",
+                str(surfaces_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("status_mismatch", report["blockers"])
+        self.assertIn("public_abi_not_false", report["blockers"])
+        self.assertIn("adds_obelisk_api_not_false", report["blockers"])
+        self.assertIn("command_chat_response_surface_public_contract_not_empty", report["blockers"])
+        self.assertIn("command_chat_response_surface_dependencies_mismatch", report["blockers"])
 
 
 if __name__ == "__main__":

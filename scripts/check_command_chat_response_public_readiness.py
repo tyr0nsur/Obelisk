@@ -22,11 +22,15 @@ DEFAULT_ROOT = Path(
 DEFAULT_READINESS_NAME = "command-chat-response-route-planning-readiness.json"
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+DEFAULT_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 
 REPORT_SCHEMA = "obelisk.command-chat-response-public-readiness-check.v1"
 READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 DECISIONS_SCHEMA = "obelisk.command-chat-response-public-contract-decisions.v1"
+SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 SURFACE = "obelisk.command_chat_response_path.v1"
+IDENTITY_SURFACE = "obelisk.player_identity.v1"
+PERMISSIONS_SURFACE = "obelisk.permissions_admin.v1"
 TARGET_SET = "command-chat-response-route-planning"
 TARGETS = frozenset(
     (
@@ -51,14 +55,18 @@ REQUIRED_DECISION_IDS = frozenset(
 )
 REQUIRED_FORBIDDEN_PUBLIC_CONTRACT = frozenset(
     (
+        "public CallProcessEvent response path",
         "raw UE pointers",
         "raw ProcessEvent params",
         "raw FString storage",
         "UObject pointers",
         "UFunction pointers",
         "FName/GObjects indices",
+        "direct native-call wrappers",
         "reply API",
         "send-chat API",
+        "broadcast/notices API",
+        "moderation API",
         "principal or permission claims from command text",
         "principal or permission claims from operator config",
         "player lookup",
@@ -172,6 +180,7 @@ NEGATIVE_CONTEXT_TOKENS = (
     "not_promoted",
     "not_sufficient",
     "required",
+    "requires",
     "snapshot_prep_checks",
     "why_blocked",
 )
@@ -209,6 +218,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_PUBLIC_HEADER,
         help="Public Obelisk API header to scan for forbidden response-path symbols.",
+    )
+    parser.add_argument(
+        "--surfaces",
+        type=Path,
+        default=DEFAULT_SURFACES,
+        help="Public SDK surfaces manifest to verify response path remains planning/post-v1.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON. The checker always emits JSON.")
     return parser.parse_args()
@@ -520,14 +535,71 @@ def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
         )
 
 
-def build_report(readiness_path: Path, decisions_path: Path, public_header_path: Path) -> dict[str, Any]:
+def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    require_equal(payload, "schema", SURFACES_SCHEMA, "$.surfaces", blockers)
+    surfaces = payload.get("surfaces")
+    if not isinstance(surfaces, list):
+        add(blockers, "surfaces_not_list", "$.surfaces.surfaces")
+        return
+    by_id = {item.get("id"): item for item in surfaces if isinstance(item, dict)}
+    response = by_id.get(SURFACE)
+    if not isinstance(response, dict):
+        add(blockers, "command_chat_response_surface_missing", "$.surfaces")
+        return
+    require_equal(response, "status", "post-v1", "$.surfaces.command_chat_response_path", blockers)
+    require_equal(response, "support_tier", "blocked", "$.surfaces.command_chat_response_path", blockers)
+    require_false(response, "public_abi", "$.surfaces.command_chat_response_path", blockers)
+    require_false(response, "adds_obelisk_api", "$.surfaces.command_chat_response_path", blockers)
+    if response.get("public_contract") != []:
+        add(
+            blockers,
+            "command_chat_response_surface_public_contract_not_empty",
+            "$.surfaces.command_chat_response_path.public_contract",
+            value=response.get("public_contract"),
+        )
+    if set(response.get("depends_on", [])) != {IDENTITY_SURFACE, PERMISSIONS_SURFACE}:
+        add(
+            blockers,
+            "command_chat_response_surface_dependencies_mismatch",
+            "$.surfaces.command_chat_response_path.depends_on",
+            value=response.get("depends_on"),
+        )
+    contract = response.get("v1_decision_contract")
+    if not isinstance(contract, dict):
+        add(blockers, "command_chat_response_surface_decision_contract_missing", "$.surfaces.command_chat_response_path.v1_decision_contract")
+    else:
+        require_equal(
+            contract,
+            "decision_manifest",
+            "docs/command_chat_response_public_contract_decisions.json",
+            "$.surfaces.command_chat_response_path.v1_decision_contract",
+            blockers,
+        )
+        if contract.get("must_remain_without_public_contract_until_promotion") is not True:
+            add(
+                blockers,
+                "command_chat_response_surface_public_contract_gate_missing",
+                "$.surfaces.command_chat_response_path.v1_decision_contract.must_remain_without_public_contract_until_promotion",
+            )
+    collect_surface_overclaims(response, blockers, "$.surfaces.command_chat_response_path")
+
+
+def build_report(
+    readiness_path: Path,
+    decisions_path: Path,
+    public_header_path: Path,
+    surfaces_path: Path,
+) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     readiness = safe_load_json(readiness_path, "readiness", blockers)
     decisions = safe_load_json(decisions_path, "decisions", blockers)
+    surfaces = safe_load_json(surfaces_path, "surfaces", blockers)
     if readiness is not None:
         validate_readiness(readiness, blockers)
     if decisions is not None:
         validate_decisions(decisions, blockers)
+    if surfaces is not None:
+        validate_surfaces(surfaces, blockers)
     validate_public_header(public_header_path, blockers)
 
     valid = not blockers
@@ -547,9 +619,22 @@ def build_report(readiness_path: Path, decisions_path: Path, public_header_path:
         "target_filters": sorted(TARGETS),
         "readiness_path": str(readiness_path),
         "decisions_path": str(decisions_path),
+        "surfaces_path": str(surfaces_path),
         "public_header_path": str(public_header_path),
         "readiness_status": readiness.get("second_source_status") if isinstance(readiness, dict) else None,
         "decisions_status": decisions.get("status") if isinstance(decisions, dict) else None,
+        "surfaces_status": (
+            next(
+                (
+                    item.get("status")
+                    for item in surfaces.get("surfaces", [])
+                    if isinstance(item, dict) and item.get("id") == SURFACE
+                ),
+                None,
+            )
+            if isinstance(surfaces, dict) and isinstance(surfaces.get("surfaces"), list)
+            else None
+        ),
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
     }
@@ -558,7 +643,7 @@ def build_report(readiness_path: Path, decisions_path: Path, public_header_path:
 def main() -> int:
     args = parse_args()
     readiness_path = args.readiness if args.readiness is not None else args.root / DEFAULT_READINESS_NAME
-    report = build_report(readiness_path, args.decisions, args.public_header)
+    report = build_report(readiness_path, args.decisions, args.public_header, args.surfaces)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1
 
