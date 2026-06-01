@@ -237,6 +237,35 @@ against committed fixtures with `second_source_accepted=6`, `layout_ready=true`,
 promotion or release review, regenerate or materialize the same second-source snapshots
 under an approved artifact root with complete provenance.
 
+That root was then materialized under the approved offline workspace:
+
+- root:
+  `/servidor/ark/workspace-offline/structure-aggregate-census-planning-second-source-bool-tail-20260530-offline-regenerated`
+- snapshots:
+  `ufunction-snapshots/7e7ded49e0c6/sdk_structures/*.snapshot.json`
+- manifest: `manifest.json`
+- checksums: `SHA256SUMS`
+- readiness report: `structure-aggregate-census-planning-readiness.json`
+
+Validation on 2026-06-01:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py \
+  --base-root tests/fixtures/ufunction_snapshots \
+  --candidate-root /servidor/ark/workspace-offline/structure-aggregate-census-planning-second-source-bool-tail-20260530-offline-regenerated/ufunction-snapshots \
+  --readiness-report \
+  --planning-layout-intake \
+  --target-set structure-aggregate-census-planning \
+  --json
+```
+
+The report has `second_source_accepted=6`, `planning_layout_gate.ready=true`,
+`ready_scope=planning_only`, `public_sdk_ready=false`, `runtime_ready=false`, and
+`promotion_ready=false`. This closes the durable second-source layout gap for planning,
+but it still does not promote `StructureEvents`, a public Structure SDK, identity,
+lookup, mutation, return override, runtime hooks, enforcement, `ResourceHandle`, or v1
+completion.
+
 The same JSON includes machine-readable non-claims. These are intentional and must stay
 visible in future edits: no public `StructureEvents`, no public Structure SDK, no
 identity/lookup, no mutation, no return override, no enforcement, and no runtime claim.

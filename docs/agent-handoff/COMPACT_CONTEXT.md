@@ -374,10 +374,18 @@ priorities, and do not use history files as the active source of truth.
   `/servidor/ark/workspace-offline/structure-observer-intake-refresh-20260529T141455Z/ufunction-snapshots`
   has all six files but remains `second_source_inconclusive=6` because bool metadata is
   incomplete; do not treat it as accepted second-source evidence.
-  A regenerated `/tmp` root
-  `/tmp/obelisk-head-rc-ufunction-second-source-root-20260530-offline-regenerated`
-  compares 6/6 accepted for planning layout only, but it is non-durable local evidence
-  until materialized under an approved artifact root with provenance.
+  The regenerated bool-tail root was materialized under the approved offline workspace at
+  `/servidor/ark/workspace-offline/structure-aggregate-census-planning-second-source-bool-tail-20260530-offline-regenerated`
+  with `manifest.json`, `SHA256SUMS`, the six sanitized `sdk_structures` snapshots, and
+  `structure-aggregate-census-planning-readiness.json`. Re-running
+  `scripts/compare_reflection_snapshots.py --planning-layout-intake --target-set structure-aggregate-census-planning`
+  against its `ufunction-snapshots` root reports `second_source_accepted=6`,
+  `planning_layout_gate.ready=true`, `ready_scope=planning_only`,
+  `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`. This
+  closes the durable second-source layout gap for Structure aggregate/census planning
+  only; it still does not promote `StructureEvents`, a public Structure SDK, identity,
+  lookup, mutation, return override, runtime hooks, enforcement, `ResourceHandle`, or v1
+  completion.
 - Inventory item return-only copied signals are the preferred no-core side lane because
   they already ride copied `GameplayPolicyEvent` evidence. They remain consume/evidence
   only and do not promote public Inventory SDK, public Items SDK, identity, lookup,
