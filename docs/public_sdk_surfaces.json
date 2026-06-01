@@ -1203,6 +1203,7 @@
       "depends_on": [
         "obelisk.player_identity.v1",
         "obelisk.permissions_admin.v1",
+        "obelisk.command_chat_response_path.v1",
         "obelisk.operator_ingress_storage.v1"
       ],
       "evidence": {

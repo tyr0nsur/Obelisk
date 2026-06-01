@@ -123,6 +123,12 @@ REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
         "obelisk.permissions_admin.v1",
         "obelisk.command_chat_response_path.v1",
     ),
+    "obelisk.player_services_economy_mobility.v1": (
+        "obelisk.player_identity.v1",
+        "obelisk.permissions_admin.v1",
+        "obelisk.command_chat_response_path.v1",
+        "obelisk.operator_ingress_storage.v1",
+    ),
 }
 PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS = {
     "blockers",
@@ -237,9 +243,10 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:complete|full|production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
     r"\b(?:sdk|api|surface|capability|support)\s+"
     r"(?:is|are|remains?|stays?)\s+"
-    r"(?:complete|full|production|stable|available|ready|supported|included|shipped)\b",
+    r"(?:complete|full|production|stable|available|ready|supported|included|shipped|"
+    r"public|promoted)\b",
     r"\b[a-z0-9_ /+-]{2,80}\s+(?:is|are)\s+"
-    r"(?:available|ready|supported|included|shipped)\s+in\s+v1\b",
+    r"(?:available|ready|supported|included|shipped|public|promoted)\s+in\s+v1\b",
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
@@ -250,22 +257,34 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
     r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
     r"commands?/replies|commands?[-_ ]?replies|command[-_ ]?router|"
-    r"missions?|buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
+    r"inventory[-_ ]?(?:identity|lookup|mutation)|item[-_ ]?(?:identity|lookup|mutation|handles?)|"
+    r"give[-_ ]?item|remove[-_ ]?item|object[-_ ]?identity|uobject[-_ ]?identity|"
+    r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
+    r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
     r"(?:sdk|api|surface|support)\b.{0,80}"
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|"
-    r"shipped|stable|supported|promoted)\b",
+    r"shipped|stable|supported|public|promoted)\b",
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|"
-    r"shipped|stable|supported|promoted)\b.{0,80}"
+    r"shipped|stable|supported|public|promoted)\b.{0,80}"
     r"\b(?:player[-_ ]?identity|player[-_ ]?principal|playeridentity|"
     r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
     r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
     r"commands?/replies|commands?[-_ ]?replies|command[-_ ]?router|"
-    r"missions?|buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
+    r"inventory[-_ ]?(?:identity|lookup|mutation)|item[-_ ]?(?:identity|lookup|mutation|handles?)|"
+    r"give[-_ ]?item|remove[-_ ]?item|object[-_ ]?identity|uobject[-_ ]?identity|"
+    r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
+    r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
     r"(?:sdk|api|surface|support)\b",
     r"\b(?:inventory\s+sdk|items\s+sdk)\b.{0,80}"
-    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b",
-    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported)\b"
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b",
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b"
     r".{0,80}\b(?:inventory\s+sdk|items\s+sdk)\b",
+    r"\b(?:resourcehandle|resource[- ]?handle|object[- ]?identity|object[- ]?lookup)\s+"
+    r"(?:sdk|api|surface|support)?\b.{0,80}"
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b",
+    r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b"
+    r".{0,80}\b(?:resourcehandle|resource[- ]?handle|object[- ]?identity|object[- ]?lookup)\s+"
+    r"(?:sdk|api|surface|support)?\b",
     r"\b(?:plugin\s+hub|pluginhub)\b.{0,80}"
     r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b",
     r"\b(?:available|complete|full|production[- ]?ready|ready|released|shipped|stable|supported)\b"
@@ -304,14 +323,15 @@ CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
 BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     "obelisk.player_identity.v1": (
         re.compile(
-            r"(?:PlayerIdentity|PlayerPrincipal|PlayerLookup|PlayerHandle|PlayerId|"
-            r"SteamId|EOSId|PlatformAccountId|PlayerName|TribeId|NetworkAddress|"
+            r"(?:PlayerIdentity|PlayerPrincipal|PlayerLookup|PlayerHandle|PlayerId|PlayerID|"
+            r"SteamId|SteamID|EOSId|EOSID|PlatformAccountId|PlatformAccountID|"
+            r"PlayerName|TribeId|TribeID|NetworkAddress|"
             r"PrincipalHandle|PrincipalGeneration|PrincipalScope|ObeliskPrincipal|"
             r"PlayerSession)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:PLAYER_IDENTITY|PLAYER_PRINCIPAL|PLAYER_LOOKUP|"
-            r"STEAM_ID|EOS_ID|PLATFORM_ACCOUNT_ID|PLAYER_NAME|TRIBE_ID|"
+            r"PLAYER_ID|STEAM_ID|EOS_ID|PLATFORM_ACCOUNT_ID|PLAYER_NAME|TRIBE_ID|"
             r"NETWORK_ADDRESS|PRINCIPAL_HANDLE|PRINCIPAL_GENERATION|"
             r"PRINCIPAL_SCOPE|PLAYER_SESSION)[A-Z0-9_]*$"
         ),
@@ -323,16 +343,16 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
     ),
     "obelisk.permissions_admin.v1": (
         re.compile(
-            r"(?:Permission|Permissions|Admin|Authorization|Authorize|Moderation|"
-            r"Moderator|BanPlayer|KickPlayer|Grant|Revoke|RoleId)"
+            r"(?:Permission|Permissions|Admin|Authorization|Authorize|Authz|AuthZ|ACL|Acl|"
+            r"Moderation|Moderator|BanPlayer|KickPlayer|Grant|Revoke|RoleId|RoleID)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:PERMISSION|ADMIN|AUTHORIZATION|MODERATION|"
-            r"BAN|KICK|GRANT|REVOKE)[A-Z0-9_]*$"
+            r"AUTHZ|ACL|BAN|KICK|GRANT|REVOKE|ROLE_ID)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:permission|permissions|admin|authorization|authority_kind|"
-            r"policy_epoch|ban_player|kick_player|grant|revoke|role_id)(?:_|$)"
+            r"authz|acl|policy_epoch|ban_player|kick_player|grant|revoke|role_id)(?:_|$)"
         ),
     ),
     "obelisk.command_chat_response_path.v1": (
@@ -366,21 +386,22 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
         re.compile(
             r"(?:InventorySdk|ItemsSdk|InventoryLookup|ItemLookup|ItemHandle|GiveItem|"
             r"RemoveItem|GrantItem|InventoryMutation|ItemMutation|Kit|Kits|Reward|Rewards|"
-            r"Engram|Progression|ResourceHandle|InventoryComp|ItemNetId|ItemStack|"
+            r"Engram|Progression|ResourceHandle|InventoryComp|InventoryID|InventoryId|"
+            r"ItemID|ItemId|ItemNetId|ItemNetID|ItemStack|ItemStackID|ItemStackId|"
             r"CraftBlueprint|AdditionalData)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:INVENTORY_SDK|ITEMS_SDK|INVENTORY_LOOKUP|"
             r"ITEM_LOOKUP|ITEM_HANDLE|GIVE_ITEM|REMOVE_ITEM|GRANT_ITEM|INVENTORY_MUTATION|"
             r"ITEM_MUTATION|KIT|KITS|REWARD|REWARDS|ENGRAM|PROGRESSION|"
-            r"RESOURCE_HANDLE|INVENTORY_COMP|ITEM_NET_ID|ITEM_STACK|CRAFT_BLUEPRINT|"
-            r"ADDITIONAL_DATA)[A-Z0-9_]*$"
+            r"RESOURCE_HANDLE|INVENTORY_COMP|INVENTORY_ID|ITEM_ID|ITEM_NET_ID|"
+            r"ITEM_STACK|ITEM_STACK_ID|CRAFT_BLUEPRINT|ADDITIONAL_DATA)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:inventory_sdk|items_sdk|inventory_lookup|item_lookup|item_handle|"
             r"give_item|remove_item|grant_item|inventory_mutation|item_mutation|kits?|"
             r"rewards?|engram|progression|resource_handle|inventory_comp|item_net_id|"
-            r"item_stack|craft_blueprint|additional_data)(?:_|$)"
+            r"inventory_id|item_id|item_stack|item_stack_id|craft_blueprint|additional_data)(?:_|$)"
         ),
     ),
     "obelisk.object_identity_resource_handle.v1": (
@@ -388,21 +409,24 @@ BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
             r"(?:ObjectIdentity|UObjectIdentity|ObjectLookup|ResourceHandle|ObjectHandle|"
             r"PostCallbackObject|StructureHandle|ItemHandle|InventoryHandle|DinoHandle|"
             r"TribeHandle|BuffStatusHandle|MissionTransferHandle|AreaPolicyObjectHandle|"
-            r"PersistentHandle|SerialHandle|EconomyHandle|MobilityHandle)"
+            r"PersistentHandle|SerialHandle|EconomyHandle|MobilityHandle|ObjectID|ObjectId|"
+            r"UObjectID|UObjectId|ResourceID|ResourceId)"
         ),
         re.compile(
             r"^OBELISK_[A-Z0-9_]*(?:OBJECT_IDENTITY|UOBJECT_IDENTITY|OBJECT_LOOKUP|"
             r"RESOURCE_HANDLE|OBJECT_HANDLE|POST_CALLBACK_OBJECT|STRUCTURE_HANDLE|"
             r"ITEM_HANDLE|INVENTORY_HANDLE|DINO_HANDLE|TRIBE_HANDLE|BUFF_STATUS_HANDLE|"
             r"MISSION_TRANSFER_HANDLE|AREA_POLICY_OBJECT_HANDLE|PERSISTENT_HANDLE|"
-            r"SERIAL_HANDLE|ECONOMY_HANDLE|MOBILITY_HANDLE)[A-Z0-9_]*$"
+            r"SERIAL_HANDLE|ECONOMY_HANDLE|MOBILITY_HANDLE|OBJECT_ID|UOBJECT_ID|"
+            r"RESOURCE_ID)[A-Z0-9_]*$"
         ),
         re.compile(
             r"(?:^|_)(?:object_identity|uobject_identity|object_lookup|resource_handle|"
             r"object_handle|post_callback_object|structure_handle|item_handle|"
             r"inventory_handle|dino_handle|tribe_handle|buff_status_handle|"
             r"mission_transfer_handle|area_policy_object_handle|persistent_handle|"
-            r"serial_handle|serial_reuse|economy_handle|mobility_handle)(?:_|$)"
+            r"serial_handle|serial_reuse|economy_handle|mobility_handle|object_id|"
+            r"uobject_id|resource_id)(?:_|$)"
         ),
     ),
     "obelisk.lifecycle_ops_recovery.v1": (

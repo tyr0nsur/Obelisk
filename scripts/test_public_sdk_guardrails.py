@@ -2565,6 +2565,87 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
 
+    def test_public_sdk_completion_checker_blocks_claim_wording_for_blocked_surface_synonyms(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        forbidden_claims = (
+            "Player identity surface is public in v1.",
+            "Permissions/admin support is promoted in v1.",
+            "Command router API is public.",
+            "Inventory mutation API is public.",
+            "Item handle surface is promoted.",
+            "ResourceHandle API is public in v1.",
+            "Object lookup support is promoted.",
+        )
+        allowed_boundaries = (
+            "Player identity surface is not public in v1.",
+            "Inventory mutation API remains post-v1 and blocked.",
+            "ResourceHandle API is not promoted.",
+        )
+
+        for claim in forbidden_claims:
+            with self.subTest(kind="forbidden", claim=claim):
+                self.assertTrue(checker["text_has_affirmative_release_claim"](claim))
+                self.assertNotEqual(checker["release_statement_forbidden_broad_claims"](claim), [])
+
+        for boundary in allowed_boundaries:
+            with self.subTest(kind="allowed", boundary=boundary):
+                self.assertEqual(checker["release_statement_forbidden_broad_claims"](boundary), [])
+
+    def test_public_sdk_completion_checker_blocks_header_symbol_acronym_variants(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        blocked_symbols = {
+            "obelisk.player_identity.v1": (
+                "ObeliskPlayerID",
+                "ObeliskSteamID",
+                "OBELISK_API_CAPABILITY_PLAYER_ID",
+                "platform_account_id",
+            ),
+            "obelisk.permissions_admin.v1": (
+                "ObeliskAuthZDecision",
+                "OBELISK_API_CAPABILITY_AUTHZ_CHECKS",
+                "acl_policy_epoch",
+                "role_id",
+            ),
+            "obelisk.inventory_items_mutation.v1": (
+                "ObeliskItemNetID",
+                "OBELISK_API_CAPABILITY_ITEM_ID_LOOKUP",
+                "inventory_id",
+                "item_stack_id",
+            ),
+            "obelisk.object_identity_resource_handle.v1": (
+                "ObeliskObjectID",
+                "ObeliskResourceID",
+                "OBELISK_API_CAPABILITY_RESOURCE_ID_LOOKUP",
+                "uobject_id",
+            ),
+        }
+        allowed_symbols = {
+            "obelisk.object_identity_resource_handle.v1": (
+                "ObeliskResourceKindDescriptor",
+                "resource_kind",
+            ),
+            "obelisk.inventory_items_mutation.v1": (
+                "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
+                "resource_kind",
+            ),
+        }
+
+        for surface_id, symbols in blocked_symbols.items():
+            for symbol in symbols:
+                with self.subTest(surface=surface_id, symbol=symbol):
+                    self.assertTrue(checker["symbol_matches_blocked_contract"](symbol, surface_id))
+
+        for surface_id, symbols in allowed_symbols.items():
+            for symbol in symbols:
+                with self.subTest(surface=surface_id, symbol=symbol):
+                    self.assertFalse(checker["symbol_matches_blocked_contract"](symbol, surface_id))
+
     def test_public_sdk_surfaces_manifest_keeps_inventory_items_mutation_blocked_until_identity_promotion(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         surfaces = {surface["id"]: surface for surface in manifest["surfaces"]}
@@ -3450,6 +3531,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             [
                 "obelisk.player_identity.v1",
                 "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
                 "obelisk.operator_ingress_storage.v1",
             ],
         )

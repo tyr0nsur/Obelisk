@@ -51,12 +51,11 @@ priorities, and do not use history files as the active source of truth.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Current release baseline: `v0.1.0-rc.2` is published as the frozen core-first RC
-  baseline after a clean release gate and exact tag/ref verification. It is not a
-  production-stable `v1.0` claim. Post-RC work should move toward a broader `v1.0`
-  complete SDK through architecture hardening, UE4 reflection evidence, copied-data
-  module APIs, and later compatibility for familiar ARK plugin concepts on top of
-  Obelisk primitives.
+- Current release baseline: `v0.1.0-rc.2` is published as the v0.1 RC baseline for the
+  current public surface after a clean release gate and exact tag/ref verification. It is not a
+  production-stable `v1.0` claim. Post-RC work should move toward a complete `v1.0` SDK
+  through architecture hardening, UE4 reflection evidence, copied-data module APIs, and
+  later compatibility for familiar ARK plugin concepts on top of Obelisk primitives.
 - `v1.0` stable means the complete public SDK contract for plugin authors, not merely a
   stable internal runtime. The current v1 surface inventory lives in
   `docs/public_sdk_surfaces.json`, with human guidance in `docs/SDK_V1_COMPATIBILITY.md`;
@@ -67,7 +66,7 @@ priorities, and do not use history files as the active source of truth.
   identity must name the reviewed core/reflection evidence terms before supporting public
   permissions or command claims. It must also enforce the canonical
   `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub
-  package shape, core-first readiness, and copied event seeds remain non-sufficient for a
+  package shape, RC package readiness, and copied event seeds remain non-sufficient for a
   stable SDK claim.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   After player identity/principal, the permissions/admin candidate is query-only
@@ -220,7 +219,7 @@ priorities, and do not use history files as the active source of truth.
   evidence is binary-scoped until the relevant second-source/static promotion gates pass.
 - The accepted minimal second-source layout evidence is recorded in
   `docs/research/2026-05-29-minimal-second-source-readiness.md`. It supports the
-  core-first release gate but does not promote GObjects, ResourceHandle, identity,
+  v0.1 RC release gate but does not promote GObjects, ResourceHandle, identity,
   mutation, return overrides, raw params, player/item/inventory identity, or public
   Inventory/StructureEvents SDK surfaces.
   Current validator refresh:
@@ -489,8 +488,8 @@ priorities, and do not use history files as the active source of truth.
 
 ## Historical Checkpoint Baseline
 
-- Published RC baseline is core-first: `ObeliskApi` v1 is frozen around Linux runtime,
-  ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
+- Published RC baseline is for the v0.1 public surface: `ObeliskApi` v1 is frozen
+  around Linux runtime, ProcessEvent hook infrastructure, plugin lifecycle, central install layout,
   `oBaseEvents`, `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
   `DescribeResourceKind`, `DescribeGameplayPolicyEventKind`, and process-local
   owner-token timers.
@@ -596,7 +595,8 @@ priorities, and do not use history files as the active source of truth.
   JSON queue coordination stays out of active prompts, handoff, and checkpoint planning.
 - Sub-agent prompts still need scoped objective, safety baseline, allowed paths,
   required skills, expert role, and expected decision; pass only the skills needed for
-  that scope and close completed sub-agents before the next round.
+  that scope, omit leader-only strategy/cadence and active goal framing, and close
+  completed sub-agents before the next round.
 
 ## Canonical References
 

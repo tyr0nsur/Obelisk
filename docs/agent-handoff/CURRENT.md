@@ -6,8 +6,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Active Objective
 
-- `v0.1.0-rc.2` is the current published core-first RC baseline after a clean release gate and tag/ref verification; stale tags must not be reused.
-- Current post-RC focus: move from the accepted RC UFunction second-source root and core-first release baseline toward the complete SDK track without treating historical recovery context as active routing.
+- `v0.1.0-rc.2` is the current published v0.1 RC baseline for the current public surface after a clean release gate and tag/ref verification; stale tags must not be reused.
+- Current post-RC focus: use the accepted RC UFunction second-source root and release baseline as evidence, then continue the complete SDK track without treating historical recovery context as active routing.
 - Post-RC work moves toward `v1.0`: a complete public SDK contract for plugin authors,
   not just a stable runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
   `docs/public_sdk_surfaces.json` as the v1 surface map until a release gate supersedes
@@ -36,7 +36,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   process-local owner-token timers with explicit unregister; this is not a gameplay/module timer API, shared scheduler state, UE identity, or persistent handles. It is not a production-stable `v1.0` claim.
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim; all blocker rows remain unresolved unless promoted or explicitly excluded in a reviewed v1 release statement.
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or `production SDK` in public sinks unless that gate allows the stable SDK claim. The checker also enforces canonical `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data seeds cannot become sufficient evidence by manifest drift.
-- Plugin Hub work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 only.
+- Plugin Hub work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 contributor/package-shape evidence only and are not Plugin Hub seeds.
 - `obelisk.command_chat_response_path.v1` and `obelisk.commands_replies.v1` remain
   blocked/planning-only until promoted player identity and permissions/admin exist. Their
   checkers must keep public header, ABI, runtime, SDK, reply/send/broadcast/moderation, and
@@ -127,8 +127,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   ingress, inventory/items mutation, and structure/build policy; P2 dino/tribe/
   buff-status/mission/transfer leaf lanes. Do not copy ArkApi/NextGenPlugins
   implementation details.
-- No-core fallback: keep progress offline through guardrails, permission/admin query-only
-  design, command/principal contract, and inventory copied-signal hygiene. inventory copied
+- Offline fallback while runtime/core work is blocked: keep progress through guardrails,
+  permission/admin query-only design, command/principal contract, and inventory
+  copied-signal hygiene. Inventory copied
   signals are the higher-value side lane, but do not displace identity -> permissions/admin
   -> commands/replies and does not authorize Transfer runtime work. Neither side lane
   displaces identity -> permissions/admin -> commands/replies. Prefer inventory
@@ -200,7 +201,9 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`
 - Start every supervised round by verifying no stale stand-by sub-agent remains open.
   Assign scoped objective, safety baseline, allowed paths, required skills, expert role,
-  expected decision, and edit permission. Pass only the skills needed for that task. The lead retains server-safety decisions.
+  expected decision, and edit permission. Pass only the skills needed for that task, and
+  do not pass leader-only strategy/cadence or active goal framing unless it changes the
+  task. The lead retains server-safety decisions.
 ## Agent Protocol
 - The lead owns integration. Sub-agents must not commit, amend, rebase, tag, push, update GitHub state, touch servers, send Discord updates, or broaden live-ops scope.
 - Use expert roles with disjoint ownership: ABI/API, build/SDK, UE4 reflection, static binary analysis, live-ops, release audit, or docs/skills.

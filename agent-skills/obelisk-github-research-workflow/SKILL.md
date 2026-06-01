@@ -24,11 +24,12 @@ stable internal runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
 while remembering that those documents are a planning contract until a release gate
 packages or supersedes them.
 Treat `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` as the lead-owned list
-of high-demand blockers that prevent a complete v1 SDK claim. Installed-SDK foundation
-examples can improve contributor readiness, but Plugin Hub seed work remains
-post-SDK-complete. Neither can declare v1 complete while blockers remain planning or
-post-v1. Explicitly excluded blockers require a reviewed v1 release statement with scoped
-wording; exclusions do not permit claiming a complete SDK for the excluded capability.
+of high-demand blockers that prevent a complete v1 SDK claim. Installed-SDK examples are
+contributor smoke/package-shape evidence only; they are not Plugin Hub seed work and
+cannot declare v1 complete while blockers remain planning or post-v1. Plugin Hub seed
+work remains post-SDK-complete. Explicitly excluded blockers require a reviewed v1 release
+statement with scoped wording; exclusions do not permit claiming a complete SDK for the
+excluded capability.
 
 Compatibility research may consult ArkServerApi/AseApi and local NextGenPlugins clones
 only as names and demand signals for familiar ARK plugin concepts. They are not architecture,
@@ -51,8 +52,8 @@ release-policy claim. Treat `ResourceHandle` and object identity/lifetime as a
 cross-cutting SDK blocker for any surface that needs post-callback object correlation,
 lookup, mutation, or persistent handles.
 
-Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts unless
-that context changes the agent's concrete task.
+Keep leader-only strategy, cadence, and active goal text out of sub-agent prompts. Pass
+only the blocker context that changes the agent's concrete task.
 
 ## Working Contract
 
@@ -105,7 +106,7 @@ that context changes the agent's concrete task.
 - Assign agents as scope experts, not generic helpers. Name the expert role in the task
   prompt, such as ABI/API engineer, UE4 reflection engineer, static binary analysis
   engineer, build/SDK engineer, live-ops engineer, or release-readiness auditor.
-- Do not pass broad leader cadence, long-term goal wording,
+- Do not pass broad leader cadence, active goal wording, long-term strategy,
   community/announcement policy, commit flow, or unrelated module history unless that
   information changes the agent's concrete task.
 - Before spawning agents, define disjoint ownership:

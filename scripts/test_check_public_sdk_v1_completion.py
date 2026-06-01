@@ -3013,6 +3013,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         cases = {
             "obelisk.permissions_admin.v1": ["obelisk.player_identity.v1"],
             "obelisk.commands_replies.v1": ["obelisk.command_chat_response_path.v1"],
+            "obelisk.player_services_economy_mobility.v1": [
+                "obelisk.command_chat_response_path.v1",
+            ],
         }
         for surface_id, removed_dependencies in cases.items():
             with self.subTest(surface=surface_id):
