@@ -95,7 +95,10 @@ REQUIRED_FAIL_CLOSED_CASES = frozenset(
         "missing_principal_handle",
         "missing_principal_generation",
         "missing_principal_scope_flags",
+        "missing_principal_provenance",
         "principal_generation_mismatch",
+        "plugin_supplied_principal_tuple",
+        "server_process_epoch_mismatch",
         "unsupported_principal_scope_flags",
         "missing_plugin_owner_token",
         "zero_plugin_owner_token",
@@ -133,7 +136,10 @@ REQUIRED_FAIL_CLOSED_CASE_SEQUENCE = (
     "missing_principal_handle",
     "missing_principal_generation",
     "missing_principal_scope_flags",
+    "missing_principal_provenance",
     "principal_generation_mismatch",
+    "plugin_supplied_principal_tuple",
+    "server_process_epoch_mismatch",
     "unsupported_principal_scope_flags",
     "missing_plugin_owner_token",
     "zero_plugin_owner_token",
@@ -200,6 +206,18 @@ REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY = {
     "operator_config_principal_claim_allowed": False,
     "command_text_permission_claim_allowed": False,
     "operator_config_permission_claim_allowed": False,
+}
+REQUIRED_PRINCIPAL_PROVENANCE_POLICY = {
+    "principal_tuple_source": "runtime_owned_player_identity_observation",
+    "plugin_supplied_principal_tuple_allowed": False,
+    "command_supplied_principal_tuple_allowed": False,
+    "operator_config_supplied_principal_tuple_allowed": False,
+    "principal_generation_provenance_required_before_allow": True,
+    "principal_scope_provenance_required_before_allow": True,
+    "server_process_epoch_required_before_allow": True,
+    "server_process_epoch_mismatch_result": "deny",
+    "public_abi_field_allowed": False,
+    "runtime_ready": False,
 }
 REQUIRED_QUERY_TEXT_POLICY = {
     "action_required": True,
@@ -455,6 +473,7 @@ def build_template_manifest() -> dict[str, Any]:
             "unknown_authority_fails_closed": True,
         },
         "principal_runtime_identity_policy": dict(REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY),
+        "principal_provenance_policy": dict(REQUIRED_PRINCIPAL_PROVENANCE_POLICY),
         "dependency_context": dict(REQUIRED_DEPENDENCY_CONTEXT),
         "query_text_policy": dict(REQUIRED_QUERY_TEXT_POLICY),
         "abuse_policy": dict(REQUIRED_ABUSE_POLICY),
@@ -819,6 +838,18 @@ def validate_principal_runtime_identity_policy(policy: Any, blockers: list[dict[
             )
 
 
+def validate_principal_provenance_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    validate_exact_mapping(
+        policy,
+        label="$.principal_provenance_policy",
+        required=REQUIRED_PRINCIPAL_PROVENANCE_POLICY,
+        missing_reason="principal_provenance_policy_missing",
+        fields_reason="principal_provenance_policy_fields_mismatch",
+        invalid_prefix="principal_provenance_policy",
+        blockers=blockers,
+    )
+
+
 def validate_query_text_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
     label = "$.query_text_policy"
     if not isinstance(policy, dict):
@@ -1082,6 +1113,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         payload.get("authority_policy"), blockers
     )
     validate_principal_runtime_identity_policy(payload.get("principal_runtime_identity_policy"), blockers)
+    validate_principal_provenance_policy(payload.get("principal_provenance_policy"), blockers)
     validate_query_text_policy(payload.get("query_text_policy"), blockers)
     validate_abuse_policy(payload.get("abuse_policy"), blockers)
     validate_sequence_gate(payload.get("sequence_gate"), blockers)

@@ -67,7 +67,10 @@ def manifest() -> dict:
         "missing_principal_handle",
         "missing_principal_generation",
         "missing_principal_scope_flags",
+        "missing_principal_provenance",
         "principal_generation_mismatch",
+        "plugin_supplied_principal_tuple",
+        "server_process_epoch_mismatch",
         "unsupported_principal_scope_flags",
         "missing_plugin_owner_token",
         "zero_plugin_owner_token",
@@ -168,6 +171,18 @@ def manifest() -> dict:
             "operator_config_principal_claim_allowed": False,
             "command_text_permission_claim_allowed": False,
             "operator_config_permission_claim_allowed": False,
+        },
+        "principal_provenance_policy": {
+            "principal_tuple_source": "runtime_owned_player_identity_observation",
+            "plugin_supplied_principal_tuple_allowed": False,
+            "command_supplied_principal_tuple_allowed": False,
+            "operator_config_supplied_principal_tuple_allowed": False,
+            "principal_generation_provenance_required_before_allow": True,
+            "principal_scope_provenance_required_before_allow": True,
+            "server_process_epoch_required_before_allow": True,
+            "server_process_epoch_mismatch_result": "deny",
+            "public_abi_field_allowed": False,
+            "runtime_ready": False,
         },
         "dependency_context": {
             "upstream_surface": "obelisk.player_identity.v1",
@@ -322,11 +337,13 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "missing_principal",
                 "missing_principal_generation",
                 "missing_principal_handle",
+                "missing_principal_provenance",
                 "missing_principal_scope_flags",
                 "missing_runtime_principal_identity",
                 "operator_config_allow_capability_claim",
                 "operator_config_permission_claim",
                 "operator_config_principal_claim",
+                "plugin_supplied_principal_tuple",
                 "plugin_supplied_provenance",
                 "policy_source_generation_mismatch",
                 "principal_generation_mismatch",
@@ -334,6 +351,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 "rate_limit_exceeded",
                 "resource_scope_size_exceeds_max",
                 "scope_mismatch",
+                "server_process_epoch_mismatch",
                 "stale_principal",
                 "unknown_authority",
                 "unknown_plugin_owner_token",
@@ -548,7 +566,10 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "resource_scope_size_exceeds_max",
             "missing_principal_handle",
             "missing_principal_scope_flags",
+            "missing_principal_provenance",
             "unsupported_principal_scope_flags",
+            "plugin_supplied_principal_tuple",
+            "server_process_epoch_mismatch",
             "zero_plugin_owner_token",
             "unknown_plugin_owner_token",
             "unloading_plugin_owner_token",
@@ -647,6 +668,37 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "principal_runtime_identity_policy_operator_config_permission_claim_allowed_invalid",
             report["blockers"],
         )
+
+    def test_rejects_missing_or_weakened_principal_provenance_policy(self) -> None:
+        payload = manifest()
+        payload.pop("principal_provenance_policy")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_provenance_policy_missing", report["blockers"])
+
+        payload = manifest()
+        payload["principal_provenance_policy"]["plugin_supplied_principal_tuple_allowed"] = True
+        payload["principal_provenance_policy"]["principal_generation_provenance_required_before_allow"] = False
+        payload["principal_provenance_policy"]["server_process_epoch_mismatch_result"] = "allow"
+        payload["principal_provenance_policy"]["public_abi_field_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "principal_provenance_policy_plugin_supplied_principal_tuple_allowed_invalid",
+            report["blockers"],
+        )
+        self.assertIn(
+            "principal_provenance_policy_principal_generation_provenance_required_before_allow_invalid",
+            report["blockers"],
+        )
+        self.assertIn("principal_provenance_policy_server_process_epoch_mismatch_result_invalid", report["blockers"])
+        self.assertIn("principal_provenance_policy_public_abi_field_allowed_invalid", report["blockers"])
 
     def test_rejects_missing_or_weakened_query_text_policy(self) -> None:
         payload = manifest()

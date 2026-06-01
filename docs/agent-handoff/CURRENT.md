@@ -19,8 +19,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   checks are explicitly rejected as runtime principal lifecycle evidence. Inventory-action
   fixture boundary now locks exact function flags, param counts/sizes, return offset,
   field offsets, element sizes, array dims, property flags, and direction for the two
-  redacted action fixtures. These are guardrails only and do not promote identity,
-  Inventory SDK, runtime readiness, public SDK readiness, or v1 completion.
+  redacted action fixtures. Permissions/admin query planning now also requires a
+  candidate-only `principal_provenance_policy`: the principal tuple source must be
+  runtime-owned player identity observation, plugin/command/operator-config supplied
+  principal tuples are forbidden, generation/scope provenance is required before allow,
+  and server-process epoch mismatch fails closed internally. These are guardrails only
+  and do not promote identity, permissions/admin, Inventory SDK, runtime readiness,
+  public SDK readiness, or v1 completion.
 
 ## Hard Overrides
 
@@ -56,6 +61,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   authz bridge, command copied-response intent lifecycle, command/chat response
   public-readiness, and commands/replies readiness checks. A pass is planning-only;
   promotion/public ABI/public SDK/runtime/public-header claims must stay false.
+- `docs/permissions_admin_query_failclosed_contract.json` requires principal provenance
+  before any future allow: runtime-owned player identity observation is the only accepted
+  principal tuple source, plugin/command/operator-config supplied principal tuples are
+  fail-closed, and `missing_principal_provenance`, `plugin_supplied_principal_tuple`, and
+  `server_process_epoch_mismatch` are internal candidate reason flags. This is not a
+  public ABI field or permissions/admin promotion.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is

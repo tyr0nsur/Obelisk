@@ -187,7 +187,25 @@
     },
     {
       "allow_allowed": false,
+      "case": "missing_principal_provenance",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
       "case": "principal_generation_mismatch",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "plugin_supplied_principal_tuple",
+      "consumer_result": "deny",
+      "fail_closed": true
+    },
+    {
+      "allow_allowed": false,
+      "case": "server_process_epoch_mismatch",
       "consumer_result": "deny",
       "fail_closed": true
     },
@@ -442,6 +460,14 @@
       {
         "allow_allowed": false,
         "bit_index": 18,
+        "case": "missing_principal_provenance",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "missing_principal_provenance"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 19,
         "case": "principal_generation_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -449,7 +475,23 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 19,
+        "bit_index": 20,
+        "case": "plugin_supplied_principal_tuple",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "plugin_supplied_principal_tuple"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 21,
+        "case": "server_process_epoch_mismatch",
+        "consumer_result": "deny",
+        "fail_closed": true,
+        "name": "server_process_epoch_mismatch"
+      },
+      {
+        "allow_allowed": false,
+        "bit_index": 22,
         "case": "unsupported_principal_scope_flags",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -457,7 +499,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 20,
+        "bit_index": 23,
         "case": "missing_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -465,7 +507,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 21,
+        "bit_index": 24,
         "case": "zero_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -473,7 +515,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 22,
+        "bit_index": 25,
         "case": "unknown_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -481,7 +523,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 23,
+        "bit_index": 26,
         "case": "unloading_plugin_owner_token",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -489,7 +531,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 24,
+        "bit_index": 27,
         "case": "missing_capability",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -497,7 +539,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 25,
+        "bit_index": 28,
         "case": "rate_limit_exceeded",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -505,7 +547,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 26,
+        "bit_index": 29,
         "case": "unknown_authority",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -513,7 +555,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 27,
+        "bit_index": 30,
         "case": "missing_authority_kind",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -521,7 +563,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 28,
+        "bit_index": 31,
         "case": "missing_policy_source",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -529,7 +571,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 29,
+        "bit_index": 32,
         "case": "missing_policy_source_generation",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -537,7 +579,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 30,
+        "bit_index": 33,
         "case": "policy_source_generation_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -545,7 +587,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 31,
+        "bit_index": 34,
         "case": "missing_policy_epoch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -553,7 +595,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 32,
+        "bit_index": 35,
         "case": "missing_authority_generation",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -561,7 +603,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 33,
+        "bit_index": 36,
         "case": "authority_generation_mismatch",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -569,7 +611,7 @@
       },
       {
         "allow_allowed": false,
-        "bit_index": 34,
+        "bit_index": 37,
         "case": "plugin_supplied_provenance",
         "consumer_result": "deny",
         "fail_closed": true,
@@ -607,6 +649,18 @@
     "promotion, public SDK readiness, and runtime readiness require a separate reviewed ABI and runtime gate"
   ],
   "pre_abi": true,
+  "principal_provenance_policy": {
+    "command_supplied_principal_tuple_allowed": false,
+    "operator_config_supplied_principal_tuple_allowed": false,
+    "plugin_supplied_principal_tuple_allowed": false,
+    "principal_generation_provenance_required_before_allow": true,
+    "principal_scope_provenance_required_before_allow": true,
+    "principal_tuple_source": "runtime_owned_player_identity_observation",
+    "public_abi_field_allowed": false,
+    "runtime_ready": false,
+    "server_process_epoch_mismatch_result": "deny",
+    "server_process_epoch_required_before_allow": true
+  },
   "principal_runtime_identity_policy": {
     "command_text_permission_claim_allowed": false,
     "command_text_principal_claim_allowed": false,
