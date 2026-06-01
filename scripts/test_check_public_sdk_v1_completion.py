@@ -1303,6 +1303,40 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ["Foundation/Plugin Hub seed package shape"],
         )
 
+    def test_stable_release_contract_rejects_ambiguous_demand_family_equivalent_text(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        canonical = (
+            "non-P0 minimum promoted demand families are promoted or satisfied by explicit "
+            "v1_completion_equivalent_for records before complete/full/production SDK wording; "
+            "no demand-family equivalent or legacy completion alias may satisfy a P0 dependency-chain surface"
+        )
+        legacy = (
+            "minimum promoted demand families are promoted or satisfied by explicit completion "
+            "equivalents before complete/full/production SDK wording"
+        )
+        manifest["stable_release_contract"]["claim_requires"] = [
+            legacy if item == canonical else item
+            for item in manifest["stable_release_contract"]["claim_requires"]
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            release_statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            release_statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(release_statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("stable_release_contract_claim_requires_incomplete", payload["blockers"])
+        self.assertIn(canonical, payload["stable_release_contract_missing_claim_requires"])
+
     def test_installed_sdk_package_shape_must_remain_non_claim_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()
         manifest["installed_sdk_package_shape"]["status"] = "plugin-hub-seed-ready"
@@ -3914,6 +3948,26 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn(
             "obelisk.player_identity.v1",
             payload["v1_sdk_blocker_outcome_summary"]["dependency_chain_remaining"],
+        )
+        self.assertEqual(
+            payload["unpromoted_required_dependency_chain"],
+            [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+        )
+        self.assertEqual(payload["v1_sdk_progress"]["completion_blockers_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        self.assertEqual(payload["v1_sdk_progress"]["complete_sdk_claim_progress_percent"], 0)
+        self.assertNotIn(
+            "obelisk.player_identity.v1",
+            payload["v1_sdk_progress"]["completion_blockers_with_promoted_outcome"],
+        )
+        self.assertIn(
+            "obelisk.player_identity.v1",
+            payload["v1_sdk_progress"]["completion_blockers_with_manifest_promoted_status"],
         )
         outcome_by_surface = {
             row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]

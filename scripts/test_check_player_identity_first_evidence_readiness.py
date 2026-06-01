@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from pathlib import Path
 from unittest import mock
@@ -1216,13 +1217,15 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             request_path = Path(tmp) / "window-request.json"
             env_path = Path(tmp) / "observer-window.env"
+            start = datetime.now(timezone.utc) + timedelta(hours=1)
+            end = start + timedelta(minutes=10)
             request_args = SimpleNamespace(
                 instance="arkserver2",
                 map_name="TheIsland",
                 run_id="20260601T120000Z-player-principal-lifecycle",
                 obelisk_commit="1234567890abcdef1234567890abcdef12345678",
-                approved_window_start_utc="2026-06-01T12:00:00Z",
-                approved_window_end_utc="2026-06-01T12:10:00Z",
+                approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
                 restart_expectation="restart",
                 final_posture="stable",

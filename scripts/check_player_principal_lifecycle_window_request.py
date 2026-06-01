@@ -353,6 +353,8 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "approved_window_end_utc_invalid", "approved_window.end_utc")
         if start_dt is not None and end_dt is not None and not start_dt < end_dt:
             add(blockers, "approved_window_order_invalid", "approved_window")
+        if end_dt is not None and end_dt <= datetime.now(timezone.utc):
+            add(blockers, "approved_window_expired", "approved_window.end_utc", value=end)
     rollback = require_keys(payload.get("rollback"), required=EXPECTED_ROLLBACK_KEYS, label="rollback", blockers=blockers)
     if rollback:
         if not isinstance(rollback.get("owner"), str) or not re.fullmatch(r"[A-Za-z0-9_.@ -]+", rollback["owner"]):

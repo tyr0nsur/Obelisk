@@ -80,10 +80,10 @@ MISSION_COPIED_BOOL_POLICY_ARTIFACT = (
     "/home/flowcommunity-ark/obelisk-artifacts/"
     "mission-copied-bool-tail-policy-slice-20260530T090211Z/"
 )
-MISSION_COPIED_BOOL_POLICY_ARTIFACT_SHA256 = (
+MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256 = (
     "f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945"
 )
-MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256 = (
+MISSION_COPIED_BOOL_ARTIFACT_PACK_MANIFEST_SHA256 = (
     "b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb"
 )
 MISSION_CONSUME_ONLY_TARGET_SETS = frozenset(
@@ -341,8 +341,8 @@ TARGET_SET_BLOCKER_GUIDANCE = {
         "next_offline_input": (
             "consume existing offline artifact "
             f"{MISSION_COPIED_BOOL_POLICY_ARTIFACT} "
-            f"(pack_sha256={MISSION_COPIED_BOOL_POLICY_ARTIFACT_SHA256}, "
-            f"manifest_sha256={MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256}) "
+            f"(policy_manifest_sha256={MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256}, "
+            f"artifact_pack_manifest_sha256={MISSION_COPIED_BOOL_ARTIFACT_PACK_MANIFEST_SHA256}) "
             "or refresh sanitized mission UFunction snapshots from distinct non-protected "
             "copied/offline artifacts with complete artifact identity"
         ),

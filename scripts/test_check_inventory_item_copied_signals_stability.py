@@ -301,6 +301,24 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("public_claim_forbidden_term", reasons)
         self.assertIn("gameplay_policy_resource_contract_guardrail_missing", reasons)
 
+    def test_positive_return_override_claim_is_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        fixtures["decisions"]["public_contract"]["payload_contract"] = (
+            "GameplayPolicyEvent includes copied scalars and return override support"
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("public_claim_forbidden_term", reasons)
+        detail = next(
+            blocker
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "public_claim_forbidden_term"
+        )
+        self.assertEqual("return override", detail["term"])
+
     def test_public_sdk_and_v1_readiness_cannot_be_activated_by_this_surface(self) -> None:
         fixtures = self.make_fixture()
         surfaces = fixtures["public_sdk_surfaces"]

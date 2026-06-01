@@ -1951,6 +1951,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             stable_contract["claim_requires"],
         )
         self.assertIn(
+            "non-P0 minimum promoted demand families are promoted or satisfied by explicit v1_completion_equivalent_for records before complete/full/production SDK wording; no demand-family equivalent or legacy completion alias may satisfy a P0 dependency-chain surface",
+            stable_contract["claim_requires"],
+        )
+        self.assertNotIn(
+            "minimum promoted demand families are promoted or satisfied by explicit completion equivalents before complete/full/production SDK wording",
+            stable_contract["claim_requires"],
+        )
+        self.assertIn(
             "no promoted-experimental-only surface remains unresolved",
             stable_contract["claim_requires"],
         )
@@ -5330,8 +5338,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_public_header_marks_copied_event_seeds_as_not_v1_complete(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
         raw_callback_section = header[
-            header.index("Raw ProcessEvent callback registration") :
-            header.index("Filtered registrations are rejected")
+            header.index("Legacy raw ProcessEvent callback registration") :
+            header.index("Call the original ProcessEvent trampoline")
         ]
 
         self.assertIn("copied v0.1", raw_callback_section)

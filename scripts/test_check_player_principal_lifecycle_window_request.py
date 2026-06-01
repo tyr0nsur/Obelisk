@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -20,6 +21,8 @@ TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 def prepare_args(output_dir: Path) -> list[str]:
+    start = datetime.now(timezone.utc) + timedelta(hours=1)
+    end = start + timedelta(minutes=10)
     return [
         sys.executable,
         str(PREPARE),
@@ -32,9 +35,9 @@ def prepare_args(output_dir: Path) -> list[str]:
         "--obelisk-commit",
         TEST_COMMIT,
         "--approved-window-start-utc",
-        "2026-06-01T12:00:00Z",
+        start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "--approved-window-end-utc",
-        "2026-06-01T12:10:00Z",
+        end.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "--binary-sha256",
         SHA,
         "--restart-expectation",
@@ -128,6 +131,21 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("copied_log_path_not_exact_expected_path", report["blockers"])
+
+    def test_rejects_expired_approved_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["approved_window"]["start_utc"] = "2026-01-01T12:00:00Z"
+            request["approved_window"]["end_utc"] = "2026-01-01T12:10:00Z"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved_window_expired", report["blockers"])
 
     def test_rejects_beta_policy_without_notice_and_public_readiness_claim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

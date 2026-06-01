@@ -164,7 +164,7 @@ It intentionally fails on the current post-RC tree; passing the core-first relea
 alone is not enough to claim `v1.0 stable`. The release statement is part of the gate
 because every non-chain non-promoted blocker must be named as excluded or post-v1, while
 the P0 dependency chain must be promoted with evidence.
-Current complete-SDK blocker promotion is 0/12, the P0 dependency chain promotion is 0/4,
+Current SDK blocker promotion is 0/12, the P0 dependency chain promotion is 0/4,
 and the stable SDK claim switch is disabled. Excluded/post-v1 accounting does not count
 as completion progress for a complete SDK claim.
 

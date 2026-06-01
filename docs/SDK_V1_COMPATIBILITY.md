@@ -24,7 +24,7 @@ The machine-readable `v1_sdk_completion_blockers` list records the high-demand c
 that currently prevent a complete SDK claim: player identity, permissions/admin,
 command/chat response path, commands/replies, inventory/items mutation, structure
 census/build policy, object identity/ResourceHandle, lifecycle ops recovery, gameplay
-modules including mission/transfer/dino/tribe/buff-status, player
+modules including buffs, mission/transfer/dino/tribe/buff-status, player
 services/economy/mobility/areas, operator ingress/storage, and gameplay/server tick
 callbacks. Lifecycle ops recovery is tracked as `obelisk.lifecycle_ops_recovery.v1`
 so lifecycle/config/logging cannot be mistaken for watchdog, reload, restart, or server

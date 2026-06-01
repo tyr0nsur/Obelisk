@@ -648,9 +648,12 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/",
             mission["next_offline_input"],
         )
-        self.assertIn("pack_sha256=f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945", mission["next_offline_input"])
         self.assertIn(
-            "manifest_sha256=b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb",
+            "policy_manifest_sha256=f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945",
+            mission["next_offline_input"],
+        )
+        self.assertIn(
+            "artifact_pack_manifest_sha256=b47f0497c92ae3e8f9a006fb5be87cfbcc1d1dd5f15d78267ad186073e4c26fb",
             mission["next_offline_input"],
         )
         self.assertIn(

@@ -82,7 +82,7 @@ CANONICAL_STABLE_RELEASE_CLAIM_REQUIRES = (
     "v1_completion_required is true in this manifest",
     "every v1_required_dependency_chain surface is promoted with evidence before complete/full/production SDK wording",
     "every non-chain v1_sdk_completion_blocker is promoted or explicitly named as excluded/post-v1 in the v1 release statement",
-    "minimum promoted demand families are promoted or satisfied by explicit completion equivalents before complete/full/production SDK wording",
+    "non-P0 minimum promoted demand families are promoted or satisfied by explicit v1_completion_equivalent_for records before complete/full/production SDK wording; no demand-family equivalent or legacy completion alias may satisfy a P0 dependency-chain surface",
     "no promoted-experimental-only surface remains unresolved",
     "the release ships a reviewed SDK compatibility statement based on docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json",
 )
@@ -2447,6 +2447,20 @@ def build_report(
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
     p0_scoped_non_complete_outcomes = blocker_outcome_summary["p0_scoped_non_complete_outcomes"]
+    completion_blockers_counting_toward_claim = sorted(
+        row["surface"]
+        for row in blocker_outcome_rows
+        if row.get("counts_toward_complete_sdk_claim") is True
+    )
+    p0_chain_counting_toward_claim = sorted(
+        row["surface"]
+        for row in blocker_outcome_rows
+        if row.get("is_p0_dependency_chain") is True
+        and row.get("counts_toward_complete_sdk_claim") is True
+    )
+    required_dependency_chain_unresolved_for_claim = blocker_outcome_summary[
+        "dependency_chain_remaining"
+    ]
     if p0_scoped_non_complete_outcomes:
         blockers.append("p0_dependency_chain_outcomes_scoped_non_complete_only")
     ready = not blockers
@@ -2544,7 +2558,7 @@ def build_report(
         "v1_required_dependency_chain_expected": list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
         "p0_dependency_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
         "p0_dependency_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
-        "unpromoted_required_dependency_chain": unpromoted_required_dependency_chain,
+        "unpromoted_required_dependency_chain": required_dependency_chain_unresolved_for_claim,
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "non_promoted_with_public_abi": sorted(set(non_promoted_with_public_abi)),
@@ -2561,11 +2575,9 @@ def build_report(
         "v1_sdk_report_sections": report_sections,
         "v1_sdk_progress": {
             "completion_blocker_total": completion_blocker_total,
-            "completion_blockers_promoted_count": len(completion_blockers_with_promoted_outcome),
+            "completion_blockers_promoted_count": len(completion_blockers_counting_toward_claim),
             "p0_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
-            "p0_chain_promoted_count": (
-                len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN) - len(unpromoted_required_dependency_chain)
-            ),
+            "p0_chain_promoted_count": len(p0_chain_counting_toward_claim),
             "p0_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
             "p0_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
             "p0_chain_scoped_non_complete_note": (
@@ -2573,11 +2585,16 @@ def build_report(
                 "increase p0_chain_promoted_count or complete_sdk_claim_progress_percent."
             ),
             "complete_sdk_claim_progress_percent": (
-                int((len(completion_blockers_with_promoted_outcome) / completion_blocker_total) * 100)
+                int((len(completion_blockers_counting_toward_claim) / completion_blocker_total) * 100)
                 if completion_blocker_total
                 else 0
             ),
-            "completion_blockers_with_promoted_outcome": completion_blockers_with_promoted_outcome,
+            "completion_blockers_with_promoted_outcome": completion_blockers_counting_toward_claim,
+            "completion_blockers_with_manifest_promoted_status": completion_blockers_with_promoted_outcome,
+            "completion_blockers_with_promoted_outcome_note": (
+                "Only promoted blockers with acceptable evidence and a matching promoted "
+                "release-statement record count toward complete SDK claim progress."
+            ),
             "completion_blockers_with_post_v1_or_excluded_outcome": (
                 completion_blockers_with_post_v1_or_excluded_outcome
             ),

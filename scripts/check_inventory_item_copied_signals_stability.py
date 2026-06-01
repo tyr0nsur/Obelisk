@@ -113,6 +113,7 @@ PUBLIC_CLAIM_TERMS = frozenset(
         "Items SDK",
         "lookup",
         "mutation",
+        "return override",
         "ResourceHandle",
         "AdditionalData",
         "ResourceHandle API",

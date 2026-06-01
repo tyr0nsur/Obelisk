@@ -65,7 +65,16 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   scoped non-complete bookkeeping that keeps `p0_chain_promoted_count=0` until the
   canonical P0 surface itself is promoted with evidence. Missing P0 entries in
   `v1_sdk_completion_blockers` now raise a specific blocker instead of being hidden by
-  broader canonical-blocker drift.
+  broader canonical-blocker drift. `v1_sdk_progress` counts only blocker rows whose
+  `counts_toward_complete_sdk_claim=true`; manifest `status=promoted` without evidence
+  and promoted release-statement accounting remains visible separately but does not
+  increase P0 count or percentage.
+- Latest request-pack expiry hardening: `check_player_principal_lifecycle_window_request.py`
+  now rejects expired `approved_window.end_utc` values with `approved_window_expired`.
+  The old `20260601T120000Z-player-principal-lifecycle` request-pack is now correctly
+  pre-window stale and must be regenerated or reapproved with a future operator window
+  before any live-ops brief; it remains non-evidence and does not clear
+  `approved_runtime_evidence_missing`.
 - Latest copied-signal integration hardening: the v1 completion checker now composes the
   inventory/item copied-signal stability checker and rejects any drift that makes it public
   SDK or v1-completion evidence. It also rejects nested public/runtime claims reported by
@@ -74,7 +83,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   exactly at `ParamData + reflected_offset` with the exact reflected `ParmsSize`, matching
   the inventory copied-scalar provenance pattern. This does not promote Inventory SDK,
   Items SDK, lookup, mutation, `ResourceHandle`, return override, runtime readiness, or v1
-  completion.
+  completion. Inventory copied-signal stability also treats positive `return override`
+  wording as a forbidden public claim, not merely as an exclusion-list term.
 - Latest inventory-action/P0 guardrail hardening: redacted inventory-action signatures now
   classify `ServerRequestInventoryUseItemWithActor.AdditionalData` as
   `redacted_action_metadata_scalar`, not a copied integer candidate. Fixture and observer

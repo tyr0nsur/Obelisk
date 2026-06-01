@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -33,6 +34,19 @@ RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 OTHER_TEST_COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
+
+
+def future_window() -> dict[str, str]:
+    start = datetime.now(timezone.utc) + timedelta(hours=1)
+    actual_start = start + timedelta(minutes=1)
+    actual_end = start + timedelta(minutes=9)
+    end = start + timedelta(minutes=10)
+    return {
+        "start": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "actual_start": actual_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "actual_end": actual_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "end": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
 
 
 def runtime_log_lines() -> list[str]:
@@ -95,6 +109,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         observer_env = sidecar_dir / "observer-window.env"
         preflight_pre = manifest.parent / "preflight-pre.txt"
         preflight_post = manifest.parent / "preflight-post.txt"
+        window = future_window()
         request_args = type(
             "Args",
             (),
@@ -116,8 +131,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "obelisk_commit": TEST_COMMIT,
                     "target": {"instance": "arkserver2", "map": "TheIsland"},
                     "approved_window": {
-                        "start_utc": "2026-06-01T12:00:00Z",
-                        "end_utc": "2026-06-01T12:10:00Z",
+                        "start_utc": window["start"],
+                        "end_utc": window["end"],
                     },
                     "restart_expectation": "restart",
                     "final_posture": "stable",
@@ -159,10 +174,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     f"obelisk_commit={TEST_COMMIT}",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",
-                    "approved_window_start_utc=2026-06-01T12:00:00Z",
-                    "approved_window_end_utc=2026-06-01T12:10:00Z",
-                    "actual_capture_start_utc=2026-06-01T12:01:00Z",
-                    "actual_capture_end_utc=2026-06-01T12:09:00Z",
+                    f"approved_window_start_utc={window['start']}",
+                    f"approved_window_end_utc={window['end']}",
+                    f"actual_capture_start_utc={window['actual_start']}",
+                    f"actual_capture_end_utc={window['actual_end']}",
                     f"copied_log_path={copied_log}",
                     f"copied_log_sha256={copied_log_sha256}",
                     f"request_pack_path={request_pack}",
@@ -177,8 +192,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "post_posture=stable",
                     "pre_check=passed",
                     "post_check=passed",
-                    "rollback_start_utc=2026-06-01T12:09:00Z",
-                    "rollback_end_utc=2026-06-01T12:10:00Z",
+                    f"rollback_start_utc={window['actual_end']}",
+                    f"rollback_end_utc={window['end']}",
                     "rollback_completed=true",
                     "rollback_delta=removed_observer_env_and_markers_preserved_disable_plugins",
                     "observer_env_survived=false",
