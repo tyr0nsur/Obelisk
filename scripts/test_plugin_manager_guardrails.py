@@ -19,10 +19,6 @@ COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
         "internal/test-only copied lifecycle dispatcher; not plugin-facing until a later "
         "promotion wires a public ABI registration path and PluginManager owner cleanup"
     ),
-    "PlayerPrincipalEventDispatcher": (
-        "internal/test-only copied lifecycle dispatcher; not plugin-facing until player "
-        "identity promotion wires a public ABI registration path and PluginManager owner cleanup"
-    ),
 }
 
 COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
@@ -558,6 +554,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "UnregisterGameplayPolicyRegistrationsForOwner(owner)",
             "InventoryPolicyEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
             "ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
+            "PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner)",
         ):
             with self.subTest(owner_cleanup_token=token):
                 self.assertIn(token, cleanup_body)

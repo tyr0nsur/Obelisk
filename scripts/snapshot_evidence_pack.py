@@ -82,21 +82,11 @@ def reject_protected_output_path(path: Path, label: str) -> Path:
 
 
 def first_symlink_component(path: Path) -> Path | None:
-    expanded = path.expanduser()
-    candidate = expanded if expanded.is_absolute() else expanded.absolute()
-    current = Path(candidate.anchor) if candidate.anchor else Path()
-    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
-    for part in parts:
-        current = current / part
-        if current.is_symlink():
-            return current
-    return None
+    return protected_paths.first_symlink_component(path)
 
 
 def reject_symlink_component(path: Path, label: str) -> None:
-    symlink_component = first_symlink_component(path)
-    if symlink_component is not None:
-        raise SystemExit(f"{label} must not be a symlink: {symlink_component}")
+    protected_paths.reject_symlink_component(path, label)
 
 
 def reject_protected_core_path(path: Path, manifest_path: Path) -> Path:

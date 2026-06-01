@@ -21,6 +21,7 @@ WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
 def write_sidecar(path: Path, text: str) -> str:
@@ -72,7 +73,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
         result = subprocess.run(
-            [sys.executable, str(ANALYZER), "--obelisk-commit", "test-commit", str(log_path)],
+            [sys.executable, str(ANALYZER), "--obelisk-commit", TEST_COMMIT, str(log_path)],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
@@ -317,6 +318,50 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("--source-summary must not read from protected server root", result.stderr)
             self.assertFalse(output.exists())
+
+    def test_rejects_protected_output_path_before_writing(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            output = Path("/servidor/ark/obelisk/approved-manifest.json")
+
+            result = self.run_builder(summary_path, window_check, output)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--output must not write under protected server root", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_rejects_symlinked_source_summary_before_reading(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            summary_link = temp_dir / "runtime-summary-link.json"
+            summary_link.symlink_to(summary_path)
+            output = temp_dir / "manifest.json"
+
+            result = self.run_builder(summary_link, window_check, output)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--source-summary must not be a symlink", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_rejects_symlinked_output_before_writing(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            summary_path = self.write_summary(temp_dir)
+            window_check = self.write_window_check(temp_dir, summary_path)
+            target = temp_dir / "target.json"
+            target.write_text("preserve me\n", encoding="utf-8")
+            output_link = temp_dir / "approved-manifest-link.json"
+            output_link.symlink_to(target)
+
+            result = self.run_builder(summary_path, window_check, output_link)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--output must not be a symlink", result.stderr)
+            self.assertEqual(target.read_text(encoding="utf-8"), "preserve me\n")
 
     def test_rejects_summary_generated_with_server_paths_allowed(self) -> None:
         with self.temp_offline_workspace() as temp:

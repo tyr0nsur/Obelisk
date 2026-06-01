@@ -290,6 +290,7 @@ class CommandsRepliesPublicContractDecisionTests(unittest.TestCase):
                 "candidate vtable slots",
                 "raw ProcessEvent callbacks",
                 "legacy CallProcessEvent debug access",
+                "command copied response intent planning vocabulary",
             ],
         )
         self.assertIn(

@@ -2315,7 +2315,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn("useful to contributors", workflow_skill)
         self.assertIn("stable integration point", workflow_skill)
         self.assertIn("Do not draft or send Discord updates unless explicitly approved", workflow_skill)
-        self.assertIn("Endpoints are operator secrets", workflow_skill)
+        self.assertIn("Endpoints are operator secrets", normalized_workflow)
         self.assertIn("scripts/send_discord_embed.py --dry-run", workflow_skill)
         self.assertIn("--confirm-approved-send", workflow_skill)
         self.assertIn("--approval-scope community", workflow_skill)

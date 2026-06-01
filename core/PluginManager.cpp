@@ -6,6 +6,7 @@
 #include "EventManager.h"
 #include "InventoryPolicyEventDispatcher.h"
 #include "ItemReturnEventDispatcher.h"
+#include "PlayerPrincipalEventDispatcher.h"
 #include "PluginConfig.h"
 #include "StructureEventDispatcher.h"
 #include "TimerManager.h"
@@ -2311,6 +2312,9 @@ namespace Obelisk::Core
         const size_t itemReturnRemoved = cleanupFamily("item return", [&]() {
             return ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
         });
+        const size_t playerPrincipalRemoved = cleanupFamily("player principal", [&]() {
+            return PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+        });
 
         const auto logRemoved = [&](size_t count, const char* label) {
             if (count == 0)
@@ -2327,6 +2331,7 @@ namespace Obelisk::Core
         logRemoved(structureRemoved, "structure");
         logRemoved(inventoryRemoved, "inventory policy");
         logRemoved(itemReturnRemoved, "item return");
+        logRemoved(playerPrincipalRemoved, "player principal");
 
         return cleanupSucceeded;
     }

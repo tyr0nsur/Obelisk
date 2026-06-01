@@ -101,6 +101,30 @@ class ProtectedPathsTests(unittest.TestCase):
 
         self.assertEqual(sibling.resolve(), resolved)
 
+    def test_first_symlink_component_reports_nearest_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            real = root / "real"
+            real.mkdir()
+            link = root / "link"
+            link.symlink_to(real, target_is_directory=True)
+
+            self.assertEqual(
+                link,
+                protected_paths.first_symlink_component(link / "nested" / "snapshot.json"),
+            )
+
+    def test_reject_symlink_component_fails_before_resolving_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            real = root / "real"
+            real.mkdir()
+            link = root / "link"
+            link.symlink_to(real, target_is_directory=True)
+
+            with self.assertRaisesRegex(SystemExit, r"--source must not be a symlink: .*link"):
+                protected_paths.reject_symlink_component(link / "snapshot.json", "--source")
+
 
 if __name__ == "__main__":
     unittest.main()

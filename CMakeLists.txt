@@ -248,6 +248,7 @@ add_executable(plugin_manager_tests
     tests/core/PluginManagerTests.cpp
     core/ChatEventDispatcher.cpp
     core/InventoryPolicyEventDispatcher.cpp
+    core/PlayerPrincipalEventDispatcher.cpp
     core/StructureEventDispatcher.cpp
     core/TimerManager.cpp
     core/EventManager.cpp

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence_checker
+import protected_paths
 from artifact_identity import canonical_json_bytes
 
 
@@ -25,8 +26,6 @@ SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
 WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_MODULE = "player_principal_lifecycle"
-SERVER_ROOT = Path("/servidor/ark")
-APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
 FORBIDDEN_REVIEW_TEXT_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|ip(?:v4|v6)?|tribe[_-]?id|"
@@ -93,58 +92,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def is_under_path(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return True
-
-
-def first_symlink_component(path: Path) -> Path | None:
-    expanded = path.expanduser()
-    candidate = expanded if expanded.is_absolute() else expanded.absolute()
-    current = Path(candidate.anchor) if candidate.anchor else Path()
-    parts = candidate.parts[1:] if candidate.anchor else candidate.parts
-    for part in parts:
-        current = current / part
-        if current.is_symlink():
-            return current
-    return None
-
-
-def reject_symlink_component(path: Path, label: str) -> None:
-    symlink = first_symlink_component(path)
-    if symlink is not None:
-        raise SystemExit(f"{label} must not be a symlink: {symlink}")
-
-
-def protected_path_status(path: Path) -> tuple[bool, Path]:
-    expanded = path.expanduser()
-    resolved = expanded.resolve()
-    protected = SERVER_ROOT.resolve()
-    direct_protected = expanded.is_absolute() and is_under_path(expanded, SERVER_ROOT)
-    resolved_protected = is_under_path(resolved, protected)
-    approved_offline = any(
-        expanded.is_absolute()
-        and is_under_path(expanded, root)
-        and is_under_path(resolved, root.resolve())
-        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
-    )
-    return (direct_protected or resolved_protected) and not approved_offline, resolved
-
-
-def reject_protected_path(path: Path, label: str, *, write: bool = False) -> Path:
-    blocked, resolved = protected_path_status(path)
-    if blocked:
-        action = "write under" if write else "read from"
-        raise SystemExit(f"{label} must not {action} protected server root {SERVER_ROOT}: {resolved}")
-    return resolved
-
-
 def load_summary(path: Path) -> dict[str, Any]:
-    reject_symlink_component(path, "--source-summary")
-    resolved = reject_protected_path(path, "--source-summary")
+    protected_paths.reject_symlink_component(path, "--source-summary")
+    resolved = protected_paths.reject_protected_input_path(path, "--source-summary")
     try:
         payload = json.loads(resolved.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -157,8 +107,8 @@ def load_summary(path: Path) -> dict[str, Any]:
 
 
 def load_window_check(path: Path) -> dict[str, Any]:
-    reject_symlink_component(path, "--window-manifest-check")
-    resolved = reject_protected_path(path, "--window-manifest-check")
+    protected_paths.reject_symlink_component(path, "--window-manifest-check")
+    resolved = protected_paths.reject_protected_input_path(path, "--window-manifest-check")
     try:
         payload = json.loads(resolved.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -180,22 +130,14 @@ def reject_if_forbidden_review_text(value: str, label: str) -> None:
 def path_is_copied_or_offline(path_text: Any) -> bool:
     if not isinstance(path_text, str) or not path_text:
         return False
-    blocked, _ = protected_path_status(Path(path_text))
-    return not blocked
+    return not protected_paths.protected_path_status(Path(path_text)).protected
 
 
 def path_is_approved_offline_workspace(path_text: Any) -> bool:
     if not isinstance(path_text, str) or not path_text:
         return False
-    blocked, resolved = protected_path_status(Path(path_text))
-    if blocked:
-        return False
-    return any(
-        Path(path_text).expanduser().is_absolute()
-        and is_under_path(Path(path_text).expanduser(), root)
-        and is_under_path(resolved, root.resolve())
-        for root in APPROVED_OFFLINE_WORKSPACE_ROOTS
-    )
+    status = protected_paths.protected_path_status(Path(path_text))
+    return not status.protected and status.approved_offline_workspace
 
 
 def validate_source_summary(summary: dict[str, Any]) -> None:
@@ -365,8 +307,8 @@ def build_manifest(
 
 
 def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
-    reject_symlink_component(path, "--output")
-    resolved = reject_protected_path(path, "--output", write=True)
+    protected_paths.reject_symlink_component(path, "--output")
+    resolved = protected_paths.reject_protected_output_path(path, "--output")
     resolved.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     fd = -1

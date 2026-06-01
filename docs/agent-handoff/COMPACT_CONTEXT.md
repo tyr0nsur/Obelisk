@@ -50,7 +50,7 @@ priorities, and do not use history files as the active source of truth.
 - Repo: `/home/flowcommunity-ark/Obelisk`
 - Remote: `git@github.com:tyr0nsur/Obelisk.git`
 - Central Obelisk root: `/servidor/ark/obelisk`
-- Current release baseline: `v0.1.0-rc.2` is published as the v0.1 RC baseline for the
+- Current release baseline: `v0.1.0-rc.2` is the current published core-first RC baseline for the
   current public surface after a clean release gate and exact tag/ref verification. It is not a
   production-stable `v1.0` claim. Post-RC work should move toward a complete `v1.0` SDK
   through architecture hardening, UE4 reflection evidence, copied-data module APIs, and

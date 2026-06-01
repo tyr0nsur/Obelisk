@@ -6,7 +6,7 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 
 ## Active Objective
 
-- `v0.1.0-rc.2` is the current published v0.1 RC baseline for the current public surface after a clean release gate and tag/ref verification; stale tags must not be reused.
+- `v0.1.0-rc.2` is the current published core-first RC baseline for the current public surface after a clean release gate and tag/ref verification; stale tags must not be reused.
 - Current post-RC focus: use the accepted RC UFunction second-source root and release baseline as evidence, then continue the complete SDK track without treating historical recovery context as active routing.
 - Post-RC work moves toward `v1.0`: a complete public SDK contract for plugin authors,
   not just a stable runtime. Use `docs/SDK_V1_COMPATIBILITY.md` and
