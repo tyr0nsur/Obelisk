@@ -517,7 +517,8 @@
         "non_claims": [
           "offline ShooterGameServer binary alone is insufficient",
           "copied core or direct core/bin planning alone is insufficient",
-          "manual FName/GObjects roots alone are insufficient"
+          "manual FName/GObjects roots alone are insufficient",
+          "private player-principal lifecycle observer wiring, marker/env-gated runtime observations, and internal lifecycle-anchor logs are promotion inputs only; they do not add public header symbols, plugin callback dispatch, player lookup, principal identifiers, permissions/admin, command/chat response, v1 SDK completion, or support-tier changes"
         ],
         "docs": [
           "docs/research/2026-05-31-player-identity-first-evidence.md",

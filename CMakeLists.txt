@@ -89,6 +89,7 @@ add_library(obelisk SHARED
     ue/ItemReflection.cpp
     ue/InventoryReflection.cpp
     ue/StructureReflection.cpp
+    ue/PlayerPrincipalLifecycleReflection.cpp
     ue/RuntimeReflection.cpp
     ue/ReflectionScanner.cpp
     hooks/HookManager.cpp
@@ -406,6 +407,15 @@ add_executable(item_reflection_tests
 target_include_directories(item_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME ItemReflectionTests COMMAND item_reflection_tests)
+
+add_executable(player_principal_lifecycle_reflection_tests
+    tests/core/PlayerPrincipalLifecycleReflectionTests.cpp
+    ue/PlayerPrincipalLifecycleReflection.cpp
+    ue/RuntimeReflection.cpp
+)
+target_include_directories(player_principal_lifecycle_reflection_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME PlayerPrincipalLifecycleReflectionTests COMMAND player_principal_lifecycle_reflection_tests)
 
 add_executable(process_event_item_reflection_tests
     tests/core/ProcessEventItemReflectionTests.cpp

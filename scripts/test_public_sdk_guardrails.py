@@ -634,6 +634,16 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "ObeliskPlayerHandle",
     "ObeliskPlayerIdentity",
     "ObeliskPlayerLookup",
+    "ObeliskPlayerPrincipal",
+    "ObeliskPrincipalId",
+    "ObeliskPlayerLifecycleEvent",
+    "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL",
+    "RegisterPlayerPrincipalLifecycle",
+    "RegisterPlayerLifecycle",
+    "RegisterPlayerIdentityEvent",
+    "PlayerPrincipal",
+    "PrincipalLookup",
     "RegisterCommand",
     "RegisterAdminCommand",
     "RegisterPlayerCommand",
@@ -1986,6 +1996,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "offline ShooterGameServer binary alone is insufficient",
             "copied core or direct core/bin planning alone is insufficient",
             "manual FName/GObjects roots alone are insufficient",
+            "private player-principal lifecycle observer wiring, marker/env-gated runtime observations, and internal lifecycle-anchor logs are promotion inputs only; they do not add public header symbols, plugin callback dispatch, player lookup, principal identifiers, permissions/admin, command/chat response, v1 SDK completion, or support-tier changes",
         ):
             self.assertIn(non_claim, player_identity["evidence"]["non_claims"])
         self.assertIn("obelisk.player_identity.v1", manifest["planning_surfaces"])
@@ -1994,8 +2005,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertNotIn("players-identity-lifecycle-intake", json.dumps(manifest["experimental_surfaces"]))
 
         for blocker in (
-            "No accepted login/logout lifecycle anchors.",
-            "No principal privacy, invalidation, or cross-instance semantics.",
+            "No approved runtime principal lifecycle evidence.",
+            "No accepted login/logout lifecycle ordering or principal invalidation semantics.",
+            "No principal privacy, invalidation, or cross-instance scope contract.",
         ):
             self.assertIn(blocker, player_identity["blockers"])
 

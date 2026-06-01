@@ -119,6 +119,10 @@ shape. The active promotion blocker is approved runtime principal lifecycle evid
 principal privacy, invalidation, and cross-instance semantics. Permissions/admin,
 `obelisk.command_chat_response_path.v1`, and then commands/replies remain separately
 blocked until identity authority and the named copied response path are promoted.
+A private player-principal lifecycle observer is internal evidence collection only:
+disabled by default, marker/env/hash gated, redacted, and not plugin-facing. It does not
+promote public player identity, player lookup, permissions/admin, commands/replies,
+runtime readiness, or v1 SDK completion.
 
 ## v1.0 SDK Completion Bar
 
