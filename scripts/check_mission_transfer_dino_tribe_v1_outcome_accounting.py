@@ -24,6 +24,48 @@ DEFAULT_SPLIT_NOTE = REPO_ROOT / "docs" / "research" / "2026-06-01-mission-trans
 REPORT_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1"
 SURFACE_ID = "obelisk.mission_transfer_dino_tribe.v1"
 REQUIRED_LEAVES = ("mission", "transfer", "dino_policy", "tribe_policy", "buff_status")
+MISSION_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-mission-leaf-blocker-accounting.v1"
+MISSION_REQUIRED_EVIDENCE = ("mission-compact-intake", "mission-copied-bool-policy-slice")
+MISSION_COPIED_TARGETS = (
+    "MissionType.AddPlayerToMission",
+    "MissionType.BPAllowPlayerToLeaveMission",
+    "MissionType.BPOnPlayerRemovedFromMission",
+)
+MISSION_RECOGNITION_ONLY_TARGETS = ("MissionType.GetPlayerUsableItems",)
+MISSION_COPIED_BOOL_FIELDS = (
+    "MissionType.AddPlayerToMission.bForceAdd",
+    "MissionType.AddPlayerToMission.ReturnValue",
+    "MissionType.BPAllowPlayerToLeaveMission.ReturnValue",
+    "MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent",
+    "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+)
+MISSION_REDACTED_RECOGNITION_FIELDS = (
+    "MissionType.AddPlayerToMission.PlayerCharacter",
+    "MissionType.BPAllowPlayerToLeaveMission.PlayerPawn",
+    "MissionType.BPOnPlayerRemovedFromMission.Player",
+    "MissionType.BPOnPlayerRemovedFromMission.Controller",
+    "MissionType.GetPlayerUsableItems.Character",
+    "MissionType.GetPlayerUsableItems.OutItemIDs",
+)
+MISSION_SPLIT_NOTE_REQUIRED_TOKENS = (
+    "mission-copied-bool-policy-slice",
+    "promote-mode blocked",
+    "MissionType.GetPlayerUsableItems",
+    "recognition-only",
+) + MISSION_COPIED_TARGETS + MISSION_RECOGNITION_ONLY_TARGETS + MISSION_COPIED_BOOL_FIELDS + MISSION_REDACTED_RECOGNITION_FIELDS
+MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
+    "mission_sdk_ready",
+    "promotion_ready",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_mission_sdk_ready",
+    "public_sdk_ready",
+    "runtime_hook_ready",
+    "runtime_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_ready",
+}
 LEAF_ALIASES = {
     "mission": ("mission",),
     "transfer": ("transfer",),
@@ -363,6 +405,14 @@ def validate_split_note(text: str, blockers: list[dict[str, Any]]) -> None:
     for phrase in required_non_claims:
         if phrase not in text:
             add(blockers, "split_note_non_claim_missing", "$.split_note", phrase=phrase)
+    for token in MISSION_SPLIT_NOTE_REQUIRED_TOKENS:
+        if token not in text:
+            add(
+                blockers,
+                "mission_leaf_accounting_split_note_token_missing",
+                "$.split_note.mission_leaf_accounting",
+                token=token,
+            )
 
 
 def release_statement_outcome(text: str) -> dict[str, Any]:
@@ -440,6 +490,99 @@ def validate_promoted_leaf_evidence(surface: dict[str, Any], leaves: dict[str, d
         if NEGATIVE_EVIDENCE_RE.search(joined):
             add(blockers, "promoted_leaf_evidence_contains_candidate_only_markers", label, leaf=leaf_id)
     return True
+
+
+def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
+    overclaims: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{prefix}.{key}"
+            if key in MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS and child is True:
+                overclaims.append(child_path)
+            overclaims.extend(collect_true_ready_overclaims(child, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            overclaims.extend(collect_true_ready_overclaims(child, f"{prefix}[{index}]"))
+    return overclaims
+
+
+def validate_mission_candidate_leaf(leaf: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    status = leaf.get("status") if isinstance(leaf.get("status"), str) else "missing"
+    if status == "promoted":
+        return
+    evidence = leaf.get("evidence")
+    if isinstance(evidence, dict):
+        for field in collect_true_ready_overclaims(evidence, "$.leaf_decision_units[mission].evidence"):
+            add(blockers, "mission_leaf_candidate_ready_overclaim", field)
+        claims = forbidden_claims("\n".join(flattened_strings(evidence)))
+        for claim in claims:
+            add(
+                blockers,
+                "mission_leaf_candidate_evidence_forbidden_claim",
+                "$.leaf_decision_units[mission].evidence",
+                claim=claim,
+            )
+
+
+def build_mission_leaf_blocker_accounting(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+) -> dict[str, Any]:
+    leaf = leaves.get("mission", {})
+    current_evidence = string_list(leaf.get("current_evidence"))
+    missing_required_evidence = sorted(set(MISSION_REQUIRED_EVIDENCE) - set(current_evidence))
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    mission_gap = gaps.get("mission") if isinstance(gaps, dict) and isinstance(gaps.get("mission"), dict) else {}
+
+    return {
+        "schema": MISSION_LEAF_ACCOUNTING_SCHEMA,
+        "leaf": "mission",
+        "lane": "mission_copied_bool_policy_slice",
+        "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+        "accounting_scope": "candidate-only internal blocker accounting",
+        "accepted_for_internal_planning": not missing_required_evidence and leaf.get("status") == "planning",
+        "v1_accounted": bool(mission_gap.get("v1_accounted")),
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "promotion_ready": False,
+        "focused_checker": "scripts/check_mission_copied_bool_readiness.py",
+        "input_target_set": "mission-compact-intake",
+        "output_target_set": "mission-copied-bool-policy-slice",
+        "required_evidence": list(MISSION_REQUIRED_EVIDENCE),
+        "current_evidence": current_evidence,
+        "missing_required_evidence": missing_required_evidence,
+        "copied_bool_boundary": {
+            "copied_targets": list(MISSION_COPIED_TARGETS),
+            "copied_bool_fields": list(MISSION_COPIED_BOOL_FIELDS),
+            "copied_bool_count": len(MISSION_COPIED_BOOL_FIELDS),
+        },
+        "redaction_boundary": {
+            "recognition_only_targets": list(MISSION_RECOGNITION_ONLY_TARGETS),
+            "redacted_recognition_fields": list(MISSION_REDACTED_RECOGNITION_FIELDS),
+            "forbidden_promotions": [
+                "mission identity",
+                "player/controller/character identity",
+                "item arrays",
+                "object pointers",
+                "lookup",
+                "runtime hook wiring",
+                "mutation",
+                "return override",
+                "ResourceHandle",
+            ],
+        },
+        "remaining_public_gates": string_list(mission_gap.get("missing_public_gates")),
+        "outcome": (
+            "internal_planning_only"
+            if not missing_required_evidence and leaf.get("status") == "planning"
+            else "blocked_accounting"
+        ),
+        "non_claims": [
+            "mission leaf accounting does not promote a public Mission SDK, ABI, callback, or descriptor",
+            "mission leaf accounting does not promote runtime hooks, dispatcher wiring, mutation, return override, identity, lookup, arrays, or ResourceHandle",
+            "mission leaf accounting does not expand beyond the frozen copied-bool policy slice",
+        ],
+    }
 
 
 def validate_public_contracts(
@@ -643,6 +786,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         surface = {"id": SURFACE_ID, "leaf_decision_units": []}
     leaves = leaf_map(surface, blockers)
     outcome = release_statement_outcome(release_statement)
+    validate_mission_candidate_leaf(leaves.get("mission", {}), blockers)
 
     manifest_umbrella_excluded = surface.get("status") == "excluded" and all(
         leaves.get(leaf_id, {}).get("status") == "excluded" for leaf_id in REQUIRED_LEAVES
@@ -681,6 +825,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         route = "candidate_only"
     leaf_family_accounting = build_leaf_family_accounting(surface, leaves, outcome, route, blockers)
     leaf_priority = build_leaf_priority(leaves, leaf_family_accounting, blockers)
+    mission_leaf_blocker_accounting = build_mission_leaf_blocker_accounting(leaves, leaf_family_accounting)
 
     return {
         "schema": REPORT_SCHEMA,
@@ -696,6 +841,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         "observed_leaves": [leaf_id for leaf_id in REQUIRED_LEAVES if leaf_id in leaves],
         "leaf_statuses": {leaf_id: leaves.get(leaf_id, {}).get("status") for leaf_id in REQUIRED_LEAVES},
         "candidate_only_accounting": leaf_family_accounting,
+        "mission_leaf_blocker_accounting": mission_leaf_blocker_accounting,
         "leaf_priority": leaf_priority,
         "missing_leaf_families": leaf_family_accounting["missing_leaf_families"],
         "release_statement": outcome,

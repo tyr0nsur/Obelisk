@@ -42,6 +42,43 @@ redaction, lifecycle, runtime, ABI, and public documentation gates are satisfied
 For v1, the allowed outcome is documentation and consume-only/internal planning
 evidence. Public SDK promotion remains blocked for all five leaves.
 
+## Mission Leaf Accounting Boundary
+
+The `mission` leaf is the selected narrow accounting lane for the next internal
+hardening pass. Its current useful surface is only
+`mission-copied-bool-policy-slice`: consume-mode planning evidence with
+promote-mode blocked. This lane is narrower than `mission-compact-intake` and
+must stay candidate/accounting-only.
+
+Copied target accounting is limited to these three reflected targets:
+
+- `MissionType.AddPlayerToMission`
+- `MissionType.BPAllowPlayerToLeaveMission`
+- `MissionType.BPOnPlayerRemovedFromMission`
+
+Copied bool field accounting is limited to these five one-byte bool fields:
+
+- `MissionType.AddPlayerToMission.bForceAdd`
+- `MissionType.AddPlayerToMission.ReturnValue`
+- `MissionType.BPAllowPlayerToLeaveMission.ReturnValue`
+- `MissionType.BPOnPlayerRemovedFromMission.bFromMissionCompleteEvent`
+- `MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess`
+
+Recognition-only redaction accounting is limited to these fields. Their pointer,
+object, array, identity, and payload values are not copied, logged, or promoted:
+
+- `MissionType.AddPlayerToMission.PlayerCharacter`
+- `MissionType.BPAllowPlayerToLeaveMission.PlayerPawn`
+- `MissionType.BPOnPlayerRemovedFromMission.Player`
+- `MissionType.BPOnPlayerRemovedFromMission.Controller`
+- `MissionType.GetPlayerUsableItems.Character`
+- `MissionType.GetPlayerUsableItems.OutItemIDs`
+
+`MissionType.GetPlayerUsableItems` remains a recognition-only target for this
+lane. It is not part of the copied bool target set and does not authorize item
+array exposure, item identity, mission identity, lookup, runtime hook wiring,
+mutation, return override, `ResourceHandle`, or public Mission SDK promotion.
+
 ## Validation
 
 Local/offline commands used for this note:
@@ -53,5 +90,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_dino_scalar_readiness.py --json
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/compare_reflection_snapshots.py --list-target-sets
 ```
 
-No servers, live logs, debuggers, Discord, Git commands, manifest/test/script
-edits, or `/servidor/ark` writes were used for this docs-only split.
+The original split pass was docs-only. The 2026-06-01 mission leaf accounting
+hardening pass edited only the accounting checker, its corresponding test, and
+this note. No servers, live logs, debuggers, Discord, Git commands, runtime
+probes, manifest edits, ABI/runtime code edits, or `/servidor/ark` writes were
+used.

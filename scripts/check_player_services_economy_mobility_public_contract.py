@@ -35,11 +35,13 @@ FALSE_ONLY_TOP_LEVEL_KEYS = (
 REQUIRED_DEPENDENCIES = {
     "obelisk.player_identity.v1": "identity",
     "obelisk.permissions_admin.v1": "permissions_admin",
+    "obelisk.command_chat_response_path.v1": "command_chat_response",
     "obelisk.operator_ingress_storage.v1": "storage_persistence",
 }
 REQUIRED_CONTROL_GATES = {
     "identity",
     "permissions_admin",
+    "command_chat_response_path",
     "storage_persistence",
     "audit",
     "rollback",

@@ -45,6 +45,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self,
         manifest: dict | None = None,
         statement: str | None = None,
+        split_note: str | None = None,
         *,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
@@ -52,14 +53,19 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             root = Path(tmp)
             manifest_path = root / "public_sdk_surfaces.json"
             statement_path = root / "release-statement.md"
+            split_note_path = root / "mission-transfer-dino-tribe-v1-split.md"
             manifest_path.write_text(json.dumps(manifest if manifest is not None else load_manifest()), encoding="utf-8")
+            split_note_path.write_text(
+                split_note if split_note is not None else SPLIT_NOTE.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             args = [
                 sys.executable,
                 str(SCRIPT),
                 "--manifest",
                 str(manifest_path),
                 "--split-note",
-                str(SPLIT_NOTE),
+                str(split_note_path),
                 "--json",
             ]
             if statement is not None:
@@ -108,6 +114,42 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("privacy_redaction_contract", accounting["leaf_family_gaps"]["tribe_policy"]["missing_public_gates"])
         self.assertIn("buff_class_object_redaction_contract", accounting["leaf_family_gaps"]["buff_status"]["missing_public_gates"])
         self.assertFalse(accounting["leaf_family_gaps"]["tribe_policy"]["v1_accounted"])
+
+        mission = report["mission_leaf_blocker_accounting"]
+        self.assertEqual(
+            mission["schema"],
+            "obelisk.mission-transfer-dino-tribe-v1-mission-leaf-blocker-accounting.v1",
+        )
+        self.assertEqual(mission["lane"], "mission_copied_bool_policy_slice")
+        self.assertEqual(mission["outcome"], "internal_planning_only")
+        self.assertTrue(mission["accepted_for_internal_planning"])
+        self.assertFalse(mission["v1_accounted"])
+        self.assertFalse(mission["public_sdk_ready"])
+        self.assertFalse(mission["runtime_ready"])
+        self.assertFalse(mission["promotion_ready"])
+        self.assertEqual(mission["missing_required_evidence"], [])
+        self.assertEqual(mission["copied_bool_boundary"]["copied_bool_count"], 5)
+        self.assertEqual(
+            mission["copied_bool_boundary"]["copied_targets"],
+            [
+                "MissionType.AddPlayerToMission",
+                "MissionType.BPAllowPlayerToLeaveMission",
+                "MissionType.BPOnPlayerRemovedFromMission",
+            ],
+        )
+        self.assertIn(
+            "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess",
+            mission["copied_bool_boundary"]["copied_bool_fields"],
+        )
+        self.assertEqual(
+            mission["redaction_boundary"]["recognition_only_targets"],
+            ["MissionType.GetPlayerUsableItems"],
+        )
+        self.assertIn(
+            "MissionType.GetPlayerUsableItems.OutItemIDs",
+            mission["redaction_boundary"]["redacted_recognition_fields"],
+        )
+        self.assertIn("public_mission_sdk_abi", mission["remaining_public_gates"])
 
         priority = report["leaf_priority"]
         self.assertEqual(priority["schema"], "obelisk.mission-transfer-dino-tribe-v1-leaf-priority.v1")
@@ -272,6 +314,51 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         details = [item for item in report["blocker_details"] if item["reason"] == "leaf_priority_required_evidence_missing"]
         self.assertEqual(details[0]["leaf"], "mission")
         self.assertEqual(details[0]["missing"], ["mission-copied-bool-policy-slice"])
+
+    def test_mission_leaf_split_note_requires_frozen_field_boundary(self) -> None:
+        note = SPLIT_NOTE.read_text(encoding="utf-8").replace(
+            "- `MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess`\n",
+            "",
+        )
+
+        result = self.run_checker(split_note=note, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_leaf_accounting_split_note_token_missing", report["blockers"])
+        details = [
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "mission_leaf_accounting_split_note_token_missing"
+        ]
+        self.assertEqual(details[0]["token"], "MissionType.BPOnPlayerRemovedFromMission.bLastPhaseSuccess")
+
+    def test_mission_candidate_leaf_rejects_ready_overclaim(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["mission"]["evidence"] = {
+            "public_sdk_ready": True,
+            "nested": {"runtime_ready": True},
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_leaf_candidate_ready_overclaim", report["blockers"])
+        fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "mission_leaf_candidate_ready_overclaim"
+        }
+        self.assertEqual(
+            fields,
+            {
+                "$.leaf_decision_units[mission].evidence.public_sdk_ready",
+                "$.leaf_decision_units[mission].evidence.nested.runtime_ready",
+            },
+        )
 
 
 if __name__ == "__main__":

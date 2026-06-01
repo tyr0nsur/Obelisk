@@ -102,6 +102,15 @@ REQUIRED_PRIVACY_DECISION_BEHAVIORS = frozenset(
         "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
     )
 )
+REQUIRED_LAYOUT_RUNTIME_SDK_NOT_SUFFICIENT = frozenset(
+    (
+        "static thunk orientation",
+        "candidate vtable slots",
+        "passive ChatMessageEvent parsing",
+        "legacy CallProcessEvent debug gate",
+        "raw ProcessEvent callbacks",
+    )
+)
 REQUIRED_PUBLIC_HEADER_FORBIDDEN_TOKENS = frozenset(
     (
         "OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH",
@@ -514,6 +523,17 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     evidence = by_id.get("evidence.response_target_set_snapshot_second_source", {})
     if string_set(evidence.get("required_targets")) != TARGETS:
         add(blockers, "decision_response_targets_mismatch", "$.decisions.required_before_public_header", value=evidence.get("required_targets"))
+
+    coverage = by_id.get("evidence.layout_runtime_sdk_coverage", {})
+    not_sufficient = string_set(coverage.get("not_sufficient"))
+    missing_not_sufficient = REQUIRED_LAYOUT_RUNTIME_SDK_NOT_SUFFICIENT - not_sufficient
+    if missing_not_sufficient:
+        add(
+            blockers,
+            "evidence_not_sufficient_missing_required",
+            "$.decisions.required_before_public_header",
+            missing=sorted(missing_not_sufficient),
+        )
 
     collect_surface_overclaims(payload, blockers, "$.decisions")
 

@@ -153,7 +153,17 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "command registration API",
                 "moderation API",
             ]},
-            {"id": "evidence.layout_runtime_sdk_coverage", "status": "unresolved"},
+            {
+                "id": "evidence.layout_runtime_sdk_coverage",
+                "status": "unresolved",
+                "not_sufficient": [
+                    "static thunk orientation",
+                    "candidate vtable slots",
+                    "passive ChatMessageEvent parsing",
+                    "legacy CallProcessEvent debug gate",
+                    "raw ProcessEvent callbacks",
+                ],
+            },
             {"id": "evidence.response_target_set_snapshot_second_source", "status": "unresolved", "required_targets": TARGETS},
         ]
         return {
@@ -405,6 +415,41 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
         self.assertIn("privacy_redaction_behavior_missing", report["blockers"])
+
+    def test_rejects_missing_not_sufficient_shortcut_evidence(self) -> None:
+        decisions = self.make_decisions()
+        evidence = next(
+            item
+            for item in decisions["required_before_public_header"]
+            if item["id"] == "evidence.layout_runtime_sdk_coverage"
+        )
+        evidence["not_sufficient"] = [
+            "candidate vtable slots",
+            "raw ProcessEvent callbacks",
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("evidence_not_sufficient_missing_required", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "evidence_not_sufficient_missing_required"
+        )
+        self.assertIn("passive ChatMessageEvent parsing", detail["missing"])
+        self.assertIn("static thunk orientation", detail["missing"])
+        self.assertIn("legacy CallProcessEvent debug gate", detail["missing"])
 
     def test_rejects_missing_call_process_event_and_native_wrapper_forbidden_contracts(self) -> None:
         decisions = self.make_decisions()

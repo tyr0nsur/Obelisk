@@ -84,11 +84,11 @@ priorities, and do not use history files as the active source of truth.
   target set for `ClientServerChatDirectMessage`, `ClientServerChatMessage`, and
   `ClientChatMessage`; it is not a release-readiness target set, public reply/send-chat
   ABI, command router, or runtime response claim.
-  While identity waits on copied core evidence, inventory copied signals are the
-  higher-value side lane. Neither side lane displaces identity -> permissions/admin ->
-  commands/replies. Prefer inventory copied-signal hygiene over structure census when
-  choosing one side lane, while structure census remains useful offline
-  planning/consume-only work.
+  While identity waits on approved copied runtime principal lifecycle evidence, inventory
+  copied signals are the higher-value side lane. Neither side lane displaces identity ->
+  permissions/admin -> commands/replies. Prefer inventory copied-signal hygiene over
+  structure census when choosing one side lane, while structure census remains useful
+  offline planning/consume-only work.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -388,7 +388,7 @@ priorities, and do not use history files as the active source of truth.
   Details: `docs/research/2026-05-31-v02-module-priority.md`,
   `docs/research/2026-05-29-mission-reflection-internal-readiness.md`, and
   `docs/research/2026-05-30-mission-copied-bool-observer-plan.md`.
-- Structure aggregate/census is the leading product-facing planning direction only. Keep
+- Structure aggregate/census remains a product-facing planning direction only. Keep
   it planning/consume-only with no runtime observer, callback ABI, descriptor, capability
   bit, public StructureEvents SDK, identity, lookup, mutation, enforcement, return
   override, or v1 completion claim. Details:

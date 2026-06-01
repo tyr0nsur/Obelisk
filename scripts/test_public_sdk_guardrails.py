@@ -723,6 +723,12 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "ObeliskPlayerIdentity",
     "ObeliskPlayerLookup",
     "ObeliskPlayerPrincipal",
+    "ObeliskSteamId",
+    "ObeliskEOSId",
+    "ObeliskPlatformAccountId",
+    "ObeliskPlayerName",
+    "ObeliskTribeId",
+    "ObeliskNetworkAddress",
     "ObeliskPrincipalId",
     "ObeliskPlayerLifecycleEvent",
     "ObeliskPlayerPrincipalLifecycle",
@@ -744,10 +750,12 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "UnregisterPlayerPrincipalLifecycleEvent",
     "PlayerPrincipal",
     "PrincipalLookup",
+    "PlatformAccountId",
     "RegisterCommand",
     "RegisterAdminCommand",
     "RegisterPlayerCommand",
     "RegisterPlayerLookup",
+    "RegisterPlayerSession",
     "UnregisterCommand",
     "UnregisterAdminCommand",
     "UnregisterPlayerCommand",
@@ -762,6 +770,13 @@ UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS = (
     "FindPlayer",
     "ResolvePlayer",
     "ResolvePlayerIdentity",
+    "steam_id",
+    "eos_id",
+    "platform_account_id",
+    "player_name",
+    "tribe_id",
+    "network_address",
+    "role_id",
 )
 UNPROMOTED_INVENTORY_ACTION_OBSERVER_API_TOKENS = (
     "OBELISK_API_CAPABILITY_INVENTORY_ACTIONS",
@@ -870,6 +885,7 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "ObeliskInventoryPolicyEvent",
     "ObeliskInventory",
     "ObeliskInventoryItem",
+    "ObeliskInventoryComp",
     "RegisterInventoryEvent",
     "RegisterInventoryPolicyEvent",
     "RegisterOnInventoryEvent",
@@ -879,6 +895,7 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "ObeliskItemEvent",
     "ObeliskItemPolicyEvent",
     "ObeliskItem",
+    "ObeliskItemNetId",
     "ObeliskItemStack",
     "RegisterItemEvent",
     "RegisterItemPolicyEvent",
@@ -906,8 +923,12 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "ObeliskResourceId",
     "inventory_id",
     "item_id",
+    "item_net_id",
+    "item_stack",
     "resource_id",
     "object_id",
+    "CraftBlueprint",
+    "AdditionalData",
     "ObeliskMutation",
     "ObeliskMutationContext",
     "MutateResource",
@@ -923,6 +944,14 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "ObeliskReturnOverride",
     "SetReturnOverride",
     "return_override",
+    "ObeliskPersistentHandle",
+    "ObeliskSerialHandle",
+    "ObeliskEconomyHandle",
+    "ObeliskMobilityHandle",
+    "persistent_handle",
+    "serial_reuse",
+    "RegisterPersistentHandleWithOwnerTokenHandle",
+    "RegisterItemGrantWithOwnerTokenHandle",
     *UNPROMOTED_INVENTORY_ACTION_OBSERVER_API_TOKENS,
     *UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS,
     *UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS,
@@ -9462,7 +9491,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         guardrails = normalized("\n".join(surfaces.get("release_guardrails", [])))
 
         for term in (
-            "While identity waits on copied core evidence",
+            "While identity waits on approved copied runtime principal lifecycle evidence",
             "inventory copied signals are the higher-value side lane",
             "structure census remains useful offline planning/consume-only work",
             "Neither side lane displaces\nidentity -> permissions/admin -> commands/replies",
@@ -9475,7 +9504,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertIn(
             normalized(
-                "While player identity waits on copied core/reflection evidence, "
+                "While player identity waits on approved copied runtime principal lifecycle evidence, "
                 "inventory_item_copied_signals may be treated as the higher-value "
                 "near-term side lane than structure_census because it rides "
                 "promoted-experimental copied GameplayPolicyEvent signals; this must "

@@ -94,6 +94,26 @@ class PlayerServicesEconomyMobilityPublicContractTests(unittest.TestCase):
         self.assertIn("economy.blocked_until_controls missing abuse", errors)
         self.assertIn("economy.forbidden_public_contract missing shop API", errors)
 
+    def test_command_response_dependency_is_required_for_player_facing_notices(self) -> None:
+        contract = self.load_valid_contract()
+        contract["dependencies"] = [
+            dependency
+            for dependency in contract["dependencies"]
+            if dependency["id"] != "obelisk.command_chat_response_path.v1"
+        ]
+        contract["required_control_gates"] = [
+            control
+            for control in contract["required_control_gates"]
+            if control["id"] != "command_chat_response_path"
+        ]
+        contract["audit_units"][-1]["blocked_until_controls"].remove("command_chat_response_path")
+
+        errors = checker.validate_contract(contract)
+
+        self.assertIn("missing required dependency: obelisk.command_chat_response_path.v1", errors)
+        self.assertIn("missing required control gate: command_chat_response_path", errors)
+        self.assertIn("timed_notices.blocked_until_controls missing command_chat_response_path", errors)
+
     def test_dependencies_and_controls_must_remain_unresolved(self) -> None:
         contract = self.load_valid_contract()
         contract["dependencies"][0]["status"] = "promoted"

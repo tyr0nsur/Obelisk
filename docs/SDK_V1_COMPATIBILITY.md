@@ -272,11 +272,12 @@ The shortest useful route toward a complete v1 SDK is:
 3. Promote the command/chat response path, then promote commands/replies as a new
    owner-token copied callback/response surface, not as a parser-only extension to
    `ChatMessageEvent`.
-4. While identity waits on copied core evidence, treat inventory/item copied signals as
-   the higher-value side lane than structure census because they already ride copied
-   `GameplayPolicyEvent` evidence. Keep that work experimental and non-completion; keep
-   structure census offline planning/consume-only unless a future promotion gate accepts
-   it. Promote or explicitly exclude each surface in the first v1 support statement.
+4. While identity waits on approved copied runtime principal lifecycle evidence, treat
+   inventory/item copied signals as the higher-value side lane than structure census
+   because they already ride copied `GameplayPolicyEvent` evidence. Keep that work
+   experimental and non-completion; keep structure census offline planning/consume-only
+   unless a future promotion gate accepts it. Promote or explicitly exclude each surface
+   in the first v1 support statement.
 5. Explicitly promote or name as excluded/post-v1 every remaining blocker ID. The
    `obelisk.mission_transfer_dino_tribe.v1` umbrella is split for accounting into
    mission, transfer, dino policy, tribe policy, and buff/status leaf decisions; the v1

@@ -30,6 +30,12 @@
       "status": "unresolved"
     },
     {
+      "id": "obelisk.command_chat_response_path.v1",
+      "kind": "command_chat_response",
+      "required_before_public_surface": true,
+      "status": "unresolved"
+    },
+    {
       "id": "obelisk.operator_ingress_storage.v1",
       "kind": "storage_persistence",
       "required_before_public_surface": true,
@@ -48,6 +54,12 @@
       "status": "unresolved",
       "must_exist_before_promotion": true,
       "decision_required": "Promote fail-closed authority and permission checks before any grant, spend, teleport, area-policy, or timed-notice action is public."
+    },
+    {
+      "id": "command_chat_response_path",
+      "status": "unresolved",
+      "must_exist_before_promotion": true,
+      "decision_required": "Promote a copied command/chat response path before any broadcast, timed notice, send-chat, or player-facing notice service is public."
     },
     {
       "id": "storage_persistence",
@@ -84,6 +96,7 @@
       "blocked_until_controls": [
         "identity",
         "permissions_admin",
+        "command_chat_response_path",
         "storage_persistence",
         "audit",
         "rollback",
@@ -108,6 +121,7 @@
       "blocked_until_controls": [
         "identity",
         "permissions_admin",
+        "command_chat_response_path",
         "storage_persistence",
         "audit",
         "rollback",
@@ -130,6 +144,7 @@
       "blocked_until_controls": [
         "identity",
         "permissions_admin",
+        "command_chat_response_path",
         "storage_persistence",
         "audit",
         "rollback",
@@ -151,6 +166,7 @@
       "blocked_until_controls": [
         "identity",
         "permissions_admin",
+        "command_chat_response_path",
         "storage_persistence",
         "audit",
         "rollback",
@@ -167,7 +183,7 @@
   "non_claims": [
     "candidate-only pre-ABI planning contract for player services, economy, mobility, areas, and timed notices",
     "does not add public headers, public ABI, runtime wiring, runtime services, storage, commands, replies, send-chat, broadcast, teleport, homes, shops, rewards, kits, stats, safe-zone, area-policy, mutation, lookup, ResourceHandle, UE pointers, raw params, or return override",
-    "identity, permissions/admin, storage/persistence, audit, rollback, and abuse controls are all required before any audit unit can be promoted",
+    "identity, permissions/admin, command/chat response path, storage/persistence, audit, rollback, and abuse controls are all required before any audit unit can be promoted",
     "each audit unit must be promoted as a separate narrow copied C ABI surface or explicitly excluded from v1"
   ]
 }

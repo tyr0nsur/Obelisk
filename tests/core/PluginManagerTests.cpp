@@ -2686,6 +2686,14 @@ namespace
         Require(Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner) == 0,
                 "timer survived plugin unload");
         Require(plugin.timerEventCalls == 0, "long-delay timer fired before unload cleanup");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "owner token remained valid for timer registration after plugin unload");
 
         CleanupPlugin(plugin);
         CleanupPlugin(otherPlugin);
