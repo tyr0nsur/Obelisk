@@ -395,7 +395,7 @@ Validate the reviewed manifest locally:
 ```bash
 python3 scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py \
   --json \
-  /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-runtime-principal-lifecycle-evidence.json
+  /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle/approved-runtime-principal-lifecycle-evidence.json
 ```
 
 Optional consume-gate cross-check:
@@ -403,7 +403,7 @@ Optional consume-gate cross-check:
 ```bash
 python3 scripts/validate_offline_artifact_gate.py \
   --mode consume \
-  --manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-runtime-principal-lifecycle-evidence.json
+  --manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle/approved-runtime-principal-lifecycle-evidence.json
 ```
 
 Promotion, public-readiness, and runtime-readiness modes must still fail closed. If a

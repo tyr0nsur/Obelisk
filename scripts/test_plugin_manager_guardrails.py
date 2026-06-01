@@ -363,7 +363,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertNotEqual(close_index, -1)
         self.assertIn("if (!", body[max(0, close_index - 16):close_index])
         self.assertLess(close_index, body.index("RemoveLoadedPluginOwner(plugin.owner)"))
-        close_following = body[close_index:close_index + 520]
+        close_following = body[close_index:close_index + 620]
         self.assertIn("retainPluginForUnloadRetry", close_following)
         self.assertIn("return", close_following)
         self.assertIn("continue", close_following)

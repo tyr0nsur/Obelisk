@@ -525,6 +525,13 @@ def write_template(path: Path, copied_log: Path | None = None) -> None:
 
 def build_report(fields: dict[str, str], validation: Validation, manifest_path: Path) -> dict[str, Any]:
     accepted = not validation.blockers
+    copied_log_path = fields.get("copied_log_path")
+    resolved_copied_log_path = None
+    if copied_log_path:
+        try:
+            resolved_copied_log_path = str(manifest_relative_path(copied_log_path, manifest_path).expanduser().resolve())
+        except OSError:
+            resolved_copied_log_path = str(manifest_relative_path(copied_log_path, manifest_path).expanduser())
     return {
         "schema": REPORT_SCHEMA,
         "ready": accepted,
@@ -542,7 +549,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
         },
         "manifest": str(manifest_path),
         "copied_log": {
-            "path": fields.get("copied_log_path"),
+            "path": resolved_copied_log_path,
             "sha256": fields.get("copied_log_sha256"),
             "path_status": validation.copied_log_status,
         },

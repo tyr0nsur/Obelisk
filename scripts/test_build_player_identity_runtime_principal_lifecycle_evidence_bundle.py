@@ -117,6 +117,17 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
         return manifest
 
+    def write_relative_window_manifest(self, temp_dir: Path, copied_log: Path) -> Path:
+        manifest = self.write_window_manifest(temp_dir, copied_log)
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(
+                f"copied_log_path={copied_log}",
+                f"copied_log_path={copied_log.relative_to(temp_dir)}",
+            ),
+            encoding="utf-8",
+        )
+        return manifest
+
     def run_bundle(
         self,
         copied_log: Path,
@@ -186,6 +197,23 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertTrue((output_dir / "evidence-bundle-report.json").is_file())
             self.assertTrue(report["operational_window"]["manifest_ready"])
             self.assertEqual(report["operational_window"]["obelisk_commit"], "test-commit")
+
+    def test_builds_bundle_with_relative_window_manifest_log_path(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_relative_window_manifest(temp_dir, copied_log)
+
+            result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            window_check = json.loads(
+                (output_dir / "player-principal-lifecycle-window-manifest.check.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(window_check["copied_log"]["path"], str(copied_log.resolve()))
 
     def test_generated_bundle_manifest_clears_first_evidence_runtime_blocker_only(self) -> None:
         with self.temp_offline_workspace() as temp:

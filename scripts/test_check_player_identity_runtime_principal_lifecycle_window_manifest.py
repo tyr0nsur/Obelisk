@@ -132,6 +132,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertTrue(report["operational_window_manifest_ready"])
         self.assertEqual(report["obelisk_commit"], "test-commit")
         self.assertEqual(report["copied_log"]["path_status"], "approved_offline_workspace")
+        self.assertTrue(Path(report["copied_log"]["path"]).is_absolute())
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])

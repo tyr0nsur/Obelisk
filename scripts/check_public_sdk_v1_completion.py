@@ -508,6 +508,9 @@ REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS = {
     "obelisk.command_chat_response_path.v1": "command_chat_response_public_contract_decisions.json",
     "obelisk.commands_replies.v1": "commands_replies_public_contract_decisions.json",
 }
+REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS = {
+    "obelisk.command_principal_authz_response_bridge.v1": "command_principal_authz_response_bridge_decisions.json",
+}
 CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES = CANONICAL_V1_COMPLETION_BLOCKERS
 
 
@@ -617,7 +620,12 @@ def load_public_header_symbols(path: Path) -> tuple[set[str], list[str]]:
 
 def contract_decision_paths(decisions_dir: Path) -> list[Path]:
     try:
-        return sorted(decisions_dir.glob(PUBLIC_CONTRACT_DECISIONS_GLOB))
+        paths = set(decisions_dir.glob(PUBLIC_CONTRACT_DECISIONS_GLOB))
+        for filename in REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS.values():
+            path = decisions_dir / filename
+            if path.exists():
+                paths.add(path)
+        return sorted(paths)
     except OSError:
         return []
 
@@ -627,10 +635,17 @@ def missing_required_contract_decision_manifests(decisions_dir: Path) -> dict[st
         if decisions_dir.resolve() != DEFAULT_CONTRACT_DECISIONS_DIR.resolve():
             return {}
     except OSError:
-        return dict(REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS)
+        return {
+            **REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
+            **REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS,
+        }
 
     missing: dict[str, str] = {}
-    for surface_id, filename in REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS.items():
+    required_manifests = {
+        **REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
+        **REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS,
+    }
+    for surface_id, filename in required_manifests.items():
         path = decisions_dir / filename
         payload, blockers = load_manifest(path)
         if blockers or payload is None or payload.get("surface") != surface_id:
@@ -680,6 +695,10 @@ def symbol_matches_blocked_contract(symbol: str, surface_id: str) -> bool:
     return any(pattern.search(symbol) for pattern in contract_symbol_patterns(surface_id))
 
 
+def symbol_matches_contract_forbidden_tokens(symbol: str, payload: dict[str, Any]) -> bool:
+    return symbol in set(as_string_list(payload.get("public_header_forbidden_tokens")))
+
+
 def blocked_contract_public_header_symbol_drift(
     public_header_path: Path,
     decisions_dir: Path,
@@ -701,12 +720,16 @@ def blocked_contract_public_header_symbol_drift(
         if public_header_allowed is not False and raw_declared_symbols != []:
             continue
         surface_id = payload.get("surface")
-        if not isinstance(surface_id, str) or not contract_symbol_patterns(surface_id):
+        if not isinstance(surface_id, str):
             continue
         matching_symbols = sorted(
             symbol
             for symbol in public_symbols
-            if symbol not in declared_symbols and symbol_matches_blocked_contract(symbol, surface_id)
+            if symbol not in declared_symbols
+            and (
+                symbol_matches_blocked_contract(symbol, surface_id)
+                or symbol_matches_contract_forbidden_tokens(symbol, payload)
+            )
         )
         if matching_symbols:
             drift[str(decision_path)] = {

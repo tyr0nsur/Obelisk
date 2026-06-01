@@ -216,6 +216,10 @@ command, console command, admin-like command, reply request, and permission acti
 claim ArkApi/AseApi parser compatibility, dispatch ordering compatibility, return
 semantics compatibility, direct plugin portability, copied parser/control flow, or ABI
 compatibility.
+The planning bridge is tracked by
+[`command_principal_authz_response_bridge_decisions.json`](command_principal_authz_response_bridge_decisions.json)
+and its checker; it is a fail-closed vocabulary/header-drift guardrail only, not a public
+ABI or promoted SDK surface.
 
 Player identity is planning-only. `players-identity-lifecycle-intake` and
 `obelisk.players-identity-first-evidence.v1` are candidate-only,

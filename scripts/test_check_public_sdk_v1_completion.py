@@ -102,6 +102,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         surface_id = "obelisk.inventory_item_copied_signals.v1"
         filename = "inventory_item_copied_signals_public_contract_decisions.json"
         self.assertEqual(module.REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS[surface_id], filename)
+        bridge_surface_id = "obelisk.command_principal_authz_response_bridge.v1"
+        bridge_filename = "command_principal_authz_response_bridge_decisions.json"
+        self.assertEqual(module.REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS[bridge_surface_id], bridge_filename)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             decisions_dir = Path(temp_dir) / "docs"
@@ -111,6 +114,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             try:
                 missing = module.missing_required_contract_decision_manifests(decisions_dir)
                 self.assertEqual(missing[surface_id], filename)
+                self.assertEqual(missing[bridge_surface_id], bridge_filename)
 
                 (decisions_dir / filename).write_text(
                     json.dumps(
@@ -136,6 +140,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 )
                 missing = module.missing_required_contract_decision_manifests(decisions_dir)
                 self.assertNotIn(surface_id, missing)
+                self.assertIn(bridge_surface_id, missing)
+
+                (decisions_dir / bridge_filename).write_text(
+                    json.dumps(
+                        {
+                            "surface": bridge_surface_id,
+                            "status": "blocked",
+                            "public_header_allowed": False,
+                            "public_header_symbols_now": [],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                missing = module.missing_required_contract_decision_manifests(decisions_dir)
+                self.assertNotIn(bridge_surface_id, missing)
             finally:
                 module.DEFAULT_CONTRACT_DECISIONS_DIR = original_default
 
@@ -437,6 +456,52 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(drift["surface"], "obelisk.commands_replies.v1")
         self.assertIn("ObeliskCommandPayload", drift["undeclared_symbols"])
         self.assertIn("RegisterCommandWithOwnerTokenHandle", drift["undeclared_symbols"])
+
+    def test_route_guardrail_contract_detects_forbidden_token_symbols(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            header_path = temp_path / "ObeliskApi.h"
+            decisions_dir = temp_path / "docs"
+            decisions_dir.mkdir()
+            header_path.write_text(
+                "#pragma once\n"
+                "#define OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE 0x80000000u\n"
+                "typedef struct ObeliskCommandPrincipalAuthzResponseBridge { unsigned abi_version; } ObeliskCommandPrincipalAuthzResponseBridge;\n",
+                encoding="utf-8",
+            )
+            (decisions_dir / "command_principal_authz_response_bridge_decisions.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-principal-authz-response-bridge-decisions.v1",
+                        "surface": "obelisk.command_principal_authz_response_bridge.v1",
+                        "status": "blocked",
+                        "public_header_allowed": False,
+                        "public_header": str(header_path),
+                        "public_header_symbols_now": [],
+                        "public_header_forbidden_tokens": [
+                            "OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE",
+                            "ObeliskCommandPrincipalAuthzResponseBridge",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--public-header",
+                str(header_path),
+                "--contract-decisions-dir",
+                str(decisions_dir),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertIn("blocked_public_contract_header_symbols_detected", payload["blockers"])
+        drift = next(iter(payload["blocked_public_contract_header_symbols"].values()))
+        self.assertEqual(drift["surface"], "obelisk.command_principal_authz_response_bridge.v1")
+        self.assertIn("OBELISK_API_CAPABILITY_COMMAND_PRINCIPAL_AUTHZ_RESPONSE_BRIDGE", drift["undeclared_symbols"])
+        self.assertIn("ObeliskCommandPrincipalAuthzResponseBridge", drift["undeclared_symbols"])
 
     def test_blocked_contract_symbols_are_not_reported_when_contract_lists_them(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -5671,13 +5671,17 @@ namespace
 
         FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false};
         FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .throwOnClose = true};
+        FakePlugin pluginC{.filename = "c_third.so", .pluginId = "plugin_c", .hasShutdown = false};
         FakeLoader loader;
         loader.Add(pluginA);
         loader.Add(pluginB);
+        loader.Add(pluginC);
         TouchPlugin(root, pluginA.filename);
         TouchPlugin(root, pluginB.filename);
+        TouchPlugin(root, pluginC.filename);
         WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
         WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginC.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
@@ -5689,6 +5693,8 @@ namespace
                 "unload continued to an earlier plugin after close-retention tracking failed");
         Require(pluginB.closeCalls == 1,
                 "close-retention tracking failure did not leave the throwing plugin mapped for retry");
+        Require(pluginC.closeCalls == 1,
+                "later plugin was not closed before close-retention tracking failure");
 
         Obelisk::Core::SetPluginRetentionFailureForTesting(false);
         pluginB.throwOnClose = false;
@@ -5696,9 +5702,11 @@ namespace
 
         Require(pluginA.closeCalls == 1, "retention-fail retry did not close the earlier plugin");
         Require(pluginB.closeCalls == 2, "retention-fail retry did not reattempt the retained plugin close");
+        Require(pluginC.closeCalls == 1, "retention-fail retry closed an already-closed later plugin again");
 
         CleanupPlugin(pluginA);
         CleanupPlugin(pluginB);
+        CleanupPlugin(pluginC);
         fs::remove_all(root);
     }
 

@@ -2789,6 +2789,21 @@ namespace Obelisk::Core
         for (auto it = m_LoadedPlugins.rbegin(); it != m_LoadedPlugins.rend(); ++it)
         {
             auto& plugin = *it;
+            const auto eraseProcessedClosedPluginsAndAbort = [&]() noexcept
+            {
+                try
+                {
+                    m_LoadedPlugins.erase(it.base(), m_LoadedPlugins.end());
+                }
+                catch (const std::exception& e)
+                {
+                    SafeLogErrorNoThrow("Failed to publish partial unload progress after retention failure", e.what());
+                }
+                catch (...)
+                {
+                    SafeLogErrorNoThrow("Failed to publish partial unload progress after retention failure with unknown exception");
+                }
+            };
             SafeLogInfoNoThrow("Unloading plugin: ", plugin.name);
             try
             {
@@ -2844,7 +2859,10 @@ namespace Obelisk::Core
                 if (!retainPluginForUnloadRetry(
                         plugin,
                         "Plugin retention tracking failed after callback cleanup failure; aborting unload pass"))
+                {
+                    eraseProcessedClosedPluginsAndAbort();
                     return;
+                }
                 continue;
             }
 
@@ -2856,7 +2874,10 @@ namespace Obelisk::Core
                 if (!retainPluginForUnloadRetry(
                         plugin,
                         "Plugin retention tracking failed after library close failure; aborting unload pass"))
+                {
+                    eraseProcessedClosedPluginsAndAbort();
                     return;
+                }
                 continue;
             }
 
