@@ -191,6 +191,21 @@ for review but is not sufficient evidence.
 Analyze only the copied or sanitized log:
 
 ```bash
+python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
+  --obelisk-commit <reviewed-obelisk-commit> \
+  --reviewed-by <reviewer> \
+  --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
+```
+
+The bundle helper runs analyzer -> approved manifest builder -> approved-evidence checker
+-> offline consume gate, rejects direct server log paths through the underlying analyzer,
+and reports only the `player_principal_lifecycle` module.
+
+Manual equivalent analyzer command:
+
+```bash
 python3 scripts/analyze_runtime_observer_log.py \
   --obelisk-commit <reviewed-obelisk-commit> \
   --fail-on-quality-blockers \
