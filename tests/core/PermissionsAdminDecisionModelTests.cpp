@@ -1,144 +1,21 @@
-#include <cstdint>
+#include "core/AuthzDecisionModel.h"
+
 #include <iostream>
 #include <stdexcept>
 
 namespace
 {
-    enum class Decision
-    {
-        Allow,
-        Deny,
-        Unknown
-    };
-
-    enum class PrincipalScope
-    {
-        CallbackLocal,
-        ProcessLocal,
-        ClusterStable,
-        Persistent,
-        CrossMapShared
-    };
-
-    enum class PolicyAuthority
-    {
-        RuntimeOwned,
-        OperatorConfig,
-        PluginSupplied,
-        RemoteService,
-        Unknown
-    };
-
-    struct Principal
-    {
-        bool Copied = true;
-        uint64_t Handle = 17;
-        bool HasGeneration = true;
-        uint64_t Generation = 42;
-        uint64_t CurrentGeneration = 42;
-        PrincipalScope Scope = PrincipalScope::CallbackLocal;
-        bool SameProcess = true;
-    };
-
-    struct OwnerContext
-    {
-        bool HasOwnerToken = true;
-        bool HasCapability = true;
-    };
-
-    struct PolicyProvenance
-    {
-        bool HasSourceId = true;
-        bool HasSourceGeneration = true;
-        bool SourceGenerationMatches = true;
-        bool HasAuthorityGeneration = true;
-        bool AuthorityGenerationMatches = true;
-        bool HasPolicyEpoch = true;
-        PolicyAuthority Authority = PolicyAuthority::RuntimeOwned;
-        bool SuppliedByPlugin = false;
-    };
-
-    struct AbuseControls
-    {
-        bool RateLimitOk = true;
-        bool AuditOk = true;
-    };
-
-    struct PermissionQuery
-    {
-        Principal PrincipalValue;
-        OwnerContext Owner;
-        PolicyProvenance Provenance;
-        AbuseControls Abuse;
-    };
+    using obelisk::permissions_admin::CompleteRuntimeOwnedQuery;
+    using obelisk::permissions_admin::Decision;
+    using obelisk::permissions_admin::EvaluatePermissionQuery;
+    using obelisk::permissions_admin::PermissionQuery;
+    using obelisk::permissions_admin::PolicyAuthority;
+    using obelisk::permissions_admin::PrincipalScope;
 
     void Require(bool condition, const char* message)
     {
         if (!condition)
             throw std::runtime_error(message);
-    }
-
-    bool IsSupportedScope(PrincipalScope scope)
-    {
-        return scope == PrincipalScope::CallbackLocal || scope == PrincipalScope::ProcessLocal;
-    }
-
-    bool IsRecognizedAuthority(PolicyAuthority authority)
-    {
-        return authority == PolicyAuthority::RuntimeOwned || authority == PolicyAuthority::OperatorConfig;
-    }
-
-    bool IsAllowCapableAuthority(PolicyAuthority authority)
-    {
-        return authority == PolicyAuthority::RuntimeOwned;
-    }
-
-    Decision EvaluatePermissionQuery(const PermissionQuery& query)
-    {
-        const Principal& principal = query.PrincipalValue;
-        const OwnerContext& owner = query.Owner;
-        const PolicyProvenance& provenance = query.Provenance;
-        const AbuseControls& abuse = query.Abuse;
-
-        if (!owner.HasOwnerToken || !owner.HasCapability)
-            return Decision::Deny;
-
-        if (!principal.Copied || principal.Handle == 0)
-            return Decision::Deny;
-
-        if (!principal.HasGeneration || principal.Generation != principal.CurrentGeneration)
-            return Decision::Unknown;
-
-        if (!IsSupportedScope(principal.Scope) || !principal.SameProcess)
-            return Decision::Unknown;
-
-        if (!provenance.HasSourceId || !provenance.HasSourceGeneration ||
-            !provenance.HasAuthorityGeneration || !provenance.HasPolicyEpoch)
-        {
-            return Decision::Unknown;
-        }
-
-        if (provenance.SuppliedByPlugin || provenance.Authority == PolicyAuthority::PluginSupplied)
-            return Decision::Deny;
-
-        if (!IsRecognizedAuthority(provenance.Authority) || !IsAllowCapableAuthority(provenance.Authority))
-            return Decision::Unknown;
-
-        if (!provenance.SourceGenerationMatches || !provenance.AuthorityGenerationMatches)
-            return Decision::Unknown;
-
-        if (!abuse.RateLimitOk)
-            return Decision::Deny;
-
-        if (!abuse.AuditOk)
-            return Decision::Unknown;
-
-        return Decision::Allow;
-    }
-
-    PermissionQuery CompleteRuntimeOwnedQuery()
-    {
-        return {};
     }
 
     void RequireDecision(Decision actual, Decision expected, const char* message)

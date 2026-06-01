@@ -322,7 +322,9 @@ add_test(NAME ProcessEventCallGuardTests COMMAND process_event_call_guard_tests)
 
 add_executable(permissions_admin_decision_model_tests
     tests/core/PermissionsAdminDecisionModelTests.cpp
+    core/AuthzDecisionModel.cpp
 )
+target_include_directories(permissions_admin_decision_model_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_test(NAME PermissionsAdminDecisionModelTests COMMAND permissions_admin_decision_model_tests)
 

@@ -922,7 +922,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("planning_guidance_only", guidance["why_blocked"])
         self.assertIn("not_release_readiness_target", guidance["why_blocked"])
         self.assertIn("public_response_path_blocked", guidance["why_blocked"])
-        self.assertIn("ClientChatMessage.Chat", " ".join(guidance["snapshot_prep_checks"]))
+        for required in (
+            "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+            "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+            "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+            "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+            "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
+        ):
+            self.assertIn(required, guidance["snapshot_prep_checks"])
         self.assertIn("do not use this target set for release/readiness or public SDK promotion gates", guidance["snapshot_prep_checks"])
         self.assertIn("public reply/send-chat ABI", guidance["non_claim"])
         self.assertIn("command router", guidance["non_claim"])
@@ -2429,6 +2436,38 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             {"reason": "planning_layout_intake_not_promotion_gate", "count": 1},
             report["promotion_gate"]["blockers"],
         )
+
+    def test_command_chat_response_planning_intake_emits_redaction_guidance(self) -> None:
+        target_set = "command-chat-response-route-planning"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "planning_layout_intake")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(len(report["target_set_guidance"]), 1)
+        checks = report["target_set_guidance"][0]["snapshot_prep_checks"]
+        for required in (
+            "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+            "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+            "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+            "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+            "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
+        ):
+            self.assertIn(required, checks)
 
     def test_planning_layout_intake_contract_does_not_change_second_source_promotion_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

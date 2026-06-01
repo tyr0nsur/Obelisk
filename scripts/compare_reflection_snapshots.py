@@ -251,8 +251,11 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "--target-set command-chat-response-route-planning for planning review only"
         ),
         "snapshot_prep_checks": [
-            "keep ClientChatMessage.Chat as redacted or recognition-only until a separate ScriptStruct and privacy review exists",
-            "keep sender identity, directed recipient identity, raw FString data, UE pointers, ProcessEvent params, and object refs redacted",
+            "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+            "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+            "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+            "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+            "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
             "keep reply API, send-chat API, broadcast/notices, moderation, command router, permission checks, mutation, and return override blocked",
             "require promoted player identity/principal and permissions/admin before any public response path is considered",
             "do not use this target set for release/readiness or public SDK promotion gates",
