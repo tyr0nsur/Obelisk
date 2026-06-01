@@ -56,7 +56,8 @@ that context changes the agent's concrete task.
   violation even when the technical content is useful. The lead must audit the commit,
   record or correct the deviation, and restate ownership before launching more agents.
 - Sub-agents deliver scoped file edits, evidence, validation output, and risks. The lead
-  reviews, stages, commits, pushes, closes agents, and updates shared handoff state.
+  reviews, stages, commits, closes agents, updates shared handoff state, and may push
+  only when publication is explicitly authorized for the current scope.
 - Keep each commit focused: runtime code, docs, skills, or deployment scripts should not be
   mixed unless the change requires it.
 - Batch small internal documentation, skill, handoff, and guardrail cleanups. Do not commit

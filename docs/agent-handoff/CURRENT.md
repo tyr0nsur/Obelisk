@@ -30,12 +30,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   marker/env changes, start/restart/stop window, notice path when players are involved,
   evidence capture, and rollback. Technical progress is only a reason to request a scoped
   run, not approval by itself.
-- no Discord for internal rounds or agent status. Discord sends require explicit
+- no Discord for internal rounds or agent status. Discord drafts or sends require explicit
   current-turn approval for approved public milestones or beta-test windows, must use
   `OBELISK_COMMUNITY_UPDATES_WEBHOOK_URL` or `OBELISK_BETA_TEST_WEBHOOK_URL`, and must
   use embed shape through `scripts/send_discord_embed.py`. Always dry-run before any approved send.
-  Never send routine validation notes, speculative reversing notes, or
-  internal agent status.
+  Never send routine validation notes, speculative reversing notes, or internal agent status.
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, ReflectionScanner, debug
   controls, and observers unless the matching approved env+marker pair is enabled for a
@@ -200,7 +199,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   stays blocked on lifecycle-anchor evidence unless an explicit lifecycle-anchor candidate
   manifest is provided; with both lifecycle-anchor and principal-invalidation policy
   manifests it stays blocked on approved runtime evidence. Public SDK v1 completion stays
-  blocked, Plugin Hub docs stay non-promotional, and `git diff --check` passes.
+  blocked, Plugin Hub docs stay non-promotional, and `git diff --check` must be rerun
+  before checkpoint.
 - lifecycle-anchor and principal-invalidation candidate manifests can now be consumed
   together; the next blocker is approved runtime principal lifecycle evidence. Do not
   rerun the completed admin snapshot, second-source layout, or lifecycle layout routes.

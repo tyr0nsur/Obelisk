@@ -1378,8 +1378,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertEqual(decisions["schema"], "obelisk.player-identity-public-contract-decisions.v1")
         self.assertEqual(decisions["surface"], "obelisk.player_identity.v1")
         self.assertEqual(decisions["status"], "blocked")
+        self.assertEqual(decisions["planning_stage"], "identity_public_contract_gate")
+        self.assertEqual(decisions["decision_gate"]["id"], "identity_public_contract_gate")
+        self.assertEqual(decisions["decision_gate"]["status"], "blocked/planning")
         self.assertIs(decisions["public_header_allowed"], False)
         self.assertEqual(decisions["public_header"], "include/obelisk/ObeliskApi.h")
+        self.assertEqual(decisions["public_header_symbols_now"], [])
+        self.assertEqual(decisions["public_capability_bits_now"], [])
+        self.assertEqual(decisions["public_callback_abi_now"], [])
 
         forbidden_contract = set(decisions.get("forbidden_public_contract", []))
         self.assertTrue(
@@ -1422,6 +1428,66 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 isinstance(item, dict) and item.get("status") == "unresolved"
                 for item in requirements
             )
+        )
+
+    def test_player_identity_public_contract_gate_records_pod_proposal_and_runtime_evidence_limit(self) -> None:
+        decisions = json.loads(PLAYER_IDENTITY_PUBLIC_CONTRACT_DECISIONS.read_text(encoding="utf-8"))
+
+        runtime_limit = decisions["approved_runtime_evidence_not_sufficient"]
+        self.assertIn("necessary evidence", runtime_limit["decision"])
+        self.assertIn("not sufficient", runtime_limit["decision"])
+        for reason in (
+            "runtime evidence can prove a candidate lifecycle route was observed; it does not define a stable C ABI",
+            "runtime evidence does not provide ABI layout tests, SDK consumer tests, or append-only compatibility rules",
+            "runtime evidence does not authorize permissions/admin, command/chat response, player lookup, persistence, mutation, return override, or cross-process identity claims",
+        ):
+            self.assertIn(reason, runtime_limit["why"])
+
+        proposal = decisions["proposed_public_pod_abi_candidate"]
+        self.assertEqual(proposal["status"], "proposal_only_not_public")
+        self.assertFalse(proposal["public_header_allowed"])
+        for field in (
+            "abi_version",
+            "struct_size",
+            "principal_handle",
+            "principal_generation",
+            "principal_scope_flags",
+            "invalidation_reason_flags",
+        ):
+            self.assertIn(field, proposal["candidate_event_payload_fields_or_equivalent"])
+        for property_name in (
+            "POD C ABI only",
+            "front-loaded abi_version and struct_size",
+            "append-only fields after promotion",
+            "copied Obelisk-owned storage",
+            "no UE pointers",
+            "no FName/GObjects indices",
+            "no lookup handle",
+            "no mutation or return override authority",
+        ):
+            self.assertIn(property_name, proposal["required_payload_properties"])
+
+        non_claims = set(decisions["non_claims"])
+        self.assertIn("This manifest does not add public header symbols.", non_claims)
+        self.assertIn("This manifest does not make approved runtime evidence sufficient by itself.", non_claims)
+        self.assertIn("This manifest does not promote permissions/admin.", non_claims)
+        self.assertIn("This manifest does not promote command/chat response or commands/replies.", non_claims)
+
+        required_test_ids = {
+            item["id"]
+            for item in decisions["required_tests_before_public_header"]
+        }
+        self.assertEqual(
+            required_test_ids,
+            {
+                "manifest.guardrails",
+                "abi.layout",
+                "sdk.consumer",
+                "lifecycle.owner_cleanup",
+                "identity.fail_closed",
+                "privacy.redaction",
+                "runtime.evidence_intake",
+            },
         )
 
     def test_command_chat_response_public_contract_decisions_block_public_header(self) -> None:
@@ -2442,7 +2508,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "process-local timers",
             "Experimental Copied Event Patterns",
             "promoted-experimental-only",
-            "must be promoted, downgraded, or explicitly excluded",
+            "must be promoted, downgraded to planning/post-v1, or explicitly excluded",
             "GameplayPolicyEvent",
             "ChatMessageEvent",
             "OBELISK_API_CAPABILITY_CHAT_EVENTS",
@@ -2545,7 +2611,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "or explicitly excluded before v1_completion_required can become true.",
             release_guardrails,
         )
-        self.assertIn("promoted, downgraded, or explicitly excluded", PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(
+        self.assertIn("promoted, downgraded to planning/post-v1, or explicitly excluded", PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(
             encoding="utf-8"
         ))
 

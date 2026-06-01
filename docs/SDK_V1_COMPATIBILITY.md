@@ -106,7 +106,7 @@ later callbacks must copy those values into plugin-owned storage during init.
 
 `GameplayPolicyEvent` is a v0.1 copied ABI surface with release-readiness evidence, but it
 remains `promoted-experimental-only` in the v1 compatibility inventory until the full SDK
-completion bar is met. It must be promoted, downgraded, or explicitly excluded before a
+completion bar is met. It must be promoted, downgraded to planning/post-v1, or explicitly excluded before a
 complete v1 SDK claim. It carries copied observational policy data for the named event
 kinds in [`public_gameplay_events.json`](public_gameplay_events.json). It is not an
 Inventory SDK, Items SDK, StructureEvents SDK, identity API, lookup API, mutation API, or

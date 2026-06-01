@@ -2,8 +2,51 @@
   "schema": "obelisk.player-identity-public-contract-decisions.v1",
   "surface": "obelisk.player_identity.v1",
   "status": "blocked",
+  "planning_stage": "identity_public_contract_gate",
+  "decision_gate": {
+    "id": "identity_public_contract_gate",
+    "status": "blocked/planning",
+    "current_decision": "no public header, no public capability bit, no plugin callback, no lookup, no downstream permission or command dependency may consume identity yet",
+    "scope": "First decision manifest for a future copied opaque player principal contract only.",
+    "allowed_now": [
+      "document blockers",
+      "document candidate POD shape",
+      "document non-claims",
+      "document tests required before promotion"
+    ],
+    "forbidden_now": [
+      "C++ ABI edits",
+      "public header symbols",
+      "runtime plugin callback exposure",
+      "player lookup API",
+      "permission/admin API",
+      "command/chat response API",
+      "storage or persistence API"
+    ]
+  },
   "public_header_allowed": false,
   "public_header": "include/obelisk/ObeliskApi.h",
+  "public_header_symbols_now": [],
+  "public_capability_bits_now": [],
+  "public_callback_abi_now": [],
+  "approved_runtime_evidence_not_sufficient": {
+    "decision": "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.",
+    "why": [
+      "runtime evidence can prove a candidate lifecycle route was observed; it does not define a stable C ABI",
+      "runtime evidence can show login/logout ordering; it does not choose the copied opaque identifier form, generation rules, or scope flags",
+      "runtime evidence can support internal lifecycle semantics; it does not prove owner-token registration, unregister, plugin unload cleanup, or in-flight callback drain",
+      "runtime evidence does not provide ABI layout tests, SDK consumer tests, or append-only compatibility rules",
+      "runtime evidence does not authorize permissions/admin, command/chat response, player lookup, persistence, mutation, return override, or cross-process identity claims"
+    ],
+    "minimum_additional_gates": [
+      "privacy and redaction decision resolved",
+      "principal lifetime and invalidation decision resolved",
+      "candidate POD payload and descriptor contract reviewed",
+      "named capability and owner-token lifecycle policy reviewed",
+      "ABI layout and SDK consumer tests passing",
+      "public docs state exact non-claims and downstream dependency order"
+    ]
+  },
   "forbidden_public_contract": [
     "UE pointers",
     "raw params",
@@ -13,6 +56,182 @@
     "lookup",
     "mutation",
     "return override"
+  ],
+  "promotion_blockers": [
+    {
+      "id": "runtime.lifecycle_evidence",
+      "status": "unresolved",
+      "decision": "approved runtime principal lifecycle evidence is missing and later acceptance is necessary but not sufficient"
+    },
+    {
+      "id": "privacy.identifier_redaction",
+      "status": "unresolved",
+      "decision": "the public identifier form, redaction policy, logging policy, and persistence prohibition are not resolved"
+    },
+    {
+      "id": "lifetime.generation_scope_invalidation",
+      "status": "unresolved",
+      "decision": "principal generation, scope, reconnect, duplicate, stale-handle, transfer, logout, and restart semantics are not resolved"
+    },
+    {
+      "id": "abi.public_pod_contract",
+      "status": "unresolved",
+      "decision": "the candidate POD ABI has not been promoted, laid out, capability-gated, or tested"
+    },
+    {
+      "id": "lifecycle.owner_cleanup",
+      "status": "unresolved",
+      "decision": "owner-token handle registration, owner-scoped unregister, init-failure cleanup, unload cleanup, and callback drain are not specified or tested"
+    },
+    {
+      "id": "separation.downstream_surfaces",
+      "status": "unresolved",
+      "decision": "permissions/admin, command/chat response, commands/replies, player lookup, persistence, mutation, and return override are separate blocked contracts"
+    }
+  ],
+  "proposed_public_pod_abi_candidate": {
+    "status": "proposal_only_not_public",
+    "abi_family": "copied opaque principal lifecycle notification",
+    "public_header_allowed": false,
+    "required_payload_properties": [
+      "POD C ABI only",
+      "front-loaded abi_version and struct_size",
+      "append-only fields after promotion",
+      "copied Obelisk-owned storage",
+      "no UE pointers",
+      "no raw ProcessEvent params",
+      "no FString or raw string ownership crossing the ABI",
+      "no FName/GObjects indices",
+      "no platform account ids",
+      "no player names",
+      "no tribe ids",
+      "no network addresses",
+      "no lookup handle",
+      "no mutation or return override authority"
+    ],
+    "candidate_event_payload_fields_or_equivalent": [
+      "abi_version",
+      "struct_size",
+      "event_kind",
+      "principal_handle",
+      "principal_generation",
+      "principal_scope_flags",
+      "principal_state_flags",
+      "invalidation_reason_flags",
+      "event_sequence",
+      "server_process_epoch",
+      "reserved"
+    ],
+    "candidate_descriptor_fields_or_equivalent": [
+      "abi_version",
+      "struct_size",
+      "supported_event_kind_mask",
+      "supported_scope_flags",
+      "supported_state_flags",
+      "supported_invalidation_reason_flags",
+      "contract_flags"
+    ],
+    "candidate_registration_shape_or_equivalent": [
+      "nonzero plugin_owner_token required",
+      "event-kind mask required",
+      "opaque uint64 registration handle returned on success",
+      "owner-token unregister required",
+      "plugin init failure removes registrations",
+      "plugin unload removes registrations and drains in-flight callbacks",
+      "callback payload storage is valid only for the callback"
+    ],
+    "candidate_capability_policy": [
+      "named player identity capability bit required before use",
+      "capability must be captured in the init-time API table",
+      "missing capability fails closed",
+      "missing or zero owner token fails closed",
+      "later marker or env changes cannot widen a plugin's captured capability"
+    ]
+  },
+  "non_claims": [
+    "This manifest does not add public header symbols.",
+    "This manifest does not reserve final C symbol names.",
+    "This manifest does not promote obelisk.player_identity.v1.",
+    "This manifest does not make approved runtime evidence sufficient by itself.",
+    "This manifest does not expose player lookup.",
+    "This manifest does not expose platform account ids, player names, tribe ids, network addresses, UE pointers, FName/GObjects indices, or ResourceHandle.",
+    "This manifest does not promote permissions/admin.",
+    "This manifest does not promote command/chat response or commands/replies.",
+    "This manifest does not authorize storage, persistence, cross-process identity, cluster-stable identity, mutation, return override, or send-chat identity."
+  ],
+  "required_tests_before_public_header": [
+    {
+      "id": "manifest.guardrails",
+      "status": "missing",
+      "required_coverage": [
+        "decision gate remains blocked/planning until every blocker is resolved",
+        "public_header_allowed remains false while unresolved blockers exist",
+        "public_header_symbols_now remains empty",
+        "approved runtime evidence is documented as necessary but insufficient",
+        "non-claims forbid lookup, permissions/admin, command/chat response, persistence, mutation, and return override"
+      ]
+    },
+    {
+      "id": "abi.layout",
+      "status": "missing",
+      "required_coverage": [
+        "POD layout size and alignment tests",
+        "abi_version and struct_size validation",
+        "append-only field offset tests",
+        "old-plugin prefix compatibility or explicit major-version rejection"
+      ]
+    },
+    {
+      "id": "sdk.consumer",
+      "status": "missing",
+      "required_coverage": [
+        "installed SDK consumer compiles against the promoted header",
+        "consumer checks struct_size and capability before using identity fields",
+        "consumer treats callback payload storage as callback-local"
+      ]
+    },
+    {
+      "id": "lifecycle.owner_cleanup",
+      "status": "missing",
+      "required_coverage": [
+        "owner-token registration rejects missing or zero owner tokens",
+        "unregister is owner-scoped",
+        "init failure removes callbacks before dlclose",
+        "plugin unload drains in-flight callbacks",
+        "self-unregister from callback is safe",
+        "callback exceptions do not cross the C ABI"
+      ]
+    },
+    {
+      "id": "identity.fail_closed",
+      "status": "missing",
+      "required_coverage": [
+        "stale generation fails closed",
+        "unsupported scope fails closed",
+        "duplicate principal observation invalidates or quarantines according to policy",
+        "reconnect creates a new generation unless continuity is proven",
+        "lookup-by-public-handle remains unavailable"
+      ]
+    },
+    {
+      "id": "privacy.redaction",
+      "status": "missing",
+      "required_coverage": [
+        "raw identity-like fields are classified before copying",
+        "platform ids, player names, tribe ids, network addresses, and object references are redacted",
+        "logs contain only allowed sanitized reason flags and handle presence",
+        "no persistence is possible through the identity ABI"
+      ]
+    },
+    {
+      "id": "runtime.evidence_intake",
+      "status": "missing",
+      "required_coverage": [
+        "approved runtime evidence is checked as an input to promotion",
+        "approved runtime evidence alone leaves the public-header gate closed",
+        "offline fixtures and second-source layout evidence remain separate from runtime lifecycle acceptance"
+      ]
+    }
   ],
   "required_before_public_header": [
     {
@@ -154,22 +373,68 @@
     {
       "id": "abi.payload_shape",
       "category": "abi",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Promote or replace the proposal-only copied opaque principal payload before any public symbol is added.",
+      "required_fields_or_equivalent": [
+        "abi_version",
+        "struct_size",
+        "event_kind",
+        "principal_handle",
+        "principal_generation",
+        "principal_scope_flags",
+        "principal_state_flags",
+        "invalidation_reason_flags",
+        "event_sequence",
+        "server_process_epoch"
+      ],
+      "required_properties": [
+        "POD C ABI",
+        "append-only after promotion",
+        "copied Obelisk-owned storage",
+        "callback-local payload lifetime",
+        "no UE pointers or raw params",
+        "no platform account ids, player names, tribe ids, or network addresses",
+        "no lookup, persistence, mutation, or return override"
+      ]
     },
     {
       "id": "abi.capability_bits",
       "category": "abi",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Define a named player identity capability bit before any plugin can consume this surface.",
+      "required_behavior": [
+        "capability is absent while this gate is blocked/planning",
+        "capability is captured in the plugin init-time API table",
+        "missing capability fails closed",
+        "later env or marker changes cannot widen a loaded plugin's captured capability"
+      ]
     },
     {
       "id": "abi.owner_token_registration",
       "category": "abi",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Define owner-token handle registration and unregister before any callback surface is public.",
+      "required_behavior": [
+        "nonzero plugin_owner_token required",
+        "registration returns an opaque process-local handle",
+        "unregister requires the same owner token",
+        "init failure and plugin unload remove all owner registrations",
+        "cleanup waits for in-flight callbacks except when policy explicitly permits same-callback self-unregister"
+      ]
     },
     {
       "id": "abi.append_only_layout_tests",
       "category": "abi",
-      "status": "unresolved"
+      "status": "unresolved",
+      "decision_required": "Add ABI and SDK consumer coverage before the proposal can become a public header contract.",
+      "required_tests": [
+        "POD layout size and alignment tests",
+        "field offset and append-only compatibility tests",
+        "struct_size short-write or rejection tests",
+        "capability and owner-token fail-closed tests",
+        "installed SDK consumer compile test",
+        "callback lifecycle cleanup and drain tests"
+      ]
     },
     {
       "id": "separation.no_commands_permissions_persistence",
