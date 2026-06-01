@@ -22,7 +22,7 @@ services/economy/mobility/areas, and operator ingress/storage. Lifecycle ops rec
 tracked as `obelisk.lifecycle_ops_recovery.v1`
 so lifecycle/config/logging cannot be mistaken for watchdog, reload, restart, or server
 recovery APIs. Gameplay/server tick callbacks are also tracked as a separate
-post-v1 blocker so process-local timers are not mistaken for UE gameplay tick hooks.
+v1 completion blocker so process-local timers are not mistaken for UE gameplay tick hooks.
 Those blockers must be promoted or deliberately excluded in the release statement before
 `v1_completion_required` can become true.
 
@@ -139,9 +139,9 @@ promise a public command SDK/router, sender identity, permissions, replies, send
 moderation, blocking, mutation, return override, UE lookup, or raw
 UE/`FString`/params exposure.
 
-Commands/replies is post-v1 and blocked as a combined surface. It depends on a promoted
+Commands/replies is a blocked v1 completion surface. It depends on a promoted
 player identity/principal contract, a promoted permission/authority model, and the
-post-v1 `obelisk.command_chat_response_path.v1` command/chat response path before any
+blocked `obelisk.command_chat_response_path.v1` planning dependency before any
 public command router or reply API can be claimed.
 The pre-ABI decision checklist for the future commands/replies surface is
 [`commands_replies_public_contract_decisions.json`](commands_replies_public_contract_decisions.json).
@@ -218,7 +218,7 @@ candidate-only policy input; it does not promote player identity/principal,
 permissions/admin, command response paths, commands/replies, runtime readiness, or v1 SDK
 completion.
 Player identity/principal evidence does not unlock `operator_ingress_storage`; operator
-ingress/storage remains a separate post-v1 blocker until secret-safe ingress,
+ingress/storage remains a separate v1 completion blocker until secret-safe ingress,
 storage schema/migration, queue drain, audit, encoding, and lifecycle policy are promoted,
 explicitly excluded, or named post-v1. The v1 release decision for
 `obelisk.operator_ingress_storage.v1` has three valid outcomes: promote a reviewed
@@ -324,7 +324,7 @@ SDK compatibility statement based on `public_sdk_surfaces.json`. Any surface mar
 - explicit target-set or static/offline evidence where gameplay data is involved;
 - documentation that does not imply blocked categories are available.
 
-Surfaces marked `promoted-experimental-only` can be useful RC/plugin-hub seeds, but they
+Surfaces marked `promoted-experimental-only` can be useful copied-data seed surfaces, but they
 do not satisfy a complete v1 SDK claim by themselves. A complete `v1.0` release cannot
 leave `.v1` experimental contracts in that state; it must promote them to stable SDK
 surfaces, move them back to planning/post-v1, or explicitly exclude them in the release

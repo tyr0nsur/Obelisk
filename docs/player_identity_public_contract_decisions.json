@@ -7,7 +7,7 @@
     "id": "identity_public_contract_gate",
     "status": "blocked/planning",
     "current_decision": "no public header, no public capability bit, no plugin callback, no lookup, no downstream permission or command dependency may consume identity yet",
-    "scope": "First decision manifest for a future copied opaque player principal contract only.",
+    "scope": "v1 copied opaque player principal blocker; excludes lookup and downstream permission/command/storage surfaces until separately promoted.",
     "allowed_now": [
       "document blockers",
       "document candidate POD shape",

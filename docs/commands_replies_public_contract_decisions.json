@@ -2,7 +2,7 @@
   "schema": "obelisk.commands-replies-public-contract-decisions.v1",
   "surface": "obelisk.commands_replies.v1",
   "status": "blocked",
-  "planning_stage": "post-v1",
+  "planning_stage": "v1_completion_blocker",
   "not_sufficient_for_v1": true,
   "public_header_allowed": false,
   "public_header": "include/obelisk/ObeliskApi.h",
@@ -59,7 +59,7 @@
       "decision_required": "Promote obelisk.command_chat_response_path.v1 before commands/replies can claim reply, send-chat, broadcast, notice, or directed response behavior.",
       "required_dependency": "obelisk.command_chat_response_path.v1",
       "required_behavior": [
-        "commands/replies remains blocked while command_chat_response_path is planning or post-v1",
+        "commands/replies remains blocked while command_chat_response_path is unpromoted or unresolved",
         "passive ChatMessageEvent parsing does not authorize replies",
         "legacy CallProcessEvent debug access does not authorize responses",
         "no response path is public through commands/replies until the response path is separately promoted"
@@ -220,9 +220,9 @@
       "status": "unresolved",
       "decision_required": "Keep commands/replies as a v1 completion blocker until it is promoted or explicitly named post-v1/excluded in a reviewed v1 release statement.",
       "required_behavior": [
-        "commands/replies is planning/post-v1 now",
+        "commands/replies is a blocked v1 completion surface now",
         "commands/replies is not sufficient for a complete v1 SDK claim now",
-        "public_contract stays empty while status is post-v1 or blocked",
+        "public_contract stays empty while status is blocked or unresolved",
         "v1_completion_required must not change because of this planning contract alone",
         "a future exclusion must state that no public command SDK/router, console command API, RCON command API, admin command API, player command API, chat replies, send-chat, broadcast/notices API, or moderation API is included in v1"
       ]
