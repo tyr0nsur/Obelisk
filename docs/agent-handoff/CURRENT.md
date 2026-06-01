@@ -84,29 +84,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - Private hook-side player-principal lifecycle observer wiring now exists for
   `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`: it is default-off,
   observer-debug/env/marker/SHA/log-budget gated, redacted, dispatch-limit `0`, and
-  plugin-invisible. This is a runtime-evidence collection path only; it does not promote
-  player identity/principal, lookup, permissions/admin, commands/replies, runtime
-  readiness, public SDK readiness, or v1 SDK completion.
+  plugin-invisible. It is evidence collection only; no player identity, permissions,
+  commands/replies, runtime/public SDK readiness, or v1 claim is promoted.
 - Player-principal runtime evidence must use the exact single-module, plugins-disabled,
-  dispatch-limit-`0`, no-sibling-observer/debug marker window.
-  The approved evidence bundle path now requires the copied log to be bound to a checked
-  operational window manifest via `--window-manifest`; the window report must match the
-  analyzer source path/SHA and preserve stable posture, rollback, no-claim, and
-  no-public-readiness semantics.
-- Player-principal lifecycle observer semantics are strict: `session_start` and
-  `candidate_created` require copied `bIsFromLogin=1` and `ReturnValue=1`; other
-  canonical bool combinations remain `session_start_rejected` with no principal action.
-  Runtime-log and evidence-shape analyzers reject identity/internals leaks, require the
-  expected copied fields for each lifecycle case, and enforce lifecycle case order,
-  duplicate rejection, gate log-budget bounds, and monotonic observer sequence quality.
-  Runtime-log summaries also require player-principal lifecycle events to appear only
-  after a safe `PlayerPrincipalLifecycleObserver enabled` gate in the same copied source;
-  `event_before_gate_lines` is a hard quality blocker for bundles and approved evidence
-  manifests.
-  The runtime principal lifecycle evidence shape also requires an explicit
-  `session_start_rejected_anchor` case, observer-safe `role`, `post_original`,
-  `copied_bool_fields`, `copied_bool_values`, redaction fields/count,
-  `principal_action`, and `delivery_claim=none` semantics.
+  dispatch-limit-`0`, no-sibling marker window and a checked `--window-manifest` whose
+  source path/SHA matches the copied log. Analyzer rules remain strict: copied bool cases,
+  redaction, lifecycle order, post-gate events, log-budget bounds, monotonic sequence
+  quality, stable posture, rollback, and no-claim/no-public-readiness semantics.
 - Candidate lifecycle layouts are reproducible for all six
   `players-lifecycle-anchor-candidates` targets, but remain planning-only. The narrow
   candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
@@ -190,7 +174,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   compact evidence is regenerated or independently repaired.
 - Product-planning lane: Structure aggregate/census is planning/consume-only with no
   runtime observer, public StructureEvents SDK, enforcement, return override, or v1 claim.
-  Exact build-policy target names stay out of public docs/ABI/descriptors until promoted.
+  Build-policy intake has a planning-only target set; details live in the 2026-06-01
+  research note and it remains outside release/public/runtime surfaces.
 - Command/chat response static orientation is complete for the reviewed binary but remains
   orientation-only until identity, permissions/admin, and a copied response contract exist.
 - Permissions/admin pre-ABI contracts remain candidate-only. Public symbols stay empty

@@ -752,6 +752,7 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             ("--ufunction-second-source-target-set", "command-chat-response-route-planning", "UFunction"),
             ("--ufunction-second-source-target-set", "mission-copied-bool-policy-slice", "UFunction"),
             ("--ufunction-second-source-target-set", "structure-aggregate-census-planning", "UFunction"),
+            ("--ufunction-second-source-target-set", "structure-build-policy-offline-intake", "UFunction"),
             ("--ufunction-second-source-target-set", "nextgen-plugin-hub-planning", "UFunction"),
             ("--scriptstruct-second-source-target-set", "structure-aggregate-census-planning", "ScriptStruct"),
             ("--scriptstruct-second-source-target-set", "plugin-hub-planning", "ScriptStruct"),
@@ -1290,18 +1291,37 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(forbidden=item):
                 self.assertNotIn(item, runbook)
 
-    def test_structure_build_policy_target_is_not_release_scope(self) -> None:
+    def test_structure_build_policy_target_is_candidate_only_and_not_release_scope(self) -> None:
         forbidden_terms = [
             "PrimalStructure.IsAllowedToBuild",
+            "PrimalStructure.BPIsAllowedToBuild",
+            "PrimalStructure.BPIsAllowedToBuildEx",
             "APrimalStructure.IsAllowedToBuild",
         ]
+        build_policy_targets = {
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx",
+        }
+        self.assertEqual(
+            set(TARGET_SETS["structure-build-policy-offline-intake"]),
+            build_policy_targets,
+        )
+        self.assertIn("structure-build-policy-offline-intake", PLANNING_ONLY_TARGET_SETS)
+        self.assertNotIn("structure-build-policy-offline-intake", RELEASE_READINESS_TARGET_SETS)
+        for target_set in PUBLIC_RC_UFUNCTION_TARGET_SETS:
+            with self.subTest(target_set=target_set):
+                self.assertTrue(build_policy_targets.isdisjoint(set(TARGET_SETS[target_set])))
+
+        planning_only_text = read("scripts/reflection_target_sets.py")
+        self.assertIn("Candidate-only offline intake for structure build-placement policy", planning_only_text)
+        self.assertIn("no public/runtime SDK, mutation, enforcement, or return", planning_only_text)
         release_scope_files = [
             "docs/RELEASE.md",
             "docs/STATUS.md",
             "CHANGELOG.md",
             "scripts/check_release_readiness.sh",
             "scripts/check_rc_layout_evidence_smoke.sh",
-            "scripts/reflection_target_sets.py",
             "scripts/assemble_rc_ufunction_second_source_root.py",
         ]
 

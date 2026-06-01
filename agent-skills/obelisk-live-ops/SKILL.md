@@ -118,8 +118,11 @@ scripts/check_obelisk_server_posture.sh --expect-stable \
   log limit `1..10`, exact observer exclusivity, and no debug/scanner/callback escape
   markers. The wrapper must reject residual observer markers or symlink marker entries
   on the same instance, and approved evidence must be copied/analyzed as a single-module
-  `player_principal_lifecycle` summary only. This remains consume-only and does not
-  promote public player identity, lookup, permissions, commands, or SDK completion.
+  `player_principal_lifecycle` summary only. Evidence bundles must be bound to a checked
+  `--window-manifest` whose source path/SHA match the analyzed copied log and preserve
+  stable posture, rollback, no-claim, and no-public-readiness semantics. This remains
+  consume-only and does not promote public player identity, lookup, permissions, commands,
+  or SDK completion.
 - Runtime debug/scanner gates also require both env and instance markers:
   - `allow-ptrace`
   - `enable-debug-control`

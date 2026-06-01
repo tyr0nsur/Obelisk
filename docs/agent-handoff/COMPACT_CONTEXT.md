@@ -1,6 +1,6 @@
 # Compact Context Snapshot
 
-Updated: 2026-05-31
+Updated: 2026-06-01
 
 Use this file after conversation compaction or when resuming Obelisk from repository
 state. Current routing table only: read `docs/agent-handoff/CURRENT.md` for active
@@ -266,14 +266,12 @@ priorities, and do not use history files as the active source of truth.
   citations. This legacy root does not promote public `StructureEvents`, SDK callbacks,
   identity, lookup, mutation, return override, dispatcher/hook wiring, `ResourceHandle`,
   runtime observation, or probing.
-- `PrimalStructure.IsAllowedToBuild` / `APrimalStructure.IsAllowedToBuild` is a
-  second-wave build-policy dictionary seed only. There is no committed candidate pack,
-  second-source comparison, target-set promotion, public StructureEvents/build-policy SDK,
-  mutation, or return override. Fixture-only `missing_base_snapshot` readiness is a
-  negative guardrail, not progress or promotion evidence. First useful work is an approved
-  offline focused snapshot with an explicit base root or complete core evidence-pack
-  manifest, followed by a distinct second-source compare; do not add either key to release
-  targets, ABI enums, descriptors, dispatchers, public docs, or runtime gates.
+- `structure-build-policy-offline-intake` now exists as a planning-only target set for
+  `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
+  `PrimalStructure.BPIsAllowedToBuildEx`. It is in the `structures` lane and is not in
+  release readiness. No sanitized snapshots are accepted yet; placement/location/player/
+  controller redaction policy, distinct-source compare, public/runtime/promotion gates,
+  mutation, enforcement, and return override all remain blocked.
 - Focal UFunction snapshot planning helpers live in
   `scripts/ufunction_focal_snapshot_plan.py`; `build_reflection_inventory_pack.py` uses
   them for candidate-only exact snapshot command plans. Target-set bridge coverage proves
@@ -298,6 +296,10 @@ priorities, and do not use history files as the active source of truth.
   runtime window; it is not accepted evidence and must not be used for promotion. The
   optional runtime-principal lifecycle manifest checker accepts only a synthetic/redacted
   shape fixture and stays blocked on runtime promotion.
+  Future runtime evidence must use the exact player-principal lifecycle window contract:
+  single module, plugins disabled, dispatch limit `0`, no sibling observer/debug markers,
+  checked `--window-manifest`, analyzer source path/SHA match, stable posture, rollback,
+  no-claim semantics, and public/runtime/promotion readiness all false.
   Separately, all six `players-lifecycle-anchor-candidates` targets are reproducible in
   scratch base-vs-vanilla evidence with `accepted=6` and now have committed
   planning-only base fixtures under `players_lifecycle`; promotion still fails as
@@ -491,10 +493,14 @@ priorities, and do not use history files as the active source of truth.
   current head, use `CURRENT.md` for current blockers, and use the accepted
   `ChatMessageEvent` evidence notes above for chat facts. Keep future changes focused by
   subsystem rather than by the old 0-pre/0a/0b slicing sequence.
-- Current ResourceHandle flag-policy pointer:
-  `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md`. It records
-  consume-accepted/promote-blocked internal evidence; public `ResourceHandle`, lookup,
-  lifecycle names, mutation, and return override remain blocked.
+- Current ResourceHandle pointers:
+  `docs/research/2026-05-30-post-rc-offline-resourcehandle-priority.md` and
+  `docs/research/2026-06-01-object-identity-resource-handle-v1-blocker.md`. The old
+  flag-policy artifact is obsolete; the rich-provenance refresh remains preserved and
+  consume-accepted/promote-blocked, and the strict serial reuse/wraparound policy is
+  candidate-only. The next offline package should build rejected zero-serial object
+  samples from the two existing cores, while runtime rejected-object samples and runtime
+  serial reuse/wraparound semantics still require an approved live-ops brief.
 - Weak-helper caller-mode manifests now require embedded verified provenance for
   `ghidra_stdout`, `r2_windows`, and `direct_call_counts`; consume acceptance remains
   internal static evidence only and promote mode stays blocked.

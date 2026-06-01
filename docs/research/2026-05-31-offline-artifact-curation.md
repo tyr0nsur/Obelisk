@@ -26,11 +26,15 @@ python3 scripts/check_reflection_inventory_pack_readiness.py \
 Planning-only target-set artifact packs are consume-mode planning evidence only. The
 planning-only target sets are `command-chat-response-route-planning`,
 `mission-copied-bool-policy-slice`, `players-identity-lifecycle-intake`,
-`players-lifecycle-anchor-candidates`, and `structure-aggregate-census-planning`; their
-packs, container manifests, and child evidence must not be cited as release-readiness
-roots, public SDK promotion evidence, or `v1.0` completion signals. The
+`players-lifecycle-anchor-candidates`, `structure-aggregate-census-planning`, and
+`structure-build-policy-offline-intake`; their packs, container manifests, and child
+evidence must not be cited as release-readiness roots, public SDK promotion evidence, or
+`v1.0` completion signals. The
 `players-lifecycle-anchor-candidates` target set is layout-planning only and carries no
-runtime lifecycle ordering claim.
+runtime lifecycle ordering claim. The `structure-build-policy-offline-intake` target set
+has no accepted artifact pack in this snapshot and remains planning-only until sanitized
+snapshots, redaction policy, distinct-source evidence, and runtime safety gates are
+reviewed.
 
 Primary current planning inputs:
 
@@ -41,6 +45,8 @@ Primary current planning inputs:
 - Mission copied bool: `mission-copied-bool-tail-policy-slice-20260530T090211Z`;
 - Structure planning: `structure-aggregate-census-policy-slice-20260531T034715Z`
   and `structure-return-only-policy-slice-20260530T093002Z`;
+- Structure build-policy planning: no current accepted artifact pack for
+  `structure-build-policy-offline-intake`;
 - Transfer planning: `transfer-baccept-only-policy-slice-20260530T073308Z` and
   `transfer-scriptstruct-bool-tail-refresh-20260530T163945Z/inventory-pack`;
 - ResourceHandle/UObject blocker context only:

@@ -53,7 +53,9 @@ Development-server gated:
   plugins disabled, no scanner/debug/callback escape markers, and an analyzed summary
   containing only the `player_principal_lifecycle` module. It must not be mixed with
   broad tracing, ReflectionScanner, ptrace/gcore, raw parameter exploration, plugin
-  callbacks, or any public identity/lookup/promotion claim.
+  callbacks, or any public identity/lookup/promotion claim. Evidence bundle tooling must
+  require `--window-manifest`, source path/SHA agreement with the copied log, rollback and
+  stable-posture evidence, and no-public/no-promotion semantics.
 
 Forbidden on live/shared instances:
 

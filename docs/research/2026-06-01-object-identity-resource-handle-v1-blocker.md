@@ -40,3 +40,23 @@ Before any public object identity/lookup lane exists, Obelisk needs:
 Until then, `ResourceHandle`, object lookup, and persistent object identity remain blocked
 across structures, inventory, dinos, tribes, buffs, missions, transfers, economy, mobility,
 and area-policy work.
+
+## Next Offline Cohort
+
+The next useful offline-only package is a negative-sample cohort for zero-serial
+`FUObjectItem` entries from the existing two cores. Current redacted serial scans show a
+clear gap: `rejected_sample_count=0`, while both cores include many serial-zero entries.
+
+Use existing offline artifacts only:
+
+- `/servidor/ark/workspace-offline/resource-handle-nonzero-revalidation-20260529T060741Z/readiness-redacted.json`
+- `/servidor/ark/workspace-offline/resource-handle-serial-scan-20260529/vanilla-serial-scan.redacted.json`
+- `/servidor/ark/workspace-offline/resource-handle-serial-scan-20260529/second_source-serial-scan.redacted.json`
+- `/servidor/ark/workspace-offline/vanilla-gdb-arkserver2-TheIsland-20260529T012853Z/raw/core`
+- `/servidor/ark/workspace-offline/second-source-arkserver2-TheIsland-20260529T011227Z/raw/core`
+
+The candidate cohort should record object items with non-null object pointers and
+`FUObjectItem+0x8 == 0` as stale/invalid handle evidence, contrasted with known positive
+samples such as index `50834` with serial `1001`. This still does not prove UObject flag
+validity semantics, runtime reuse/wraparound behavior, public lookup, or `ResourceHandle`
+promotion.

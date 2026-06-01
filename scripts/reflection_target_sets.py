@@ -89,6 +89,14 @@ TARGET_SETS = {
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
         "obelisk.ufunction-chain.snapshot.v1:PrimalStructureSeating.CanSeat",
     ),
+    # Candidate-only offline intake for structure build-placement policy. This is a
+    # planning target set only: no public/runtime SDK, mutation, enforcement, or return
+    # override readiness is implied by accepting sanitized layouts.
+    "structure-build-policy-offline-intake": (
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild",
+        "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx",
+    ),
     "transfer-ufunction-intake": (
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerDownloadTransferredPlayer",
         "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ServerTransferredPlayerConfirmationResult",
@@ -149,6 +157,7 @@ PLANNING_ONLY_TARGET_SETS = frozenset(
         "players-lifecycle-anchor-candidates",
         "players-identity-lifecycle-intake",
         "structure-aggregate-census-planning",
+        "structure-build-policy-offline-intake",
     )
 )
 
@@ -181,6 +190,7 @@ TARGET_SET_MODULE_LANES = {
     "players-identity-lifecycle-intake": "players_identity",
     "players-lifecycle-anchor-candidates": "players_lifecycle",
     "structure-aggregate-census-planning": "structures",
+    "structure-build-policy-offline-intake": "structures",
     "structure-nonpin-copied-scalar-policy-slice": "structures",
     "structure-observer-intake": "structures",
     "structure-return-only-policy-slice": "structures",

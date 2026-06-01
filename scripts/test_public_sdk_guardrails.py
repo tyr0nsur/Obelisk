@@ -3640,8 +3640,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(boundary, candidate["required_boundaries"])
 
     def test_structure_build_policy_targets_stay_research_only_not_public_or_runtime(self) -> None:
-        forbidden_targets = (
+        planning_only_targets = (
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx",
+        )
+        forbidden_public_targets = (
             "PrimalStructure.IsAllowedToBuild",
+            "PrimalStructure.BPIsAllowedToBuild",
+            "PrimalStructure.BPIsAllowedToBuildEx",
             "APrimalStructure.IsAllowedToBuild",
         )
         forbidden_abi_tokens = (
@@ -3668,17 +3675,24 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIn("structure-aggregate-census-planning", PLANNING_ONLY_TARGET_SETS)
         self.assertNotIn("structure-aggregate-census-planning", RELEASE_READINESS_TARGET_SETS)
+        self.assertIn("structure-build-policy-offline-intake", PLANNING_ONLY_TARGET_SETS)
+        self.assertNotIn("structure-build-policy-offline-intake", RELEASE_READINESS_TARGET_SETS)
+        self.assertEqual(
+            TARGET_SETS["structure-build-policy-offline-intake"],
+            planning_only_targets,
+        )
 
         target_set_offenders = [
             f"{target_set}: {target}"
             for target_set, targets in TARGET_SETS.items()
+            if target_set != "structure-build-policy-offline-intake"
             for target in targets
-            if any(forbidden in target for forbidden in forbidden_targets)
+            if any(forbidden in target for forbidden in forbidden_public_targets)
         ]
         self.assertEqual(target_set_offenders, [])
 
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
-        for token in (*forbidden_targets, *forbidden_abi_tokens):
+        for token in (*forbidden_public_targets, *forbidden_abi_tokens):
             with self.subTest(surface="public_header", token=token):
                 self.assertNotIn(token, header)
 
@@ -3688,7 +3702,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         for path in descriptor_files:
             text = path.read_text(encoding="utf-8")
-            for token in forbidden_targets:
+            for token in forbidden_public_targets:
                 with self.subTest(surface=path.relative_to(REPO_ROOT), token=token):
                     self.assertNotIn(token, text)
 
@@ -3699,7 +3713,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         for path in public_doc_files:
             text = path.read_text(encoding="utf-8")
-            for token in forbidden_targets:
+            for token in forbidden_public_targets:
                 with self.subTest(surface=path.relative_to(REPO_ROOT), token=token):
                     self.assertNotIn(token, text)
 
@@ -3712,7 +3726,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         for path in runtime_dispatcher_files:
             text = path.read_text(encoding="utf-8")
-            for token in forbidden_targets:
+            for token in forbidden_public_targets:
                 with self.subTest(surface=path.relative_to(REPO_ROOT), token=token):
                     self.assertNotIn(token, text)
 
@@ -9256,7 +9270,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "The planning-only target sets are `command-chat-response-route-planning`, "
             "`mission-copied-bool-policy-slice`, "
             "`players-identity-lifecycle-intake`, `players-lifecycle-anchor-candidates`, "
-            "and `structure-aggregate-census-planning`; "
+            "`structure-aggregate-census-planning`, and "
+            "`structure-build-policy-offline-intake`; "
             "their packs, container manifests, and child evidence must not be cited as "
             "release-readiness roots, public SDK promotion evidence, or `v1.0` completion signals."
         )
@@ -9265,6 +9280,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             normalized(
                 "The `players-lifecycle-anchor-candidates` target set is layout-planning only "
                 "and carries no runtime lifecycle ordering claim."
+            ),
+            compact,
+        )
+        self.assertIn(
+            normalized(
+                "The `structure-build-policy-offline-intake` target set has no accepted "
+                "artifact pack in this snapshot and remains planning-only"
             ),
             compact,
         )

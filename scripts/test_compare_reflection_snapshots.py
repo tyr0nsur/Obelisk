@@ -247,6 +247,7 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(lanes["command-chat-response-route-planning"], "command_chat_response")
         self.assertEqual(lanes["mission-copied-bool-policy-slice"], "mission")
         self.assertEqual(lanes["players-lifecycle-anchor-candidates"], "players_lifecycle")
+        self.assertEqual(lanes["structure-build-policy-offline-intake"], "structures")
         self.assertEqual(lanes["structure-observer-intake"], "structures")
         self.assertEqual(lanes["transfer-scriptstruct"], "transfer")
         self.assertEqual(report["evidence_scope"], "second_source_layout_evidence_only")
@@ -280,6 +281,9 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertEqual(classifications["structure-aggregate-census-planning"], "planning_only")
         self.assertIs(release_flags["structure-aggregate-census-planning"], False)
         self.assertEqual(readiness_scopes["structure-aggregate-census-planning"], "planning_only")
+        self.assertEqual(classifications["structure-build-policy-offline-intake"], "planning_only")
+        self.assertIs(release_flags["structure-build-policy-offline-intake"], False)
+        self.assertEqual(readiness_scopes["structure-build-policy-offline-intake"], "planning_only")
         self.assertEqual(classifications["command-chat-response-route-planning"], "planning_only")
         self.assertIs(release_flags["command-chat-response-route-planning"], False)
         self.assertEqual(readiness_scopes["command-chat-response-route-planning"], "planning_only")
@@ -396,6 +400,14 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "obelisk.ufunction-chain.snapshot.v1:PrimalStructureItemContainer.VerifyPinCode",
             sets["structure-observer-intake"],
         )
+        self.assertEqual(
+            sets["structure-build-policy-offline-intake"],
+            [
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild",
+                "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx",
+            ],
+        )
         self.assertIn("transfer-ufunction-intake", sets)
         self.assertEqual(
             sets["transfer-baccept-only-policy-slice"],
@@ -428,19 +440,35 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             text_result.stdout,
         )
 
-    def test_structure_build_policy_targets_stay_out_of_rc_compact_sets_with_missing_base_gap(self) -> None:
+    def test_structure_build_policy_targets_stay_candidate_only_with_missing_base_gap(self) -> None:
         result = run_compare_raw("--list-target-sets", "--json")
 
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         report = json.loads(result.stdout)
         sets = {item["name"]: item["targets"] for item in report["target_sets"]}
-        forbidden_targets = {
+        classifications = {item["name"]: item["readiness_classification"] for item in report["target_sets"]}
+        release_flags = {item["name"]: item["release_readiness"] for item in report["target_sets"]}
+        promotion_flags = {item["name"]: item["promotion_ready"] for item in report["target_sets"]}
+        public_sdk_flags = {item["name"]: item["public_sdk_ready"] for item in report["target_sets"]}
+        build_policy_targets = {
             "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild",
-            "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild",
+            "obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx",
         }
-        for target_set in sets:
+        self.assertEqual(set(sets["structure-build-policy-offline-intake"]), build_policy_targets)
+        self.assertEqual(classifications["structure-build-policy-offline-intake"], "planning_only")
+        self.assertIs(release_flags["structure-build-policy-offline-intake"], False)
+        self.assertIs(promotion_flags["structure-build-policy-offline-intake"], False)
+        self.assertIs(public_sdk_flags["structure-build-policy-offline-intake"], False)
+        for target_set, targets in sets.items():
+            if target_set == "structure-build-policy-offline-intake":
+                continue
             with self.subTest(target_set=target_set):
-                self.assertTrue(forbidden_targets.isdisjoint(set(sets[target_set])))
+                self.assertTrue(build_policy_targets.isdisjoint(set(targets)))
+                self.assertNotIn(
+                    "obelisk.ufunction-chain.snapshot.v1:APrimalStructure.IsAllowedToBuild",
+                    targets,
+                )
 
         result = run_compare_raw(
             "--base-root",
@@ -2503,6 +2531,48 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
             "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
         ):
             self.assertIn(required, checks)
+
+    def test_structure_build_policy_planning_intake_stays_non_public_non_runtime(self) -> None:
+        target_set = "structure-build-policy-offline-intake"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_target_set_root(root / "base", target_set)
+            write_target_set_root(root / "candidate", target_set)
+
+            result = run_compare(
+                root / "base",
+                root / "candidate",
+                "--readiness-report",
+                "--target-set",
+                target_set,
+                "--planning-layout-intake",
+                "--json",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["gate_mode"], "planning_layout_intake")
+        self.assertEqual(report["target_sets"], [target_set])
+        self.assertEqual(report["totals"]["targets"], 3)
+        self.assertEqual(report["totals"]["second_source_accepted"], 3)
+        self.assertEqual(
+            report["planning_layout_gate"],
+            {
+                "ready": True,
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+            },
+        )
+        self.assertFalse(report["promotion_gate"]["ready"])
+        self.assertFalse(report["promotion_gate"]["promotion_ready"])
+        self.assertIn(
+            {"reason": "planning_layout_intake_not_promotion_gate", "count": 1},
+            report["promotion_gate"]["blockers"],
+        )
 
     def test_planning_layout_intake_contract_does_not_change_second_source_promotion_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

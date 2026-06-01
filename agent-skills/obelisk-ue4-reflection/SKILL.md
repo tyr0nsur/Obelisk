@@ -85,15 +85,16 @@ metadata.
   only, no raw UE pointer exposure, no identity/lookup/`ResourceHandle`, no mutation, no
   return override, no public callback before ABI/lifetime policy, and no runtime observer
   without live-ops approval.
-- Structure placement/build authority targets, including ArkApi-named
-  `APrimalStructure.IsAllowedToBuild`, are not part of the current compact structure target
-  sets or fixtures. Treat ArkApi-style plugin demand as a dictionary seed only; require a
-  sanitized exact-target snapshot, redaction policy for placement structs/location/player
-  context, and distinct second-source evidence before any runtime observation or dispatcher.
-  Do not infer allow/deny constants from ArkApi code. Mutation, return override, and
-  enforcing build-deny APIs require separate promotion beyond read-only observation. Do
-  not add these targets to release target sets, ABI enums, descriptors, dispatchers,
-  public docs, or runtime gates before that promotion.
+- Structure placement/build authority targets now have a planning-only offline intake
+  target set, `structure-build-policy-offline-intake`, for
+  `PrimalStructure.IsAllowedToBuild`, `PrimalStructure.BPIsAllowedToBuild`, and
+  `PrimalStructure.BPIsAllowedToBuildEx`. It is not a release, public SDK, runtime,
+  mutation, enforcement, or return-override target. Require sanitized exact-target
+  snapshots, redaction policy for placement structs/location/player context, and distinct
+  second-source evidence before any runtime observation or dispatcher. Do not infer
+  allow/deny constants from ArkApi code, and do not add build-policy targets to release
+  target sets, ABI enums, descriptors, public docs, or runtime gates before separate
+  promotion.
 
 ## Reflection Direction
 

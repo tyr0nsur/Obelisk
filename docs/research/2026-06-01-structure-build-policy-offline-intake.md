@@ -2,10 +2,19 @@
 
 ## Summary
 
-`APrimalStructure.IsAllowedToBuild` and its Blueprint variants are viable as the next
-structure build-policy **offline intake** targets. This is not public SDK evidence and
-does not authorize runtime observation, build allow/deny, mutation, enforcement, or return
-override.
+`PrimalStructure.IsAllowedToBuild` and its Blueprint variants are viable as a
+candidate-only structure build-policy **offline intake** target set. This is not public
+SDK evidence and does not authorize runtime observation, build allow/deny, mutation,
+enforcement, or return override.
+
+The implemented target set is `structure-build-policy-offline-intake`:
+
+- `obelisk.ufunction-chain.snapshot.v1:PrimalStructure.IsAllowedToBuild`
+- `obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuild`
+- `obelisk.ufunction-chain.snapshot.v1:PrimalStructure.BPIsAllowedToBuildEx`
+
+It is classified `planning_only`, assigned to the `structures` lane, and excluded from
+`RELEASE_READINESS_TARGET_SETS`.
 
 ## Evidence
 
@@ -27,18 +36,23 @@ The binary is a stripped x86-64 Linux ELF. The second-source reflection inventor
 Source artifact:
 `/servidor/ark/workspace-offline/reflection-inventory-pack-second-source-20260529T000000Z/ufunction-inventory.json`.
 
-No existing sanitized `ufunction-snapshots` were found for these three targets.
+No existing sanitized `ufunction-snapshots` were found for these three targets. The
+target set therefore records intake scope only; it is not an accepted layout claim.
 
 ## Boundary
 
-The current `structure_census` lane covers aggregate/census-style copied fields only. It
-does not include build placement policy, no-collision policy, location/placement structs,
-player/controller identity, ownership lookup, mutation, enforcement, or return override.
+The current `structure_census` and `structure-observer-intake` lanes remain unchanged.
+They do not include build placement policy, no-collision policy, location/placement
+structs, player/controller identity, ownership lookup, mutation, enforcement, or return
+override.
 
-The next valid step is a candidate-only snapshot/intake pack:
+The next valid step is a candidate-only snapshot/intake pack through
+`structure-build-policy-offline-intake`:
 
 - generate exact sanitized UFunction snapshots for the three targets;
 - define a redaction policy for placement structs, location/context, and player/controller
   references before accepting any copied field;
 - compare against a distinct source before treating the layout as second-source accepted;
-- keep `public_sdk_ready=false`, `runtime_ready=false`, and `promotion_ready=false`.
+- keep `public_sdk_ready=false`, `runtime_ready=false`, and `promotion_ready=false`;
+- keep the set out of release-readiness, public SDK, runtime hook, mutation, enforcement,
+  and return-override paths.
