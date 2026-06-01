@@ -541,10 +541,16 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             plugin_manager_text,
             r"size_t UnregisterGameplayPolicyRegistrationsForOwner\(.*?\)",
         )
-        self.assertIn("registration.InventoryRegistrationId", unregister_owner_body)
-        self.assertIn("InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner", unregister_owner_body)
-        self.assertIn("registration.ItemReturnRegistrationId", unregister_owner_body)
-        self.assertIn("ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner", unregister_owner_body)
+        self.assertIn("UnregisterGameplayPolicyRegistrationForOwner(owner, item.first)", unregister_owner_body)
+        self.assertIn("throw std::runtime_error", unregister_owner_body)
+        self.assertLess(
+            unregister_body.index("registration.InventoryRegistrationId"),
+            unregister_body.index("GameplayPolicyRegistrations().erase(it)"),
+        )
+        self.assertLess(
+            unregister_body.index("registration.ItemReturnRegistrationId"),
+            unregister_body.index("GameplayPolicyRegistrations().erase(it)"),
+        )
 
         cleanup_body = extract_function_body(
             plugin_manager_text,
@@ -693,6 +699,14 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 body = extract_function_body(text, rf"void {function_name}\(.*?\)")
                 self.assertIn("SafeLogErrorNoThrow", body)
                 self.assertNotIn("OBELISK_ERROR", body)
+
+        for function_name in ("PluginDescribeResourceKind", "PluginDescribeGameplayPolicyEventKind"):
+            with self.subTest(function_name=function_name):
+                body = extract_function_body(text, rf"bool {function_name}\(.*?\)")
+                self.assertIn("try", body)
+                self.assertIn("catch (const std::exception& e)", body)
+                self.assertIn("catch (...)", body)
+                self.assertIn("SafeLogErrorNoThrow", body)
 
         extern_match = re.search(r"// C-API Wrappers for Plugins\s+extern \"C\" \{", text)
         self.assertIsNotNone(extern_match)

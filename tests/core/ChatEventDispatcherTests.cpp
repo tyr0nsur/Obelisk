@@ -114,6 +114,24 @@ namespace
     {
     }
 
+    struct DestroyFailureState
+    {
+        int calls = 0;
+    };
+
+    void ThrowingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->calls;
+        throw std::runtime_error("expected destroy failure");
+    }
+
+    void CountingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->calls;
+    }
+
     Obelisk::Core::ChatMessageView MakeMessage(std::string_view text = "hello from copied chat")
     {
         return {
@@ -665,6 +683,32 @@ namespace
         Require(captureB.calls == 1, "owner B callback did not run");
     }
 
+    void TestOwnerCleanupPropagatesDestroyUserDataFailure()
+    {
+        Obelisk::Core::ChatEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, ThrowingDestroyUserData}) != 0,
+                "throwing destroy chat registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountingDestroyUserData}) != 0,
+                "counting destroy chat registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid throwing chat DestroyUserData");
+        Require(state.calls == 2, "owner cleanup did not attempt all chat DestroyUserData callbacks");
+        Require(dispatcher.SubscriptionCount() == 0, "owner cleanup failure left chat callbacks registered");
+    }
+
     struct DestroyUnregisterOtherState
     {
         Obelisk::Core::ChatEventDispatcher* dispatcher = nullptr;
@@ -900,6 +944,7 @@ int main()
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestOwnerCleanup();
+    TestOwnerCleanupPropagatesDestroyUserDataFailure();
     TestDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestDeferredDestroyUserDataCanUnregisterAnotherCallbackWithoutDeadlock();
     TestDestroyUserDataRunsInsideGameplayCallbackScope();

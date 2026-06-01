@@ -72,6 +72,28 @@ namespace
         throw 7;
     }
 
+    void NoopCallback(const Obelisk::Core::InventoryPolicyEventView&, void*)
+    {
+    }
+
+    struct DestroyFailureState
+    {
+        int Calls = 0;
+    };
+
+    void ThrowingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+        throw std::runtime_error("expected destroy failure");
+    }
+
+    void CountingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+    }
+
     void TestDispatchCopiesScalarInputForCallbackDuration()
     {
         Obelisk::Core::InventoryPolicyEventDispatcher dispatcher;
@@ -706,6 +728,33 @@ namespace
         Require(dispatcher.Dispatch(MakeEvent(scalars)) == 1, "successful dispatch count ignored exception");
         Require(capture.Calls == 1, "callback after exception did not run");
     }
+
+    void TestOwnerCleanupPropagatesDestroyUserDataFailure()
+    {
+        Obelisk::Core::InventoryPolicyEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, ThrowingDestroyUserData}) != 0,
+                "throwing destroy inventory policy registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountingDestroyUserData}) != 0,
+                "counting destroy inventory policy registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid throwing inventory policy DestroyUserData");
+        Require(state.Calls == 2, "owner cleanup did not attempt all inventory policy DestroyUserData callbacks");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup failure left inventory policy callbacks registered");
+    }
 }
 
 int main()
@@ -725,6 +774,7 @@ int main()
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestExceptionsDoNotStopDispatch();
+    TestOwnerCleanupPropagatesDestroyUserDataFailure();
 
     std::cout << "InventoryPolicyEventDispatcherTests passed\n";
     return 0;

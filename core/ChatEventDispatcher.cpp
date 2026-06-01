@@ -41,7 +41,7 @@ namespace Obelisk::Core
             return g_DestroyUserDataDepth > 0;
         }
 
-        void DestroySubscriptionUserData(const ChatMessageSubscription& subscription)
+        void DestroySubscriptionUserData(const ChatMessageSubscription& subscription, bool propagateFailure = false)
         {
             if (!subscription.DestroyUserData)
                 return;
@@ -56,12 +56,36 @@ namespace Obelisk::Core
             {
                 if (Obelisk::Logger::IsInitialized())
                     OBELISK_ERROR("Chat message subscription cleanup threw: {}", e.what());
+                if (propagateFailure)
+                    throw;
             }
             catch (...)
             {
                 if (Obelisk::Logger::IsInitialized())
                     OBELISK_ERROR("Chat message subscription cleanup threw an unknown exception.");
+                if (propagateFailure)
+                    throw;
             }
+        }
+
+        void DestroySubscriptionsForOwnerCleanup(const std::vector<ChatMessageSubscription>& subscriptions)
+        {
+            std::exception_ptr firstFailure;
+            for (const ChatMessageSubscription& subscription : subscriptions)
+            {
+                try
+                {
+                    DestroySubscriptionUserData(subscription, true);
+                }
+                catch (...)
+                {
+                    if (!firstFailure)
+                        firstFailure = std::current_exception();
+                }
+            }
+
+            if (firstFailure)
+                std::rethrow_exception(firstFailure);
         }
 
         bool IsInsideAnyGameplayCallback()
@@ -209,6 +233,7 @@ namespace Obelisk::Core
             return 0;
 
         std::vector<ChatMessageSubscription> removed;
+        std::exception_ptr deferredFailure;
         size_t before = 0;
         size_t after = 0;
         try
@@ -246,8 +271,18 @@ namespace Obelisk::Core
             after = m_Registrations.size();
             if (before > after)
                 m_SubscriptionCount.fetch_sub(before - after, std::memory_order_release);
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock))
+            uint64_t cleanupBatchId = 0;
+            if (!IsInsideAnyGameplayCallback() && !IsInsideDispatcherCleanup())
+            {
+                cleanupBatchId = m_NextCleanupBatchId++;
+                if (m_NextCleanupBatchId == 0)
+                    m_NextCleanupBatchId = 1;
+            }
+            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
+                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+            }
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
@@ -265,8 +300,9 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Chat event owner cleanup failed with an unknown exception.");
             throw;
         }
-        for (const ChatMessageSubscription& subscription : removed)
-            DestroySubscriptionUserData(subscription);
+        DestroySubscriptionsForOwnerCleanup(removed);
+        if (deferredFailure)
+            std::rethrow_exception(deferredFailure);
         return before - after;
     }
 
@@ -280,19 +316,40 @@ namespace Obelisk::Core
 
     bool ChatEventDispatcher::QueueOrDestroyRemovedSubscriptions(
         std::vector<ChatMessageSubscription>& removed,
-        std::unique_lock<std::mutex>&)
+        std::unique_lock<std::mutex>&,
+        uint64_t cleanupBatchId)
     {
         if (removed.empty())
             return false;
 
         if (m_DispatchDepth > 0)
         {
-            m_PendingDestroy.insert(m_PendingDestroy.end(), removed.begin(), removed.end());
+            for (const ChatMessageSubscription& subscription : removed)
+                m_PendingDestroy.push_back({subscription, cleanupBatchId});
             removed.clear();
             return !IsInsideAnyGameplayCallback();
         }
 
         return false;
+    }
+
+    std::exception_ptr ChatEventDispatcher::TakeDeferredDestroyFailure(uint64_t cleanupBatchId)
+    {
+        if (cleanupBatchId == 0)
+            return nullptr;
+
+        const auto failureIt = std::find_if(
+            m_DeferredDestroyFailures.begin(),
+            m_DeferredDestroyFailures.end(),
+            [cleanupBatchId](const DeferredDestroyFailure& failure) {
+                return failure.CleanupBatchId == cleanupBatchId;
+            });
+        if (failureIt == m_DeferredDestroyFailures.end())
+            return nullptr;
+
+        std::exception_ptr failure = failureIt->Failure;
+        m_DeferredDestroyFailures.erase(failureIt);
+        return failure;
     }
 
     bool ChatEventDispatcher::IsDispatchCleanupComplete() const
@@ -302,7 +359,8 @@ namespace Obelisk::Core
 
     void ChatEventDispatcher::FinishDispatch()
     {
-        std::vector<ChatMessageSubscription> pending;
+        std::vector<PendingDestroy> pending;
+        std::vector<DeferredDestroyFailure> failures;
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             if (m_DispatchDepth == 0)
@@ -316,11 +374,33 @@ namespace Obelisk::Core
             m_PendingDestroyInProgress += pending.size();
         }
 
-        for (const ChatMessageSubscription& subscription : pending)
-            DestroySubscriptionUserData(subscription);
+        for (const PendingDestroy& item : pending)
+        {
+            try
+            {
+                DestroySubscriptionUserData(item.Subscription, item.CleanupBatchId != 0);
+            }
+            catch (...)
+            {
+                if (item.CleanupBatchId == 0)
+                    continue;
+                const bool alreadyCaptured = std::any_of(
+                    failures.begin(),
+                    failures.end(),
+                    [&item](const DeferredDestroyFailure& failure) {
+                        return failure.CleanupBatchId == item.CleanupBatchId;
+                    });
+                if (!alreadyCaptured)
+                    failures.push_back({item.CleanupBatchId, std::current_exception()});
+            }
+        }
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_PendingDestroyInProgress -= pending.size();
+            m_DeferredDestroyFailures.insert(
+                m_DeferredDestroyFailures.end(),
+                failures.begin(),
+                failures.end());
         }
         m_DispatchCv.notify_all();
     }

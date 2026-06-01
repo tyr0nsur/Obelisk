@@ -121,6 +121,24 @@ namespace
     {
     }
 
+    struct DestroyFailureState
+    {
+        int Calls = 0;
+    };
+
+    void ThrowingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+        throw std::runtime_error("expected destroy failure");
+    }
+
+    void CountingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+    }
+
     void TestPlayerPrincipalSurfaceIsInternalObservationOnly()
     {
         const auto [kind, action, eventSequence, serverProcessEpoch, bools] = PlayerPrincipalEventView{};
@@ -901,6 +919,33 @@ namespace
                 "owner cleanup after exception containment removed wrong count");
     }
 
+    void TestOwnerCleanupPropagatesDestroyUserDataFailure()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, ThrowingDestroyUserData}) != 0,
+                "throwing destroy player principal registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountingDestroyUserData}) != 0,
+                "counting destroy player principal registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid throwing player principal DestroyUserData");
+        Require(state.Calls == 2, "owner cleanup did not attempt all player principal DestroyUserData callbacks");
+        Require(dispatcher.SubscriptionCount() == 0,
+                "owner cleanup failure left player principal callbacks registered");
+    }
+
     void TestUnregisterIsIdempotent()
     {
         PlayerPrincipalEventDispatcher dispatcher;
@@ -939,6 +984,7 @@ int main()
         TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
         TestOwnerCleanupRemovesOnlyMatchingOwner();
         TestCallbackExceptionsAreContained();
+        TestOwnerCleanupPropagatesDestroyUserDataFailure();
         TestUnregisterIsIdempotent();
     }
     catch (const std::exception& e)

@@ -45,6 +45,8 @@ namespace Obelisk::Core
 {
     void SetPluginCallbackCleanupFailureForTesting(bool enabled);
     void SetPluginRetentionFailureForTesting(bool enabled);
+    void SetPublicChatMessageInternalUnregisterFailureForTesting(bool enabled);
+    void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled);
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token);
 }
 
@@ -1925,10 +1927,19 @@ namespace
         Require(plugin.gameplayPolicyEventCalls == 1,
                 "gameplay policy callback ignored event kind mask");
 
+        Obelisk::Core::SetPublicGameplayPolicyInternalUnregisterFailureForTesting(true);
+        Require(!plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    registrationId),
+                "owner-token gameplay policy unregister succeeded despite injected internal failure");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "failed gameplay policy unregister removed structure dispatcher callback");
+        Obelisk::Core::SetPublicGameplayPolicyInternalUnregisterFailureForTesting(false);
+
         Require(plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
                     plugin.initOwnerToken,
                     registrationId),
-                "owner-token gameplay policy unregister failed");
+                "owner-token gameplay policy unregister did not retain tracking after internal failure");
         Require(!plugin.capturedApi.UnregisterGameplayPolicyEventWithOwnerToken(
                     plugin.initOwnerToken,
                     registrationId),
@@ -2357,10 +2368,19 @@ namespace
         Require(plugin.chatMessageSequence == 1,
                 "chat message event sequence did not skip zero after wrap");
 
+        Obelisk::Core::SetPublicChatMessageInternalUnregisterFailureForTesting(true);
+        Require(!plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
+                    plugin.initOwnerToken,
+                    registrationId),
+                "owner-token chat message unregister succeeded despite injected internal failure");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "failed chat message unregister removed dispatcher callback");
+        Obelisk::Core::SetPublicChatMessageInternalUnregisterFailureForTesting(false);
+
         Require(plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
                     plugin.initOwnerToken,
                     registrationId),
-                "owner-token chat message unregister failed");
+                "owner-token chat message unregister did not retain tracking after internal failure");
         Require(!plugin.capturedApi.UnregisterChatMessageEventWithOwnerToken(
                     plugin.initOwnerToken,
                     registrationId),

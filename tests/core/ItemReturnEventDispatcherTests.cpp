@@ -72,6 +72,28 @@ namespace
         throw 7;
     }
 
+    void NoopCallback(const Obelisk::Core::ItemReturnEventView&, void*)
+    {
+    }
+
+    struct DestroyFailureState
+    {
+        int Calls = 0;
+    };
+
+    void ThrowingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+        throw std::runtime_error("expected destroy failure");
+    }
+
+    void CountingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+    }
+
     void TestDispatchCopiesScalarInputForCallbackDuration()
     {
         Obelisk::Core::ItemReturnEventDispatcher dispatcher;
@@ -641,6 +663,32 @@ namespace
         Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 3,
                 "owner cleanup after exception removed wrong callback count");
     }
+
+    void TestOwnerCleanupPropagatesDestroyUserDataFailure()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, ThrowingDestroyUserData}) != 0,
+                "throwing destroy item return registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountingDestroyUserData}) != 0,
+                "counting destroy item return registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid throwing item return DestroyUserData");
+        Require(state.Calls == 2, "owner cleanup did not attempt all item return DestroyUserData callbacks");
+        Require(dispatcher.SubscriptionCount() == 0, "owner cleanup failure left item return callbacks registered");
+    }
 }
 
 int main()
@@ -660,6 +708,7 @@ int main()
         TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
         TestOwnerCleanupWithoutDispatchDestroysImmediatelyAndSuppressesCallbacks();
         TestCallbackExceptionDoesNotStopDispatch();
+        TestOwnerCleanupPropagatesDestroyUserDataFailure();
     }
     catch (const std::exception& e)
     {

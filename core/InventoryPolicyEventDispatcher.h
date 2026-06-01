@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <condition_variable>
+#include <exception>
 #include <mutex>
 #include <span>
 #include <vector>
@@ -69,13 +70,27 @@ namespace Obelisk::Core
             InventoryPolicyEventSubscription Subscription;
         };
 
+        struct PendingDestroy
+        {
+            InventoryPolicyEventSubscription Subscription;
+            uint64_t CleanupBatchId = 0;
+        };
+
+        struct DeferredDestroyFailure
+        {
+            uint64_t CleanupBatchId = 0;
+            std::exception_ptr Failure;
+        };
+
         uint64_t AllocateRegistrationId();
         bool HasRegistrationId(uint64_t registrationId) const;
         bool IsRegistrationActive(uint64_t registrationId, uint64_t generation) const;
         bool QueueOrDestroyRemovedSubscriptions(
             std::vector<InventoryPolicyEventSubscription>& removed,
-            std::unique_lock<std::mutex>& lock);
+            std::unique_lock<std::mutex>& lock,
+            uint64_t cleanupBatchId = 0);
         bool IsDispatchCleanupComplete() const;
+        std::exception_ptr TakeDeferredDestroyFailure(uint64_t cleanupBatchId);
         void FinishDispatch();
 
         mutable std::mutex m_Mutex;
@@ -85,7 +100,9 @@ namespace Obelisk::Core
         uint64_t m_NextGeneration = 1;
         std::vector<Registration> m_Registrations;
         std::atomic<size_t> m_SubscriptionCount{0};
-        std::vector<InventoryPolicyEventSubscription> m_PendingDestroy;
+        std::vector<PendingDestroy> m_PendingDestroy;
+        std::vector<DeferredDestroyFailure> m_DeferredDestroyFailures;
         size_t m_PendingDestroyInProgress = 0;
+        uint64_t m_NextCleanupBatchId = 1;
     };
 }

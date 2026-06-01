@@ -88,6 +88,28 @@ namespace
         throw 7;
     }
 
+    void NoopCallback(const Obelisk::Core::StructureEventView&, void*)
+    {
+    }
+
+    struct DestroyFailureState
+    {
+        int Calls = 0;
+    };
+
+    void ThrowingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+        throw std::runtime_error("expected destroy failure");
+    }
+
+    void CountingDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<DestroyFailureState*>(userData);
+        ++state->Calls;
+    }
+
     void TestDispatchCopiesScalarInputForCallbackDuration()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -734,6 +756,32 @@ namespace
         Require(captureB.Calls == 1, "owner B callback did not run");
     }
 
+    void TestOwnerCleanupPropagatesDestroyUserDataFailure()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        DestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, ThrowingDestroyUserData}) != 0,
+                "throwing destroy structure registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountingDestroyUserData}) != 0,
+                "counting destroy structure registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid throwing structure DestroyUserData");
+        Require(state.Calls == 2, "owner cleanup did not attempt all structure DestroyUserData callbacks");
+        Require(dispatcher.SubscriptionCount() == 0, "owner cleanup failure left structure callbacks registered");
+    }
+
     void TestExceptionsDoNotStopDispatch()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -766,6 +814,7 @@ int main()
     TestCrossFamilyCallbackSuppressesDeferredCleanupWait();
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestOwnerCleanup();
+    TestOwnerCleanupPropagatesDestroyUserDataFailure();
     TestExceptionsDoNotStopDispatch();
 
     std::cout << "StructureEventDispatcherTests passed\n";

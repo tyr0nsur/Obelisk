@@ -22,6 +22,7 @@
 #include <exception>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -38,6 +39,8 @@ namespace Obelisk::Core
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
+        std::atomic_bool g_ForcePublicChatMessageInternalUnregisterFailureForTesting{false};
+        std::atomic_bool g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting{false};
 #endif
 
         struct GameplayPolicyRegistration
@@ -1283,11 +1286,30 @@ namespace Obelisk::Core
                 if (it == ChatMessageRegistrations().end() || it->second.Owner != owner)
                     return false;
                 registration = it->second;
-                ChatMessageRegistrations().erase(it);
             }
 
-            return registration.Dispatcher &&
-                registration.Dispatcher->Unregister(registration.InternalRegistrationId);
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+            if (g_ForcePublicChatMessageInternalUnregisterFailureForTesting.load(std::memory_order_acquire))
+                return false;
+#endif
+
+            if (!registration.Dispatcher ||
+                !registration.Dispatcher->Unregister(registration.InternalRegistrationId))
+            {
+                return false;
+            }
+
+            std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
+            const auto it = ChatMessageRegistrations().find(registrationId);
+            if (it == ChatMessageRegistrations().end())
+                return true;
+            if (it->second.Owner == owner &&
+                it->second.Dispatcher == registration.Dispatcher &&
+                it->second.InternalRegistrationId == registration.InternalRegistrationId)
+            {
+                ChatMessageRegistrations().erase(it);
+            }
+            return true;
         }
 
         size_t UnregisterChatMessageRegistrationsForOwner(void* owner)
@@ -1298,28 +1320,19 @@ namespace Obelisk::Core
             std::vector<std::pair<uint64_t, ChatMessageRegistration>> registrations;
             {
                 std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
-                for (auto it = ChatMessageRegistrations().begin();
-                     it != ChatMessageRegistrations().end();)
+                for (const auto& item : ChatMessageRegistrations())
                 {
-                    if (it->second.Owner != owner)
-                    {
-                        ++it;
-                        continue;
-                    }
-                    registrations.push_back(*it);
-                    it = ChatMessageRegistrations().erase(it);
+                    if (item.second.Owner == owner)
+                        registrations.push_back(item);
                 }
             }
 
             size_t removed = 0;
             for (const auto& item : registrations)
             {
-                const ChatMessageRegistration& registration = item.second;
-                if (registration.Dispatcher &&
-                    registration.Dispatcher->Unregister(registration.InternalRegistrationId))
-                {
-                    ++removed;
-                }
+                if (!UnregisterChatMessageRegistrationForOwner(owner, item.first))
+                    throw std::runtime_error("public chat unregister failed before tracking cleanup");
+                ++removed;
             }
             return removed;
         }
@@ -1503,29 +1516,70 @@ namespace Obelisk::Core
                 if (it == GameplayPolicyRegistrations().end() || it->second.Owner != owner)
                     return false;
                 registration = it->second;
-                GameplayPolicyRegistrations().erase(it);
             }
 
-            bool removed = false;
+            bool cleanupSucceeded = true;
+            bool structureRemoved = false;
+            bool inventoryRemoved = false;
+            bool itemReturnRemoved = false;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+            if (g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.load(std::memory_order_acquire))
+                cleanupSucceeded = false;
+#endif
             if (registration.StructureRegistrationId != 0)
             {
-                removed = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                    owner,
-                    registration.StructureRegistrationId) || removed;
+                structureRemoved = cleanupSucceeded &&
+                    StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.StructureRegistrationId);
+                cleanupSucceeded = cleanupSucceeded && structureRemoved;
             }
             if (registration.InventoryRegistrationId != 0)
             {
-                removed = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
-                    owner,
-                    registration.InventoryRegistrationId) || removed;
+                inventoryRemoved = cleanupSucceeded &&
+                    InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.InventoryRegistrationId);
+                cleanupSucceeded = cleanupSucceeded && inventoryRemoved;
             }
             if (registration.ItemReturnRegistrationId != 0)
             {
-                removed = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
-                    owner,
-                    registration.ItemReturnRegistrationId) || removed;
+                itemReturnRemoved = cleanupSucceeded &&
+                    ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.ItemReturnRegistrationId);
+                cleanupSucceeded = cleanupSucceeded && itemReturnRemoved;
             }
-            return removed;
+
+            std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
+            const auto it = GameplayPolicyRegistrations().find(registrationId);
+            if (it == GameplayPolicyRegistrations().end())
+                return cleanupSucceeded;
+            if (it->second.Owner != owner)
+                return cleanupSucceeded;
+
+            if (cleanupSucceeded)
+            {
+                GameplayPolicyRegistrations().erase(it);
+                return true;
+            }
+
+            if (structureRemoved &&
+                it->second.StructureRegistrationId == registration.StructureRegistrationId)
+            {
+                it->second.StructureRegistrationId = 0;
+            }
+            if (inventoryRemoved &&
+                it->second.InventoryRegistrationId == registration.InventoryRegistrationId)
+            {
+                it->second.InventoryRegistrationId = 0;
+            }
+            if (itemReturnRemoved &&
+                it->second.ItemReturnRegistrationId == registration.ItemReturnRegistrationId)
+            {
+                it->second.ItemReturnRegistrationId = 0;
+            }
+            return false;
         }
 
         size_t UnregisterGameplayPolicyRegistrationsForOwner(void* owner)
@@ -1536,44 +1590,19 @@ namespace Obelisk::Core
             std::vector<std::pair<uint64_t, GameplayPolicyRegistration>> registrations;
             {
                 std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
-                for (auto it = GameplayPolicyRegistrations().begin();
-                     it != GameplayPolicyRegistrations().end();)
+                for (const auto& item : GameplayPolicyRegistrations())
                 {
-                    if (it->second.Owner != owner)
-                    {
-                        ++it;
-                        continue;
-                    }
-                    registrations.push_back(*it);
-                    it = GameplayPolicyRegistrations().erase(it);
+                    if (item.second.Owner == owner)
+                        registrations.push_back(item);
                 }
             }
 
             size_t removed = 0;
             for (const auto& item : registrations)
             {
-                const GameplayPolicyRegistration& registration = item.second;
-                bool removedAny = false;
-                if (registration.StructureRegistrationId != 0)
-                {
-                    removedAny = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.StructureRegistrationId) || removedAny;
-                }
-                if (registration.InventoryRegistrationId != 0)
-                {
-                    removedAny = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.InventoryRegistrationId) || removedAny;
-                }
-                if (registration.ItemReturnRegistrationId != 0)
-                {
-                    removedAny = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.ItemReturnRegistrationId) || removedAny;
-                }
-                if (removedAny)
-                    ++removed;
+                if (!UnregisterGameplayPolicyRegistrationForOwner(owner, item.first))
+                    throw std::runtime_error("gameplay policy unregister failed before tracking cleanup");
+                ++removed;
             }
             return removed;
         }
@@ -2133,10 +2162,36 @@ namespace Obelisk::Core
             }
         }
         bool PluginDescribeResourceKind(uint32_t resourceKind, ObeliskResourceKindDescriptor* out) {
-            return DescribeResourceKind(resourceKind, out);
+            try
+            {
+                return DescribeResourceKind(resourceKind, out);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("DescribeResourceKind failed after exception", e.what());
+                return false;
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("DescribeResourceKind failed after unknown exception.");
+                return false;
+            }
         }
         bool PluginDescribeGameplayPolicyEventKind(uint32_t eventKind, ObeliskGameplayPolicyEventDescriptor* out) {
-            return DescribeGameplayPolicyEventKind(eventKind, out);
+            try
+            {
+                return DescribeGameplayPolicyEventKind(eventKind, out);
+            }
+            catch (const std::exception& e)
+            {
+                SafeLogErrorNoThrow("DescribeGameplayPolicyEventKind failed after exception", e.what());
+                return false;
+            }
+            catch (...)
+            {
+                SafeLogErrorNoThrow("DescribeGameplayPolicyEventKind failed after unknown exception.");
+                return false;
+            }
         }
         void PluginCallProcessEvent(void* caller, void* function, void* parms) {
             try
@@ -2176,6 +2231,16 @@ namespace Obelisk::Core
     void SetPluginRetentionFailureForTesting(bool enabled)
     {
         g_ForcePluginRetentionFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void SetPublicChatMessageInternalUnregisterFailureForTesting(bool enabled)
+    {
+        g_ForcePublicChatMessageInternalUnregisterFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled)
+    {
+        g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.store(enabled, std::memory_order_release);
     }
 
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token)
