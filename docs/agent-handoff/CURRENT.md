@@ -41,6 +41,13 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   blocked/planning-only until promoted player identity and permissions/admin exist. Their
   checkers must keep public header, ABI, runtime, SDK, reply/send/broadcast/moderation, and
   migration/ArkApi portability claims false.
+- `scripts/check_command_permission_route_gate.py --json` is the canonical offline
+  planning gate for the principal -> permissions/admin -> command response ->
+  commands/replies route. It composes the permissions query fail-closed contract,
+  permissions/admin public-readiness, command copied-response intent, command/principal/
+  authz bridge, command/chat response public-readiness, and commands/replies readiness
+  checks. A pass is planning-only; promotion/public ABI/public SDK/runtime/public-header
+  claims must stay false.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
@@ -111,6 +118,10 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   no runtime observer, dispatch readiness, public Inventory/Items SDK, item/inventory
   identity, lookup, mutation, return override, `ResourceHandle`, public callback, public
   ABI, runtime readiness, public SDK readiness, or `v1.0` completion claim.
+  `ue/InventoryReflection` recognizes the two inventory-action targets by exact metadata
+  only; all fields, including `AdditionalData`, keep `ExposesRange=false`, and
+  `ProcessEventInventoryReflection` must continue rejecting their FName indices before
+  reading UFunction memory or dispatching callbacks.
 - Static field-window evidence clears only the field-window packaging blocker, is not a `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are present as package-shape evidence only, not a `v1.0` completion marker.
 ## Priority Next Steps
 

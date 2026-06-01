@@ -65,6 +65,9 @@ inherited_item_return_events_log_limit="${OBELISK_ITEM_RETURN_EVENTS_LOG_LIMIT:-
 inherited_player_principal_lifecycle_binary_sha256="${OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256:-}"
 inherited_player_principal_lifecycle_log_limit="${OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT:-}"
 inherited_player_principal_lifecycle_dispatch_limit="${OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT:-}"
+inherited_inventory_action_redacted_observer_binary_sha256="${OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256:-}"
+inherited_inventory_action_redacted_observer_log_limit="${OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_LOG_LIMIT:-}"
+inherited_inventory_action_redacted_observer_dispatch_limit="${OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT:-}"
 
 unset OBELISK_ENABLE_PROCESS_EVENT_HOOK
 unset OBELISK_DISABLE_PLUGINS
@@ -103,6 +106,10 @@ unset OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER
 unset OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256
 unset OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT
 unset OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT
+unset OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER
+unset OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256
+unset OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_LOG_LIMIT
+unset OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT
 
 enable_marker() {
     local feature="$1"
@@ -198,7 +205,8 @@ validate_observer_wrapper_profile() {
                 enable-inventory-reflection \
                 enable-structure-reflection \
                 enable-item-return-events \
-                enable-player-principal-lifecycle-observer
+                enable-player-principal-lifecycle-observer \
+                enable-inventory-action-redacted-observer
             do
                 if marker_entry_exists "${marker}"; then
                     echo "Experimental observer marker ${marker} is present for ${OBELISK_INSTANCE_ID}; refusing stable wrapper launch." >&2
@@ -209,6 +217,10 @@ validate_observer_wrapper_profile() {
         observer-debug)
             if ! enable_marker "allow-observer-debug-window"; then
                 echo "OBELISK_WRAPPER_PROFILE=observer-debug requires allow-observer-debug-window marker for ${OBELISK_INSTANCE_ID}." >&2
+                exit 1
+            fi
+            if marker_entry_exists "enable-inventory-action-redacted-observer"; then
+                echo "enable-inventory-action-redacted-observer is not implemented; refusing observer-debug launch until its marker/env/SHA/dispatch-limit-0 gate is promoted." >&2
                 exit 1
             fi
             ;;

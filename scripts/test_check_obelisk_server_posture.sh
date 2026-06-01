@@ -363,6 +363,7 @@ for marker in \
     enable-structure-reflection \
     enable-item-return-events \
     enable-player-principal-lifecycle-observer \
+    enable-inventory-action-redacted-observer \
     enable-reflection-scanner
 do
     : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/${marker}"
@@ -370,6 +371,18 @@ do
         "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 101 --expect-stable --instance arkserver
     rm -f "${TEST_OBELISK_ROOT}/state/instances/arkserver/${marker}"
 done
+
+write_proc_fixture 242 "${stable_maps}" \
+    "LD_PRELOAD=${TEST_OBELISK_ROOT}/lib/libobelisk.so" \
+    "OBELISK_INSTANCE_ID=arkserver" \
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1" \
+    "OBELISK_DISABLE_PLUGINS=1" \
+    "OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER=1" \
+    "OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520" \
+    "OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_LOG_LIMIT=1" \
+    "OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT=0"
+expect_failure inventory-action-redacted-observer-forbidden-for-stable \
+    "${SCRIPT}" --proc-root "${TMP_DIR}/proc" --pid 242 --expect-stable --instance arkserver
 
 : > "${TEST_OBELISK_ROOT}/state/instances/arkserver/request-static-fname-probe"
 expect_failure active-debug-request-marker-forbidden-for-stable \

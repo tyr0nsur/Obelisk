@@ -224,6 +224,10 @@ The planning bridge is tracked by
 [`command_principal_authz_response_bridge_decisions.json`](command_principal_authz_response_bridge_decisions.json)
 and its checker; it is a fail-closed vocabulary/header-drift guardrail only, not a public
 ABI or promoted SDK surface.
+`scripts/check_command_permission_route_gate.py --json` is the aggregate offline posture
+check for this route. A passing report means the route remains internally consistent for
+planning only; it is not release evidence, public ABI readiness, runtime readiness,
+command router readiness, reply/send-chat readiness, or v1 completion evidence.
 
 Player identity is planning-only. `players-identity-lifecycle-intake` and
 `obelisk.players-identity-first-evidence.v1` are candidate-only,

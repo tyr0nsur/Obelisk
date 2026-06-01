@@ -780,9 +780,11 @@ run_pending_inventory_action_redacted_observer_tests() {
         OBELISK_WRAPPER_CAPTURE="${TMP_DIR}/inventory-action-redacted-symlink-marker.env" \
         "${WRAPPER}" Ragnarok?listen
 
+    local root_future_scrub="${TMP_DIR}/root-inventory-action-redacted-observer-scrub"
+    prepare_root "${root_future_scrub}"
     (
         cd "${RUN_CWD}"
-        OBELISK_ROOT="${root_future}" \
+        OBELISK_ROOT="${root_future_scrub}" \
         OBELISK_WRAPPER_CAPTURE="${capture_future}" \
         OBELISK_ENABLE_INVENTORY_ACTION_REDACTED_OBSERVER=1 \
         OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_BINARY_SHA256=bad-inventory-action-sha \
@@ -797,8 +799,6 @@ run_pending_inventory_action_redacted_observer_tests() {
     assert_not_contains "${capture_future}" '^OBELISK_INVENTORY_ACTION_REDACTED_OBSERVER_DISPATCH_LIMIT='
 }
 
-if [[ "${OBELISK_RUN_PENDING_INVENTORY_ACTION_REDACTED_OBSERVER_TESTS:-0}" == "1" ]]; then
-    run_pending_inventory_action_redacted_observer_tests
-fi
+run_pending_inventory_action_redacted_observer_tests
 
 echo "test_linuxgsm_wrapper_markers passed"

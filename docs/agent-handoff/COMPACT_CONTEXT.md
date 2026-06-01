@@ -82,6 +82,9 @@ priorities, and do not use history files as the active source of truth.
   target set for `ClientServerChatDirectMessage`, `ClientServerChatMessage`, and
   `ClientChatMessage`; it is not a release-readiness target set, public reply/send-chat
   ABI, command router, or runtime response claim.
+  `scripts/check_command_permission_route_gate.py --json` is the canonical offline route
+  posture check for this dependency chain; passing it means planning-only alignment, not
+  public ABI, runtime readiness, command router, reply/send-chat ABI, or v1 completion.
   While identity waits on approved copied runtime principal lifecycle evidence, inventory
   copied signals are the higher-value side lane. Neither side lane displaces identity ->
   permissions/admin -> commands/replies. Prefer inventory copied-signal hygiene over

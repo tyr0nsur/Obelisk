@@ -168,6 +168,15 @@ Do not skip steps because a single core, log line, or recognizer test looks conv
   `ReturnValue` bool only, with no public Items/Inventory SDK, identity, mutation, or
   return override. The runtime producer stays default-off, observer/SHA/budget-gated,
   post-original, and live validation still requires a separate live-ops brief.
+- `inventory-action-compact-intake` currently means metadata-only recognition for
+  `ShooterPlayerController.ServerRequestInventoryUseItem` and
+  `ShooterPlayerController.ServerRequestInventoryUseItemWithActor`. All fields, including
+  `AdditionalData`, must stay `ExposesRange=false`; `ProcessEventInventoryReflection` must
+  reject these FName indices before reading UFunction memory, reserving budget, building
+  copied output, or dispatching callbacks. A future observer needs its own marker/env/SHA/
+  dispatch-limit-0 gate and live-ops approval; this recognizer is not hook wiring,
+  runtime readiness, Inventory/Items SDK promotion, identity, lookup, mutation, return
+  override, or `ResourceHandle`.
 - Use snapshot fixtures and `compare_reflection_snapshots.py` before promoting any
   UFunction or ScriptStruct shape beyond candidate-only.
 - `compare_reflection_snapshots.py --target <Outer.Name>` is offline. It compares
