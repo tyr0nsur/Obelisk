@@ -101,3 +101,51 @@ After the P0 chain is promoted, the rentable module hardening routes are:
 These routes are good post-P0 candidates because they have clear evidence boundaries and
 limited blast radius. They remain side lanes until identity -> permissions/admin ->
 command response -> commands/replies is promoted.
+
+## P0 Route Hardening Follow-Up
+
+The next supervised audit round tightened the planning-only P0 route without changing the
+runtime blocker:
+
+- `scripts/check_permissions_admin_public_readiness.py` now rejects fabricated
+  `obelisk.permissions-admin-query-failclosed-contract-check.v1` reports unless they carry
+  the checker-emitted contract fingerprint: input schema, query fields, decisions,
+  provenance fields, authority kinds, and fail-closed cases.
+- The same permissions/admin checker now rejects top-level drift in
+  `docs/public_sdk_surfaces.json` that lists permissions/admin as promoted, removes it
+  from planning surfaces, enables `v1_completion_required`, or rewrites the P0 dependency
+  chain.
+- `scripts/check_command_chat_response_public_readiness.py` and
+  `scripts/check_commands_replies_public_readiness.py` now scope overclaim negation by
+  clause, so mixed text such as `... remains blocked but reply API ready` is rejected
+  while current dependency statements with `before`, `until`, `only`, or `never` remain
+  valid non-claims.
+- `scripts/check_commands_replies_public_readiness.py` now requires the composed
+  `obelisk.command-chat-response-public-readiness-check.v1` report through
+  `--response-path-report`. A raw `obelisk.reflection-snapshot-readiness.v1` planning
+  JSON is no longer accepted as the response-path dependency artifact.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness scripts.test_check_command_chat_response_public_readiness scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
+  passed with 98 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, P0 `0/4`, and complete SDK
+  `0/12`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_inventory_item_copied_signals_stability.py --json`
+  passed with public SDK/v1 completion false.
+
+Deferred audit findings for future focused rounds:
+
+- Player-identity approved evidence should rerun or strongly verify the window manifest
+  and request-pack sidecars instead of trusting embedded metadata and hashes alone.
+- `check_player_identity_first_evidence_readiness.py` should preserve env parse blockers
+  from the request checker when producing combined request-pack diagnosis.
+- Permissions/admin should validate cache generation/scope invalidation semantics, expand
+  public header alias/protected-path coverage, and enforce query-field ordering and
+  duplicate rejection in the query fail-closed contract checker.
+- `scripts/check_public_sdk_v1_completion.py` should reject weak non-canonical demand
+  family equivalents unless a reviewed allowlist and surface-specific evidence prove the
+  equivalent is legitimate.

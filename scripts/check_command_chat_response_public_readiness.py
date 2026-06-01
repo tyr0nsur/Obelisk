@@ -317,7 +317,14 @@ POSITIVE_SURFACE_RE = re.compile(
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(before|blocked|cannot|candidate|does\s+not|fail[s-]?closed|forbidden|must\s+be|not|planning|require[sd]?|until)\b",
+    r"\b(before|blocked|cannot|candidate|does\s+not|fail[s-]?closed|forbidden|future|must|must\s+be|"
+    r"never|no|not|only|planning|require[sd]?|until|without)\b",
+    re.IGNORECASE,
+)
+CLAIM_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+NEGATED_CLAIM_SUFFIX_RE = re.compile(
+    r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
+    r"unauthorized|unsupported|unresolved|.*\b(?:before|only|never|until|requires?)\b)",
     re.IGNORECASE,
 )
 
@@ -407,6 +414,27 @@ def strip_c_comments(text: str) -> str:
     return re.sub(r"//.*", "", text)
 
 
+def preceding_claim_scope(text: str, start: int) -> str:
+    parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
+    return parts[-1] if parts else text[:start]
+
+
+def claim_match_is_negated(text: str, match: re.Match[str]) -> bool:
+    if NEGATED_CLAIM_RE.search(match.group(0)):
+        return True
+    if NEGATED_CLAIM_RE.search(preceding_claim_scope(text, match.start())):
+        return True
+    return bool(NEGATED_CLAIM_SUFFIX_RE.match(text[match.end() :]))
+
+
+def has_unnegated_positive_surface_claim(text: str) -> bool:
+    for clause in CLAIM_SCOPE_SPLIT_RE.split(text):
+        for match in POSITIVE_SURFACE_RE.finditer(clause):
+            if not claim_match_is_negated(clause, match):
+                return True
+    return False
+
+
 def c_identifier_exact_re(token: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
 
@@ -429,7 +457,7 @@ def collect_surface_overclaims(value: Any, blockers: list[dict[str, Any]], trail
         return
     if not isinstance(value, str) or negative_context(trail):
         return
-    if POSITIVE_SURFACE_RE.search(value) and NEGATED_CLAIM_RE.search(value) is None:
+    if has_unnegated_positive_surface_claim(value):
         add(blockers, "positive_public_surface_claim", trail, value=value)
 
 

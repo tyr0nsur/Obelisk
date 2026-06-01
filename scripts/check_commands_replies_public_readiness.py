@@ -293,8 +293,14 @@ NEGATIVE_CONTEXT_TOKENS = (
     "why_blocked",
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|must\s+be|must\s+not|no|not|planning|"
-    r"post-v1|require[sd]?|unresolved|until|without)\b",
+    r"\b(before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|future|must|must\s+be|must\s+not|"
+    r"never|no|not|only|planning|post-v1|require[sd]?|unresolved|until|without)\b",
+    re.IGNORECASE,
+)
+CLAIM_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+NEGATED_CLAIM_SUFFIX_RE = re.compile(
+    r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
+    r"unauthorized|unsupported|unresolved|.*\b(?:before|only|never|until|requires?)\b)",
     re.IGNORECASE,
 )
 POSITIVE_CLAIM_RE = re.compile(
@@ -330,7 +336,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--response-path-report",
         type=Path,
-        help="Optional command/chat response readiness report or raw planning-readiness JSON.",
+        help="Required composed command/chat response public-readiness report.",
     )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
@@ -387,6 +393,28 @@ def strip_c_comments(text: str) -> str:
     return re.sub(r"//.*", "", text)
 
 
+def preceding_claim_scope(text: str, start: int) -> str:
+    parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
+    return parts[-1] if parts else text[:start]
+
+
+def claim_match_is_negated(text: str, match: re.Match[str]) -> bool:
+    if NEGATED_CLAIM_RE.search(match.group(0)):
+        return True
+    if NEGATED_CLAIM_RE.search(preceding_claim_scope(text, match.start())):
+        return True
+    return bool(NEGATED_CLAIM_SUFFIX_RE.match(text[match.end() :]))
+
+
+def has_unnegated_positive_claim(text: str) -> bool:
+    for clause in CLAIM_SCOPE_SPLIT_RE.split(text):
+        for regex in (POSITIVE_CLAIM_RE, POSITIVE_CLAIM_REVERSED_RE):
+            for match in regex.finditer(clause):
+                if not claim_match_is_negated(clause, match):
+                    return True
+    return False
+
+
 def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -407,7 +435,7 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         or trail.endswith(".id")
     ):
         return
-    if (POSITIVE_CLAIM_RE.search(value) or POSITIVE_CLAIM_REVERSED_RE.search(value)) and not NEGATED_CLAIM_RE.search(value):
+    if has_unnegated_positive_claim(value):
         add(blockers, "positive_public_surface_claim", trail, value=value)
 
 
@@ -893,8 +921,6 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                     f"$.response_path_report.{key}",
                     value=payload.get(key),
                 )
-    elif schema == RESPONSE_PATH_READINESS_SCHEMA:
-        response_path_readiness.validate_readiness(payload, blockers)
     else:
         add(blockers, "response_path_report_schema_mismatch", "$.response_path_report.schema", value=schema)
     collect_overclaims(payload, blockers, "$.response_path_report")
@@ -915,6 +941,8 @@ def build_report(
         if response_path_report_path is not None
         else None
     )
+    if response_path_report_path is None:
+        add(blockers, "response_path_report_required", "$.response_path_report_path")
 
     if decisions is not None:
         validate_decisions(decisions, blockers)

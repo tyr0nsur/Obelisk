@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,13 @@ RESPONSE_TARGETS = [
     "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
     "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage",
 ]
+
+sys.path.insert(0, str(SCRIPT_DIR))
+SPEC = importlib.util.spec_from_file_location("check_commands_replies_public_readiness", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+READINESS = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = READINESS
+SPEC.loader.exec_module(READINESS)
 
 
 class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
@@ -57,8 +65,33 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         header_path.write_text(header if header is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
         return decisions_path, surfaces_path, header_path
 
+    def write_response_report(self, root: Path) -> Path:
+        response_report = {
+            "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+            "valid": True,
+            "accepted_for_planning": True,
+            "planning_only": True,
+            "surface": "obelisk.command_chat_response_path.v1",
+            "target_set": "command-chat-response-route-planning",
+            "target_filters": RESPONSE_TARGETS,
+            "readiness_status": "compared",
+            "decisions_status": "blocked",
+            "public_readiness_ready": False,
+            "public_header_allowed": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+            "blockers": [],
+        }
+        report_path = root / "response.json"
+        report_path.write_text(json.dumps(response_report), encoding="utf-8")
+        return report_path
+
     def test_accepts_current_manifests_as_planning_only(self) -> None:
-        result = self.run_checker("--json")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_path = self.write_response_report(Path(temp_dir))
+            result = self.run_checker("--response-path-report", str(report_path), "--json")
         report = json.loads(result.stdout)
 
         self.assertTrue(report["valid"])
@@ -78,7 +111,14 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
-        self.assertEqual([], report["blockers"])
+
+    def test_rejects_missing_response_path_report(self) -> None:
+        result = self.run_checker("--json", check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_required", report["blockers"])
+        self.assertIsNone(report["response_path_report_path"])
 
     def test_rejects_decision_public_symbols_and_allowed_flags(self) -> None:
         decisions = self.load_decisions()
@@ -332,6 +372,18 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_surface_overclaim", report["blockers"])
         self.assertIn("positive_public_surface_claim", report["blockers"])
 
+    def test_mixed_negation_does_not_hide_positive_reply_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims({"note": "command router remains blocked but reply API ready"}, blockers)
+
+        self.assertEqual(["positive_public_surface_claim"], [item["reason"] for item in blockers])
+
+    def test_negative_reply_suffix_is_not_positive_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims({"note": "reply API ready remains blocked"}, blockers)
+
+        self.assertEqual([], blockers)
+
     def test_rejects_missing_runtime_owned_principal_permissions_gate(self) -> None:
         decisions = self.load_decisions()
         gate = decisions["runtime_owned_principal_permissions_gate"]
@@ -525,28 +577,9 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("migration_vocabulary_non_compatibility_missing", report["blockers"])
 
     def test_accepts_optional_response_path_planning_report_only(self) -> None:
-        response_report = {
-            "schema": "obelisk.command-chat-response-public-readiness-check.v1",
-            "valid": True,
-            "accepted_for_planning": True,
-            "planning_only": True,
-            "surface": "obelisk.command_chat_response_path.v1",
-            "target_set": "command-chat-response-route-planning",
-            "target_filters": RESPONSE_TARGETS,
-            "readiness_status": "compared",
-            "decisions_status": "blocked",
-            "public_readiness_ready": False,
-            "public_header_allowed": False,
-            "promotion_ready": False,
-            "public_sdk_ready": False,
-            "public_abi_ready": False,
-            "runtime_ready": False,
-            "blockers": [],
-        }
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report_path = root / "response.json"
-            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            report_path = self.write_response_report(root)
             result = self.run_checker("--response-path-report", str(report_path), "--json")
 
         report = json.loads(result.stdout)
@@ -594,9 +627,7 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
-        self.assertIn("evidence_scope_mismatch", report["blockers"])
-        self.assertIn("target_sets_mismatch", report["blockers"])
-        self.assertIn("totals_missing", report["blockers"])
+        self.assertIn("response_path_report_schema_mismatch", report["blockers"])
 
     def test_rejects_optional_response_path_report_promoted_overclaim(self) -> None:
         response_report = {

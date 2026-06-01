@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_command_chat_response_public_readiness.py"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+SPEC = importlib.util.spec_from_file_location("check_command_chat_response_public_readiness", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+READINESS = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = READINESS
+SPEC.loader.exec_module(READINESS)
 
 
 TARGETS = [
@@ -380,6 +388,21 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_readiness_ready"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["runtime_ready"])
+
+    def test_mixed_negation_does_not_hide_positive_send_chat_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {"note": "reply API remains blocked but send-chat API is operational"},
+            blockers,
+        )
+
+        self.assertEqual(["positive_public_surface_claim"], [item["reason"] for item in blockers])
+
+    def test_negative_reply_suffix_is_not_positive_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims({"note": "reply API ready remains blocked"}, blockers)
+
+        self.assertEqual([], blockers)
 
     def test_rejects_decision_public_header_overclaims(self) -> None:
         decisions = self.make_decisions()

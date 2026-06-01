@@ -84,6 +84,20 @@ This file is an active routing table only. Durable evidence belongs in
   and `docs/public_gameplay_events.json`, and request-pack privacy/readiness negation
   scanning. These guardrails do not change runtime approval, public SDK readiness, or v1
   completion.
+- 2026-06-02 P0 route hardening follow-up: permissions/admin public readiness now rejects
+  fabricated query fail-closed reports without the checker-emitted contract fingerprint and
+  rejects top-level permissions/admin promotion/sequence drift in
+  `docs/public_sdk_surfaces.json`. Command response and commands/replies readiness scanners
+  now distinguish mixed positive claims after `but/then/however` from legitimate
+  `before/until/only/never` non-claims. Commands/replies public readiness now requires the
+  exact composed `command_chat_response_public_readiness` report and rejects raw
+  `obelisk.reflection-snapshot-readiness.v1` as a dependency artifact. Route gate remains
+  planning-only and still blocks at `approved_runtime_evidence_missing`.
+- Deferred audited guardrails: player-identity approved evidence should rerun or strongly
+  verify its window/request sidecars; first-evidence request diagnosis should preserve env
+  parse blockers; permissions/admin should validate cache generation semantics, header
+  alias/protected-path coverage, and query field ordering/duplicates; SDK v1 completion
+  should reject weak non-canonical demand-family equivalents.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

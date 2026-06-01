@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,13 @@ HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 AUTHZ_DECISION_MODEL = REPO_ROOT / "core" / "AuthzDecisionModel.h"
 QUERY_CHECKER = SCRIPT_DIR / "check_permissions_admin_query_failclosed_contract.py"
 CANONICAL_QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+SPEC = importlib.util.spec_from_file_location("check_permissions_admin_public_readiness", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+READINESS = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = READINESS
+SPEC.loader.exec_module(READINESS)
 
 
 def run_checker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -95,6 +103,34 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
                 report["query_failclosed_artifact_schema"],
                 "obelisk.permissions-admin-query-failclosed-contract-check.v1",
             )
+
+    def test_rejects_fabricated_query_failclosed_report_without_contract_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "fake-query-report.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.permissions-admin-query-failclosed-contract-check.v1",
+                        "mode": "consume",
+                        "ready": True,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_cache_abi_allowed": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_checker("--query-failclosed-artifact", str(report_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("query_failclosed_report_input_schema_mismatch", report["blockers"])
+        self.assertIn("query_failclosed_report_query_fields_mismatch", report["blockers"])
+        self.assertIn("query_failclosed_report_fail_closed_cases_mismatch", report["blockers"])
 
     def test_accepts_canonical_query_failclosed_manifest_as_planning_only(self) -> None:
         result = run_checker("--query-failclosed-artifact", str(CANONICAL_QUERY_CONTRACT))
@@ -275,6 +311,18 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("public_surface_overclaim", report["blockers"])
         self.assertIn("positive_public_surface_claim", report["blockers"])
 
+    def test_mixed_negation_does_not_hide_positive_runtime_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims({"note": "permissions/admin remains blocked but runtime ready"}, blockers)
+
+        self.assertEqual(["positive_public_surface_claim"], [item["reason"] for item in blockers])
+
+    def test_negative_runtime_suffix_is_not_positive_claim(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims({"note": "runtime ready remains blocked"}, blockers)
+
+        self.assertEqual([], blockers)
+
     def test_rejects_camel_hyphen_space_aliases_and_positive_readiness_texts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -325,6 +373,31 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("permissions_admin_surface_status_unexpected", report["blockers"])
         self.assertIn("permissions_admin_public_contract_not_empty", report["blockers"])
         self.assertIn("permissions_admin_promoted_before_player_identity", report["blockers"])
+
+    def test_rejects_top_level_permissions_admin_promotion_and_sequence_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            surfaces["promoted_surfaces"].append("obelisk.permissions_admin.v1")
+            surfaces["planning_surfaces"] = [
+                item for item in surfaces["planning_surfaces"] if item != "obelisk.permissions_admin.v1"
+            ]
+            surfaces["v1_completion_required"] = True
+            surfaces["v1_required_dependency_chain"] = [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.commands_replies.v1",
+            ]
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("permissions_admin_listed_as_promoted", report["blockers"])
+        self.assertIn("permissions_admin_missing_from_planning_surfaces", report["blockers"])
+        self.assertIn("v1_completion_required_not_false", report["blockers"])
+        self.assertIn("v1_required_dependency_chain_mismatch", report["blockers"])
 
     def test_rejects_manifest_only_player_identity_promotion_as_upstream_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

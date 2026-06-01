@@ -26,6 +26,9 @@ QUERY_CONTRACT_SCHEMA = "obelisk.permissions-admin-query-failclosed-contract.v1"
 QUERY_CONTRACT_REPORT_SCHEMA = "obelisk.permissions-admin-query-failclosed-contract-check.v1"
 SURFACE = "obelisk.permissions_admin.v1"
 IDENTITY_SURFACE = "obelisk.player_identity.v1"
+COMMAND_RESPONSE_SURFACE = "obelisk.command_chat_response_path.v1"
+COMMANDS_REPLIES_SURFACE = "obelisk.commands_replies.v1"
+REQUIRED_P0_CHAIN = [IDENTITY_SURFACE, SURFACE, COMMAND_RESPONSE_SURFACE, COMMANDS_REPLIES_SURFACE]
 
 REQUIRED_DECISION_IDS = frozenset(
     (
@@ -360,6 +363,7 @@ NEGATIVE_CONTEXT_TOKENS = (
     "blocker",
     "blockers",
     "blocked",
+    "compatibility_statement",
     "decision_required",
     "deny_or_unknown",
     "exclusion",
@@ -378,8 +382,14 @@ NEGATIVE_CONTEXT_TOKENS = (
     "v1_sequence_gate",
 )
 NEGATED_CLAIM_RE = re.compile(
-    r"\b(blocked|cannot|deny|does\s+not|fail[s-]?closed|forbidden|must\s+not|no|not|planning|"
-    r"post-v1|require[sd]?|unresolved|until|without)\b",
+    r"\b(blocked|cannot|deny|does\s+not|fail[s-]?closed|forbidden|future|must|must\s+not|never|no|not|"
+    r"only|planning|post-v1|require[sd]?|unresolved|until|without)\b",
+    re.IGNORECASE,
+)
+CLAIM_SCOPE_SPLIT_RE = re.compile(r"[.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
+NEGATED_CLAIM_SUFFIX_RE = re.compile(
+    r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
+    r"unauthorized|unsupported|unresolved|.*\b(?:before|only|never|until|requires?)\b)",
     re.IGNORECASE,
 )
 POSITIVE_CLAIM_RE = re.compile(
@@ -463,6 +473,28 @@ def strip_c_comments(text: str) -> str:
     return re.sub(r"//.*", "", text)
 
 
+def preceding_claim_scope(text: str, start: int) -> str:
+    parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
+    return parts[-1] if parts else text[:start]
+
+
+def claim_match_is_negated(text: str, match: re.Match[str]) -> bool:
+    if NEGATED_CLAIM_RE.search(match.group(0)):
+        return True
+    if NEGATED_CLAIM_RE.search(preceding_claim_scope(text, match.start())):
+        return True
+    return bool(NEGATED_CLAIM_SUFFIX_RE.match(text[match.end() :]))
+
+
+def has_unnegated_positive_claim(text: str) -> bool:
+    for clause in CLAIM_SCOPE_SPLIT_RE.split(text):
+        for regex in (POSITIVE_CLAIM_RE, POSITIVE_CLAIM_REVERSED_RE):
+            for match in regex.finditer(clause):
+                if not claim_match_is_negated(clause, match):
+                    return True
+    return False
+
+
 def c_identifier_exact_re(token: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![A-Za-z0-9_]){re.escape(token)}(?![A-Za-z0-9_])")
 
@@ -497,7 +529,7 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         or trail.endswith(".id")
     ):
         return
-    if (POSITIVE_CLAIM_RE.search(value) or POSITIVE_CLAIM_REVERSED_RE.search(value)) and not NEGATED_CLAIM_RE.search(value):
+    if has_unnegated_positive_claim(value):
         add(blockers, "positive_public_surface_claim", trail, value=value)
 
 
@@ -740,6 +772,15 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
 def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     if payload.get("schema") != SURFACES_SCHEMA:
         add(blockers, "surfaces_schema_mismatch", "$.schema")
+    if SURFACE in string_set(payload.get("promoted_surfaces")):
+        add(blockers, "permissions_admin_listed_as_promoted", "$.promoted_surfaces")
+    if SURFACE not in string_set(payload.get("planning_surfaces")):
+        add(blockers, "permissions_admin_missing_from_planning_surfaces", "$.planning_surfaces")
+    if payload.get("v1_completion_required") is not False:
+        add(blockers, "v1_completion_required_not_false", "$.v1_completion_required")
+    for key in ("v1_required_dependency_chain", "v1_dependency_sequence"):
+        if payload.get(key) != REQUIRED_P0_CHAIN:
+            add(blockers, f"{key}_mismatch", f"$.{key}", expected=REQUIRED_P0_CHAIN, value=payload.get(key))
     surfaces = payload.get("surfaces")
     if not isinstance(surfaces, list):
         add(blockers, "surfaces_not_list", "$.surfaces")
@@ -900,6 +941,25 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
             add(blockers, "query_failclosed_report_mode_not_consume", f"{path}:mode")
         if payload.get("ready") is not True:
             add(blockers, "query_failclosed_report_not_ready_for_consume", f"{path}:ready")
+        expected_report_fields = {
+            "input_schema": QUERY_CONTRACT_SCHEMA,
+            "query_fields": sorted(query_failclosed_contract.REQUIRED_QUERY_FIELDS),
+            "decision_fields": sorted(query_failclosed_contract.REQUIRED_DECISION_FIELDS),
+            "decisions": sorted(query_failclosed_contract.REQUIRED_DECISIONS),
+            "provenance_fields": sorted(query_failclosed_contract.REQUIRED_PROVENANCE_FIELDS),
+            "recognized_authority_kinds": sorted(query_failclosed_contract.REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
+            "allow_capable_authority_kinds": sorted(query_failclosed_contract.REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS),
+            "fail_closed_cases": sorted(query_failclosed_contract.REQUIRED_FAIL_CLOSED_CASES),
+        }
+        for key, expected in expected_report_fields.items():
+            if payload.get(key) != expected:
+                add(
+                    blockers,
+                    f"query_failclosed_report_{key}_mismatch",
+                    f"{path}:{key}",
+                    expected=expected,
+                    value=payload.get(key),
+                )
     else:
         if payload.get("artifact_status") != "candidate_only":
             add(blockers, "query_failclosed_manifest_not_candidate_only", f"{path}:artifact_status")
