@@ -78,7 +78,7 @@ PLAYER_PRINCIPAL_LIFECYCLE_GATE_RE = re.compile(
     + r"PlayerPrincipalLifecycleObserver enabled binary_sha256=(?P<sha256>[a-fA-F0-9]{64}) "
     r"target_set=(?P<target_set>players-lifecycle-anchor-candidates) "
     r"limit=(?P<limit>\d+) dispatch_limit=(?P<dispatch_limit>\d+) "
-    r"delivery_claim=(?P<delivery_claim>\S+) principal_claim=(?P<principal_claim>\S+)\.?"
+    r"delivery_claim=(?P<delivery_claim>[^.\s]+) principal_claim=(?P<principal_claim>[^.\s]+)\.?"
 )
 PLAYER_PRINCIPAL_LIFECYCLE_EVENT_RE = re.compile(
     LOG_PREFIX
@@ -93,7 +93,7 @@ PLAYER_PRINCIPAL_LIFECYCLE_EVENT_RE = re.compile(
     r"principal_action=(?P<principal_action>candidate_created|candidate_invalidated|none) "
     r"principal_id_logged=(?P<principal_id_logged>true|false) "
     r"principal_generation_logged=(?P<principal_generation_logged>true|false) "
-    r"delivery_claim=(?P<delivery_claim>\S+)\.?"
+    r"delivery_claim=(?P<delivery_claim>[^.\s]+)\.?"
 )
 PROCESS_EVENT_RE = re.compile(
     LOG_PREFIX
@@ -208,6 +208,66 @@ def int_or_text(value: str) -> int | str:
 def add_unique(values: list[Any], value: Any) -> None:
     if value not in values:
         values.append(value)
+
+
+def csv_values(value: str) -> list[str]:
+    if value == "":
+        return []
+    return value.split(",")
+
+
+def player_principal_lifecycle_gate_is_safe(match: re.Match[str]) -> bool:
+    return (
+        match.group("target_set") == "players-lifecycle-anchor-candidates"
+        and match.group("dispatch_limit") == "0"
+        and match.group("delivery_claim") == "none"
+        and match.group("principal_claim") == "none"
+    )
+
+
+def player_principal_lifecycle_event_is_safe(match: re.Match[str]) -> bool:
+    target = match.group("target")
+    role = match.group("role")
+    post_original = match.group("post_original")
+    copied_bool_fields = csv_values(match.group("copied_bool_fields"))
+    copied_bool_values = csv_values(match.group("copied_bool_values"))
+    redacted_count = int(match.group("redacted_count"))
+    redacted_fields = csv_values(match.group("redacted_fields"))
+    principal_action = match.group("principal_action")
+
+    if (
+        post_original != "true"
+        or match.group("principal_id_logged") != "false"
+        or match.group("principal_generation_logged") != "false"
+        or match.group("delivery_claim") != "none"
+    ):
+        return False
+
+    if target == "ShooterGameMode.HandleNewPlayer":
+        if copied_bool_fields != ["bIsFromLogin", "ReturnValue"]:
+            return False
+        if len(copied_bool_values) != 2 or any(value not in {"0", "1"} for value in copied_bool_values):
+            return False
+        if redacted_count != 3 or redacted_fields != ["NewPlayer", "PlayerData", "PlayerCharacter"]:
+            return False
+        return_value = copied_bool_values[1]
+        if role == "session_start":
+            return principal_action == "candidate_created" and return_value == "1"
+        if role == "session_start_rejected":
+            return principal_action == "none" and return_value == "0"
+        return False
+
+    if target == "ShooterGameMode.OnLogout":
+        return (
+            role == "session_end"
+            and copied_bool_fields == []
+            and copied_bool_values == []
+            and redacted_count == 1
+            and redacted_fields == ["Exiting"]
+            and principal_action == "candidate_invalidated"
+        )
+
+    return False
 
 
 def module_record() -> dict[str, Any]:
@@ -413,6 +473,9 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             record = modules[module]
             add_source_index(record, source_index)
             record["source_merge_explicit"] = source_merge_explicit
+            if not player_principal_lifecycle_gate_is_safe(match):
+                record["malformed_observer_lines"] += 1
+                continue
             add_unique(record["gate_sha256"], match.group("sha256").lower())
             gate_function = "observer_gate"
             record["functions"].setdefault(gate_function, function_record())
@@ -427,6 +490,9 @@ def analyze_source_lines(sources: list[list[str]], *, source_merge_explicit: boo
             record = modules[module]
             record["source_merge_explicit"] = source_merge_explicit
             add_source_index(record, source_index)
+            if not player_principal_lifecycle_event_is_safe(match):
+                record["malformed_observer_lines"] += 1
+                continue
             record["accepted_count"] += 1
             functions = record["functions"]
             functions.setdefault(function, function_record())
