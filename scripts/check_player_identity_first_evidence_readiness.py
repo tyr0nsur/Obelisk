@@ -1448,6 +1448,16 @@ def next_actionable_blocker(
         "blocked_until": "reviewed_identity_public_contract",
         "why": "runtime evidence is accepted for the player-principal lane, but public identity still requires the reviewed public contract gate",
         "decision_manifest": "docs/player_identity_public_contract_decisions.json",
+        "required_public_contract_gates": [
+            "approved runtime evidence remains necessary but not sufficient",
+            "copied opaque principal POD ABI reviewed",
+            "named player identity capability reviewed",
+            "owner-token registration and unregister lifecycle reviewed",
+            "process-local non-persistent handle scope reviewed",
+            "ABI layout tests passing",
+            "installed SDK consumer tests passing",
+            "public docs preserve lookup, persistence, permissions/admin, commands, mutation, return override, and cross-process non-claims",
+        ],
     }
 
 

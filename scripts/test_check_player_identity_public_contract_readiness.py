@@ -78,6 +78,8 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["required_tests_before_public_header"]["covered_for_contract_review_only"], ["runtime.evidence_intake"])
         self.assertIn("abi.layout", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate")
+        self.assertNotEqual(report["next_blocker"], "public_readiness")
         self.assertEqual(report["blockers"], [])
 
     def test_accepts_candidate_only_pod_abi_shape(self) -> None:
@@ -142,6 +144,30 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
         self.assertIn("public_callback_abi_now_not_empty", report["blockers"])
+
+    def test_rejects_decision_gate_rerouted_to_public_readiness(self) -> None:
+        decisions = self.decisions()
+        gate = decisions["decision_gate"]
+        gate["id"] = "public_readiness"
+        gate["status"] = "ready"
+        gate["current_decision"] = "approved runtime evidence accepted; next blocker is public readiness"
+        gate["allowed_now"].append("public readiness")
+        gate["forbidden_now"].remove("player lookup API")
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
+        for blocker in (
+            "decision_gate_id_mismatch",
+            "decision_gate_status_mismatch",
+            "decision_gate_current_decision_mismatch",
+            "decision_gate_allowed_now_mismatch",
+            "decision_gate_forbidden_now_mismatch",
+        ):
+            with self.subTest(blocker=blocker):
+                self.assertIn(blocker, report["blockers"])
 
     def test_rejects_unmanifested_player_identity_tokens_in_public_header(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

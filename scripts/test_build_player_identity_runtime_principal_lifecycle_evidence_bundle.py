@@ -104,6 +104,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     "dispatch_limit=0",
                     "wrapper_profile=observer-debug",
                     "observer_exclusivity=player_principal_lifecycle_only",
+                    "sibling_marker_entries=absent",
+                    "sibling_observer_env=absent",
                     "debug_escape_markers=absent",
                     "callback_escape_markers=absent",
                     "native_exec_disabled=true",

@@ -120,6 +120,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-31-player-identity-static-target-orientation.json](2026-05-31-player-identity-static-target-orientation.json)
 - [2026-06-01-player-principal-offline-to-runtime-plan.md](2026-06-01-player-principal-offline-to-runtime-plan.md)
 - [2026-06-01-player-principal-runtime-capture-plan.md](2026-06-01-player-principal-runtime-capture-plan.md)
+- [2026-06-01-player-identity-runtime-capture-readiness-checklist.md](2026-06-01-player-identity-runtime-capture-readiness-checklist.md)
 - [2026-06-01-static-offline-sdk-v1-command-player-audit.md](2026-06-01-static-offline-sdk-v1-command-player-audit.md)
 - [2026-05-31-native-ufunction-registration-static-discovery-plan.md](2026-05-31-native-ufunction-registration-static-discovery-plan.md)
 - [2026-05-31-arktribute-playerdata-identity-boundary.md](2026-05-31-arktribute-playerdata-identity-boundary.md)

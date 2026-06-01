@@ -42,6 +42,8 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "rollback_delta": "removed_observer_env_and_markers_preserved_disable_plugins",
         "observer_env_survived": "false",
         "observer_marker_survived": "false",
+        "sibling_marker_entries": "absent",
+        "sibling_observer_env": "absent",
         "user_policy": "no_regular_users",
         "notice_sent": "not_applicable",
         "log_budget": "10",
@@ -379,6 +381,16 @@ class WindowManifestCheckerTests(unittest.TestCase):
             manifest_lines(
                 wrapper_profile="stable",
                 observer_exclusivity="chat_and_player_principal",
+                sibling_marker_entries=(
+                    "enable-chat-events,enable-reflection-scanner,"
+                    "enable-native-exec-probes,allow-ptrace,enable-debug-control,"
+                    "allow-plugin-callbacks,symlink:enable-structure-reflection,malformed-entry"
+                ),
+                sibling_observer_env=(
+                    "OBELISK_ENABLE_CHAT_EVENTS=1,OBELISK_ENABLE_REFLECTION_SCANNER=1,"
+                    "OBELISK_ENABLE_NATIVE_EXEC_PROBES=1,OBELISK_DEBUG_ALLOW_PTRACE=1,"
+                    "OBELISK_ENABLE_DEBUG_CONTROL=1,OBELISK_ALLOW_PLUGIN_CALLBACKS=1"
+                ),
                 debug_escape_markers="present",
                 callback_escape_markers="present",
                 native_exec_disabled="false",
@@ -392,11 +404,33 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("wrapper_profile_not_observer_debug", report["blockers"])
         self.assertIn("observer_exclusivity_not_player_principal_lifecycle_only", report["blockers"])
+        self.assertIn("sibling_marker_entries_not_absent", report["blockers"])
+        self.assertIn("sibling_observer_env_not_absent", report["blockers"])
         self.assertIn("debug_escape_markers_not_absent", report["blockers"])
         self.assertIn("callback_escape_markers_not_absent", report["blockers"])
         self.assertIn("native_exec_disabled_not_true", report["blockers"])
         self.assertIn("ptrace_disabled_not_true", report["blockers"])
         self.assertIn("single_module_summary_not_player_principal_lifecycle", report["blockers"])
+
+    def test_rejects_missing_explicit_no_sibling_marker_and_env_assertions(self) -> None:
+        result = self.run_checker(
+            manifest_lines(sibling_marker_entries=None, sibling_observer_env=None),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required_field_missing", report["blockers"])
+        missing_labels = {
+            detail["label"]
+            for detail in report["blocker_details"]
+            if detail["reason"] == "required_field_missing"
+        }
+        self.assertIn("sibling_marker_entries", missing_labels)
+        self.assertIn("sibling_observer_env", missing_labels)
+        self.assertIn("sibling_marker_entries_not_absent", report["blockers"])
+        self.assertIn("sibling_observer_env_not_absent", report["blockers"])
+        self.assertFalse(report["ready"])
 
     def test_rejects_capture_outside_approved_window_and_bad_rollback_order(self) -> None:
         result = self.run_checker(

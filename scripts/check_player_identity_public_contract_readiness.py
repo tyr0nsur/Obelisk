@@ -23,6 +23,30 @@ REPORT_SCHEMA = "obelisk.player-identity-public-contract-readiness-check.v1"
 SURFACE = "obelisk.player_identity.v1"
 REQUIRED_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
 REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
+NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
+REQUIRED_DECISION_GATE_CURRENT_DECISION = (
+    "no public header, no public capability bit, no plugin callback, no lookup, "
+    "no downstream permission or command dependency may consume identity yet"
+)
+REQUIRED_DECISION_GATE_SCOPE = (
+    "v1 copied opaque player principal blocker; excludes lookup and downstream "
+    "permission/command/storage surfaces until separately promoted."
+)
+REQUIRED_DECISION_GATE_ALLOWED_NOW = {
+    "document blockers",
+    "document candidate POD shape",
+    "document non-claims",
+    "document tests required before promotion",
+}
+REQUIRED_DECISION_GATE_FORBIDDEN_NOW = {
+    "C++ ABI edits",
+    "public header symbols",
+    "runtime plugin callback exposure",
+    "player lookup API",
+    "permission/admin API",
+    "command/chat response API",
+    "storage or persistence API",
+}
 REQUIRED_FORBIDDEN = {
     "UE pointers",
     "raw params",
@@ -813,6 +837,40 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         add(blockers, "decision_status_not_blocked", "$.status")
     if decisions.get("planning_stage") != "identity_public_contract_gate":
         add(blockers, "decision_planning_stage_mismatch", "$.planning_stage")
+    decision_gate = decisions.get("decision_gate")
+    if not isinstance(decision_gate, dict):
+        add(blockers, "decision_gate_missing", "$.decision_gate")
+    else:
+        if decision_gate.get("id") != NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE:
+            add(blockers, "decision_gate_id_mismatch", "$.decision_gate.id")
+        if decision_gate.get("status") != "blocked/planning":
+            add(blockers, "decision_gate_status_mismatch", "$.decision_gate.status")
+        if decision_gate.get("current_decision") != REQUIRED_DECISION_GATE_CURRENT_DECISION:
+            add(blockers, "decision_gate_current_decision_mismatch", "$.decision_gate.current_decision")
+        if decision_gate.get("scope") != REQUIRED_DECISION_GATE_SCOPE:
+            add(blockers, "decision_gate_scope_mismatch", "$.decision_gate.scope")
+        allowed_now = string_list(decision_gate.get("allowed_now"))
+        if allowed_now is None:
+            add(blockers, "decision_gate_allowed_now_not_string_list", "$.decision_gate.allowed_now")
+        elif set(allowed_now) != REQUIRED_DECISION_GATE_ALLOWED_NOW:
+            add(
+                blockers,
+                "decision_gate_allowed_now_mismatch",
+                "$.decision_gate.allowed_now",
+                expected=sorted(REQUIRED_DECISION_GATE_ALLOWED_NOW),
+                observed=sorted(allowed_now),
+            )
+        forbidden_now = string_list(decision_gate.get("forbidden_now"))
+        if forbidden_now is None:
+            add(blockers, "decision_gate_forbidden_now_not_string_list", "$.decision_gate.forbidden_now")
+        elif set(forbidden_now) != REQUIRED_DECISION_GATE_FORBIDDEN_NOW:
+            add(
+                blockers,
+                "decision_gate_forbidden_now_mismatch",
+                "$.decision_gate.forbidden_now",
+                expected=sorted(REQUIRED_DECISION_GATE_FORBIDDEN_NOW),
+                observed=sorted(forbidden_now),
+            )
     if decisions.get("public_header_allowed") is not False:
         add(blockers, "public_header_allowed_not_false", "$.public_header_allowed")
     if decisions.get("public_header") != "include/obelisk/ObeliskApi.h":
@@ -993,6 +1051,11 @@ def build_report(
             for blocker in decisions.get("promotion_blockers", [])
             if isinstance(blocker, dict)
         ],
+        "next_blocker": (
+            NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE
+            if accepted_for_contract_review
+            else "player_identity_public_contract_gate_not_accepted"
+        ),
         "required_tests_before_public_header": {
             "covered_for_contract_review_only": sorted(CONTRACT_REVIEW_INPUT_ONLY_TESTS),
             "remaining_missing": [

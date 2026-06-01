@@ -122,6 +122,9 @@ REQUIRED_DEPENDENCY_BEHAVIOR = frozenset(
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
+        "promoted player identity must define copied principal semantics for principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle before permissions/admin can count as promoted",
+        "promoted player identity must include owner-token cleanup on init failure, plugin unload, and owner-scoped unregister before permissions/admin can count as promoted",
+        "permissions/admin cannot infer copied principal semantics from surface status text, runtime evidence text, command text, operator config, or plugin input",
         "runtime observation must establish principal identity before permissions/admin can consume it",
         "operator config enables surfaces or policy inputs only and cannot establish principal identity",
         "command text cannot establish principal identity",
@@ -203,6 +206,14 @@ REQUIRED_IDENTITY_PUBLIC_FIELDS = frozenset(
         "principal_handle",
         "principal_generation",
         "principal_scope_flags",
+    )
+)
+REQUIRED_IDENTITY_LIFECYCLE_CONTRACT = frozenset(
+    (
+        "plugin-owner cleanup",
+        "owner-token cleanup on init failure",
+        "owner-token cleanup on plugin unload",
+        "owner-scoped unregister cleanup",
     )
 )
 IDENTITY_PROMOTED_DECISION_VALUES = frozenset(
@@ -585,7 +596,7 @@ def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bo
         return False
     if not REQUIRED_IDENTITY_PUBLIC_ABI_CONTRACT.issubset(abi_contract):
         return False
-    if "plugin-owner cleanup" not in lifecycle_contract and "plugin_owner_cleanup" not in lifecycle_contract:
+    if not REQUIRED_IDENTITY_LIFECYCLE_CONTRACT.issubset(lifecycle_contract):
         return False
     if not REQUIRED_IDENTITY_PUBLIC_FIELDS.issubset(public_fields):
         return False

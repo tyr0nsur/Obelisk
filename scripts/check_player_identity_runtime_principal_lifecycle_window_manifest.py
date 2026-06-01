@@ -87,6 +87,8 @@ REQUIRED_SIMPLE_FIELDS = (
     "rollback_delta",
     "observer_env_survived",
     "observer_marker_survived",
+    "sibling_marker_entries",
+    "sibling_observer_env",
     "log_budget",
     "plugins_disabled",
     "scanner_disabled",
@@ -400,7 +402,12 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
             "observer_exclusivity",
             expected="player_principal_lifecycle_only",
         )
-    for key in ("debug_escape_markers", "callback_escape_markers"):
+    for key in (
+        "sibling_marker_entries",
+        "sibling_observer_env",
+        "debug_escape_markers",
+        "callback_escape_markers",
+    ):
         if fields.get(key) != "absent":
             add(blockers, f"{key}_not_absent", key, expected="absent")
     for key in ("native_exec_disabled", "ptrace_disabled"):
@@ -451,6 +458,8 @@ def build_template_fields() -> dict[str, str]:
         "rollback_delta": "removed_observer_env_and_markers_preserved_disable_plugins",
         "observer_env_survived": "false",
         "observer_marker_survived": "false",
+        "sibling_marker_entries": "absent",
+        "sibling_observer_env": "absent",
         "user_policy": "no_regular_users",
         "notice_sent": "not_applicable",
         "log_budget": "10",
@@ -563,6 +572,8 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "dispatch_limit": fields.get("dispatch_limit"),
             "wrapper_profile": fields.get("wrapper_profile"),
             "observer_exclusivity": fields.get("observer_exclusivity"),
+            "sibling_marker_entries": fields.get("sibling_marker_entries"),
+            "sibling_observer_env": fields.get("sibling_observer_env"),
             "debug_escape_markers": fields.get("debug_escape_markers"),
             "callback_escape_markers": fields.get("callback_escape_markers"),
             "native_exec_disabled": parse_bool(fields.get("native_exec_disabled")),

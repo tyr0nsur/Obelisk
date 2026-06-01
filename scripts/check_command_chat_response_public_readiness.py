@@ -541,6 +541,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
         "operator config enables surfaces only and cannot establish principal identity",
         "response delivery never creates identity or permission claims",
         "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish principal identity",
+        "generic chat routing cannot establish principal identity",
         "commands/replies planning cannot bypass identity promotion",
     ):
         if required not in behaviors:
@@ -551,6 +552,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     for required in (
         "permissions/admin must be promoted before any reply, send-chat, broadcast, or moderation delivery is public",
         "minimal ChatMessageEvent, raw ProcessEvent, legacy CallProcessEvent, and static thunk orientation cannot establish permissions or admin authority",
+        "generic chat routing cannot establish permissions or admin authority",
         "commands/replies planning cannot bypass permissions/admin promotion",
     ):
         if required not in permission_behaviors:

@@ -55,6 +55,7 @@
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
         "promoted player identity must define copied principal semantics for principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle before permissions/admin can count as promoted",
+        "promoted player identity must include owner-token cleanup on init failure, plugin unload, and owner-scoped unregister before permissions/admin can count as promoted",
         "permissions/admin cannot infer copied principal semantics from surface status text, runtime evidence text, command text, operator config, or plugin input",
         "runtime observation must establish principal identity before permissions/admin can consume it",
         "operator config enables surfaces or policy inputs only and cannot establish principal identity",

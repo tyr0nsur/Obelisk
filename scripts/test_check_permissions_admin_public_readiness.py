@@ -280,7 +280,7 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
 
-    def test_accepts_promoted_player_identity_only_with_public_contract_promotion(self) -> None:
+    def test_rejects_promoted_player_identity_without_owner_token_cleanup_lifecycle(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
@@ -310,6 +310,62 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
                         "no_ue_internals_in_public_abi",
                     ]
                     surface["lifecycle_contract"] = ["plugin-owner cleanup"]
+                    surface["evidence"]["accepted_runtime_evidence"] = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                        "result": "approved runtime principal lifecycle evidence",
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                    surface["evidence"]["sdk_consumer_tests"] = ["tests/sdk_consumer/player_identity_plugin.cpp"]
+                    surface["v1_decision_contract"]["current_decision"] = "promoted_public_contract"
+                    surface["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"] = False
+                    surface["blockers"] = [
+                        blocker
+                        for blocker in surface["blockers"]
+                        if blocker != "No approved runtime principal lifecycle evidence."
+                    ]
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
+
+    def test_accepts_promoted_player_identity_only_with_public_contract_promotion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["support_tier"] = "release-supported copied principal"
+                    surface["capabilities"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+                    surface["public_contract"] = [
+                        "ObeliskPlayerPrincipalEvent",
+                        "RegisterPlayerPrincipalEventWithOwnerTokenHandle",
+                        "UnregisterPlayerPrincipalEventWithOwnerToken",
+                    ]
+                    surface["public_fields"] = [
+                        "abi_version",
+                        "struct_size",
+                        "principal_handle",
+                        "principal_generation",
+                        "principal_scope_flags",
+                    ]
+                    surface["abi_contract"] = [
+                        "capability_gated",
+                        "append_only_abi",
+                        "owner_token_handle_registration",
+                        "owner_scoped_unregister",
+                        "plugin_owner_cleanup",
+                        "no_ue_internals_in_public_abi",
+                    ]
+                    surface["lifecycle_contract"] = [
+                        "plugin-owner cleanup",
+                        "owner-token cleanup on init failure",
+                        "owner-token cleanup on plugin unload",
+                        "owner-scoped unregister cleanup",
+                    ]
                     surface["evidence"]["accepted_runtime_evidence"] = {
                         "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
                         "result": "approved runtime principal lifecycle evidence",
@@ -481,6 +537,26 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             )
             dependency["required_behavior"].remove(
                 "runtime principal evidence alone is not public identity promotion"
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("dependency_player_identity_public_contract_requirements_missing", report["blockers"])
+
+    def test_rejects_missing_owner_token_cleanup_dependency_requirements(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            dependency = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "dependency.promoted_player_identity"
+            )
+            dependency["required_behavior"].remove(
+                "promoted player identity must include owner-token cleanup on init failure, plugin unload, and owner-scoped unregister before permissions/admin can count as promoted"
             )
             decisions_path = write_json(root, "decisions.json", decisions)
 

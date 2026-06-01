@@ -21,7 +21,7 @@ from typing import Any
 import protected_paths
 import analyze_runtime_observer_log as runtime_observer_analyzer
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
-from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
+from snapshot_evidence_pack import first_symlink_component, reject_protected_input_path, reject_symlink_component
 
 
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
@@ -98,6 +98,8 @@ ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
         "dispatch_limit",
         "wrapper_profile",
         "observer_exclusivity",
+        "sibling_marker_entries",
+        "sibling_observer_env",
         "debug_escape_markers",
         "callback_escape_markers",
         "native_exec_disabled",
@@ -412,6 +414,12 @@ def source_path_is_approved_offline_workspace(path_text: Any) -> bool:
     return not status.protected and status.approved_offline_workspace
 
 
+def symlink_component_for_path_text(path_text: Any) -> Path | None:
+    if not isinstance(path_text, str) or not path_text:
+        return None
+    return first_symlink_component(Path(path_text).expanduser())
+
+
 def validate_copied_source_file(source: dict[str, Any], label: str, blockers: list[dict[str, Any]]) -> None:
     path_text = source.get("path")
     expected_sha256 = source.get("sha256")
@@ -685,6 +693,14 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
                         label,
                         unexpected=sorted(unexpected_source_keys),
                     )
+                symlink_component = symlink_component_for_path_text(source.get("path"))
+                if symlink_component is not None:
+                    add(
+                        blockers,
+                        "source_summary_source_path_symlink_component",
+                        f"{label}.path",
+                        symlink=str(symlink_component),
+                    )
                 if not source_path_is_copied_or_offline(source.get("path")):
                     add(blockers, "source_summary_source_path_not_copied_or_offline", f"{label}.path")
                 elif not source_path_is_approved_offline_workspace(source.get("path")):
@@ -813,6 +829,14 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             f"{label}.copied_log.path_status",
             expected=EXPECTED_COPIED_LOG_PATH_STATUS,
         )
+    copied_symlink_component = symlink_component_for_path_text(copied.get("path"))
+    if copied_symlink_component is not None:
+        add(
+            blockers,
+            "operational_window_copied_log_path_symlink_component",
+            f"{label}.copied_log.path",
+            symlink=str(copied_symlink_component),
+        )
     if not source_path_is_copied_or_offline(copied.get("path")):
         add(blockers, "operational_window_copied_log_path_not_copied_or_offline", f"{label}.copied_log.path")
     elif not source_path_is_approved_offline_workspace(copied.get("path")):
@@ -868,6 +892,8 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             "dispatch_limit": "0",
             "wrapper_profile": "observer-debug",
             "observer_exclusivity": "player_principal_lifecycle_only",
+            "sibling_marker_entries": "absent",
+            "sibling_observer_env": "absent",
             "debug_escape_markers": "absent",
             "callback_escape_markers": "absent",
             "native_exec_disabled": True,

@@ -1194,6 +1194,19 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             payload["next_actionable_blocker"]["decision_manifest"],
             "docs/player_identity_public_contract_decisions.json",
         )
+        self.assertEqual(
+            payload["next_actionable_blocker"]["required_public_contract_gates"],
+            [
+                "approved runtime evidence remains necessary but not sufficient",
+                "copied opaque principal POD ABI reviewed",
+                "named player identity capability reviewed",
+                "owner-token registration and unregister lifecycle reviewed",
+                "process-local non-persistent handle scope reviewed",
+                "ABI layout tests passing",
+                "installed SDK consumer tests passing",
+                "public docs preserve lookup, persistence, permissions/admin, commands, mutation, return override, and cross-process non-claims",
+            ],
+        )
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])

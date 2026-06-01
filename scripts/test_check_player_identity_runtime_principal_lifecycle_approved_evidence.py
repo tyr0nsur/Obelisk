@@ -149,6 +149,8 @@ def manifest() -> dict:
                 "dispatch_limit": "0",
                 "wrapper_profile": "observer-debug",
                 "observer_exclusivity": "player_principal_lifecycle_only",
+                "sibling_marker_entries": "absent",
+                "sibling_observer_env": "absent",
                 "debug_escape_markers": "absent",
                 "callback_escape_markers": "absent",
                 "native_exec_disabled": True,
@@ -264,6 +266,8 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
                 "dispatch_limit": "0",
                 "wrapper_profile": "observer-debug",
                 "observer_exclusivity": "player_principal_lifecycle_only",
+                "sibling_marker_entries": "absent",
+                "sibling_observer_env": "absent",
                 "debug_escape_markers": "absent",
                 "callback_escape_markers": "absent",
                 "native_exec_disabled": True,
@@ -388,6 +392,33 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
         self.assertIn(
             "source_summary_source_sha256_mismatch",
+            {blocker["reason"] for blocker in rejected.blockers},
+        )
+
+    def test_rejects_symlinked_operational_copied_log_run_id_alias(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_symlink")
+        old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        actual_run_id = "20260601T121500Z-player-principal-lifecycle"
+        with tempfile.TemporaryDirectory() as tmp:
+            offline_root = Path(tmp)
+            actual_log = offline_root / "live-validation-logs" / actual_run_id / "Obelisk.log"
+            claimed_log = offline_root / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            actual_log.parent.mkdir(parents=True, exist_ok=True)
+            claimed_log.parent.mkdir(parents=True, exist_ok=True)
+            actual_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            claimed_log.symlink_to(actual_log)
+            checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (offline_root,)
+            try:
+                payload = manifest_for_copied_log(actual_log)
+                payload["operational_window"]["copied_log"]["path"] = str(claimed_log)
+                payload.pop("output_artifact_identity")
+                add_output_artifact_identity(payload)
+                rejected = checker.validate_manifest(payload, check_mode="consume")
+            finally:
+                checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+
+        self.assertIn(
+            "operational_window_copied_log_path_symlink_component",
             {blocker["reason"] for blocker in rejected.blockers},
         )
 
