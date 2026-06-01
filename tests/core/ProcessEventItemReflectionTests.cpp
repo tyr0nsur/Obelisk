@@ -25,6 +25,17 @@ namespace
     constexpr int32_t kDestinationItemNameIndex = 19285;
     constexpr int32_t kAdditionalDataNameIndex = 19290;
     constexpr int32_t kBConsumeResourcesNameIndex = 19293;
+    constexpr int32_t kIntPropertyClassNameIndex = 2;
+    constexpr int32_t kBoolPropertyClassNameIndex = 3;
+    constexpr int32_t kObjectPropertyClassNameIndex = 5;
+    constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+    constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+    constexpr int32_t kIntPropertyClassObjectIndex = 539;
+    constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+    constexpr uint64_t kToInventoryPropertyFlags = 0x1044080280;
+    constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+    constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
 
     static_assert(std::is_standard_layout_v<ItemBoolObservation>,
                   "copied item bool observations must keep a simple C-compatible layout");
@@ -63,6 +74,48 @@ namespace
         return EvaluateGate("1", true, true, true, kSupportedShooterGameServerSha256.data());
     }
 
+    void ExpectedPropertyMetadata(Obelisk::UE::ItemReflection::ItemField field,
+                                  int32_t propertyNameIndex,
+                                  int32_t& classNameIndex,
+                                  int32_t& classObjectIndex,
+                                  uint64_t& propertyFlags)
+    {
+        using Obelisk::UE::ItemReflection::ItemField;
+        switch (field)
+        {
+        case ItemField::ReturnValue:
+            classNameIndex = kBoolPropertyClassNameIndex;
+            classObjectIndex = kBoolPropertyClassObjectIndex;
+            propertyFlags = kBoolReturnPropertyFlags;
+            return;
+        case ItemField::BIgnoreInventoryRequirement:
+        case ItemField::BConsumeResources:
+            classNameIndex = kBoolPropertyClassNameIndex;
+            classObjectIndex = kBoolPropertyClassObjectIndex;
+            propertyFlags = kBoolInputPropertyFlags;
+            return;
+        case ItemField::ToInventory:
+            classNameIndex = kObjectPropertyClassNameIndex;
+            classObjectIndex = kObjectPropertyClassObjectIndex;
+            propertyFlags = kToInventoryPropertyFlags;
+            return;
+        case ItemField::DestinationItem:
+            classNameIndex = kObjectPropertyClassNameIndex;
+            classObjectIndex = kObjectPropertyClassObjectIndex;
+            propertyFlags = kObjectInputPropertyFlags;
+            return;
+        case ItemField::AdditionalData:
+            classNameIndex = kIntPropertyClassNameIndex;
+            classObjectIndex = kIntPropertyClassObjectIndex;
+            propertyFlags = kIntInputPropertyFlags;
+            return;
+        }
+        (void)propertyNameIndex;
+        classNameIndex = -1;
+        classObjectIndex = -1;
+        propertyFlags = 0;
+    }
+
     Obelisk::UE::ItemReflection::ItemFieldRange MakeField(Obelisk::UE::ItemReflection::ItemField field,
                                                           int32_t propertyNameIndex,
                                                           int32_t offset,
@@ -74,6 +127,11 @@ namespace
         Obelisk::UE::ItemReflection::ItemFieldRange value;
         value.Field = field;
         value.PropertyNameIndex = propertyNameIndex;
+        ExpectedPropertyMetadata(field,
+                                 propertyNameIndex,
+                                 value.PropertyClassNameIndex,
+                                 value.PropertyClassObjectIndex,
+                                 value.PropertyFlags);
         value.Offset = offset;
         value.Size = size;
         value.ExposesRange = exposesRange;
@@ -1110,6 +1168,26 @@ namespace
                 "CanRepair partial ReturnValue-only shape bypassed exact metadata validation");
     }
 
+    void TestRejectsForgedItemPropertyMetadata()
+    {
+        uint8_t ignoredRequirement = 0;
+        uint8_t returnValue = 1;
+        Obelisk::UE::ItemReflection::ItemInvocation wrongClass =
+            MakeValidCanRepairInvocation(ignoredRequirement, returnValue);
+        wrongClass.Fields[0].PropertyClassNameIndex = kObjectPropertyClassNameIndex;
+        RequireRejected(wrongClass, "forged item property class built copied item observation");
+
+        Obelisk::UE::ItemReflection::ItemInvocation wrongClassObject =
+            MakeValidCanRepairInvocation(ignoredRequirement, returnValue);
+        wrongClassObject.Fields[0].PropertyClassObjectIndex = kObjectPropertyClassObjectIndex;
+        RequireRejected(wrongClassObject, "forged item property class object built copied item observation");
+
+        Obelisk::UE::ItemReflection::ItemInvocation wrongFlags =
+            MakeValidCanRepairInvocation(ignoredRequirement, returnValue);
+        wrongFlags.Fields[0].PropertyFlags ^= 0x400;
+        RequireRejected(wrongFlags, "forged item property flags built copied item observation");
+    }
+
     void TestRejectsMissingOrForbiddenRanges()
     {
         uint64_t inventory = 0x1111111122222222ULL;
@@ -1296,6 +1374,7 @@ int main()
     TestRejectsMalformedReturnOnlyShapes();
     TestRejectsNonCanonicalBoolBytes();
     TestRejectsPartialCanRepairShape();
+    TestRejectsForgedItemPropertyMetadata();
     TestRejectsMissingOrForbiddenRanges();
     TestObserveReservesBudgetBeforeRead();
     TestObserveReaderExceptionFailsClosedAfterBudgetReservation();

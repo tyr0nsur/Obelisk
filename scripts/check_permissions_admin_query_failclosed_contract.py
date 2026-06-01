@@ -174,6 +174,15 @@ REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY = {
     "command_text_permission_claim_allowed": False,
     "operator_config_permission_claim_allowed": False,
 }
+REQUIRED_QUERY_TEXT_POLICY = {
+    "action_required": True,
+    "action_max_bytes": 128,
+    "resource_scope_required": False,
+    "resource_scope_max_bytes": 256,
+    "bytes_are_copied": True,
+    "utf8_decoding_required_before_allow": False,
+    "command_parser_claim_allowed": False,
+}
 
 FORBIDDEN_COORDINATE_KEYS = frozenset(
     (
@@ -369,6 +378,7 @@ def build_template_manifest() -> dict[str, Any]:
             "unknown_authority_fails_closed": True,
         },
         "principal_runtime_identity_policy": dict(REQUIRED_PRINCIPAL_RUNTIME_IDENTITY_POLICY),
+        "query_text_policy": dict(REQUIRED_QUERY_TEXT_POLICY),
         "fail_closed_cases": [
             {
                 "case": case,
@@ -729,6 +739,22 @@ def validate_principal_runtime_identity_policy(policy: Any, blockers: list[dict[
             )
 
 
+def validate_query_text_policy(policy: Any, blockers: list[dict[str, Any]]) -> None:
+    label = "$.query_text_policy"
+    if not isinstance(policy, dict):
+        add(blockers, "query_text_policy_missing", label)
+        return
+    for key, expected in REQUIRED_QUERY_TEXT_POLICY.items():
+        if policy.get(key) != expected:
+            add(
+                blockers,
+                f"query_text_policy_{key}_invalid",
+                f"{label}.{key}",
+                expected=expected,
+                value=policy.get(key),
+            )
+
+
 def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:
     if not isinstance(cases, list):
         add(blockers, "fail_closed_cases_not_list", "$.fail_closed_cases")
@@ -811,6 +837,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         payload.get("authority_policy"), blockers
     )
     validate_principal_runtime_identity_policy(payload.get("principal_runtime_identity_policy"), blockers)
+    validate_query_text_policy(payload.get("query_text_policy"), blockers)
     fail_closed_cases = validate_fail_closed_cases(payload.get("fail_closed_cases"), blockers)
     validate_negative_exclusions(payload.get("negative_surface_exclusions"), blockers)
     validate_promotion_gate(payload.get("promotion_gate"), blockers)

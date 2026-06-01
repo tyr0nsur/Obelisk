@@ -29,6 +29,9 @@ namespace Obelisk::UE::ItemReflection
     {
         ItemField Field = ItemField::ReturnValue;
         int32_t PropertyNameIndex = -1;
+        int32_t PropertyClassNameIndex = -1;
+        int32_t PropertyClassObjectIndex = -1;
+        uint64_t PropertyFlags = 0;
         int32_t Offset = -1;
         size_t Size = 0;
         bool ExposesRange = false;

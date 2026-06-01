@@ -72,6 +72,45 @@ namespace
             throw std::runtime_error(message);
     }
 
+    void ExpectedPropertyMetadata(ItemReflection::ItemField field,
+                                  int32_t& classNameIndex,
+                                  int32_t& classObjectIndex,
+                                  uint64_t& propertyFlags)
+    {
+        switch (field)
+        {
+        case ItemReflection::ItemField::ReturnValue:
+            classNameIndex = kBoolPropertyClassNameIndex;
+            classObjectIndex = kBoolPropertyClassObjectIndex;
+            propertyFlags = kBoolReturnPropertyFlags;
+            return;
+        case ItemReflection::ItemField::BIgnoreInventoryRequirement:
+        case ItemReflection::ItemField::BConsumeResources:
+            classNameIndex = kBoolPropertyClassNameIndex;
+            classObjectIndex = kBoolPropertyClassObjectIndex;
+            propertyFlags = kBoolInputPropertyFlags;
+            return;
+        case ItemReflection::ItemField::ToInventory:
+            classNameIndex = kObjectPropertyClassNameIndex;
+            classObjectIndex = kObjectPropertyClassObjectIndex;
+            propertyFlags = kToInventoryPropertyFlags;
+            return;
+        case ItemReflection::ItemField::DestinationItem:
+            classNameIndex = kObjectPropertyClassNameIndex;
+            classObjectIndex = kObjectPropertyClassObjectIndex;
+            propertyFlags = kObjectInputPropertyFlags;
+            return;
+        case ItemReflection::ItemField::AdditionalData:
+            classNameIndex = kIntPropertyClassNameIndex;
+            classObjectIndex = kIntPropertyClassObjectIndex;
+            propertyFlags = kIntInputPropertyFlags;
+            return;
+        }
+        classNameIndex = -1;
+        classObjectIndex = -1;
+        propertyFlags = 0;
+    }
+
     template <typename T, size_t N>
     void WriteAt(std::array<uint8_t, N>& buffer, size_t offset, const T& value)
     {
@@ -299,8 +338,18 @@ namespace
                               size_t expectedSize,
                               bool expectedExposesRange)
     {
+        int32_t expectedClassNameIndex = -1;
+        int32_t expectedClassObjectIndex = -1;
+        uint64_t expectedPropertyFlags = 0;
+        ExpectedPropertyMetadata(expectedField,
+                                 expectedClassNameIndex,
+                                 expectedClassObjectIndex,
+                                 expectedPropertyFlags);
         Require(field.Field == expectedField, "item field kind mismatch");
         Require(field.PropertyNameIndex == expectedNameIndex, "item field FName mismatch");
+        Require(field.PropertyClassNameIndex == expectedClassNameIndex, "item field property class FName mismatch");
+        Require(field.PropertyClassObjectIndex == expectedClassObjectIndex, "item field property class object mismatch");
+        Require(field.PropertyFlags == expectedPropertyFlags, "item field property flags mismatch");
         Require(field.Offset == expectedOffset, "item field offset mismatch");
         Require(field.Size == expectedSize, "item field size mismatch");
         Require(field.ExposesRange == expectedExposesRange, "item field exposure mismatch");

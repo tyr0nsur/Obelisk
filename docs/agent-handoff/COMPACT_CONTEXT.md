@@ -97,6 +97,12 @@ priorities, and do not use history files as the active source of truth.
   The candidate `obelisk.permissions-admin-query-failclosed-contract.v1` is now supported
   by the offline artifact gate in consume mode only; it is not public ABI, runtime
   readiness, public SDK readiness, or v1 completion evidence.
+  `scripts/check_permissions_admin_public_readiness.py` is the reusable planning-only
+  public-readiness guard for this surface and must keep public header/ABI/SDK/runtime
+  readiness false until promoted identity and a reviewed ABI exist. The internal
+  `AuthzDecisionModel` models copied query text bounds (`action` required <=128 bytes,
+  optional `resource_scope` <=256 bytes) without promoting a public parser, cache, or
+  permissions/admin ABI.
   Permissions authority is split between recognized and allow-capable kinds:
   `operator-config` is recognized but not allow-capable; only runtime-local/runtime-owned
   provenance may allow. Nested readiness/promotion overclaims in the candidate contract
@@ -186,6 +192,11 @@ priorities, and do not use history files as the active source of truth.
   depth/deferred-destroy state, not the subscriber mirror. Copied inventory payloads
   rebind scalar spans on copy/move so dispatch-time values own their storage, and failed
   budget reservation clears stale payloads.
+  Item copied-signal dispatch now preserves and revalidates property class FName index,
+  property class object index, and property flags in `ItemFieldRange`; forged item
+  observations with correct name/offset/size but wrong class metadata fail closed. This is
+  still internal copied-signal hardening, not a public Inventory/Items SDK, identity,
+  mutation, return override, runtime readiness, or v1 completion signal.
 - Structure copied-policy dispatch now follows the same safety pattern: dispatch budget
   requires live subscribers, matched attempts reserve with one self-contained copied event,
   copied scalar spans rebind on copy/move, exposed scalar range sizes are validated, and

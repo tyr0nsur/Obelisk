@@ -29,23 +29,29 @@ DEFAULT_REQUIRED_COVERAGE = (
     "BoolProperty",
     "ByteProperty",
     "ClassProperty",
+    "FloatProperty",
     "IntProperty",
+    "NameProperty",
     "ObjectProperty",
     "StrProperty",
     "StructProperty",
+    "UInt32Property",
     "UInt64Property",
 )
 
 SCALAR_METADATA_CLASSES = {
     "BoolProperty": "bool_metadata",
     "ByteProperty": "byte_or_enum_metadata",
+    "FloatProperty": "float_metadata",
     "IntProperty": "int32_metadata",
+    "UInt32Property": "uint32_metadata",
     "UInt64Property": "uint64_metadata",
 }
 
 REDACTED_CLASSES = {
     "ArrayProperty": "container_redacted",
     "ClassProperty": "class_ref_redacted",
+    "NameProperty": "fname_redacted",
     "ObjectProperty": "uobject_ref_redacted",
     "StrProperty": "fstring_redacted",
     "StructProperty": "struct_redacted",
@@ -54,8 +60,10 @@ REDACTED_CLASSES = {
 IDENTITY_KEYS = (
     "class_name_index",
     "class_object_index",
+    "comparison_index",
     "enum",
     "enum_name",
+    "fname",
     "inner_class_name",
     "name_index",
     "object_index",
@@ -80,6 +88,8 @@ SENSITIVE_SCALAR_NAMES = {
     "steamid",
     "targetingteam",
     "tribeid",
+    "dinoid1",
+    "dinoid2",
 }
 
 NON_CLAIMS = (
@@ -279,8 +289,20 @@ def classify_property(
         "payload_decode_claim": False,
         "planning_only": True,
     }
+    if policy == "blocked_unknown":
+        blockers.append(
+            {
+                "reason": "property_redaction_policy_unknown",
+                "target": target,
+                "property": name,
+                "class": class_name,
+                "detail": policy_reason,
+            }
+        )
     if class_name == "StrProperty":
         field["fstring_policy"] = "redacted"
+    if class_name == "NameProperty":
+        field["fname_policy"] = "redacted"
     if class_name == "ByteProperty":
         field["enum_metadata_policy"] = "metadata_only_identity_redacted"
     check_bounds(
@@ -298,21 +320,38 @@ def classify_property(
         inner = nested.get("inner_property") if isinstance(nested, dict) else None
         if isinstance(inner, dict):
             inner_class = inner.get("class_name")
+            inner_class_name = inner_class if isinstance(inner_class, str) else "<unknown-class>"
+            inner_policy, inner_policy_reason = classify_policy(inner)
+            if inner_policy == "blocked_unknown":
+                blockers.append(
+                    {
+                        "reason": "array_inner_redaction_policy_unknown",
+                        "target": target,
+                        "property": name,
+                        "class": inner_class_name,
+                        "detail": inner_policy_reason,
+                    }
+                )
             fields.append(
                 {
                     "artifact": artifact_id,
                     "target": target,
                     "name": f"{name}.Inner",
-                    "class": inner_class if isinstance(inner_class, str) else "<unknown-class>",
+                    "class": inner_class_name,
                     "coverage_key": "ArrayProperty.Inner",
+                    "class_coverage_key": inner_class_name,
                     "status": inner.get("status", prop.get("status")),
-                    "policy": "array_inner_metadata_redacted",
-                    "policy_reason": "ArrayProperty inner identity is metadata-only and redacted",
+                    "policy": f"array_inner_{inner_policy}",
+                    "policy_reason": f"ArrayProperty inner: {inner_policy_reason}",
                     "identity_redaction": identity_redaction_notes(inner),
                     "payload_decode_claim": False,
                     "planning_only": True,
                 }
             )
+            if inner_class_name == "NameProperty":
+                fields[-1]["fname_policy"] = "redacted"
+            if inner_class_name == "ByteProperty":
+                fields[-1]["enum_metadata_policy"] = "metadata_only_identity_redacted"
         else:
             blockers.append(
                 {
@@ -400,7 +439,12 @@ def build_report(paths: list[Path], required_classes: list[str]) -> dict[str, An
                         )
                     )
 
-    coverage_counts = Counter(field["coverage_key"] for field in fields)
+    coverage_counts: Counter[str] = Counter()
+    for field in fields:
+        coverage_counts[field["coverage_key"]] += 1
+        class_coverage_key = field.get("class_coverage_key")
+        if isinstance(class_coverage_key, str) and class_coverage_key:
+            coverage_counts[class_coverage_key] += 1
     policy_counts = Counter(field["policy"] for field in fields)
     missing = [class_name for class_name in required_classes if coverage_counts.get(class_name, 0) == 0]
     for class_name in missing:

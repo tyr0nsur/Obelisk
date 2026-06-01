@@ -31,14 +31,29 @@ The checker consumes sanitized JSON artifacts only:
 It reports planning-only policy for:
 
 - scalar metadata candidates: `BoolProperty`, `ByteProperty`, `IntProperty`,
-  `UInt64Property`;
+  `FloatProperty`, `UInt32Property`, `UInt64Property`;
 - redacted references/payloads: `ObjectProperty`, `ClassProperty`, `ArrayProperty`,
-  `StrProperty`/FString, `StructProperty`;
-- nested `ArrayProperty.Inner` metadata with identity redacted;
+  `NameProperty`/FName, `StrProperty`/FString, `StructProperty`;
+- nested `ArrayProperty.Inner` metadata with identity redacted, including the inner
+  property class as coverage for common sanitized snapshot shapes;
 - identity-like scalar names, including `PlayerDataID`, as redacted sensitive scalars.
 
 For UFunction snapshots it validates `offset_internal + element_size * array_dim <=
 ParmsSize`. ScriptStruct snapshots use `PropertiesSize` for the analogous offline bound.
+
+## Follow-Up Audit
+
+The first audit pass found that sanitized fixtures already used common UE4 property classes
+outside the original default coverage set:
+
+- `FloatProperty` and `UInt32Property` in transfer ScriptStruct snapshots;
+- nested `NameProperty` under `ArrayProperty.Inner` for mission tag snapshots.
+
+The checker now covers those classes without adding payload decoding or public ABI claims.
+`NameProperty` is treated as FName identity/payload redacted. `DinoID1` and `DinoID2` are
+treated as identity-like scalar names and redacted rather than scalar metadata. Unknown
+top-level or nested property classes now fail closed with redaction-policy blockers instead
+of only reporting `blocked_unknown` as a field policy.
 
 ## Non-Claims
 
@@ -53,10 +68,15 @@ Commands run:
 ```text
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_check_reflection_property_redaction_coverage.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_property_redaction_coverage.py --artifact tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_missions/MissionType.GetPlayerUsableItems.snapshot.json --require-class ObjectProperty --require-class ArrayProperty --require-class ArrayProperty.Inner --json
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_property_redaction_coverage.py --snapshot-root tests/fixtures --require-default-coverage
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_property_redaction_coverage.py --artifact tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_tribes/ShooterPlayerController.ClientReceiveActiveMissionTags.snapshot.json --require-class NameProperty --require-class ArrayProperty.Inner
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_reflection_property_redaction_coverage.py --artifact tests/fixtures/scriptstruct_snapshots/7e7ded49e0c6/sdk_transfers/PrimalLocalProfile.ARKTributeDino.snapshot.json --require-class FloatProperty --require-class UInt32Property
 ```
 
 Results:
 
-- unit tests: 5 passed;
+- unit tests: 9 passed;
 - real fixture smoke: no blockers for required `ObjectProperty`, `ArrayProperty`, and
   `ArrayProperty.Inner` coverage.
+- full sanitized fixture smoke: 50 artifacts, 127 fields, no blockers for default coverage,
+  including `FloatProperty: 3`, `NameProperty: 1`, and `UInt32Property: 4`.

@@ -70,6 +70,7 @@ shell_scripts=(
     scripts/test_run_script_tests.sh
     scripts/check_obelisk_server_posture.sh
     scripts/test_check_obelisk_server_posture.sh
+    scripts/test_check_player_principal_lifecycle_preflight.sh
     scripts/obelisk_supervisor_snapshot.sh
     scripts/obelisk_supervisor_loop.sh
     scripts/test_obelisk_supervisor_snapshot.sh

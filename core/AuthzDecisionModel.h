@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 
 namespace obelisk::permissions_admin
 {
@@ -64,14 +65,24 @@ namespace obelisk::permissions_admin
         bool AuditOk = true;
     };
 
+    struct QueryText
+    {
+        const char* Action = nullptr;
+        size_t ActionSize = 0;
+        const char* ResourceScope = nullptr;
+        size_t ResourceScopeSize = 0;
+    };
+
     struct PermissionQuery
     {
         Principal PrincipalValue;
         OwnerContext Owner;
         PolicyProvenance Provenance;
         AbuseControls Abuse;
+        QueryText Text;
     };
 
+    bool HasWellFormedCopiedQueryText(const QueryText& text);
     bool IsSupportedScope(PrincipalScope scope);
     bool IsRecognizedAuthority(PolicyAuthority authority);
     bool IsAllowCapableAuthority(PolicyAuthority authority);

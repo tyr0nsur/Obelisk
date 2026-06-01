@@ -38,12 +38,12 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
             "targets": [
                 {
                     "target": {"outer_name": "SyntheticOuter", "name": "SyntheticFunction"},
-                    "num_parms": 9,
-                    "parms_size": 96,
+                    "num_parms": 12,
+                    "parms_size": 112,
                     "return_value_offset": "0xffff",
                     "property_chain": {
-                        "expected_count": 9,
-                        "observed_count": 9,
+                        "expected_count": 12,
+                        "observed_count": 12,
                         "properties": [
                             {
                                 "name": "bAllowed",
@@ -83,7 +83,8 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
                                     "membership_status": "candidate-uobject",
                                     "inner_property": {
                                         "name": "Items",
-                                        "class_name": "StrProperty",
+                                        "class_name": "NameProperty",
+                                        "comparison_index": 77,
                                         "object_index": 1234,
                                     },
                                 },
@@ -131,6 +132,31 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
                                 "element_size": 8,
                                 "array_dim": 1,
                             },
+                            {
+                                "name": "ItemCount",
+                                "class_name": "UInt32Property",
+                                "status": "candidate",
+                                "offset_internal": 88,
+                                "element_size": 4,
+                                "array_dim": 1,
+                            },
+                            {
+                                "name": "Version",
+                                "class_name": "FloatProperty",
+                                "status": "candidate",
+                                "offset_internal": 92,
+                                "element_size": 4,
+                                "array_dim": 1,
+                            },
+                            {
+                                "name": "MissionTag",
+                                "class_name": "NameProperty",
+                                "status": "candidate",
+                                "offset_internal": 96,
+                                "element_size": 8,
+                                "array_dim": 1,
+                                "comparison_index": 88,
+                            },
                         ],
                     },
                 }
@@ -158,6 +184,9 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
             "StructProperty",
             "ClassProperty",
             "ByteProperty",
+            "FloatProperty",
+            "NameProperty",
+            "UInt32Property",
             "UInt64Property",
         ):
             self.assertGreaterEqual(report["coverage"].get(key, 0), 1)
@@ -167,6 +196,13 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
         self.assertEqual("class_ref_redacted", fields["ActorClass"]["policy"])
         self.assertEqual("metadata_only_identity_redacted", fields["Mode"]["enum_metadata_policy"])
         self.assertIs(False, fields["Items.Inner"]["payload_decode_claim"])
+        self.assertEqual("array_inner_fname_redacted", fields["Items.Inner"]["policy"])
+        self.assertEqual("uint32_metadata", fields["ItemCount"]["policy"])
+        self.assertEqual("float_metadata", fields["Version"]["policy"])
+        self.assertEqual("fname_redacted", fields["MissionTag"]["policy"])
+        self.assertEqual("redacted", fields["MissionTag"]["fname_policy"])
+        self.assertIn("comparison_index_redacted", fields["Items.Inner"]["identity_redaction"])
+        self.assertIn("comparison_index_redacted", fields["MissionTag"]["identity_redaction"])
         self.assertIn("does not decode UE parameter payloads or FString contents", report["non_claims"])
 
         serialized = json.dumps(report)
@@ -218,10 +254,60 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
         self.assertEqual("ParmsSize", overflow["bound_name"])
         self.assertEqual(12, overflow["bound"])
 
+    def test_unknown_property_class_blocks_report(self) -> None:
+        snapshot_payload = self.complete_snapshot()
+        first_prop = snapshot_payload["targets"][0]["property_chain"]["properties"][0]
+        first_prop["class_name"] = "DelegateProperty"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = Path(tmp) / "unknown-property.snapshot.json"
+            write_json(snapshot, snapshot_payload)
+
+            result = run_checker("--artifact", str(snapshot), "--json")
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertIn(
+            {
+                "reason": "property_redaction_policy_unknown",
+                "target": "SyntheticOuter.SyntheticFunction",
+                "property": "bAllowed",
+                "class": "DelegateProperty",
+                "detail": "unsupported property class: DelegateProperty",
+            },
+            report["blockers"],
+        )
+
+    def test_unknown_array_inner_class_blocks_report(self) -> None:
+        snapshot_payload = self.complete_snapshot()
+        props = snapshot_payload["targets"][0]["property_chain"]["properties"]
+        array_prop = next(prop for prop in props if prop["class_name"] == "ArrayProperty")
+        array_prop["array_inner_candidate"]["inner_property"]["class_name"] = "DelegateProperty"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = Path(tmp) / "unknown-array-inner.snapshot.json"
+            write_json(snapshot, snapshot_payload)
+
+            result = run_checker("--artifact", str(snapshot), "--json")
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertIn(
+            {
+                "reason": "array_inner_redaction_policy_unknown",
+                "target": "SyntheticOuter.SyntheticFunction",
+                "property": "Items",
+                "class": "DelegateProperty",
+                "detail": "unsupported property class: DelegateProperty",
+            },
+            report["blockers"],
+        )
+
     def test_sensitive_uint64_name_is_redacted_not_scalar_metadata(self) -> None:
         snapshot_payload = self.complete_snapshot()
-        last_prop = snapshot_payload["targets"][0]["property_chain"]["properties"][-1]
-        last_prop["name"] = "PlayerDataID"
+        props = snapshot_payload["targets"][0]["property_chain"]["properties"]
+        uint64_prop = next(prop for prop in props if prop["class_name"] == "UInt64Property")
+        uint64_prop["name"] = "PlayerDataID"
 
         with tempfile.TemporaryDirectory() as tmp:
             snapshot = Path(tmp) / "sensitive.snapshot.json"
@@ -234,6 +320,44 @@ class ReflectionPropertyRedactionCoverageTests(unittest.TestCase):
         fields = {field["name"]: field for field in report["fields"]}
         self.assertEqual("redacted_sensitive_scalar", fields["PlayerDataID"]["policy"])
         self.assertEqual("identity-like scalar redacted by name", fields["PlayerDataID"]["policy_reason"])
+
+    def test_sensitive_uint32_dino_id_is_redacted_not_scalar_metadata(self) -> None:
+        snapshot_payload = self.complete_snapshot()
+        props = snapshot_payload["targets"][0]["property_chain"]["properties"]
+        uint32_prop = next(prop for prop in props if prop["class_name"] == "UInt32Property")
+        uint32_prop["name"] = "DinoID1"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = Path(tmp) / "sensitive-uint32.snapshot.json"
+            write_json(snapshot, snapshot_payload)
+
+            result = run_checker("--artifact", str(snapshot), "--require-class", "UInt32Property", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        fields = {field["name"]: field for field in report["fields"]}
+        self.assertEqual("redacted_sensitive_scalar", fields["DinoID1"]["policy"])
+        self.assertEqual("identity-like scalar redacted by name", fields["DinoID1"]["policy_reason"])
+
+    def test_array_inner_class_counts_toward_required_coverage(self) -> None:
+        snapshot_payload = self.complete_snapshot()
+        props = snapshot_payload["targets"][0]["property_chain"]["properties"]
+        snapshot_payload["targets"][0]["property_chain"]["properties"] = [
+            prop for prop in props if prop["class_name"] != "NameProperty"
+        ]
+        snapshot_payload["targets"][0]["num_parms"] = 11
+        snapshot_payload["targets"][0]["property_chain"]["expected_count"] = 11
+        snapshot_payload["targets"][0]["property_chain"]["observed_count"] = 11
+
+        with tempfile.TemporaryDirectory() as tmp:
+            snapshot = Path(tmp) / "array-inner-name.snapshot.json"
+            write_json(snapshot, snapshot_payload)
+
+            result = run_checker("--artifact", str(snapshot), "--require-class", "NameProperty", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertGreaterEqual(report["coverage"].get("NameProperty", 0), 1)
 
     def test_rejects_protected_live_server_snapshot_root(self) -> None:
         result = run_checker("--snapshot-root", "/servidor/ark/not-approved/snapshots")

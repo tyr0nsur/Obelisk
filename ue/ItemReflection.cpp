@@ -445,9 +445,23 @@ namespace Obelisk::UE::ItemReflection
             ItemFieldRange field;
             field.Field = fieldSpec.Field;
             field.PropertyNameIndex = fieldSpec.NameIndex;
+            field.PropertyClassNameIndex = fieldSpec.ClassNameIndex;
+            field.PropertyFlags = fieldSpec.PropertyFlags;
             field.Offset = fieldSpec.Offset;
             field.Size = fieldSpec.Size;
             field.ExposesRange = fieldSpec.ExposesRange;
+
+            RuntimeReflection::UObjectView propertyClass;
+            if (RuntimeReflection::ReadResult result =
+                    RuntimeReflection::TryReadUObject(reader,
+                                                      *options.Layout,
+                                                      property.Object.ClassPrivate,
+                                                      propertyClass);
+                !result)
+            {
+                return result;
+            }
+            field.PropertyClassObjectIndex = propertyClass.InternalIndex;
 
             if (value.HasParameterRanges && field.ExposesRange)
             {

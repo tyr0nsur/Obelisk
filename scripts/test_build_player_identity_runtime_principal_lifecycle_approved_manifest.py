@@ -18,6 +18,7 @@ ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 
 
 def runtime_log_lines() -> list[str]:
@@ -53,8 +54,13 @@ def runtime_log_lines() -> list[str]:
 
 
 class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
+    def temp_offline_workspace(self) -> tempfile.TemporaryDirectory[str]:
+        if not OFFLINE_WORKSPACE.is_dir():
+            self.skipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
+        return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
+
     def write_summary(self, temp_dir: Path) -> Path:
-        log_path = temp_dir / RUN_ID / "Obelisk.log"
+        log_path = temp_dir / "live-validation-logs" / RUN_ID / "Obelisk.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
         result = subprocess.run(
@@ -168,7 +174,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         )
 
     def test_builds_manifest_that_passes_existing_consume_checker(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             summary_path = self.write_summary(temp_dir)
             window_check = self.write_window_check(temp_dir, summary_path)
@@ -203,7 +209,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             )
 
     def test_generated_manifest_still_fails_closed_for_promote_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             manifest_path = temp_dir / "approved-manifest.json"
             summary_path = self.write_summary(temp_dir)
@@ -231,7 +237,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_rejects_summary_generated_with_server_paths_allowed(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             summary_path = self.write_summary(temp_dir)
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -247,7 +253,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_rejects_summary_with_protected_inner_source_path(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             summary_path = self.write_summary(temp_dir)
             window_check = self.write_window_check(temp_dir, summary_path)
@@ -263,7 +269,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_rejects_summary_with_multiple_sources(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             summary_path = self.write_summary(temp_dir)
             window_check = self.write_window_check(temp_dir, summary_path)
@@ -279,7 +285,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_rejects_summary_with_mixed_observer_modules(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             summary_path = self.write_summary(temp_dir)
             summary = json.loads(summary_path.read_text(encoding="utf-8"))
@@ -298,7 +304,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_rejects_review_text_that_would_trip_privacy_gate(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             output = temp_dir / "manifest.json"
             result = self.run_builder(

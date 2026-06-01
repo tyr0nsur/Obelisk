@@ -108,6 +108,10 @@
         "owner-token scoped call",
         "capability gated",
         "query-only result contract only",
+        "action bytes are required, copied, and bounded to 128 bytes before allow",
+        "resource_scope bytes are optional, copied, and bounded to 256 bytes before allow",
+        "no command parser compatibility claim from action or resource_scope bytes",
+        "no UTF-8 or text decoding claim before a separate reviewed parser contract",
         "no mutation of permission policy or admin state",
         "no command/reply handles",
         "no UE pointers or raw params"

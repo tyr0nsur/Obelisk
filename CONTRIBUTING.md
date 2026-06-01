@@ -86,7 +86,7 @@ scripts/run_script_tests.sh
 Docs-only changes may skip the CMake build, but the PR should say why.
 
 Release-candidate, installer, SDK package, CMake export, public-header, or
-first-stable scope changes must use the core-first release gate instead of
+first-stable scope changes must use the canonical release-readiness gate instead of
 hand-picking equivalent commands:
 
 ```bash
@@ -96,7 +96,8 @@ scripts/check_release_readiness.sh
 That gate requires a clean worktree by default and runs the build, CTest,
 script tests, install-layout validation, operator CLI status check, install
 dry-runs, plugin install dry-run, and whitespace checks with one set of
-defaults.
+defaults. A stable SDK v1 claim additionally depends on
+`scripts/check_public_sdk_v1_completion.py`; core-first or RC readiness is not enough.
 
 ## SDK Foundation And Offline Evidence
 
@@ -171,24 +172,26 @@ Harden reflected event parameter decoding
 
 ## Current Priorities
 
-1. Hold the published core-first `v0.1.0-rc.2` surface stable after release confirmation:
+1. Move toward the complete SDK v1 chain: player identity/principal route first, then
+   permissions/admin, command/chat response, and commands/replies. Those blockers
+   unlock the higher-demand module APIs without relying on ArkApi/Windows internals.
+2. Preserve the published core-first `v0.1.0-rc.2` baseline as a no-regression floor:
    stable runtime hooks, marker gates, plugin lifecycle, C ABI behavior,
-   `GameplayPolicyEvent`, minimal `ChatMessageEvent`, and metadata helpers
-   `DescribeResourceKind` and `DescribeGameplayPolicyEventKind`. Accept only
-   release-blocker fixes or explicitly scoped post-RC follow-up work.
-2. Keep additional gameplay/module APIs out of public scope until their copied
+   `GameplayPolicyEvent`, minimal `ChatMessageEvent`, metadata helpers, and
+   process-local owner-token timers must remain stable while v1 work proceeds.
+3. Keep additional gameplay/module APIs out of public scope until their copied
    payloads, callback lifetime, SDK consumer coverage, and explicitly named
    second-source gates are complete.
    process-local core timer callbacks may evolve as owner-token core runtime utilities
    with explicit unregister only; do not describe them as gameplay/module timer APIs,
    shared scheduler state, UE identity, or persistent handles.
-3. Expand offline snapshot tooling and second-source comparison before promoting
+4. Expand offline snapshot tooling and second-source comparison before promoting
    public SDK module APIs.
-4. Build the general UE4 reflection pipeline (`FName`, `GNames`, `GObjects`,
+5. Build the general UE4 reflection pipeline (`FName`, `GNames`, `GObjects`,
    `UObject`, `UFunction`, and property-chain validation) as research/tooling
    work unless a scoped RC task requires it.
-5. Harden safe plugin examples only after the relevant promotion gates are met.
-6. Reduce operational and documentation debt that can mislead new contributors.
+6. Harden safe plugin examples only after the relevant promotion gates are met.
+7. Reduce operational and documentation debt that can mislead new contributors.
 
 ArkServerApi/AseApi may be consulted only as names and demand signals for familiar ARK
 plugin concepts. It is not an architecture source, ergonomics source, behavior map,

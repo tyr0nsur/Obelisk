@@ -37,52 +37,24 @@ recovery context is not active routing; use `git log --oneline -1` for the check
 - `docs/public_sdk_surfaces.json::v1_sdk_completion_blockers` is the active blocker list for a complete SDK claim; all blocker rows remain unresolved unless promoted or explicitly excluded in a reviewed v1 release statement.
 - `scripts/check_public_sdk_v1_completion.py --json` intentionally reports blocked on the current tree. Do not use broad phrases like `v1.0 stable`, `complete SDK`, `full SDK`, or `production SDK` in public sinks unless that gate allows the stable SDK claim. The checker also enforces canonical `stable_release_contract.claim_requires` and `not_sufficient` clauses so Plugin Hub package shape, RC readiness, and copied-data seeds cannot become sufficient evidence by manifest drift.
 - Plugin Hub foundation work is post-SDK-complete planning only. Do not route active rounds to Plugin Hub examples, packaging, intake tooling, or seed hardening while SDK blockers remain open. Installed SDK examples are Linux x86_64 only.
-- `obelisk.command_chat_response_path.v1` is post-v1 planning only and adds no ABI today.
-  Replies/send-chat/broadcast/moderation stay blocked; static thunks, passive chat,
-  vtable slots, raw callbacks, and legacy `CallProcessEvent` are insufficient.
-  `scripts/check_command_chat_response_public_readiness.py` consumes the durable
-  `command-chat-response-route-planning` second-source readiness report plus
-  `docs/command_chat_response_public_contract_decisions.json` and accepts only
-  planning-layout evidence: `public_readiness_ready`, `public_header_allowed`,
-  `promotion_ready`, `public_sdk_ready`, `public_abi_ready`, and `runtime_ready` must all
-  remain false. It also scans `include/obelisk/ObeliskApi.h` and fails if command response
-  capability bits, ABI versions, reply/send/broadcast APIs, or public `CallProcessEvent`
-  response symbols appear early. The checker now also requires explicit redaction guidance for
-  `ClientChatMessage.Chat`, raw FString message text, sender identity, directed recipient
-  identity, and future targeting through promoted copied principal handle/generation only.
-  The offline readiness artifact under
-  `/servidor/ark/workspace-offline/command-chat-response-route-planning-distinct-second-source-20260601`
-  has been regenerated with that guidance and its `SHA256SUMS` updated; this restores
-  planning-layout acceptance only, not runtime/public readiness.
-- `scripts/check_commands_replies_public_readiness.py` is the current commands/replies
-  readiness guardrail. It must keep `obelisk.commands_replies.v1` blocked/post-v1 until
-  promoted player identity, permissions/admin, and `obelisk.command_chat_response_path.v1`
-  all exist; a green blocked report is not public header, runtime, or SDK readiness. It
-  now requires a planning-only migration vocabulary block so familiar terms like chat
-  command, console command, admin-like command, reply request, and permission action stay
-  allowed as vocabulary only, with explicit no ArkApi/AseApi parser, ordering, return
-  semantics, direct portability, copied control-flow, or ABI-compatibility claims.
+- `obelisk.command_chat_response_path.v1` and `obelisk.commands_replies.v1` remain
+  blocked/planning-only until promoted player identity and permissions/admin exist. Their
+  checkers must keep public header, ABI, runtime, SDK, reply/send/broadcast/moderation, and
+  migration/ArkApi portability claims false.
 - The active P0 dependency route is principal -> permissions/admin -> command response.
   Player identity/principal is the first v1 dependency for permissions, commands,
   economy, moderation, and several ownership-sensitive module APIs. The target set is
   12-target `players-identity-lifecycle-intake`; it remains planning-only and
   candidate-only.
-- Current player-identity state: `/servidor/ark/workspace-offline` now has the staged
-  `player-identity-offline-identity-second-source-20260529T011227Z` hardlink layout, a
-  complete `obelisk.core-dump-evidence-pack.v1`, an accepted
-  `obelisk.reflection-inventory-pack.v1` with 12/12
-  `players-identity-lifecycle-intake` target coverage, and committed candidate fixtures
-  for `ShooterPlayerController.ServerListPlayers` and
+- Current player-identity state: accepted offline/core/reflection inventory,
+  complete `obelisk.core-dump-evidence-pack.v1`, accepted
+  `obelisk.reflection-inventory-pack.v1`, 12/12 candidate fixtures for
+  `players-identity-lifecycle-intake`, and accepted distinct second-source layout
+  evidence from the vanilla-gdb core, including committed candidates
+  `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer`. The lane depends on a non-protected
   evidence root; lifecycle-anchor schema/target-set and principal invalidation policy
-  still need a reviewed gate.
-- Distinct second-source layout is now accepted for the 12-target player-identity intake
-  when using candidate root
-  `/servidor/ark/workspace-offline/player-identity-offline-identity-vanilla-gdb-20260529T012853Z/focal-snapshots`
-  with `scripts/compare_reflection_snapshots.py --planning-layout-intake`: totals are
-  `targets=12`, `comparable=12`, `second_source_accepted=12`, rejected/inconclusive/missing
-  all zero, and promotion remains false. This is accepted distinct second-source layout
-  evidence from the vanilla-gdb core.
+  still need a reviewed gate. Promotion remains false.
 - Current identity next blocker is approved copied runtime principal lifecycle evidence
   for the accepted login/logout anchor route. Lifecycle-anchor and principal-invalidation
   manifests are consume-only; no public identity, permissions, commands, runtime lookup,
@@ -101,21 +73,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   quality, stable posture, rollback, no private identity/UE terms in keys or values, and
   no-claim/no-public-readiness semantics.
 - Candidate lifecycle layouts are reproducible for all six
-  `players-lifecycle-anchor-candidates` targets, but remain planning-only. The narrow
-  candidate anchors are `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`;
-  the other four targets do not prove runtime ordering. Details:
+  `players-lifecycle-anchor-candidates` targets, but only `ShooterGameMode.HandleNewPlayer`
+  and `ShooterGameMode.OnLogout` are narrow runtime-ordering candidates. Details:
   `docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md`.
-- `scripts/check_player_identity_first_evidence_readiness.py` runs a schema-specific
-  consume-gate diagnostic for the generated `obelisk.players-identity-first-evidence.v1`
-  payload. The generated first-evidence payload now accepts in consume mode with strict
-  target-set coverage, including multiple complete source artifact id triples. With the
-  consume-only lifecycle/principal-policy manifests supplied, the primary blocker is
-  `approved_runtime_evidence_missing`, while `promotion_ready`, `public_sdk_ready`, and
-  `runtime_ready` remain false. The emitted
-  `first_evidence.runtime_principal_lifecycle_evidence` block is requirements-only, not
-  accepted evidence or promotion. The optional
-  `--runtime-principal-lifecycle-evidence-manifest` input accepts only a synthetic/redacted
-  shape fixture; it still leaves runtime promotion blocked.
+- `scripts/check_player_identity_first_evidence_readiness.py` accepts current consume-only
+  first evidence and leaves `approved_runtime_evidence_missing` as the blocker; promotion,
+  public SDK, and runtime readiness stay false.
 - Static orientation reports for identity/lifecycle/admin and command response are
   navigation clues only, not consume/promote evidence packs or artifact-gate schemas.
 - The current artifact-root audit is summarized in
@@ -124,22 +87,17 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   stage. First-evidence consume-gate acceptance is restored; runtime principal lifecycle
   evidence is the next promotion blocker.
 - Inventory, structures, missions, transfers, dinos, buffs, tribes, ResourceHandle, and
-  GObjects remain internal/candidate. ResourceHandle/public GObjects remain blocked. The
-  old flag-policy artifact is obsolete; the durable rich-provenance refresh is preserved,
-  Consume mode accepts it and promote mode stays blocked, and the post-callback rejection
-  contract is preserved as candidate-only. The first strict serial reuse/wraparound policy
-  artifact is preserved; manifest consume mode accepts it and promote mode blocks it as
-  candidate-only. The offline zero-serial negative cohort is now reproducible across both
-  copied cores and remains candidate-blocked. This does not unlock runtime negative
-  samples, public lookup, object identity, mutation, or fail-closed semantic helper
-  promotion. Do not rerun broad FName, GObjects, or core scans for ResourceHandle. Do not
-  replace this with another broad offline FName/GObjects scan. Future runtime
-  ResourceHandle evidence must include both paired schemas for rejection samples and
-  runtime serial semantics; duplicate schemas, half-pairs, source/run mismatches, or
-  binary SHA mismatch block consume. The next strict ResourceHandle
-  blocker is rejected runtime object samples plus runtime serial reuse/wraparound semantics,
-  with a future-runtime-observation-plan only after an operator-approved live-ops brief
-  names the exact debug target.
+  GObjects remain internal/candidate. ResourceHandle/public GObjects remain blocked; old
+  flag-policy artifact is obsolete; durable rich-provenance refresh is preserved; Consume
+  mode accepts it and promote mode stays blocked; post-callback rejection contract is
+  preserved as candidate-only; first strict serial reuse/wraparound policy artifact is
+  preserved; manifest consume mode accepts it and promote mode blocks it as candidate-only.
+  This does not unlock runtime negative samples, public lookup, object identity, mutation,
+  or fail-closed semantic helper promotion. Do not rerun broad FName, GObjects, or core
+  scans for ResourceHandle. Do not replace this with another broad offline FName/GObjects
+  scan. next strict ResourceHandle blocker is rejected runtime object samples plus runtime
+  serial reuse/wraparound semantics with a future-runtime-observation-plan only after an
+  operator-approved live-ops brief names the exact debug target.
 - `scripts/check_inventory_action_redacted_observer_gate.py` is an offline
   candidate-only checker for the future `enable-inventory-action-redacted-observer`
   marker and `inventory-action-compact-intake` fixtures. It must stay non-promotional:
@@ -172,6 +130,11 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   `GameplayPolicyEvent` `ReturnValue` checks and accepted descriptor reconciliation; it
   does not promote public Inventory SDK, Items SDK, identity, mutation, return override,
   or v1.
+  The item copied-signal bridge now revalidates property class FName index, property class
+  object index, and property flags in `ItemFieldRange`, matching the inventory copied-signal
+  metadata hardening pattern. This rejects forged item observations but still does not
+  promote public Inventory/Items SDK, identity, mutation, return override, runtime readiness,
+  or v1.
 - v0.2 internal hardening lane: Mission copied-bool is internal/default-off only, not a
   Plugin Hub module or Mission SDK claim. The preserved bool-tail evidence is
   `bool_field_size=1`, `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and
@@ -202,6 +165,12 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   rate-limit/audit, and v1 sequence gates are resolved. `operator-config` is recognized
   for planning/audit but is not allow-capable. Fail-closed coverage must include
   `principal_generation_mismatch`, not only missing or stale generations.
+  `scripts/check_permissions_admin_public_readiness.py` is now the planning-only reusable
+  gate for this surface: it accepts the current blocked state only with
+  `public_header_allowed=false`, `public_abi_ready=false`, `public_sdk_ready=false`, and
+  `runtime_ready=false`. The internal `AuthzDecisionModel` also models copied query text
+  bounds (`action` required <=128 bytes, optional `resource_scope` <=256 bytes), without
+  promoting public permissions/admin ABI, parser, cache, mutation, or admin actions.
 - Operator ingress/storage is an offline internal planning contract only:
   `obelisk.operator_ingress_storage.v1` has no public header, public ABI, runtime
   services, promotion readiness, or v1 completion meaning. It is useful for shaping later

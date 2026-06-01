@@ -2,6 +2,27 @@
 
 namespace obelisk::permissions_admin
 {
+    namespace
+    {
+        constexpr size_t kMaxActionBytes = 128;
+        constexpr size_t kMaxResourceScopeBytes = 256;
+
+        bool HasValidCopiedByteSpan(const char* data, size_t size, size_t max_size, bool allow_empty)
+        {
+            if (size > max_size)
+                return false;
+            if (size == 0)
+                return allow_empty && data == nullptr;
+            return data != nullptr;
+        }
+    }
+
+    bool HasWellFormedCopiedQueryText(const QueryText& text)
+    {
+        return HasValidCopiedByteSpan(text.Action, text.ActionSize, kMaxActionBytes, false) &&
+               HasValidCopiedByteSpan(text.ResourceScope, text.ResourceScopeSize, kMaxResourceScopeBytes, true);
+    }
+
     bool IsSupportedScope(PrincipalScope scope)
     {
         return scope == PrincipalScope::CallbackLocal || scope == PrincipalScope::ProcessLocal;
@@ -25,6 +46,9 @@ namespace obelisk::permissions_admin
         const AbuseControls& abuse = query.Abuse;
 
         if (!owner.HasOwnerToken || !owner.HasCapability)
+            return Decision::Deny;
+
+        if (!HasWellFormedCopiedQueryText(query.Text))
             return Decision::Deny;
 
         if (!principal.Copied || principal.Handle == 0)
@@ -85,6 +109,11 @@ namespace obelisk::permissions_admin
 
         query.Abuse.RateLimitOk = true;
         query.Abuse.AuditOk = true;
+
+        query.Text.Action = "obelisk.permission.sample";
+        query.Text.ActionSize = 25;
+        query.Text.ResourceScope = nullptr;
+        query.Text.ResourceScopeSize = 0;
         return query;
     }
 }

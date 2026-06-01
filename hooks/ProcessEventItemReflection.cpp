@@ -121,11 +121,25 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
         constexpr int32_t kDestinationItemNameIndex = 19285;
         constexpr int32_t kAdditionalDataNameIndex = 19290;
         constexpr int32_t kBConsumeResourcesNameIndex = 19293;
+        constexpr int32_t kIntPropertyClassNameIndex = 2;
+        constexpr int32_t kBoolPropertyClassNameIndex = 3;
+        constexpr int32_t kObjectPropertyClassNameIndex = 5;
+        constexpr int32_t kBoolPropertyClassObjectIndex = 532;
+        constexpr int32_t kObjectPropertyClassObjectIndex = 534;
+        constexpr int32_t kIntPropertyClassObjectIndex = 539;
+        constexpr uint64_t kBoolInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kBoolReturnPropertyFlags = 0x1040000780;
+        constexpr uint64_t kToInventoryPropertyFlags = 0x1044080280;
+        constexpr uint64_t kObjectInputPropertyFlags = 0x1040000280;
+        constexpr uint64_t kIntInputPropertyFlags = 0x1040000280;
 
         struct ExpectedItemField
         {
             Obelisk::UE::ItemReflection::ItemField Field;
             int32_t PropertyNameIndex = -1;
+            int32_t PropertyClassNameIndex = -1;
+            int32_t PropertyClassObjectIndex = -1;
+            uint64_t PropertyFlags = 0;
             int32_t Offset = -1;
             size_t Size = 0;
             bool ExposesRange = false;
@@ -142,31 +156,68 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
         };
 
         constexpr std::array<ExpectedItemField, 2> kAllowEquipItemFields{{
-            {Obelisk::UE::ItemReflection::ItemField::ToInventory, kToInventoryNameIndex, 0x00, 0x08, false},
-            {Obelisk::UE::ItemReflection::ItemField::ReturnValue, kReturnValueNameIndex, 0x08, 0x01, true},
+            {Obelisk::UE::ItemReflection::ItemField::ToInventory,
+             kToInventoryNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kToInventoryPropertyFlags,
+             0x00,
+             0x08,
+             false},
+            {Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+             kReturnValueNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
+             0x08,
+             0x01,
+             true},
         }};
 
         constexpr std::array<ExpectedItemField, 2> kCanRepairFields{{
             {Obelisk::UE::ItemReflection::ItemField::BIgnoreInventoryRequirement,
              kBIgnoreInventoryRequirementNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolInputPropertyFlags,
              0x00,
              0x01,
              true},
-            {Obelisk::UE::ItemReflection::ItemField::ReturnValue, kReturnValueNameIndex, 0x01, 0x01, true},
+            {Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+             kReturnValueNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
+             0x01,
+             0x01,
+             true},
         }};
 
         constexpr std::array<ExpectedItemField, 3> kUseItemOntoItemFields{{
             {Obelisk::UE::ItemReflection::ItemField::DestinationItem,
              kDestinationItemNameIndex,
+             kObjectPropertyClassNameIndex,
+             kObjectPropertyClassObjectIndex,
+             kObjectInputPropertyFlags,
              0x00,
              0x08,
              false},
             {Obelisk::UE::ItemReflection::ItemField::AdditionalData,
              kAdditionalDataNameIndex,
+             kIntPropertyClassNameIndex,
+             kIntPropertyClassObjectIndex,
+             kIntInputPropertyFlags,
              0x08,
              0x04,
              false},
-            {Obelisk::UE::ItemReflection::ItemField::ReturnValue, kReturnValueNameIndex, 0x0c, 0x01, true},
+            {Obelisk::UE::ItemReflection::ItemField::ReturnValue,
+             kReturnValueNameIndex,
+             kBoolPropertyClassNameIndex,
+             kBoolPropertyClassObjectIndex,
+             kBoolReturnPropertyFlags,
+             0x0c,
+             0x01,
+             true},
         }};
 
         constexpr ExpectedItemObservation kExpectedItemObservations[]{
@@ -212,6 +263,9 @@ namespace Obelisk::Hooks::ProcessEventItemReflection
         {
             return field.Field == expected.Field &&
                 field.PropertyNameIndex == expected.PropertyNameIndex &&
+                field.PropertyClassNameIndex == expected.PropertyClassNameIndex &&
+                field.PropertyClassObjectIndex == expected.PropertyClassObjectIndex &&
+                field.PropertyFlags == expected.PropertyFlags &&
                 field.Offset == expected.Offset &&
                 field.Size == expected.Size &&
                 field.ExposesRange == expected.ExposesRange;

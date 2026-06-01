@@ -16,6 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 
 
 def runtime_log_lines() -> list[str]:
@@ -55,6 +56,11 @@ def copied_log_path(root: Path) -> Path:
 
 
 class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
+    def temp_offline_workspace(self) -> tempfile.TemporaryDirectory[str]:
+        if not OFFLINE_WORKSPACE.is_dir():
+            self.skipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
+        return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
+
     def write_window_manifest(self, temp_dir: Path, copied_log: Path) -> Path:
         manifest = temp_dir / "window.env"
         copied_log_sha256 = (
@@ -140,7 +146,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
 
     def test_builds_complete_consume_only_bundle(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
@@ -178,7 +184,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertEqual(report["operational_window"]["obelisk_commit"], "test-commit")
 
     def test_fails_closed_for_live_server_log_path(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             result = self.run_bundle(
                 Path("/servidor/ark/obelisk/logs/arkserver2/Obelisk.log"),
                 Path(temp) / "bundle",
@@ -188,7 +194,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertIn("check player principal lifecycle window manifest failed", result.stderr)
 
     def test_rejects_protected_output_dir_before_writing(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             copied_log.parent.mkdir(parents=True, exist_ok=True)
@@ -206,7 +212,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertFalse((temp_dir / "runtime-observer-summary.json").exists())
 
     def test_rejects_symlinked_output_dir_before_writing(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             copied_log.parent.mkdir(parents=True, exist_ok=True)
@@ -234,7 +240,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             "principal_action=candidate_created principal_id_logged=false "
             "principal_generation_logged=false delivery_claim=none.",
         )
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
@@ -248,7 +254,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertIn("player_principal_event_before_safe_gate", result.stderr)
 
     def test_fails_closed_when_window_manifest_sha_does_not_match_log(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
@@ -271,7 +277,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertIn("copied_log_sha256_mismatch", result.stderr)
 
     def test_fails_closed_when_window_manifest_commit_does_not_match_summary(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"
@@ -294,7 +300,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             line.replace("limit=10 dispatch_limit=0", "limit=9 dispatch_limit=0")
             for line in runtime_log_lines()
         ]
-        with tempfile.TemporaryDirectory() as temp:
+        with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             copied_log = copied_log_path(temp_dir)
             output_dir = temp_dir / "bundle"

@@ -18,6 +18,13 @@ SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approve
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
+
+
+def temp_offline_workspace() -> tempfile.TemporaryDirectory[str]:
+    if not OFFLINE_WORKSPACE.is_dir():
+        raise unittest.SkipTest(f"approved offline workspace missing: {OFFLINE_WORKSPACE}")
+    return tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=OFFLINE_WORKSPACE)
 
 
 def runtime_log_lines() -> list[str]:
@@ -53,7 +60,7 @@ def runtime_log_lines() -> list[str]:
 
 
 def analyzer_summary() -> dict:
-    with tempfile.TemporaryDirectory() as tmp:
+    with temp_offline_workspace() as tmp:
         log_path = Path(tmp) / "live-validation-logs" / RUN_ID / "Obelisk.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")

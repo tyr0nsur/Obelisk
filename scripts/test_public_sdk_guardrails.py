@@ -8173,6 +8173,20 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 with self.subTest(file=path.relative_to(REPO_ROOT), phrase=phrase):
                     self.assertIn(normalized(phrase), compact)
 
+    def test_contributing_priorities_start_with_complete_sdk_v1_chain(self) -> None:
+        compact = normalized((REPO_ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"))
+        sdk_phrase = normalized(
+            "Move toward the complete SDK v1 chain: player identity/principal route first, "
+            "then permissions/admin, command/chat response, and commands/replies"
+        )
+        rc_phrase = normalized("Preserve the published core-first `v0.1.0-rc.2` baseline as a no-regression floor")
+
+        self.assertIn(sdk_phrase, compact)
+        self.assertIn(rc_phrase, compact)
+        self.assertLess(compact.index(sdk_phrase), compact.index(rc_phrase))
+        self.assertIn("scripts/check_public_sdk_v1_completion.py", compact)
+        self.assertIn("core-first or RC readiness is not enough", compact)
+
     def test_plugin_hub_public_docs_keep_foundation_matrix_and_experimental_split(self) -> None:
         required_phrases = {
             REPO_ROOT / "README.md": (

@@ -8,6 +8,7 @@ namespace
     using obelisk::permissions_admin::CompleteRuntimeOwnedQuery;
     using obelisk::permissions_admin::Decision;
     using obelisk::permissions_admin::EvaluatePermissionQuery;
+    using obelisk::permissions_admin::HasWellFormedCopiedQueryText;
     using obelisk::permissions_admin::PermissionQuery;
     using obelisk::permissions_admin::PolicyAuthority;
     using obelisk::permissions_admin::PrincipalScope;
@@ -121,6 +122,53 @@ namespace
                         "missing capability returned allow");
     }
 
+    void TestActionAndResourceScopeFailClosed()
+    {
+        PermissionQuery missingAction = CompleteRuntimeOwnedQuery();
+        missingAction.Text.Action = nullptr;
+        missingAction.Text.ActionSize = 10;
+        RequireDecision(EvaluatePermissionQuery(missingAction),
+                        Decision::Deny,
+                        "missing copied action returned allow");
+
+        PermissionQuery emptyAction = CompleteRuntimeOwnedQuery();
+        emptyAction.Text.Action = "";
+        emptyAction.Text.ActionSize = 0;
+        RequireDecision(EvaluatePermissionQuery(emptyAction),
+                        Decision::Deny,
+                        "empty action returned allow");
+
+        PermissionQuery oversizedAction = CompleteRuntimeOwnedQuery();
+        oversizedAction.Text.ActionSize = 129;
+        RequireDecision(EvaluatePermissionQuery(oversizedAction),
+                        Decision::Deny,
+                        "oversized action returned allow");
+
+        PermissionQuery missingResourceScope = CompleteRuntimeOwnedQuery();
+        missingResourceScope.Text.ResourceScope = nullptr;
+        missingResourceScope.Text.ResourceScopeSize = 1;
+        RequireDecision(EvaluatePermissionQuery(missingResourceScope),
+                        Decision::Deny,
+                        "missing copied resource scope returned allow");
+
+        PermissionQuery oversizedResourceScope = CompleteRuntimeOwnedQuery();
+        oversizedResourceScope.Text.ResourceScope = "ark:scope";
+        oversizedResourceScope.Text.ResourceScopeSize = 257;
+        RequireDecision(EvaluatePermissionQuery(oversizedResourceScope),
+                        Decision::Deny,
+                        "oversized resource scope returned allow");
+
+        PermissionQuery scoped = CompleteRuntimeOwnedQuery();
+        scoped.Text.ResourceScope = "ark:global";
+        scoped.Text.ResourceScopeSize = 10;
+        RequireDecision(EvaluatePermissionQuery(scoped),
+                        Decision::Allow,
+                        "well-formed copied action and resource scope was not allowed");
+
+        Require(HasWellFormedCopiedQueryText(scoped.Text),
+                "well-formed copied query text helper rejected scoped query");
+    }
+
     void TestOwnerProvenanceAndScopeMustAllBeValidForAllow()
     {
         PermissionQuery processLocal = CompleteRuntimeOwnedQuery();
@@ -230,6 +278,7 @@ int main()
     TestPrincipalGenerationFailsClosed();
     TestUnsupportedScopeFailsClosed();
     TestOwnerAndCapabilityFailClosed();
+    TestActionAndResourceScopeFailClosed();
     TestOwnerProvenanceAndScopeMustAllBeValidForAllow();
     TestPolicyProvenanceFailsClosed();
     TestPluginSuppliedProvenanceFailsClosed();

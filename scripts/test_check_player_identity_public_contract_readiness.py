@@ -25,11 +25,7 @@ from test_check_player_identity_runtime_principal_lifecycle_approved_evidence im
 
 class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
     def normalize_runtime_manifest_paths(self, runtime: dict) -> dict:
-        payload = copy.deepcopy(runtime)
-        safe_path = "/tmp/obelisk-approved-runtime.log"
-        payload["operational_window"]["copied_log"]["path"] = safe_path
-        payload["source_summary"]["evidence"]["sources"][0]["path"] = safe_path
-        return payload
+        return copy.deepcopy(runtime)
 
     def run_checker(self, decisions: dict, runtime: dict, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:

@@ -101,6 +101,15 @@ def manifest() -> dict:
             "command_text_permission_claim_allowed": False,
             "operator_config_permission_claim_allowed": False,
         },
+        "query_text_policy": {
+            "action_required": True,
+            "action_max_bytes": 128,
+            "resource_scope_required": False,
+            "resource_scope_max_bytes": 256,
+            "bytes_are_copied": True,
+            "utf8_decoding_required_before_allow": False,
+            "command_parser_claim_allowed": False,
+        },
         "fail_closed_cases": [
             fail_closed_case("stale_principal"),
             fail_closed_case("scope_mismatch"),
@@ -492,6 +501,29 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
             "principal_runtime_identity_policy_operator_config_permission_claim_allowed_invalid",
             report["blockers"],
         )
+
+    def test_rejects_missing_or_weakened_query_text_policy(self) -> None:
+        payload = manifest()
+        payload.pop("query_text_policy")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_text_policy_missing", report["blockers"])
+
+        payload = manifest()
+        payload["query_text_policy"]["action_max_bytes"] = 4096
+        payload["query_text_policy"]["resource_scope_required"] = True
+        payload["query_text_policy"]["command_parser_claim_allowed"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_text_policy_action_max_bytes_invalid", report["blockers"])
+        self.assertIn("query_text_policy_resource_scope_required_invalid", report["blockers"])
+        self.assertIn("query_text_policy_command_parser_claim_allowed_invalid", report["blockers"])
 
     def test_rejects_principal_or_permission_claim_sources_before_runtime_identity(self) -> None:
         for key, value in (
