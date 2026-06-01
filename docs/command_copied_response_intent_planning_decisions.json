@@ -63,6 +63,104 @@
     "redaction_flags and audit_correlation_id are required before any future delivery contract",
     "this planning contract cannot reserve a public capability bit or ABI version"
   ],
+  "permission_query_dependency_crosswalk": {
+    "planning_only": true,
+    "source_schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
+    "source_report_schema": "obelisk.permissions-admin-query-failclosed-contract-check.v1",
+    "public_abi_allowed": false,
+    "runtime_delivery_allowed": false,
+    "source_to_intent_fields": [
+      {
+        "source": "plugin_owner_token",
+        "intent": "plugin_owner_token",
+        "required": true
+      },
+      {
+        "source": "principal_handle",
+        "intent": "principal_handle",
+        "required": true
+      },
+      {
+        "source": "principal_generation",
+        "intent": "principal_generation",
+        "required": true
+      },
+      {
+        "source": "principal_scope_flags",
+        "intent": "principal_scope_flags",
+        "required": true
+      },
+      {
+        "source": "policy_epoch",
+        "intent": "permission_policy_epoch",
+        "required": true
+      },
+      {
+        "source": "policy_source_id",
+        "intent": "policy_source_id",
+        "required": true
+      },
+      {
+        "source": "policy_source_generation",
+        "intent": "policy_source_generation",
+        "required": true
+      },
+      {
+        "source": "authority_kind",
+        "intent": "authority_kind",
+        "required": true
+      },
+      {
+        "source": "authority_generation",
+        "intent": "authority_generation",
+        "required": true
+      }
+    ],
+    "decision_to_intent_policy": [
+      {
+        "query_decision": "allow",
+        "requires_provenance": true,
+        "response_intent_allowed_after_future_promotion": true,
+        "fail_closed_without_provenance": true
+      },
+      {
+        "query_decision": "deny",
+        "requires_provenance": false,
+        "response_intent_allowed_after_future_promotion": false,
+        "fail_closed": true
+      },
+      {
+        "query_decision": "unknown",
+        "requires_provenance": false,
+        "response_intent_allowed_after_future_promotion": false,
+        "fail_closed": true
+      }
+    ],
+    "required_source_fail_closed_cases": [
+      "missing_plugin_owner_token",
+      "zero_plugin_owner_token",
+      "unknown_plugin_owner_token",
+      "unloading_plugin_owner_token",
+      "missing_principal_handle",
+      "missing_principal_generation",
+      "missing_principal_scope_flags",
+      "principal_generation_mismatch",
+      "unsupported_principal_scope_flags",
+      "stale_principal",
+      "scope_mismatch",
+      "process_mismatch",
+      "missing_policy_epoch",
+      "missing_policy_source",
+      "missing_policy_source_generation",
+      "policy_source_generation_mismatch",
+      "missing_authority_kind",
+      "missing_authority_generation",
+      "authority_generation_mismatch",
+      "unknown_authority",
+      "plugin_supplied_provenance"
+    ],
+    "non_claim": "planning-only dependency crosswalk; it does not create a public permission query ABI, response intent ABI, reply/send-chat API, runtime delivery, command router, public SDK readiness, or v1 completion"
+  },
   "fail_closed_cases": [
     "promotion flag true",
     "runtime flag true",

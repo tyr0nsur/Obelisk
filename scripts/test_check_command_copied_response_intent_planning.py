@@ -70,6 +70,7 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
             report["query_failclosed_artifact_schema"],
             "obelisk.permissions-admin-query-failclosed-contract.v1",
         )
+        self.assertTrue(report["permission_query_crosswalk_checked"])
         self.assertIn("plugin_owner_token", report["intent_fields"])
         self.assertIn("policy_source_id", report["intent_fields"])
         self.assertIn("redaction_flags", report["intent_fields"])
@@ -83,6 +84,7 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
         self.assertFalse(report["accepted_for_planning"])
         self.assertIn("query_failclosed_artifact_missing", report["blockers"])
         self.assertIn("response_intent_accepts_without_query_failclosed_planning", report["blockers"])
+        self.assertFalse(report["permission_query_crosswalk_checked"])
 
     def test_accepts_query_failclosed_consume_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -107,6 +109,7 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
             report["query_failclosed_artifact_schema"],
             "obelisk.permissions-admin-query-failclosed-contract-check.v1",
         )
+        self.assertTrue(report["permission_query_crosswalk_checked"])
 
     def test_rejects_public_or_runtime_overclaims_in_decisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -155,6 +158,110 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("intent_field_vocabulary_mismatch", report["blockers"])
+
+    def test_rejects_permission_query_crosswalk_field_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            for mapping in payload["permission_query_dependency_crosswalk"]["source_to_intent_fields"]:
+                if mapping["source"] == "principal_generation":
+                    mapping["intent"] = "principal_handle"
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker(
+                "--decisions",
+                str(decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("permission_query_dependency_crosswalk_mapping_mismatch", report["blockers"])
+
+    def test_rejects_permission_query_crosswalk_policy_epoch_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            payload["permission_query_dependency_crosswalk"]["source_to_intent_fields"] = [
+                mapping
+                for mapping in payload["permission_query_dependency_crosswalk"]["source_to_intent_fields"]
+                if mapping["source"] != "policy_epoch"
+            ]
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker(
+                "--decisions",
+                str(decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("permission_query_dependency_crosswalk_mapping_mismatch", report["blockers"])
+
+    def test_rejects_permission_query_crosswalk_deny_unknown_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            for policy in payload["permission_query_dependency_crosswalk"]["decision_to_intent_policy"]:
+                if policy["query_decision"] == "deny":
+                    policy["response_intent_allowed_after_future_promotion"] = True
+                if policy["query_decision"] == "unknown":
+                    policy["fail_closed"] = False
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker(
+                "--decisions",
+                str(decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("permission_query_dependency_crosswalk_decision_policy_field_mismatch", report["blockers"])
+
+    def test_rejects_query_artifact_missing_crosswalk_source_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(query_manifest.read_text(encoding="utf-8"))
+            payload["decision_contract"]["provenance_fields"].remove("policy_source_generation")
+            write_json(root, "permissions-query.json", payload)
+
+            result = run_checker("--query-failclosed-artifact", str(query_manifest), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_failclosed_manifest_invalid", report["blockers"])
+        self.assertIn("permission_query_crosswalk_source_field_missing_from_artifact", report["blockers"])
+
+    def test_rejects_query_artifact_missing_crosswalk_fail_closed_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(query_manifest.read_text(encoding="utf-8"))
+            payload["fail_closed_cases"] = [
+                case
+                for case in payload["fail_closed_cases"]
+                if case["case"] != "authority_generation_mismatch"
+            ]
+            write_json(root, "permissions-query.json", payload)
+
+            result = run_checker("--query-failclosed-artifact", str(query_manifest), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_failclosed_manifest_invalid", report["blockers"])
+        self.assertIn("permission_query_crosswalk_fail_closed_cases_missing_from_artifact", report["blockers"])
 
     def test_rejects_public_header_symbol_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

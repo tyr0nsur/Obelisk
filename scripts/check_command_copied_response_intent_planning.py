@@ -91,6 +91,59 @@ REQUIRED_INTENT_FIELDS = (
     "audit_correlation_id",
     "redaction_flags",
 )
+REQUIRED_PERMISSION_QUERY_CROSSWALK_MAPPINGS = (
+    ("plugin_owner_token", "plugin_owner_token"),
+    ("principal_handle", "principal_handle"),
+    ("principal_generation", "principal_generation"),
+    ("principal_scope_flags", "principal_scope_flags"),
+    ("policy_epoch", "permission_policy_epoch"),
+    ("policy_source_id", "policy_source_id"),
+    ("policy_source_generation", "policy_source_generation"),
+    ("authority_kind", "authority_kind"),
+    ("authority_generation", "authority_generation"),
+)
+REQUIRED_PERMISSION_QUERY_DECISION_POLICIES = {
+    "allow": {
+        "requires_provenance": True,
+        "response_intent_allowed_after_future_promotion": True,
+        "fail_closed_without_provenance": True,
+    },
+    "deny": {
+        "requires_provenance": False,
+        "response_intent_allowed_after_future_promotion": False,
+        "fail_closed": True,
+    },
+    "unknown": {
+        "requires_provenance": False,
+        "response_intent_allowed_after_future_promotion": False,
+        "fail_closed": True,
+    },
+}
+REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT = frozenset(
+    (
+        "missing_plugin_owner_token",
+        "zero_plugin_owner_token",
+        "unknown_plugin_owner_token",
+        "unloading_plugin_owner_token",
+        "missing_principal_handle",
+        "missing_principal_generation",
+        "missing_principal_scope_flags",
+        "principal_generation_mismatch",
+        "unsupported_principal_scope_flags",
+        "stale_principal",
+        "scope_mismatch",
+        "process_mismatch",
+        "missing_policy_epoch",
+        "missing_policy_source",
+        "missing_policy_source_generation",
+        "policy_source_generation_mismatch",
+        "missing_authority_kind",
+        "missing_authority_generation",
+        "authority_generation_mismatch",
+        "unknown_authority",
+        "plugin_supplied_provenance",
+    )
+)
 REQUIRED_INTENT_PROPERTIES = frozenset(
     (
         "intent field names are planning vocabulary only and are not a public struct",
@@ -222,6 +275,107 @@ def string_list(value: Any) -> list[str]:
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
 
+def validate_permission_query_crosswalk(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    crosswalk = payload.get("permission_query_dependency_crosswalk")
+    label = "$.permission_query_dependency_crosswalk"
+    if not isinstance(crosswalk, dict):
+        add(blockers, "permission_query_dependency_crosswalk_missing", label)
+        return
+    if crosswalk.get("planning_only") is not True:
+        add(blockers, "permission_query_dependency_crosswalk_not_planning_only", f"{label}.planning_only")
+    if crosswalk.get("source_schema") != QUERY_CONTRACT_SCHEMA:
+        add(blockers, "permission_query_dependency_crosswalk_source_schema_mismatch", f"{label}.source_schema")
+    if crosswalk.get("source_report_schema") != QUERY_CONTRACT_REPORT_SCHEMA:
+        add(blockers, "permission_query_dependency_crosswalk_source_report_schema_mismatch", f"{label}.source_report_schema")
+    for key in ("public_abi_allowed", "runtime_delivery_allowed"):
+        if crosswalk.get(key) is not False:
+            add(blockers, f"permission_query_dependency_crosswalk_{key}_not_false", f"{label}.{key}")
+
+    mappings = crosswalk.get("source_to_intent_fields")
+    if not isinstance(mappings, list):
+        add(blockers, "permission_query_dependency_crosswalk_mappings_not_list", f"{label}.source_to_intent_fields")
+    else:
+        observed: set[tuple[str, str]] = set()
+        for index, mapping in enumerate(mappings):
+            item_label = f"{label}.source_to_intent_fields[{index}]"
+            if not isinstance(mapping, dict):
+                add(blockers, "permission_query_dependency_crosswalk_mapping_invalid", item_label)
+                continue
+            source = mapping.get("source")
+            intent = mapping.get("intent")
+            if not isinstance(source, str) or not isinstance(intent, str):
+                add(blockers, "permission_query_dependency_crosswalk_mapping_names_invalid", item_label)
+                continue
+            observed.add((source, intent))
+            if mapping.get("required") is not True:
+                add(blockers, "permission_query_dependency_crosswalk_mapping_not_required", f"{item_label}.required")
+        expected = set(REQUIRED_PERMISSION_QUERY_CROSSWALK_MAPPINGS)
+        if observed != expected:
+            add(
+                blockers,
+                "permission_query_dependency_crosswalk_mapping_mismatch",
+                f"{label}.source_to_intent_fields",
+                missing=sorted(f"{src}->{dst}" for src, dst in expected - observed),
+                unexpected=sorted(f"{src}->{dst}" for src, dst in observed - expected),
+            )
+
+    policies = crosswalk.get("decision_to_intent_policy")
+    if not isinstance(policies, list):
+        add(blockers, "permission_query_dependency_crosswalk_decision_policy_not_list", f"{label}.decision_to_intent_policy")
+    else:
+        observed_policies = {
+            item.get("query_decision"): item
+            for item in policies
+            if isinstance(item, dict) and isinstance(item.get("query_decision"), str)
+        }
+        if set(observed_policies) != set(REQUIRED_PERMISSION_QUERY_DECISION_POLICIES):
+            add(
+                blockers,
+                "permission_query_dependency_crosswalk_decision_policy_mismatch",
+                f"{label}.decision_to_intent_policy",
+                missing=sorted(set(REQUIRED_PERMISSION_QUERY_DECISION_POLICIES) - set(observed_policies)),
+                unexpected=sorted(set(observed_policies) - set(REQUIRED_PERMISSION_QUERY_DECISION_POLICIES)),
+            )
+        for decision, required in REQUIRED_PERMISSION_QUERY_DECISION_POLICIES.items():
+            policy = observed_policies.get(decision)
+            if not isinstance(policy, dict):
+                continue
+            for key, expected in required.items():
+                if policy.get(key) is not expected:
+                    add(
+                        blockers,
+                        "permission_query_dependency_crosswalk_decision_policy_field_mismatch",
+                        f"{label}.decision_to_intent_policy[{decision}].{key}",
+                        expected=expected,
+                        value=policy.get(key),
+                    )
+
+    fail_closed = set(string_list(crosswalk.get("required_source_fail_closed_cases")))
+    if not REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT.issubset(fail_closed):
+        add(
+            blockers,
+            "permission_query_dependency_crosswalk_fail_closed_cases_missing_required",
+            f"{label}.required_source_fail_closed_cases",
+            missing=sorted(REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT - fail_closed),
+        )
+    non_claim = crosswalk.get("non_claim")
+    if not isinstance(non_claim, str) or not all(
+        token in non_claim
+        for token in (
+            "planning-only",
+            "does not create",
+            "public permission query ABI",
+            "response intent ABI",
+            "reply/send-chat API",
+            "runtime delivery",
+            "command router",
+            "public SDK readiness",
+            "v1 completion",
+        )
+    ):
+        add(blockers, "permission_query_dependency_crosswalk_non_claim_incomplete", f"{label}.non_claim")
+
+
 def validate_main_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> list[str]:
     if payload.get("schema") != DECISIONS_SCHEMA:
         add(blockers, "decisions_schema_mismatch", "$.schema")
@@ -281,6 +435,7 @@ def validate_main_decisions(payload: dict[str, Any], blockers: list[dict[str, An
     if not REQUIRED_NON_CLAIMS.issubset(non_claims):
         add(blockers, "non_claims_missing_required", "$.non_claims")
 
+    validate_permission_query_crosswalk(payload, blockers)
     for token in DEFAULT_FORBIDDEN_HEADER_TOKENS:
         if token not in string_list(payload.get("public_header_forbidden_tokens")):
             add(blockers, "public_header_forbidden_token_missing", "$.public_header_forbidden_tokens", token=token)
@@ -352,15 +507,103 @@ def validate_public_header(path: Path, tokens: list[str], blockers: list[dict[st
         add(blockers, "public_header_contains_command_response_intent_symbol", str(path), tokens=present)
 
 
-def validate_query_failclosed_artifact(path: Path | None, blockers: list[dict[str, Any]]) -> str | None:
+def query_artifact_summary(payload: dict[str, Any], schema: str) -> dict[str, list[str] | str | bool | None]:
+    if schema == QUERY_CONTRACT_REPORT_SCHEMA:
+        return {
+            "schema": schema,
+            "ready": payload.get("mode") == "consume" and payload.get("ready") is True,
+            "query_fields": string_list(payload.get("query_fields")),
+            "decisions": string_list(payload.get("decisions")),
+            "provenance_fields": string_list(payload.get("provenance_fields")),
+            "fail_closed_cases": string_list(payload.get("fail_closed_cases")),
+            "allow_capable_authority_kinds": string_list(payload.get("allow_capable_authority_kinds")),
+        }
+    validation = query_failclosed_contract.validate_manifest(payload, check_mode="consume")
+    return {
+        "schema": schema,
+        "ready": not validation.blockers,
+        "query_fields": validation.query_fields,
+        "decisions": validation.decisions,
+        "provenance_fields": validation.provenance_fields,
+        "fail_closed_cases": validation.fail_closed_cases,
+        "allow_capable_authority_kinds": validation.allow_capable_authority_kinds,
+    }
+
+
+def validate_query_summary_against_crosswalk(
+    decisions: dict[str, Any],
+    summary: dict[str, list[str] | str | bool | None] | None,
+    blockers: list[dict[str, Any]],
+) -> None:
+    if summary is None:
+        return
+    crosswalk = decisions.get("permission_query_dependency_crosswalk")
+    if not isinstance(crosswalk, dict):
+        return
+
+    query_fields = set(summary.get("query_fields") if isinstance(summary.get("query_fields"), list) else [])
+    provenance_fields = set(summary.get("provenance_fields") if isinstance(summary.get("provenance_fields"), list) else [])
+    decisions_seen = set(summary.get("decisions") if isinstance(summary.get("decisions"), list) else [])
+    fail_closed = set(summary.get("fail_closed_cases") if isinstance(summary.get("fail_closed_cases"), list) else [])
+    allow_capable = set(
+        summary.get("allow_capable_authority_kinds") if isinstance(summary.get("allow_capable_authority_kinds"), list) else []
+    )
+
+    for source, intent in REQUIRED_PERMISSION_QUERY_CROSSWALK_MAPPINGS:
+        source_pool = provenance_fields if source in {"policy_epoch", "policy_source_id", "policy_source_generation", "authority_kind", "authority_generation"} else query_fields
+        if source not in source_pool:
+            add(
+                blockers,
+                "permission_query_crosswalk_source_field_missing_from_artifact",
+                "permission_query_dependency_crosswalk.source_to_intent_fields",
+                source=source,
+                intent=intent,
+            )
+        if intent not in REQUIRED_INTENT_FIELDS:
+            add(
+                blockers,
+                "permission_query_crosswalk_intent_field_missing_from_vocabulary",
+                "permission_query_dependency_crosswalk.source_to_intent_fields",
+                source=source,
+                intent=intent,
+            )
+
+    if decisions_seen != set(REQUIRED_PERMISSION_QUERY_DECISION_POLICIES):
+        add(
+            blockers,
+            "permission_query_crosswalk_decisions_missing_from_artifact",
+            "permission_query_dependency_crosswalk.decision_to_intent_policy",
+            missing=sorted(set(REQUIRED_PERMISSION_QUERY_DECISION_POLICIES) - decisions_seen),
+            unexpected=sorted(decisions_seen - set(REQUIRED_PERMISSION_QUERY_DECISION_POLICIES)),
+        )
+    if not REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT.issubset(fail_closed):
+        add(
+            blockers,
+            "permission_query_crosswalk_fail_closed_cases_missing_from_artifact",
+            "permission_query_dependency_crosswalk.required_source_fail_closed_cases",
+            missing=sorted(REQUIRED_QUERY_FAIL_CLOSED_FOR_RESPONSE_INTENT - fail_closed),
+        )
+    if allow_capable != {"runtime-local"}:
+        add(
+            blockers,
+            "permission_query_crosswalk_allow_capable_authority_not_runtime_local_only",
+            "permission_query_dependency_crosswalk.allow_capable_authority_kinds",
+            observed=sorted(allow_capable),
+        )
+
+
+def validate_query_failclosed_artifact(
+    path: Path | None, blockers: list[dict[str, Any]]
+) -> tuple[str | None, dict[str, list[str] | str | bool | None] | None]:
     if path is None:
         add(blockers, "query_failclosed_artifact_missing", "--query-failclosed-artifact")
-        return None
+        return None, None
     payload = load_json(path, "query-failclosed-artifact")
     schema = payload.get("schema")
     if schema not in {QUERY_CONTRACT_SCHEMA, QUERY_CONTRACT_REPORT_SCHEMA}:
         add(blockers, "query_failclosed_artifact_schema_mismatch", str(path), schema=schema)
-        return None
+        return None, None
+    summary = query_artifact_summary(payload, str(schema))
     if schema == QUERY_CONTRACT_REPORT_SCHEMA:
         if payload.get("mode") != "consume" or payload.get("ready") is not True:
             add(blockers, "query_failclosed_report_not_consume_ready", str(path))
@@ -373,7 +616,7 @@ def validate_query_failclosed_artifact(path: Path | None, blockers: list[dict[st
                 str(path),
                 reasons=[blocker["reason"] for blocker in validation.blockers],
             )
-    return str(schema)
+    return str(schema), summary
 
 
 def validate_permissions_public_readiness(
@@ -433,7 +676,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     validate_dependency_docs(command_response, bridge, commands_replies, permissions, blockers)
     validate_surfaces(surfaces, blockers)
     validate_public_header(args.public_header, forbidden_tokens, blockers)
-    query_artifact_schema = validate_query_failclosed_artifact(args.query_failclosed_artifact, blockers)
+    query_artifact_schema, query_summary = validate_query_failclosed_artifact(args.query_failclosed_artifact, blockers)
+    validate_query_summary_against_crosswalk(decisions, query_summary, blockers)
     validate_permissions_public_readiness(args, query_artifact_schema, blockers)
     positive_claim = find_positive_claim(decisions)
     if positive_claim is not None:
@@ -455,6 +699,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "intent_fields": list(REQUIRED_INTENT_FIELDS),
         "dependency_chain": [IDENTITY_SURFACE, PERMISSIONS_SURFACE, COMMAND_RESPONSE_SURFACE, COMMANDS_REPLIES_SURFACE],
         "query_failclosed_artifact_schema": query_artifact_schema,
+        "permission_query_crosswalk_checked": query_summary is not None,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
     }
