@@ -318,6 +318,36 @@ V010_CHAT_MESSAGE_EVENT_PAYLOAD_FIELDS = [
     "sequence",
     "message",
 ]
+UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS = (
+    "OBELISK_API_CAPABILITY_CHAT_COMMANDS",
+    "OBELISK_API_CAPABILITY_CHAT_RESPONSES",
+    "OBELISK_API_CAPABILITY_SEND_CHAT",
+    "OBELISK_API_CAPABILITY_CHAT_MODERATION",
+    "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
+    "OBELISK_API_CAPABILITY_PERMISSION_CHECKS",
+    "ObeliskChatCommand",
+    "ObeliskChatCommandEvent",
+    "ObeliskChatCommandContext",
+    "ObeliskChatCommandReply",
+    "ObeliskChatResponse",
+    "ObeliskChatModeration",
+    "ObeliskPermissionQuery",
+    "RegisterChatCommand",
+    "RegisterCommand",
+    "RegisterCommandHandler",
+    "RegisterChatRoute",
+    "RegisterChatResponse",
+    "RegisterChatModeration",
+    "UnregisterChatCommand",
+    "UnregisterCommand",
+    "UnregisterCommandHandler",
+    "ReplyToCommand",
+    "ReplyToChat",
+    "SendChat",
+    "SendChatMessage",
+    "BroadcastChat",
+    "ModerateChat",
+)
 V010_GAMEPLAY_POLICY_TARGET_SETS = [
     "structure-observer-intake",
     "minimal-second-source-intake",
@@ -818,6 +848,7 @@ UNPROMOTED_SDK_CONSUMER_API_TOKENS = (
     "SetReturnOverride",
     "return_override",
     *UNPROMOTED_COMMAND_ADMIN_PLAYER_API_TOKENS,
+    *UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS,
 )
 PUBLIC_SDK_OPTIONAL_API_CONSUMERS = [
     REPO_ROOT / "tests" / "sdk_consumer" / "MinimalPlugin.cpp",
@@ -2370,6 +2401,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "GiveItem",
             "RemoveItem",
             "SetItemQuantity",
+            *UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS,
         )
         for token in forbidden_public_header_tokens:
             with self.subTest(token=token):
@@ -4564,6 +4596,38 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 for forbidden in forbidden_payload_fields:
                     self.assertNotIn(forbidden, lowered)
 
+    def test_public_chat_abi_stays_notification_only_without_command_response_symbols(self) -> None:
+        header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
+        stripped_header = strip_c_comments(header)
+
+        self.assertEqual(
+            [name for name in public_api_capability_defines(header) if "CHAT" in name],
+            ["OBELISK_API_CAPABILITY_CHAT_EVENTS"],
+        )
+        self.assertEqual(
+            [name for name in public_struct_typedefs(header) if "Chat" in name],
+            ["ObeliskChatMessageEvent"],
+        )
+        self.assertEqual(
+            [name for name in public_enum_typedefs(header) if "Chat" in name],
+            ["ObeliskChatSendMode"],
+        )
+        self.assertEqual(
+            [name for name in public_callback_typedefs(header) if "Chat" in name],
+            ["ObeliskChatMessageEventCallback"],
+        )
+        self.assertEqual(
+            [name for name in obelisk_api_field_names(header) if "Chat" in name],
+            [
+                "RegisterChatMessageEventWithOwnerTokenHandle",
+                "UnregisterChatMessageEventWithOwnerToken",
+            ],
+        )
+
+        for token in UNPROMOTED_CHAT_COMMAND_RESPONSE_API_TOKENS:
+            with self.subTest(token=token):
+                self.assertNotIn(token, stripped_header)
+
     def test_player_identity_must_remain_a_separate_future_surface_not_event_extension(self) -> None:
         header = PUBLIC_API_HEADER.read_text(encoding="utf-8")
         stripped_header = strip_c_comments(header)
@@ -5582,6 +5646,13 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "chat command helper callback survived shutdown unregister",
             "chat command helper user data survived shutdown unregister",
             "chat command helper registered without chat capability",
+            "chat command helper unexpectedly registered ProcessEvent callback",
+            "DispatchValidChatMessageEventWithText(\"!help\")",
+            "DispatchValidChatMessageEventWithText(\"/help raw-secret\")",
+            "Local chat command matched principal=unknown command=help",
+            "Local chat command rejected reason=unknown-command principal=unknown command=unknown",
+            "chat command helper logged raw command arguments",
+            "chat command helper did not reject malformed chat message events",
         ):
             with self.subTest(file="tests/sdk_consumer/SdkConsumerFixture.cpp", token=token):
                 self.assertIn(token, fixture)

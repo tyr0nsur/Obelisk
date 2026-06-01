@@ -105,6 +105,8 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   plugin-invisible. This is a runtime-evidence collection path only; it does not promote
   player identity/principal, lookup, permissions/admin, commands/replies, runtime
   readiness, public SDK readiness, or v1 SDK completion.
+- Player-principal runtime evidence must use the exact single-module, plugins-disabled,
+  dispatch-limit-`0`, no-sibling-observer/debug marker window.
 - Player-principal lifecycle observer semantics are strict: `session_start` and
   `candidate_created` require copied `bIsFromLogin=1` and `ReturnValue=1`; other
   canonical bool combinations remain `session_start_rejected` with no principal action.
@@ -150,19 +152,16 @@ recovery context is not active routing; use `git log --oneline -1` for the check
   FName/GObjects scan. The next strict ResourceHandle blocker is rejected runtime object
   samples plus runtime serial reuse/wraparound semantics, with a future-runtime-observation-plan
   only after an operator-approved live-ops brief names the exact debug target.
-- Static field-window evidence clears only the field-window packaging blocker, is not a
-  `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are
-  present as package-shape evidence only, not a `v1.0` completion marker.
-
+- Static field-window evidence clears only the field-window packaging blocker, is not a `v1.0` SDK blocker, route shortcut, or completion signal. CMake package target are present as package-shape evidence only, not a `v1.0` completion marker.
 ## Priority Next Steps
 
 - Primary v1 route: player identity has accepted offline/core/reflection inventory,
   12/12 candidate fixtures for the exact 12-target `players-identity-lifecycle-intake`
-  set, distinct second-source layout evidence, and consume-only lifecycle/principal
-  manifests. Current blocker: approved runtime principal lifecycle evidence, still with
-  no identity promotion, public SDK readiness, or runtime readiness. Do not rerun the completed admin snapshot,
-  second-source layout, lifecycle layout, or broad discovery routes unless a new binary
-  hash or rejected evidence requires it.
+  set, distinct second-source layout evidence, consume-only lifecycle/principal manifests,
+  and an exact runtime evidence builder/checker path. Current blocker: a real approved
+  copied runtime principal lifecycle evidence summary, still with no identity promotion,
+  public SDK readiness, or runtime readiness. Do not rerun completed broad/offline routes
+  unless a new binary hash or rejected evidence requires it.
 - Demand-map priority from local NextGenPlugins dictionary signals is P0 principal ->
   permissions/admin -> command response; P1 economy/storage/operator
   ingress, inventory/items mutation, and structure/build policy; P2 dinos/tribes/
