@@ -8,6 +8,7 @@ server logs, does not start servers, and does not promote public player identity
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -35,6 +36,36 @@ EXPECTED_RUNTIME_LOG_POSTURE = {
     "reflection_scanner_disabled": True,
     "plugins_disabled": True,
 }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def artifact(path: Path) -> dict[str, str]:
+    return {"path": str(path), "sha256": sha256_file(path)}
+
+
+def report_identity(report: dict[str, Any]) -> dict[str, str]:
+    identity = {
+        "artifact_kind": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle.v1",
+        "capture_id": str(report.get("operational_window", {}).get("run_id")),
+        "evidence_pack_id": f"player-principal-lifecycle-bundle-{report.get('operational_window', {}).get('run_id')}",
+    }
+    material = {
+        "artifact_identity": identity,
+        "report": report,
+    }
+    return {
+        **identity,
+        "artifact_sha256": hashlib.sha256(
+            json.dumps(material, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest(),
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -345,14 +376,14 @@ def main() -> int:
             "target": window_check.get("target"),
         },
         "outputs": {
-            "summary": str(summary_path),
-            "window_manifest_check": str(window_check_path),
-            "manifest": str(manifest_path),
-            "check": str(check_path),
-            "promote_check": str(promote_check_path),
-            "public_readiness_check": str(public_check_path),
-            "runtime_readiness_check": str(runtime_check_path),
-            "consume_gate": str(gate_path),
+            "summary": artifact(summary_path),
+            "window_manifest_check": artifact(window_check_path),
+            "manifest": artifact(manifest_path),
+            "check": artifact(check_path),
+            "promote_check": artifact(promote_check_path),
+            "public_readiness_check": artifact(public_check_path),
+            "runtime_readiness_check": artifact(runtime_check_path),
+            "consume_gate": artifact(gate_path),
         },
         "summary_modules": sorted(summary.get("modules", {}).keys()),
         "observed_runtime_cases": check.get("observed_runtime_cases", []),
@@ -368,6 +399,7 @@ def main() -> int:
             "or v1 SDK completion"
         ),
     }
+    report["bundle_report_identity"] = report_identity(report)
     report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

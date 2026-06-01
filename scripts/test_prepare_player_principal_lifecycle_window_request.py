@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
@@ -64,10 +65,28 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
             env = (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines()
             markdown = (output_dir / "operator-approval-request.md").read_text(encoding="utf-8")
+            output_sha256 = {
+                filename: hashlib.sha256((output_dir / filename).read_bytes()).hexdigest()
+                for filename in (
+                    "observer-window.env",
+                    "window-request.json",
+                    "operator-approval-request.md",
+                )
+            }
 
         self.assertEqual(report["status"], "prepared")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertIn("no server operation", report["non_claim"])
+        for name, filename in (
+            ("observer_env", "observer-window.env"),
+            ("request_json", "window-request.json"),
+            ("operator_request", "operator-approval-request.md"),
+        ):
+            self.assertEqual(report["outputs"][name]["path"], str(output_dir / filename))
+            self.assertEqual(
+                report["outputs"][name]["sha256"],
+                output_sha256[filename],
+            )
         self.assertEqual(request["schema"], "obelisk.player-principal-lifecycle-window-request.v1")
         self.assertEqual(request["status"], "candidate_only_request_pack")
         self.assertEqual(request["approval_required"], "current-turn operator-approved runtime window, not standing approval")

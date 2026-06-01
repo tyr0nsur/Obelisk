@@ -86,6 +86,30 @@ prepare_root "${root_stable}"
     --allow-stopped \
     | grep -F 'player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2' >/dev/null
 
+"${CHECK}" \
+    --instance arkserver2 \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped \
+    --json > "${TMP_DIR}/stable-preflight.json"
+python3 - "${TMP_DIR}/stable-preflight.json" "${server_sha}" <<'PY'
+import json
+import sys
+
+path, server_sha = sys.argv[1:]
+payload = json.loads(open(path, encoding="utf-8").read())
+assert payload["schema"] == "obelisk.player-principal-lifecycle-preflight.v1"
+assert payload["ready"] is True
+assert payload["mode"] == "stable"
+assert payload["instance"] == "arkserver2"
+assert payload["server_binary"]["sha256"] == server_sha
+assert payload["env_file"] is None
+assert "not runtime approval" in payload["non_claim"]
+PY
+
 proc_root="${TMP_DIR}/proc"
 write_proc_fixture "${proc_root}" 4242 "${root_stable}" "TheIsland"
 "${CHECK}" \
@@ -116,6 +140,29 @@ write_observer_env "${observer_env}" "${server_sha}"
     --env-file "${observer_env}" \
     --allow-stopped \
     | grep -F 'player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2' >/dev/null
+
+"${CHECK}" \
+    --instance arkserver2 \
+    --mode observer-window \
+    --obelisk-root "${root_window}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --env-file "${observer_env}" \
+    --allow-stopped \
+    --json > "${TMP_DIR}/observer-preflight.json"
+python3 - "${TMP_DIR}/observer-preflight.json" "${observer_env}" <<'PY'
+import hashlib
+import json
+import sys
+
+path, env_path = sys.argv[1:]
+payload = json.loads(open(path, encoding="utf-8").read())
+assert payload["mode"] == "observer-window"
+assert payload["env_file"]["path"] == env_path
+assert payload["env_file"]["sha256"] == hashlib.sha256(open(env_path, "rb").read()).hexdigest()
+assert payload["posture_check"] == "accepted"
+PY
 
 assert_fail observer-window-missing-env "${CHECK}" \
     --instance arkserver2 \

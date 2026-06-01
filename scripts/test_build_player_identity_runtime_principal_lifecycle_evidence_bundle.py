@@ -260,6 +260,19 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.runtime-readiness-check.json").is_file())
             self.assertTrue((output_dir / "approved-runtime-principal-lifecycle-evidence.consume-gate.json").is_file())
             self.assertTrue((output_dir / "evidence-bundle-report.json").is_file())
+            for output_name, output in report["outputs"].items():
+                output_path = Path(output["path"])
+                self.assertTrue(output_path.is_file(), output_name)
+                self.assertEqual(output["sha256"], hashlib.sha256(output_path.read_bytes()).hexdigest())
+            identity = report["bundle_report_identity"]
+            self.assertEqual(
+                identity["artifact_kind"],
+                "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle.v1",
+            )
+            self.assertEqual(
+                identity["capture_id"],
+                "20260601T120000Z-player-principal-lifecycle",
+            )
             self.assertTrue(report["operational_window"]["manifest_ready"])
             self.assertEqual(report["operational_window"]["obelisk_commit"], "test-commit")
 

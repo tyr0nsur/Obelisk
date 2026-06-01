@@ -9,6 +9,7 @@ promotion.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from datetime import datetime, timezone
@@ -238,6 +239,13 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
     return "\n".join(lines)
 
 
+def artifact(path: Path) -> dict[str, str]:
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
 def main() -> int:
     args = parse_args()
     validate_args(args)
@@ -260,9 +268,9 @@ def main() -> int:
         "status": "prepared",
         "approval_required": APPROVAL_TEXT,
         "outputs": {
-            "observer_env": str(env_path),
-            "request_json": str(request_json_path),
-            "operator_request": str(request_md_path),
+            "observer_env": artifact(env_path),
+            "request_json": artifact(request_json_path),
+            "operator_request": artifact(request_md_path),
         },
         "target": payload["target"],
         "run_id": args.run_id,

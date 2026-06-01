@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 usage() {
     cat <<'EOF'
 Usage: scripts/check_player_principal_lifecycle_preflight.sh [options]
@@ -20,6 +22,7 @@ Options:
   --proc-root <path>              Procfs root for posture checks. Default: /proc.
   --allow-stopped                 Accept no running process after marker/SHA checks.
   --offline-only                  Reject live server paths and running-process checks.
+  --json                          Emit a stable JSON sidecar instead of text.
   -h, --help                      Show this help.
 EOF
 }
@@ -35,6 +38,7 @@ ENV_FILE=""
 PROC_ROOT="/proc"
 ALLOW_STOPPED=0
 OFFLINE_ONLY=0
+JSON_OUTPUT=0
 SERVER_ROOT="/servidor/ark"
 APPROVED_OFFLINE_ROOT="/servidor/ark/workspace-offline"
 
@@ -82,6 +86,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --offline-only)
             OFFLINE_ONLY=1
+            shift
+            ;;
+        --json)
+            JSON_OUTPUT=1
             shift
             ;;
         -h|--help)
@@ -448,7 +456,7 @@ if [[ "${actual_sha}" != "${EXPECTED_BINARY_SHA256}" ]]; then
     exit 1
 fi
 
-scripts/check_linuxgsm_wrapper_drift.sh --installed "${INSTALLED_WRAPPER}" >/dev/null
+"${SCRIPT_DIR}/check_linuxgsm_wrapper_drift.sh" --installed "${INSTALLED_WRAPPER}" >/dev/null
 
 MARKER_DIR="${OBELISK_ROOT%/}/state/instances/${INSTANCE}"
 require_marker_dir
@@ -502,7 +510,7 @@ if [[ -n "${MAP}" ]]; then
             echo "Running observer-window posture is not checked by this preflight; use it before launch or after rollback." >&2
             exit 1
         fi
-        scripts/check_obelisk_server_posture.sh \
+        "${SCRIPT_DIR}/check_obelisk_server_posture.sh" \
             --expect-stable \
             --pid "${shooter_pid}" \
             --instance "${INSTANCE}" \
@@ -513,5 +521,63 @@ if [[ -n "${MAP}" ]]; then
     fi
 fi
 
-printf 'player_principal_lifecycle_preflight=ok mode=%s instance=%s binary_sha256=%s\n' \
-    "${MODE}" "${INSTANCE}" "${actual_sha}"
+wrapper_sha="$(sha256sum "${INSTALLED_WRAPPER}" | awk '{print $1}')"
+env_sha=""
+if [[ -n "${ENV_FILE}" ]]; then
+    env_sha="$(sha256sum "${ENV_FILE}" | awk '{print $1}')"
+fi
+
+if [[ "${JSON_OUTPUT}" == "1" ]]; then
+    export OBELISK_PREFLIGHT_MODE="${MODE}"
+    export OBELISK_PREFLIGHT_INSTANCE="${INSTANCE}"
+    export OBELISK_PREFLIGHT_MAP="${MAP}"
+    export OBELISK_PREFLIGHT_BINARY="${SERVER_BINARY}"
+    export OBELISK_PREFLIGHT_BINARY_SHA="${actual_sha}"
+    export OBELISK_PREFLIGHT_ROOT="${OBELISK_ROOT}"
+    export OBELISK_PREFLIGHT_WRAPPER="${INSTALLED_WRAPPER}"
+    export OBELISK_PREFLIGHT_WRAPPER_SHA="${wrapper_sha}"
+    export OBELISK_PREFLIGHT_ENV="${ENV_FILE}"
+    export OBELISK_PREFLIGHT_ENV_SHA="${env_sha}"
+    export OBELISK_PREFLIGHT_MARKER_DIR="${MARKER_DIR}"
+    export OBELISK_PREFLIGHT_OFFLINE_ONLY="${OFFLINE_ONLY}"
+    export OBELISK_PREFLIGHT_ALLOW_STOPPED="${ALLOW_STOPPED}"
+    python3 - <<'PY'
+import json
+import os
+
+def optional_file(path: str, sha256: str) -> dict | None:
+    if not path:
+        return None
+    return {"path": path, "sha256": sha256}
+
+payload = {
+    "schema": "obelisk.player-principal-lifecycle-preflight.v1",
+    "ready": True,
+    "mode": os.environ["OBELISK_PREFLIGHT_MODE"],
+    "instance": os.environ["OBELISK_PREFLIGHT_INSTANCE"],
+    "map": os.environ["OBELISK_PREFLIGHT_MAP"] or None,
+    "server_binary": {
+        "path": os.environ["OBELISK_PREFLIGHT_BINARY"],
+        "sha256": os.environ["OBELISK_PREFLIGHT_BINARY_SHA"],
+    },
+    "obelisk_root": os.environ["OBELISK_PREFLIGHT_ROOT"],
+    "installed_wrapper": {
+        "path": os.environ["OBELISK_PREFLIGHT_WRAPPER"],
+        "sha256": os.environ["OBELISK_PREFLIGHT_WRAPPER_SHA"],
+    },
+    "env_file": optional_file(
+        os.environ["OBELISK_PREFLIGHT_ENV"],
+        os.environ["OBELISK_PREFLIGHT_ENV_SHA"],
+    ),
+    "marker_dir": os.environ["OBELISK_PREFLIGHT_MARKER_DIR"],
+    "offline_only": os.environ["OBELISK_PREFLIGHT_OFFLINE_ONLY"] == "1",
+    "allow_stopped": os.environ["OBELISK_PREFLIGHT_ALLOW_STOPPED"] == "1",
+    "posture_check": "accepted",
+    "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+}
+print(json.dumps(payload, indent=2, sort_keys=True))
+PY
+else
+    printf 'player_principal_lifecycle_preflight=ok mode=%s instance=%s binary_sha256=%s\n' \
+        "${MODE}" "${INSTANCE}" "${actual_sha}"
+fi
