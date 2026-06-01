@@ -242,6 +242,38 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
         self.assertEqual(end["details"]["role"], ["session_end"])
         self.assertEqual(end["details"]["principal_action"], ["candidate_invalidated"])
 
+    def test_accepts_safe_player_principal_lifecycle_rejections(self) -> None:
+        result = self.run_analyzer(
+            [
+                "[info] PlayerPrincipalLifecycleObserver enabled "
+                "binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 "
+                "target_set=players-lifecycle-anchor-candidates limit=10 dispatch_limit=0 "
+                "delivery_claim=none principal_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=1 role=session_start_rejected "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=0,1 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=none principal_id_logged=false principal_generation_logged=false "
+                "delivery_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=2 role=session_start_rejected "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=1,0 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=none principal_id_logged=false principal_generation_logged=false "
+                "delivery_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=3 role=session_start_rejected "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=0,0 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=none principal_id_logged=false principal_generation_logged=false "
+                "delivery_claim=none.",
+            ]
+        )
+
+        module = result["modules"]["player_principal_lifecycle"]
+        self.assertEqual(module["accepted_count"], 3)
+        self.assertNotIn("malformed_observer_lines", module["blockers"])
+
     def test_flags_malformed_player_principal_lifecycle_lines(self) -> None:
         result = self.run_analyzer(
             [
@@ -299,12 +331,29 @@ class RuntimeObserverLogAnalyzerTests(unittest.TestCase):
                 "copied_bool_fields=Exiting copied_bool_values=1 redacted_count=1 redacted_fields=Exiting "
                 "principal_action=candidate_invalidated principal_id_logged=false "
                 "principal_generation_logged=false delivery_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=4 role=session_start "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,ReturnValue copied_bool_values=0,1 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=candidate_created principal_id_logged=false "
+                "principal_generation_logged=false delivery_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=5 role=session_start_rejected "
+                "target=ShooterGameMode.HandleNewPlayer post_original=true "
+                "copied_bool_fields=bIsFromLogin,bIsFromLogin copied_bool_values=1,0 "
+                "redacted_count=3 redacted_fields=NewPlayer,PlayerData,PlayerCharacter "
+                "principal_action=none principal_id_logged=false principal_generation_logged=false "
+                "delivery_claim=none.",
+                "[info] PlayerPrincipalLifecycleObserver event sequence=6 role=session_end "
+                "target=ShooterGameMode.OnLogout post_original=true copied_bool_fields= "
+                "copied_bool_values= redacted_count=1 redacted_fields=Exiting,steamid "
+                "principal_action=candidate_invalidated principal_id_logged=false "
+                "principal_generation_logged=false delivery_claim=none.",
             ]
         )
 
         module = result["modules"]["player_principal_lifecycle"]
         self.assertEqual(module["accepted_count"], 0)
-        self.assertEqual(module["malformed_observer_lines"], 3)
+        self.assertEqual(module["malformed_observer_lines"], 6)
         self.assertIn("malformed_observer_lines", module["blockers"])
 
     def test_keeps_same_field_name_layouts_separate_by_function(self) -> None:

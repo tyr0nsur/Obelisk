@@ -210,10 +210,46 @@ def add_unique(values: list[Any], value: Any) -> None:
         values.append(value)
 
 
-def csv_values(value: str) -> list[str]:
+PLAYER_PRINCIPAL_FORBIDDEN_CSV_TOKENS = {
+    "eosid",
+    "fname_index",
+    "fnames",
+    "gobjects",
+    "ipaddress",
+    "playerdataid",
+    "playerid",
+    "playername",
+    "raw_params",
+    "raw_pointer",
+    "resourcehandle",
+    "steamid",
+    "tribeid",
+    "uobject_address",
+    "uobjectpointer",
+    "uniquenetid",
+}
+
+
+def csv_values(
+    value: str,
+    *,
+    allowed: set[str] | None = None,
+    allow_duplicates: bool = False,
+) -> list[str] | None:
     if value == "":
         return []
-    return value.split(",")
+    parts = value.split(",")
+    if any(part == "" for part in parts):
+        return None
+    if not allow_duplicates and len(set(parts)) != len(parts):
+        return None
+    for part in parts:
+        lowered = part.lower()
+        if lowered in PLAYER_PRINCIPAL_FORBIDDEN_CSV_TOKENS:
+            return None
+        if allowed is not None and part not in allowed:
+            return None
+    return parts
 
 
 def player_principal_lifecycle_gate_is_safe(match: re.Match[str]) -> bool:
@@ -229,14 +265,27 @@ def player_principal_lifecycle_event_is_safe(match: re.Match[str]) -> bool:
     target = match.group("target")
     role = match.group("role")
     post_original = match.group("post_original")
-    copied_bool_fields = csv_values(match.group("copied_bool_fields"))
-    copied_bool_values = csv_values(match.group("copied_bool_values"))
+    copied_bool_fields = csv_values(
+        match.group("copied_bool_fields"),
+        allowed={"bIsFromLogin", "ReturnValue"},
+    )
+    copied_bool_values = csv_values(
+        match.group("copied_bool_values"),
+        allowed={"0", "1"},
+        allow_duplicates=True,
+    )
     redacted_count = int(match.group("redacted_count"))
-    redacted_fields = csv_values(match.group("redacted_fields"))
+    redacted_fields = csv_values(
+        match.group("redacted_fields"),
+        allowed={"NewPlayer", "PlayerData", "PlayerCharacter", "Exiting"},
+    )
     principal_action = match.group("principal_action")
 
     if (
-        post_original != "true"
+        copied_bool_fields is None
+        or copied_bool_values is None
+        or redacted_fields is None
+        or post_original != "true"
         or match.group("principal_id_logged") != "false"
         or match.group("principal_generation_logged") != "false"
         or match.group("delivery_claim") != "none"
@@ -246,15 +295,16 @@ def player_principal_lifecycle_event_is_safe(match: re.Match[str]) -> bool:
     if target == "ShooterGameMode.HandleNewPlayer":
         if copied_bool_fields != ["bIsFromLogin", "ReturnValue"]:
             return False
-        if len(copied_bool_values) != 2 or any(value not in {"0", "1"} for value in copied_bool_values):
+        if len(copied_bool_values) != 2:
             return False
         if redacted_count != 3 or redacted_fields != ["NewPlayer", "PlayerData", "PlayerCharacter"]:
             return False
+        is_from_login = copied_bool_values[0]
         return_value = copied_bool_values[1]
         if role == "session_start":
-            return principal_action == "candidate_created" and return_value == "1"
+            return principal_action == "candidate_created" and copied_bool_values == ["1", "1"]
         if role == "session_start_rejected":
-            return principal_action == "none" and return_value == "0"
+            return principal_action == "none" and (is_from_login == "0" or return_value == "0")
         return False
 
     if target == "ShooterGameMode.OnLogout":

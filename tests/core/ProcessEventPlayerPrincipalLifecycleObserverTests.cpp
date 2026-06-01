@@ -219,6 +219,20 @@ namespace
         Require(observation.Action == Observer::PrincipalAction::None,
                 "session_start_rejected action mismatch");
 
+        Require(Observer::TryBuildCopiedLifecycleObservation(HandleNewPlayerInvocation(0, 1), observation),
+                "non-login HandleNewPlayer observation rejected");
+        Require(observation.Role == Observer::LifecycleRole::SessionStartRejected,
+                "non-login session_start_rejected role mismatch");
+        Require(observation.Action == Observer::PrincipalAction::None,
+                "non-login session_start_rejected action mismatch");
+
+        Require(Observer::TryBuildCopiedLifecycleObservation(HandleNewPlayerInvocation(0, 0), observation),
+                "non-login rejected HandleNewPlayer observation rejected");
+        Require(observation.Role == Observer::LifecycleRole::SessionStartRejected,
+                "non-login rejected session_start_rejected role mismatch");
+        Require(observation.Action == Observer::PrincipalAction::None,
+                "non-login rejected session_start_rejected action mismatch");
+
         Require(!Observer::TryBuildCopiedLifecycleObservation(HandleNewPlayerInvocation(2, 1), observation),
                 "non-canonical lifecycle bool accepted");
         Require(observation.BoolCount == 0, "failed lifecycle copy left bools");

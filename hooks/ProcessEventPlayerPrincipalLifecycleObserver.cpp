@@ -290,6 +290,7 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
 
             bool sawBIsFromLogin = false;
             bool sawReturnValue = false;
+            bool isFromLogin = false;
             bool returnValue = false;
             for (const auto& field : invocation.Fields)
             {
@@ -315,7 +316,10 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
                         return false;
                     }
                     if (field.Field == LifecycleField::BIsFromLogin)
+                    {
                         sawBIsFromLogin = true;
+                        isFromLogin = copied.Value;
+                    }
                     if (field.Field == LifecycleField::ReturnValue)
                     {
                         sawReturnValue = true;
@@ -335,8 +339,8 @@ namespace Obelisk::Hooks::ProcessEventPlayerPrincipalLifecycleObserver
                 return false;
             }
 
-            out.Role = returnValue ? LifecycleRole::SessionStart : LifecycleRole::SessionStartRejected;
-            out.Action = returnValue ? PrincipalAction::CandidateCreated : PrincipalAction::None;
+            out.Role = (isFromLogin && returnValue) ? LifecycleRole::SessionStart : LifecycleRole::SessionStartRejected;
+            out.Action = (isFromLogin && returnValue) ? PrincipalAction::CandidateCreated : PrincipalAction::None;
             return true;
         }
         case LifecycleFunction::OnLogout:
