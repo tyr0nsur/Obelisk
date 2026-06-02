@@ -799,6 +799,7 @@ def build_report(
         "schema": SCHEMA,
         "surface": SURFACE,
         "status": "blocked",
+        "valid": not blockers,
         "guardrail_passed": not blockers,
         "accepted_for_contract_review": False,
         "promotion_ready": False,

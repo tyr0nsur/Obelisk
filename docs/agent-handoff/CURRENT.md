@@ -185,6 +185,18 @@ This file is an active routing table only. Durable evidence belongs in
   abbreviations such as `Obelisk SDK v1 is GA`, `reaches GA`, and `The v1 SDK is GA`.
   These are offline guardrails only; route gate remains planning-only and SDK completion
   remains fail-closed.
+- 2026-06-02 promoted-leaf and route-validity hardening: Mission/Transfer/Dino/Tribe
+  `per_leaf_promoted` accounting now requires per-leaf promoted evidence entries with
+  readable JSON reports, expected SHA256, matching `surface`/`leaf`/`evidence_kind`,
+  promoted status/readiness booleans, artifact identity, and second-source provenance for
+  second-source evidence; placeholder strings no longer account a leaf or select the
+  promoted route. SDK completion also refuses to treat the umbrella
+  `obelisk.mission_transfer_dino_tribe.v1` row as promoted evidence unless all five
+  leaf decision units are promoted. The command/permission route gate now requires
+  explicit `valid=true` from child checks and validates the player-identity
+  first-evidence child exit/status/ready/internal-planning fields. Gap/query child reports
+  now emit explicit `valid`. These remain offline guardrails only; no public SDK/runtime
+  readiness or v1 completion is promoted.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -281,10 +293,11 @@ This file is an active routing table only. Durable evidence belongs in
   must not imply public SDK, runtime readiness, mutation, return override, lookup,
   post-callback handles, or v1 completion.
 - Mission/Transfer/Dino/Tribe outcome accounting: audit the future `per_leaf_promoted`
-  route before any use as promotion evidence. Current read-only finding: placeholder
-  `abi_tests`, `sdk_consumer_tests`, and `second_source_evidence` paths can satisfy the
-  promoted leaf shape without checking path existence, approved gate report identity, leaf
-  ownership, or second-source provenance.
+  route before any use as promotion evidence. The placeholder-list bypass is now blocked;
+  future promoted leaves should use actual promote-mode gate outputs or a reviewed
+  promotion report shape with leaf/surface binding, artifact identity, and second-source
+  provenance. Current mission/transfer/item/structure side lanes remain consume-only or
+  candidate planning evidence and must not be reinterpreted as promoted leaves.
 - ResourceHandle: wait for rejected runtime object samples plus runtime serial
   reuse/wraparound semantics from an approved live-ops brief; offline/core artifacts cannot
   synthesize that blocker away.

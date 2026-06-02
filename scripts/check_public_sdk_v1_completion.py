@@ -1550,6 +1550,14 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     surface_id = surface.get("id")
     if not isinstance(surface_id, str):
         return False
+    if surface_id == "obelisk.mission_transfer_dino_tribe.v1":
+        leaf_units = surface.get("leaf_decision_units")
+        if not isinstance(leaf_units, list) or not leaf_units:
+            return False
+        observed = {leaf.get("id"): leaf.get("status") for leaf in leaf_units if isinstance(leaf, dict)}
+        required = {"mission", "transfer", "dino_policy", "tribe_policy", "buff_status"}
+        if set(observed) != required or any(observed.get(leaf_id) != "promoted" for leaf_id in required):
+            return False
     allow_generic_dirs = surface_id not in STRICT_PROMOTION_EVIDENCE_SURFACE_IDS
     if not allow_generic_dirs:
         if evidence.get("surface_id") != surface_id:

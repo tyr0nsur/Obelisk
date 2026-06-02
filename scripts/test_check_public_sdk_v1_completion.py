@@ -1053,6 +1053,55 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(payload["promoted_surfaces_without_evidence"], [])
         self.assertEqual(payload["promoted_blockers_without_evidence"], [])
 
+    def test_mission_transfer_dino_tribe_promotion_requires_all_leaf_units_promoted(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        surface_id = "obelisk.mission_transfer_dino_tribe.v1"
+        for surface in manifest["surfaces"]:
+            if surface["id"] == surface_id:
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["Mission copied policy callback"]
+                surface["evidence"] = {
+                    "surface_id": surface_id,
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/MissionCopiedBoolEventDispatcherTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/SdkConsumerFixture.cpp"],
+                }
+                for leaf in surface["leaf_decision_units"]:
+                    leaf["status"] = "promoted" if leaf["id"] == "mission" else "planning"
+                break
+        manifest["promoted_surfaces"].append(surface_id)
+        manifest["post_v1_or_excluded_surfaces"] = [
+            item for item in manifest["post_v1_or_excluded_surfaces"] if item != surface_id
+        ]
+        release_lines = []
+        for line in release_statement.splitlines():
+            if line.startswith(f"{surface_id}:"):
+                release_lines.append(f"{surface_id}: promoted - mission copied policy callback reviewed.")
+            else:
+                release_lines.append(line)
+        release_statement = "\n".join(release_lines) + "\n"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        outcome = next(row for row in payload["v1_sdk_blocker_outcomes"] if row["surface"] == surface_id)
+        self.assertFalse(outcome["promotion_evidence_satisfied"])
+        self.assertFalse(outcome["counts_toward_complete_sdk_claim"])
+        self.assertIn(surface_id, payload["promoted_blockers_without_evidence"])
+
     def test_scoped_release_statement_template_passes_statement_scope_only(self) -> None:
         result = self.run_checker(
             "--release-statement",

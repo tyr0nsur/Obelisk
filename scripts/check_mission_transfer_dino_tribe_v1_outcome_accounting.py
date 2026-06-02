@@ -11,6 +11,7 @@ evidence.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -88,6 +89,7 @@ LEAF_ALIASES = {
     "buff_status": ("buff_status", "buff/status", "buff status", "buff"),
 }
 PROMOTED_LEAF_EVIDENCE_KEYS = ("abi_tests", "sdk_consumer_tests", "second_source_evidence")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 LEAF_MISSING_PUBLIC_GATES = {
     "mission": (
         "public_mission_sdk_abi",
@@ -492,7 +494,132 @@ def evidence_for_leaf(surface: dict[str, Any], leaf: dict[str, Any]) -> dict[str
     return {}
 
 
-def validate_promoted_leaf_evidence(surface: dict[str, Any], leaves: dict[str, dict[str, Any]], blockers: list[dict[str, Any]]) -> bool:
+def resolve_evidence_path(raw_path: str, manifest_dir: Path) -> Path:
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path
+    repo_path = REPO_ROOT / path
+    if repo_path.exists():
+        return repo_path
+    return manifest_dir / path
+
+
+def validate_promoted_leaf_gate_report(
+    entry: Any,
+    *,
+    evidence_key: str,
+    leaf_id: str,
+    label: str,
+    manifest_dir: Path,
+    blockers: list[dict[str, Any]],
+) -> None:
+    if not isinstance(entry, dict):
+        add(blockers, "promoted_leaf_gate_report_unverified", label, leaf=leaf_id, evidence_key=evidence_key)
+        return
+    raw_path = entry.get("path")
+    expected_sha = entry.get("sha256")
+    if not isinstance(raw_path, str) or not raw_path:
+        add(blockers, "promoted_leaf_evidence_path_missing", f"{label}.path", leaf=leaf_id, evidence_key=evidence_key)
+        return
+    if not isinstance(expected_sha, str) or SHA256_RE.fullmatch(expected_sha) is None:
+        add(
+            blockers,
+            "promoted_leaf_evidence_sha256_missing",
+            f"{label}.sha256",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+        )
+        return
+    path = resolve_evidence_path(raw_path, manifest_dir)
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        add(
+            blockers,
+            "promoted_leaf_evidence_path_missing",
+            f"{label}.path",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            path=str(path),
+            detail=str(exc),
+        )
+        return
+    actual_sha = hashlib.sha256(content).hexdigest()
+    if actual_sha != expected_sha:
+        add(
+            blockers,
+            "promoted_leaf_evidence_sha256_mismatch",
+            f"{label}.sha256",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            expected=expected_sha,
+            value=actual_sha,
+        )
+        return
+    try:
+        report = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        add(
+            blockers,
+            "promoted_leaf_gate_report_unverified",
+            label,
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            path=str(path),
+            detail=str(exc),
+        )
+        return
+    if not isinstance(report, dict):
+        add(blockers, "promoted_leaf_gate_report_unverified", label, leaf=leaf_id, evidence_key=evidence_key)
+        return
+    expected_pairs = {
+        "surface": SURFACE_ID,
+        "leaf": leaf_id,
+        "evidence_kind": evidence_key,
+        "status": "promoted",
+        "promotion_ready": True,
+        "public_sdk_ready": True,
+        "runtime_ready": True,
+    }
+    for key, expected in expected_pairs.items():
+        if report.get(key) != expected:
+            add(
+                blockers,
+                "promoted_leaf_gate_report_unverified",
+                f"{label}.{key}",
+                leaf=leaf_id,
+                evidence_key=evidence_key,
+                expected=expected,
+                value=report.get(key),
+            )
+    if not isinstance(report.get("schema"), str) or not report["schema"].startswith("obelisk."):
+        add(blockers, "promoted_leaf_gate_report_unverified", f"{label}.schema", leaf=leaf_id, evidence_key=evidence_key)
+    artifact_identity = report.get("artifact_identity")
+    if not isinstance(artifact_identity, dict) or not isinstance(artifact_identity.get("sha256"), str):
+        add(
+            blockers,
+            "promoted_leaf_gate_report_unverified",
+            f"{label}.artifact_identity",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+        )
+    if evidence_key == "second_source_evidence" and not isinstance(report.get("second_source_provenance"), dict):
+        add(
+            blockers,
+            "promoted_leaf_second_source_provenance_missing",
+            f"{label}.second_source_provenance",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+        )
+
+
+def validate_promoted_leaf_evidence(
+    surface: dict[str, Any],
+    leaves: dict[str, dict[str, Any]],
+    blockers: list[dict[str, Any]],
+    *,
+    manifest_dir: Path,
+) -> bool:
     all_promoted = bool(leaves) and all(leaf.get("status") == "promoted" for leaf in leaves.values())
     any_promoted = any(leaf.get("status") == "promoted" for leaf in leaves.values())
     if any_promoted and not all_promoted:
@@ -500,6 +627,7 @@ def validate_promoted_leaf_evidence(surface: dict[str, Any], leaves: dict[str, d
         return False
     if not all_promoted:
         return False
+    blocker_count = len(blockers)
     for leaf_id in REQUIRED_LEAVES:
         leaf = leaves[leaf_id]
         evidence = evidence_for_leaf(surface, leaf)
@@ -515,10 +643,20 @@ def validate_promoted_leaf_evidence(surface: dict[str, Any], leaves: dict[str, d
             values = evidence.get(key)
             if not isinstance(values, list) or not values:
                 add(blockers, "promoted_leaf_real_evidence_missing", f"{label}.{key}", leaf=leaf_id)
+                continue
+            for index, entry in enumerate(values):
+                validate_promoted_leaf_gate_report(
+                    entry,
+                    evidence_key=key,
+                    leaf_id=leaf_id,
+                    label=f"{label}.{key}[{index}]",
+                    manifest_dir=manifest_dir,
+                    blockers=blockers,
+                )
         joined = "\n".join(flattened_strings(evidence))
         if NEGATIVE_EVIDENCE_RE.search(joined):
             add(blockers, "promoted_leaf_evidence_contains_candidate_only_markers", label, leaf=leaf_id)
-    return True
+    return len(blockers) == blocker_count
 
 
 def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
@@ -843,7 +981,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
     statement_umbrella_excluded = outcome["present"] and outcome["umbrella_excluded"] and all(
         outcome["leaf_exclusions"].get(leaf_id) for leaf_id in REQUIRED_LEAVES
     )
-    all_promoted = validate_promoted_leaf_evidence(surface, leaves, blockers)
+    all_promoted = validate_promoted_leaf_evidence(surface, leaves, blockers, manifest_dir=manifest_path.parent)
 
     if outcome["forbidden_claims"]:
         add(

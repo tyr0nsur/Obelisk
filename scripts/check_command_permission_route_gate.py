@@ -341,7 +341,7 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         result.returncode == 0
         and report is not None
         and schema_valid
-        and report.get("valid", True) is True
+        and report.get("valid") is True
         and (
             name not in REQUIRED_PLANNING_ONLY_CHECKS
             or (
@@ -411,6 +411,11 @@ def build_critical_path_phase() -> dict[str, Any]:
         "source_checker_exit_code": result.returncode,
         "source_checker_schema": report.get("schema") if report is not None else None,
         "source_checker_parse_error": parse_error,
+        "source_checker_status": report.get("status") if report is not None else None,
+        "source_checker_ready": report.get("ready") if report is not None else None,
+        "source_checker_accepted_for_internal_planning": (
+            report.get("accepted_for_internal_planning") if report is not None else None
+        ),
         "planning_only": True,
         "promotion_ready": report.get("promotion_ready") is True if report is not None else None,
         "public_sdk_ready": report.get("public_sdk_ready") is True if report is not None else None,
@@ -427,6 +432,14 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_schema_mismatch")
     if phase.get("source_checker_parse_error") is not None:
         blockers.append("critical_path_identity_readiness_output_invalid")
+    if phase.get("source_checker_exit_code") != 1:
+        blockers.append("critical_path_identity_readiness_exit_code_unexpected")
+    if phase.get("source_checker_status") != "blocked":
+        blockers.append("critical_path_identity_readiness_status_unexpected")
+    if phase.get("source_checker_ready") is not False:
+        blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
+    if phase.get("source_checker_accepted_for_internal_planning") is not False:
+        blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
     if phase.get("source_checker_primary_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:
         blockers.append("critical_path_identity_readiness_blocker_missing")
     if phase.get("current_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:

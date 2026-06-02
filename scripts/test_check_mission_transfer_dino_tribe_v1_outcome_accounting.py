@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -38,6 +39,31 @@ def excluded_release_statement() -> str:
         "teleport/spawn API, ownership lookup, ResourceHandle, mutation, return override, "
         "runtime hook, identity, lookup, or cross-map correlation API is included in v1.\n"
     )
+
+
+def write_promoted_leaf_report(root: Path, leaf_id: str, evidence_kind: str) -> dict[str, str]:
+    path = root / f"{leaf_id}-{evidence_kind}.json"
+    payload = {
+        "schema": f"obelisk.{leaf_id}-{evidence_kind}-promotion-gate.v1",
+        "surface": SURFACE_ID,
+        "leaf": leaf_id,
+        "evidence_kind": evidence_kind,
+        "status": "promoted",
+        "promotion_ready": True,
+        "public_sdk_ready": True,
+        "runtime_ready": True,
+        "artifact_identity": {
+            "kind": evidence_kind,
+            "sha256": hashlib.sha256(f"{leaf_id}:{evidence_kind}".encode("utf-8")).hexdigest(),
+        },
+    }
+    if evidence_kind == "second_source_evidence":
+        payload["second_source_provenance"] = {
+            "source": "synthetic unit-test promoted evidence",
+            "binary_sha256": hashlib.sha256(f"{leaf_id}:binary".encode("utf-8")).hexdigest(),
+        }
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
@@ -264,6 +290,41 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("leaf_public_contract_forbidden_claim", report["blockers"])
 
     def test_future_per_leaf_promoted_route_requires_real_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_root = Path(temp_dir)
+            manifest = load_manifest()
+            gameplay = surface(manifest)
+            gameplay["status"] = "promoted"
+            for leaf in gameplay["leaf_decision_units"]:
+                leaf["status"] = "promoted"
+                leaf["public_contract"] = [f"Copied {leaf['id']} policy event"]
+                leaf["evidence"] = {
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "promotion_ready": True,
+                    "runtime_ready": True,
+                    "abi_tests": [write_promoted_leaf_report(evidence_root, leaf["id"], "abi_tests")],
+                    "sdk_consumer_tests": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "sdk_consumer_tests")
+                    ],
+                    "second_source_evidence": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "second_source_evidence")
+                    ],
+                }
+
+            result = self.run_checker(manifest=manifest)
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["accounting_route"], "per_leaf_promoted")
+        self.assertTrue(report["promotion_ready"])
+        self.assertTrue(report["public_sdk_ready"])
+        self.assertTrue(report["runtime_ready"])
+        self.assertEqual(report["missing_leaf_families"], [])
+        self.assertEqual(report["candidate_only_accounting"]["result"], "all_leaf_families_accounted")
+        self.assertEqual(report["candidate_only_accounting"]["missing_public_gate_counts"]["mission"], 0)
+
+    def test_future_per_leaf_promoted_route_rejects_placeholder_evidence_paths(self) -> None:
         manifest = load_manifest()
         gameplay = surface(manifest)
         gameplay["status"] = "promoted"
@@ -280,37 +341,39 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
                 "second_source_evidence": [f"docs/research/{leaf['id']}-accepted-second-source.md"],
             }
 
-        result = self.run_checker(manifest=manifest)
+        result = self.run_checker(manifest=manifest, check=False)
         report = json.loads(result.stdout)
 
-        self.assertTrue(report["ready"])
-        self.assertEqual(report["accounting_route"], "per_leaf_promoted")
-        self.assertTrue(report["promotion_ready"])
-        self.assertTrue(report["public_sdk_ready"])
-        self.assertTrue(report["runtime_ready"])
-        self.assertEqual(report["missing_leaf_families"], [])
-        self.assertEqual(report["candidate_only_accounting"]["result"], "all_leaf_families_accounted")
-        self.assertEqual(report["candidate_only_accounting"]["missing_public_gate_counts"]["mission"], 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        self.assertNotEqual(report["accounting_route"], "per_leaf_promoted")
+        self.assertIn("promoted_leaf_gate_report_unverified", report["blockers"])
 
     def test_future_per_leaf_promoted_route_rejects_missing_or_candidate_evidence(self) -> None:
-        manifest = load_manifest()
-        gameplay = surface(manifest)
-        gameplay["status"] = "promoted"
-        for leaf in gameplay["leaf_decision_units"]:
-            leaf["status"] = "promoted"
-            leaf["evidence"] = {
-                "promotion_status": "promoted",
-                "public_sdk_ready": True,
-                "promotion_ready": True,
-                "runtime_ready": True,
-                "abi_tests": [f"tests/abi/{leaf['id']}_abi_tests.cpp"],
-                "sdk_consumer_tests": [f"tests/sdk_consumer/{leaf['id']}_consumer.c"],
-                "second_source_evidence": [f"docs/research/{leaf['id']}-accepted-second-source.md"],
-            }
-        gameplay["leaf_decision_units"][0]["evidence"].pop("second_source_evidence")
-        gameplay["leaf_decision_units"][1]["evidence"]["notes"] = "candidate-only intake is not promoted"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_root = Path(temp_dir)
+            manifest = load_manifest()
+            gameplay = surface(manifest)
+            gameplay["status"] = "promoted"
+            for leaf in gameplay["leaf_decision_units"]:
+                leaf["status"] = "promoted"
+                leaf["evidence"] = {
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "promotion_ready": True,
+                    "runtime_ready": True,
+                    "abi_tests": [write_promoted_leaf_report(evidence_root, leaf["id"], "abi_tests")],
+                    "sdk_consumer_tests": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "sdk_consumer_tests")
+                    ],
+                    "second_source_evidence": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "second_source_evidence")
+                    ],
+                }
+            gameplay["leaf_decision_units"][0]["evidence"].pop("second_source_evidence")
+            gameplay["leaf_decision_units"][1]["evidence"]["notes"] = "candidate-only intake is not promoted"
 
-        result = self.run_checker(manifest=manifest, check=False)
+            result = self.run_checker(manifest=manifest, check=False)
         report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 1)

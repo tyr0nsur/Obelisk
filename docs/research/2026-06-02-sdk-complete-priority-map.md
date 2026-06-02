@@ -571,3 +571,72 @@ Validation:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a
 stable SDK claim.
+
+## Promoted Leaf Provenance And Route Validity Guardrails
+
+The next supervised round closed the deferred Mission/Transfer/Dino/Tribe promoted-leaf
+accounting risk and two remaining command-route fail-closed gaps:
+
+- `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` no longer accepts
+  non-empty placeholder lists as promoted leaf evidence. Each promoted leaf evidence entry
+  must now be a JSON report reference with `path` and expected `sha256`; the file must be
+  readable, match the SHA, decode as an object, declare the expected `surface`, `leaf`,
+  `evidence_kind`, `status=promoted`, `promotion_ready/public_sdk_ready/runtime_ready`,
+  and include `artifact_identity`. `second_source_evidence` entries must also include
+  `second_source_provenance`.
+- The promoted-leaf route now returns false if promoted evidence blockers were added, so
+  invalid promoted leaves cannot still select `accounting_route=per_leaf_promoted`,
+  clear missing public gates, or mark `v1_accounted=true`.
+- `scripts/check_public_sdk_v1_completion.py` now refuses to treat
+  `obelisk.mission_transfer_dino_tribe.v1` as having promotion evidence unless all five
+  leaf decision units (`mission`, `transfer`, `dino_policy`, `tribe_policy`,
+  `buff_status`) are present and promoted. Mission-only evidence cannot count the umbrella
+  blocker toward complete-SDK progress.
+- `scripts/check_command_permission_route_gate.py` now requires route child reports to
+  emit explicit `valid=true`, and validates the player-identity first-evidence child
+  `source_checker_exit_code`, `status`, `ready`, and
+  `accepted_for_internal_planning` fields. A child that preserves the current blocker text
+  but claims readiness now blocks the route.
+- `scripts/check_player_identity_public_contract_gap_report.py` and
+  `scripts/check_permissions_admin_query_failclosed_contract.py` now emit explicit
+  `valid` fields, allowing the stricter route gate to stay fail-closed without rejecting
+  healthy current prereqs.
+
+Reusable provenance notes from read-only artifact-gate audit:
+
+- `validate_offline_artifact_gate.py` emits
+  `schema=obelisk.offline-artifact-gate-result.v1`, `mode`, `binary_sha256`, `status`,
+  `manifests[]`, `artifacts[]`, and `blockers`; manifest records include `path`,
+  `resolved_path`, `schema`, and `sha256`; artifact records include `label`, `sha256`,
+  `provenance`, and `provenance_verified`.
+- Existing side-lane readiness wrappers for Mission, Transfer, Item return, and Structure
+  are consume-only/candidate evidence today. `ready=true`, `status=candidate_ready`,
+  `not_artifact_gate=true`, or skipped consume/promote gates must not be interpreted as
+  promoted leaf evidence.
+- Future promoted leaves should bind evidence to leaf/source snapshots/targets and carry
+  artifact identity plus second-source provenance; no Dino/Tribe promoted-leaf schema is
+  currently present in the scoped files.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_mission_transfer_dino_tribe_v1_outcome_accounting`
+  passed with 14 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate`
+  passed with 21 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_public_contract_gap_report scripts.test_check_permissions_admin_query_failclosed_contract`
+  passed with 48 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 111 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing` and
+  explicit valid child reports.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json`
+  passed as candidate-only accounting with all five leaves still planning.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a
+stable SDK claim.

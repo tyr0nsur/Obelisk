@@ -1357,6 +1357,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "input_schema": payload.get("schema"),
         "mode": check_mode,
         "ready": not validation.blockers,
+        "valid": not validation.blockers,
         "candidate_only": payload.get("artifact_status") == "candidate_only",
         "pre_abi": payload.get("pre_abi") is True,
         "public_header_allowed": False,
