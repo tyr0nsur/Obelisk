@@ -48,6 +48,8 @@ This file is an active routing table only. Durable evidence belongs in
   No Discord for routine validation, speculative reversing notes, private live-ops detail,
   raw player text, or secrets.
 - ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only.
+  Do not
+  copy code, offsets, layouts, vtables, ABI assumptions.
   Do not copy architecture, ergonomics, behavior, offsets, layouts, vtables, ABI
   assumptions, wrappers, raw UE pointer APIs, command parsers, return semantics, or source
   implementations.
@@ -61,8 +63,17 @@ This file is an active routing table only. Durable evidence belongs in
 - Plugin Hub is post-SDK-complete planning only. Archived Plugin Hub docs are boundaries,
   not current work. Plugin Hub examples, package intake, catalog publication, and seed
   review do not replace the active SDK blocker chain.
+- Plugin Hub/field-window packaging blocker notes remain package-shape evidence only, not
+  a `v1.0` completion marker. Plugin Hub seed examples, CMake package target presence, and
+  package schema docs are not a `v1.0` SDK blocker, route shortcut, or completion signal;
+  they do not gain priority, support tier, public SDK scope, or `v1.0` completion weight
+  while complete-SDK blockers remain open. No Plugin Hub publication, intake
+  prioritization, production module availability, or support-tier activation is in the
+  current RC/post-RC SDK scope.
 - ResourceHandle remains blocked on rejected runtime object samples plus runtime serial
-  reuse/wraparound semantics. Do not restart broad FName, GObjects, or core scans for that
+  reuse/wraparound semantics. Strict serial policy artifacts remain candidate-only and do
+  not prove runtime reuse semantics, public lookup safety, public lookup, or public
+  ResourceHandle readiness. Do not restart broad FName, GObjects, or core scans for that
   blocker unless current evidence is contradicted.
 
 ## Current Routing Facts
@@ -80,6 +91,19 @@ This file is an active routing table only. Durable evidence belongs in
   `players-identity-principal-invalidation-policy.json` bound to the current
   first-evidence source. A transient bound route proof with those outputs reports
   `approved_runtime_evidence_missing`, with runtime/server authorization false.
+- Current recipe:
+  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` remains the safe
+  offline pack route. It requires a non-protected complete
+  `obelisk.core-dump-evidence-pack.v1`, accepted `obelisk.reflection-inventory-pack.v1`,
+  12/12 candidate fixtures, and accepted distinct second-source layout
+  evidence from the vanilla-gdb core. The standalone lifecycle and principal manifests
+  are consume-only planning inputs; the consume-only lifecycle-anchor and
+  principal-invalidation manifests are consume-only planning inputs; they must be
+  source-bound before the aggregate route can move past
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
+  After explicit bound artifacts are supplied and accepted, the next blocker is approved
+  runtime principal lifecycle evidence. Do not rerun the completed admin snapshot,
+  second-source layout, or lifecycle layout routes.
 - Player identity first evidence uses the 12-target `players-identity-lifecycle-intake`
   planning set. `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` are exact required admin targets in that set,
@@ -106,7 +130,10 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 identity: use `scripts/build_player_identity_planning_source_manifests.py` when a
   bound route proof is needed, then run
   `scripts/check_command_permission_route_gate_bound_identity_sources.py` and confirm the
-  wrapper blocker is only `approved_runtime_evidence_missing`.
+  wrapper blocker is only `approved_runtime_evidence_missing`. Before runtime evidence,
+  close the remaining offline provenance gap: accepted `ShooterGameMode.HandleNewPlayer`
+  and `ShooterGameMode.OnLogout` lifecycle-anchor snapshot hashes must match the current
+  `--snapshot-root`, not only shared source artifact ids.
 - P0 runtime evidence: prepare, but do not run, a fresh live-ops brief for approved copied
   runtime principal lifecycle evidence. It must name target instance/map, feature gates,
   marker/env changes, restart/start window, notice path if players are involved, evidence
@@ -115,8 +142,8 @@ This file is an active routing table only. Durable evidence belongs in
   the player identity contract before permissions/admin, command response, or
   commands/replies ABI.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
-  structure, inventory, and item-return paths in `PluginManagerTests`. Next focused gap is
-  `TimerManager` repeating timer cleanup under an in-flight callback during `UnloadAll`.
+  structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
+  cleanup under an in-flight callback during `UnloadAll` is now covered.
 - Side lanes: keep guardrails fail-closed for inventory copied-signal hygiene,
   ResourceHandle overclaims, Mission copied-bool planning, and Structure planning slices.
 

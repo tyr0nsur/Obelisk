@@ -492,6 +492,41 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
         self.assertFalse(report["public_sdk_ready"])
 
+    def test_rejects_player_identity_runtime_evidence_readiness_overclaim_as_upstream(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = [
+                        "ObeliskPlayerPrincipalEvent",
+                        "RegisterPlayerPrincipalEventWithOwnerTokenHandle",
+                        "UnregisterPlayerPrincipalEventWithOwnerToken",
+                    ]
+                    surface["evidence"]["accepted_runtime_evidence"] = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                        "result": "approved runtime principal lifecycle evidence",
+                        "next_blocker": "identity_public_contract_gate_missing",
+                        "promotion_ready": True,
+                        "public_sdk_ready": True,
+                        "runtime_ready": True,
+                    }
+                    surface["blockers"] = [
+                        blocker
+                        for blocker in surface["blockers"]
+                        if blocker != "No approved runtime principal lifecycle evidence."
+                    ]
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertGreaterEqual(report["blockers"].count("public_surface_overclaim"), 2)
+        self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+
     def test_rejects_promoted_player_identity_without_owner_token_public_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

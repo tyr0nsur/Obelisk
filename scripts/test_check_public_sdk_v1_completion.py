@@ -1881,6 +1881,42 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("Obelisk SDK v1 reaches GA today.", forbidden_claims)
         self.assertIn("The v1 SDK is GA for plugin authors.", forbidden_claims)
 
+    def test_scoped_release_statement_scope_rejects_public_doc_broad_claim_variants(self) -> None:
+        claims = [
+            "SDK v1.0: stable.",
+            "The complete-SDK is available.",
+            "The GA SDK is published.",
+            "The 1.0 stable SDK is ready.",
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "\n".join(claims)
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for claim in claims:
+            with self.subTest(claim=claim):
+                self.assertIn(claim, forbidden_claims)
+
     def test_scoped_release_statement_scope_rejects_production_grade_sdk_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"

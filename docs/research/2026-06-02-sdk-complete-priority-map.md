@@ -726,6 +726,61 @@ This round does not approve runtime work, public identity, public permissions/ad
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Timer Cleanup And Release/Runtime Evidence Guardrail Round
+
+The next supervised round used four read-only agents for live-ops evidence route audit,
+identity/permissions public-contract audit, offline identity provenance audit, and SDK
+release overclaim audit. The lead integrated only offline changes and did not touch
+servers, `/servidor/ark`, markers/env, Discord, GitHub publication, or release refs.
+
+Integrated changes:
+
+- `PluginManagerTests` now covers a plugin-owned repeating timer whose callback is
+  in-flight while `PluginManager::UnloadAll()` runs. The test proves unload reaches
+  shutdown, does not close the plugin while the callback is blocked, waits for callback
+  completion, unregisters owner callbacks, and does not reschedule the repeating timer
+  after cleanup.
+- The short `scripts/check_player_principal_lifecycle_window_manifest.py` entry point is
+  now the canonical route for player-principal lifecycle window manifest checking in the
+  evidence bundle builder and approved-evidence replay. It re-exports the long checker's
+  replay API so consumers can use the exact operator-facing artifact name.
+- Permissions/admin public-readiness tests now pin that even a promoted-looking
+  `obelisk.player_identity.v1` row with accepted runtime evidence and readiness
+  overclaims remains blocked from permissions/admin readiness unless the public identity
+  contract is actually promoted.
+- Scoped release-statement validation now rejects broad claim variants such as
+  `SDK v1.0: stable.`, `complete-SDK is available`, `GA SDK is published`, and
+  `1.0 stable SDK is ready`. The package manifest schema doc is included in the broad
+  v1-completion claim scan without treating the schema's enumerated blocked surfaces as
+  public promotion claims.
+
+Read-only findings preserved:
+
+- Identity/permissions audit found no direct bypass: approved runtime principal lifecycle
+  evidence remains only a contract-review input and does not imply public identity ABI,
+  permissions/admin readiness, runtime readiness, or public SDK readiness.
+- The remaining P0 offline provenance gap is lifecycle-anchor snapshot binding. Current
+  source binding checks artifact ids, but accepted `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout` anchor `source_snapshot_sha256` values should be checked
+  against the actual `--snapshot-root` files before a bound route advances to the final
+  `approved_runtime_evidence_missing` posture.
+
+Validation:
+
+- `cmake --build build --target plugin_manager_tests -j$(nproc) && ./build/plugin_manager_tests`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness scripts.test_check_player_principal_lifecycle_window_manifest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_public_sdk_guardrails`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_inventory_item_copied_signals_stability scripts.test_inventory_items_public_contract_boundary scripts.test_agent_handoff_guardrails`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+
+The default command/permission route remains valid only as planning, with
+`promotion_ready=false` and current blocker `lifecycle_anchor_first_evidence_provenance_unbound`.
+The SDK completion checker remains fail-closed with `stable_claim_allowed=false`. This
+round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Delegated Route Runtime Rollback Hardening
 
 The next delegated round kept the lead-owned integration model and split four scoped

@@ -424,7 +424,13 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
-    r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|production|stable)\s+"
+    r"\b(?:sdk|api|support)\s+v?1(?:\.0)?\s*[:,-]\s*"
+    r"(?:complete|full|production[- ]?ready|stable)\b",
+    r"\b(?:ga|generally[- ]available)\s+(?:sdk|api|support)\b.{0,80}"
+    r"\b(?:available|published|ready|released|shipped)\b",
+    r"\b(?:sdk|api|support)\b.{0,40}\b(?:ga|generally[- ]available)\b",
+    r"\b1\.0\s+stable\s+(?:sdk|api|support)\b",
+    r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|production|stable)[- ]+"
     r"(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",

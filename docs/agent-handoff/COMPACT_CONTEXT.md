@@ -114,6 +114,10 @@ priorities, and do not use history files as the active source of truth.
   `lifecycle_anchor_first_evidence_provenance_unbound`. Only an explicit bound-wrapper
   route run may advance the blocker to `approved_runtime_evidence_missing`; that is
   missing runtime principal lifecycle evidence, not readiness or promotion.
+  A remaining offline provenance gap is accepted lifecycle-anchor snapshot binding:
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` must be checked against
+  actual `--snapshot-root` file hashes, not only shared source artifact ids, before that
+  bound route should be trusted as the final pre-runtime posture.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -150,6 +154,9 @@ priorities, and do not use history files as the active source of truth.
   Timer ids are not shared config, cluster state, UE identity, gameplay/module timer
   abstractions, shared scheduler state, or persistent handles. `oProcessTimer` is the
   first-party process-local timer example.
+  PluginManager tests now cover repeating timer cleanup under an in-flight callback during
+  `UnloadAll`, proving the plugin is not closed early and the repeating timer does not
+  reschedule after owner cleanup.
 - EventManager granular raw ProcessEvent unregister avoids waiting behind unrelated
   in-flight callbacks and active-id checks skip unregistered callbacks from stale
   snapshots; owner cleanup still waits before plugin unload. Tests cover debug-gated

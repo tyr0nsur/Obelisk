@@ -679,15 +679,6 @@
         "ResourceHandle",
         "CraftBlueprint",
         "AdditionalData",
-        "Inventory callback API",
-        "ServerRequestInventoryUseItem",
-        "ServerRequestInventoryUseItemWithActor",
-        "ItemId",
-        "ItemID1",
-        "InventoryComp",
-        "anActor",
-        "action params",
-        "raw params",
         "UObject pointers"
       ]
     },

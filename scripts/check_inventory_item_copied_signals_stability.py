@@ -126,16 +126,7 @@ REQUIRED_FORBIDDEN_TERMS = frozenset(
         "return override",
         "ResourceHandle",
         "AdditionalData",
-        "Inventory callback API",
-        "InventoryComp",
-        "ItemId",
-        "ItemID1",
         "ItemNetID identity",
-        "ServerRequestInventoryUseItem",
-        "ServerRequestInventoryUseItemWithActor",
-        "action params",
-        "anActor",
-        "raw params",
     )
 )
 PUBLIC_CLAIM_TERMS = frozenset(

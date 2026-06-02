@@ -20,7 +20,7 @@ from typing import Any
 
 import protected_paths
 import analyze_runtime_observer_log as runtime_observer_analyzer
-import check_player_identity_runtime_principal_lifecycle_window_manifest as window_manifest_checker
+import check_player_principal_lifecycle_window_manifest as window_manifest_checker
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
 from snapshot_evidence_pack import first_symlink_component, reject_protected_input_path, reject_symlink_component
 
