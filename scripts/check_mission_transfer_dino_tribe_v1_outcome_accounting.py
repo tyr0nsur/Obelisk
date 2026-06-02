@@ -54,14 +54,28 @@ MISSION_SPLIT_NOTE_REQUIRED_TOKENS = (
     "recognition-only",
 ) + MISSION_COPIED_TARGETS + MISSION_RECOGNITION_ONLY_TARGETS + MISSION_COPIED_BOOL_FIELDS + MISSION_REDACTED_RECOGNITION_FIELDS
 MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
+    "dino_sdk_ready",
+    "identity_ready",
+    "lookup_ready",
     "mission_sdk_ready",
+    "mutation_ready",
+    "ownership_ready",
     "promotion_ready",
     "public_abi_ready",
     "public_api_ready",
+    "public_dino_sdk_ready",
+    "public_buff_sdk_ready",
     "public_mission_sdk_ready",
     "public_sdk_ready",
+    "public_transfer_sdk_ready",
+    "public_tribe_sdk_ready",
+    "resource_handle_ready",
+    "return_override_ready",
+    "runtime_observer_approved",
     "runtime_hook_ready",
     "runtime_ready",
+    "transfer_sdk_ready",
+    "tribe_sdk_ready",
     "v1_complete",
     "v1_completion",
     "v1_ready",
@@ -521,20 +535,28 @@ def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
     return overclaims
 
 
-def validate_mission_candidate_leaf(leaf: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_candidate_leaf_evidence(leaf_id: str, leaf: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     status = leaf.get("status") if isinstance(leaf.get("status"), str) else "missing"
     if status == "promoted":
         return
     evidence = leaf.get("evidence")
     if isinstance(evidence, dict):
-        for field in collect_true_ready_overclaims(evidence, "$.leaf_decision_units[mission].evidence"):
-            add(blockers, "mission_leaf_candidate_ready_overclaim", field)
+        label = f"$.leaf_decision_units[{leaf_id}].evidence"
+        ready_reason = "mission_leaf_candidate_ready_overclaim" if leaf_id == "mission" else "leaf_candidate_ready_overclaim"
+        claim_reason = (
+            "mission_leaf_candidate_evidence_forbidden_claim"
+            if leaf_id == "mission"
+            else "leaf_candidate_evidence_forbidden_claim"
+        )
+        for field in collect_true_ready_overclaims(evidence, label):
+            add(blockers, ready_reason, field, leaf=leaf_id)
         claims = forbidden_claims("\n".join(flattened_strings(evidence)))
         for claim in claims:
             add(
                 blockers,
-                "mission_leaf_candidate_evidence_forbidden_claim",
-                "$.leaf_decision_units[mission].evidence",
+                claim_reason,
+                label,
+                leaf=leaf_id,
                 claim=claim,
             )
 
@@ -812,7 +834,8 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         surface = {"id": SURFACE_ID, "leaf_decision_units": []}
     leaves = leaf_map(surface, blockers)
     outcome = release_statement_outcome(release_statement)
-    validate_mission_candidate_leaf(leaves.get("mission", {}), blockers)
+    for leaf_id in REQUIRED_LEAVES:
+        validate_candidate_leaf_evidence(leaf_id, leaves.get(leaf_id, {}), blockers)
 
     manifest_umbrella_excluded = surface.get("status") == "excluded" and all(
         leaves.get(leaf_id, {}).get("status") == "excluded" for leaf_id in REQUIRED_LEAVES

@@ -382,3 +382,47 @@ Remaining focused offline finding:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Structure SDK, ResourceHandle, Inventory SDK, release readiness, or a
 stable SDK claim.
+
+## Inventory, Mission Leaf, And Release Wording Guardrails
+
+The next supervised round closed four more offline overclaim paths:
+
+- `scripts/check_inventory_item_copied_signals_stability.py` now scans all
+  `docs/public_sdk_surfaces.json` string text for positive `Inventory SDK` and `Items SDK`
+  side-lane claims. It still skips negative-key areas such as exclusions/non-claims and
+  honors existing negation handling, so scoped wording like `no Inventory SDK readiness`
+  remains valid.
+- `scripts/check_player_identity_first_evidence_readiness.py` now reports
+  `identity_public_contract_gate_missing` consistently in both `blockers` and
+  `primary_blocker`/`next_actionable_blocker.code` after approved runtime evidence. This
+  removes the blocker-alias drift between the safer missing-contract blocker and the
+  contract-gate route label.
+- `scripts/check_public_sdk_v1_completion.py` now rejects release-statement wording in
+  the form `Obelisk SDK v1 is ready` and `Obelisk SDK v1 is production ready`, closing a
+  word-order gap in broad stable/complete SDK claim scanning.
+- `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` now validates
+  every non-promoted mission/transfer/dino/tribe/buff leaf evidence object for readiness
+  boolean overclaims and forbidden claims. The previous guardrail only scanned the
+  Mission leaf, so a Transfer leaf could claim `public_sdk_ready`, `runtime_ready`, or
+  `ResourceHandle lookup ready` without blocking candidate-only accounting.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_inventory_item_copied_signals_stability scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_public_sdk_v1_completion scripts.test_check_mission_transfer_dino_tribe_v1_outcome_accounting`
+  passed with 166 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_inventory_item_copied_signals_stability.py --json`
+  passed with five allowed copied inventory/item signals while keeping public SDK/v1
+  completion false.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json`
+  passed as candidate-only Mission/Transfer/Dino/Tribe/Buff accounting with public
+  SDK/runtime/v1 accounting false.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Mission/Transfer/Dino/Tribe/Buff SDKs, Inventory SDK, release readiness,
+or a stable SDK claim.

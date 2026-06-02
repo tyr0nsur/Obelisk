@@ -366,6 +366,10 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",
+    r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+v1(?:\.0)?\s+"
+    r"(?:is|are|remains?|stays?)\s+"
+    r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
+    r"shipped|stable|supported|public|promoted)\b",
     r"\b(?:this|statement|release)\s+"
     r"(?:is|declares?|approves?|allows?|authorizes?)\s+"
     r"(?:a\s+)?v1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim))?\b",

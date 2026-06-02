@@ -390,6 +390,42 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             },
         )
 
+    def test_transfer_candidate_leaf_rejects_ready_and_resource_handle_overclaims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["transfer"]["evidence"] = {
+            "public_sdk_ready": True,
+            "nested": {"runtime_ready": True},
+            "claim": "ResourceHandle lookup ready for transfer payloads",
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_ready_overclaim", report["blockers"])
+        self.assertIn("leaf_candidate_evidence_forbidden_claim", report["blockers"])
+        fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim"
+        }
+        self.assertEqual(
+            fields,
+            {
+                "$.leaf_decision_units[transfer].evidence.public_sdk_ready",
+                "$.leaf_decision_units[transfer].evidence.nested.runtime_ready",
+            },
+        )
+        claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_evidence_forbidden_claim"
+        }
+        self.assertIn("ResourceHandle", claims)
+        self.assertIn("lookup", claims)
+
 
 if __name__ == "__main__":
     unittest.main()

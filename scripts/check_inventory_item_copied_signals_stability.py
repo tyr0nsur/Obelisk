@@ -134,6 +134,7 @@ PUBLIC_CLAIM_TERMS = frozenset(
         "AdditionalData API",
     )
 )
+PUBLIC_SDK_SURFACES_INVENTORY_SIDE_LANE_TERMS = frozenset(("Inventory SDK", "Items SDK"))
 CONTRACT_SCAN_KEYS = frozenset(
     (
         "public_contract",
@@ -301,6 +302,34 @@ def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: s
     elif isinstance(value, list):
         for index, child in enumerate(value):
             scan_public_claim_terms(child, blockers, f"{trail}[{index}]")
+
+
+def scan_public_sdk_surfaces_inventory_side_lane_claims(
+    value: Any, blockers: list[dict[str, Any]], trail: str = "$"
+) -> None:
+    if isinstance(value, str):
+        for term in PUBLIC_SDK_SURFACES_INVENTORY_SIDE_LANE_TERMS:
+            match = re.search(rf"\b{re.escape(term)}\b", value, re.IGNORECASE)
+            if not match:
+                continue
+            if is_negated_for_match(value, match.start(), match.end()):
+                continue
+            add(
+                blockers,
+                "public_sdk_surfaces_positive_inventory_side_lane_claim",
+                trail,
+                term=term,
+                value=value,
+            )
+        return
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in NEGATIVE_KEYS:
+                continue
+            scan_public_sdk_surfaces_inventory_side_lane_claims(child, blockers, f"{trail}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            scan_public_sdk_surfaces_inventory_side_lane_claims(child, blockers, f"{trail}[{index}]")
 
 
 def require_equal(
@@ -645,6 +674,7 @@ def validate_public_sdk_surfaces(payload: dict[str, Any], blockers: list[dict[st
                 value=resource_handle_surface.get("public_contract"),
             )
 
+    scan_public_sdk_surfaces_inventory_side_lane_claims(payload, blockers, label)
     scan_readiness_claims(payload, blockers, label)
     return {"inventory_copied_status": surface.get("status") if isinstance(surface, dict) else None}
 

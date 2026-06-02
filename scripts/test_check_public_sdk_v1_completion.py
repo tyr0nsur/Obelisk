@@ -2035,6 +2035,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         release_statement += (
             "Inventory SDK is ready in v1.\n"
             "Items SDK is ready in v1.\n"
+            "Obelisk SDK v1 is ready.\n"
+            "Obelisk SDK v1 is production ready.\n"
             "Plugin Hub completion is ready for v1.\n"
             "Plugin Hub is complete for v1 plugin authors.\n"
         )
@@ -2059,6 +2061,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         for term in (
             "Inventory SDK is ready in v1.",
             "Items SDK is ready in v1.",
+            "Obelisk SDK v1 is ready.",
+            "Obelisk SDK v1 is production ready.",
             "Plugin Hub completion is ready for v1.",
             "Plugin Hub is complete for v1 plugin authors.",
         ):

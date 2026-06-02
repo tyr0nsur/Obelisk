@@ -143,9 +143,16 @@ This file is an active routing table only. Durable evidence belongs in
   scans decisions text for positive public ResourceHandle/object lookup/post-callback
   claims. These remain offline guardrails only; no runtime, public SDK, Structure SDK,
   ResourceHandle, identity, or v1 completion readiness is promoted.
-- Deferred audited guardrail: inventory copied-signal stability should scan top-level and
-  adjacent `docs/public_sdk_surfaces.json` text for positive Inventory/Items SDK side-lane
-  claims, not only the `obelisk.inventory_item_copied_signals.v1` surface row.
+- 2026-06-02 Inventory/Mission/release wording hardening: inventory copied-signal
+  stability now scans all `docs/public_sdk_surfaces.json` string text for positive
+  Inventory/Items SDK side-lane claims while preserving negated non-claims. Mission/
+  transfer/dino/tribe/buff outcome accounting now scans every non-promoted leaf evidence
+  object for readiness booleans and forbidden ResourceHandle/lookup/identity/mutation/
+  return-override claims, not only the Mission leaf. Player-identity first-evidence now
+  uses `identity_public_contract_gate_missing` consistently for both blockers and
+  `primary_blocker` after approved runtime evidence. SDK completion release-statement
+  scanning now rejects broad wording such as `Obelisk SDK v1 is ready` and production-ready
+  variants. These changes keep route gate planning-only and SDK completion fail-closed.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

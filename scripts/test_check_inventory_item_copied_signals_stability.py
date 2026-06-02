@@ -395,6 +395,38 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         reasons = set(payload["blockers"])
         self.assertIn("public_claim_forbidden_term", reasons)
 
+    def test_top_level_public_sdk_surfaces_inventory_side_lane_claim_is_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        fixtures["public_sdk_surfaces"]["release_note"] = (
+            "Inventory SDK ready through inventory_item_copied_signals side lane."
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("public_sdk_surfaces_positive_inventory_side_lane_claim", reasons)
+        detail = next(
+            blocker
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "public_sdk_surfaces_positive_inventory_side_lane_claim"
+        )
+        self.assertEqual("$.public_sdk_surfaces.release_note", detail["path"])
+        self.assertEqual("Inventory SDK", detail["term"])
+
+    def test_negated_public_sdk_surfaces_inventory_side_lane_text_is_allowed(self) -> None:
+        fixtures = self.make_fixture()
+        fixtures["public_sdk_surfaces"]["release_note"] = (
+            "inventory_item_copied_signals remains a copied signal side lane only; "
+            "no Inventory SDK or Items SDK readiness."
+        )
+
+        result = self.run_fixture(fixtures)
+        payload = json.loads(result.stdout)
+
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["blockers"], [])
+
     def test_positive_return_override_claim_is_rejected(self) -> None:
         fixtures = self.make_fixture()
         fixtures["decisions"]["public_contract"]["payload_contract"] = (

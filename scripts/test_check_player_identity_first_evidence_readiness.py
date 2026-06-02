@@ -1194,8 +1194,8 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(payload["ready"])
         self.assertFalse(payload["accepted_for_internal_planning"])
         self.assertEqual(payload["next_step"], "prepare_identity_public_contract_review")
-        self.assertEqual(payload["primary_blocker"], "identity_public_contract_gate")
-        self.assertEqual(payload["next_actionable_blocker"]["code"], "identity_public_contract_gate")
+        self.assertEqual(payload["primary_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(payload["next_actionable_blocker"]["code"], "identity_public_contract_gate_missing")
         self.assertEqual(
             payload["next_actionable_blocker"]["decision_manifest"],
             "docs/player_identity_public_contract_decisions.json",
