@@ -642,11 +642,13 @@ priorities, and do not use history files as the active source of truth.
   `CallProcessEvent`, background worker plugins, operator lifecycle commands, and
   ScriptStruct/transfer promotion remain blocked unless a later focused gate changes
   scope.
-- If internal recognizer work resumes, keep it test-only. Transfer `bAccept` remains a
-  useful bool-layout fixture but is lower product value than Structure aggregate/census
-  planning and Player identity research because it lacks identity, payload correlation,
-  cross-map semantics, enforcement, and privacy policy. This is not RC public SDK/API
-  scope and does not change the RC public API.
+- Transfer `bAccept` hook-side recognition now exists only as a CTest helper in
+  `hooks/ProcessEventTransferReflection.{h,cpp}` plus
+  `process_event_transfer_reflection_tests`; keep it out of runtime, public headers,
+  ops, and plugin surfaces. It remains a useful bool-layout fixture but is lower product
+  value than Structure aggregate/census planning and Player identity research because it
+  lacks identity, payload correlation, cross-map semantics, enforcement, and privacy
+  policy. This is not RC public SDK/API scope and does not change the RC public API.
   None of these promote public Mission/Items/Transfer SDKs, public callbacks, ABI,
   markers/env, runtime logs, hook wiring, mutation, return override, object identity,
   lookup, or `ResourceHandle`, and this handoff does not authorize Transfer runtime work.

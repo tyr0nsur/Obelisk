@@ -731,6 +731,16 @@ class WindowManifestCheckerTests(unittest.TestCase):
             self.assertNotIn("player-principal-preflight", fields["observer_env_path"])
             self.assertNotIn("player-principal-preflight", fields["operator_approval_receipt_path"])
 
+    def test_default_template_sidecars_live_with_copied_evidence(self) -> None:
+        fields = CHECKER.build_template_fields()
+
+        self.assertIn("/live-validation-logs/", fields["request_pack_path"])
+        self.assertIn("/live-validation-logs/", fields["observer_env_path"])
+        self.assertIn("/live-validation-logs/", fields["operator_approval_receipt_path"])
+        self.assertNotIn("player-principal-preflight", fields["request_pack_path"])
+        self.assertNotIn("player-principal-preflight", fields["observer_env_path"])
+        self.assertNotIn("player-principal-preflight", fields["operator_approval_receipt_path"])
+
     def test_emit_template_from_copied_log_rejects_protected_live_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             template = Path(temp_dir) / "window-manifest.env"

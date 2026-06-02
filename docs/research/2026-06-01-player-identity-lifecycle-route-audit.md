@@ -139,7 +139,9 @@ following from copied offline evidence:
   `principal_action=candidate_invalidated`;
 - fail-closed consumer boundary cases for stale-after-logout and malformed/unsupported
   evidence;
-- a checked window manifest whose copied log path and SHA match the copied offline log;
+- a checked window manifest whose copied log path and SHA match the copied offline log,
+  using `--post-window-replay` for any post-window replay or promotion-route
+  consumption;
 - a built approved-evidence manifest accepted in consume mode while promotion,
   public-readiness, and runtime-readiness modes still fail closed;
 - rollback and stable-posture evidence for the same approved instance and map.

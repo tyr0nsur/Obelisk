@@ -147,11 +147,14 @@ python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifes
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log
 ```
 
-Validate the completed manifest:
+Validate the completed manifest for any post-window replay or promotion-route
+consumption. The replay flag is mandatory after the approved runtime window; do not use
+a plain manifest check as evidence input after the window has closed:
 
 ```bash
 python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
   --json \
+  --post-window-replay \
   /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env
 ```
 

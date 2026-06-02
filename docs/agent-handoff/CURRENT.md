@@ -155,11 +155,12 @@ This file is an active routing table only. Durable evidence belongs in
   work only: request-pack acceptance keeps `server_operations_authorized=false`,
   `runtime_work_authorized=false`, public/runtime/promotion/v1 readiness false, and
   `next_blocker=operator_current_turn_runtime_window_approval_required`. Preserve checked
-  `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, reviewed server
-  binary path/SHA, exact env/marker and forbidden-marker boundaries, pre/post evidence paths, structured preflight/window
-  binding, post-run verification commands, canonical rollback delta, and no runtime/server
-  authorization. Request packs are pre-window only: already-started or expired approved
-  windows fail closed.
+  `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, digest-bound
+  completed `operator-approval-receipt.json` for post-window replay, reviewed server
+  binary path/SHA, exact env/marker and forbidden-marker boundaries, pre/post evidence
+  paths, structured preflight/window binding, post-run verification commands, canonical
+  rollback delta, and no runtime/server authorization. Request packs are pre-window only:
+  already-started or expired approved windows fail closed.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
@@ -208,12 +209,12 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing` non-counting.
 - Latest guardrails closed command-response/report-root provenance, mission-leaf
   accounting, permissions/admin certificate dependency, default identity source provenance,
-  and request hygiene. Default route/SDK remain fail-closed:
-  `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated no-runtime round landed Transfer `bAccept` test-only hook helper,
-  kept it out of runtime/public/ops, updated Transfer research, restored release-scope
-  handoff guardrails, and hardened release-statement wording for v1 surface verbs.
+  and request hygiene.
+- Latest delegated no-runtime round landed Transfer `bAccept` test-only helper out of
+  runtime/public/ops, updated Transfer research, restored release-scope handoff guardrails,
+  and hardened release-statement wording for v1 surface verbs.
   Validated Transfer, release-scope, SDK focused gates, build, ctest, and runtime-symbol
-  absence. Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`,
-  `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`. No runtime/server op. Next offline
-  P0 cleanup: align post-window docs to require `--post-window-replay`.
+  absence. Latest delegated replay-doc audit closed `--post-window-replay` examples,
+  stable-only final posture wording, receipt/replay handoff drift, and manifest template
+  sidecar paths. Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`,
+  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.

@@ -63,7 +63,8 @@ the exact scoped run. That approval must name:
 - notice path if any user-facing/beta action is involved;
 - copied evidence destination under an approved offline workspace;
 - rollback owner and rollback delta;
-- post-check command and expected final posture or shutdown state.
+- post-check command and required `final_posture=stable`; stopped/shutdown is unsupported
+  for this evidence chain.
 
 ## Exact Approved-Window Preflight
 
@@ -168,6 +169,7 @@ enable-chat-events
 enable-chat-reflection
 enable-chat-route-observer
 enable-inventory-reflection
+enable-inventory-action-redacted-observer
 enable-structure-reflection
 enable-item-return-events
 ```
@@ -200,6 +202,7 @@ After rollback and log copy, the secret-free window manifest must be checked off
 ```bash
 python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
   --json \
+  --post-window-replay \
   /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.check.json
 ```

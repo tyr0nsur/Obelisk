@@ -21,6 +21,34 @@ def normalized(text: str) -> str:
 
 
 class ResearchDocGuardrailTests(unittest.TestCase):
+    def test_player_identity_post_window_replay_is_mandatory_for_promotion_route_docs(self) -> None:
+        checklist = (
+            REPO_ROOT
+            / "docs/research/2026-06-01-player-identity-runtime-capture-readiness-checklist.md"
+        ).read_text(encoding="utf-8")
+        route_audit = (
+            REPO_ROOT / "docs/research/2026-06-01-player-identity-lifecycle-route-audit.md"
+        ).read_text(encoding="utf-8")
+        runtime_plan = (
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-capture-plan.md"
+        ).read_text(encoding="utf-8")
+
+        offline_bundle = checklist.split("## Offline Bundle Commands", 1)[1].split(
+            "## Fail-Closed No-Go Conditions", 1
+        )[0]
+        manifest_validation = offline_bundle.split("Validate the completed manifest", 1)[1].split(
+            "Build the consume-only evidence bundle", 1
+        )[0]
+
+        self.assertIn("--post-window-replay", manifest_validation)
+        self.assertIn("post-window replay or promotion-route\nconsumption", offline_bundle)
+        self.assertIn(
+            "using `--post-window-replay` for any post-window replay or promotion-route\n"
+            "  consumption",
+            route_audit,
+        )
+        self.assertIn("--post-window-replay", runtime_plan)
+
     def test_resourcehandle_research_and_handoff_do_not_claim_readiness(self) -> None:
         scanned_paths = [
             REPO_ROOT / "docs" / "agent-handoff" / "CURRENT.md",

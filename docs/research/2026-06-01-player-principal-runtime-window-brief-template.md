@@ -127,8 +127,9 @@ path/SHA, pre/post posture, rollback timestamps, rollback delta, `log_budget=10`
 
 ## Rollback
 
-Rollback must be inside the approved window unless the operator explicitly approves a
-different final posture. Preserve evidence before cleanup or further changes.
+Rollback must be inside the approved window and the final posture must be stable;
+stopped/shutdown is unsupported for this evidence chain. Preserve evidence before
+cleanup or further changes.
 
 Remove these observer-only env values:
 

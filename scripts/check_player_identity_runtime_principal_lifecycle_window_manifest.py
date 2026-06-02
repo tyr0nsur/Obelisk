@@ -1784,17 +1784,17 @@ def build_template_fields() -> dict[str, str]:
         ),
         "copied_log_sha256": "0" * 64,
         "request_pack_path": (
-            "/servidor/ark/workspace-offline/player-principal-preflight/"
+            "/servidor/ark/workspace-offline/live-validation-logs/"
             "20260601T120000Z-player-principal-lifecycle/window-request.json"
         ),
         "request_pack_sha256": "0" * 64,
         "observer_env_path": (
-            "/servidor/ark/workspace-offline/player-principal-preflight/"
+            "/servidor/ark/workspace-offline/live-validation-logs/"
             "20260601T120000Z-player-principal-lifecycle/observer-window.env"
         ),
         "observer_env_sha256": "0" * 64,
         "operator_approval_receipt_path": (
-            "/servidor/ark/workspace-offline/player-principal-preflight/"
+            "/servidor/ark/workspace-offline/live-validation-logs/"
             "20260601T120000Z-player-principal-lifecycle/operator-approval-receipt.json"
         ),
         "operator_approval_receipt_sha256": "0" * 64,
