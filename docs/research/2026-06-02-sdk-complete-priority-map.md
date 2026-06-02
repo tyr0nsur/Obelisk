@@ -664,6 +664,35 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Command Response Readiness Provenance Binding
+
+The next P0-focused supervised round closed the deferred synthetic readiness provenance
+risk on the command response path:
+
+- `scripts/check_command_chat_response_public_readiness.py` now passes a selected
+  readiness root through report construction, requires the readiness JSON path to resolve
+  exactly to `root/command-chat-response-route-planning-readiness.json`, and validates
+  each `modules[0].target_details[*].path` as the expected regular snapshot file under
+  `root/base-snapshots/`.
+- The command response report now emits `readiness_root` so consumers can compare replayed
+  source identity, not only the readiness JSON path.
+- `scripts/check_command_permission_route_gate.py` now rejects caller-supplied
+  `--command-response-readiness` unless `--command-response-root` is also supplied and the
+  readiness path is exactly the default readiness file under that root. When composing
+  commands/replies, the route forwards expected response root/readiness context.
+- `scripts/check_commands_replies_public_readiness.py` now accepts optional
+  `--response-path-root` and `--response-path-readiness` arguments and rejects embedded
+  response-path reports whose `readiness_root` or source readiness path disagrees with
+  that expected context.
+
+This closes the stale/synthetic self-consistent report path for explicit route
+composition without adding public response ABI or runtime authority. The route remains
+planning-only and still blocks at approved runtime principal lifecycle evidence.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Side-Lane Overclaim Closure And Command Response Provenance Risk
 
 The next supervised round closed the three deferred side-lane overclaim classes and one

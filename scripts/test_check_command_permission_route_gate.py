@@ -372,6 +372,53 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertEqual(["masked_dependency_provenance_gap"], result["blockers"])
 
+    def test_route_rejects_caller_supplied_command_response_readiness_without_root(self) -> None:
+        args = SimpleNamespace(
+            command_response_root=None,
+            command_response_readiness=Path("/tmp/synthetic-readiness.json"),
+        )
+
+        blockers = ROUTE_GATE.validate_command_response_readiness_binding(args)
+
+        self.assertEqual(
+            ["command_chat_response_public_readiness: caller-supplied readiness requires --command-response-root"],
+            blockers,
+        )
+
+    def test_route_rejects_command_response_readiness_outside_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "root"
+            stale = Path(temp_dir) / "stale"
+            root.mkdir()
+            stale.mkdir()
+            args = SimpleNamespace(
+                command_response_root=root,
+                command_response_readiness=stale / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME,
+            )
+
+            blockers = ROUTE_GATE.validate_command_response_readiness_binding(args)
+
+        self.assertEqual(
+            [
+                "command_chat_response_public_readiness: caller-supplied readiness is not bound to "
+                "--command-response-root"
+            ],
+            blockers,
+        )
+
+    def test_route_accepts_command_response_readiness_bound_to_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "root"
+            root.mkdir()
+            args = SimpleNamespace(
+                command_response_root=root,
+                command_response_readiness=root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME,
+            )
+
+            blockers = ROUTE_GATE.validate_command_response_readiness_binding(args)
+
+        self.assertEqual([], blockers)
+
     def test_route_check_rejects_schema_drift_even_when_otherwise_valid(self) -> None:
         original = ROUTE_GATE.run_check
 

@@ -344,6 +344,8 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Required composed command/chat response public-readiness report.",
     )
+    parser.add_argument("--response-path-root", type=Path)
+    parser.add_argument("--response-path-readiness", type=Path)
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
 
@@ -407,6 +409,21 @@ def resolve_source_artifact_path(path: Path, label: str, blockers: list[dict[str
         )
         return None
     return resolved
+
+
+def resolve_expected_path(path: Path, label: str, blockers: list[dict[str, Any]]) -> Path | None:
+    try:
+        reject_symlink_component(path, label)
+        return reject_protected_input_path(path, label)
+    except SystemExit as exc:
+        add(
+            blockers,
+            "response_path_report_expected_artifact_rejected",
+            f"$.{label}",
+            path=str(path),
+            detail=str(exc),
+        )
+        return None
 
 
 def strings(value: Any) -> list[str]:
@@ -889,7 +906,13 @@ def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
         add(blockers, "public_header_forbidden_symbols_present", "$.public_header", symbols=observed)
 
 
-def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_response_path_report(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    expected_root: Path | None = None,
+    expected_readiness: Path | None = None,
+) -> None:
     schema = payload.get("schema")
     if schema == RESPONSE_PATH_REPORT_SCHEMA:
         missing_source_artifacts = [
@@ -922,6 +945,29 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                 resolved = resolve_source_artifact_path(Path(payload[key]), key, blockers)
                 if resolved is not None:
                     resolved_source_artifacts[key] = resolved
+        if expected_root is not None:
+            resolved_expected_root = resolve_expected_path(expected_root, "response_path_root", blockers)
+            if resolved_expected_root is not None and payload.get("readiness_root") != str(resolved_expected_root):
+                add(
+                    blockers,
+                    "response_path_report_readiness_root_mismatch",
+                    "$.response_path_report.readiness_root",
+                    expected=str(resolved_expected_root),
+                    value=payload.get("readiness_root"),
+                )
+        if expected_readiness is not None:
+            resolved_expected_readiness = resolve_expected_path(expected_readiness, "response_path_readiness", blockers)
+            if (
+                resolved_expected_readiness is not None
+                and resolved_source_artifacts.get("readiness_path") != resolved_expected_readiness
+            ):
+                add(
+                    blockers,
+                    "response_path_report_readiness_path_mismatch",
+                    "$.response_path_report.readiness_path",
+                    expected=str(resolved_expected_readiness),
+                    value=str(resolved_source_artifacts.get("readiness_path")),
+                )
         if payload.get("valid") is not True or payload.get("accepted_for_planning") is not True:
             add(blockers, "response_path_report_not_accepted_for_planning", "$.response_path_report")
         if payload.get("planning_only") is not True:
@@ -1001,7 +1047,9 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                     value=payload.get(key),
                 )
         if len(resolved_source_artifacts) == len(RESPONSE_PATH_SOURCE_ARTIFACT_KEYS):
+            readiness_root = resolved_source_artifacts["readiness_path"].parent
             rebuilt = response_path_readiness.build_report(
+                readiness_root,
                 resolved_source_artifacts["readiness_path"],
                 resolved_source_artifacts["decisions_path"],
                 resolved_source_artifacts["public_header_path"],
@@ -1021,6 +1069,7 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                 "surface",
                 "target_set",
                 "target_filters",
+                "readiness_root",
                 "readiness_status",
                 "decisions_status",
                 "surfaces_status",
@@ -1051,6 +1100,8 @@ def build_report(
     surfaces_path: Path,
     public_header_path: Path,
     response_path_report_path: Path | None,
+    response_path_root: Path | None = None,
+    response_path_readiness: Path | None = None,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     decisions = load_json(decisions_path, "decisions", blockers)
@@ -1069,7 +1120,12 @@ def build_report(
         validate_surfaces(surfaces, blockers)
     validate_public_header(public_header_path, blockers)
     if response_path_report is not None:
-        validate_response_path_report(response_path_report, blockers)
+        validate_response_path_report(
+            response_path_report,
+            blockers,
+            expected_root=response_path_root,
+            expected_readiness=response_path_readiness,
+        )
 
     valid = not blockers
     return {
@@ -1115,6 +1171,8 @@ def main() -> int:
         surfaces_path=args.surfaces,
         public_header_path=args.public_header,
         response_path_report_path=args.response_path_report,
+        response_path_root=args.response_path_root,
+        response_path_readiness=args.response_path_readiness,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1

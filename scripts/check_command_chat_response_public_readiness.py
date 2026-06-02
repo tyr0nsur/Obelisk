@@ -385,6 +385,15 @@ def safe_load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> di
     return payload
 
 
+def safe_resolve_input_path(path: Path, label: str, blockers: list[dict[str, Any]]) -> Path | None:
+    try:
+        reject_symlink_component(path, label)
+        return reject_protected_input_path(path, label)
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", f"${label}", path=str(path), detail=str(exc))
+        return None
+
+
 def strings(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -495,7 +504,63 @@ def validate_gate(
             require_false(gate, key, label, blockers)
 
 
-def validate_readiness(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def expected_snapshot_path(root: Path, target: str) -> Path:
+    return root / "base-snapshots" / f"{target.rsplit(':', 1)[1]}.snapshot.json"
+
+
+def validate_readiness_path_bound_to_root(
+    *,
+    root: Path,
+    readiness_path: Path,
+    blockers: list[dict[str, Any]],
+) -> Path | None:
+    resolved_root = safe_resolve_input_path(root, "root", blockers)
+    resolved_readiness = safe_resolve_input_path(readiness_path, "readiness", blockers)
+    if resolved_root is None or resolved_readiness is None:
+        return resolved_root
+    expected_readiness = resolved_root / DEFAULT_READINESS_NAME
+    if resolved_readiness != expected_readiness:
+        add(
+            blockers,
+            "readiness_path_not_bound_to_root",
+            "$.readiness_path",
+            expected=str(expected_readiness),
+            value=str(resolved_readiness),
+            root=str(resolved_root),
+        )
+    return resolved_root
+
+
+def validate_target_detail_path(
+    detail: dict[str, Any],
+    *,
+    label: str,
+    root: Path,
+    blockers: list[dict[str, Any]],
+) -> None:
+    target = detail.get("target")
+    path_value = detail.get("path")
+    if not isinstance(target, str) or not isinstance(path_value, str):
+        add(blockers, "target_detail_path_missing", f"{label}.path", target=target, value=path_value)
+        return
+    expected = expected_snapshot_path(root, target)
+    observed = safe_resolve_input_path(Path(path_value), "readiness_target_detail_path", blockers)
+    if observed is None:
+        return
+    if observed != expected:
+        add(
+            blockers,
+            "target_detail_path_root_mismatch",
+            f"{label}.path",
+            target=target,
+            expected=str(expected),
+            value=str(observed),
+        )
+    if not observed.is_file():
+        add(blockers, "target_detail_path_not_regular_file", f"{label}.path", target=target, value=str(observed))
+
+
+def validate_readiness(payload: dict[str, Any], blockers: list[dict[str, Any]], *, root: Path) -> None:
     require_equal(payload, "schema", READINESS_SCHEMA, "$.readiness", blockers)
     require_equal(payload, "evidence_scope", "second_source_layout_evidence_only", "$.readiness", blockers)
     require_equal(payload, "gate_mode", "planning_layout_intake", "$.readiness", blockers)
@@ -555,6 +620,7 @@ def validate_readiness(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
                 detail_targets.add(detail.get("target"))
                 require_equal(detail, "comparable", True, label, blockers)
                 require_equal(detail, "second_source_status", "accepted", label, blockers)
+                validate_target_detail_path(detail, label=label, root=root, blockers=blockers)
                 if detail.get("block_reasons") != []:
                     add(blockers, "target_detail_block_reasons_not_empty", f"{label}.block_reasons")
             if detail_targets != TARGETS:
@@ -918,17 +984,19 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
 
 
 def build_report(
+    root: Path,
     readiness_path: Path,
     decisions_path: Path,
     public_header_path: Path,
     surfaces_path: Path,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
+    resolved_root = validate_readiness_path_bound_to_root(root=root, readiness_path=readiness_path, blockers=blockers)
     readiness = safe_load_json(readiness_path, "readiness", blockers)
     decisions = safe_load_json(decisions_path, "decisions", blockers)
     surfaces = safe_load_json(surfaces_path, "surfaces", blockers)
     if readiness is not None:
-        validate_readiness(readiness, blockers)
+        validate_readiness(readiness, blockers, root=resolved_root or root)
     if decisions is not None:
         validate_decisions(decisions, blockers)
     if surfaces is not None:
@@ -950,6 +1018,7 @@ def build_report(
         "surface": SURFACE,
         "target_set": TARGET_SET,
         "target_filters": sorted(TARGETS),
+        "readiness_root": str(root),
         "readiness_path": str(readiness_path),
         "decisions_path": str(decisions_path),
         "surfaces_path": str(surfaces_path),
@@ -975,8 +1044,9 @@ def build_report(
 
 def main() -> int:
     args = parse_args()
-    readiness_path = args.readiness if args.readiness is not None else args.root / DEFAULT_READINESS_NAME
-    report = build_report(readiness_path, args.decisions, args.public_header, args.surfaces)
+    root = args.readiness.parent if args.readiness is not None and args.root == DEFAULT_ROOT else args.root
+    readiness_path = args.readiness if args.readiness is not None else root / DEFAULT_READINESS_NAME
+    report = build_report(root, readiness_path, args.decisions, args.public_header, args.surfaces)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1
 

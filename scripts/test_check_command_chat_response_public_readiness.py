@@ -43,7 +43,13 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             text=True,
         )
 
-    def make_readiness(self) -> dict:
+    def make_readiness(self, root: Path | None = None) -> dict:
+        def target_path(target: str) -> str:
+            basename = f"{target.rsplit(':', 1)[1]}.snapshot.json"
+            if root is None:
+                return f"/offline/{basename}"
+            return str(root / "base-snapshots" / basename)
+
         return {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
             "evidence_scope": "second_source_layout_evidence_only",
@@ -65,7 +71,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                         {
                             "block_reasons": [],
                             "comparable": True,
-                            "path": f"/offline/{target.rsplit(':', 1)[1]}.snapshot.json",
+                            "path": target_path(target),
                             "second_source_status": "accepted",
                             "target": target,
                         }
@@ -314,10 +320,17 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         }
 
     def write_inputs(self, root: Path, readiness: dict | None = None, decisions: dict | None = None) -> tuple[Path, Path, Path]:
+        snapshot_root = root / "base-snapshots"
+        snapshot_root.mkdir(parents=True, exist_ok=True)
+        for target in TARGETS:
+            (snapshot_root / f"{target.rsplit(':', 1)[1]}.snapshot.json").write_text(
+                json.dumps({"schema": "obelisk.ufunction-chain.snapshot.v1", "target": target}),
+                encoding="utf-8",
+            )
         readiness_path = root / "command-chat-response-route-planning-readiness.json"
         decisions_path = root / "command_chat_response_public_contract_decisions.json"
         public_header_path = root / "ObeliskApi.h"
-        readiness_path.write_text(json.dumps(readiness if readiness is not None else self.make_readiness()), encoding="utf-8")
+        readiness_path.write_text(json.dumps(readiness if readiness is not None else self.make_readiness(root)), encoding="utf-8")
         decisions_path.write_text(json.dumps(decisions if decisions is not None else self.make_decisions()), encoding="utf-8")
         public_header_path.write_text("/* minimal public header without response-path ABI */\n", encoding="utf-8")
         return readiness_path, decisions_path, public_header_path
@@ -347,6 +360,33 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
+
+    def test_rejects_readiness_not_bound_to_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            expected_root = base / "expected-root"
+            stale_root = base / "stale-root"
+            expected_root.mkdir()
+            stale_root.mkdir()
+            readiness_path, decisions_path, public_header_path = self.write_inputs(stale_root)
+            result = self.run_checker(
+                "--root",
+                str(expected_root),
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("readiness_path_not_bound_to_root", report["blockers"])
+        self.assertIn("target_detail_path_root_mismatch", report["blockers"])
 
     def test_rejects_readiness_public_runtime_and_promotion_overclaims(self) -> None:
         readiness = self.make_readiness()

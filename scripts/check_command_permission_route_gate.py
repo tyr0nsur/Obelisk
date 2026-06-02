@@ -22,6 +22,7 @@ DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE = (
     REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json"
 )
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+COMMAND_RESPONSE_DEFAULT_READINESS_NAME = "command-chat-response-route-planning-readiness.json"
 
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
 PLAYER_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
@@ -273,6 +274,21 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
     ]
 
 
+def validate_command_response_readiness_binding(args: argparse.Namespace) -> list[str]:
+    if args.command_response_readiness is None:
+        return []
+    if args.command_response_root is None:
+        return ["command_chat_response_public_readiness: caller-supplied readiness requires --command-response-root"]
+    expected = (args.command_response_root / COMMAND_RESPONSE_DEFAULT_READINESS_NAME).resolve()
+    observed = args.command_response_readiness.resolve()
+    if observed != expected:
+        return [
+            "command_chat_response_public_readiness: caller-supplied readiness is not bound to "
+            "--command-response-root"
+        ]
+    return []
+
+
 def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]:
     claims: list[str] = []
 
@@ -480,13 +496,17 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                         encoding="utf-8",
                     )
                     effective_argv.extend(["--response-path-report", str(response_path_report_path)])
+                    if args.command_response_root is not None:
+                        effective_argv.extend(["--response-path-root", str(args.command_response_root)])
+                    if args.command_response_readiness is not None:
+                        effective_argv.extend(["--response-path-readiness", str(args.command_response_readiness)])
             check = run_check(name, effective_argv)
             checks.append(check)
             if name == "command_chat_response_public_readiness":
                 payload = check.get("report_payload")
                 if isinstance(payload, dict):
                     response_path_report = payload
-    blockers = []
+    blockers = validate_command_response_readiness_binding(args)
     for check in checks:
         if check["name"] == "commands_replies_public_readiness" and "--response-path-report" not in check["argv"]:
             blockers.append("commands_replies_public_readiness: missing composed response path report")

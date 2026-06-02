@@ -227,6 +227,15 @@ This file is an active routing table only. Durable evidence belongs in
   aggregate route remains planning-only and still blocks at approved runtime principal
   lifecycle evidence, but the next P0 guardrail target should bind or regenerate command
   response readiness artifacts before the route treats them as aligned planning evidence.
+- 2026-06-02 P0 command response provenance closure: command/chat response public
+  readiness now binds the readiness JSON to its selected root, requires target-detail
+  snapshot paths to be the expected files under `base-snapshots/`, and emits
+  `readiness_root` for downstream replay. The route gate now rejects caller-supplied
+  command response readiness without a matching `--command-response-root`, and
+  commands/replies can compare embedded response-path reports against expected response
+  root/readiness when the route supplies that context. This is still planning-only; it
+  does not promote command response, replies/send-chat ABI, command router, runtime
+  readiness, or v1 completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
