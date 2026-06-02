@@ -9638,7 +9638,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     self.assertIn(normalized(term), text)
 
         for term in (
-            "lifecycle-anchor and principal-invalidation manifests are accepted for consume-only planning",
+            "standalone lifecycle and principal manifests are consume-only planning inputs",
+            "they must be source-bound before\n  the aggregate route can move past `lifecycle_anchor_first_evidence_provenance_unbound`",
             "complete `obelisk.core-dump-evidence-pack.v1`",
             "accepted `obelisk.reflection-inventory-pack.v1`",
             "12/12 candidate fixtures",
@@ -9694,7 +9695,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for term in (
             "consume-only lifecycle-anchor and principal-invalidation manifests",
-            "the next identity blocker is approved runtime principal lifecycle evidence",
+            "they must be source-bound before\n  the aggregate route can move past `lifecycle_anchor_first_evidence_provenance_unbound`",
+            "After explicit bound artifacts are supplied and accepted, the\n  next blocker is approved runtime principal lifecycle evidence",
             "Do not\n  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
             "Current recipe:\n  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`",
         ):

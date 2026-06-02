@@ -757,6 +757,14 @@ The follow-up identity round added an offline binder for the aggregate provenanc
   `approved_runtime_evidence_missing`, invalid first-evidence rejection, protected output
   rejection, self-consistent stale lifecycle source rejection, and principal source
   binding mismatch rejection.
+- Route-gate consumption of bound lifecycle/principal artifacts is explicit. The default
+  repo route remains blocked on `lifecycle_anchor_first_evidence_provenance_unbound` until
+  bound artifacts are supplied; with explicit bound artifacts, route aggregation may
+  advance only to `approved_runtime_evidence_missing`.
+- The route-gate passthrough round found that real first-evidence can carry multiple
+  complete `artifact_sha256`/`capture_id`/`evidence_pack_id` source triples. The lifecycle
+  checker now accepts multiple complete triples while still rejecting incomplete or
+  mismatched source-id counts, so the binder can preserve exact first-evidence provenance.
 
 Validation:
 
@@ -789,7 +797,9 @@ risk on the command response path:
 
 This closes the stale/synthetic self-consistent report path for explicit route
 composition without adding public response ABI or runtime authority. The route remains
-planning-only and still blocks at approved runtime principal lifecycle evidence.
+planning-only. On the default repo route it can still be blocked by
+`lifecycle_anchor_first_evidence_provenance_unbound`; with explicit bound identity
+planning artifacts it may advance only to `approved_runtime_evidence_missing`.
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,

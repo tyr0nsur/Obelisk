@@ -351,6 +351,10 @@ priorities, and do not use history files as the active source of truth.
   emits bound lifecycle/principal planning artifacts plus a non-claim report, and rejects
   protected output paths and symlinks. Bound outputs are planning provenance only; they do
   not approve runtime evidence, public identity, public SDK readiness, or v1 completion.
+  Route-gate passthrough for these bound artifacts is explicit: the repo-default route
+  stays blocked on `lifecycle_anchor_first_evidence_provenance_unbound`, while a route run
+  with explicit bound lifecycle/principal inputs may report only
+  `approved_runtime_evidence_missing` as the next blocker.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

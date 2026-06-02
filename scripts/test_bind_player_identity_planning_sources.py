@@ -143,8 +143,12 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
                 route_report = first_evidence_checker.build_report(args)
 
         self.assertFalse(route_report["ready"])
+        self.assertFalse(route_report["accepted_for_internal_planning"])
+        self.assertFalse(route_report["promotion_ready"])
+        self.assertFalse(route_report["public_sdk_ready"])
+        self.assertFalse(route_report["runtime_ready"])
         self.assertEqual(route_report["primary_blocker"], "approved_runtime_evidence_missing")
-        self.assertIn("approved_runtime_evidence_missing", route_report["blockers"])
+        self.assertEqual(["approved_runtime_evidence_missing"], route_report["blockers"])
         self.assertNotIn("lifecycle_anchor_first_evidence_provenance_unbound", route_report["blockers"])
 
     def test_rejects_invalid_first_evidence_before_writing_outputs(self) -> None:

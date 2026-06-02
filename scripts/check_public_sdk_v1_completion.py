@@ -2026,9 +2026,10 @@ def categorized_v1_report_sections(
     dependency_chain_remaining = blocker_outcome_summary.get("dependency_chain_remaining", [])
     if dependency_chain_remaining:
         recommended_next_action = (
-            "resolve the player identity/principal critical path first, starting with "
-            "approved copied runtime principal lifecycle evidence before any public "
-            "identity, permissions/admin, command response, or commands/replies ABI"
+            "resolve the player identity/principal critical path first: supply bound "
+            "lifecycle-anchor/principal-policy planning artifacts to the route gate, "
+            "then produce approved copied runtime principal lifecycle evidence before "
+            "any public identity, permissions/admin, command response, or commands/replies ABI"
         )
     elif manifest_outcome_missing:
         recommended_next_action = (

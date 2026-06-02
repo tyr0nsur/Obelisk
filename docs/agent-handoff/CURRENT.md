@@ -262,10 +262,15 @@ This file is an active routing table only. Durable evidence belongs in
   now emits bound lifecycle-anchor and principal-policy planning artifacts from validated
   first-evidence, lifecycle, and principal JSON inputs. The tool writes only to a checked
   offline output directory, rejects protected output paths and symlinks, emits a
-  non-claim report, and validates that aggregate planning provenance is ready. Using the
-  bound outputs can move the identity route back to `approved_runtime_evidence_missing`;
-  it still does not provide approved runtime evidence, public identity, permissions/admin,
-  command response, commands/replies, release readiness, or v1 completion.
+  non-claim report, and validates aggregate planning provenance. The default repo route
+  remains blocked on `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit
+  bound lifecycle/principal planning artifacts are supplied to the route gate via
+  `--lifecycle-anchor-candidates-manifest` and
+  `--principal-invalidation-policy-manifest`; with those explicit bound inputs, the route
+  may advance only to `approved_runtime_evidence_missing`. The route gate rejects partial
+  lifecycle/principal input. Bound outputs do not provide approved runtime evidence,
+  public identity, permissions/admin, command response, commands/replies, release
+  readiness, or v1 completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -287,11 +292,12 @@ This file is an active routing table only. Durable evidence belongs in
   `obelisk.core-dump-evidence-pack.v1` from a non-protected source, accepted
   `obelisk.reflection-inventory-pack.v1`, 12/12 candidate fixtures, accepted distinct
   second-source layout evidence from the vanilla-gdb core, and consume-only
-  lifecycle-anchor and principal-invalidation manifests. The lifecycle-anchor and
-  principal-invalidation manifests are accepted for consume-only planning. Promotion
-  remains false; the next identity blocker is approved runtime principal lifecycle
-  evidence. Do not rerun the completed admin snapshot, second-source layout, or lifecycle
-  layout routes.
+  lifecycle-anchor and principal-invalidation manifests. Those standalone lifecycle and
+  principal manifests are consume-only planning inputs; they must be source-bound before
+  the aggregate route can move past `lifecycle_anchor_first_evidence_provenance_unbound`.
+  Promotion remains false. After explicit bound artifacts are supplied and accepted, the
+  next blocker is approved runtime principal lifecycle evidence. Do not rerun the
+  completed admin snapshot, second-source layout, or lifecycle layout routes.
 - Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
 - If the identity offline packs remain accepted, identity is blocked on an approved
@@ -348,9 +354,11 @@ This file is an active routing table only. Durable evidence belongs in
 
 ## Priority Next Steps
 
-- P0: produce approved copied runtime principal lifecycle evidence from an approved,
-  copied, redacted observer log; then review the public identity contract before any
-  permissions/admin, command response, or commands/replies ABI.
+- P0: first supply or produce bound lifecycle-anchor/principal-policy planning artifacts
+  for the route gate; then, once the route reports `approved_runtime_evidence_missing`,
+  request approved copied runtime principal lifecycle evidence from a copied, redacted
+  observer log; then review the public identity contract before any permissions/admin,
+  command response, or commands/replies ABI.
 - Offline: keep tightening guardrails around permissions/admin query-only provenance,
   command/principal contracts, command route drift, inventory copied-signal hygiene, and
   structure build-policy snapshot envelopes.

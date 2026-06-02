@@ -271,6 +271,24 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
 
+    def test_accepts_multiple_complete_source_artifact_id_triples(self) -> None:
+        payload = manifest()
+        payload["artifact_identity"]["source_artifact_ids"] = [
+            f"artifact_sha256:{SHA}",
+            "capture_id:player-lifecycle-candidates",
+            "evidence_pack_id:player-lifecycle-pack",
+            f"artifact_sha256:{'1' * 64}",
+            "capture_id:second-capture",
+            "evidence_pack_id:second-pack",
+        ]
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["ready"])
+        self.assertEqual([], report["blockers"])
+
     def test_promote_blocks_candidate_only(self) -> None:
         result = self.run_checker(manifest(), "--promote", check=False)
         payload = json.loads(result.stdout)

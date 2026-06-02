@@ -346,6 +346,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["release_statement_missing_blocker_outcomes"],
         )
         self.assertIn(
+            "supply bound lifecycle-anchor/principal-policy planning artifacts",
+            sections["next_v1_work"]["recommended_next_action"],
+        )
+        self.assertIn(
             "approved copied runtime principal lifecycle evidence",
             sections["next_v1_work"]["recommended_next_action"],
         )

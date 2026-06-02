@@ -182,15 +182,15 @@ def validate_source_artifact_ids(value: Any, blockers: list[dict[str, Any]], lab
             continue
         parsed[key].append(raw)
     for key, values in parsed.items():
-        if len(values) != 1:
+        if len(values) == 0 or len(values) != len(parsed["artifact_sha256"]):
             add(blockers, "artifact_identity_source_id_count_mismatch", label, field=key, recorded_count=len(values))
             continue
-        value = values[0]
-        if key == "artifact_sha256":
-            if SHA256_RE.fullmatch(value) is None:
-                add(blockers, "artifact_identity_source_artifact_sha_invalid", label)
-        elif SAFE_ID_RE.fullmatch(value) is None:
-            add(blockers, "artifact_identity_source_artifact_id_invalid", label, field=key)
+        for value in values:
+            if key == "artifact_sha256":
+                if SHA256_RE.fullmatch(value) is None:
+                    add(blockers, "artifact_identity_source_artifact_sha_invalid", label)
+            elif SAFE_ID_RE.fullmatch(value) is None:
+                add(blockers, "artifact_identity_source_artifact_id_invalid", label, field=key)
 
 
 def validate_artifact_identity(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:

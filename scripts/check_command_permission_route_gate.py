@@ -203,8 +203,77 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional command/chat response readiness JSON.",
     )
+    parser.add_argument(
+        "--player-identity-artifact-root",
+        type=Path,
+        help="Optional artifact root forwarded to the player-identity first-evidence checker.",
+    )
+    parser.add_argument(
+        "--player-identity-snapshot-root",
+        type=Path,
+        help="Optional first-evidence snapshot root forwarded to the player-identity first-evidence checker.",
+    )
+    parser.add_argument(
+        "--player-identity-candidate-root",
+        type=Path,
+        help="Optional second-source candidate root forwarded to the player-identity first-evidence checker.",
+    )
+    parser.add_argument(
+        "--lifecycle-anchor-candidates-manifest",
+        "--player-identity-lifecycle-anchor-candidates-manifest",
+        dest="player_identity_lifecycle_anchor_candidates_manifest",
+        type=Path,
+        help="Optional bound lifecycle-anchor candidates manifest forwarded to the identity checker.",
+    )
+    parser.add_argument(
+        "--principal-invalidation-policy-manifest",
+        "--player-identity-principal-invalidation-policy-manifest",
+        dest="player_identity_principal_invalidation_policy_manifest",
+        type=Path,
+        help="Optional bound principal invalidation policy manifest forwarded to the identity checker.",
+    )
+    parser.add_argument(
+        "--runtime-principal-lifecycle-evidence-manifest",
+        "--player-identity-runtime-principal-lifecycle-evidence-manifest",
+        dest="player_identity_runtime_principal_lifecycle_evidence_manifest",
+        type=Path,
+        help="Optional synthetic/redacted runtime-principal lifecycle shape manifest forwarded to the identity checker.",
+    )
+    parser.add_argument(
+        "--approved-runtime-principal-lifecycle-evidence-manifest",
+        "--player-identity-approved-runtime-principal-lifecycle-evidence-manifest",
+        dest="player_identity_approved_runtime_principal_lifecycle_evidence_manifest",
+        type=Path,
+        help="Optional approved runtime-principal lifecycle evidence manifest forwarded to the identity checker.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON. The checker always emits JSON.")
     return parser.parse_args()
+
+
+def identity_readiness_argv(args: argparse.Namespace | None) -> list[str]:
+    argv = [sys.executable, str(SCRIPT_DIR / "check_player_identity_first_evidence_readiness.py"), "--json"]
+    if args is None:
+        return argv
+    optional_args = (
+        ("player_identity_artifact_root", "--artifact-root"),
+        ("player_identity_snapshot_root", "--snapshot-root"),
+        ("player_identity_candidate_root", "--candidate-root"),
+        ("player_identity_lifecycle_anchor_candidates_manifest", "--lifecycle-anchor-candidates-manifest"),
+        ("player_identity_principal_invalidation_policy_manifest", "--principal-invalidation-policy-manifest"),
+        (
+            "player_identity_runtime_principal_lifecycle_evidence_manifest",
+            "--runtime-principal-lifecycle-evidence-manifest",
+        ),
+        (
+            "player_identity_approved_runtime_principal_lifecycle_evidence_manifest",
+            "--approved-runtime-principal-lifecycle-evidence-manifest",
+        ),
+    )
+    for attr, flag in optional_args:
+        value = getattr(args, attr, None)
+        if value is not None:
+            argv.extend([flag, str(value)])
+    return argv
 
 
 def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
@@ -294,6 +363,16 @@ def validate_command_response_readiness_binding(args: argparse.Namespace) -> lis
         return [
             "command_chat_response_public_readiness: caller-supplied readiness is not bound to "
             "--command-response-root"
+        ]
+    return []
+
+
+def validate_identity_planning_binding_args(args: argparse.Namespace) -> list[str]:
+    lifecycle = getattr(args, "player_identity_lifecycle_anchor_candidates_manifest", None)
+    principal = getattr(args, "player_identity_principal_invalidation_policy_manifest", None)
+    if (lifecycle is None) != (principal is None):
+        return [
+            "player_identity_first_evidence_readiness: lifecycle/principal planning manifests must be supplied together"
         ]
     return []
 
@@ -398,9 +477,9 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
     }
 
 
-def build_critical_path_phase() -> dict[str, Any]:
+def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[str, Any]:
     result = subprocess.run(
-        [sys.executable, str(SCRIPT_DIR / "check_player_identity_first_evidence_readiness.py"), "--json"],
+        identity_readiness_argv(args),
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
@@ -519,6 +598,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 if isinstance(payload, dict):
                     response_path_report = payload
     blockers = validate_command_response_readiness_binding(args)
+    blockers.extend(validate_identity_planning_binding_args(args))
     for check in checks:
         if check["name"] == "commands_replies_public_readiness" and "--response-path-report" not in check["argv"]:
             blockers.append("commands_replies_public_readiness: missing composed response path report")
@@ -543,7 +623,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 blockers.append(f"{check['name']}: accepted_for_planning must stay true")
         if not check["valid"]:
             blockers.append(f"{check['name']}: invalid route prerequisite")
-    critical_path_phase = build_critical_path_phase()
+    critical_path_phase = build_critical_path_phase(args)
     blockers.extend(validate_critical_path_phase(critical_path_phase))
 
     return {

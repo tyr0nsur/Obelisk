@@ -19,11 +19,17 @@ SCRIPT = SCRIPT_DIR / "check_command_permission_route_gate.py"
 QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
 IDENTITY_DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 SPEC = importlib.util.spec_from_file_location("check_command_permission_route_gate", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 ROUTE_GATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ROUTE_GATE)
+
+import build_redacted_ufunction_signatures
+from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
+from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
 
 
 class CommandPermissionRouteGateTests(unittest.TestCase):
@@ -107,6 +113,98 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             self.assertTrue(check["valid"], check)
             self.assertEqual([], check["public_or_runtime_claims"], check)
             self.assertEqual(check["expected_schema"], check["report_schema"], check)
+
+    def test_accepts_bound_player_identity_planning_sources_as_planning_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            first_evidence = build_redacted_ufunction_signatures.build_players_identity_first_evidence()
+            first_evidence_path = root / "players-identity-first-evidence.json"
+            lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
+            principal_path = root / "players-identity-principal-invalidation-policy.json"
+            bound_dir = root / "bound"
+            first_evidence_path.write_text(json.dumps(first_evidence), encoding="utf-8")
+            lifecycle_path.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            principal_path.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            binder = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_DIR / "bind_player_identity_planning_sources.py"),
+                    "--first-evidence",
+                    str(first_evidence_path),
+                    "--lifecycle-anchor-candidates",
+                    str(lifecycle_path),
+                    "--principal-invalidation-policy",
+                    str(principal_path),
+                    "--output-dir",
+                    str(bound_dir),
+                    "--json",
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, binder.returncode, binder.stderr)
+
+            result = self.run_checker(
+                "--lifecycle-anchor-candidates-manifest",
+                str(bound_dir / "players-identity-lifecycle-anchor-candidates.json"),
+                "--principal-invalidation-policy-manifest",
+                str(bound_dir / "players-identity-principal-invalidation-policy.json"),
+                "--json",
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(0, result.returncode)
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertEqual([], report["blockers"])
+        phase = report["critical_path_phase"]
+        self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
+        self.assertEqual("approved_runtime_evidence_missing", phase["source_checker_primary_blocker"])
+        self.assertEqual("produce_approved_runtime_principal_lifecycle_evidence", phase["next_action"])
+        self.assertEqual("identity_public_contract_gate_missing", phase["next_after_runtime_evidence"])
+        self.assertFalse(phase["permissions_admin_unlocked"])
+        self.assertFalse(phase["command_response_unlocked"])
+        self.assertFalse(phase["commands_replies_unlocked"])
+        self.assertFalse(phase["promotion_ready"])
+        self.assertFalse(phase["public_sdk_ready"])
+        self.assertFalse(phase["public_abi_ready"])
+        self.assertFalse(phase["runtime_ready"])
+        self.assertFalse(phase["source_checker_ready"])
+        self.assertFalse(phase["source_checker_accepted_for_internal_planning"])
+        self.assertEqual(
+            ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
+            report["route_lock"]["blocked_until"],
+        )
+        for check in report["checks"]:
+            self.assertTrue(check["valid"], check)
+            self.assertEqual([], check["public_or_runtime_claims"], check)
+
+    def test_rejects_partial_bound_player_identity_planning_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lifecycle_path = Path(temp_dir) / "players-identity-lifecycle-anchor-candidates.json"
+            lifecycle_path.write_text("{}", encoding="utf-8")
+            result = self.run_checker(
+                "--lifecycle-anchor-candidates-manifest",
+                str(lifecycle_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn(
+            "player_identity_first_evidence_readiness: lifecycle/principal planning manifests must be supplied together",
+            report["blockers"],
+        )
 
     def test_rejects_broken_query_contract_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -262,6 +360,61 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIsNone(phase["current_blocker"])
         self.assertIn("critical_path_identity_readiness_blocker_missing", blockers)
         self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
+
+    def test_build_critical_path_phase_forwards_bound_identity_artifacts(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+        seen_argv: list[str] = []
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            nonlocal seen_argv
+            seen_argv = list(args[0])
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=1,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                        "primary_blocker": "approved_runtime_evidence_missing",
+                        "status": "blocked",
+                        "ready": False,
+                        "accepted_for_internal_planning": False,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                    }
+                ),
+                stderr="",
+            )
+
+        args = SimpleNamespace(
+            player_identity_artifact_root=Path("/tmp/identity-artifacts"),
+            player_identity_snapshot_root=Path("/tmp/identity-snapshots"),
+            player_identity_candidate_root=Path("/tmp/identity-candidate"),
+            player_identity_lifecycle_anchor_candidates_manifest=Path("/tmp/bound/lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("/tmp/bound/principal.json"),
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+        )
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            phase = ROUTE_GATE.build_critical_path_phase(args)
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+        self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
+        self.assertEqual("produce_approved_runtime_principal_lifecycle_evidence", phase["next_action"])
+        for flag, expected in (
+            ("--artifact-root", "/tmp/identity-artifacts"),
+            ("--snapshot-root", "/tmp/identity-snapshots"),
+            ("--candidate-root", "/tmp/identity-candidate"),
+            ("--lifecycle-anchor-candidates-manifest", "/tmp/bound/lifecycle.json"),
+            ("--principal-invalidation-policy-manifest", "/tmp/bound/principal.json"),
+        ):
+            with self.subTest(flag=flag):
+                self.assertIn(flag, seen_argv)
+                self.assertEqual(expected, seen_argv[seen_argv.index(flag) + 1])
 
     def test_build_critical_path_phase_rejects_identity_readiness_overclaim_flags(self) -> None:
         original_run = ROUTE_GATE.subprocess.run
@@ -442,6 +595,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
             command_response_root=None,
             command_response_readiness=None,
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
             json=True,
         )
         try:
@@ -480,6 +640,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
             command_response_root=None,
             command_response_readiness=None,
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
             json=True,
         )
         try:
@@ -527,6 +694,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
             command_response_root=None,
             command_response_readiness=None,
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
             json=True,
         )
         try:
