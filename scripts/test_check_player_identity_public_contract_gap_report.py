@@ -170,6 +170,21 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "lifetime.generation_scope_invalidation.candidate_policy",
             ],
         )
+        self.assertIn("runtime.lifecycle_evidence", report["remaining_contract_gate_inputs"])
+        self.assertIn("lifetime.principal_scope", report["remaining_contract_gate_inputs"])
+        self.assertIn("lifetime.invalidation_events", report["remaining_contract_gate_inputs"])
+        self.assertIn("lifetime.reconnect_duplicate_stale_policy", report["remaining_contract_gate_inputs"])
+        lifetime_action = next(
+            action
+            for action in report["next_offline_actions"]
+            if action["id"] == "lifetime.generation_scope_invalidation"
+        )
+        self.assertTrue(lifetime_action["candidate_policy_accepted"])
+        self.assertEqual(lifetime_action["status"], "blocked")
+        self.assertIn(
+            "does not resolve the full lifetime/generation/scope blocker",
+            lifetime_action["non_claim"],
+        )
         self.assertTrue(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
         self.assertEqual(report["identifier_redaction_evidence"]["resolved_inputs"], ["privacy.identifier_redaction"])
         self.assertFalse(report["identifier_redaction_evidence"]["promotion_ready"])
@@ -252,6 +267,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             report["contract_review_inputs_resolved"],
             ["lifetime.generation_scope_invalidation.candidate_policy"],
         )
+        self.assertIn("privacy.identifier_redaction", report["remaining_contract_gate_inputs"])
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
         self.assertIn("promotion_ready_not_false", report["identifier_redaction_evidence"]["blockers"])
         self.assertIn("required_identifier_class_not_redacted", report["identifier_redaction_evidence"]["blockers"])
@@ -270,6 +286,12 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
         self.assertEqual(report["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        lifetime_action = next(
+            action
+            for action in report["next_offline_actions"]
+            if action["id"] == "lifetime.generation_scope_invalidation"
+        )
+        self.assertFalse(lifetime_action["candidate_policy_accepted"])
         self.assertIn("principal_invalidation_policy_not_accepted", report["blockers"])
         self.assertIn("negative_consumer_rules_missing_required", report["principal_invalidation_policy"]["blockers"])
 

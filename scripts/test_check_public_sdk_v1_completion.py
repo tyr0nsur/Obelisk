@@ -6499,6 +6499,19 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "identity_public_contract_gate_missing",
                 )
             ]
+            planning_only_accepted_row = row_for_route_gate(
+                {
+                    "completion_gate_accepted": True,
+                    "valid": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "route_lock_locked": True,
+                    "current_blocker": "approved_runtime_evidence_missing",
+                    "blockers": [],
+                }
+            )
             unlocked_row = row_for_route_gate(
                 {
                     "valid": True,
@@ -6522,6 +6535,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.assertTrue(row["structured_promotion_evidence_satisfied"])
             self.assertFalse(row["route_gate_claim_satisfied"])
             self.assertFalse(row["counts_toward_complete_sdk_claim"])
+        self.assertTrue(planning_only_accepted_row["is_p0_dependency_chain"])
+        self.assertFalse(planning_only_accepted_row["route_gate_claim_satisfied"])
+        self.assertFalse(planning_only_accepted_row["counts_toward_complete_sdk_claim"])
         self.assertTrue(unlocked_row["route_gate_claim_satisfied"])
         self.assertTrue(unlocked_row["counts_toward_complete_sdk_claim"])
 

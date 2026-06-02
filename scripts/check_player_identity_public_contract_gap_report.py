@@ -1011,6 +1011,33 @@ def build_report(
         resolved_inputs.append(PRIMARY_OFFLINE_GAP)
     if principal_policy_accepted:
         resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
+    remaining_contract_gate_inputs = [
+        "runtime.lifecycle_evidence",
+        "lifetime.principal_scope",
+        "lifetime.invalidation_events",
+        "lifetime.reconnect_duplicate_stale_policy",
+        "abi.public_pod_contract",
+    ]
+    if not redaction_accepted:
+        remaining_contract_gate_inputs.insert(1, PRIMARY_OFFLINE_GAP)
+    next_offline_actions = [
+        {
+            "id": "lifetime.generation_scope_invalidation",
+            "status": "blocked",
+            "candidate_policy_accepted": principal_policy_accepted,
+            "next_input": "reviewed lifetime principal scope/invalidation/stale-handle decision",
+            "non_claim": (
+                "candidate policy acceptance does not resolve the full "
+                "lifetime/generation/scope blocker or prove runtime lifecycle ordering"
+            ),
+        },
+        {
+            "id": "runtime.lifecycle_evidence",
+            "status": "runtime_window_required",
+            "next_input": "approved copied runtime principal lifecycle evidence",
+            "non_claim": "offline planning inputs do not authorize runtime work or public SDK readiness",
+        },
+    ]
     return {
         "schema": SCHEMA,
         "surface": SURFACE,
@@ -1024,6 +1051,8 @@ def build_report(
         "public_header_allowed": False,
         "primary_offline_gap": primary_offline_gap,
         "contract_review_inputs_resolved": resolved_inputs,
+        "remaining_contract_gate_inputs": remaining_contract_gate_inputs,
+        "next_offline_actions": next_offline_actions,
         "runtime_evidence_missing": True,
         "inputs": {
             "decisions": str(args.decisions),

@@ -210,8 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
 - Latest delegated identity/gap rounds integrated read-only agents. Gap/readiness reports
   consume sanitized `privacy.identifier_redaction` and repo-local
-  `players-identity-principal-invalidation-policy` as contract/policy review inputs only;
-  visible gap stays `lifetime.generation_scope_invalidation`, `principal_invalidation_ready=false`,
-  and first-evidence/route/SDK remain fail-closed at `approved_runtime_evidence_missing`.
-  Runtime bundle replay uses explicit `--post-window-replay` and rejects ready reports with
-  retained blockers. No runtime/server op.
+  `players-identity-principal-invalidation-policy` as review inputs only; visible gap
+  stays `lifetime.generation_scope_invalidation`, with explicit remaining inputs
+  `runtime.lifecycle_evidence`, `lifetime.principal_scope`, `lifetime.invalidation_events`,
+  `lifetime.reconnect_duplicate_stale_policy`, and `abi.public_pod_contract`.
+  SDK accounting now tests that route `completion_gate_accepted=true` while
+  `planning_only=true` still gives P0 route credit `0/4`. Runtime bundle replay uses explicit
+  `--post-window-replay`; next request-pack guard is a generated pre-window
+  `post_window_replay_contract` tying request/env/preflight/manifest sidecars. No runtime/server op.

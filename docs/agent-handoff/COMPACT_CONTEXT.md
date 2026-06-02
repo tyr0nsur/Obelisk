@@ -989,6 +989,17 @@ priorities, and do not use history files as the active source of truth.
   candidate-only policy review evidence; `lifetime.generation_scope_invalidation` remains
   the visible gap, `principal_invalidation_ready=false`, and SDK/P0 remain fail-closed.
   Bundle post-window replay also rejects contradictory ready reports with retained blockers.
+- 2026-06-02 follow-up delegated SDK/contract audit: SDK completion now has a regression
+  assertion that `command_permission_route_gate.completion_gate_accepted=true` while the
+  route is still `planning_only=true` does not satisfy P0 route credit or increment
+  `p0_chain_promoted_count`. The player-identity gap report now emits
+  `remaining_contract_gate_inputs` and `next_offline_actions`, making explicit that the
+  candidate principal-invalidation policy does not resolve full
+  `lifetime.generation_scope_invalidation`; remaining inputs include runtime lifecycle
+  evidence, principal scope, invalidation events, reconnect/duplicate stale policy, and
+  ABI POD contract. Delegated request-pack audit identified the next offline guard:
+  generate and validate a pre-window `post_window_replay_contract` that binds the exact
+  request/env/preflight/window-manifest sidecars later required by post-window replay.
 
 ## Agent Coordination
 

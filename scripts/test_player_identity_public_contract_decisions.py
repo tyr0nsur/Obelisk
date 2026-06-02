@@ -279,6 +279,27 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         )
         self.assertIn("sanitized contract-review evidence only", intake["non_claim"])
 
+    def test_principal_invalidation_policy_intake_is_candidate_only_not_promoting(self) -> None:
+        payload = self.load_decisions()
+        intake = payload["principal_invalidation_policy_evidence_intake"]
+
+        self.assertEqual(intake["id"], "principal_invalidation_policy_evidence")
+        self.assertEqual(intake["status"], "repo_candidate_policy_required")
+        self.assertEqual(
+            intake["resolved_input"],
+            "lifetime.generation_scope_invalidation.candidate_policy",
+        )
+        self.assertFalse(intake["promotion_ready"])
+        self.assertFalse(intake["public_sdk_ready"])
+        self.assertFalse(intake["runtime_ready"])
+        self.assertFalse(intake["public_header_allowed"])
+        self.assertFalse(intake["principal_invalidation_ready"])
+        self.assertEqual(
+            intake["required_checker"],
+            "scripts/check_player_identity_principal_invalidation_policy.py",
+        )
+        self.assertIn("does not resolve the full lifetime/generation/scope blocker", intake["non_claim"])
+
     def test_runtime_evidence_intake_test_is_covered_without_promotion(self) -> None:
         payload = self.load_decisions()
         tests = {
