@@ -512,6 +512,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         and preflight_pre["exists"]
         and preflight_post["exists"]
         and request_check["ready"]
+        and window_check["ready"]
     )
     ready = bool(input_ready and not (approved_bundle["exists"] and not approved_bundle_check["ready"]))
     return {

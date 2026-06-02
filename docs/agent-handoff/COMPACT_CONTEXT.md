@@ -1018,6 +1018,13 @@ priorities, and do not use history files as the active source of truth.
   `abi.public_pod_contract`, `abi.layout`, SDK consumer, runtime evidence, and P0 completion
   unresolved. SDK completion rejects the private layout as structured promotion evidence or
   `abi_tests`; route gate remains planning-only at `approved_runtime_evidence_missing`.
+- 2026-06-02 follow-up runtime preflight guardrail round: delegated live-ops, ABI/SDK,
+  reversing, and P0-accounting audits. Bundle preflight classification now requires
+  `window_check.ready=true` before reporting `request_pack_ready`, so valid request/env
+  bytes cannot hide invalid preflight sidecars or replay failure. Sub-agents recommended
+  the next offline runtime delta as a digest-bound `operator-approval-receipt.json`; ABI
+  work should stay candidate-only until approved runtime lifecycle evidence exists. No
+  runtime/server operation was performed.
 
 ## Agent Coordination
 

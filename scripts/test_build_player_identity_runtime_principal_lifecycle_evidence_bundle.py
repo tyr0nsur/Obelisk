@@ -30,6 +30,7 @@ from prepare_player_principal_lifecycle_window_request import (
     env_lines,
     markdown_request,
     operator_live_ops_brief,
+    post_window_replay_contract,
 )
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
@@ -152,7 +153,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             if copied_log.is_file()
             else "0000000000000000000000000000000000000000000000000000000000000000"
         )
-        sidecar_dir = temp_dir / "player-principal-preflight" / RUN_ID
+        sidecar_dir = manifest.parent
         request_pack = sidecar_dir / "window-request.json"
         observer_env = sidecar_dir / "observer-window.env"
         operator_request = sidecar_dir / "operator-approval-request.md"
@@ -206,6 +207,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             request_payload,
             env_lines(request_args),
         )
+        request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
         request_pack_sha256 = write_sidecar(
             request_pack,
             json.dumps(request_payload, sort_keys=True) + "\n",
@@ -536,6 +538,39 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(report["bundle_inputs_ready"])
         self.assertFalse(report["request_pack_ready"])
         self.assertIn("request_pack_check_failed", report["blockers"])
+        self.assertIn("window_manifest_check_failed", report["blockers"])
+
+    def test_preflight_request_pack_ready_requires_valid_preflight_sidecars(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            manifest = self.write_window_manifest(temp_dir, copied_log)
+            fields = dict(
+                line.split("=", 1)
+                for line in manifest.read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#")
+            )
+            preflight_pre = Path(fields["preflight_pre_path"])
+            payload = json.loads(preflight_pre.read_text(encoding="utf-8"))
+            payload["mode"] = "stable"
+            preflight_pre.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["preflight_pre_sha256"] = hashlib.sha256(preflight_pre.read_bytes()).hexdigest()
+            manifest.write_text(
+                "\n".join(f"{key}={value}" for key, value in fields.items()) + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["ready"])
+        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertFalse(report["request_pack_ready"])
+        self.assertTrue(report["inputs"]["request_pack_check"]["ready"])
+        self.assertFalse(report["inputs"]["window_manifest_check"]["ready"])
         self.assertIn("window_manifest_check_failed", report["blockers"])
 
     def test_approved_runtime_manifest_check_state_requires_checker_ready_and_zero_exit(self) -> None:

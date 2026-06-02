@@ -208,13 +208,13 @@ This file is an active routing table only. Durable evidence belongs in
   evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
   build-policy now passes planning-only with no central `structure_*` blockers. SDK
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated identity/gap rounds integrated read-only agents. Gap/readiness reports
-  consume sanitized `privacy.identifier_redaction` and repo-local
-  `players-identity-principal-invalidation-policy` as review inputs only; visible gap stays
-  `lifetime.generation_scope_invalidation`, with remaining inputs `runtime.lifecycle_evidence`,
-  lifetime scope/invalidation/reconnect policy, and `abi.public_pod_contract`.
-  SDK accounting rejects planning route credit and rejects candidate-only/private identity
-  contract reports as promoted evidence, including through permissions/admin certificates.
-  Private POD layout candidate evidence now pins event/descriptor byte layout as review-only
-  input for `abi.public_pod_contract`; `abi.public_pod_contract`, `abi.layout`, SDK consumer,
-  runtime evidence, and SDK/P0 completion remain unresolved. No runtime/server op.
+- Latest delegated identity/runtime round: private redaction, candidate invalidation
+  policy, and private POD layout are review inputs only; `abi.public_pod_contract`,
+  `abi.layout`, SDK consumer, runtime evidence, and SDK/P0 completion remain unresolved.
+  Runtime bundle preflight now reports `request_pack_ready` only when the request/env,
+  preflight sidecars, and window-manifest replay all validate. Sub-agents found no P0
+  counting escape; next offline deltas are a digest-bound operator approval receipt and,
+  after that, a candidate-only public ABI promotion preflight. Anchor hashes for
+  `HandleNewPlayer`/`OnLogout` are repo-local and bound; full offline inventory/core pack
+  proof remains external/offline-workspace unless a redacted repo-local artifact is added.
+  No runtime/server op.
