@@ -8,6 +8,34 @@ Record the post-RC feasibility model for transfer-related reflected targets afte
 accepted layout-only `transfer-ufunction-intake` and `transfer-scriptstruct` second-source
 evidence. This is planning input only, not an RC public API proposal.
 
+## Current Status
+
+As of 2026-06-02, the Transfer `bAccept` lane has a test-only hook-side helper in
+`hooks/ProcessEventTransferReflection.{h,cpp}` with coverage in
+`tests/core/ProcessEventTransferReflectionTests.cpp`. It is wired only into the
+`process_event_transfer_reflection_tests` CTest target and remains absent from
+`libobelisk.so`, `ProcessEventHook.cpp`, public headers, PluginManager, operational
+markers/env, SDK consumers, and public manifests.
+
+The helper scope is exactly
+`ShooterPlayerController.ServerTransferredPlayerConfirmationResult.bAccept` for the
+supported ARK binary SHA
+`7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
+Metadata-only recognition may match without params, but copied value production requires
+borrowed `params + 0`, one byte, and canonical bool `0` or `1`; non-canonical values,
+forged ranges, missing gate, wrong FName, zero budget, zero subscribers, and pre-original
+delivery all fail closed and clear stale output.
+
+This helper does not promote runtime hook wiring, dispatcher wiring, public Transfer SDK,
+public ABI, payload decoding, downloaded-character or dino payload contracts, player
+identity, ownership, cross-map state, mutation, return override, `ResourceHandle`, or v1
+completion. The canonical consume-only artifact remains
+`/home/flowcommunity-ark/obelisk-artifacts/transfer-baccept-only-policy-slice-20260530T073308Z/`
+with manifest SHA
+`a2b0939189cb847b351c638141fa5e122c08ca69acadae8b5c86d894fc208f12`; consume mode accepts
+and promote mode blocks with `promote_mode_manifest_has_non_claims` and
+`promote_mode_transfer_baccept_policy_slice_evidence_only`.
+
 ## Decision Matrix
 
 | Target | Decision | Reason |

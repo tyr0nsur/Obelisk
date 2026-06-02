@@ -1,19 +1,20 @@
 # Current Agent Handoff
-
 This file is an active routing table only. Durable evidence belongs in
 `docs/research/`, resume facts in `COMPACT_CONTEXT.md`, and old detail in
 `HISTORY-*.md`. Historical recovery context is not active routing; use
 `git log --oneline -1` for the checkpoint.
 
 ## Active Objective
-
-- Published baseline: `v0.1.0-rc.2` is a core-first RC, not a production-stable `v1.0`
-  or complete SDK claim. Public RC scope remains limited to promoted copied
-  `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`, descriptor helpers, and
+- Published baseline: `v0.1.0-rc.2` is the current published core-first RC baseline after
+  a clean release gate and exact tag/ref verification, not a production-stable `v1.0` or
+  complete SDK claim. Stale tags must not be reused. RC public scope remains limited to
+  promoted copied `GameplayPolicyEvent`, minimal copied `ChatMessageEvent`,
+  `DescribeResourceKind`, and `DescribeGameplayPolicyEventKind`; core scope also includes
   process-local timers.
-- Post-RC target: a complete `v1.0` public SDK contract for plugin authors. The complete
-  v1 claim is blocked; do not use complete/full/production/stable SDK wording unless
-  `scripts/check_public_sdk_v1_completion.py --json` allows it.
+- Current post-RC focus: a complete `v1.0` public SDK contract for plugin authors. The
+  complete v1 claim is blocked; do not use complete/full/production/stable SDK wording
+  unless `scripts/check_public_sdk_v1_completion.py --json` allows it. The accepted RC
+  UFunction second-source root remains release-scope evidence only.
 - Active P0 spine:
   `docs/public_sdk_surfaces.json::v1_required_dependency_chain` is promoted-only for a
   complete SDK claim and currently ordered as `obelisk.player_identity.v1` ->
@@ -30,9 +31,9 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`, still locked/planning-only.
 
 ## Hard Overrides
-
-- GitHub work may be delegated only for an evidenced, stable milestone. This handoff does
-  not authorize push, tag, release-ref updates, rebase, or routine publication.
+- GitHub work may be delegated only for an evidenced, stable milestone. No tag or
+  release-ref push has release-manager/lead authorization for this current-turn; this
+  handoff does not authorize push, tag, release-ref updates, rebase, or routine publication.
 - No server target has standing approval. Technical progress is only a reason to request a
   scoped run; it is not approval to change markers/env, start/restart/stop a server, run
   ReflectionScanner, ptrace/gcore, broad ProcessEvent tracing, runtime observers, or write
@@ -48,11 +49,10 @@ This file is an active routing table only. Durable evidence belongs in
   `OBELISK_BETA_TEST_WEBHOOK_URL` by variable name. Always dry-run before any approved send.
   No Discord for routine validation, speculative reversing notes, private live-ops detail,
   raw player text, or secrets.
-- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only.
-  Do not
-  copy code, offsets, layouts, vtables, ABI assumptions.
-  Do not copy architecture, ergonomics, behavior, offsets, layouts, vtables, ABI
-  assumptions, wrappers, raw UE pointer APIs, command parsers, return semantics, or source
+- ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only:
+  do not copy code, offsets, layouts, vtables, ABI assumptions, architecture, ergonomics,
+  behavior, wrappers, raw UE pointer APIs, command parsers, return semantics, or source
+  implementations; not architecture, behavior maps, porting targets, copying source, or
   implementations.
 - Runtime posture is default-deny for filtered/global raw `ProcessEvent`, public
   `CallProcessEvent`, ProcessEvent blocking, broad tracing, scanner/debug controls, and
@@ -71,14 +71,20 @@ This file is an active routing table only. Durable evidence belongs in
   while complete-SDK blockers remain open. No Plugin Hub publication, intake
   prioritization, production module availability, or support-tier activation is in the
   current RC/post-RC SDK scope.
-- ResourceHandle remains blocked on rejected runtime object samples plus runtime serial
-  reuse/wraparound semantics. Strict serial policy artifacts remain candidate-only and do
-  not prove runtime reuse semantics, public lookup safety, public lookup, or public
-  ResourceHandle readiness. Do not restart broad FName, GObjects, or core scans for that
-  blocker unless current evidence is contradicted.
+- ResourceHandle/public GObjects remain blocked: old flag-policy artifact is obsolete,
+  durable rich-provenance refresh is preserved, Consume mode accepts it and promote mode
+  stays blocked. Strict serial policy artifacts remain candidate-only; the first strict
+  serial reuse/wraparound policy artifact is preserved, manifest consume mode accepts it
+  and promote mode blocks it as candidate-only, and post-callback rejection contract is
+  preserved as candidate-only. It does not unlock runtime negative samples, public lookup,
+  object identity, public lookup safety, or public ResourceHandle readiness. The next
+  strict ResourceHandle blocker is rejected runtime object samples plus runtime serial
+  reuse/wraparound semantics; future-runtime-observation-plan requires an
+  operator-approved live-ops brief names the exact debug target. Do not rerun broad FName,
+  GObjects, or core scans for ResourceHandle. Do not replace this with another broad
+  offline FName/GObjects scan.
 
 ## Current Routing Facts
-
 - `scripts/check_command_permission_route_gate.py --json` is the canonical offline route
   posture check for identity/principal -> permissions/admin -> command response ->
   commands/replies. Passing it means planning-only alignment, not public ABI, runtime
@@ -101,15 +107,14 @@ This file is an active routing table only. Durable evidence belongs in
   `blocked_until=[approved_runtime_principal_lifecycle_evidence,
   reviewed_identity_public_contract]`; `identity_public_contract_gate_missing` keeps
   `blocked_until=[reviewed_identity_public_contract]`.
-- Current recipe:
-  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` remains the safe
-  offline pack route. It requires a non-protected complete
+- Current recipe: `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`
+  remains the safe offline pack route. It requires a non-protected complete
   `obelisk.core-dump-evidence-pack.v1`, accepted `obelisk.reflection-inventory-pack.v1`,
-  12/12 candidate fixtures, and accepted distinct second-source layout
-  evidence from the vanilla-gdb core. The repo-local lifecycle-anchor and
-  principal-invalidation manifests are consume-only planning inputs and source-bound;
-  the remaining blocker is approved runtime principal lifecycle evidence. Do not rerun the completed admin snapshot,
-  second-source layout, or lifecycle layout routes.
+  12/12 candidate fixtures, and accepted distinct second-source layout evidence from the
+  vanilla-gdb core. Repo-local lifecycle-anchor and principal-invalidation manifests are
+  consume-only planning inputs and source-bound; remaining blocker is approved runtime
+  principal lifecycle evidence. Do not rerun completed admin snapshot, second-source
+  layout, or lifecycle layout routes.
 - Player identity first evidence uses the 12-target `players-identity-lifecycle-intake`
   planning set. `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` are exact required admin targets in that set,
@@ -126,14 +131,15 @@ This file is an active routing table only. Durable evidence belongs in
   Current guardrails pin accepted inventory evidence to `minimal-second-source-intake`
   and `item-return-only-policy-slice`, keep `inventory-action-compact-intake` excluded,
   and reject positive raw identity/action-param claims such as `ItemId`, `ItemID1`,
-  `InventoryComp`, `anActor`, and raw params.
+  `InventoryComp`, `anActor`, and raw params. Item return-only public shape remains three
+  copied `GameplayPolicyEvent` `ReturnValue` kinds only; no public Inventory SDK, Items
+  SDK, identity, mutation, return override, or ResourceHandle.
 - Structure census, Structure build-policy, Mission/Transfer/Dino/Tribe,
   ResourceHandle, economy/storage/operator ingress, and gameplay tick surfaces remain
   planning, post-v1, or blocked unless a future route explicitly promotes them with
   evidence.
 
 ## Priority Next Steps
-
 - P0 identity: use `scripts/build_player_identity_planning_source_manifests.py` when a
   bound route proof is needed, then run
   `scripts/check_command_permission_route_gate_bound_identity_sources.py`. For a
@@ -161,23 +167,24 @@ This file is an active routing table only. Durable evidence belongs in
   `docs/research/2026-06-02-player-identity-identifier-redaction-evidence.json` passes
   contract-review-only intake; it cannot promote identity, unlock public SDK/runtime/header
   readiness, or satisfy the complete SDK claim.
-- Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
-  structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
-  cleanup under an in-flight callback during `UnloadAll` is now covered.
-- Side lanes: mission/transfer/dino/tribe/buff leaf accounting is now enforced by
-  top-level SDK completion via
-  `check_mission_transfer_dino_tribe_v1_outcome_accounting.py`; umbrella release
-  wording cannot bypass explicit mission, transfer, dino-policy, tribe-policy, and
-  buff-status outcomes. This is accounting-only and does not promote
-  Mission/Transfer/Dino/Tribe/Buff SDKs, runtime, ABI, public callbacks,
-  ResourceHandle, or v1 completion.
+- Runtime/ABI hardening: cleanup failure skips `dlclose`, retains the plugin for retry,
+  and does not repeat plugin shutdown. Gameplay-policy rollback-failure orphan coverage
+  covers structure, inventory, and item-return paths; owner-token process-local core timer
+  explicit unregister remains distinct from gameplay/module timer, shared scheduler state,
+  UE identity, persistent handles, and repeating timer cleanup under in-flight `UnloadAll`.
+- Side lanes: Mission copied-bool exact bool-tail evidence is `bool_field_size=1`,
+  `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`;
+  consume mode accepts and promote mode blocks. Mission/Transfer/Dino/Tribe/Buff leaf
+  accounting is enforced by `check_mission_transfer_dino_tribe_v1_outcome_accounting.py`;
+  it remains internal/not ready, with no public Mission SDK, public module SDK,
+  ResourceHandle, identity, mutation, return override, runtime, ABI, public callbacks,
+  v1 completion, and does not authorize Transfer runtime work.
 - P0 guardrail: permissions/admin structured promotion now requires a matching
   player-identity promotion certificate for `obelisk.player_identity.v1`, chain position
   1, and a reviewed artifact hash before permissions/admin structured evidence can
   count. Missing, mismatched, or stale certificates keep permissions/admin non-counting.
 
 ## Agent Protocol
-
 - Delegated sub-agents get only the scoped objective, safety baseline, allowed paths,
   required skills, expert role, expected decision, and edit permission needed for their
   task. Pass only the skills needed for that scope.
@@ -203,10 +210,10 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated no-runtime round added Mission copied-bool public-frontier cleanup
-  guardrails, SDK/header typedef-alias drift detection, and broader stable/complete/full/
-  production SDK claim-key/reversed-text scanners. Validated Mission, route, SDK, and
-  PluginManager gates; SDK checker remains fail-closed with `stable_claim_allowed=false`,
-  SDK `0/12`, P0 `0/4`, and route blocker `approved_runtime_evidence_missing`. No
-  runtime/server op. Next no-runtime side-lane candidate: Transfer `bAccept` test-only
-  hook helper.
+- Latest delegated no-runtime round landed Transfer `bAccept` test-only hook helper,
+  kept it out of runtime/public/ops, updated Transfer research, restored release-scope
+  handoff guardrails, and hardened release-statement wording for v1 surface verbs.
+  Validated Transfer, release-scope, SDK focused gates, build, ctest, and runtime-symbol
+  absence. Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`,
+  `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`. No runtime/server op. Next offline
+  P0 cleanup: align post-window docs to require `--post-window-replay`.

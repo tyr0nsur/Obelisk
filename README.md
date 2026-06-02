@@ -475,8 +475,7 @@ compatibility, but plugins must treat it as unavailable unless `struct_size` cov
 field, `OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT` is advertised, the function pointer is
 non-null, and the call happens inside that plugin's `ObeliskPlugin_Init` while the live
 debug env+marker gate is active. Post-init calls through a captured API table fail closed;
-callback/runtime execution needs a future owner-token ABI. Stable plugin APIs should prefer
-higher-level Obelisk module surfaces as they are promoted.
+callback/runtime execution needs a future owner-token ABI. Stable plugin APIs should prefer higher-level Obelisk module surfaces as they are promoted.
 
 Owner-token timers are process-local runtime utilities. The timer unregister call cancels
 future delivery for a handle, but plugins must not treat it as proof that a timer callback

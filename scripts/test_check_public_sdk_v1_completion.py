@@ -2659,6 +2659,44 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["scoped_release_statement"]["blocking_report_blockers"],
         )
 
+    def test_scoped_release_statement_scope_rejects_v1_surface_verb_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "v1 supports commands/replies.\n"
+                + "Obelisk v1 ships commands/replies.\n"
+                + "ResourceHandle is in v1.\n"
+                + "v1 exposes player identity.\n"
+                + "Plugin Hub opens for v1 packages.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        for term in (
+            "v1 supports commands/replies.",
+            "Obelisk v1 ships commands/replies.",
+            "ResourceHandle is in v1.",
+            "v1 exposes player identity.",
+            "Plugin Hub opens for v1 packages.",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, forbidden_claims)
+
     def test_scoped_release_statement_scope_rejects_active_release_verbs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"

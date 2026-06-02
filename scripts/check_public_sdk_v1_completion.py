@@ -556,7 +556,7 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
     r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
     r"(?:sdk|api|surface|support)\b",
-    r"\bv1(?:\.0)?\s+includes?\b.{0,80}"
+    r"\bv1(?:\.0)?\s+(?:includes?|supports?|ships?|exposes?|provides?|offers?|covers?|has)\b.{0,80}"
     r"\b(?:player[-_ ]?identity|player[-_ ]?principal|playeridentity|"
     r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
     r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
@@ -565,6 +565,16 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"give[-_ ]?item|remove[-_ ]?item|object[-_ ]?identity|uobject[-_ ]?identity|"
     r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
     r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\b",
+    r"\b(?:player[-_ ]?identity|player[-_ ]?principal|playeridentity|"
+    r"permissions?/admin|permissions?[-_ ]?admin|permissionsadmin|permissions?|admin|"
+    r"command[-_ ]?(?:chat[-_ ]?)?responses?|commandresponse|"
+    r"commands?/replies|commands?[-_ ]?replies|command[-_ ]?router|"
+    r"inventory[-_ ]?(?:identity|lookup|mutation)|item[-_ ]?(?:identity|lookup|mutation|handles?)|"
+    r"give[-_ ]?item|remove[-_ ]?item|object[-_ ]?identity|uobject[-_ ]?identity|"
+    r"object[-_ ]?lookup|resource[-_ ]?handles?|resourcehandle|missions?|"
+    r"buff(?:/status|[-_ ]?status)?|buffstatus|buffs?)\s+"
+    r"(?:is|are)?\s*(?:included|supported|shipped|exposed|provided|offered|covered|available|public)?\s*"
+    r"(?:in|for|part\s+of)\s+v1(?:\.0)?\b",
     r"\b(?:inventory\s+sdk|items\s+sdk)\b.{0,80}"
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b",
     r"\b(?:available|complete|full|included|production[- ]?ready|ready|released|shipped|stable|supported|public|promoted)\b"
@@ -576,10 +586,10 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r".{0,80}\b(?:resourcehandle|resource[- ]?handle|object[- ]?identity|object[- ]?lookup)\s+"
     r"(?:sdk|api|surface|support)?\b",
     r"\b(?:plugin\s+hub|pluginhub)\b.{0,80}"
-    r"\b(?:available|complete|full|included|production[- ]?ready|public|publication|published|"
+    r"\b(?:available|complete|full|included|opens?|production[- ]?ready|public|publication|published|"
     r"ready|release[- ]?scope|released|shipped|stable|supported)\b",
     r"\b(?:available|complete|full|included|production[- ]?ready|public|publication|published|"
-    r"ready|release[- ]?scope|released|shipped|stable|supported)\b"
+    r"ready|release[- ]?scope|released|shipped|stable|supported|opens?)\b"
     r".{0,80}\b(?:plugin\s+hub|pluginhub)\b",
     r"\b(?:candidate(?:[- ]?only)?|planning(?:[- ]?only)?|orientation(?:[- ]?only)?|"
     r"consume[- ]?only|evidence[- ]?only|preflight|readiness|foundation|package[- ]?shape|"
