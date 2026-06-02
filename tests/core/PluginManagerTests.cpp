@@ -2273,6 +2273,103 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestGameplayPolicyInventoryTrackingFailureInertsRollbackOrphan()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_inventory_tracking_rollback_orphan");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_inventory_tracking_rollback_orphan.so",
+            .pluginId = "gameplay_policy_inventory_tracking_rollback_orphan",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPublicGameplayPolicyTrackingFailureForTesting(true);
+        Obelisk::Core::SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(true);
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Obelisk::Core::SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(false);
+        Obelisk::Core::SetPublicGameplayPolicyTrackingFailureForTesting(false);
+
+        Require(registrationId == 0,
+                "inventory gameplay policy tracking failure did not reject public registration");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "inventory gameplay rollback-failure orphan was not retained for owner cleanup");
+
+        const std::vector<Obelisk::Core::InventoryPolicyScalarValue> scalars = MakeInventoryCanUseScalars();
+        (void)Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(MakeInventoryCanUseEvent(scalars));
+        Require(plugin.gameplayPolicyEventCalls == 0,
+                "inert inventory rollback orphan invoked plugin callback after public registration returned zero");
+
+        manager.UnloadAll();
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "inert inventory rollback orphan survived plugin owner cleanup");
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestGameplayPolicyItemReturnTrackingFailureInertsRollbackOrphan()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_item_return_tracking_rollback_orphan");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_item_return_tracking_rollback_orphan.so",
+            .pluginId = "gameplay_policy_item_return_tracking_rollback_orphan",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPublicGameplayPolicyTrackingFailureForTesting(true);
+        Obelisk::Core::SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(true);
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Obelisk::Core::SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(false);
+        Obelisk::Core::SetPublicGameplayPolicyTrackingFailureForTesting(false);
+
+        Require(registrationId == 0,
+                "item-return gameplay policy tracking failure did not reject public registration");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "item-return gameplay rollback-failure orphan was not retained for owner cleanup");
+
+        const std::vector<Obelisk::Core::ItemReturnScalarValue> scalars = MakeItemReturnScalars(true);
+        (void)Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(
+            MakeItemReturnEvent(
+                Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                scalars));
+        Require(plugin.gameplayPolicyEventCalls == 0,
+                "inert item-return rollback orphan invoked plugin callback after public registration returned zero");
+
+        manager.UnloadAll();
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "inert item-return rollback orphan survived plugin owner cleanup");
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestOwnerTokenGameplayPolicyRegistrationRejectedDuringShutdown()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_shutdown_register");
@@ -6444,6 +6541,8 @@ int main()
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyMultiDispatcherRegistrationRollback();
     TestGameplayPolicyTrackingFailureInertsRollbackOrphan();
+    TestGameplayPolicyInventoryTrackingFailureInertsRollbackOrphan();
+    TestGameplayPolicyItemReturnTrackingFailureInertsRollbackOrphan();
     TestOwnerTokenGameplayPolicyRegistrationRejectedDuringShutdown();
     TestOwnerTokenGameplayPolicyUnregisterAllowedDuringShutdown();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();

@@ -36,10 +36,15 @@ PUBLIC_CONTRACT_DOCS = [
 PUBLIC_JSON_CONTRACT_KEYS = {
     "public_contract",
     "payload_contract",
+    "resource_contract",
+    "scope",
     "public_fields",
     "descriptor_fields",
     "candidate_public_contract",
     "contract",
+    "inventory_sdk",
+    "item_module_sdk",
+    "support_tier",
 }
 PUBLIC_JSON_ALLOW_NEGATIVE_KEYS = {
     "blockers",

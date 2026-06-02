@@ -93,6 +93,10 @@ This file is an active routing table only. Durable evidence belongs in
   permissions/admin.
 - Inventory copied signals remain the preferred side lane while P0 waits, but they do not
   promote inventory mutation, identity, lookup, ResourceHandle, or v1 completion.
+  Current guardrails pin accepted inventory evidence to `minimal-second-source-intake`
+  and `item-return-only-policy-slice`, keep `inventory-action-compact-intake` excluded,
+  and reject positive raw identity/action-param claims such as `ItemId`, `ItemID1`,
+  `InventoryComp`, `anActor`, and raw params.
 - Structure census, Mission/Transfer/Dino/Tribe, ResourceHandle, economy/storage/operator
   ingress, and gameplay tick surfaces remain planning, post-v1, or blocked unless a
   future route explicitly promotes them with evidence.
@@ -110,9 +114,9 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 public contract: after approved runtime principal lifecycle evidence exists, review
   the player identity contract before permissions/admin, command response, or
   commands/replies ABI.
-- Runtime/ABI hardening: add later `PluginManagerTests` coverage for gameplay-policy
-  rollback-failure orphans on inventory and item-return paths, then audit `TimerManager`
-  owner cleanup under in-flight repeating callbacks.
+- Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
+  structure, inventory, and item-return paths in `PluginManagerTests`. Next focused gap is
+  `TimerManager` repeating timer cleanup under an in-flight callback during `UnloadAll`.
 - Side lanes: keep guardrails fail-closed for inventory copied-signal hygiene,
   ResourceHandle overclaims, Mission copied-bool planning, and Structure planning slices.
 
@@ -128,3 +132,6 @@ This file is an active routing table only. Durable evidence belongs in
   the current turn.
 - Sub-agents are not alone in the codebase: do not revert unrelated changes; leave edits
   unstaged/uncommitted and report touched paths, validations, and risks.
+- Lead handles delegation directly when the user asks for agents. Keep the scoped
+  delegation fact in handoff/research notes before finishing so compaction does not erase
+  which work was delegated and which findings remain pending.

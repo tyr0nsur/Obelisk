@@ -13,6 +13,9 @@ priorities, and do not use history files as the active source of truth.
    `git status --short --ignored`.
 3. Close completed or obsolete internal agents before starting a new round.
 4. Continue direct supervised work with scoped sub-agent prompts when delegation is used.
+   When the user asks for delegation, the lead must spawn/coordinate the agents directly
+   and record the delegated scopes plus integrated findings in handoff/research notes
+   before finishing so compaction does not lose them.
 
 ## Active Overrides
 
@@ -207,6 +210,11 @@ priorities, and do not use history files as the active source of truth.
   signals as rentable SDK hardening paths because they have focused consume-only evidence
   and explicit no-public-SDK/no-mutation/no-identity boundaries. They remain side lanes
   until identity -> permissions/admin -> command response -> commands/replies is promoted.
+- The current inventory/item copied-signal side-lane guardrail pins public evidence to
+  `minimal-second-source-intake` and `item-return-only-policy-slice`, keeps
+  `inventory-action-compact-intake` excluded, and rejects positive raw inventory/item
+  identity/action-param claims such as `ItemId`, `ItemID1`, `InventoryComp`, `anActor`,
+  `ItemNetID identity`, and raw params.
 - `DescribeResourceKind` is a metadata-only v0.1 SDK helper for known resource categories.
   It returns copied POD descriptors with supported gameplay-policy event/field masks and
   explicit no-identity/no-lookup flags.

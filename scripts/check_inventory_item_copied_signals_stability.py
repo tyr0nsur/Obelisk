@@ -33,6 +33,13 @@ ALL_INVENTORY_MASK = "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_INVENTORY"
 RETURN_VALUE = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE"
 REQUESTED_BY_PLAYER = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER"
 IGNORE_COOLDOWN = "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN"
+EXPECTED_INVENTORY_TARGET_SET = "minimal-second-source-intake"
+EXPECTED_ITEM_RETURN_TARGET_SET = "item-return-only-policy-slice"
+EXCLUDED_INVENTORY_ACTION_TARGET_SET = "inventory-action-compact-intake"
+EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS = (
+    EXPECTED_INVENTORY_TARGET_SET,
+    EXPECTED_ITEM_RETURN_TARGET_SET,
+)
 
 EXPECTED_ALLOWED_SIGNALS: tuple[dict[str, Any], ...] = (
     {
@@ -119,6 +126,16 @@ REQUIRED_FORBIDDEN_TERMS = frozenset(
         "return override",
         "ResourceHandle",
         "AdditionalData",
+        "Inventory callback API",
+        "InventoryComp",
+        "ItemId",
+        "ItemID1",
+        "ItemNetID identity",
+        "ServerRequestInventoryUseItem",
+        "ServerRequestInventoryUseItemWithActor",
+        "action params",
+        "anActor",
+        "raw params",
     )
 )
 PUBLIC_CLAIM_TERMS = frozenset(
@@ -132,6 +149,16 @@ PUBLIC_CLAIM_TERMS = frozenset(
         "AdditionalData",
         "ResourceHandle API",
         "AdditionalData API",
+        "Inventory callback API",
+        "InventoryComp",
+        "ItemId",
+        "ItemID1",
+        "ItemNetID identity",
+        "ServerRequestInventoryUseItem",
+        "ServerRequestInventoryUseItemWithActor",
+        "action params",
+        "anActor",
+        "raw params",
     )
 )
 PUBLIC_SDK_SURFACES_INVENTORY_SIDE_LANE_TERMS = frozenset(("Inventory SDK", "Items SDK"))
@@ -360,6 +387,28 @@ def find_gameplay_policy_event(payload: dict[str, Any]) -> dict[str, Any] | None
     return matches[0] if len(matches) == 1 else None
 
 
+def target_set_evidence_names(event: dict[str, Any]) -> set[str]:
+    evidence = event.get("target_set_evidence")
+    if not isinstance(evidence, list):
+        return set()
+    return {
+        str(item.get("target_set"))
+        for item in evidence
+        if isinstance(item, dict) and item.get("target_set") is not None
+    }
+
+
+def excluded_target_set_names(event: dict[str, Any]) -> set[str]:
+    excluded = event.get("excluded_target_sets")
+    if not isinstance(excluded, list):
+        return set()
+    return {
+        str(item.get("target_set"))
+        for item in excluded
+        if isinstance(item, dict) and item.get("target_set") is not None
+    }
+
+
 def find_resource_descriptor(payload: dict[str, Any]) -> dict[str, Any] | None:
     return find_metadata_surface(payload, "obelisk.resource_kind_descriptors.v1")
 
@@ -493,6 +542,49 @@ def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict
     require_equal(event, "v1_sdk_status", "promoted-experimental-only", f"{label}.{GAMEPLAY_POLICY_EVENT}", blockers)
     require_false(event, "v1_completion_evidence", f"{label}.{GAMEPLAY_POLICY_EVENT}", blockers)
     require_equal(event, "payload", "copied POD scalar fields only", f"{label}.{GAMEPLAY_POLICY_EVENT}", blockers)
+    require_equal(
+        event,
+        "inventory_backing_target_set",
+        EXPECTED_INVENTORY_TARGET_SET,
+        f"{label}.{GAMEPLAY_POLICY_EVENT}",
+        blockers,
+    )
+    require_equal(
+        event,
+        "item_return_backing_target_set",
+        EXPECTED_ITEM_RETURN_TARGET_SET,
+        f"{label}.{GAMEPLAY_POLICY_EVENT}",
+        blockers,
+    )
+    target_sets = set(event.get("target_sets") or [])
+    missing_target_sets = sorted(set(EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS) - target_sets)
+    if missing_target_sets:
+        add(
+            blockers,
+            "gameplay_policy_inventory_target_sets_missing",
+            f"{label}.{GAMEPLAY_POLICY_EVENT}.target_sets",
+            missing=missing_target_sets,
+            value=sorted(target_sets),
+        )
+    evidence_target_sets = target_set_evidence_names(event)
+    missing_evidence_sets = sorted(set(EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS) - evidence_target_sets)
+    if missing_evidence_sets:
+        add(
+            blockers,
+            "gameplay_policy_inventory_target_set_evidence_missing",
+            f"{label}.{GAMEPLAY_POLICY_EVENT}.target_set_evidence",
+            missing=missing_evidence_sets,
+            value=sorted(evidence_target_sets),
+        )
+    excluded_target_sets = excluded_target_set_names(event)
+    if EXCLUDED_INVENTORY_ACTION_TARGET_SET not in excluded_target_sets:
+        add(
+            blockers,
+            "gameplay_policy_inventory_action_target_set_not_excluded",
+            f"{label}.{GAMEPLAY_POLICY_EVENT}.excluded_target_sets",
+            expected=EXCLUDED_INVENTORY_ACTION_TARGET_SET,
+            value=sorted(excluded_target_sets),
+        )
     resource_contract = str(event.get("resource_contract") or "")
     for term in ("kind-only", "no identity", "no lookup", "no persistent handle", "no cross-event correlation"):
         if term not in resource_contract:
@@ -647,6 +739,19 @@ def validate_public_sdk_surfaces(payload: dict[str, Any], blockers: list[dict[st
         missing = sorted(REQUIRED_FORBIDDEN_TERMS - exclusions)
         if missing:
             add(blockers, "inventory_copied_surface_exclusions_missing", f"{label}.{SURFACE}.exclusions", missing=missing)
+        evidence = surface.get("evidence")
+        if not isinstance(evidence, dict):
+            add(blockers, "inventory_copied_surface_evidence_missing", f"{label}.{SURFACE}.evidence")
+        else:
+            readiness_target_sets = tuple(evidence.get("release_readiness_target_sets") or [])
+            if readiness_target_sets != EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS:
+                add(
+                    blockers,
+                    "inventory_copied_release_readiness_target_sets_mismatch",
+                    f"{label}.{SURFACE}.evidence.release_readiness_target_sets",
+                    expected=list(EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS),
+                    value=list(readiness_target_sets),
+                )
         scan_public_claim_terms(surface, blockers, f"{label}.{SURFACE}")
 
     mutation_surface = find_surface(payload, INVENTORY_MUTATION_SURFACE)

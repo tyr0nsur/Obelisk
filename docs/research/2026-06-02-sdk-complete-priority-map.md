@@ -672,6 +672,60 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Delegated Runtime And Inventory Guardrail Round
+
+The next supervised round was delegated by the lead into four scoped read-only lanes:
+live-ops P0 principal lifecycle evidence planning, runtime/ABI TimerManager audit,
+identity public-contract sequencing, and inventory copied-signal guardrails. The lead
+integrated only offline, low-risk changes; agents did not commit, push, touch servers, or
+edit protected live paths.
+
+Implemented guardrails:
+
+- `PluginManagerTests` now covers gameplay-policy registration tracking failure with
+  rollback-unregister failure on the inventory dispatcher and item-return dispatcher, not
+  only the structure dispatcher. The orphaned dispatcher subscription is inert during
+  dispatch and is removed by `UnloadAll()`.
+- `check_inventory_item_copied_signals_stability.py` now pins inventory copied-signal
+  public evidence to `minimal-second-source-intake` and `item-return-only-policy-slice`,
+  requires `inventory-action-compact-intake` to remain excluded, and requires the same
+  release-readiness target set list in `docs/public_sdk_surfaces.json`.
+- Inventory/item copied-signal public-claim scanning now treats raw identity/action-param
+  terms such as `ItemId`, `ItemID1`, `InventoryComp`, `anActor`, `ItemNetID identity`,
+  server request action params, and raw params as forbidden positive public claims.
+- The Inventory/Items public-contract boundary test now scans JSON `resource_contract`,
+  `scope`, `inventory_sdk`, `item_module_sdk`, and `support_tier` fields in addition to
+  public contract payload fields.
+
+Read-only findings preserved for the next focused rounds:
+
+- Live-ops P0 runtime evidence remains planning-only. Any future approved copied runtime
+  principal lifecycle evidence request must name exact target instance/map, run id,
+  binary SHA, reviewed Obelisk commit, UTC window, restart expectation, final posture,
+  user policy/notice path, copied evidence dir, rollback owner/delta, exact observer env,
+  exact markers, and post-copy manifest checks. No runtime approval exists from this
+  planning brief.
+- TimerManager audit found no confirmed bug in owner validation, callback exception
+  handling, owner cleanup, ABI flag validation, or unload/init-failure cleanup. The
+  actionable test gap is a repeating timer with an in-flight callback during
+  `PluginManager::UnloadAll()` to prove cleanup waits, does not `dlclose` early, and does
+  not reschedule.
+- Identity public-contract sequencing remains blocked after runtime evidence: resolving
+  `approved_runtime_evidence_missing` should advance to
+  `identity_public_contract_gate_missing`, not public SDK readiness. Permissions/admin
+  must remain blocked until identity has a reviewed public contract, capability, ABI,
+  lifecycle cleanup, and SDK consumer coverage.
+
+Validation:
+
+- `cmake --build build --target plugin_manager_tests -j$(nproc) && ./build/plugin_manager_tests`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_inventory_item_copied_signals_stability scripts.test_inventory_items_public_contract_boundary`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_inventory_item_copied_signals_stability.py --json`
+
+This round does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Delegated Route Runtime Rollback Hardening
 
 The next delegated round kept the lead-owned integration model and split four scoped

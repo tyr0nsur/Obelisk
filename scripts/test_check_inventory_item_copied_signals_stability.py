@@ -129,6 +129,8 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                     "v1_completion_evidence": False,
                     "resource_contract": "kind-only, no identity, no lookup, no persistent handle, no cross-event correlation",
                     "payload": "copied POD scalar fields only",
+                    "inventory_backing_target_set": stability.EXPECTED_INVENTORY_TARGET_SET,
+                    "item_return_backing_target_set": stability.EXPECTED_ITEM_RETURN_TARGET_SET,
                     "event_kinds": [
                         {
                             **dict(signal),
@@ -136,6 +138,19 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                             "required_flags": sorted(stability.EXPECTED_REQUIRED_FLAGS),
                         }
                         for signal in stability.EXPECTED_ALLOWED_SIGNALS
+                    ],
+                    "target_sets": [
+                        "structure-observer-intake",
+                        stability.EXPECTED_INVENTORY_TARGET_SET,
+                        stability.EXPECTED_ITEM_RETURN_TARGET_SET,
+                    ],
+                    "target_set_evidence": [
+                        {"target_set": "structure-observer-intake"},
+                        {"target_set": stability.EXPECTED_INVENTORY_TARGET_SET},
+                        {"target_set": stability.EXPECTED_ITEM_RETURN_TARGET_SET},
+                    ],
+                    "excluded_target_sets": [
+                        {"target_set": stability.EXCLUDED_INVENTORY_ACTION_TARGET_SET}
                     ],
                 }
             ],
@@ -155,6 +170,11 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                     "support_tier": "promoted-experimental-only copied-data seed",
                     "public_contract": list(stability.EXPECTED_PUBLIC_CONTRACT),
                     "payload_contract": list(stability.EXPECTED_SURFACE_PAYLOAD_CONTRACT),
+                    "evidence": {
+                        "release_readiness_target_sets": list(
+                            stability.EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS
+                        )
+                    },
                     "exclusions": sorted(stability.REQUIRED_FORBIDDEN_TERMS),
                 },
                 {
@@ -341,6 +361,36 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         reasons = set(payload["blockers"])
         self.assertIn("public_gameplay_inventory_required_flags_mismatch", reasons)
 
+    def test_inventory_target_set_provenance_must_stay_pinned(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["inventory_backing_target_set"] = "inventory-action-compact-intake"
+        event["item_return_backing_target_set"] = "inventory-action-compact-intake"
+        event["target_sets"] = ["structure-observer-intake", "inventory-action-compact-intake"]
+        event["target_set_evidence"] = [{"target_set": "structure-observer-intake"}]
+        event["excluded_target_sets"] = []
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("inventory_backing_target_set_mismatch", reasons)
+        self.assertIn("item_return_backing_target_set_mismatch", reasons)
+        self.assertIn("gameplay_policy_inventory_target_sets_missing", reasons)
+        self.assertIn("gameplay_policy_inventory_target_set_evidence_missing", reasons)
+        self.assertIn("gameplay_policy_inventory_action_target_set_not_excluded", reasons)
+
+    def test_public_sdk_surface_release_readiness_target_sets_must_stay_pinned(self) -> None:
+        fixtures = self.make_fixture()
+        surface = fixtures["public_sdk_surfaces"]["surfaces"][0]
+        surface["evidence"]["release_readiness_target_sets"] = ["inventory-action-compact-intake"]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("inventory_copied_release_readiness_target_sets_mismatch", reasons)
+
     def test_non_copied_payload_contract_wording_is_rejected(self) -> None:
         fixtures = self.make_fixture()
         fixtures["decisions"]["public_contract"]["payload_contract"] = "non-copied POD scalar observation only"
@@ -444,6 +494,23 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
             if blocker["reason"] == "public_claim_forbidden_term"
         )
         self.assertEqual("return override", detail["term"])
+
+    def test_positive_raw_inventory_identity_claims_are_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        fixtures["public_gameplay_events"]["promoted_events"][0]["resource_contract"] = (
+            "kind metadata provides ItemId identity and InventoryComp support"
+        )
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        terms = {
+            blocker["term"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "public_claim_forbidden_term"
+        }
+        self.assertIn("ItemId", terms)
+        self.assertIn("InventoryComp", terms)
 
     def test_public_sdk_and_v1_readiness_cannot_be_activated_by_this_surface(self) -> None:
         fixtures = self.make_fixture()
