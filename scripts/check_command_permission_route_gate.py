@@ -390,17 +390,18 @@ def build_critical_path_phase() -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         parse_error = f"stdout_json_decode_error: {exc}"
 
-    current_blocker = CURRENT_CRITICAL_PATH_BLOCKER
+    primary_blocker = None
+    next_blocker = None
     if report is not None:
-        current_blocker = (
-            report.get("primary_blocker")
-            or report.get("next_blocker")
-            or current_blocker
-        )
+        primary_blocker = report.get("primary_blocker")
+        next_blocker = report.get("next_blocker")
+    current_blocker = primary_blocker or next_blocker
 
     return {
         "current_surface": "obelisk.player_identity.v1",
         "current_blocker": current_blocker,
+        "source_checker_primary_blocker": primary_blocker,
+        "source_checker_next_blocker": next_blocker,
         "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
         "next_after_runtime_evidence": "identity_public_contract_gate_missing",
         "permissions_admin_unlocked": False,
@@ -411,10 +412,10 @@ def build_critical_path_phase() -> dict[str, Any]:
         "source_checker_schema": report.get("schema") if report is not None else None,
         "source_checker_parse_error": parse_error,
         "planning_only": True,
-        "promotion_ready": False,
-        "public_sdk_ready": False,
-        "public_abi_ready": False,
-        "runtime_ready": False,
+        "promotion_ready": report.get("promotion_ready") is True if report is not None else None,
+        "public_sdk_ready": report.get("public_sdk_ready") is True if report is not None else None,
+        "public_abi_ready": report.get("public_abi_ready") is True if report is not None else None,
+        "runtime_ready": report.get("runtime_ready") is True if report is not None else None,
     }
 
 
@@ -426,6 +427,8 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_schema_mismatch")
     if phase.get("source_checker_parse_error") is not None:
         blockers.append("critical_path_identity_readiness_output_invalid")
+    if phase.get("source_checker_primary_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:
+        blockers.append("critical_path_identity_readiness_blocker_missing")
     if phase.get("current_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
     if phase.get("current_blocker") in {"identity_public_contract_gate", "identity_public_contract_gate_missing"}:
@@ -440,7 +443,10 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         "runtime_ready",
     ):
         if phase.get(key) is not False:
-            blockers.append(f"critical_path_{key}_must_stay_false")
+            if key in {"promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready"}:
+                blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
+            else:
+                blockers.append(f"critical_path_{key}_must_stay_false")
     return blockers
 
 

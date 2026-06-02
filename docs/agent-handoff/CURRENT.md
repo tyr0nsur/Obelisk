@@ -177,6 +177,14 @@ This file is an active routing table only. Durable evidence belongs in
   the same round found no actionable gap in public ABI, owner cleanup, CallProcessEvent,
   timers, or PluginManager static guardrails. These remain offline guardrails only; no
   public SDK, runtime, ResourceHandle, Dino SDK, or v1 completion readiness is promoted.
+- 2026-06-02 route blocker and release wording guardrails: the command/permission route
+  gate now preserves the player-identity first-evidence checker's reported primary/next
+  blocker and readiness booleans in `critical_path_phase` and rejects missing identity
+  blocker provenance or positive readiness overclaims instead of manufacturing a clean
+  planning-locked phase. SDK completion release-statement scanning now rejects `GA`
+  abbreviations such as `Obelisk SDK v1 is GA`, `reaches GA`, and `The v1 SDK is GA`.
+  These are offline guardrails only; route gate remains planning-only and SDK completion
+  remains fail-closed.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -272,6 +280,11 @@ This file is an active routing table only. Durable evidence belongs in
   ResourceHandle, Mission copied-bool, and Structure planning slices. Consume acceptance
   must not imply public SDK, runtime readiness, mutation, return override, lookup,
   post-callback handles, or v1 completion.
+- Mission/Transfer/Dino/Tribe outcome accounting: audit the future `per_leaf_promoted`
+  route before any use as promotion evidence. Current read-only finding: placeholder
+  `abi_tests`, `sdk_consumer_tests`, and `second_source_evidence` paths can satisfy the
+  promoted leaf shape without checking path existence, approved gate report identity, leaf
+  ownership, or second-source provenance.
 - ResourceHandle: wait for rejected runtime object samples plus runtime serial
   reuse/wraparound semantics from an approved live-ops brief; offline/core artifacts cannot
   synthesize that blocker away.

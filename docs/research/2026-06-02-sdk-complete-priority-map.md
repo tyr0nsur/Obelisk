@@ -527,3 +527,47 @@ Validation:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Dino SDK, ResourceHandle, object lookup, release readiness, or a stable
 SDK claim.
+
+## Route Blocker Provenance And GA Wording Guardrails
+
+The next supervised round closed two offline release/route guardrail gaps and recorded one
+deferred side-lane promotion provenance risk:
+
+- `scripts/check_command_permission_route_gate.py` now preserves
+  `source_checker_primary_blocker`, `source_checker_next_blocker`, and the player-identity
+  first-evidence readiness booleans in `critical_path_phase`. The route validator rejects
+  missing first-evidence blocker provenance and positive readiness overclaims instead of
+  defaulting a malformed child report back to `approved_runtime_evidence_missing`.
+- `scripts/check_public_sdk_v1_completion.py` now rejects `GA` abbreviations in scoped
+  release statements, including `Obelisk SDK v1 is GA`, `Obelisk SDK v1 reaches GA`, and
+  `The v1 SDK is GA`, alongside existing `generally available`, `ships`, `launches`,
+  `production-grade`, and `release-grade` broad wording.
+- Read-only side-lane audit found a deferred risk in the future
+  `per_leaf_promoted` path of
+  `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py`: placeholder
+  `abi_tests`, `sdk_consumer_tests`, and `second_source_evidence` lists can satisfy the
+  promoted leaf shape without verifying path existence, approved gate report identity,
+  leaf ownership, or second-source provenance. This was not integrated in this checkpoint;
+  it should be the next offline artifact-gate hardening target before any promoted
+  Mission/Transfer/Dino/Tribe leaf is accepted.
+- Runtime/ABI audit again found no actionable offline-detectable gap in the inspected
+  public header, PluginManager/EventManager/TimerManager cleanup, CallProcessEvent
+  init-window posture, callback exception containment, or static PluginManager guardrails.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate`
+  passed with 19 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 110 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing` and
+  preserved source-checker blocker provenance.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a
+stable SDK claim.

@@ -71,6 +71,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "source_checker_exit_code": 1,
                 "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
                 "source_checker_parse_error": None,
+                "source_checker_primary_blocker": "approved_runtime_evidence_missing",
+                "source_checker_next_blocker": None,
                 "planning_only": True,
                 "promotion_ready": False,
                 "public_sdk_ready": False,
@@ -151,6 +153,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "current_blocker": "approved_runtime_evidence_missing",
             "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
             "source_checker_parse_error": None,
+            "source_checker_primary_blocker": "approved_runtime_evidence_missing",
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -177,6 +180,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "current_blocker": "unexpected",
             "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
             "source_checker_parse_error": None,
+            "source_checker_primary_blocker": "unexpected",
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": True,
@@ -195,6 +199,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "current_blocker": "approved_runtime_evidence_missing",
             "source_checker_schema": "wrong-schema",
             "source_checker_parse_error": "stdout_json_decode_error: broken",
+            "source_checker_primary_blocker": "approved_runtime_evidence_missing",
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -208,6 +213,65 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertIn("critical_path_identity_readiness_schema_mismatch", blockers)
         self.assertIn("critical_path_identity_readiness_output_invalid", blockers)
+
+    def test_build_critical_path_phase_rejects_missing_identity_readiness_blocker(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=1,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                    }
+                ),
+                stderr="",
+            )
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            phase = ROUTE_GATE.build_critical_path_phase()
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        self.assertIsNone(phase["current_blocker"])
+        self.assertIn("critical_path_identity_readiness_blocker_missing", blockers)
+        self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
+
+    def test_build_critical_path_phase_rejects_identity_readiness_overclaim_flags(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=1,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                        "primary_blocker": "approved_runtime_evidence_missing",
+                        "promotion_ready": True,
+                        "public_sdk_ready": True,
+                        "public_abi_ready": True,
+                        "runtime_ready": True,
+                    }
+                ),
+                stderr="",
+            )
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            phase = ROUTE_GATE.build_critical_path_phase()
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
+        self.assertEqual(4, blockers.count("critical_path_identity_readiness_ready_flag_overclaim"))
 
     def test_route_check_rejects_schema_drift_even_when_otherwise_valid(self) -> None:
         original = ROUTE_GATE.run_check

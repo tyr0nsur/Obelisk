@@ -1194,6 +1194,37 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertGreaterEqual(len(payload["release_statement_forbidden_broad_claims"]), 4)
 
+    def test_scoped_release_statement_scope_rejects_ga_abbreviation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "Obelisk SDK v1 is GA.\n"
+                + "Obelisk SDK v1 reaches GA today.\n"
+                + "The v1 SDK is GA for plugin authors.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        self.assertIn("Obelisk SDK v1 is GA.", forbidden_claims)
+        self.assertIn("Obelisk SDK v1 reaches GA today.", forbidden_claims)
+        self.assertIn("The v1 SDK is GA for plugin authors.", forbidden_claims)
+
     def test_scoped_release_statement_scope_rejects_production_grade_sdk_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
