@@ -672,6 +672,46 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Structured Player-Principal Preflight Sidecars
+
+The next supervised round closed the deferred structured-preflight sidecar gap on the
+future approved runtime principal lifecycle evidence path:
+
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now requires
+  structured `obelisk.player-principal-lifecycle-preflight.v1` JSON sidecars for
+  `preflight-pre.json` and `preflight-post.json`. Legacy one-line text preflight sidecars
+  fail closed even when the manifest SHA is refreshed.
+- The window-manifest checker validates `ready=true`, `posture_check=accepted`, expected
+  mode, target instance, reviewed ARK binary SHA, wrapper SHA shape, marker-dir instance
+  binding, and observer-window env-file path/SHA against the manifest's
+  `observer_env_path` and `observer_env_sha256`.
+- Window-manifest reports now emit resolved paths for the manifest, request pack,
+  observer env, and preflight sidecars so approved-evidence consumers do not interpret
+  relative paths under a different cwd. Both the window checker and approved-evidence
+  consumer require canonical preflight artifact filenames.
+- `check_player_principal_lifecycle_preflight.sh` now rejects launch-posture env keys in
+  observer-window mode, including `LD_PRELOAD`, `LD_LIBRARY_PATH`, `OBELISK_ROOT`,
+  `OBELISK_PLUGIN_DIR`, `OBELISK_CONFIG_DIR`, `OBELISK_LOG_DIR`, and
+  `OBELISK_STATE_DIR`.
+
+Validation:
+
+- `bash scripts/test_check_player_principal_lifecycle_preflight.sh`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence scripts.test_build_player_identity_runtime_principal_lifecycle_approved_manifest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+
+Deferred read-only audit findings for future offline guardrail rounds:
+
+- Route/SDK provenance should bind child `primary_blocker` values to child blocker lists,
+  stale child readiness/status fields, and route-lock `blocked_until` values.
+- Command response and commands/replies readiness should reject fake public-header paths
+  and bind embedded response-path reports to canonical decision manifests.
+- Permissions/admin public readiness should reject symlinked JSON artifacts and protected
+  decisions/surfaces inputs.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Player Identity Aggregate Provenance Closure
 
 The next supervised P0 identity round closed the deferred aggregate provenance gap:

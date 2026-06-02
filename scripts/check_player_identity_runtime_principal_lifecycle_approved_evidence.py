@@ -1076,12 +1076,14 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             f"{label}.preflight.pre",
             blockers,
             run_id=run_id,
+            expected_name="preflight-pre.json",
         )
         validate_operational_window_artifact(
             preflight.get("post"),
             f"{label}.preflight.post",
             blockers,
             run_id=run_id,
+            expected_name="preflight-post.json",
         )
 
     posture = window.get("posture")

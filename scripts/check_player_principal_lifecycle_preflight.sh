@@ -376,6 +376,13 @@ require_observer_window_env() {
     require_env_value OBELISK_PE_TRACE_LIMIT 0
 
     for key in \
+        LD_PRELOAD \
+        LD_LIBRARY_PATH \
+        OBELISK_ROOT \
+        OBELISK_PLUGIN_DIR \
+        OBELISK_CONFIG_DIR \
+        OBELISK_LOG_DIR \
+        OBELISK_STATE_DIR \
         OBELISK_DEBUG_ALLOW_PTRACE \
         OBELISK_ENABLE_DEBUG_CONTROL \
         OBELISK_ENABLE_REFLECTION_SCANNER \

@@ -35,15 +35,7 @@ EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf6
 
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-PREFLIGHT_TEXT_RE = re.compile(
-    r"^player_principal_lifecycle_preflight=ok mode=(?P<mode>[A-Za-z0-9_.-]+) "
-    r"instance=(?P<instance>[A-Za-z0-9_.-]+) "
-    r"binary_sha256=(?P<binary_sha256>[0-9a-f]{64})\n$"
-)
-LEGACY_PREFLIGHT_TEXT_RE = re.compile(
-    r"^player_principal_lifecycle_preflight=ok mode=(?P<mode>[A-Za-z0-9_.-]+) "
-    r"instance=(?P<instance>[A-Za-z0-9_.-]+)\n$"
-)
+PREFLIGHT_SCHEMA = "obelisk.player-principal-lifecycle-preflight.v1"
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 FORBIDDEN_KEY_RE = re.compile(
@@ -441,37 +433,84 @@ def validate_preflight_content(
     if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
         return
     try:
-        actual = status.resolved.read_text(encoding="utf-8")
+        payload = json.loads(status.resolved.read_text(encoding="utf-8"))
     except OSError as exc:
         add(blockers, f"{path_key}_unreadable", path_key, detail=str(exc))
         return
-    match = PREFLIGHT_TEXT_RE.fullmatch(actual)
-    if match is None:
-        if LEGACY_PREFLIGHT_TEXT_RE.fullmatch(actual):
-            add(blockers, f"{path_key}_binary_sha256_missing", path_key)
-        add(
-            blockers,
-            f"{path_key}_content_mismatch",
-            path_key,
-            expected=(
-                "player_principal_lifecycle_preflight=ok "
-                f"mode={expected_mode} instance={target.instance} "
-                f"binary_sha256={EXPECTED_BINARY_SHA256}"
-            ),
-        )
+    except json.JSONDecodeError as exc:
+        add(blockers, f"{path_key}_json_invalid", path_key, detail=str(exc))
         return
-    if match.group("mode") != expected_mode:
-        add(blockers, f"{path_key}_mode_mismatch", path_key, expected=expected_mode, actual=match.group("mode"))
-    if match.group("instance") != target.instance:
-        add(blockers, f"{path_key}_instance_mismatch", path_key, expected=target.instance, actual=match.group("instance"))
-    if match.group("binary_sha256") != EXPECTED_BINARY_SHA256:
+    if not isinstance(payload, dict):
+        add(blockers, f"{path_key}_not_object", path_key)
+        return
+
+    if payload.get("schema") != PREFLIGHT_SCHEMA:
+        add(blockers, f"{path_key}_schema_mismatch", path_key, expected=PREFLIGHT_SCHEMA, actual=payload.get("schema"))
+    if payload.get("ready") is not True:
+        add(blockers, f"{path_key}_ready_not_true", path_key)
+    if payload.get("posture_check") != "accepted":
+        add(blockers, f"{path_key}_posture_check_not_accepted", path_key)
+    if payload.get("mode") != expected_mode:
+        add(blockers, f"{path_key}_mode_mismatch", path_key, expected=expected_mode, actual=payload.get("mode"))
+    if payload.get("instance") != target.instance:
+        add(blockers, f"{path_key}_instance_mismatch", path_key, expected=target.instance, actual=payload.get("instance"))
+
+    server_binary = payload.get("server_binary")
+    if not isinstance(server_binary, dict):
+        add(blockers, f"{path_key}_server_binary_missing", path_key)
+    elif server_binary.get("sha256") != EXPECTED_BINARY_SHA256:
         add(
             blockers,
             f"{path_key}_binary_sha256_mismatch",
             path_key,
             expected=EXPECTED_BINARY_SHA256,
-            actual=match.group("binary_sha256"),
+            actual=server_binary.get("sha256"),
         )
+
+    installed_wrapper = payload.get("installed_wrapper")
+    if not isinstance(installed_wrapper, dict):
+        add(blockers, f"{path_key}_installed_wrapper_missing", path_key)
+    elif SHA256_RE.fullmatch(str(installed_wrapper.get("sha256", ""))) is None:
+        add(blockers, f"{path_key}_installed_wrapper_sha256_invalid", path_key)
+
+    marker_dir = payload.get("marker_dir")
+    if not isinstance(marker_dir, str) or not marker_dir.endswith(f"/state/instances/{target.instance}"):
+        add(blockers, f"{path_key}_marker_dir_instance_mismatch", path_key, actual=marker_dir)
+
+    env_file = payload.get("env_file")
+    if expected_mode == "observer-window":
+        observer_env_text = fields.get("observer_env_path")
+        observer_env_sha256 = fields.get("observer_env_sha256")
+        if not isinstance(env_file, dict):
+            add(blockers, f"{path_key}_env_file_missing", path_key)
+        else:
+            observer_env_path = manifest_relative_path(observer_env_text, manifest_path) if observer_env_text else None
+            if observer_env_path is None:
+                add(blockers, f"{path_key}_observer_env_path_missing", path_key)
+            else:
+                observer_env_status = protected_paths.protected_path_status(
+                    observer_env_path,
+                    protected_root=SERVER_ROOT,
+                    approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+                )
+                if env_file.get("path") != str(observer_env_status.resolved):
+                    add(
+                        blockers,
+                        f"{path_key}_env_file_path_mismatch",
+                        path_key,
+                        expected=str(observer_env_status.resolved),
+                        actual=env_file.get("path"),
+                    )
+            if env_file.get("sha256") != observer_env_sha256:
+                add(
+                    blockers,
+                    f"{path_key}_env_file_sha256_mismatch",
+                    path_key,
+                    expected=observer_env_sha256,
+                    actual=env_file.get("sha256"),
+                )
+    elif env_file is not None:
+        add(blockers, f"{path_key}_env_file_unexpected", path_key)
 
 
 def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers: list[dict[str, Any]]) -> None:
@@ -677,6 +716,7 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
         blockers,
         path_key="preflight_pre_path",
         sha_key="preflight_pre_sha256",
+        expected_name="preflight-pre.json",
     )
     validate_preflight_content(
         fields,
@@ -692,6 +732,7 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
         blockers,
         path_key="preflight_post_path",
         sha_key="preflight_post_sha256",
+        expected_name="preflight-post.json",
     )
     validate_preflight_content(
         fields,
@@ -810,12 +851,12 @@ def build_template_fields() -> dict[str, str]:
         "observer_env_sha256": "0" * 64,
         "preflight_pre_path": (
             "/servidor/ark/workspace-offline/live-validation-logs/"
-            "20260601T120000Z-player-principal-lifecycle/preflight-pre.txt"
+            "20260601T120000Z-player-principal-lifecycle/preflight-pre.json"
         ),
         "preflight_pre_sha256": "0" * 64,
         "preflight_post_path": (
             "/servidor/ark/workspace-offline/live-validation-logs/"
-            "20260601T120000Z-player-principal-lifecycle/preflight-post.txt"
+            "20260601T120000Z-player-principal-lifecycle/preflight-post.json"
         ),
         "preflight_post_sha256": "0" * 64,
         "pre_posture": "stable",
@@ -904,6 +945,25 @@ def write_template(path: Path, copied_log: Path | None = None) -> None:
 
 def build_report(fields: dict[str, str], validation: Validation, manifest_path: Path) -> dict[str, Any]:
     accepted = not validation.blockers
+    manifest_status = protected_paths.protected_path_status(
+        manifest_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    resolved_manifest_path = str(manifest_status.resolved)
+
+    def resolved_field_path(key: str) -> str | None:
+        value = fields.get(key)
+        if not value:
+            return None
+        path = manifest_relative_path(value, manifest_path)
+        status = protected_paths.protected_path_status(
+            path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        return str(status.resolved)
+
     try:
         manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     except OSError:
@@ -931,7 +991,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "map": validation.target.map_name,
         },
         "manifest": {
-            "path": str(manifest_path),
+            "path": resolved_manifest_path,
             "sha256": manifest_sha256,
         },
         "copied_log": {
@@ -940,20 +1000,20 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "path_status": validation.copied_log_status,
         },
         "request_pack": {
-            "path": fields.get("request_pack_path"),
+            "path": resolved_field_path("request_pack_path"),
             "sha256": fields.get("request_pack_sha256"),
         },
         "observer_env": {
-            "path": fields.get("observer_env_path"),
+            "path": resolved_field_path("observer_env_path"),
             "sha256": fields.get("observer_env_sha256"),
         },
         "preflight": {
             "pre": {
-                "path": fields.get("preflight_pre_path"),
+                "path": resolved_field_path("preflight_pre_path"),
                 "sha256": fields.get("preflight_pre_sha256"),
             },
             "post": {
-                "path": fields.get("preflight_post_path"),
+                "path": resolved_field_path("preflight_post_path"),
                 "sha256": fields.get("preflight_post_sha256"),
             },
         },

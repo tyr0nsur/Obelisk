@@ -33,6 +33,38 @@ def write_sidecar(path: Path, text: str) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def preflight_payload(
+    *,
+    mode: str,
+    instance: str,
+    env_file: Path | None = None,
+    env_sha256: str | None = None,
+) -> str:
+    payload = {
+        "schema": "obelisk.player-principal-lifecycle-preflight.v1",
+        "ready": True,
+        "mode": mode,
+        "instance": instance,
+        "map": None,
+        "server_binary": {
+            "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
+            "sha256": SHA,
+        },
+        "obelisk_root": "/servidor/ark/obelisk",
+        "installed_wrapper": {
+            "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh",
+            "sha256": "1" * 64,
+        },
+        "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
+        "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
+        "offline_only": False,
+        "allow_stopped": True,
+        "posture_check": "accepted",
+        "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+    }
+    return json.dumps(payload, sort_keys=True) + "\n"
+
+
 def runtime_log_lines() -> list[str]:
     return [
         "[info]  Obelisk Runtime Loaded Native (LD_PRELOAD)",
@@ -94,8 +126,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         sidecar_dir = temp_dir / "player-principal-preflight" / RUN_ID
         request_pack = sidecar_dir / "window-request.json"
         observer_env = sidecar_dir / "observer-window.env"
-        preflight_pre = manifest_path.parent / "preflight-pre.txt"
-        preflight_post = manifest_path.parent / "preflight-post.txt"
+        preflight_pre = manifest_path.parent / "preflight-pre.json"
+        preflight_post = manifest_path.parent / "preflight-post.json"
         request_pack_sha256 = write_sidecar(
             request_pack,
             json.dumps(
@@ -182,11 +214,16 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
-            f"player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2 binary_sha256={SHA}\n",
+            preflight_payload(
+                mode="observer-window",
+                instance="arkserver2",
+                env_file=observer_env,
+                env_sha256=observer_env_sha256,
+            ),
         )
         preflight_post_sha256 = write_sidecar(
             preflight_post,
-            f"player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2 binary_sha256={SHA}\n",
+            preflight_payload(mode="stable", instance="arkserver2"),
         )
         manifest_path.write_text(
             "\n".join(

@@ -302,6 +302,17 @@ This file is an active routing table only. Durable evidence belongs in
   copied evidence dir, or `window-manifest.env` path drifts from the current manifest
   being checked. This is consume-side offline validation only and does not approve runtime
   capture, public identity, route promotion, or v1 completion.
+- Follow-up preflight/window guardrails require structured
+  `obelisk.player-principal-lifecycle-preflight.v1` JSON for `preflight-pre.json` and
+  `preflight-post.json`, reject legacy text sidecars, bind observer-window preflight JSON
+  to the manifest's observer env path/SHA, normalize window-manifest report paths to
+  resolved artifact paths, and reject launch-posture env keys such as `LD_PRELOAD`,
+  `LD_LIBRARY_PATH`, `OBELISK_ROOT`, and Obelisk plugin/config/log roots in observer
+  preflight env. This remains offline consume-side validation only.
+- Deferred read-only audit risks for the next offline guardrail round: route/SDK checks
+  should bind child primary blockers to child blocker lists and route locks; command
+  response/commands-replies should reject fake public-header paths and bind response
+  reports to canonical decisions; permissions/admin should reject symlinked JSON inputs.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

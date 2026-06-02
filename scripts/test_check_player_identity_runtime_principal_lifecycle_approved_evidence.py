@@ -104,6 +104,38 @@ def write_sidecar(path: Path, text: str) -> dict[str, str]:
     return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
+def preflight_payload(
+    *,
+    mode: str,
+    instance: str,
+    env_file: Path | None = None,
+    env_sha256: str | None = None,
+) -> str:
+    payload = {
+        "schema": "obelisk.player-principal-lifecycle-preflight.v1",
+        "ready": True,
+        "mode": mode,
+        "instance": instance,
+        "map": None,
+        "server_binary": {
+            "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
+            "sha256": SHA,
+        },
+        "obelisk_root": "/servidor/ark/obelisk",
+        "installed_wrapper": {
+            "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh",
+            "sha256": "1" * 64,
+        },
+        "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
+        "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
+        "offline_only": False,
+        "allow_stopped": True,
+        "posture_check": "accepted",
+        "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+    }
+    return json.dumps(payload, sort_keys=True) + "\n"
+
+
 def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     workspace = copied_log.parents[2]
     live_dir = copied_log.parent
@@ -112,8 +144,8 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     manifest_path = live_dir / "window-manifest.env"
     request_pack_path = sidecar_dir / "window-request.json"
     observer_env_path = sidecar_dir / "observer-window.env"
-    preflight_pre_path = live_dir / "preflight-pre.txt"
-    preflight_post_path = live_dir / "preflight-post.txt"
+    preflight_pre_path = live_dir / "preflight-pre.json"
+    preflight_post_path = live_dir / "preflight-post.json"
     target = {"instance": "arkserver2", "map": "TheIsland"}
     approved_window = {
         "start_utc": "2026-06-01T12:00:00Z",
@@ -205,11 +237,16 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     )
     preflight_pre = write_sidecar(
         preflight_pre_path,
-        f"player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2 binary_sha256={SHA}\n",
+        preflight_payload(
+            mode="observer-window",
+            instance="arkserver2",
+            env_file=observer_env_path,
+            env_sha256=observer_env["sha256"],
+        ),
     )
     preflight_post = write_sidecar(
         preflight_post_path,
-        f"player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2 binary_sha256={SHA}\n",
+        preflight_payload(mode="stable", instance="arkserver2"),
     )
     manifest = write_sidecar(
         manifest_path,
@@ -598,8 +635,16 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 "preflight_pre",
                 lambda payload: payload["operational_window"]["preflight"]["pre"],
                 lambda path: path.read_text(encoding="utf-8").replace(
-                    "mode=observer-window",
-                    "mode=stable",
+                    '"mode": "observer-window"',
+                    '"mode": "stable"',
+                ),
+            ),
+            (
+                "preflight_post",
+                lambda payload: payload["operational_window"]["preflight"]["post"],
+                lambda path: path.read_text(encoding="utf-8").replace(
+                    '"mode": "stable"',
+                    '"mode": "observer-window"',
                 ),
             ),
         )

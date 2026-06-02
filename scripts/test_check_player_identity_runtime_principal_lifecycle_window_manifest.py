@@ -78,9 +78,9 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "request_pack_sha256": "0" * 64,
         "observer_env_path": f"sidecars/{RUN_ID}/observer-window.env",
         "observer_env_sha256": "0" * 64,
-        "preflight_pre_path": f"sidecars/{RUN_ID}/preflight-pre.txt",
+        "preflight_pre_path": f"sidecars/{RUN_ID}/preflight-pre.json",
         "preflight_pre_sha256": "0" * 64,
-        "preflight_post_path": f"sidecars/{RUN_ID}/preflight-post.txt",
+        "preflight_post_path": f"sidecars/{RUN_ID}/preflight-post.json",
         "preflight_post_sha256": "0" * 64,
         "pre_posture": "stable",
         "post_posture": "stable",
@@ -186,31 +186,69 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     }
 
 
+def preflight_payload(
+    *,
+    mode: str,
+    instance: str,
+    env_file: Path | None = None,
+    env_sha256: str | None = None,
+) -> dict:
+    return {
+        "schema": "obelisk.player-principal-lifecycle-preflight.v1",
+        "ready": True,
+        "mode": mode,
+        "instance": instance,
+        "map": None,
+        "server_binary": {
+            "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
+            "sha256": ARK_SHA,
+        },
+        "obelisk_root": "/servidor/ark/obelisk",
+        "installed_wrapper": {
+            "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh",
+            "sha256": "1" * 64,
+        },
+        "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
+        "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
+        "offline_only": False,
+        "allow_stopped": True,
+        "posture_check": "accepted",
+        "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+    }
+
+
 def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
+    observer_env_path = Path(fields["observer_env_path"])
+    if not observer_env_path.is_absolute():
+        observer_env_path = base / observer_env_path
+    observer_env_text = "\n".join(
+        [
+            "OBELISK_INSTANCE_ID=arkserver2",
+            "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
+            "OBELISK_DISABLE_PLUGINS=1",
+            "OBELISK_WRAPPER_PROFILE=observer-debug",
+            "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
+            f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={ARK_SHA}",
+            "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+            "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+            "OBELISK_PE_TRACE_LIMIT=0",
+        ]
+    ) + "\n"
+    observer_env_sha256 = hashlib.sha256(observer_env_text.encode("utf-8")).hexdigest()
     contents = {
         "request_pack": json.dumps(request_pack_payload(fields, base), sort_keys=True) + "\n",
-        "observer_env": "\n".join(
-            [
-                "OBELISK_INSTANCE_ID=arkserver2",
-                "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
-                "OBELISK_DISABLE_PLUGINS=1",
-                "OBELISK_WRAPPER_PROFILE=observer-debug",
-                "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
-                f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={ARK_SHA}",
-                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
-                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
-                "OBELISK_PE_TRACE_LIMIT=0",
-            ]
+        "observer_env": observer_env_text,
+        "preflight_pre": json.dumps(
+            preflight_payload(
+                mode="observer-window",
+                instance="arkserver2",
+                env_file=observer_env_path,
+                env_sha256=observer_env_sha256,
+            ),
+            sort_keys=True,
         )
         + "\n",
-        "preflight_pre": (
-            "player_principal_lifecycle_preflight=ok "
-            f"mode=observer-window instance=arkserver2 binary_sha256={ARK_SHA}\n"
-        ),
-        "preflight_post": (
-            "player_principal_lifecycle_preflight=ok "
-            f"mode=stable instance=arkserver2 binary_sha256={ARK_SHA}\n"
-        ),
+        "preflight_post": json.dumps(preflight_payload(mode="stable", instance="arkserver2"), sort_keys=True) + "\n",
     }
     key_map = {
         "request_pack": ("request_pack_path", "request_pack_sha256"),
@@ -400,13 +438,28 @@ class WindowManifestCheckerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest_path = root / "window-manifest.env"
-            preflight_path = root / "preflight-pre.txt"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            preflight_path = root / "preflight-pre.json"
             preflight_path.write_text(
-                "player_principal_lifecycle_preflight=ok "
-                f"mode=observer-window instance=arkserver2 binary_sha256={ARK_SHA}\n",
+                json.dumps(
+                    preflight_payload(
+                        mode="observer-window",
+                        instance="arkserver2",
+                        env_file=observer_env,
+                        env_sha256=observer_env_sha256,
+                    ),
+                    sort_keys=True,
+                )
+                + "\n",
                 encoding="utf-8",
             )
-            fields = {"preflight_pre_path": str(preflight_path)}
+            fields = {
+                "preflight_pre_path": str(preflight_path),
+                "observer_env_path": str(observer_env),
+                "observer_env_sha256": observer_env_sha256,
+            }
             blockers: list[dict[str, object]] = []
             original_server_root = CHECKER.SERVER_ROOT
             original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
@@ -427,15 +480,16 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertEqual([], blockers)
 
-    def test_validate_preflight_content_rejects_missing_or_wrong_binary_sha(self) -> None:
+    def test_validate_preflight_content_rejects_text_or_wrong_binary_sha(self) -> None:
+        wrong_sha_payload = preflight_payload(mode="observer-window", instance="arkserver2")
+        wrong_sha_payload["server_binary"]["sha256"] = "0" * 64
         for content, expected_reason in (
             (
                 "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
-                "preflight_pre_path_binary_sha256_missing",
+                "preflight_pre_path_json_invalid",
             ),
             (
-                "player_principal_lifecycle_preflight=ok "
-                f"mode=observer-window instance=arkserver2 binary_sha256={'0' * 64}\n",
+                json.dumps(wrong_sha_payload, sort_keys=True) + "\n",
                 "preflight_pre_path_binary_sha256_mismatch",
             ),
         ):
@@ -443,9 +497,16 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as tmp:
                     root = Path(tmp)
                     manifest_path = root / "window-manifest.env"
-                    preflight_path = root / "preflight-pre.txt"
+                    observer_env = root / "observer-window.env"
+                    observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+                    observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+                    preflight_path = root / "preflight-pre.json"
                     preflight_path.write_text(content, encoding="utf-8")
-                    fields = {"preflight_pre_path": str(preflight_path)}
+                    fields = {
+                        "preflight_pre_path": str(preflight_path),
+                        "observer_env_path": str(observer_env),
+                        "observer_env_sha256": observer_env_sha256,
+                    }
                     blockers: list[dict[str, object]] = []
                     original_server_root = CHECKER.SERVER_ROOT
                     original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
@@ -465,6 +526,52 @@ class WindowManifestCheckerTests(unittest.TestCase):
                         CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
 
                 self.assertIn(expected_reason, [item["reason"] for item in blockers])
+
+    def test_validate_preflight_content_rejects_observer_env_path_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "window-manifest.env"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            preflight_path = root / "preflight-pre.json"
+            preflight_path.write_text(
+                json.dumps(
+                    preflight_payload(
+                        mode="observer-window",
+                        instance="arkserver2",
+                        env_file=root / "stale-observer-window.env",
+                        env_sha256=observer_env_sha256,
+                    ),
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            fields = {
+                "preflight_pre_path": str(preflight_path),
+                "observer_env_path": str(observer_env),
+                "observer_env_sha256": observer_env_sha256,
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                CHECKER.validate_preflight_content(
+                    fields,
+                    manifest_path,
+                    blockers,
+                    path_key="preflight_pre_path",
+                    expected_mode="observer-window",
+                    target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        self.assertIn("preflight_pre_path_env_file_path_mismatch", [item["reason"] for item in blockers])
 
     def test_validate_request_pack_rejects_manifest_path_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -884,7 +991,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("preflight_pre_path_content_mismatch", report["blockers"])
+        self.assertIn("preflight_pre_path_json_invalid", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_capture_outside_approved_window_and_bad_rollback_order(self) -> None:

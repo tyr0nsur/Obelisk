@@ -284,6 +284,30 @@ assert_fail observer-window-forbidden-env "${CHECK}" \
 grep -F 'Forbidden env exists for player-principal preflight: OBELISK_ENABLE_CHAT_EVENTS' \
     "${TMP_DIR}/observer-window-forbidden-env.err" >/dev/null
 
+for forbidden_launch_key in \
+    LD_PRELOAD \
+    LD_LIBRARY_PATH \
+    OBELISK_ROOT \
+    OBELISK_PLUGIN_DIR \
+    OBELISK_CONFIG_DIR \
+    OBELISK_LOG_DIR
+do
+    launch_env="${TMP_DIR}/observer-window-forbidden-${forbidden_launch_key}.env"
+    write_observer_env "${launch_env}" "${server_sha}"
+    printf '%s=%s\n' "${forbidden_launch_key}" "${root_window}" >> "${launch_env}"
+    assert_fail "observer-window-forbidden-${forbidden_launch_key}" "${CHECK}" \
+        --instance arkserver2 \
+        --mode observer-window \
+        --obelisk-root "${root_window}" \
+        --installed-wrapper "${wrapper}" \
+        --server-binary "${server_binary}" \
+        --expected-binary-sha256 "${server_sha}" \
+        --env-file "${launch_env}" \
+        --allow-stopped
+    grep -F "Forbidden env exists for player-principal preflight: ${forbidden_launch_key}" \
+        "${TMP_DIR}/observer-window-forbidden-${forbidden_launch_key}.err" >/dev/null
+done
+
 duplicate_observer_env="${TMP_DIR}/observer-window-duplicate.env"
 write_observer_env "${duplicate_observer_env}" "${server_sha}"
 printf 'OBELISK_PE_TRACE_LIMIT=0\n' >> "${duplicate_observer_env}"
