@@ -165,6 +165,18 @@ This file is an active routing table only. Durable evidence belongs in
   as `ships`, `launches`, `goes live`, and `generally available` for SDK v1/complete or
   stable SDK wording. These are offline guardrails only; route gate remains planning-only
   and SDK completion remains fail-closed.
+- 2026-06-02 route/Dino/ResourceHandle wording guardrails: the command/permission route
+  gate now forwards the supplied `--public-sdk-surfaces` and `--public-header` to the
+  downstream permissions/admin, command response, and commands/replies child checks, so a
+  caller cannot validate aggregate route posture against one manifest while child checks
+  read the repo default. Dino scalar readiness now revalidates external `--report`
+  provenance by rebuilding the redacted signature report from the supplied snapshot root
+  and rejecting `generated_from`/`descriptor_preflight` drift. ResourceHandle readiness
+  now rejects positive `ships`/`includes`/`part of v1` wording, and SDK completion
+  rejects `production-grade`/`release-grade` SDK/API/support claims. Runtime/ABI audit in
+  the same round found no actionable gap in public ABI, owner cleanup, CallProcessEvent,
+  timers, or PluginManager static guardrails. These remain offline guardrails only; no
+  public SDK, runtime, ResourceHandle, Dino SDK, or v1 completion readiness is promoted.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

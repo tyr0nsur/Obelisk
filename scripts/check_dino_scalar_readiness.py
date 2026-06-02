@@ -139,6 +139,14 @@ def load_signature_report(report_path: Path | None, snapshot_root: Path, blocker
         if not isinstance(payload, dict):
             append_blocker(blockers, "report_not_object", path=str(report_path))
             return {}
+        try:
+            rebuilt = signature_builder.build_report(snapshot_root=snapshot_root, target_sets=[TARGET_SET])
+        except SystemExit as exc:
+            append_blocker(blockers, "report_source_snapshot_revalidation_failed", detail=str(exc))
+            return payload
+        for key in ("generated_from", "descriptor_preflight"):
+            if payload.get(key) != rebuilt.get(key):
+                append_blocker(blockers, "report_source_snapshot_revalidation_mismatch", section=key)
         return payload
     try:
         return signature_builder.build_report(snapshot_root=snapshot_root, target_sets=[TARGET_SET])
@@ -456,7 +464,7 @@ def build_report(repo_root_arg: Path, report_path: Path | None = None, snapshot_
         if not (repo_root / relative).is_file():
             append_blocker(blockers, "required_file_missing", path=relative)
     safe_report = safe_path(report_path, "--report", blockers) if report_path is not None else None
-    safe_snapshot_root = safe_path(snapshot_root, "--snapshot-root", blockers) if report_path is None else snapshot_root
+    safe_snapshot_root = safe_path(snapshot_root, "--snapshot-root", blockers)
     if (report_path is not None and safe_report is None) or (report_path is None and safe_snapshot_root is None):
         signature_report: dict[str, Any] = {}
     else:

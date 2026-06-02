@@ -198,7 +198,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
-    command_response_args = ["check_command_chat_response_public_readiness.py", "--json"]
+    shared_surface_args = ["--surfaces", str(args.public_sdk_surfaces)]
+    shared_header_args = ["--public-header", str(args.public_header)]
+    command_response_args = [
+        "check_command_chat_response_public_readiness.py",
+        *shared_surface_args,
+        *shared_header_args,
+        "--json",
+    ]
     if args.command_response_root is not None:
         command_response_args.extend(["--root", str(args.command_response_root)])
     if args.command_response_readiness is not None:
@@ -231,6 +238,8 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
                 "check_permissions_admin_public_readiness.py",
                 "--query-failclosed-artifact",
                 query_artifact,
+                *shared_surface_args,
+                *shared_header_args,
                 "--json",
             ],
         ),
@@ -252,7 +261,15 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
         ),
         ("command_principal_authz_response_bridge", ["check_command_principal_authz_response_bridge.py", "--json"]),
         ("command_chat_response_public_readiness", command_response_args),
-        ("commands_replies_public_readiness", ["check_commands_replies_public_readiness.py", "--json"]),
+        (
+            "commands_replies_public_readiness",
+            [
+                "check_commands_replies_public_readiness.py",
+                *shared_surface_args,
+                *shared_header_args,
+                "--json",
+            ],
+        ),
     ]
 
 

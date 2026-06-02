@@ -92,6 +92,27 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             report["blockers"],
         )
 
+    def test_rejects_resource_handle_ships_claim_in_decisions_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["release_claim"] = (
+                "v1 ships ResourceHandle object identity for post-callback object correlation."
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("decisions_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
     def test_rejects_public_sdk_surface_promotion_or_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -120,6 +141,30 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
                     surface["evidence"]["claim"] = (
                         "ResourceHandle ready for public SDK lookup and post-callback object correlation"
+                    )
+                    break
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("surface_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
+    def test_rejects_resource_handle_ships_claim_in_surface_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
+                    surface["evidence"]["claim"] = (
+                        "v1 ships ResourceHandle object identity for post-callback object correlation."
                     )
                     break
             surfaces_path = write_json(root, "surfaces.json", surfaces)

@@ -210,6 +210,42 @@ class CheckDinoScalarReadinessTests(unittest.TestCase):
         reasons = {blocker["reason"] for blocker in payload["blockers"]}
         self.assertIn("copied_scalar_source_snapshot_unknown", reasons)
 
+    def test_report_source_snapshots_are_revalidated_against_snapshot_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = self.make_report()
+            renamed = {
+                snapshot["id"]: f"fabricated-{index}"
+                for index, snapshot in enumerate(report["generated_from"]["input_snapshots"], start=1)
+            }
+            for snapshot in report["generated_from"]["input_snapshots"]:
+                snapshot["id"] = renamed[snapshot["id"]]
+            for collection in ("copied_scalars", "excluded_object_refs"):
+                for entry in report["descriptor_preflight"][collection]:
+                    entry["source_snapshot"] = renamed[entry["source_snapshot"]]
+            report_path = self.write_report(root, report)
+            result = self.run_checker("--report", str(report_path), check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        reasons = {blocker["reason"] for blocker in payload["blockers"]}
+        self.assertIn("report_source_snapshot_revalidation_mismatch", reasons)
+        self.assertFalse(payload["public_dino_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+        self.assertFalse(payload["v1_completion_ready"])
+
+    def test_report_generated_from_current_snapshot_root_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_report(root, self.make_report())
+            result = self.run_checker("--report", str(report_path))
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(0, result.returncode)
+        self.assertTrue(payload["ready"])
+        self.assertFalse(payload["public_dino_sdk_ready"])
+        self.assertFalse(payload["runtime_ready"])
+
     def test_report_path_must_not_use_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

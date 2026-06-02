@@ -472,3 +472,58 @@ Validation:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Mission SDK, ResourceHandle, object lookup, release readiness, or a
 stable SDK claim.
+
+## Route Manifest, Dino Provenance, And Wording Guardrails
+
+The next supervised round closed four offline gaps and recorded one negative ABI/runtime
+audit result:
+
+- `scripts/check_command_permission_route_gate.py` now forwards the route-level
+  `--public-sdk-surfaces` and `--public-header` arguments into the downstream
+  permissions/admin, command response, and commands/replies child checks. The aggregate
+  route gate can no longer pass against a caller-supplied manifest that promotes
+  `obelisk.commands_replies.v1` while the downstream child checks silently read the repo
+  default manifest.
+- `scripts/check_dino_scalar_readiness.py` now revalidates external `--report` input by
+  rebuilding the redacted UFunction signature report from the supplied snapshot root and
+  comparing `generated_from` plus `descriptor_preflight`. A synthetic Dino scalar report
+  with fabricated snapshot ids no longer passes as candidate-ready planning evidence.
+- `scripts/check_object_identity_resource_handle_public_contract_readiness.py` now treats
+  `ships`, `includes`, and `part of v1` as positive ResourceHandle/object identity text
+  claims when they occur with ResourceHandle/object lookup/post-callback correlation
+  terms.
+- `scripts/check_public_sdk_v1_completion.py` now rejects `production-grade` and
+  `release-grade` SDK/API/support release-statement claims, along with existing
+  production/stable/complete/full wording.
+- Runtime/ABI audit found no actionable gap in the inspected public header,
+  `CallProcessEvent` init-window enforcement, PluginManager/EventManager/TimerManager
+  owner cleanup, callback exception containment, or PluginManager static guardrails. This
+  was a read-only negative result; it does not promote additional ABI or runtime scope.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_dino_scalar_readiness`
+  passed with 16 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate`
+  passed with 17 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+  passed with 12 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 109 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`, and
+  its child argv now shows shared `--surfaces`/`--public-header` on permissions/admin,
+  command response, and commands/replies checks.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_dino_scalar_readiness.py --json`
+  passed as internal candidate-only Dino scalar planning evidence with public
+  SDK/runtime/v1 readiness false.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+  passed as planning-only with ResourceHandle/object identity still blocked.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Dino SDK, ResourceHandle, object lookup, release readiness, or a stable
+SDK claim.

@@ -362,7 +362,7 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
-    r"\b(?:complete|full|production[- ]?ready|production|stable)\s+"
+    r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|production|stable)\s+"
     r"(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",
@@ -376,7 +376,7 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bv1(?:\.0)?\s+(?:sdk|api|support)\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available)\b",
-    r"\b(?:complete|full|production[- ]?ready|production|stable)\s+"
+    r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|production|stable)\s+"
     r"(?:sdk|api|support)\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available)\b",

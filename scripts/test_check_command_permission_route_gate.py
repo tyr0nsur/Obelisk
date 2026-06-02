@@ -18,6 +18,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_command_permission_route_gate.py"
 QUERY_CONTRACT = REPO_ROOT / "docs" / "permissions_admin_query_failclosed_contract.json"
 IDENTITY_DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
+PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 
 SPEC = importlib.util.spec_from_file_location("check_command_permission_route_gate", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -472,6 +473,63 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["accepted_for_planning"])
         self.assertIn("commands_replies_public_readiness: checker exited 1", report["blockers"])
         self.assertIn("commands_replies_public_readiness: invalid route prerequisite", report["blockers"])
+
+    def test_route_gate_forwards_shared_surfaces_and_header_to_p0_child_checks(self) -> None:
+        args = SimpleNamespace(
+            query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+            player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+            public_sdk_surfaces=Path("/tmp/route-surfaces.json"),
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=Path("/tmp/ObeliskApi.h"),
+            command_response_root=None,
+            command_response_readiness=None,
+            json=True,
+        )
+
+        by_name = {name: argv for name, argv in ROUTE_GATE.route_checks(args)}
+        for name in (
+            "player_identity_public_contract_gap",
+            "permissions_admin_public_readiness",
+            "command_chat_response_public_readiness",
+            "commands_replies_public_readiness",
+        ):
+            with self.subTest(name=name):
+                self.assertIn("--surfaces", by_name[name])
+                self.assertEqual("/tmp/route-surfaces.json", by_name[name][by_name[name].index("--surfaces") + 1])
+                self.assertIn("--public-header", by_name[name])
+                self.assertEqual("/tmp/ObeliskApi.h", by_name[name][by_name[name].index("--public-header") + 1])
+
+    def test_route_gate_rejects_supplied_surfaces_promoting_commands_replies(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            surfaces = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+            surfaces["promoted_surfaces"].append("obelisk.commands_replies.v1")
+            surfaces["planning_surfaces"] = [
+                item for item in surfaces["planning_surfaces"] if item != "obelisk.commands_replies.v1"
+            ]
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.commands_replies.v1":
+                    surface["status"] = "promoted"
+                    surface["support_tier"] = "stable"
+                    surface["public_contract"] = ["RegisterCommand", "ReplyToCommand"]
+                    break
+            surfaces_path = root / "public_sdk_surfaces.json"
+            surfaces_path.write_text(json.dumps(surfaces), encoding="utf-8")
+
+            result = self.run_checker(
+                "--public-sdk-surfaces",
+                str(surfaces_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertTrue(
+            any("commands_replies_public_readiness" in blocker for blocker in report["blockers"]),
+            report["blockers"],
+        )
 
     def test_run_check_recursively_rejects_subreport_public_alias_and_text_claims(self) -> None:
         original_run = ROUTE_GATE.subprocess.run

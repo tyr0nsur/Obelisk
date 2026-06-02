@@ -87,7 +87,7 @@ SURFACE_FORBIDDEN_TERM_RE = re.compile(
 )
 SURFACE_POSITIVE_CLAIM_RE = re.compile(
     r"(?:public[_ -]?sdk|ready|readiness|allowed|available|enabled|included|"
-    r"promoted|supported|lookup[_ -]?api|handle[_ -]?api)",
+    r"includes?|ships?|part[_ -]?of[_ -]?v1|promoted|supported|lookup[_ -]?api|handle[_ -]?api)",
     re.IGNORECASE,
 )
 DESCRIPTOR_SURFACE_IDS = frozenset(
