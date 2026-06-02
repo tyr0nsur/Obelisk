@@ -4834,6 +4834,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertIn("approved_runtime_evidence_manifest:sha256_mismatch", missing)
 
+    def test_identity_structured_contract_report_with_redaction_input_still_does_not_count_for_promotion(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            contract_path = REPO_ROOT / artifacts["public_contract_readiness_report"]
+            contract_report = json.loads(contract_path.read_text(encoding="utf-8"))
+            contract_report["resolved_inputs"] = [
+                "runtime.lifecycle_evidence",
+                "privacy.identifier_redaction",
+            ]
+            contract_path.write_text(json.dumps(contract_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+
     def test_identity_structured_contract_report_must_keep_full_blocker_set(self) -> None:
         missing = self.identity_structured_missing_for_contract_report(
             {

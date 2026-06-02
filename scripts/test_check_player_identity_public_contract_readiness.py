@@ -19,6 +19,9 @@ REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_public_contract_readiness.py"
 DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+REPO_REDACTION_EVIDENCE = (
+    REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json"
+)
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -121,6 +124,17 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertFalse(report["identifier_redaction_evidence"]["public_sdk_ready"])
         self.assertFalse(report["identifier_redaction_evidence"]["runtime_ready"])
         self.assertFalse(report["identifier_redaction_evidence"]["public_header_allowed"])
+
+    def test_repo_identifier_redaction_evidence_is_non_routing_contract_review_input(self) -> None:
+        blockers: list[dict] = []
+        report = checker.identifier_redaction_report(REPO_REDACTION_EVIDENCE, blockers)
+
+        self.assertEqual(blockers, [])
+        self.assertTrue(report["provided"])
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["accepted_for_contract_review"])
+        self.assertEqual(report["resolved_inputs"], ["privacy.identifier_redaction"])
+        self.assertEqual(report["remaining_blockers"], [])
 
     def test_rejects_identifier_redaction_evidence_that_overclaims_or_fails_validation(self) -> None:
         redaction = redaction_manifest()

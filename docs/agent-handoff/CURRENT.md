@@ -157,11 +157,10 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
-  primary offline gap remains `privacy.identifier_redaction`. The redaction checker now
-  enforces strict sanitized sample-log keys/events/reason flags, and public-contract
-  readiness can consume optional identifier-redaction evidence as contract-review input
-  only. It may add `privacy.identifier_redaction` to `resolved_inputs`, but the blocker
-  remains unresolved for promotion/public SDK/runtime/public-header readiness.
+  offline `privacy.identifier_redaction` evidence artifact at
+  `docs/research/2026-06-02-player-identity-identifier-redaction-evidence.json` passes
+  contract-review-only intake; it cannot promote identity, unlock public SDK/runtime/header
+  readiness, or satisfy the complete SDK claim.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.
@@ -192,17 +191,9 @@ This file is an active routing table only. Durable evidence belongs in
 - Lead handles delegation directly when the user asks for agents. Keep the scoped
   delegation fact in handoff/research notes before finishing so compaction does not erase
   which work was delegated and which findings remain pending.
-- Latest identity-public-contract route round used four lead-scoped read-only agents:
-  public-contract gap/readiness, route composition, privacy/redaction, and
-  handoff/research continuity. Integrated result: route and bound-route validation now
-  accept `identity_public_contract_gate_missing` only as locked planning after approved
-  runtime evidence, SDK completion requires the public-contract readiness report to keep
-  `next_blocker=identity_public_contract_gate` plus unresolved
-  `privacy.identifier_redaction`, and no permissions/admin, command, runtime, public
-  header, or stable SDK readiness is unlocked.
-- Latest route-lock/evidence-hardening round used four lead-scoped read-only agents:
-  route/accounting, permissions/admin dependency evidence, side-lane SDK accounting, and
-  handoff continuity. Integrated result: route locks now dedupe
+- Earlier identity route/evidence-hardening rounds made route validation accept
+  `identity_public_contract_gate_missing` only as locked planning after approved runtime
+  evidence, and route locks now dedupe
   `blocked_until=[reviewed_identity_public_contract]` for
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
@@ -217,3 +208,8 @@ This file is an active routing table only. Durable evidence belongs in
   evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
   build-policy now passes planning-only with no central `structure_*` blockers. SDK
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
+- Latest delegated identity-redaction round added sanitized repo-local
+  `privacy.identifier_redaction` evidence and hardened its checker against unredacted
+  required classes, raw material anywhere in the evidence manifest, and policy-wording
+  drift. Public-contract readiness consumes it only as contract-review input; SDK/P0
+  remain fail-closed at `approved_runtime_evidence_missing`.

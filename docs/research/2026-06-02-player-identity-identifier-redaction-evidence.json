@@ -1,0 +1,90 @@
+{
+  "schema": "obelisk.player-identity-identifier-redaction-evidence.v1",
+  "surface": "obelisk.player_identity.v1",
+  "sanitized": true,
+  "source": "offline-sanitized-contract-review-fixture",
+  "promotion_ready": false,
+  "public_sdk_ready": false,
+  "runtime_ready": false,
+  "public_header_allowed": false,
+  "fields": [
+    {
+      "name": "opaque_principal_candidate",
+      "source_identifier_class": "platform account ids",
+      "field_class": "private-redacted",
+      "redacted": true,
+      "raw_value_present": false
+    },
+    {
+      "name": "display_label_candidate",
+      "source_identifier_class": "player names",
+      "field_class": "private-redacted",
+      "redacted": true,
+      "raw_value_present": false
+    },
+    {
+      "name": "tribe_affiliation_candidate",
+      "source_identifier_class": "tribe identifiers",
+      "field_class": "private-redacted",
+      "redacted": true,
+      "raw_value_present": false
+    },
+    {
+      "name": "remote_endpoint_candidate",
+      "source_identifier_class": "network addresses",
+      "field_class": "forbidden",
+      "redacted": true,
+      "raw_value_present": false
+    },
+    {
+      "name": "chat_identity_hint_candidate",
+      "source_identifier_class": "raw chat text used as identity",
+      "field_class": "forbidden",
+      "redacted": true,
+      "raw_value_present": false
+    },
+    {
+      "name": "controller_playerstate_reference_candidate",
+      "source_identifier_class": "controller/playerstate object references",
+      "field_class": "forbidden",
+      "redacted": true,
+      "raw_value_present": false
+    }
+  ],
+  "policy": {
+    "default": "no raw identity logging or persistence",
+    "persistence_allowed": false,
+    "raw_identity_logging_allowed": false
+  },
+  "sample_logs": [
+    {
+      "event": "session_start",
+      "principal_present": true,
+      "redaction_reason_flags": [
+        "platform_account_id_redacted",
+        "player_name_redacted",
+        "tribe_identifier_redacted",
+        "network_address_redacted",
+        "controller_playerstate_reference_redacted",
+        "opaque_principal_present",
+        "no_raw_identity_material"
+      ]
+    },
+    {
+      "event": "session_start_rejected",
+      "principal_present": false,
+      "redaction_reason_flags": [
+        "raw_chat_text_redacted",
+        "no_raw_identity_material"
+      ]
+    },
+    {
+      "event": "session_end",
+      "principal_present": true,
+      "redaction_reason_flags": [
+        "opaque_principal_present",
+        "no_raw_identity_material"
+      ]
+    }
+  ]
+}

@@ -967,6 +967,15 @@ priorities, and do not use history files as the active source of truth.
   completion remains fail-closed at complete SDK `0/12`, P0 `0/4`, and
   `stable_claim_allowed=false`. Next offline identity side-lane: sanitized
   `privacy.identifier_redaction` evidence as contract-review input only.
+- Follow-up delegated identity-redaction pass added
+  `docs/research/2026-06-02-player-identity-identifier-redaction-evidence.json` and
+  hardened `check_player_identity_identifier_redaction_evidence.py`: all required
+  identifier classes must be `private-redacted`/`forbidden`, raw identifier material is
+  rejected anywhere in the evidence manifest, and both decision-manifest logging-policy
+  wordings are accepted. The artifact passes standalone intake as
+  `resolved_inputs=[privacy.identifier_redaction]` and all readiness/header flags false.
+  Public-contract readiness consumes it only as contract-review input; SDK and route gates
+  remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`.
 
 ## Agent Coordination
 

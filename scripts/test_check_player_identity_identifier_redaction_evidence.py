@@ -16,6 +16,9 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_identifier_redaction_evidence.py"
+REPO_REDACTION_EVIDENCE = (
+    REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json"
+)
 
 
 def evidence() -> dict:
@@ -122,6 +125,28 @@ class PlayerIdentityIdentifierRedactionEvidenceTests(unittest.TestCase):
             {"identity_public_contract_gate", "identity_public_contract_gate_missing"},
         )
 
+    def test_repo_research_redaction_evidence_remains_contract_review_only(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--evidence", str(REPO_REDACTION_EVIDENCE), "--json"],
+            check=False,
+            env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["accepted_for_contract_review"])
+        self.assertEqual(report["resolved_inputs"], ["privacy.identifier_redaction"])
+        self.assertEqual(report["blockers"], [])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertEqual(report["next_blocker"], "not_applicable_contract_review_input_only")
+
     def test_rejects_unsanitized_evidence(self) -> None:
         payload = evidence()
         payload["sanitized"] = False
@@ -153,6 +178,38 @@ class PlayerIdentityIdentifierRedactionEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sample_logs_contain_raw_identifier_material", report["blockers"])
         self.assertIn("sample_log_keys_unexpected", report["blockers"])
+
+    def test_rejects_raw_identifier_values_in_top_level_metadata(self) -> None:
+        payload = evidence()
+        payload["review_note"] = "sanitized review accidentally mentioned 10.1.2.3"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("evidence_contains_raw_identifier_material", report["blockers"])
+
+    def test_required_identifier_classes_must_be_redacted_or_forbidden(self) -> None:
+        payload = evidence()
+        payload["fields"][0]["field_class"] = "recognition-only"
+        payload["fields"][0].pop("redacted")
+        payload["fields"][0].pop("raw_value_present")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required_identifier_class_not_redacted", report["blockers"])
+
+    def test_accepts_decision_manifest_logging_policy_wording(self) -> None:
+        payload = evidence()
+        payload["policy"]["default"] = "no identity persistence and no raw identity logging"
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["blockers"], [])
 
     def test_rejects_free_form_sample_log_text_without_raw_identifier_pattern(self) -> None:
         payload = evidence()

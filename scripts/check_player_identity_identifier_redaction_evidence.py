@@ -26,6 +26,10 @@ ALLOWED_FIELD_CLASSES = {
     "private-redacted",
     "forbidden",
 }
+ALLOWED_POLICY_DEFAULTS = {
+    "no raw identity logging or persistence",
+    "no identity persistence and no raw identity logging",
+}
 REQUIRED_REDACTED_CLASSES = {"private-redacted", "forbidden"}
 REQUIRED_FIELD_CLASSES = {
     "platform account ids",
@@ -172,6 +176,14 @@ def validate_field(field: Any, index: int, blockers: list[dict[str, Any]]) -> st
     source_class = field.get("source_identifier_class")
     if not isinstance(source_class, str) or source_class not in REQUIRED_FIELD_CLASSES:
         add(blockers, "source_identifier_class_not_allowed", f"{label}.source_identifier_class", value=source_class)
+    elif source_class in REQUIRED_FIELD_CLASSES and field_class not in REQUIRED_REDACTED_CLASSES:
+        add(
+            blockers,
+            "required_identifier_class_not_redacted",
+            f"{label}.field_class",
+            source_identifier_class=source_class,
+            field_class=field_class,
+        )
     if field_class in REQUIRED_REDACTED_CLASSES:
         if field.get("redacted") is not True:
             add(blockers, "redacted_field_not_marked_redacted", f"{label}.redacted", field_class=field_class)
@@ -185,6 +197,9 @@ def validate_field(field: Any, index: int, blockers: list[dict[str, Any]]) -> st
 
 def validate_evidence(payload: dict[str, Any]) -> list[dict[str, Any]]:
     blockers: list[dict[str, Any]] = []
+    raw_matches = contains_raw_identifier(payload)
+    if raw_matches:
+        add(blockers, "evidence_contains_raw_identifier_material", "$", matches=raw_matches)
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema", expected=SCHEMA, observed=payload.get("schema"))
     if payload.get("surface") != "obelisk.player_identity.v1":
@@ -219,7 +234,7 @@ def validate_evidence(payload: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(policy, dict):
         add(blockers, "policy_missing", "$.policy")
     else:
-        if policy.get("default") != "no raw identity logging or persistence":
+        if policy.get("default") not in ALLOWED_POLICY_DEFAULTS:
             add(blockers, "policy_default_mismatch", "$.policy.default")
         if policy.get("persistence_allowed") is not False:
             add(blockers, "policy_persistence_allowed_not_false", "$.policy.persistence_allowed")
