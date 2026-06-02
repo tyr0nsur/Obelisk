@@ -30,6 +30,9 @@ DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
 REQUIRED_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
 REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
+REQUIRED_IDENTIFIER_REDACTION_INTAKE_ID = "identifier_redaction_evidence"
+REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT = "privacy.identifier_redaction"
+REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
 REQUIRED_DECISION_GATE_CURRENT_DECISION = (
     "no public header, no public capability bit, no plugin callback, no lookup, "
@@ -1116,6 +1119,22 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
             if intake.get(key) is not False:
                 add(blockers, f"approved_runtime_evidence_intake_{key}_not_false", f"$.approved_runtime_evidence_intake.{key}")
+
+    redaction_intake = decisions.get("identifier_redaction_evidence_intake")
+    if not isinstance(redaction_intake, dict):
+        add(blockers, "identifier_redaction_evidence_intake_missing", "$.identifier_redaction_evidence_intake")
+    else:
+        if redaction_intake.get("id") != REQUIRED_IDENTIFIER_REDACTION_INTAKE_ID:
+            add(blockers, "identifier_redaction_evidence_intake_id_mismatch", "$.identifier_redaction_evidence_intake.id")
+        if redaction_intake.get("status") != "external_manifest_required":
+            add(blockers, "identifier_redaction_evidence_intake_status_mismatch", "$.identifier_redaction_evidence_intake.status")
+        if redaction_intake.get("resolved_input") != REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT:
+            add(blockers, "identifier_redaction_evidence_intake_resolved_input_mismatch", "$.identifier_redaction_evidence_intake.resolved_input")
+        if redaction_intake.get("required_checker") != REQUIRED_IDENTIFIER_REDACTION_CHECKER:
+            add(blockers, "identifier_redaction_evidence_intake_checker_mismatch", "$.identifier_redaction_evidence_intake.required_checker")
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+            if redaction_intake.get(key) is not False:
+                add(blockers, f"identifier_redaction_evidence_intake_{key}_not_false", f"$.identifier_redaction_evidence_intake.{key}")
 
     not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
     if not isinstance(not_sufficient, dict):

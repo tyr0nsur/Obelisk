@@ -317,8 +317,11 @@ def approved_runtime_manifest_check_state(
     state["stderr"] = stderr
     if isinstance(payload, dict):
         state["schema"] = payload.get("schema")
+        state["checker_ready"] = payload.get("ready") is True
         state["ready"] = (
-            payload.get("approved_runtime_evidence_present") is True
+            exit_code == 0
+            and payload.get("ready") is True
+            and payload.get("approved_runtime_evidence_present") is True
             and payload.get("runtime_evidence_ready") is True
             and payload.get("promotion_ready") is False
             and payload.get("public_sdk_ready") is False

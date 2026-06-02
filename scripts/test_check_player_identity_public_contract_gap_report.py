@@ -112,6 +112,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         candidate = self.load_private_candidate()
         decisions["public_header_allowed"] = True
         decisions["approved_runtime_evidence_intake"]["promotion_ready"] = True
+        decisions["identifier_redaction_evidence_intake"]["public_sdk_ready"] = True
         decisions["proposed_public_pod_abi_candidate"]["runtime_ready"] = True
         self.player_identity_surface(surfaces)["evidence"]["candidate_policy_artifacts"][0]["public_sdk_ready"] = True
         candidate["runtime_ready"] = True
@@ -124,9 +125,28 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("readiness_flag_not_false", report["blockers"])
         labels = {detail["label"] for detail in report["blocker_details"] if detail["reason"] == "readiness_flag_not_false"}
         self.assertIn("$.approved_runtime_evidence_intake.promotion_ready", labels)
+        self.assertIn("$.identifier_redaction_evidence_intake.public_sdk_ready", labels)
         self.assertIn("$.proposed_public_pod_abi_candidate.runtime_ready", labels)
         self.assertIn("$.evidence.candidate_policy_artifacts[0].public_sdk_ready", labels)
         self.assertIn("$.runtime_ready", labels)
+
+    def test_rejects_missing_or_weakened_identifier_redaction_intake(self) -> None:
+        decisions = self.load_decisions()
+        decisions["identifier_redaction_evidence_intake"]["required_checker"] = "scripts/other.py"
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_identifier_redaction_evidence_intake_checker_mismatch", report["blockers"])
+
+        decisions = self.load_decisions()
+        decisions.pop("identifier_redaction_evidence_intake")
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_identifier_redaction_evidence_intake_missing", report["blockers"])
 
     def test_rejects_missing_runtime_and_privacy_promotion_blockers(self) -> None:
         decisions = self.load_decisions()

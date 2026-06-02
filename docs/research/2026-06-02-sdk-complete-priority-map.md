@@ -2104,3 +2104,27 @@ public ABI/header readiness, promotion, release readiness, or complete/stable SD
 was authorized. The route remains locked/planning-only at
 `approved_runtime_evidence_missing`; complete-SDK progress remains non-counting until
 approved runtime principal lifecycle evidence and reviewed identity public contract exist.
+
+## Downstream Runtime-Request And SDK Accounting Guardrails
+
+A follow-up delegated round split audit across identity/privacy integration, runtime
+request replay, SDK accounting, and UE4/offline priority. Integrated offline changes:
+
+- `docs/player_identity_public_contract_decisions.json` now records
+  `identifier_redaction_evidence_intake` as an external manifest intake for
+  contract-review evidence only. The readiness and gap checkers validate its checker path
+  and false readiness flags, but it does not remove `privacy.identifier_redaction` from
+  blockers and does not add public header/capability/callback symbols.
+- Window-manifest replay, approved runtime evidence replay, and bundle preflight now have
+  focused tests proving `operator-approval-request.md` drift is not hidden by request-pack
+  expiry or transitive checks.
+- Approved runtime manifest preflight now requires both checker `ready=true` and
+  `exit_code=0` before `approved_runtime_evidence_ready` can be true.
+- SDK completion now requires `completion_gate_accepted=true` from the route-gate wrapper
+  before P0 rows can receive route-gate credit; a fake unlocked/ready route report that
+  the wrapper rejects keeps P0 route credit false.
+
+The UE4/offline audit found no broad dump/reversing task higher value than these
+request/contract guardrails for the current blocker. This remains offline-only and does
+not authorize runtime/server work, marker/env edits, Discord, publication, public ABI,
+promotion, release readiness, or stable/complete SDK wording.

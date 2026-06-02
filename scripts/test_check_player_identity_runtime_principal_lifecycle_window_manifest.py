@@ -30,6 +30,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     NON_CLAIMS,
     WINDOW_MARKERS,
     env_lines,
+    markdown_request,
     operator_live_ops_brief,
 )
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
@@ -243,9 +244,17 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
     if not copied_log_path.is_absolute():
         copied_log_path = base / copied_log_path
     window_manifest_path = base / "window-manifest.env"
+    request_pack_path = Path(fields["request_pack_path"])
+    if not request_pack_path.is_absolute():
+        request_pack_path = base / request_pack_path
+    operator_request_path = request_pack_path.parent / "operator-approval-request.md"
     contents = {
         "request_pack": json.dumps(request_pack_payload(fields, base), sort_keys=True) + "\n",
-        "observer_env": observer_env_text,
+        "operator_request": markdown_request(
+            request_pack_payload(fields, base),
+            observer_env_text.splitlines(),
+            ),
+            "observer_env": observer_env_text,
         "preflight_pre": json.dumps(
             preflight_payload(
                 mode="observer-window",
@@ -277,11 +286,13 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
     }
     key_map = {
         "request_pack": ("request_pack_path", "request_pack_sha256"),
+        "operator_request": ("operator_request_path", "operator_request_sha256"),
         "observer_env": ("observer_env_path", "observer_env_sha256"),
         "preflight_pre": ("preflight_pre_path", "preflight_pre_sha256"),
         "preflight_post": ("preflight_post_path", "preflight_post_sha256"),
     }
     updated = dict(fields)
+    updated["operator_request_path"] = str(operator_request_path)
     for content_key, (path_key, sha_key) in key_map.items():
         if path_key not in updated:
             continue
@@ -291,6 +302,8 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents[content_key], encoding="utf-8")
         updated[sha_key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    updated.pop("operator_request_path", None)
+    updated.pop("operator_request_sha256", None)
     return updated
 
 
@@ -1111,6 +1124,35 @@ class WindowManifestCheckerTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("request_pack_window_request_check_failed", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_operator_markdown_drift(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            operator_request = request_pack.parent / "operator-approval-request.md"
+            operator_request.write_text(
+                operator_request.read_text(encoding="utf-8").replace("dispatch limit=0", "dispatch limit=1"),
+                encoding="utf-8",
+            )
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+        details = [
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "request_pack_window_request_check_failed"
+        ]
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_window_request_check_failed", report["blockers"])
+        self.assertTrue(details)
+        self.assertIn("operator_request_markdown_mismatch", details[0]["request_check_blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_request_pack_obelisk_commit_mismatch(self) -> None:

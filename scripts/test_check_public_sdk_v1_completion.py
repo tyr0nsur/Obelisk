@@ -1300,6 +1300,78 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("command_permission_route_gate_lock_unexpected", payload["blockers"])
 
+    def test_completion_gate_rejects_route_gate_unlocked_ready_overclaim_without_p0_route_credit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                accepted_for_planning=True,
+                planning_only=False,
+                promotion_ready=True,
+                public_sdk_ready=True,
+                public_abi_ready=True,
+                runtime_ready=True,
+                public_header_allowed=True,
+                critical_path_phase={
+                    "current_blocker": None,
+                    "source_checker_primary_blocker": None,
+                    "source_checker_status": "ready",
+                    "source_checker_ready": True,
+                    "source_checker_accepted_for_internal_planning": True,
+                },
+                route_lock={"locked": False, "blocked_until": []},
+                blockers=[],
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        p0_rows = [
+            row
+            for row in payload["v1_sdk_blocker_outcomes"]
+            if row["surface"] in {
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            }
+        ]
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "command_permission_route_gate_not_planning_only",
+            "command_permission_route_gate_promotion_ready_not_false",
+            "command_permission_route_gate_public_sdk_ready_not_false",
+            "command_permission_route_gate_public_abi_ready_not_false",
+            "command_permission_route_gate_runtime_ready_not_false",
+            "command_permission_route_gate_public_header_allowed_not_false",
+            "command_permission_route_gate_lock_unexpected",
+            "command_permission_route_gate_default_blocker_mismatch",
+            "command_permission_route_gate_default_source_blocker_mismatch",
+            "command_permission_route_gate_source_status_unexpected",
+            "command_permission_route_gate_source_ready_overclaim",
+            "command_permission_route_gate_source_internal_planning_overclaim",
+            "command_permission_route_gate_default_lock_blocked_until_unexpected",
+            "command_permission_route_gate_public_or_runtime_claims",
+        ):
+            self.assertIn(blocker, payload["blockers"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(4, len(p0_rows))
+        for row in p0_rows:
+            self.assertFalse(row["route_gate_claim_satisfied"], row)
+            self.assertFalse(row["counts_toward_complete_sdk_claim"], row)
+        self.assertEqual(0, payload["v1_sdk_progress"]["p0_chain_promoted_count"])
+        self.assertFalse(payload["command_permission_route_gate"]["completion_gate_accepted"])
+        self.assertIn(
+            "command_permission_route_gate_not_planning_only",
+            payload["command_permission_route_gate"]["completion_gate_blockers"],
+        )
+
     def test_completion_gate_rejects_route_gate_wrong_default_blocked_until(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             route_gate_path = self.write_fake_route_gate(
@@ -5973,6 +6045,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "route_lock_locked": False,
                     "current_blocker": None,
                     "blockers": [],
+                    "completion_gate_accepted": True,
                 }
             )
         finally:

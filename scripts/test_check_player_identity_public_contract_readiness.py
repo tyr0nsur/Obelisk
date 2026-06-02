@@ -610,6 +610,26 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_evidence_not_accepted", report["blockers"])
         self.assertIn("approved_runtime_evidence_missing_or_not_ready", report["blockers"])
 
+    def test_rejects_missing_or_weakened_identifier_redaction_intake(self) -> None:
+        decisions = self.decisions()
+        decisions["identifier_redaction_evidence_intake"]["public_sdk_ready"] = True
+        decisions["identifier_redaction_evidence_intake"]["required_checker"] = "scripts/other.py"
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("identifier_redaction_evidence_intake_checker_mismatch", report["blockers"])
+        self.assertIn("identifier_redaction_evidence_intake_public_sdk_ready_not_false", report["blockers"])
+
+        decisions = self.decisions()
+        decisions.pop("identifier_redaction_evidence_intake")
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("identifier_redaction_evidence_intake_missing", report["blockers"])
+
     def test_approved_runtime_report_must_route_to_identity_public_contract_gate(self) -> None:
         original_build_report = checker.approved_evidence.build_report
 

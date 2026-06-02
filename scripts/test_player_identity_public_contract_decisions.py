@@ -262,6 +262,23 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             "scripts/check_player_identity_public_contract_readiness.py",
         )
 
+    def test_identifier_redaction_evidence_intake_is_machine_readable_but_not_promoting(self) -> None:
+        payload = self.load_decisions()
+        intake = payload["identifier_redaction_evidence_intake"]
+
+        self.assertEqual(intake["id"], "identifier_redaction_evidence")
+        self.assertEqual(intake["status"], "external_manifest_required")
+        self.assertEqual(intake["resolved_input"], "privacy.identifier_redaction")
+        self.assertFalse(intake["promotion_ready"])
+        self.assertFalse(intake["public_sdk_ready"])
+        self.assertFalse(intake["runtime_ready"])
+        self.assertFalse(intake["public_header_allowed"])
+        self.assertEqual(
+            intake["required_checker"],
+            "scripts/check_player_identity_identifier_redaction_evidence.py",
+        )
+        self.assertIn("sanitized contract-review evidence only", intake["non_claim"])
+
     def test_runtime_evidence_intake_test_is_covered_without_promotion(self) -> None:
         payload = self.load_decisions()
         tests = {

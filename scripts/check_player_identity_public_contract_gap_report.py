@@ -18,6 +18,7 @@ SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 PRIVATE_CANDIDATE_SCHEMA = "obelisk.player-identity-private-candidate-contract.v1"
 SURFACE = "obelisk.player_identity.v1"
 PRIMARY_OFFLINE_GAP = "privacy.identifier_redaction"
+REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PROMOTION_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
@@ -635,6 +636,21 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             "$.forbidden_public_contract",
             missing=missing_required(decisions.get("forbidden_public_contract"), REQUIRED_FORBIDDEN_PUBLIC_CONTRACT),
         )
+    redaction_intake = decisions.get("identifier_redaction_evidence_intake")
+    if not isinstance(redaction_intake, dict):
+        add(blockers, "decisions_identifier_redaction_evidence_intake_missing", "$.identifier_redaction_evidence_intake")
+    else:
+        if redaction_intake.get("id") != "identifier_redaction_evidence":
+            add(blockers, "decisions_identifier_redaction_evidence_intake_id_mismatch", "$.identifier_redaction_evidence_intake.id")
+        if redaction_intake.get("status") != "external_manifest_required":
+            add(blockers, "decisions_identifier_redaction_evidence_intake_status_mismatch", "$.identifier_redaction_evidence_intake.status")
+        if redaction_intake.get("resolved_input") != PRIMARY_OFFLINE_GAP:
+            add(blockers, "decisions_identifier_redaction_evidence_intake_resolved_input_mismatch", "$.identifier_redaction_evidence_intake.resolved_input")
+        if redaction_intake.get("required_checker") != REQUIRED_IDENTIFIER_REDACTION_CHECKER:
+            add(blockers, "decisions_identifier_redaction_evidence_intake_checker_mismatch", "$.identifier_redaction_evidence_intake.required_checker")
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+            if redaction_intake.get(key) is not False:
+                add(blockers, "readiness_flag_not_false", f"$.identifier_redaction_evidence_intake.{key}", input="identifier_redaction_evidence_intake", value=redaction_intake.get(key))
     not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
     if not isinstance(not_sufficient, dict):
         add(blockers, "decisions_approved_runtime_evidence_not_sufficient_missing", "$.approved_runtime_evidence_not_sufficient")

@@ -159,7 +159,8 @@ This file is an active routing table only. Durable evidence belongs in
   primary offline gap remains `privacy.identifier_redaction`; next offline work is an
   identity-specific identifier-redaction policy/checker over sanitized snapshots only.
   A new manifest checker exists for offline identifier-redaction evidence, but it is not
-  wired as sufficient promotion evidence and does not open public headers/SDK.
+  sufficient promotion evidence; its decision-manifest intake is contract-review only and
+  `privacy.identifier_redaction` remains unresolved.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.
@@ -210,9 +211,10 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest guardrails closed command-response readiness provenance, commands/replies report-root
-  binding, mission-leaf accounting, permissions/admin identity-certificate dependency,
-  default identity planning-source provenance, and runtime-evidence request hygiene:
-  request packs reject expired windows, operator Markdown sidecars are replay-checked,
-  approved runtime manifests are validated in bundle preflight, and stale route-lock
-  guidance now points to runtime evidence plus identity contract. Provenance-only; default route/SDK remain fail-closed:
+  binding, mission-leaf accounting, permissions/admin identity-certificate dependency, default identity planning-source provenance, and runtime-evidence request hygiene:
+  request packs reject expired windows, Markdown sidecars replay-check, approved runtime
+  manifests preflight-check, and stale route-lock guidance points to runtime evidence plus identity contract. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, complete-SDK `0/12`, P0 `0/4`.
+- Latest guardrail round pinned downstream operator Markdown drift, requires approved
+  manifest checker `ready` plus exit zero, blocks rejected route gates from P0 credit, and
+  found broad UE4/dump rediscovery lower value than request/contract gates.

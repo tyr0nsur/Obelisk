@@ -524,7 +524,8 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "approved_window_end_utc_invalid", "approved_window.end_utc")
         if start_dt is not None and end_dt is not None and not start_dt < end_dt:
             add(blockers, "approved_window_order_invalid", "approved_window")
-        if start_dt is not None and start_dt <= datetime.now(timezone.utc):
+        now = datetime.now(timezone.utc)
+        if start_dt is not None and start_dt <= now and (end_dt is None or end_dt > now):
             add(blockers, "approved_window_already_started", "approved_window.start_utc", value=start)
         if (
             start_dt is not None
@@ -538,7 +539,7 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
                 "approved_window",
                 max_seconds=MAX_APPROVED_WINDOW_SECONDS,
             )
-        if end_dt is not None and end_dt <= datetime.now(timezone.utc):
+        if end_dt is not None and end_dt <= now:
             add(blockers, "approved_window_expired", "approved_window.end_utc", value=end)
     rollback = require_keys(payload.get("rollback"), required=EXPECTED_ROLLBACK_KEYS, label="rollback", blockers=blockers)
     if rollback:

@@ -924,6 +924,12 @@ priorities, and do not use history files as the active source of truth.
   made request-pack preparation/checking reject already-started approved windows. This is
   still offline-only: no runtime/server operation, public header, public ABI, promotion,
   SDK completion, or release claim is authorized.
+- Follow-up delegated guardrail pass registered the identifier-redaction checker as
+  external contract-review intake only, pinned operator Markdown sidecar replay through
+  window-manifest/approved-evidence/bundle-preflight paths, required approved-manifest
+  preflight to see checker `ready` plus exit zero, and blocked rejected route-gate reports
+  from giving P0 route credit in SDK accounting. Broad offline UE4/dump rediscovery was
+  explicitly lower value for the current blocker.
 
 ## Agent Coordination
 

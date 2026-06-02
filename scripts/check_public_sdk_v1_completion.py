@@ -1018,6 +1018,8 @@ def run_command_permission_route_gate(
             "route_lock_locked": route_lock.get("locked"),
             "public_or_runtime_claims": public_or_runtime_claims,
             "blockers": route_blockers,
+            "completion_gate_accepted": not blockers,
+            "completion_gate_blockers": blockers[:],
             "stderr": result.stderr.strip(),
             "non_claim": "planning-only route guard; not v1 completion evidence",
         },
@@ -2950,7 +2952,8 @@ def completion_blocker_outcome_rows(
     if isinstance(command_permission_route_gate, dict):
         route_gate_current_blocker = command_permission_route_gate.get("current_blocker")
         route_gate_satisfies_p0_claim_accounting = (
-            command_permission_route_gate.get("valid") is True
+            command_permission_route_gate.get("completion_gate_accepted") is True
+            and command_permission_route_gate.get("valid") is True
             and command_permission_route_gate.get("planning_only") is False
             and command_permission_route_gate.get("promotion_ready") is True
             and command_permission_route_gate.get("public_sdk_ready") is True

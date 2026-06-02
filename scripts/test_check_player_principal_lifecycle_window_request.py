@@ -234,6 +234,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("approved_window_already_started", report["blockers"])
+        self.assertNotIn("approved_window_expired", report["blockers"])
 
     def test_rejects_post_run_verification_command_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

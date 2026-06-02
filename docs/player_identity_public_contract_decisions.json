@@ -41,6 +41,17 @@
     "required_checker": "scripts/check_player_identity_public_contract_readiness.py",
     "non_claim": "A valid approved runtime evidence manifest can resolve only the runtime lifecycle evidence input for contract review; it does not promote public player identity or open ABI."
   },
+  "identifier_redaction_evidence_intake": {
+    "id": "identifier_redaction_evidence",
+    "status": "external_manifest_required",
+    "resolved_input": "privacy.identifier_redaction",
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false,
+    "public_header_allowed": false,
+    "required_checker": "scripts/check_player_identity_identifier_redaction_evidence.py",
+    "non_claim": "A valid identifier-redaction evidence manifest is sanitized contract-review evidence only; it does not resolve the full privacy blocker, promote public player identity, or open ABI."
+  },
   "approved_runtime_evidence_not_sufficient": {
     "decision": "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.",
     "why": [

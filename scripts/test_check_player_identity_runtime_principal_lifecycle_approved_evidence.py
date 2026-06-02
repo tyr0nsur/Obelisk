@@ -635,6 +635,37 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         payload.pop("output_artifact_identity", None)
         add_output_artifact_identity(payload)
 
+    def test_request_check_expiry_exception_is_exact(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_expiry_filter")
+
+        self.assertTrue(
+            checker.request_check_failed_only_because_window_expired(
+                {
+                    "reason": "request_pack_window_request_check_failed",
+                    "request_check_blockers": ["approved_window_expired"],
+                }
+            )
+        )
+        self.assertFalse(
+            checker.request_check_failed_only_because_window_expired(
+                {
+                    "reason": "request_pack_window_request_check_failed",
+                    "request_check_blockers": [
+                        "approved_window_expired",
+                        "operator_request_markdown_mismatch",
+                    ],
+                }
+            )
+        )
+        self.assertFalse(
+            checker.request_check_failed_only_because_window_expired(
+                {
+                    "reason": "request_pack_window_request_check_failed",
+                    "request_check_blockers": [],
+                }
+            )
+        )
+
     def test_rejects_mutated_window_manifest_even_when_embedded_sha_is_updated(self) -> None:
         payload = manifest()
         manifest_path = Path(payload["operational_window"]["manifest"]["path"])
@@ -695,6 +726,24 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_expired_request_pack_when_markdown_drift_is_also_present(self) -> None:
+        payload = manifest()
+        request_pack = Path(payload["operational_window"]["request_pack"]["path"])
+        operator_request = request_pack.parent / "operator-approval-request.md"
+        operator_request.write_text(
+            operator_request.read_text(encoding="utf-8").replace("dispatch limit=0", "dispatch limit=1"),
+            encoding="utf-8",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_manifest_check_failed", report["blockers"])
+        self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_validate_manifest_recomputes_copied_log_sha(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker")
