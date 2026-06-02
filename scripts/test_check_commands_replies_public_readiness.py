@@ -56,13 +56,17 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         decisions: dict | None = None,
         surfaces: dict | None = None,
         header: str | None = None,
+        temp_header: bool = False,
     ) -> tuple[Path, Path, Path]:
         decisions_path = root / "commands_replies_public_contract_decisions.json"
         surfaces_path = root / "public_sdk_surfaces.json"
-        header_path = root / "ObeliskApi.h"
         decisions_path.write_text(json.dumps(decisions if decisions is not None else self.load_decisions()), encoding="utf-8")
         surfaces_path.write_text(json.dumps(surfaces if surfaces is not None else self.load_surfaces()), encoding="utf-8")
-        header_path.write_text(header if header is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
+        if temp_header or header is not None:
+            header_path = root / "ObeliskApi.h"
+            header_path.write_text(header if header is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
+        else:
+            header_path = HEADER
         return decisions_path, surfaces_path, header_path
 
     def make_response_readiness(self, root: Path | None = None) -> dict:
@@ -514,11 +518,56 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
+        self.assertIn("public_header_path_mismatch", report["blockers"])
         self.assertIn("public_header_forbidden_symbols_present", report["blockers"])
         detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_forbidden_symbols_present")
         self.assertIn("OBELISK_API_CAPABILITY_COMMAND_ROUTER", detail["symbols"])
         self.assertIn("ObeliskCommandParser", detail["symbols"])
         self.assertIn("ReplyToCommandWithOwnerToken", detail["symbols"])
+
+    def test_rejects_public_header_not_canonical_repo_header(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_path, surfaces_path, header_path = self.write_inputs(Path(temp_dir), temp_header=True)
+            result = self.run_checker(
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--public-header",
+                str(header_path),
+                "--response-path-report",
+                str(self.write_response_report(Path(temp_dir) / "response")),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("public_header_path_mismatch", report["blockers"])
+        self.assertIn("decisions_public_header_not_scanned_header", report["blockers"])
+
+    def test_rejects_response_path_report_with_fake_public_header_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root / "response")
+            response_report = json.loads(report_path.read_text(encoding="utf-8"))
+            fake_header = root / "fake-ObeliskApi.h"
+            fake_header.write_text(HEADER.read_text(encoding="utf-8"), encoding="utf-8")
+            response_report["public_header_path"] = str(fake_header)
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+
+            result = self.run_checker(
+                "--response-path-report",
+                str(report_path),
+                "--response-path-root",
+                str(root / "response"),
+                "--response-path-readiness",
+                str(root / "response" / "command-chat-response-route-planning-readiness.json"),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_public_header_path_mismatch", report["blockers"])
 
     def test_rejects_positive_command_router_response_and_arkapi_parser_claims(self) -> None:
         decisions = self.load_decisions()

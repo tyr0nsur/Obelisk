@@ -699,12 +699,21 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate_bound_identity_sources`
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
 
-Deferred read-only audit findings for the next offline guardrail round:
+Follow-up closure in the next offline guardrail round:
 
-- Command response and commands/replies readiness should reject fake public-header paths
-  and bind embedded response-path reports to canonical decision manifests.
-- Permissions/admin public readiness should reject symlinked JSON artifacts and protected
-  decisions/surfaces inputs.
+- `check_command_chat_response_public_readiness.py` now rejects symlink/protected
+  `--public-header` inputs, requires the resolved scanned header to be the canonical
+  `include/obelisk/ObeliskApi.h`, and validates that the decisions manifest's
+  `public_header` declaration matches that canonical scanned header.
+- `check_commands_replies_public_readiness.py` applies the same canonical public-header
+  binding and rejects embedded command response reports whose `public_header_path` or
+  `decisions_path` source artifact drifts from the canonical command response inputs.
+- `check_permissions_admin_public_readiness.py` now uses the protected/symlink-safe JSON
+  loader for `--decisions`, `--surfaces`, and `--query-failclosed-artifact`, returning
+  structured blocker output instead of trusting symlinked or protected JSON inputs.
+- `check_command_permission_route_gate.py` now has aggregate coverage that a fake
+  `--public-header` fails through the downstream command response and commands/replies
+  child checks.
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
@@ -741,10 +750,10 @@ Deferred read-only audit findings for future offline guardrail rounds:
 
 - Route/SDK provenance should bind child `primary_blocker` values to child blocker lists,
   stale child readiness/status fields, and route-lock `blocked_until` values.
-- Command response and commands/replies readiness should reject fake public-header paths
-  and bind embedded response-path reports to canonical decision manifests.
-- Permissions/admin public readiness should reject symlinked JSON artifacts and protected
-  decisions/surfaces inputs.
+- Closed in the downstream input provenance round: command response and commands/replies
+  now reject fake public-header paths and bind response-path reports to canonical command
+  response decisions/header source artifacts; permissions/admin now rejects symlinked or
+  protected JSON inputs for decisions, surfaces, and query artifacts.
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,

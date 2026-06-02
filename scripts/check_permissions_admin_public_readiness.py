@@ -472,10 +472,23 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
     blockers.append(blocker)
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+def load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
+    try:
+        reject_symlink_component(path, label)
+        resolved = reject_protected_input_path(path, label)
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", f"$.{label}", path=str(path), detail=str(exc))
+        return None
+    except OSError as exc:
+        add(blockers, f"{label}_unreadable", f"$.{label}", path=str(path), detail=str(exc))
+        return None
+    except json.JSONDecodeError as exc:
+        add(blockers, f"{label}_invalid_json", f"$.{label}", path=str(path), detail=str(exc))
+        return None
     if not isinstance(payload, dict):
-        raise SystemExit(f"{path}: expected JSON object")
+        add(blockers, f"{label}_not_object", f"$.{label}", path=str(path))
+        return None
     return payload
 
 
@@ -1056,7 +1069,9 @@ def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:
 def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -> str | None:
     if path is None:
         return None
-    payload = load_json(path)
+    payload = load_json(path, "query_failclosed_artifact", blockers)
+    if payload is None:
+        return None
     schema = payload.get("schema")
     if schema == QUERY_CONTRACT_REPORT_SCHEMA:
         add(blockers, "query_failclosed_report_not_accepted_as_artifact", str(path))
@@ -1082,10 +1097,12 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
-    decisions = load_json(args.decisions)
-    surfaces = load_json(args.surfaces)
-    validate_decisions(decisions, blockers, args.public_header)
-    validate_surfaces(surfaces, blockers, args.public_header)
+    decisions = load_json(args.decisions, "decisions", blockers)
+    surfaces = load_json(args.surfaces, "surfaces", blockers)
+    if decisions is not None:
+        validate_decisions(decisions, blockers, args.public_header)
+    if surfaces is not None:
+        validate_surfaces(surfaces, blockers, args.public_header)
     validate_header(args.public_header, blockers)
     query_artifact_schema = validate_query_artifact(args.query_failclosed_artifact, blockers)
     return {

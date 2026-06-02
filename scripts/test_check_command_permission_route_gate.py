@@ -970,6 +970,28 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 self.assertIn("--public-header", by_name[name])
                 self.assertEqual("/tmp/ObeliskApi.h", by_name[name][by_name[name].index("--public-header") + 1])
 
+    def test_route_gate_rejects_fake_public_header_in_downstream_p0_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            header_path = Path(temp_dir) / "ObeliskApi.h"
+            header_path.write_text("/* fake clean header */\n", encoding="utf-8")
+            result = self.run_checker("--public-header", str(header_path), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("command_chat_response_public_readiness: child blockers not empty", report["blockers"])
+        self.assertIn("commands_replies_public_readiness: child blockers not empty", report["blockers"])
+
+        by_name = {check["name"]: check for check in report["checks"]}
+        self.assertIn(
+            "public_header_path_mismatch",
+            by_name["command_chat_response_public_readiness"]["blockers"],
+        )
+        self.assertIn(
+            "public_header_path_mismatch",
+            by_name["commands_replies_public_readiness"]["blockers"],
+        )
+
     def test_route_gate_rejects_supplied_surfaces_promoting_commands_replies(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

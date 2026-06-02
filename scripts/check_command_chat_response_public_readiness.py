@@ -22,6 +22,7 @@ DEFAULT_ROOT = Path(
 DEFAULT_READINESS_NAME = "command-chat-response-route-planning-readiness.json"
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
 DEFAULT_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 
 REPORT_SCHEMA = "obelisk.command-chat-response-public-readiness-check.v1"
@@ -423,6 +424,42 @@ def strip_c_comments(text: str) -> str:
     return re.sub(r"//.*", "", text)
 
 
+def declared_header_path(value: Any) -> Path | None:
+    if not isinstance(value, str):
+        return None
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        return None
+    return REPO_ROOT / path
+
+
+def validate_public_header_declaration(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    source: str,
+    scanned_path: Path,
+) -> None:
+    declared = payload.get("public_header")
+    if declared != DEFAULT_PUBLIC_HEADER_DECL:
+        add(
+            blockers,
+            f"{source}_public_header_mismatch",
+            f"$.{source}.public_header",
+            expected=DEFAULT_PUBLIC_HEADER_DECL,
+            value=declared,
+        )
+    declared_path = declared_header_path(declared)
+    if declared_path is not None and declared_path.resolve() != scanned_path.expanduser().resolve():
+        add(
+            blockers,
+            f"{source}_public_header_not_scanned_header",
+            f"$.{source}.public_header",
+            declared=str(declared_path),
+            scanned=str(scanned_path),
+        )
+
+
 def preceding_claim_scope(text: str, start: int) -> str:
     parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
     return parts[-1] if parts else text[:start]
@@ -671,10 +708,11 @@ def validate_readiness(payload: dict[str, Any], blockers: list[dict[str, Any]], 
     collect_surface_overclaims(payload, blockers, "$.readiness")
 
 
-def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]], public_header_path: Path) -> None:
     require_equal(payload, "schema", DECISIONS_SCHEMA, "$.decisions", blockers)
     require_equal(payload, "surface", SURFACE, "$.decisions", blockers)
     require_equal(payload, "status", "blocked", "$.decisions", blockers)
+    validate_public_header_declaration(payload, blockers, source="decisions", scanned_path=public_header_path)
     require_false(payload, "public_header_allowed", "$.decisions", blockers)
     require_false(payload, "legacy_call_process_event_public_response_allowed", "$.decisions", blockers)
     require_false(payload, "minimal_chat_message_event_public_response_allowed", "$.decisions", blockers)
@@ -890,7 +928,20 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
 def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
     try:
         reject_symlink_component(path, "public_header")
-        text = strip_c_comments(path.read_text(encoding="utf-8"))
+        resolved = reject_protected_input_path(path, "public_header")
+        if resolved != DEFAULT_PUBLIC_HEADER.resolve():
+            add(
+                blockers,
+                "public_header_path_mismatch",
+                "$.public_header",
+                expected=str(DEFAULT_PUBLIC_HEADER),
+                path=str(path),
+                resolved=str(resolved),
+            )
+        text = strip_c_comments(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, "public_header_path_rejected", "$.public_header", path=str(path), detail=str(exc))
+        return
     except OSError as exc:
         add(blockers, "public_header_unreadable", "$.public_header", path=str(path), detail=str(exc))
         return
@@ -998,7 +1049,7 @@ def build_report(
     if readiness is not None:
         validate_readiness(readiness, blockers, root=resolved_root or root)
     if decisions is not None:
-        validate_decisions(decisions, blockers)
+        validate_decisions(decisions, blockers, public_header_path)
     if surfaces is not None:
         validate_surfaces(surfaces, blockers)
     validate_public_header(public_header_path, blockers)

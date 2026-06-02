@@ -319,7 +319,14 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             "required_before_public_header": required,
         }
 
-    def write_inputs(self, root: Path, readiness: dict | None = None, decisions: dict | None = None) -> tuple[Path, Path, Path]:
+    def write_inputs(
+        self,
+        root: Path,
+        readiness: dict | None = None,
+        decisions: dict | None = None,
+        *,
+        temp_header: bool = False,
+    ) -> tuple[Path, Path, Path]:
         snapshot_root = root / "base-snapshots"
         snapshot_root.mkdir(parents=True, exist_ok=True)
         for target in TARGETS:
@@ -329,10 +336,13 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             )
         readiness_path = root / "command-chat-response-route-planning-readiness.json"
         decisions_path = root / "command_chat_response_public_contract_decisions.json"
-        public_header_path = root / "ObeliskApi.h"
         readiness_path.write_text(json.dumps(readiness if readiness is not None else self.make_readiness(root)), encoding="utf-8")
         decisions_path.write_text(json.dumps(decisions if decisions is not None else self.make_decisions()), encoding="utf-8")
-        public_header_path.write_text("/* minimal public header without response-path ABI */\n", encoding="utf-8")
+        if temp_header:
+            public_header_path = root / "ObeliskApi.h"
+            public_header_path.write_text("/* minimal public header without response-path ABI */\n", encoding="utf-8")
+        else:
+            public_header_path = READINESS.DEFAULT_PUBLIC_HEADER
         return readiness_path, decisions_path, public_header_path
 
     def test_accepts_planning_layout_second_source_but_not_public_readiness(self) -> None:
@@ -472,7 +482,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
     def test_rejects_response_path_symbols_in_public_header(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root, temp_header=True)
             public_header_path.write_text(
                 "typedef struct ObeliskCommandChatResponse ObeliskCommandChatResponse;\n"
                 "typedef struct ObeliskChatRouter ObeliskChatRouter;\n"
@@ -504,7 +514,7 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
     def test_public_header_scan_ignores_comments_and_identifier_supersets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root, temp_header=True)
             public_header_path.write_text(
                 "/* ObeliskCommandChatResponse and RegisterCommandChatResponse stay blocked. */\n"
                 "// OBELISK_API_CAPABILITY_COMMAND_CHAT_RESPONSE_PATH remains absent.\n"
@@ -521,17 +531,60 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 "--public-header",
                 str(public_header_path),
                 "--json",
+                check=False,
             )
 
         report = json.loads(result.stdout)
-        self.assertEqual(0, result.returncode)
-        self.assertTrue(report["valid"])
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("public_header_path_mismatch", report["blockers"])
         self.assertNotIn("public_header_forbidden_symbols_present", report["blockers"])
         self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
+
+    def test_rejects_public_header_not_canonical_repo_header(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root, temp_header=True)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("public_header_path_mismatch", report["blockers"])
+        self.assertIn("decisions_public_header_not_scanned_header", report["blockers"])
+
+    def test_rejects_decision_public_header_path_mismatch(self) -> None:
+        decisions = self.make_decisions()
+        decisions["public_header"] = "include/obelisk/OtherApi.h"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir), decisions=decisions)
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("decisions_public_header_mismatch", report["blockers"])
+        self.assertIn("decisions_public_header_not_scanned_header", report["blockers"])
 
     def test_rejects_explicit_surface_claim_fields(self) -> None:
         for field in (

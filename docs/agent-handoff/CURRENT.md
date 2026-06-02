@@ -315,9 +315,16 @@ This file is an active routing table only. Durable evidence belongs in
   reports with stale source checker readiness/status/internal-planning fields, non-empty
   route blockers, route-lock drift, or stale default `source_checker_next_blocker`.
   This remains planning-only validation and does not advance the default or bound route.
-- Deferred read-only audit risks for the next offline guardrail round: command response
-  and commands/replies should reject fake public-header paths and bind response reports to
-  canonical decisions; permissions/admin should reject symlinked JSON inputs.
+- Follow-up downstream input provenance guardrails now require command response and
+  commands/replies public readiness to scan the canonical
+  `include/obelisk/ObeliskApi.h`, reject fake/protected/symlink public-header inputs,
+  bind response-path reports to canonical command response decisions/header artifacts,
+  and require permissions/admin public readiness to load decisions, surfaces, and query
+  artifacts through protected/symlink-safe JSON input guards. The route gate has
+  aggregate coverage that fake `--public-header` fails through the downstream child
+  checks. This remains offline planning-only validation and does not promote public
+  permissions/admin, command response, commands/replies, runtime readiness, or v1
+  completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

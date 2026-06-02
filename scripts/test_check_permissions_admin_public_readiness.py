@@ -1029,6 +1029,75 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("public_header_path_rejected", report["blockers"])
 
+    def test_rejects_decisions_under_protected_server_root(self) -> None:
+        result = run_checker("--decisions", "/servidor/ark/permissions-decisions.json", check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
+    def test_rejects_decisions_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "decisions.json"
+            target.write_text(DECISIONS.read_text(encoding="utf-8"), encoding="utf-8")
+            link = root / "decisions-link.json"
+            link.symlink_to(target)
+
+            result = run_checker("--decisions", str(link), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
+    def test_rejects_surfaces_under_protected_server_root(self) -> None:
+        result = run_checker("--surfaces", "/servidor/ark/public_sdk_surfaces.json", check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("surfaces_path_rejected", report["blockers"])
+
+    def test_rejects_surfaces_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "surfaces.json"
+            target.write_text(SURFACES.read_text(encoding="utf-8"), encoding="utf-8")
+            link = root / "surfaces-link.json"
+            link.symlink_to(target)
+
+            result = run_checker("--surfaces", str(link), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("surfaces_path_rejected", report["blockers"])
+
+    def test_rejects_query_failclosed_artifact_under_protected_server_root(self) -> None:
+        result = run_checker("--query-failclosed-artifact", "/servidor/ark/permissions-query.json", check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_failclosed_artifact_path_rejected", report["blockers"])
+
+    def test_rejects_query_failclosed_artifact_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "permissions-query.json"
+            subprocess.run(
+                [sys.executable, str(QUERY_CHECKER), "--emit-template", str(manifest_path)],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            link = root / "permissions-query-link.json"
+            link.symlink_to(manifest_path)
+
+            result = run_checker("--query-failclosed-artifact", str(link), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_failclosed_artifact_path_rejected", report["blockers"])
+
     def test_rejects_public_header_symlink_component(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

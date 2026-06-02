@@ -19,6 +19,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
 DEFAULT_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.commands-replies-public-readiness-check.v1"
 DECISIONS_SCHEMA = "obelisk.commands-replies-public-contract-decisions.v1"
@@ -451,6 +452,42 @@ def strip_c_comments(text: str) -> str:
     return re.sub(r"//.*", "", text)
 
 
+def declared_header_path(value: Any) -> Path | None:
+    if not isinstance(value, str):
+        return None
+    path = Path(value)
+    if path.is_absolute() or ".." in path.parts:
+        return None
+    return REPO_ROOT / path
+
+
+def validate_public_header_declaration(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    source: str,
+    scanned_path: Path,
+) -> None:
+    declared = payload.get("public_header")
+    if declared != DEFAULT_PUBLIC_HEADER_DECL:
+        add(
+            blockers,
+            f"{source}_public_header_mismatch",
+            f"$.{source}.public_header",
+            expected=DEFAULT_PUBLIC_HEADER_DECL,
+            value=declared,
+        )
+    declared_path = declared_header_path(declared)
+    if declared_path is not None and declared_path.resolve() != scanned_path.expanduser().resolve():
+        add(
+            blockers,
+            f"{source}_public_header_not_scanned_header",
+            f"$.{source}.public_header",
+            declared=str(declared_path),
+            scanned=str(scanned_path),
+        )
+
+
 def preceding_claim_scope(text: str, start: int) -> str:
     parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
     return parts[-1] if parts else text[:start]
@@ -513,7 +550,7 @@ def require_false(mapping: dict[str, Any], key: str, label: str, blockers: list[
         add(blockers, f"{key}_not_false", f"{label}.{key}", value=mapping.get(key))
 
 
-def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]], public_header_path: Path) -> None:
     require_equal(payload, "schema", DECISIONS_SCHEMA, "$.decisions", blockers)
     require_equal(payload, "surface", SURFACE, "$.decisions", blockers)
     require_equal(payload, "status", "blocked", "$.decisions", blockers)
@@ -523,8 +560,7 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     require_false(payload, "public_command_router_allowed", "$.decisions", blockers)
     require_false(payload, "public_reply_or_send_chat_abi_allowed", "$.decisions", blockers)
     require_false(payload, "public_response_path_allowed", "$.decisions", blockers)
-    if payload.get("public_header") != "include/obelisk/ObeliskApi.h":
-        add(blockers, "public_header_mismatch", "$.decisions.public_header", value=payload.get("public_header"))
+    validate_public_header_declaration(payload, blockers, source="decisions", scanned_path=public_header_path)
     if payload.get("public_header_symbols_now") != []:
         add(
             blockers,
@@ -897,7 +933,21 @@ def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -
 
 def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
     try:
-        header = strip_c_comments(path.read_text(encoding="utf-8"))
+        reject_symlink_component(path, "public_header")
+        resolved = reject_protected_input_path(path, "public_header")
+        if resolved != DEFAULT_PUBLIC_HEADER.resolve():
+            add(
+                blockers,
+                "public_header_path_mismatch",
+                "$.public_header",
+                expected=str(DEFAULT_PUBLIC_HEADER),
+                path=str(path),
+                resolved=str(resolved),
+            )
+        header = strip_c_comments(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, "public_header_path_rejected", "$.public_header", path=str(path), detail=str(exc))
+        return
     except OSError as exc:
         add(blockers, "public_header_unreadable", "$.public_header", path=str(path), detail=str(exc))
         return
@@ -1079,6 +1129,14 @@ def validate_response_path_report(
                     value=payload.get(key),
                 )
         if len(resolved_source_artifacts) == len(RESPONSE_PATH_SOURCE_ARTIFACT_KEYS):
+            if resolved_source_artifacts["decisions_path"] != response_path_readiness.DEFAULT_DECISIONS.resolve():
+                add(
+                    blockers,
+                    "response_path_report_decisions_path_mismatch",
+                    "$.response_path_report.decisions_path",
+                    expected=str(response_path_readiness.DEFAULT_DECISIONS),
+                    value=str(resolved_source_artifacts["decisions_path"]),
+                )
             readiness_root = resolved_source_artifacts["readiness_path"].parent
             rebuilt = response_path_readiness.build_report(
                 readiness_root,
@@ -1147,7 +1205,7 @@ def build_report(
         add(blockers, "response_path_report_required", "$.response_path_report_path")
 
     if decisions is not None:
-        validate_decisions(decisions, blockers)
+        validate_decisions(decisions, blockers, public_header_path)
     if surfaces is not None:
         validate_surfaces(surfaces, blockers)
     validate_public_header(public_header_path, blockers)
