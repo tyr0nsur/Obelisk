@@ -211,6 +211,22 @@ This file is an active routing table only. Durable evidence belongs in
   readiness claims; ResourceHandle/object-identity readiness should scan structured
   metadata in `docs/public_sdk_surfaces.json` and decisions, not only strings and gameplay
   events. Treat these as next offline guardrail targets, not current readiness evidence.
+- 2026-06-02 side-lane overclaim closure: structure second-source readiness now rejects
+  positive Structure SDK/build-policy/enforcement/runtime/v1 aliases and readiness
+  strings without breaking the accepted planning-layout second-source artifact. Inventory
+  copied-signal stability and item return-only readiness now reject generic runtime/v1
+  readiness keys and strings in `docs/public_gameplay_events.json`; item return-only also
+  accepts and validates the current copied+inventory-backed `required_flags` metadata.
+  ResourceHandle readiness now applies structured positive-claim scanning to decisions and
+  `docs/public_sdk_surfaces.json`, not only public gameplay events. These are offline
+  guardrails only; no Structure SDK, Inventory SDK, Items SDK, ResourceHandle, runtime, or
+  v1 completion readiness is promoted.
+- New deferred P0 offline route-provenance risk: command/chat response public readiness can
+  still consume a well-shaped synthetic `--command-response-readiness` JSON that is not
+  bound to the supplied `--command-response-root` or regenerated snapshot provenance. The
+  aggregate route remains planning-only and still blocks at approved runtime principal
+  lifecycle evidence, but the next P0 guardrail target should bind or regenerate command
+  response readiness artifacts before the route treats them as aligned planning evidence.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

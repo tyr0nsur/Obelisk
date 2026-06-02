@@ -113,6 +113,29 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             report["blockers"],
         )
 
+    def test_rejects_positive_resource_handle_metadata_in_decisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["metadata"] = {
+                "resource_handle": "ready",
+                "public_object_lookup_ready": True,
+            }
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "forbidden_positive_resource_handle_claim:$.decisions.metadata.resource_handle",
+            report["blockers"],
+        )
+        self.assertIn(
+            "forbidden_positive_resource_handle_claim:$.decisions.metadata.public_object_lookup_ready",
+            report["blockers"],
+        )
+
     def test_rejects_public_sdk_surface_promotion_or_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -210,6 +233,32 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 blocker.startswith("surface_positive_resource_handle_claim:")
                 for blocker in report["blockers"]
             ),
+            report["blockers"],
+        )
+
+    def test_rejects_positive_resource_handle_metadata_in_surface_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
+                    surface["resource_handle_ready"] = True
+                    surface["object_lookup"] = "ready"
+                    break
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "forbidden_positive_resource_handle_claim:"
+            "$.surfaces[obelisk.object_identity_resource_handle.v1].resource_handle_ready",
+            report["blockers"],
+        )
+        self.assertIn(
+            "forbidden_positive_resource_handle_claim:"
+            "$.surfaces[obelisk.object_identity_resource_handle.v1].object_lookup",
             report["blockers"],
         )
 

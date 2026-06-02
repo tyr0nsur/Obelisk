@@ -109,6 +109,7 @@ STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
     "no_collision_policy_ready",
     "ownership_ready",
     "placement_policy_ready",
+    "public_structure_sdk_ready",
     "return_override_allowed",
     "return_override_ready",
     "runtime_hook_ready",
@@ -149,6 +150,12 @@ STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "v1 done": "v1_completion",
     "v1 ready": "v1_completion",
 }
+STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE = re.compile(
+    r"(?:\bready\b|\breadiness\b|\ballowed\b|\benabled\b|\bpromoted\b|"
+    r"\bpublic\s+sdk\b|\bv1\s+(?:complete|completion|done|ready)\b|"
+    r"\bruntime\s+hooks?\s+ready\b)",
+    re.IGNORECASE,
+)
 
 
 def is_negative_boundary_statement(text: str) -> bool:
@@ -478,6 +485,8 @@ def validate_second_source_readiness(
             value=promotion_gate.get("ready"),
         )
 
+    validate_second_source_no_core_surface_claims(readiness, blockers)
+
     for field in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
         planning_value = planning_gate.get(field)
         if planning_value is not False:
@@ -518,6 +527,37 @@ def validate_second_source_readiness(
         "public_sdk_ready": False,
         "runtime_ready": False,
     }
+
+
+def validate_second_source_no_core_surface_claims(
+    readiness: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    for trail, value in iter_policy_values(readiness):
+        if value is True:
+            key = trail.rsplit(".", 1)[-1]
+            if key in STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS:
+                append_blocker(
+                    blockers,
+                    "second_source_readiness_surface_overclaim",
+                    surface=key,
+                    path=trail,
+                )
+        if not isinstance(value, str):
+            continue
+        text = value.casefold()
+        if is_negative_boundary_statement(text):
+            continue
+        if STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE.search(text) is None:
+            continue
+        for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES.items():
+            if phrase in text:
+                append_blocker(
+                    blockers,
+                    "second_source_readiness_surface_overclaim",
+                    surface=surface,
+                    path=trail,
+                )
 
 
 def build_target_readiness(

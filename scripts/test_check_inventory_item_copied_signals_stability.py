@@ -467,6 +467,27 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
         self.assertIn("readiness_claim_enabled", reasons)
         self.assertIn("v1_completion_evidence_not_false", reasons)
 
+    def test_public_gameplay_events_runtime_or_v1_readiness_claims_are_rejected(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        event["runtime_ready"] = True
+        event["v1_ready"] = True
+        event["runtime_readiness"] = "inventory/item copied signals runtime ready; v1 completion ready"
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("readiness_claim_enabled", reasons)
+        paths = {
+            blocker["path"]
+            for blocker in payload["blocker_details"]
+            if blocker["reason"] == "readiness_claim_enabled"
+        }
+        self.assertIn("$.public_gameplay_events.promoted_events[0].runtime_ready", paths)
+        self.assertIn("$.public_gameplay_events.promoted_events[0].v1_ready", paths)
+        self.assertIn("$.public_gameplay_events.promoted_events[0].runtime_readiness", paths)
+
 
 if __name__ == "__main__":
     unittest.main()

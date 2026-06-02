@@ -244,6 +244,7 @@ def validate_decisions(decisions: Any, blockers: list[str]) -> None:
         missing = [claim for claim in REQUIRED_NON_CLAIMS if claim not in non_claims]
         if missing:
             blockers.append("required_non_claims_missing")
+    walk_claims(decisions, blockers, "$.decisions")
     walk_decisions_text_claims(decisions, blockers, "$.decisions")
 
 
@@ -270,6 +271,7 @@ def validate_surface(surfaces: Any, blockers: list[str]) -> None:
     for term in required_terms:
         if term not in blockers_text and term not in evidence_text:
             blockers.append(f"surface_missing_boundary_term:{term}")
+    walk_claims(entry, blockers, f"$.surfaces[{SURFACE_ID}]")
     walk_surface_text_claims(entry, blockers, f"$.surfaces[{SURFACE_ID}]")
 
 

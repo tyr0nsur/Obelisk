@@ -337,6 +337,39 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])
 
+    def test_second_source_readiness_alias_and_string_overclaims_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
+            payload = json.loads(readiness.read_text(encoding="utf-8"))
+            payload["public_structure_sdk_ready"] = True
+            payload["build_policy_ready"] = True
+            payload["enforcement_ready"] = True
+            payload["v1_complete"] = True
+            payload["notes"] = "runtime hooks ready"
+            readiness.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker(
+                "--root",
+                str(root),
+                "--manifest",
+                str(manifest),
+                "--second-source-readiness",
+                str(readiness),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        reasons = {blocker["reason"] for blocker in report["blockers"]}
+        self.assertIn("second_source_readiness_surface_overclaim", reasons)
+        self.assertEqual(report["second_source_readiness"]["status"], "blocked")
+        self.assertEqual(report["target_readiness"]["second_source"]["status"], "missing")
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
     def test_second_source_readiness_expected_hash_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")

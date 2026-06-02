@@ -599,6 +599,7 @@ def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict
             )
 
     scan_public_claim_terms(payload, blockers, label)
+    scan_readiness_claims(payload, blockers, label)
     return {"inventory_event_kinds": sorted(item["kind"] for item in actual if item.get("kind"))}
 
 
@@ -687,15 +688,50 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
         "public_inventory_sdk_ready",
         "public_items_sdk_ready",
         "public_sdk_ready",
+        "runtime_ready",
         "stable_sdk_ready",
         "v1_completion_ready",
         "v1_ready",
     }
+    readiness_text_keys = forbidden_true_keys | {
+        "inventory_sdk_readiness",
+        "items_sdk_readiness",
+        "promotion_readiness",
+        "public_inventory_sdk_readiness",
+        "public_items_sdk_readiness",
+        "public_sdk_readiness",
+        "runtime_readiness",
+        "stable_sdk_readiness",
+        "v1_completion_readiness",
+        "v1_readiness",
+    }
+    positive_readiness_phrases = (
+        "inventory sdk ready",
+        "items sdk ready",
+        "promotion ready",
+        "public sdk ready",
+        "runtime ready",
+        "runtime readiness",
+        "stable sdk ready",
+        "v1 completion ready",
+        "v1 ready",
+    )
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
             if key in forbidden_true_keys and child is True:
                 add(blockers, "readiness_claim_enabled", child_trail)
+            if key in readiness_text_keys and isinstance(child, str):
+                normalized = child.lower()
+                for phrase in positive_readiness_phrases:
+                    start = normalized.find(phrase)
+                    if start < 0:
+                        continue
+                    end = start + len(phrase)
+                    if is_negated_for_match(child, start, end):
+                        continue
+                    add(blockers, "readiness_claim_enabled", child_trail, value=child, term=phrase)
+                    break
             scan_readiness_claims(child, blockers, child_trail)
     elif isinstance(value, list):
         for index, child in enumerate(value):

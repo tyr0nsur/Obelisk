@@ -182,12 +182,17 @@ EXPECTED_PUBLIC_INVENTORY_POLICY_FIELD_MASKS = {
         IGNORE_COOLDOWN_FIELD_MASK,
     ],
 }
+EXPECTED_PUBLIC_EVENT_REQUIRED_FLAGS = {
+    "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+    "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+}
 ITEM_RETURN_EVENT_KIND_ALLOWED_KEYS = {
     "kind",
     "stable_name",
     "resource_kind",
     "event_kind_mask",
     "field_mask",
+    "required_flags",
 }
 POLICY_TOP_LEVEL_ALLOWED_KEYS = {
     "schema",
@@ -303,6 +308,41 @@ FORBIDDEN_CLAIM_FIELD_RE = re.compile(
     r"return_overrides?|runtime_(?:ready|validated|validation)|v1(?:_completion|_complete|_stable)?|"
     r"completion)",
     re.IGNORECASE,
+)
+PUBLIC_GAMEPLAY_EVENTS_READINESS_KEYS = {
+    "inventory_sdk_ready",
+    "items_sdk_ready",
+    "promotion_ready",
+    "public_inventory_sdk_ready",
+    "public_items_sdk_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "stable_sdk_ready",
+    "v1_completion_ready",
+    "v1_ready",
+}
+PUBLIC_GAMEPLAY_EVENTS_READINESS_TEXT_KEYS = PUBLIC_GAMEPLAY_EVENTS_READINESS_KEYS | {
+    "inventory_sdk_readiness",
+    "items_sdk_readiness",
+    "promotion_readiness",
+    "public_inventory_sdk_readiness",
+    "public_items_sdk_readiness",
+    "public_sdk_readiness",
+    "runtime_readiness",
+    "stable_sdk_readiness",
+    "v1_completion_readiness",
+    "v1_readiness",
+}
+PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_PHRASES = (
+    "inventory sdk ready",
+    "items sdk ready",
+    "promotion ready",
+    "public sdk ready",
+    "runtime ready",
+    "runtime readiness",
+    "stable sdk ready",
+    "v1 completion ready",
+    "v1 ready",
 )
 
 
@@ -436,6 +476,41 @@ def require_not_promoted_claim(
         return
     if "not promoted" not in value.lower() or required_token not in value:
         append_blocker(blockers, reason, value=value)
+
+
+def scan_public_gameplay_event_readiness_claims(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    path: str,
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_path = f"{path}.{key}"
+            if key in PUBLIC_GAMEPLAY_EVENTS_READINESS_KEYS and child is True:
+                append_blocker(
+                    blockers,
+                    "public_gameplay_events_readiness_claim_enabled",
+                    path=child_path,
+                    field=key,
+                    value=child,
+                )
+            if key in PUBLIC_GAMEPLAY_EVENTS_READINESS_TEXT_KEYS and isinstance(child, str):
+                lowered = child.casefold()
+                for phrase in PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_PHRASES:
+                    if phrase in lowered:
+                        append_blocker(
+                            blockers,
+                            "public_gameplay_events_readiness_claim_enabled",
+                            path=child_path,
+                            field=key,
+                            term=phrase,
+                            value=child,
+                        )
+                        break
+            scan_public_gameplay_event_readiness_claims(child, blockers, child_path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            scan_public_gameplay_event_readiness_claims(child, blockers, f"{path}[{index}]")
 
 
 def validate_generated_from(policy: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
@@ -706,6 +781,7 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
         reason="public_item_module_sdk_non_claim_missing",
         value=event.get("item_module_sdk"),
     )
+    scan_public_gameplay_event_readiness_claims(event, blockers, "$.promoted_events[0]")
     for key in event:
         if key in {"inventory_sdk", "item_module_sdk"}:
             continue
@@ -829,6 +905,16 @@ def validate_public_gameplay_events(public_events: dict[str, Any], blockers: lis
                 kind=kind,
                 expected=[RETURN_VALUE_FIELD_MASK],
                 value=event_kind.get("field_mask"),
+            )
+        required_flags = event_kind.get("required_flags")
+        if required_flags is not None and set(required_flags if isinstance(required_flags, list) else []) != EXPECTED_PUBLIC_EVENT_REQUIRED_FLAGS:
+            append_blocker(
+                blockers,
+                "public_item_return_required_flags_mismatch",
+                index=index,
+                kind=kind,
+                expected=sorted(EXPECTED_PUBLIC_EVENT_REQUIRED_FLAGS),
+                value=required_flags,
             )
         if isinstance(stable_name, str) and not stable_name.startswith("inventory_item."):
             append_blocker(

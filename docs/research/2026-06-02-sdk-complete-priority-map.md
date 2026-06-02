@@ -663,3 +663,36 @@ P0 blocker and SDK-completion accounting:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
+
+## Side-Lane Overclaim Closure And Command Response Provenance Risk
+
+The next supervised round closed the three deferred side-lane overclaim classes and one
+related item-return checker drift:
+
+- `scripts/check_structure_census_readiness.py` now applies a second-source readiness
+  overclaim scan for positive Structure SDK/build-policy/enforcement/runtime/v1 aliases
+  and readiness strings. The accepted default second-source artifact remains
+  `candidate-only` planning evidence; the scanner avoids treating negative guidance text
+  as a positive claim.
+- `scripts/check_inventory_item_copied_signals_stability.py` now scans
+  `docs/public_gameplay_events.json` for generic runtime/v1 readiness booleans and
+  positive readiness strings, not only `docs/public_sdk_surfaces.json`.
+- `scripts/check_item_return_only_readiness.py` now rejects the same generic runtime/v1
+  readiness claims when run standalone against public gameplay events, and accepts the
+  current copied+inventory-backed `required_flags` metadata while still validating it.
+- `scripts/check_object_identity_resource_handle_public_contract_readiness.py` now applies
+  structured positive ResourceHandle/object-lookup claim scanning to decisions and the
+  `obelisk.object_identity_resource_handle.v1` surface row, not only public gameplay
+  events or prose strings.
+
+Read-only P0 route audit found one remaining higher-priority provenance risk:
+`check_command_chat_response_public_readiness.py` can validate a well-shaped synthetic
+`--readiness` JSON without binding it to the supplied snapshot root or regenerating it
+from source artifacts. Because `check_command_permission_route_gate.py` composes that
+child report into `commands/replies`, the next P0 guardrail should bind command response
+readiness to source root/producer argv/input hashes or rebuild and compare the readiness
+report before accepting planning alignment.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.

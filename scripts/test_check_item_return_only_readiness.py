@@ -439,6 +439,29 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
         self.assertIn("public_item_return_forbidden_claim_field", reasons)
         self.assertIn("public_item_return_unexpected_field", reasons)
 
+    def test_public_gameplay_events_rejects_generic_runtime_or_v1_readiness_claims(self) -> None:
+        public_events = self.make_public_gameplay_events()
+        event = public_events["promoted_events"][0]
+        event["runtime_ready"] = True
+        event["v1_ready"] = True
+        event["runtime_readiness"] = "inventory/item copied signals runtime ready; v1 completion ready"
+        blockers: list[dict] = []
+
+        readiness.validate_public_gameplay_events(public_events, blockers)
+
+        readiness_blockers = [
+            blocker for blocker in blockers if blocker["reason"] == "public_gameplay_events_readiness_claim_enabled"
+        ]
+        self.assertEqual(3, len(readiness_blockers), blockers)
+        self.assertEqual(
+            {
+                "$.promoted_events[0].runtime_ready",
+                "$.promoted_events[0].v1_ready",
+                "$.promoted_events[0].runtime_readiness",
+            },
+            {blocker["path"] for blocker in readiness_blockers},
+        )
+
     def test_policy_rejects_sdk_runtime_and_v1_claim_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"
