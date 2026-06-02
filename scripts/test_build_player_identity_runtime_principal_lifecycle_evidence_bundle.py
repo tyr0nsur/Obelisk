@@ -502,6 +502,11 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
             self.assertTrue(report["operational_window"]["manifest_ready"])
             self.assertEqual(report["operational_window"]["obelisk_commit"], TEST_COMMIT)
+            self.assertEqual(report["operational_window"]["log_budget"], "10")
+            self.assertIn(
+                "window manifest acceptance is operational posture only",
+                report["operational_window"]["non_claims"],
+            )
 
     def test_rejects_placeholder_cli_obelisk_commit(self) -> None:
         with self.temp_offline_workspace() as temp:

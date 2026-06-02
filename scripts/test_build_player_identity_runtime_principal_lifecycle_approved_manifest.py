@@ -362,6 +362,11 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 manifest["operational_window"]["rollback"]["delta"],
                 "removed_observer_env_and_markers_preserved_disable_plugins",
             )
+            self.assertEqual(manifest["operational_window"]["log_budget"], "10")
+            self.assertIn(
+                "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
+                manifest["operational_window"]["non_claims"],
+            )
             self.assertFalse(manifest["approval"]["server_operations_authorized_by_this_manifest"])
             self.assertFalse(manifest["promotion_ready"])
 

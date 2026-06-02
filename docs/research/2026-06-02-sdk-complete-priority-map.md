@@ -672,6 +672,47 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Approved Evidence Operational-Window Projection Binding
+
+The next supervised round closed the semantic-drop gap between an accepted
+`window-manifest.env` check and the approved runtime principal lifecycle evidence
+manifest. The lead delegated four read-only scopes and kept integration ownership:
+
+- approved-manifest `operational_window` projection audit;
+- replay attack-path audit;
+- live-ops authorization safety audit;
+- handoff and knowledge-continuity audit.
+
+Integrated changes:
+
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now emits the
+  exact approval boundary, approved window, actual capture window, rollback window,
+  `notice_sent`, `log_budget`, and fixed window non-claims in its JSON report.
+- `build_player_identity_runtime_principal_lifecycle_approved_manifest.py` now requires
+  those fields before projection and embeds them in
+  `operational_window`. Beta-user windows still require `notice_sent=true`.
+- `check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now allows,
+  validates, and replay-compares those fields. `log_budget` must be `"10"`, approval
+  must remain `current-turn operator-approved runtime window, not standing approval`,
+  window timestamps must be UTC-shaped, and window non-claims must match the fixed
+  non-authorization set.
+- A guardrail test now requires
+  `set(OPERATIONAL_WINDOW_REPLAY_KEYS) == set(ALLOWED_OPERATIONAL_WINDOW_KEYS)` so future
+  approved-evidence `operational_window` fields cannot be added without replay coverage.
+- `build_player_identity_runtime_principal_lifecycle_evidence_bundle.py` now preserves
+  `log_budget` and window non-claims in the bundle report's compact operational-window
+  summary.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_approved_manifest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Runtime Principal Lifecycle Request Brief Hardening
 
 The next P0 preparation round tightened the future player-principal lifecycle runtime

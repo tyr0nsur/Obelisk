@@ -209,6 +209,20 @@ def validate_window_check(window: dict[str, Any], summary: dict[str, Any]) -> No
     evidence_commit = evidence.get("obelisk_commit") if isinstance(evidence, dict) else None
     if window.get("obelisk_commit") != evidence_commit:
         raise SystemExit("--window-manifest-check obelisk_commit must match source summary obelisk_commit")
+    if window.get("approval") != "current-turn operator-approved runtime window, not standing approval":
+        raise SystemExit("--window-manifest-check approval must preserve current-turn runtime window boundary")
+    for key in ("approved_window", "actual_capture", "rollback_window"):
+        value = window.get(key)
+        if not isinstance(value, dict) or not value.get("start_utc") or not value.get("end_utc"):
+            raise SystemExit(f"--window-manifest-check must include {key}.start_utc and {key}.end_utc")
+    if window.get("notice_sent") not in {"true", "false", "not_applicable"}:
+        raise SystemExit("--window-manifest-check notice_sent must be true, false, or not_applicable")
+    if window.get("user_policy") == "operator_approved_beta_users" and window.get("notice_sent") != "true":
+        raise SystemExit("--window-manifest-check beta user policy requires notice_sent=true")
+    if window.get("log_budget") != "10":
+        raise SystemExit("--window-manifest-check log_budget must be 10")
+    if not isinstance(window.get("non_claims"), list) or len(window["non_claims"]) < 3:
+        raise SystemExit("--window-manifest-check must include fixed non_claims")
 
 
 def build_manifest(
@@ -242,6 +256,10 @@ def build_manifest(
             "operational_window_manifest_ready": window.get("operational_window_manifest_ready"),
             "run_id": window.get("run_id"),
             "obelisk_commit": window.get("obelisk_commit"),
+            "approval": window.get("approval"),
+            "approved_window": window.get("approved_window"),
+            "actual_capture": window.get("actual_capture"),
+            "rollback_window": window.get("rollback_window"),
             "target": window.get("target"),
             "manifest": window.get("manifest"),
             "copied_log": window.get("copied_log"),
@@ -250,11 +268,14 @@ def build_manifest(
             "preflight": window.get("preflight"),
             "posture": window.get("posture"),
             "rollback": window.get("rollback"),
+            "log_budget": window.get("log_budget"),
             "claims": window.get("claims"),
             "user_policy": window.get("user_policy"),
+            "notice_sent": window.get("notice_sent"),
             "promotion_ready": window.get("promotion_ready"),
             "public_sdk_ready": window.get("public_sdk_ready"),
             "runtime_ready": window.get("runtime_ready"),
+            "non_claims": window.get("non_claims"),
         },
         "source_summary": summary,
         "consumer_boundary_cases": [

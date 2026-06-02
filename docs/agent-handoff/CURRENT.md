@@ -185,3 +185,11 @@ This file is an active routing table only. Durable evidence belongs in
   sidecars even when their outer manifest SHA is refreshed. Request-pack binding remains
   indirect through manifest sidecar validation and request-check replay, not a preflight
   JSON field.
+- Latest operational-window projection round used four lead-scoped read-only agents:
+  approved-manifest projection audit, replay attack-path audit, live-ops authorization
+  safety, and handoff continuity. Integrated result: approved runtime evidence now
+  preserves and replays window approval text, approved/capture/rollback timestamps,
+  `notice_sent`, `log_budget=10`, and fixed window non-claims inside
+  `operational_window`; every allowed `operational_window` key is covered by replay.
+  This remains consume-only evidence and does not authorize runtime/server work or public
+  SDK readiness.

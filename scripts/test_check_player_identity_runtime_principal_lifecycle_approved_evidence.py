@@ -25,6 +25,11 @@ TEST_COMMIT = "a" * 40
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 APPROVED_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
+WINDOW_NON_CLAIMS = [
+    "window manifest acceptance is operational posture only",
+    "does not promote player identity, lookup, permissions, commands, ResourceHandle, mutation, return override, plugin delivery, public SDK, or runtime readiness",
+    "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
+]
 
 from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     APPROVAL_TEXT,
@@ -352,6 +357,10 @@ def manifest() -> dict:
             "operational_window_manifest_ready": True,
             "run_id": RUN_ID,
             "obelisk_commit": summary["evidence"]["obelisk_commit"],
+            "approval": "current-turn operator-approved runtime window, not standing approval",
+            "approved_window": {"start_utc": "2026-06-01T12:00:00Z", "end_utc": "2026-06-01T12:10:00Z"},
+            "actual_capture": {"start_utc": "2026-06-01T12:01:00Z", "end_utc": "2026-06-01T12:09:00Z"},
+            "rollback_window": {"start_utc": "2026-06-01T12:09:00Z", "end_utc": "2026-06-01T12:10:00Z"},
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             **sidecars,
             "copied_log": {"path": source["path"], "path_status": "approved_offline_workspace", "sha256": source["sha256"]},
@@ -379,11 +388,14 @@ def manifest() -> dict:
                 "observer_marker_survived": False,
                 "delta": "removed_observer_env_and_markers_preserved_disable_plugins",
             },
+            "log_budget": "10",
             "claims": {"delivery_claim": "none", "principal_claim": "none"},
             "user_policy": "no_regular_users",
+            "notice_sent": "not_applicable",
             "promotion_ready": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
+            "non_claims": WINDOW_NON_CLAIMS,
         },
         "source_summary": summary,
         "consumer_boundary_cases": [
@@ -474,6 +486,10 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             "operational_window_manifest_ready": True,
             "run_id": RUN_ID,
             "obelisk_commit": TEST_COMMIT,
+            "approval": "current-turn operator-approved runtime window, not standing approval",
+            "approved_window": {"start_utc": "2026-06-01T12:00:00Z", "end_utc": "2026-06-01T12:10:00Z"},
+            "actual_capture": {"start_utc": "2026-06-01T12:01:00Z", "end_utc": "2026-06-01T12:09:00Z"},
+            "rollback_window": {"start_utc": "2026-06-01T12:09:00Z", "end_utc": "2026-06-01T12:10:00Z"},
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             **sidecars,
             "copied_log": {"path": str(copied_log), "path_status": "approved_offline_workspace", "sha256": source_sha256},
@@ -501,11 +517,14 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
                 "observer_marker_survived": False,
                 "delta": "removed_observer_env_and_markers_preserved_disable_plugins",
             },
+            "log_budget": "10",
             "claims": {"delivery_claim": "none", "principal_claim": "none"},
             "user_policy": "no_regular_users",
+            "notice_sent": "not_applicable",
             "promotion_ready": False,
             "public_sdk_ready": False,
             "runtime_ready": False,
+            "non_claims": WINDOW_NON_CLAIMS,
         },
         "source_summary": summary,
         "consumer_boundary_cases": [
@@ -556,6 +575,13 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
 
 
 class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
+    def test_operational_window_allowed_keys_are_replayed(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_replay_keys")
+        self.assertEqual(
+            set(checker.OPERATIONAL_WINDOW_REPLAY_KEYS),
+            set(checker.ALLOWED_OPERATIONAL_WINDOW_KEYS),
+        )
+
     def run_checker(self, payload: dict, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "approved-runtime-evidence.json"
@@ -1103,14 +1129,25 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         payload = manifest()
         payload["operational_window"]["copied_log"]["sha256"] = hashlib.sha256(b"other").hexdigest()
         payload["operational_window"]["obelisk_commit"] = "other-commit"
+        payload["operational_window"]["approval"] = "standing approval"
+        payload["operational_window"]["approved_window"]["start_utc"] = "not-utc"
+        payload["operational_window"]["notice_sent"] = "maybe"
         payload["operational_window"]["posture"]["dispatch_limit"] = "1"
+        payload["operational_window"]["log_budget"] = "11"
+        payload["operational_window"]["non_claims"] = ["window manifest acceptance is operational posture only"]
         result = self.run_checker(payload, check=False)
         report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operational_window_copied_log_sha256_mismatch", report["blockers"])
         self.assertIn("operational_window_obelisk_commit_mismatch", report["blockers"])
+        self.assertIn("operational_window_approval_mismatch", report["blockers"])
+        self.assertIn("operational_window_approved_window_start_utc_invalid", report["blockers"])
+        self.assertIn("operational_window_notice_sent_invalid", report["blockers"])
         self.assertIn("operational_window_posture_mismatch", report["blockers"])
+        self.assertIn("operational_window_log_budget_mismatch", report["blockers"])
+        self.assertIn("operational_window_non_claims_mismatch", report["blockers"])
+        self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
 
     def test_rejects_operational_window_log_path_outside_live_validation_run_shape(self) -> None:
         payload = manifest()

@@ -1079,6 +1079,19 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
         "next_blocker": NEXT_BLOCKER_AFTER_WINDOW_MANIFEST if accepted else "window_manifest_not_accepted",
         "run_id": fields.get("run_id"),
         "obelisk_commit": fields.get("obelisk_commit"),
+        "approval": fields.get("approval"),
+        "approved_window": {
+            "start_utc": fields.get("approved_window_start_utc"),
+            "end_utc": fields.get("approved_window_end_utc"),
+        },
+        "actual_capture": {
+            "start_utc": fields.get("actual_capture_start_utc"),
+            "end_utc": fields.get("actual_capture_end_utc"),
+        },
+        "rollback_window": {
+            "start_utc": fields.get("rollback_start_utc"),
+            "end_utc": fields.get("rollback_end_utc"),
+        },
         "target": {
             "instance": validation.target.instance,
             "map": validation.target.map_name,
@@ -1135,6 +1148,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "delta": fields.get("rollback_delta"),
         },
         "user_policy": validation.user_policy,
+        "notice_sent": fields.get("notice_sent"),
         "log_budget": fields.get("log_budget"),
         "claims": {
             "delivery_claim": fields.get("delivery_claim"),

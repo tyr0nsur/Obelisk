@@ -729,6 +729,8 @@ def main() -> int:
             "obelisk_commit": window_check.get("obelisk_commit"),
             "run_id": window_check.get("run_id"),
             "target": window_check.get("target"),
+            "log_budget": window_check.get("log_budget"),
+            "non_claims": window_check.get("non_claims"),
         },
         "outputs": {
             "summary": artifact(summary_path),

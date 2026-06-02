@@ -830,6 +830,18 @@ priorities, and do not use history files as the active source of truth.
   - Request-pack binding remains indirect through manifest sidecar validation and
     request-check replay; there is no preflight `request_pack_path` field. No
     runtime/server/marker/env work is authorized by these artifacts.
+- Delegated operational-window projection round on 2026-06-02 closed the next approved
+  evidence semantic-drop gap:
+  - Four read-only sub-agent scopes were lead-delegated and closed: approved-manifest
+    projection, replay attack path, live-ops authorization safety, and handoff continuity.
+  - The window manifest report now emits approval text, approved/capture/rollback
+    timestamps, `notice_sent`, `log_budget`, and fixed window non-claims.
+  - The approved runtime evidence manifest now preserves those fields inside
+    `operational_window`; the approved-evidence checker validates them and includes every
+    allowed `operational_window` key in replay coverage.
+  - This is consume-only runtime evidence hardening. It does not authorize runtime/server
+    operations, marker/env edits, Discord, publication, public identity, permissions,
+    commands, or stable SDK claims.
 
 ## Agent Coordination
 

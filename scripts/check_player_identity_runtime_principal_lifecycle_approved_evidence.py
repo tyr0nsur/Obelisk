@@ -56,7 +56,9 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
 WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1"
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
+EXPECTED_APPROVAL = "current-turn operator-approved runtime window, not standing approval"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 ALLOWED_SOURCE_KEYS = frozenset(("path", "sha256", "line_count"))
 ALLOWED_APPROVAL_KEYS = frozenset(
     (
@@ -76,6 +78,10 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
         "operational_window_manifest_ready",
         "run_id",
         "obelisk_commit",
+        "approval",
+        "approved_window",
+        "actual_capture",
+        "rollback_window",
         "target",
         "manifest",
         "copied_log",
@@ -84,11 +90,14 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
         "preflight",
         "posture",
         "rollback",
+        "log_budget",
         "claims",
         "user_policy",
+        "notice_sent",
         "promotion_ready",
         "public_sdk_ready",
         "runtime_ready",
+        "non_claims",
     )
 )
 ALLOWED_OPERATIONAL_WINDOW_COPIED_LOG_KEYS = frozenset(("path", "path_status", "sha256"))
@@ -119,12 +128,23 @@ ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS = frozenset(
     ("completed", "observer_env_survived", "observer_marker_survived", "delta")
 )
 ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS = frozenset(("delivery_claim", "principal_claim"))
+REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS = frozenset(
+    (
+        "window manifest acceptance is operational posture only",
+        "does not promote player identity, lookup, permissions, commands, ResourceHandle, mutation, return override, plugin delivery, public SDK, or runtime readiness",
+        "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
+    )
+)
 OPERATIONAL_WINDOW_REPLAY_KEYS = (
     "schema",
     "ready",
     "operational_window_manifest_ready",
     "run_id",
     "obelisk_commit",
+    "approval",
+    "approved_window",
+    "actual_capture",
+    "rollback_window",
     "target",
     "manifest",
     "copied_log",
@@ -133,11 +153,14 @@ OPERATIONAL_WINDOW_REPLAY_KEYS = (
     "preflight",
     "posture",
     "rollback",
+    "log_budget",
     "claims",
     "user_policy",
+    "notice_sent",
     "promotion_ready",
     "public_sdk_ready",
     "runtime_ready",
+    "non_claims",
 )
 ALLOWED_CONSUMER_CASE_KEYS = frozenset(
     (
@@ -976,6 +999,24 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
         if window.get(key) is not False:
             add(blockers, f"operational_window_{key}_not_false", f"{label}.{key}")
+    if window.get("approval") != EXPECTED_APPROVAL:
+        add(blockers, "operational_window_approval_mismatch", f"{label}.approval", expected=EXPECTED_APPROVAL)
+    for key in ("approved_window", "actual_capture", "rollback_window"):
+        value = window.get(key)
+        if not isinstance(value, dict):
+            add(blockers, f"operational_window_{key}_missing", f"{label}.{key}")
+            continue
+        unexpected_keys = set(value) - {"start_utc", "end_utc"}
+        if unexpected_keys:
+            add(blockers, f"operational_window_{key}_keys_unexpected", f"{label}.{key}", unexpected=sorted(unexpected_keys))
+        for timestamp_key in ("start_utc", "end_utc"):
+            timestamp_value = value.get(timestamp_key)
+            if not isinstance(timestamp_value, str) or UTC_TIMESTAMP_RE.fullmatch(timestamp_value) is None:
+                add(
+                    blockers,
+                    f"operational_window_{key}_{timestamp_key}_invalid",
+                    f"{label}.{key}.{timestamp_key}",
+                )
     target = window.get("target")
     if not isinstance(target, dict) or not target.get("instance") or not target.get("map"):
         add(blockers, "operational_window_target_missing", f"{label}.target")
@@ -1157,6 +1198,20 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         )
     if window.get("user_policy") not in {"no_regular_users", "operator_approved_beta_users"}:
         add(blockers, "operational_window_user_policy_unapproved", f"{label}.user_policy")
+    if window.get("notice_sent") not in {"true", "false", "not_applicable"}:
+        add(blockers, "operational_window_notice_sent_invalid", f"{label}.notice_sent")
+    if window.get("user_policy") == "operator_approved_beta_users" and window.get("notice_sent") != "true":
+        add(blockers, "operational_window_beta_user_policy_requires_notice_sent", f"{label}.notice_sent")
+    if window.get("log_budget") != "10":
+        add(blockers, "operational_window_log_budget_mismatch", f"{label}.log_budget", expected="10")
+    non_claims = window.get("non_claims")
+    if not isinstance(non_claims, list) or set(non_claims) != REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS:
+        add(
+            blockers,
+            "operational_window_non_claims_mismatch",
+            f"{label}.non_claims",
+            expected=sorted(REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS),
+        )
     replay_operational_window_manifest(window, blockers)
 
 
@@ -1322,6 +1377,7 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
     elif (
         isinstance(value, str)
         and value not in REQUIRED_NON_CLAIMS
+        and value not in REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS
         and contains_unnegated_positive_capability_claim(value)
     ):
         return value, trail
