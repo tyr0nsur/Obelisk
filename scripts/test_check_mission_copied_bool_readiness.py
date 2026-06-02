@@ -679,6 +679,27 @@ target_sources(obelisk_runtime PRIVATE hooks/ProcessEventMissionReflection.cpp)
         self.assertIn("obelisk", {blocker.get("target") for blocker in blockers})
         self.assertIn("obelisk_runtime", {blocker.get("target") for blocker in blockers})
 
+    def test_repo_frontier_blocks_nested_cmake_mission_hook_runtime_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                cmake="add_subdirectory(runtime)\n",
+            )
+            runtime_dir = repo_root / "runtime"
+            runtime_dir.mkdir()
+            (runtime_dir / "CMakeLists.txt").write_text(
+                "add_library(obelisk SHARED ../hooks/ProcessEventMissionReflection.cpp)\n",
+                encoding="utf-8",
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        self.assertEqual(frontier["status"], "blocked")
+        self.assertFalse(frontier["mission_internal_test_only"])
+        self.assertIn("mission_hook_in_runtime_or_shared_target", {blocker["reason"] for blocker in blockers})
+        self.assertIn(str(repo_root / "runtime" / "CMakeLists.txt"), frontier["cmake"]["paths"])
+
     def test_repo_frontier_blocks_public_mission_api_and_docs_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "repo"

@@ -265,34 +265,50 @@ def is_runtime_or_shared_target(command: str, args: list[str]) -> bool:
     return False
 
 
-def validate_cmake_mission_hook_boundary(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
-    cmake_path = repo_root / "CMakeLists.txt"
-    blocker_count_before = len(blockers)
-    text = read_text_file(cmake_path, blockers, "CMakeLists.txt")
-    if text is None:
-        return {"status": "blocked", "path": str(cmake_path)}
+IGNORED_CMAKE_PATH_PARTS = frozenset((".git", "build", "local", "__pycache__", ".pytest_cache"))
 
+
+def candidate_cmake_files(repo_root: Path) -> list[Path]:
+    candidates = {repo_root / "CMakeLists.txt"}
+    for pattern in ("**/CMakeLists.txt", "**/*.cmake"):
+        for path in repo_root.glob(pattern):
+            relative_parts = path.relative_to(repo_root).parts
+            if any(part in IGNORED_CMAKE_PATH_PARTS for part in relative_parts):
+                continue
+            candidates.add(path)
+    return sorted(candidates)
+
+
+def validate_cmake_mission_hook_boundary(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    blocker_count_before = len(blockers)
+    cmake_paths = candidate_cmake_files(repo_root)
     checked_targets: list[str] = []
-    for command, body in iter_cmake_commands(text):
-        if command not in {"add_library", "add_executable", "target_sources"}:
+    checked_files: list[str] = []
+    for cmake_path in cmake_paths:
+        text = read_text_file(cmake_path, blockers, str(cmake_path.relative_to(repo_root)))
+        if text is None:
             continue
-        args = split_cmake_args(body)
-        if not args or not any(cmake_arg_matches_source(arg, MISSION_HOOK_SOURCE) for arg in args[1:]):
-            continue
-        target = args[0]
-        checked_targets.append(target)
-        if is_runtime_or_shared_target(command, args):
-            append_blocker(
-                blockers,
-                "mission_hook_in_runtime_or_shared_target",
-                path=str(cmake_path),
-                command=command,
-                target=target,
-                source=MISSION_HOOK_SOURCE,
-            )
+        checked_files.append(str(cmake_path))
+        for command, body in iter_cmake_commands(text):
+            if command not in {"add_library", "add_executable", "target_sources"}:
+                continue
+            args = split_cmake_args(body)
+            if not args or not any(cmake_arg_matches_source(arg, MISSION_HOOK_SOURCE) for arg in args[1:]):
+                continue
+            target = args[0]
+            checked_targets.append(target)
+            if is_runtime_or_shared_target(command, args):
+                append_blocker(
+                    blockers,
+                    "mission_hook_in_runtime_or_shared_target",
+                    path=str(cmake_path),
+                    command=command,
+                    target=target,
+                    source=MISSION_HOOK_SOURCE,
+                )
     return {
         "status": "accepted" if len(blockers) == blocker_count_before else "blocked",
-        "path": str(cmake_path),
+        "paths": checked_files,
         "mission_hook_targets": sorted(set(checked_targets)),
     }
 

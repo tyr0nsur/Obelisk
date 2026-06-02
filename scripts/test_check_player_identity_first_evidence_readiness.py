@@ -1185,6 +1185,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                     "bounded_artifact_file_scan",
                     return_value={"ready_to_build_core_evidence_pack": False},
                 ),
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
             ):
                 payload = checker.build_report(args)
 
@@ -2225,9 +2226,10 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
-                approved_manifest
-            )
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    approved_manifest
+                )
 
         self.assertTrue(diagnosis["ready"])
         self.assertTrue(diagnosis["approved_runtime_evidence_present"])
@@ -2263,7 +2265,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 checker.approved_runtime_principal_lifecycle_evidence,
                 "build_report",
                 side_effect=overclaiming_report,
-            ):
+            ), mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
                 diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
                     approved_manifest
                 )

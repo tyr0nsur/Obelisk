@@ -113,11 +113,19 @@ This file is an active routing table only. Durable evidence belongs in
   Route gate remains planning-only with `approved_runtime_evidence_missing`; SDK
   completion remains fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete
   SDK `0/12`.
-- Deferred audited guardrails: player-identity approved evidence should rerun or strongly
-  verify its window/request sidecars beyond path/hash checks by replaying or strongly
-  comparing the operational window manifest and request sidecars. Expired request-window
-  checks need careful handling for already-captured approved evidence; drift such as
-  target/window/env/preflight mismatch must still fail.
+- 2026-06-02 approved-evidence and Mission frontier hardening: approved player-identity
+  runtime evidence now replays the operational `window-manifest.env` and compares the
+  replayed operational-window projection against the embedded report, so mutated
+  manifest/request/env/preflight sidecars fail even if their SHA and artifact identity are
+  refreshed. The replay tolerates only an expiry-only request-window blocker for already
+  captured evidence; target/window/env/preflight drift still fails. Mission copied-bool
+  readiness now scans nested `CMakeLists.txt` and `*.cmake` files outside ignored
+  build/local/cache roots so nested CMake runtime/shared wiring cannot over-attest the
+  consume-only Mission frontier.
+- Deferred audited guardrails: standalone `commands/replies` public-readiness should
+  reject unverifiable summary-only `--response-path-report` JSON and require source
+  artifact paths or a child checker-produced report. Route gate remains less exposed
+  because it composes the child report itself.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

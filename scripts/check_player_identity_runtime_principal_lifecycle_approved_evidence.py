@@ -20,6 +20,7 @@ from typing import Any
 
 import protected_paths
 import analyze_runtime_observer_log as runtime_observer_analyzer
+import check_player_identity_runtime_principal_lifecycle_window_manifest as window_manifest_checker
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
 from snapshot_evidence_pack import first_symlink_component, reject_protected_input_path, reject_symlink_component
 
@@ -117,6 +118,26 @@ ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS = frozenset(
     ("completed", "observer_env_survived", "observer_marker_survived")
 )
 ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS = frozenset(("delivery_claim", "principal_claim"))
+OPERATIONAL_WINDOW_REPLAY_KEYS = (
+    "schema",
+    "ready",
+    "operational_window_manifest_ready",
+    "run_id",
+    "obelisk_commit",
+    "target",
+    "manifest",
+    "copied_log",
+    "request_pack",
+    "observer_env",
+    "preflight",
+    "posture",
+    "rollback",
+    "claims",
+    "user_policy",
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+)
 ALLOWED_CONSUMER_CASE_KEYS = frozenset(
     (
         "case",
@@ -521,6 +542,73 @@ def validate_operational_window_artifact(
             f"{label}.sha256",
             expected=sha256,
             actual=actual_sha256,
+        )
+
+
+def request_check_failed_only_because_window_expired(blocker: dict[str, Any]) -> bool:
+    if blocker.get("reason") != "request_pack_window_request_check_failed":
+        return False
+    request_blockers = blocker.get("request_check_blockers")
+    return isinstance(request_blockers, list) and set(request_blockers) == {"approved_window_expired"}
+
+
+def replay_operational_window_manifest(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    manifest = window.get("manifest")
+    path_text = manifest.get("path") if isinstance(manifest, dict) else None
+    if not isinstance(path_text, str) or not path_text:
+        return
+
+    manifest_path = Path(path_text).expanduser()
+    old_window_roots = window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+    window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = APPROVED_OFFLINE_WORKSPACE_ROOTS
+    try:
+        try:
+            fields = window_manifest_checker.load_manifest(manifest_path)
+            validation = window_manifest_checker.validate_manifest(fields, manifest_path)
+        except (OSError, SystemExit) as exc:
+            add(
+                blockers,
+                "operational_window_manifest_check_failed",
+                "$.operational_window.manifest.path",
+                error=str(exc),
+            )
+            return
+    finally:
+        window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_window_roots
+
+    replay_blockers = [
+        blocker
+        for blocker in validation.blockers
+        if not request_check_failed_only_because_window_expired(blocker)
+    ]
+    if replay_blockers:
+        add(
+            blockers,
+            "operational_window_manifest_check_failed",
+            "$.operational_window.manifest",
+            replay_blockers=[blocker["reason"] for blocker in replay_blockers],
+        )
+
+    replay_validation = window_manifest_checker.Validation(
+        blockers=replay_blockers,
+        target=validation.target,
+        user_policy=validation.user_policy,
+        copied_log_status=validation.copied_log_status,
+    )
+    replay_report = window_manifest_checker.build_report(fields, replay_validation, manifest_path)
+    replay_projection = {
+        key: replay_report.get(key)
+        for key in OPERATIONAL_WINDOW_REPLAY_KEYS
+    }
+    embedded_projection = {
+        key: window.get(key)
+        for key in OPERATIONAL_WINDOW_REPLAY_KEYS
+    }
+    if canonical_json_bytes(replay_projection) != canonical_json_bytes(embedded_projection):
+        add(
+            blockers,
+            "operational_window_manifest_replay_mismatch",
+            "$.operational_window",
         )
 
 
@@ -1055,6 +1143,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         )
     if window.get("user_policy") not in {"no_regular_users", "operator_approved_beta_users"}:
         add(blockers, "operational_window_user_policy_unapproved", f"{label}.user_policy")
+    replay_operational_window_manifest(window, blockers)
 
 
 def validate_consumer_boundary(cases: Any, blockers: list[dict[str, Any]]) -> list[str]:

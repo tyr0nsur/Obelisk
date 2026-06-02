@@ -236,3 +236,52 @@ Remaining focused offline finding:
 
 This round still does not approve runtime work, public permissions/admin ABI, public
 identity, command replies, ResourceHandle, release readiness, or a stable SDK claim.
+
+## Approved Evidence And Mission Frontier Hardening
+
+The next supervised round closed the focused player-identity approved-evidence sidecar
+gap and one Mission side-lane frontier gap:
+
+- `scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now
+  replays the operational `window-manifest.env` with the existing window-manifest checker
+  and compares the replayed operational-window projection against the embedded
+  `operational_window` report. Mutated `window-manifest.env`, `window-request.json`,
+  `observer-window.env`, or preflight sidecars now fail even if their embedded SHA and
+  output artifact identity are refreshed.
+- The approved-evidence replay tolerates only the historical
+  `approved_window_expired` request-check blocker when it is the sole nested request
+  blocker. This keeps already-captured approved evidence consumable while still failing
+  target/window/env/preflight drift.
+- `scripts/check_mission_copied_bool_readiness.py` now scans nested `CMakeLists.txt` and
+  `*.cmake` files, excluding ignored `build/`, `local/`, `.git`, `__pycache__`, and
+  `.pytest_cache` roots. This prevents a nested CMake file from wiring
+  `hooks/ProcessEventMissionReflection.cpp` into a runtime/shared target while the Mission
+  checker still reports the side lane as internal consume-only evidence.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed with 39 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+  passed with 28 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_mission_copied_bool_readiness`
+  passed with 18 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest scripts.test_check_mission_copied_bool_readiness`
+  passed with 116 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_copied_bool_readiness.py --json`
+  passed as consume-only Mission evidence with public SDK/runtime/v1 completion false.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+
+Remaining focused offline finding:
+
+- Standalone `scripts/check_commands_replies_public_readiness.py` still accepts a
+  summary-only `--response-path-report` fixture. The route gate composes a real child
+  response-path report, but the standalone checker should reject unverifiable response
+  reports unless they include source artifact paths or equivalent child-checker provenance.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Mission SDK, release readiness, or a stable SDK claim.

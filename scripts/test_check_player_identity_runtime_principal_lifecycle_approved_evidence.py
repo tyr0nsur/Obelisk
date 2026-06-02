@@ -7,6 +7,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,7 @@ SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approve
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+TEST_COMMIT = "a" * 40
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 APPROVED_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
@@ -106,37 +108,169 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     workspace = copied_log.parents[2]
     live_dir = copied_log.parent
     sidecar_dir = workspace / "player-principal-preflight" / RUN_ID
-    return {
-        "manifest": write_sidecar(live_dir / "window-manifest.env", f"run_id={RUN_ID}\n"),
-        "request_pack": write_sidecar(
-            sidecar_dir / "window-request.json",
-            json.dumps(
-                {
-                    "schema": "obelisk.player-principal-lifecycle-window-request.v1",
-                    "run_id": RUN_ID,
-                    "target": {"instance": "arkserver2", "map": "TheIsland"},
-                    "approved_window": {
-                        "start_utc": "2026-06-01T12:00:00Z",
-                        "end_utc": "2026-06-01T12:10:00Z",
-                    },
+    copied_log_sha256 = hashlib.sha256(copied_log.read_bytes()).hexdigest()
+    manifest_path = live_dir / "window-manifest.env"
+    request_pack_path = sidecar_dir / "window-request.json"
+    observer_env_path = sidecar_dir / "observer-window.env"
+    preflight_pre_path = live_dir / "preflight-pre.txt"
+    preflight_post_path = live_dir / "preflight-post.txt"
+    target = {"instance": "arkserver2", "map": "TheIsland"}
+    approved_window = {
+        "start_utc": "2026-06-01T12:00:00Z",
+        "end_utc": "2026-06-01T12:10:00Z",
+    }
+    marker_set = [
+        "enable-process-event-hook",
+        "disable-plugins",
+        "allow-observer-debug-window",
+        "allow-experimental-observers",
+        "enable-player-principal-lifecycle-observer",
+    ]
+    forbidden_markers = [
+        "allow-ptrace",
+        "enable-debug-control",
+        "enable-reflection-scanner",
+        "enable-native-exec-probes",
+        "allow-global-process-event-callbacks",
+        "allow-filtered-process-event-callbacks",
+        "allow-call-process-event",
+        "allow-process-event-blocking",
+        "request-static-fname-probe",
+        "enable-chat-events",
+        "enable-chat-reflection",
+        "enable-chat-route-observer",
+        "enable-inventory-reflection",
+        "enable-structure-reflection",
+        "enable-item-return-events",
+    ]
+    non_claims = [
+        "does not authorize server operations",
+        "does not authorize marker/env changes",
+        "does not authorize starts, restarts, or stops",
+        "does not authorize Discord/community notices",
+        "does not promote public player identity",
+        "does not claim stable principal identity",
+        "does not promote permissions/admin",
+        "does not promote command/chat response or commands/replies",
+        "does not authorize lookup, persistence, mutation, return override, plugin delivery, runtime readiness, public SDK readiness, or v1 SDK completion",
+    ]
+    request = write_sidecar(
+        request_pack_path,
+        json.dumps(
+            {
+                "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                "status": "candidate_only_request_pack",
+                "approval_required": "current-turn operator-approved runtime window, not standing approval",
+                "target": target,
+                "run_id": RUN_ID,
+                "ark_binary_sha256": SHA,
+                "obelisk_commit": TEST_COMMIT,
+                "approved_window": approved_window,
+                "restart_expectation": "restart",
+                "final_posture": "stable",
+                "user_policy": "no_regular_users",
+                "notice_path": "not_applicable",
+                "copied_evidence_dir": str(live_dir),
+                "copied_log_path": str(copied_log),
+                "window_manifest_path": str(manifest_path),
+                "observer_env_file": "observer-window.env",
+                "marker_set": marker_set,
+                "forbidden_markers": forbidden_markers,
+                "rollback": {
+                    "owner": "operator",
+                    "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
                 },
-                sort_keys=True,
-            )
-            + "\n",
-        ),
-        "observer_env": write_sidecar(
-            sidecar_dir / "observer-window.env",
-            "OBELISK_WRAPPER_PROFILE=observer-debug\n",
-        ),
+                "non_claims": non_claims,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+    )
+    observer_env = write_sidecar(
+        observer_env_path,
+        "\n".join(
+            [
+                "OBELISK_INSTANCE_ID=arkserver2",
+                "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
+                "OBELISK_DISABLE_PLUGINS=1",
+                "OBELISK_WRAPPER_PROFILE=observer-debug",
+                "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
+                f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={SHA}",
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+                "OBELISK_PE_TRACE_LIMIT=0",
+            ]
+        )
+        + "\n",
+    )
+    preflight_pre = write_sidecar(
+        preflight_pre_path,
+        "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+    )
+    preflight_post = write_sidecar(
+        preflight_post_path,
+        "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+    )
+    manifest = write_sidecar(
+        manifest_path,
+        "\n".join(
+            [
+                f"run_id={RUN_ID}",
+                f"obelisk_commit={TEST_COMMIT}",
+                "target=arkserver2/TheIsland",
+                "approval=current-turn operator-approved runtime window, not standing approval",
+                f"approved_window_start_utc={approved_window['start_utc']}",
+                f"approved_window_end_utc={approved_window['end_utc']}",
+                "actual_capture_start_utc=2026-06-01T12:01:00Z",
+                "actual_capture_end_utc=2026-06-01T12:09:00Z",
+                f"copied_log_path={copied_log}",
+                f"copied_log_sha256={copied_log_sha256}",
+                f"request_pack_path={request_pack_path}",
+                f"request_pack_sha256={request['sha256']}",
+                f"observer_env_path={observer_env_path}",
+                f"observer_env_sha256={observer_env['sha256']}",
+                f"preflight_pre_path={preflight_pre_path}",
+                f"preflight_pre_sha256={preflight_pre['sha256']}",
+                f"preflight_post_path={preflight_post_path}",
+                f"preflight_post_sha256={preflight_post['sha256']}",
+                "pre_posture=stable",
+                "post_posture=stable",
+                "pre_check=passed",
+                "post_check=passed",
+                "rollback_start_utc=2026-06-01T12:09:00Z",
+                "rollback_end_utc=2026-06-01T12:10:00Z",
+                "rollback_completed=true",
+                "rollback_delta=removed_observer_env_and_markers_preserved_disable_plugins",
+                "observer_env_survived=false",
+                "observer_marker_survived=false",
+                "sibling_marker_entries=absent",
+                "sibling_observer_env=absent",
+                "user_policy=no_regular_users",
+                "notice_sent=not_applicable",
+                "log_budget=10",
+                "plugins_disabled=true",
+                "scanner_disabled=true",
+                "dispatch_limit=0",
+                "wrapper_profile=observer-debug",
+                "observer_exclusivity=player_principal_lifecycle_only",
+                "debug_escape_markers=absent",
+                "callback_escape_markers=absent",
+                "native_exec_disabled=true",
+                "ptrace_disabled=true",
+                "single_module_summary=player_principal_lifecycle",
+                "delivery_claim=none",
+                "principal_claim=none",
+            ]
+        )
+        + "\n",
+    )
+    return {
+        "manifest": manifest,
+        "request_pack": request,
+        "observer_env": observer_env,
         "preflight": {
-            "pre": write_sidecar(
-                live_dir / "preflight-pre.txt",
-                "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
-            ),
-            "post": write_sidecar(
-                live_dir / "preflight-post.txt",
-                "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
-            ),
+            "pre": preflight_pre,
+            "post": preflight_post,
         },
     }
 
@@ -148,7 +282,7 @@ def analyzer_summary() -> dict:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
     result = subprocess.run(
-        [sys.executable, str(ANALYZER), "--obelisk-commit", "test-commit", str(log_path)],
+        [sys.executable, str(ANALYZER), "--obelisk-commit", TEST_COMMIT, str(log_path)],
         check=True,
         text=True,
         stdout=subprocess.PIPE,
@@ -269,7 +403,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
     source_sha256 = hashlib.sha256(copied_log.read_bytes()).hexdigest()
     summary["evidence"] = {
         "kind": "runtime-observer-log",
-        "obelisk_commit": "test-commit",
+        "obelisk_commit": TEST_COMMIT,
         "sources": [
             {
                 "path": str(copied_log),
@@ -301,7 +435,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
             "ready": True,
             "operational_window_manifest_ready": True,
             "run_id": RUN_ID,
-            "obelisk_commit": "test-commit",
+            "obelisk_commit": TEST_COMMIT,
             "target": {"instance": "arkserver2", "map": "TheIsland"},
             **sidecars,
             "copied_log": {"path": str(copied_log), "path_status": "approved_offline_workspace", "sha256": source_sha256},
@@ -390,6 +524,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), str(path), "--json", *args],
                 check=False,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -419,15 +554,74 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
         )
 
-    def test_validate_manifest_recomputes_copied_log_sha_without_server_workspace_write(self) -> None:
+    def rewrite_sidecar_and_refresh_identity(self, payload: dict, artifact: dict, text: str) -> None:
+        path = Path(artifact["path"])
+        path.write_text(text, encoding="utf-8")
+        artifact["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        payload.pop("output_artifact_identity", None)
+        add_output_artifact_identity(payload)
+
+    def test_rejects_mutated_window_manifest_even_when_embedded_sha_is_updated(self) -> None:
+        payload = manifest()
+        manifest_path = Path(payload["operational_window"]["manifest"]["path"])
+        mutated = manifest_path.read_text(encoding="utf-8").replace("dispatch_limit=0\n", "dispatch_limit=1\n")
+        self.rewrite_sidecar_and_refresh_identity(payload, payload["operational_window"]["manifest"], mutated)
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_manifest_check_failed", report["blockers"])
+        self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_mutated_request_env_or_preflight_sidecar_even_when_embedded_sha_is_updated(self) -> None:
+        cases = (
+            (
+                "request_pack",
+                lambda payload: payload["operational_window"]["request_pack"],
+                lambda path: path.read_text(encoding="utf-8").replace('"map": "TheIsland"', '"map": "Ragnarok"'),
+            ),
+            (
+                "observer_env",
+                lambda payload: payload["operational_window"]["observer_env"],
+                lambda path: path.read_text(encoding="utf-8").replace(
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0\n",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=1\n",
+                ),
+            ),
+            (
+                "preflight_pre",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda path: path.read_text(encoding="utf-8").replace(
+                    "mode=observer-window",
+                    "mode=stable",
+                ),
+            ),
+        )
+        for name, artifact_for_payload, mutate in cases:
+            with self.subTest(sidecar=name):
+                payload = manifest()
+                artifact = artifact_for_payload(payload)
+                path = Path(artifact["path"])
+                self.rewrite_sidecar_and_refresh_identity(payload, artifact, mutate(path))
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("operational_window_manifest_check_failed", report["blockers"])
+                self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
+                self.assertFalse(report["public_sdk_ready"])
+                self.assertFalse(report["runtime_ready"])
+
+    def test_validate_manifest_recomputes_copied_log_sha(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker")
-        old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
-        with tempfile.TemporaryDirectory() as tmp:
-            offline_root = Path(tmp)
-            copied_log = offline_root / "live-validation-logs" / RUN_ID / "Obelisk.log"
+        old_env = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+        os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+        with temp_offline_workspace() as tmp:
+            copied_log = Path(tmp) / "live-validation-logs" / RUN_ID / "Obelisk.log"
             copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
-            checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (offline_root,)
             try:
                 payload = manifest_for_copied_log(copied_log)
                 accepted = checker.validate_manifest(payload, check_mode="consume")
@@ -437,7 +631,10 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 payload["operational_window"]["copied_log"]["sha256"] = payload["source_summary"]["evidence"]["sources"][0]["sha256"]
                 rejected = checker.validate_manifest(payload, check_mode="consume")
             finally:
-                checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+                if old_env is None:
+                    os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+                else:
+                    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = old_env
 
         self.assertIn(
             "source_summary_source_sha256_mismatch",
