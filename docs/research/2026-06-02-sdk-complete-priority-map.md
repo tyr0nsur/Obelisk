@@ -1926,3 +1926,40 @@ commands/replies, ResourceHandle, release readiness, or stable/complete SDK word
 Default route and SDK accounting remain fail-closed with
 `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
 complete-SDK progress `0/12`, and P0 progress `0/4`.
+
+## Player-Principal Request/Window Preparation Guardrail
+
+The next delegated follow-up hardened the offline preparation path for the future
+approved player-principal lifecycle runtime evidence window:
+
+- `prepare_player_principal_lifecycle_window_request.py` limits the first approved window
+  to ten minutes, rejects restart/final-posture incoherence, and emits exact post-run
+  verification commands in `operator_live_ops_brief`.
+- `check_player_principal_lifecycle_window_request.py` validates those request-pack
+  fields exactly: target instance/map, reviewed server binary path/SHA, Obelisk commit,
+  env snapshot, marker and forbidden-marker boundaries, copied evidence/log paths, window
+  manifest path, canonical rollback delta, final posture, and target-bound post-run
+  checks.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now binds
+  preflight sidecar `checked_at_utc` values to the manifest timeline:
+  preflight-pre must fall between approved-window start and capture start, preflight-post
+  must fall between capture end and rollback end, and pre/post ordering must be forward.
+  Stale, late, or swapped sidecars fail even when their refreshed SHA is present.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_prepare_player_principal_lifecycle_window_request scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_agent_handoff_guardrails scripts.test_check_command_permission_route_gate scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+- `git diff --check`
+
+This is offline request/window preparation only. It does not authorize runtime/server
+work, `/servidor/ark` writes, marker/env changes, start/stop/restart, Discord,
+publication, tags, release refs, public identity, permissions/admin ABI, command
+response, commands/replies, public header symbols, ResourceHandle, release readiness, or
+stable/complete SDK wording. Request-pack, preflight, and window-manifest readiness are
+not approved runtime evidence. The default route remains
+`lifecycle_anchor_first_evidence_provenance_unbound`; an explicit bound no-runtime route
+may only reach `approved_runtime_evidence_missing`; accepted runtime evidence may only
+advance to `identity_public_contract_gate_missing`.

@@ -121,6 +121,30 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(0, brief["feature_gates"]["dispatch_limit"])
         self.assertEqual(10, brief["feature_gates"]["log_limit"])
         self.assertEqual("stable", brief["post_run_stable_posture"]["expected"])
+        self.assertEqual(
+            [
+                [
+                    "scripts/check_player_principal_lifecycle_preflight.sh",
+                    "--instance",
+                    "arkserver2",
+                    "--map",
+                    "TheIsland",
+                    "--mode",
+                    "stable",
+                    "--expected-binary-sha256",
+                    SHA,
+                ],
+                [
+                    "scripts/check_obelisk_server_posture.sh",
+                    "--expect-stable",
+                    "--map",
+                    "TheIsland",
+                    "--instance",
+                    "arkserver2",
+                ],
+            ],
+            brief["post_run_stable_posture"]["verification_commands"],
+        )
 
     def test_rejects_env_snapshot_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -155,6 +179,34 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_post_run_verification_command_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["post_run_stable_posture"]["verification_commands"][0][2] = "arkserver3"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_restart_final_posture_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["restart_expectation"] = "stop-after-window"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("restart_expectation_final_posture_mismatch", report["blockers"])
 
     def test_rejects_nested_live_validation_alias_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -207,6 +259,27 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("approved_window_expired", report["blockers"])
+
+    def test_rejects_approved_window_duration_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            start = datetime.strptime(
+                request["approved_window"]["start_utc"],
+                "%Y-%m-%dT%H:%M:%SZ",
+            ).replace(tzinfo=timezone.utc)
+            request["approved_window"]["end_utc"] = (start + timedelta(minutes=11)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved_window_duration_too_long", report["blockers"])
+        self.assertEqual(report["next_blocker"], "request_pack_not_accepted")
 
     def test_rejects_beta_policy_without_notice_and_public_readiness_claim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -108,6 +108,30 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("enable-reflection-scanner", request["forbidden_markers"])
         self.assertIn("does not claim stable principal identity", request["non_claims"])
         self.assertEqual(
+            request["operator_live_ops_brief"]["post_run_stable_posture"]["verification_commands"],
+            [
+                [
+                    "scripts/check_player_principal_lifecycle_preflight.sh",
+                    "--instance",
+                    "arkserver2",
+                    "--map",
+                    "TheIsland",
+                    "--mode",
+                    "stable",
+                    "--expected-binary-sha256",
+                    SHA,
+                ],
+                [
+                    "scripts/check_obelisk_server_posture.sh",
+                    "--expect-stable",
+                    "--map",
+                    "TheIsland",
+                    "--instance",
+                    "arkserver2",
+                ],
+            ],
+        )
+        self.assertEqual(
             env,
             [
                 "OBELISK_INSTANCE_ID=arkserver2",
@@ -124,6 +148,15 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("This is a request pack only. It does not authorize server operations.", markdown)
         self.assertIn("dispatch limit=0", markdown)
         self.assertIn("log limit=10", markdown)
+        self.assertIn(
+            "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --map TheIsland "
+            f"--mode stable --expected-binary-sha256 {SHA}",
+            markdown,
+        )
+        self.assertIn(
+            "scripts/check_obelisk_server_posture.sh --expect-stable --map TheIsland --instance arkserver2",
+            markdown,
+        )
 
     def test_beta_user_policy_requires_notice_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -158,6 +191,69 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must match --approved-window-start-utc exactly", result.stderr)
+
+    def test_rejects_approved_window_longer_than_first_window_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = base_args(Path(tmp) / "request")
+            args[args.index("--approved-window-end-utc") + 1] = "2026-06-01T12:11:00Z"
+            result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duration must not exceed 10 minutes", result.stderr)
+
+    def test_rejects_restart_final_posture_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stop_with_stable = base_args(Path(tmp) / "stop-stable")
+            stop_with_stable[stop_with_stable.index("--restart-expectation") + 1] = "stop-after-window"
+            stop_with_stable_result = subprocess.run(
+                stop_with_stable,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            restart_with_stopped = base_args(Path(tmp) / "restart-stopped")
+            restart_with_stopped[restart_with_stopped.index("--final-posture") + 1] = "stopped"
+            restart_with_stopped_result = subprocess.run(
+                restart_with_stopped,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertNotEqual(stop_with_stable_result.returncode, 0)
+        self.assertIn("stop-after-window requires --final-posture stopped", stop_with_stable_result.stderr)
+        self.assertNotEqual(restart_with_stopped_result.returncode, 0)
+        self.assertIn("none/start/restart requires --final-posture stable", restart_with_stopped_result.stderr)
+
+    def test_stopped_final_posture_emits_allow_stopped_post_run_check(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            args = base_args(output_dir)
+            args[args.index("--restart-expectation") + 1] = "stop-after-window"
+            args[args.index("--final-posture") + 1] = "stopped"
+            subprocess.run(args, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            request["operator_live_ops_brief"]["post_run_stable_posture"]["verification_commands"],
+            [
+                [
+                    "scripts/check_player_principal_lifecycle_preflight.sh",
+                    "--instance",
+                    "arkserver2",
+                    "--map",
+                    "TheIsland",
+                    "--mode",
+                    "stable",
+                    "--expected-binary-sha256",
+                    SHA,
+                    "--allow-stopped",
+                ],
+            ],
+        )
 
     def test_rejects_wrong_binary_sha_and_live_output_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -28,6 +28,7 @@ RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 RUN_ID_SUFFIX = "-player-principal-lifecycle"
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+MAX_APPROVED_WINDOW_SECONDS = 600
 APPROVAL_TEXT = "current-turn operator-approved runtime window, not standing approval"
 EVIDENCE_ROOT = Path("/servidor/ark/workspace-offline/live-validation-logs")
 REQUIRED_ENV = {
@@ -145,6 +146,12 @@ def validate_args(args: argparse.Namespace) -> None:
     end = parse_utc(args.approved_window_end_utc, "--approved-window-end-utc")
     if not start < end:
         raise SystemExit("--approved-window-start-utc must be before --approved-window-end-utc")
+    if (end - start).total_seconds() > MAX_APPROVED_WINDOW_SECONDS:
+        raise SystemExit("--approved-window duration must not exceed 10 minutes")
+    if args.restart_expectation == "stop-after-window" and args.final_posture != "stopped":
+        raise SystemExit("--restart-expectation stop-after-window requires --final-posture stopped")
+    if args.restart_expectation in {"none", "start", "restart"} and args.final_posture != "stable":
+        raise SystemExit("--restart-expectation none/start/restart requires --final-posture stable")
     expected_run_id = run_id_for_window_start(start)
     if args.run_id != expected_run_id:
         raise SystemExit(f"--run-id timestamp must match --approved-window-start-utc exactly: {expected_run_id}")
@@ -254,10 +261,39 @@ def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str
             "expected": payload["final_posture"],
             "stable_markers_preserved": ["enable-process-event-hook", "disable-plugins"],
             "observer_markers_removed": True,
+            "verification_commands": post_run_verification_commands(payload),
         },
         "approval_boundary": APPROVAL_TEXT,
         "non_authorization": "brief only; request-pack acceptance does not authorize operations",
     }
+
+
+def post_run_verification_commands(payload: dict[str, Any]) -> list[list[str]]:
+    target = payload["target"]
+    preflight = [
+        "scripts/check_player_principal_lifecycle_preflight.sh",
+        "--instance",
+        target["instance"],
+        "--map",
+        target["map"],
+        "--mode",
+        "stable",
+        "--expected-binary-sha256",
+        payload["ark_binary_sha256"],
+    ]
+    if payload["final_posture"] == "stopped":
+        return [preflight + ["--allow-stopped"]]
+    return [
+        preflight,
+        [
+            "scripts/check_obelisk_server_posture.sh",
+            "--expect-stable",
+            "--map",
+            target["map"],
+            "--instance",
+            target["instance"],
+        ],
+    ]
 
 
 def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
@@ -288,6 +324,12 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         "plugins disabled=true",
         "dispatch limit=0",
         "log limit=10",
+        "```",
+        "",
+        "Post-run verification commands:",
+        "",
+        "```text",
+        *[" ".join(command) for command in post_run_verification_commands(payload)],
         "```",
         "",
         "Exact observer env snapshot:",

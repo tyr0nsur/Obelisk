@@ -185,6 +185,7 @@ def preflight_payload(
     copied_log_path: Path | None = None,
     env_file: Path | None = None,
     env_sha256: str | None = None,
+    checked_at_utc: str = "2026-06-01T12:00:00Z",
 ) -> dict:
     if window_manifest_path is None:
         window_manifest_path = Path("/servidor/ark/workspace-offline/live-validation-logs") / run_id / "window-manifest.env"
@@ -214,7 +215,7 @@ def preflight_payload(
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": True,
-        "checked_at_utc": "2026-06-01T12:00:00Z",
+        "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
     }
@@ -255,6 +256,7 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
                 copied_log_path=copied_log_path,
                 env_file=observer_env_path,
                 env_sha256=observer_env_sha256,
+                checked_at_utc=fields["approved_window_start_utc"],
             ),
             sort_keys=True,
         )
@@ -267,6 +269,7 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
                 map_name=fields.get("map") or fields.get("map_name") or fields.get("target", "arkserver2/TheIsland").split("/", 1)[1],
                 window_manifest_path=window_manifest_path,
                 copied_log_path=copied_log_path,
+                checked_at_utc=fields["rollback_end_utc"],
             ),
             sort_keys=True,
         )
@@ -327,6 +330,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         check: bool = True,
         create_copied_log: bool = True,
         copied_log_text: str = COPIED_LOG_TEXT,
+        sidecar_mutator=None,
     ) -> subprocess.CompletedProcess[str]:
         workspace = Path("/servidor/ark/workspace-offline")
         if not workspace.is_dir() or not os.access(workspace, os.W_OK):
@@ -348,6 +352,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
             path = exact_manifest
             fields = dict(line.split("=", 1) for line in rewritten_lines if "=" in line)
             fields = write_sidecars(path.parent, fields)
+            if sidecar_mutator is not None:
+                sidecar_mutator(path.parent, fields)
             path.write_text("\n".join(f"{key}={value}" for key, value in fields.items()) + "\n", encoding="utf-8")
             copied_log = fields.get("copied_log_path")
             if create_copied_log and copied_log:
@@ -365,6 +371,23 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
             )
 
+    def mutate_preflight_checked_at(
+        self,
+        path_key: str,
+        sha_key: str,
+        checked_at_utc: str,
+    ):
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            preflight_path = Path(fields[path_key])
+            if not preflight_path.is_absolute():
+                preflight_path = root / preflight_path
+            payload = json.loads(preflight_path.read_text(encoding="utf-8"))
+            payload["checked_at_utc"] = checked_at_utc
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields[sha_key] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+        return mutate
+
     def test_accepts_approved_workspace_window_manifest_without_promoting_identity(self) -> None:
         result = self.run_checker_in_approved_workspace(manifest_lines())
         report = json.loads(result.stdout)
@@ -380,6 +403,95 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["remaining_blockers"], [])
         self.assertEqual(report["next_blocker"], "approved_runtime_observer_log_summary_and_manifest_missing")
+
+    def test_rejects_preflight_pre_checked_at_before_approved_window(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=self.mutate_preflight_checked_at(
+                "preflight_pre_path",
+                "preflight_pre_sha256",
+                "2026-01-01T12:00:00Z",
+            ),
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_checked_at_before_approved_window", report["blockers"])
+
+    def test_rejects_preflight_pre_checked_at_after_capture_start(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            self.mutate_preflight_checked_at(
+                "preflight_pre_path",
+                "preflight_pre_sha256",
+                fields["actual_capture_end_utc"],
+            )(root, fields)
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_checked_at_after_capture_start", report["blockers"])
+
+    def test_rejects_preflight_post_checked_at_before_capture_end(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            self.mutate_preflight_checked_at(
+                "preflight_post_path",
+                "preflight_post_sha256",
+                fields["actual_capture_start_utc"],
+            )(root, fields)
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_post_path_checked_at_before_capture_end", report["blockers"])
+
+    def test_rejects_preflight_post_checked_at_after_rollback_end(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=self.mutate_preflight_checked_at(
+                "preflight_post_path",
+                "preflight_post_sha256",
+                "2099-01-01T12:00:00Z",
+            ),
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_post_path_checked_at_after_rollback_end", report["blockers"])
+
+    def test_rejects_swapped_preflight_checked_at_order(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            self.mutate_preflight_checked_at(
+                "preflight_pre_path",
+                "preflight_pre_sha256",
+                fields["actual_capture_end_utc"],
+            )(root, fields)
+            self.mutate_preflight_checked_at(
+                "preflight_post_path",
+                "preflight_post_sha256",
+                fields["actual_capture_start_utc"],
+            )(root, fields)
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_checked_at_order_invalid", report["blockers"])
 
     def test_emit_template_from_copied_log_fills_path_sha_and_run_id(self) -> None:
         workspace = Path("/servidor/ark/workspace-offline")

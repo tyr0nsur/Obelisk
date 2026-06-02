@@ -151,12 +151,14 @@ This file is an active routing table only. Durable evidence belongs in
   and bound wrapper; stale standalone manifests still fail closed unless regenerated or
   explicitly aligned to the current `--snapshot-root`.
 - P0 runtime evidence: prepare, but do not run, a fresh live-ops brief for approved copied
-  runtime principal lifecycle evidence. It must name target instance/map, feature gates,
-  marker/env changes, restart/start window, notice path if players are involved, evidence
-  capture, rollback, and post-run stable posture. The request-pack now carries a checked
-  `operator_live_ops_brief`, reviewed server binary path/SHA, explicit pre/post evidence
-  paths, exact env/marker boundaries, and canonical rollback delta; acceptance still only
-  advances to current-turn operator approval required.
+  runtime principal lifecycle evidence. Request/window preparation is offline guardrail
+  work only: request-pack acceptance keeps `server_operations_authorized=false`,
+  `runtime_work_authorized=false`, public/runtime/promotion/v1 readiness false, and
+  `next_blocker=operator_current_turn_runtime_window_approval_required`. Preserve checked
+  `operator_live_ops_brief`, reviewed server binary path/SHA, exact env/marker and
+  forbidden-marker boundaries, pre/post evidence paths, structured preflight/window
+  binding, post-run verification commands, canonical rollback delta, and no runtime/server
+  authorization.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
@@ -210,9 +212,8 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest delegated guardrail rounds closed mission-leaf umbrella accounting and the
-  permissions/admin identity-certificate dependency gap. SDK completion now runs the
-  mission-transfer-dino-tribe outcome checker and rejects permissions/admin structured
-  evidence without a hash-bound player-identity promotion certificate. Default route and
-  SDK accounting remain unchanged: `stable_claim_allowed=false`, complete-SDK progress
-  `0/12`, and P0 progress `0/4`.
+- Latest delegated guardrail rounds closed mission-leaf umbrella accounting,
+  permissions/admin identity-certificate dependency, and player-principal lifecycle
+  request/window preparation guardrails. Default route and SDK accounting remain
+  unchanged: `lifecycle_anchor_first_evidence_provenance_unbound`,
+  `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.

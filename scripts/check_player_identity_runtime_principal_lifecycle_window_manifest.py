@@ -584,6 +584,35 @@ def validate_preflight_content(
         add(blockers, f"{path_key}_env_file_unexpected", path_key)
 
 
+def read_preflight_checked_at_utc(
+    fields: dict[str, str],
+    manifest_path: Path,
+    *,
+    path_key: str,
+) -> datetime | None:
+    path_text = fields.get(path_key)
+    if not path_text:
+        return None
+    path = manifest_relative_path(path_text, manifest_path)
+    status = protected_paths.protected_path_status(
+        path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
+        return None
+    try:
+        payload = json.loads(status.resolved.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    checked_at_utc = payload.get("checked_at_utc")
+    if not isinstance(checked_at_utc, str) or UTC_TIMESTAMP_RE.fullmatch(checked_at_utc) is None:
+        return None
+    return parse_utc_timestamp(checked_at_utc)
+
+
 def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers: list[dict[str, Any]]) -> None:
     path_text = fields.get("request_pack_path")
     if not path_text:
@@ -866,6 +895,48 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
             add(blockers, "rollback_starts_before_capture_end", "rollback_start_utc")
         if timestamps["rollback_start_utc"] > timestamps["rollback_end_utc"]:
             add(blockers, "rollback_window_not_forward", "rollback_end_utc")
+        preflight_pre_checked_at = read_preflight_checked_at_utc(
+            fields,
+            manifest_path,
+            path_key="preflight_pre_path",
+        )
+        preflight_post_checked_at = read_preflight_checked_at_utc(
+            fields,
+            manifest_path,
+            path_key="preflight_post_path",
+        )
+        if preflight_pre_checked_at is not None:
+            if preflight_pre_checked_at < timestamps["approved_window_start_utc"]:
+                add(
+                    blockers,
+                    "preflight_pre_path_checked_at_before_approved_window",
+                    "preflight_pre_path",
+                )
+            if preflight_pre_checked_at > timestamps["actual_capture_start_utc"]:
+                add(
+                    blockers,
+                    "preflight_pre_path_checked_at_after_capture_start",
+                    "preflight_pre_path",
+                )
+        if preflight_post_checked_at is not None:
+            if preflight_post_checked_at < timestamps["actual_capture_end_utc"]:
+                add(
+                    blockers,
+                    "preflight_post_path_checked_at_before_capture_end",
+                    "preflight_post_path",
+                )
+            if preflight_post_checked_at > timestamps["rollback_end_utc"]:
+                add(
+                    blockers,
+                    "preflight_post_path_checked_at_after_rollback_end",
+                    "preflight_post_path",
+                )
+        if (
+            preflight_pre_checked_at is not None
+            and preflight_post_checked_at is not None
+            and preflight_pre_checked_at >= preflight_post_checked_at
+        ):
+            add(blockers, "preflight_checked_at_order_invalid", "preflight_post_path")
 
     try:
         log_budget = int(fields.get("log_budget", ""))

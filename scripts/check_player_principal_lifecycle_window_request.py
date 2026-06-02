@@ -27,6 +27,7 @@ from prepare_player_principal_lifecycle_window_request import (
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
+    MAX_APPROVED_WINDOW_SECONDS,
     NON_CLAIMS,
     REQUIRED_ENV,
     RUN_ID_RE,
@@ -34,6 +35,7 @@ from prepare_player_principal_lifecycle_window_request import (
     UTC_RE,
     WINDOW_MARKERS,
     env_lines,
+    post_run_verification_commands,
     run_id_for_window_start,
 )
 
@@ -119,6 +121,7 @@ EXPECTED_POST_RUN_KEYS = frozenset(
         "expected",
         "stable_markers_preserved",
         "observer_markers_removed",
+        "verification_commands",
     )
 )
 ALLOWED_RESTART_EXPECTATIONS = frozenset(("none", "start", "restart", "stop-after-window"))
@@ -435,6 +438,7 @@ def expected_operator_live_ops_brief(payload: dict[str, Any], env: list[str]) ->
                 "expected": payload["final_posture"],
                 "stable_markers_preserved": ["enable-process-event-hook", "disable-plugins"],
                 "observer_markers_removed": True,
+                "verification_commands": post_run_verification_commands(payload),
             },
             "approval_boundary": APPROVAL_TEXT,
             "non_authorization": "brief only; request-pack acceptance does not authorize operations",
@@ -499,6 +503,18 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "approved_window_end_utc_invalid", "approved_window.end_utc")
         if start_dt is not None and end_dt is not None and not start_dt < end_dt:
             add(blockers, "approved_window_order_invalid", "approved_window")
+        if (
+            start_dt is not None
+            and end_dt is not None
+            and start_dt < end_dt
+            and (end_dt - start_dt).total_seconds() > MAX_APPROVED_WINDOW_SECONDS
+        ):
+            add(
+                blockers,
+                "approved_window_duration_too_long",
+                "approved_window",
+                max_seconds=MAX_APPROVED_WINDOW_SECONDS,
+            )
         if end_dt is not None and end_dt <= datetime.now(timezone.utc):
             add(blockers, "approved_window_expired", "approved_window.end_utc", value=end)
     rollback = require_keys(payload.get("rollback"), required=EXPECTED_ROLLBACK_KEYS, label="rollback", blockers=blockers)
@@ -543,6 +559,10 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
         add(blockers, "restart_expectation_invalid", "restart_expectation")
     if payload.get("final_posture") not in ALLOWED_FINAL_POSTURES:
         add(blockers, "final_posture_invalid", "final_posture")
+    if payload.get("restart_expectation") == "stop-after-window" and payload.get("final_posture") != "stopped":
+        add(blockers, "restart_expectation_final_posture_mismatch", "final_posture")
+    if payload.get("restart_expectation") in {"none", "start", "restart"} and payload.get("final_posture") != "stable":
+        add(blockers, "restart_expectation_final_posture_mismatch", "final_posture")
     user_policy = payload.get("user_policy")
     if user_policy not in ALLOWED_USER_POLICIES:
         add(blockers, "user_policy_invalid", "user_policy")

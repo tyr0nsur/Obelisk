@@ -811,12 +811,17 @@ priorities, and do not use history files as the active source of truth.
   - `prepare_player_principal_lifecycle_window_request.py` now emits a structured
     `operator_live_ops_brief` with target, reviewed server binary path/SHA, feature
     gates, marker/env snapshot, start/restart/stop window, notice path, evidence capture,
-    rollback, and post-run posture. The request checker validates the brief exactly.
+    rollback, final posture, and exact target-bound post-run verification commands. The
+    request checker validates the brief exactly and rejects windows over ten minutes plus
+    restart/final-posture incoherence.
   - Request packs now forbid `enable-inventory-action-redacted-observer`, bind
     `server_binary_path`, and the window manifest checker rejects request-pack
     `obelisk_commit`/binary drift before evidence can be accepted.
   - Window/approved evidence now preserves and validates canonical rollback delta
     `removed_observer_env_and_markers_preserved_disable_plugins`.
+  - Request packs are planning artifacts only: no runtime/server/marker/env work is
+    authorized, and acceptance keeps runtime/public/promotion/v1 readiness false with
+    current-turn operator approval still required.
 - Delegated preflight-provenance round on 2026-06-02 closed the next stale/swapped
   sidecar gap before any runtime request:
   - Four read-only sub-agent scopes were lead-delegated and closed: preflight JSON
@@ -828,8 +833,9 @@ priorities, and do not use history files as the active source of truth.
     sidecar provenance without triggering procfs posture checks.
   - Preflight JSON now records run id, target instance/map, copied log, copied evidence
     dir, window manifest path, and `checked_at_utc`; the window-manifest checker compares
-    those anchors against the resolved manifest and copied log. A stale or swapped
-    preflight sidecar fails even if the outer manifest SHA is refreshed.
+    those anchors against the resolved manifest, copied log, approved window, capture
+    interval, and rollback end. A stale, late, or swapped preflight sidecar fails even if
+    the outer manifest SHA is refreshed.
   - Request-pack binding remains indirect through manifest sidecar validation and
     request-check replay; there is no preflight `request_pack_path` field. No
     runtime/server/marker/env work is authorized by these artifacts.
