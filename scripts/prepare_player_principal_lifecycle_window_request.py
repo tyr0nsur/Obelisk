@@ -433,6 +433,8 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         "Required evidence sidecar commands:",
         "",
         "```text",
+        "requires_current_turn_operator_approval_before_execution=true",
+        "commands_authorize_runtime_or_public_readiness=false",
         *evidence_sidecar_command_lines(payload),
         "```",
         "",

@@ -2372,6 +2372,47 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## Live-Ops Sidecar Authorization Non-Claim Hardening
+
+A supervised four-agent round split preflight sidecars, window-manifest consumption,
+request-pack markdown, and SDK/P0 accounting guardrails. The lead integrated the
+implementation and adjusted validation away from live/protected paths.
+
+Integrated changes:
+
+- `check_player_principal_lifecycle_preflight.sh` still emits `ready=true` for accepted
+  pre-window posture, but now also emits explicit false flags:
+  `server_operations_authorized`, `runtime_work_authorized`, `runtime_ready`,
+  `public_sdk_ready`, `public_abi_ready`, `promotion_ready`, `public_header_allowed`, and
+  `v1_completion_ready`.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now rejects
+  consumed preflight sidecars that contain positive runtime/server/public readiness flags
+  or positive textual authorization/readiness claims.
+- `prepare_player_principal_lifecycle_window_request.py` now prints
+  `requires_current_turn_operator_approval_before_execution=true` and
+  `commands_authorize_runtime_or_public_readiness=false` before sidecar command lines.
+- `check_public_sdk_v1_completion.py` now treats request packs, window manifests,
+  operator approval receipts, preflight sidecars, live-validation sidecars, and matching
+  ready scopes as non-promotional evidence. `docs/public_sdk_surfaces.json` now states
+  these artifacts do not satisfy public identity promotion, public ABI/SDK readiness,
+  runtime readiness, or v1 SDK completion.
+- `test_public_sdk_guardrails.py` now has a correct `scripts/` import path for runpy
+  checks and current wording for the P0 route, inventory side-lane, transfer lane,
+  source-bound identity route, and ArkApi demand-only boundary.
+
+Validation notes:
+
+- A sub-agent ran a full window-manifest module test that created temporary fixtures under
+  `/servidor/ark/workspace-offline`; this was not required for the lead integration. The
+  lead converted the new sidecar-claim tests to direct `TemporaryDirectory()` validation
+  with local `APPROVED_OFFLINE_WORKSPACE_ROOTS` and did not run further protected-path
+  fixture tests in this round.
+- `bash scripts/test_check_player_principal_lifecycle_preflight.sh` passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_prepare_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest.WindowManifestCheckerTests.test_rejects_preflight_pre_positive_runtime_public_flags scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest.WindowManifestCheckerTests.test_rejects_preflight_pre_positive_textual_authorization_claims`
+  passed 14 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_public_sdk_guardrails`
+  passed 187 tests.
+
 ## Route-Blocker Summary And Delegated Evidence Audit
 
 A supervised read-only delegation round covered P0 route semantics, live-ops request/window

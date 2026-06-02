@@ -1596,10 +1596,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("player_identity_request_pack_non_evidence_manifest_terms_missing", payload["blockers"])
         self.assertIn("prepared_at_utc", payload["player_identity_request_pack_non_evidence_terms_missing"])
+        self.assertIn("observer env files", payload["player_identity_request_pack_non_evidence_terms_missing"])
         self.assertIn(
             "do not satisfy approved runtime principal lifecycle evidence",
             payload["player_identity_request_pack_non_evidence_terms_missing"],
         )
+        self.assertIn("public identity promotion", payload["player_identity_request_pack_non_evidence_terms_missing"])
+        self.assertIn("public ABI/SDK readiness", payload["player_identity_request_pack_non_evidence_terms_missing"])
+        self.assertIn("runtime readiness", payload["player_identity_request_pack_non_evidence_terms_missing"])
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)
@@ -5174,6 +5178,56 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertFalse(promoted)
+
+    def test_live_ops_sidecars_do_not_count_as_promotion_evidence(self) -> None:
+        base_evidence = {
+            "surface_id": "obelisk.player_identity.v1",
+            "promotion_status": "promoted",
+            "public_sdk_ready": True,
+            "abi_tests": ["tests/core/player_identity_promotion.cpp"],
+            "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_promotion.c"],
+        }
+        cases = (
+            {
+                **base_evidence,
+                "ready_scope": "request_pack_only",
+            },
+            {
+                **base_evidence,
+                "sidecars": [
+                    {
+                        "schema": "obelisk.player-principal-lifecycle-preflight.v1",
+                        "ready": True,
+                        "server_operations_authorized": False,
+                        "runtime_work_authorized": False,
+                        "runtime_ready": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "v1_completion_ready": False,
+                    },
+                    {
+                        "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                        "prepared_at_utc": "2026-06-02T00:00:00+00:00",
+                    },
+                    {
+                        "schema": "obelisk.operator-approval-receipt.v1",
+                        "server_operations_authorized_by_template": False,
+                    },
+                ],
+            },
+        )
+        for evidence in cases:
+            with self.subTest(evidence=evidence):
+                promoted = surface_has_promotion_evidence(
+                    {
+                        "id": "obelisk.player_identity.v1",
+                        "status": "promoted",
+                        "evidence": evidence,
+                    }
+                )
+                self.assertFalse(promoted)
 
     def test_player_identity_structured_promotion_requires_runtime_evidence_ready_scope(self) -> None:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:

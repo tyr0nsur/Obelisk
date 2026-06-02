@@ -113,8 +113,20 @@ import sys
 
 path, server_sha, run_id, window_manifest, copied_log, evidence_dir = sys.argv[1:]
 payload = json.loads(open(path, encoding="utf-8").read())
+required_false_flags = (
+    "server_operations_authorized",
+    "runtime_work_authorized",
+    "runtime_ready",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "promotion_ready",
+    "public_header_allowed",
+    "v1_completion_ready",
+)
 assert payload["schema"] == "obelisk.player-principal-lifecycle-preflight.v1"
 assert payload["ready"] is True
+for flag in required_false_flags:
+    assert payload[flag] is False, flag
 assert payload["mode"] == "stable"
 assert payload["instance"] == "arkserver2"
 assert payload["map"] == "TheIsland"
@@ -182,6 +194,19 @@ import sys
 
 path, env_path, run_id = sys.argv[1:]
 payload = json.loads(open(path, encoding="utf-8").read())
+required_false_flags = (
+    "server_operations_authorized",
+    "runtime_work_authorized",
+    "runtime_ready",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "promotion_ready",
+    "public_header_allowed",
+    "v1_completion_ready",
+)
+assert payload["ready"] is True
+for flag in required_false_flags:
+    assert payload[flag] is False, flag
 assert payload["mode"] == "observer-window"
 assert payload["run_id"] == run_id
 assert payload["target"] == {"instance": "arkserver2", "map": "TheIsland"}

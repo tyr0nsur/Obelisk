@@ -298,7 +298,13 @@ STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANON
 RUNTIME_EVIDENCE_READY_SCOPE = "runtime_evidence_only"
 PUBLIC_CONTRACT_REVIEW_READY_SCOPE = "contract_review_input_only"
 BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
-PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {BUNDLE_BUILDER_INPUTS_READY_SCOPE}
+PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
+    BUNDLE_BUILDER_INPUTS_READY_SCOPE,
+    "operator_approval_receipt_only",
+    "preflight_only",
+    "request_pack_only",
+    "window_manifest_only",
+}
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
         "obelisk.core-dump-evidence-pack.v1",
@@ -336,8 +342,13 @@ PLAYER_IDENTITY_REQUEST_PACK_NON_EVIDENCE_TERMS = (
     "request packs",
     "preflight readiness",
     "window manifests",
+    "observer env files",
     "operator approval receipts",
     "do not satisfy approved runtime principal lifecycle evidence",
+    "public identity promotion",
+    "public ABI/SDK readiness",
+    "runtime readiness",
+    "v1 SDK completion",
 )
 REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
     "obelisk.permissions_admin.v1": (
@@ -390,6 +401,8 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "inventory_policy_event",
     "item_return",
     "item_return_event",
+    "live_validation",
+    "live-validation",
     "package_shape",
     "planning",
     "plugin_hub",
@@ -397,7 +410,15 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "plugin_hub_seed",
     "orientation",
     "preflight",
+    "preflight-pre",
+    "preflight-post",
     "readiness",
+    "request_pack",
+    "request-pack",
+    "operator_approval_receipt",
+    "operator-approval-receipt",
+    "window_manifest",
+    "window-manifest",
     "static_candidate",
     "static_target",
     "return_only",
@@ -433,6 +454,8 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"(?:candidate|planning|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
+    r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
+    r"operator[-_ ]?approval[-_ ]?receipts?|window[-_ ]?manifests?|live[-_ ]?validation|"
     r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
     r"static[-_ ]?(?:orientation|candidate|target|discovery)|native[-_ ]?ufunction[-_ ]?registration[-_ ]?static[-_ ]?discovery|"
     r"admin[-_ ]?thunks?|orientation|preflight|readiness|"

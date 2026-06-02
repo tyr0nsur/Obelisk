@@ -784,6 +784,117 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("preflight_pre_path_allow_stopped_not_false", report["blockers"])
 
+    def test_rejects_preflight_pre_positive_runtime_public_flags(self) -> None:
+        forbidden_flags = (
+            "runtime_work_authorized",
+            "server_operations_authorized",
+            "runtime_ready",
+            "public_sdk_ready",
+            "public_abi_ready",
+            "promotion_ready",
+            "public_header_allowed",
+            "v1_completion_ready",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "window-manifest.env"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            copied_log = root / "Obelisk.log"
+            preflight_path = root / "preflight-pre.json"
+            payload = preflight_payload(
+                mode="observer-window",
+                instance="arkserver2",
+                window_manifest_path=manifest_path,
+                copied_log_path=copied_log,
+                env_file=observer_env,
+                env_sha256=observer_env_sha256,
+            )
+            for flag in forbidden_flags:
+                payload[flag] = True
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(copied_log),
+                "preflight_pre_path": str(preflight_path),
+                "observer_env_path": str(observer_env),
+                "observer_env_sha256": observer_env_sha256,
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                CHECKER.validate_preflight_content(
+                    fields,
+                    manifest_path,
+                    blockers,
+                    path_key="preflight_pre_path",
+                    expected_mode="observer-window",
+                    target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+        reasons = [item["reason"] for item in blockers]
+        for flag in forbidden_flags:
+            self.assertIn(f"preflight_pre_path_{flag}_not_false", reasons)
+
+    def test_rejects_preflight_pre_positive_textual_authorization_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "window-manifest.env"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            copied_log = root / "Obelisk.log"
+            preflight_path = root / "preflight-pre.json"
+            payload = preflight_payload(
+                mode="observer-window",
+                instance="arkserver2",
+                window_manifest_path=manifest_path,
+                copied_log_path=copied_log,
+                env_file=observer_env,
+                env_sha256=observer_env_sha256,
+            )
+            payload["operator_note"] = "runtime work authorized for server operations"
+            payload["nested_claim"] = {"public": "public SDK ready and public header allowed"}
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(copied_log),
+                "preflight_pre_path": str(preflight_path),
+                "observer_env_path": str(observer_env),
+                "observer_env_sha256": observer_env_sha256,
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                CHECKER.validate_preflight_content(
+                    fields,
+                    manifest_path,
+                    blockers,
+                    path_key="preflight_pre_path",
+                    expected_mode="observer-window",
+                    target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("preflight_pre_path_forbidden_authorization_claim", reasons)
+        key_paths = {
+            detail.get("key_path")
+            for detail in blockers
+            if detail["reason"] == "preflight_pre_path_forbidden_authorization_claim"
+        }
+        self.assertEqual({"operator_note", "nested_claim.public"}, key_paths)
+
     def test_rejects_swapped_preflight_checked_at_order(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:
             self.mutate_preflight_checked_at(

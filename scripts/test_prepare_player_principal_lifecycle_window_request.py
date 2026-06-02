@@ -62,6 +62,12 @@ def base_args(output_dir: Path) -> list[str]:
     ]
 
 
+def fenced_section(markdown: str, title: str) -> list[str]:
+    start = f"{title}\n\n```text\n"
+    section = markdown.split(start, 1)[1].split("\n```", 1)[0]
+    return section.splitlines()
+
+
 class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
     def test_prepares_secret_free_request_pack_without_authorizing_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -200,6 +206,12 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("operator_approval_receipt_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
         self.assertIn("completed operator-approval-receipt.json", markdown)
         self.assertIn("Required evidence sidecar commands:", markdown)
+        sidecar_lines = fenced_section(markdown, "Required evidence sidecar commands:")
+        self.assertEqual(sidecar_lines[0], "requires_current_turn_operator_approval_before_execution=true")
+        self.assertEqual(sidecar_lines[1], "commands_authorize_runtime_or_public_readiness=false")
+        self.assertTrue(sidecar_lines[2].startswith("scripts/check_player_principal_lifecycle_preflight.sh "))
+        self.assertTrue(sidecar_lines[3].startswith("scripts/check_player_principal_lifecycle_preflight.sh "))
+        self.assertFalse(any(line.endswith("=true") for line in sidecar_lines if "authorize" in line or "readiness" in line))
         self.assertIn(
             "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --target-map TheIsland "
             "--mode observer-window --env-file "

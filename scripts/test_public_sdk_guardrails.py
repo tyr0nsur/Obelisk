@@ -14,6 +14,9 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = REPO_ROOT / "scripts"
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 REFLECTION_TARGET_SET_VARS = runpy.run_path(str(REPO_ROOT / "scripts" / "reflection_target_sets.py"))
 TARGET_SETS = REFLECTION_TARGET_SET_VARS["TARGET_SETS"]
 PLANNING_ONLY_TARGET_SETS = REFLECTION_TARGET_SET_VARS["PLANNING_ONLY_TARGET_SETS"]
@@ -3198,9 +3201,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "reviewed non-protected complete `obelisk.core-dump-evidence-pack.v1`",
             "reviewed UFunction\n`obelisk.reflection-inventory-pack.v1`",
             "An offline\n`ShooterGameServer` binary, copied core, manual FName/GObjects roots, or direct\ncore/bin planning alone is insufficient",
-            "accepted lifecycle anchors",
+            "accepted lifecycle ordering",
             "principal privacy/invalidation semantics",
-            "independent second-source evidence",
+            "independent second-source layout evidence",
             "Promote the smallest copied `player_identity`/principal lifecycle contract",
             "Build a fail-closed permissions/admin query layer",
             "Promote the command/chat response path, then promote commands/replies as a new\n   owner-token copied callback/response surface",
@@ -4480,7 +4483,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "Transfer lane",
             "Admin/permissions lane",
             "Keep structure target sets layout-only unless a strict readiness note promotes a named copied surface",
-            "Keep transfer as offline/internal until copied payload ownership, privacy/redaction, lifecycle, second-source/static evidence, ABI tests, installed SDK consumer coverage, and approved runtime validation all pass.",
+            "Keep transfer as offline/internal and absent from runtime/public/ops surfaces until copied payload ownership, privacy/redaction, lifecycle, second-source/static evidence, ABI tests, installed SDK consumer coverage, and approved runtime validation all pass.",
             "admin, permissions, RCON, economy, storage",
         ):
             with self.subTest(term=term):
@@ -4538,7 +4541,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "ArkServerApi/AseApi and local NextGenPlugins clones\nonly as names and demand signals"),
             (texts["agent-skills/obelisk-github-research-workflow/SKILL.md"], "Obelisk must not copy ArkServerApi/AseApi,\nNextGenPlugins"),
             (texts["docs/agent-handoff/CURRENT.md"], "ArkServerApi/AseApi and local `NextGenPlugins` clones are names and demand signals only"),
-            (texts["docs/agent-handoff/CURRENT.md"], "Do not\n  copy code, offsets, layouts, vtables, ABI assumptions"),
+            (texts["docs/agent-handoff/CURRENT.md"], "do not copy code, offsets, layouts, vtables, ABI assumptions"),
         ):
             with self.subTest(required=required):
                 self.assertIn(required, text)
@@ -9662,13 +9665,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     self.assertIn(normalized(term), text)
 
         for term in (
-            "standalone lifecycle and principal manifests are consume-only planning inputs",
-            "they must be source-bound before\n  the aggregate route can move past `lifecycle_anchor_first_evidence_provenance_unbound`",
+            "Repo-local lifecycle-anchor and principal-invalidation manifests are\n  consume-only planning inputs and source-bound",
+            "default route consumes those repo-local fallbacks\n  and reports `approved_runtime_evidence_missing`",
+            "remaining blocker is approved runtime\n  principal lifecycle evidence",
             "complete `obelisk.core-dump-evidence-pack.v1`",
             "accepted `obelisk.reflection-inventory-pack.v1`",
             "12/12 candidate fixtures",
             "accepted distinct second-source layout\n  evidence from the vanilla-gdb core",
-            "Do not rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
+            "Do not rerun completed admin snapshot, second-source\n  layout, or lifecycle layout routes",
         ):
             with self.subTest(doc="handoff", term=term):
                 self.assertIn(normalized(term), docs["handoff"])
@@ -9718,10 +9722,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertIn(normalized(term), compact)
 
         for term in (
-            "consume-only lifecycle-anchor and principal-invalidation manifests",
-            "they must be source-bound before\n  the aggregate route can move past `lifecycle_anchor_first_evidence_provenance_unbound`",
-            "After explicit bound artifacts are supplied and accepted, the\n  next blocker is approved runtime principal lifecycle evidence",
-            "Do not\n  rerun the completed admin snapshot, second-source layout, or lifecycle layout routes",
+            "Repo-local lifecycle-anchor and principal-invalidation manifests are\n  consume-only planning inputs and source-bound",
+            "default route consumes those repo-local fallbacks\n  and reports `approved_runtime_evidence_missing`",
+            "remaining blocker is approved runtime\n  principal lifecycle evidence",
+            "Do not rerun completed admin snapshot, second-source\n  layout, or lifecycle layout routes",
             "Current recipe:\n  `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`",
         ):
             with self.subTest(doc="handoff", term=term):
@@ -9941,10 +9945,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for term in (
             "While identity waits on approved copied runtime principal lifecycle evidence",
-            "inventory copied signals are the higher-value side lane",
-            "structure census remains useful offline planning/consume-only work",
-            "Neither side lane displaces\nidentity -> permissions/admin -> commands/replies",
-            "Prefer inventory copied-signal hygiene over structure\ncensus when choosing one side lane",
+            "Inventory copied signals remain the preferred side lane while P0 waits",
+            "identity/principal -> permissions/admin -> command response -> commands/replies",
             "treat inventory/item copied signals as\nthe higher-value side lane than structure census",
             "Keep that work experimental and non-completion",
         ):

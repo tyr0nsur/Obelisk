@@ -641,7 +641,7 @@
       },
       "blockers": [
         "Candidate fixtures, reflection-inventory coverage, and distinct second-source layout evidence are consume-only and do not promote public identity.",
-        "Prepared request packs, preflight readiness, window manifests, observer env files, and operator approval receipts are freshness-bound operational preparation only; even with prepared_at_utc they do not satisfy approved runtime principal lifecycle evidence, public identity promotion, runtime readiness, or v1 SDK completion.",
+        "Prepared request packs, preflight readiness, window manifests, observer env files, and operator approval receipts are freshness-bound operational preparation only; even with prepared_at_utc they do not satisfy approved runtime principal lifecycle evidence, public identity promotion, public ABI/SDK readiness, runtime readiness, or v1 SDK completion.",
         "No approved runtime principal lifecycle evidence.",
         "No accepted login/logout lifecycle ordering or principal invalidation semantics.",
         "No principal privacy, invalidation, or cross-instance scope contract.",

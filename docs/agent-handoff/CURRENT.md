@@ -209,12 +209,11 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest supervised rounds used four read-only subagents plus lead integration. Integrated
-  offline window-manifest hardening, runtime/ABI retry-stable copied-event
-  `DestroyUserData` cleanup, and route-gate blocker summary fields (`route_blocked`,
-  `current_route_blocker`, `remaining_route_blockers`, `route_lock_invariant_valid`). SDK/P0 accounting still has no drift; Mission copied-bool
-  remains internal/non-public. Pending delegated live-ops follow-up: add explicit false
-  runtime/server authorization flags to preflight/request sidecars and reject positive
-  claims in consumed preflight JSON. Default route/SDK remain fail-closed at
-  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+- Latest supervised rounds integrated route-gate blocker summary fields, retry-stable
+  copied-event `DestroyUserData` cleanup, and live-ops sidecar non-authorization
+  hardening. Preflight/request sidecars now carry explicit false runtime/server/public
+  readiness flags; window-manifest consume checks reject positive preflight claims; SDK
+  accounting denies request packs, preflight/window sidecars, and operator receipts as
+  promotion evidence. Mission copied-bool remains internal/non-public. Default route/SDK
+  remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`. No runtime/server op.

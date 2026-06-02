@@ -70,6 +70,7 @@ FORBIDDEN_VALUE_RE = re.compile(
 )
 POSITIVE_CAPABILITY_VALUE_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
+    r"public[_ -]?headers?[_ -]?(?:allowed|ready|enabled|supported)|"
     r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
     r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
     r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
@@ -80,7 +81,7 @@ POSITIVE_CAPABILITY_VALUE_RE = re.compile(
 )
 FORBIDDEN_RECEIPT_AUTHORIZATION_CLAIM_RE = re.compile(
     r"(?:\b(?:server[_ -]?operations?|runtime(?:[_ -]?(?:work|capture|window|sdk))?|"
-    r"public[_ -]?sdk|v1(?:[_ -]?sdk)?(?:[_ -]?completion)?|player[_ -]?identity|"
+    r"public[_ -]?(?:sdk|headers?)|v1(?:[_ -]?sdk)?(?:[_ -]?completion)?|player[_ -]?identity|"
     r"promotion|sdk|lookup|permissions?|admin|commands?)\b.{0,80}"
     r"\b(?:authorized|authorizes|approved|allowed|enabled|supported|promoted|promotion|"
     r"ready|readiness|complete|completed|completion|delivered)\b|"
@@ -169,6 +170,38 @@ EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS = frozenset(
         "v1_completion_ready",
         "secrets_included",
         "player_private_data_included",
+    )
+)
+PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
+    (
+        "runtime_work_authorized",
+        "server_operations_authorized",
+        "runtime_ready",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "promotion_ready",
+        "public_header_allowed",
+        "v1_completion_ready",
+        "server_operations_authorized_by_template",
+        "runtime_work_authorized_by_template",
+        "generated_template_authorizes_runtime",
+        "request_pack_acceptance_authorizes_runtime",
+    )
+)
+PREFLIGHT_POSITIVE_TEXT_VALUES = frozenset(
+    (
+        "1",
+        "allowed",
+        "approved",
+        "authorized",
+        "complete",
+        "completed",
+        "enabled",
+        "promoted",
+        "ready",
+        "supported",
+        "true",
+        "yes",
     )
 )
 
@@ -647,6 +680,59 @@ def receipt_string_has_forbidden_authorization_claim(value: str) -> bool:
     return False
 
 
+def iter_json_object_entries(value: Any, path: str = "") -> list[tuple[str, str, Any]]:
+    if isinstance(value, dict):
+        entries: list[tuple[str, str, Any]] = []
+        for key, child in value.items():
+            key_text = str(key)
+            child_path = f"{path}.{key_text}" if path else key_text
+            entries.append((child_path, key_text, child))
+            entries.extend(iter_json_object_entries(child, child_path))
+        return entries
+    if isinstance(value, list):
+        entries = []
+        for index, child in enumerate(value):
+            entries.extend(iter_json_object_entries(child, f"{path}[{index}]"))
+        return entries
+    return []
+
+
+def preflight_flag_value_is_positive(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in PREFLIGHT_POSITIVE_TEXT_VALUES
+    return False
+
+
+def validate_preflight_non_authorization_claims(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    path_key: str,
+) -> None:
+    for key_path, key, value in iter_json_object_entries(payload):
+        if key in PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS and preflight_flag_value_is_positive(value):
+            add(
+                blockers,
+                f"{path_key}_{key}_not_false",
+                path_key,
+                key_path=key_path,
+                actual=value,
+            )
+    for string_path, value in receipt_string_values(payload):
+        if (
+            receipt_string_has_forbidden_authorization_claim(value)
+            or POSITIVE_CAPABILITY_VALUE_RE.search(value) is not None
+        ):
+            add(
+                blockers,
+                f"{path_key}_forbidden_authorization_claim",
+                path_key,
+                key_path=string_path,
+            )
+
+
 def validate_operator_approval_receipt_shape(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     add_unexpected_receipt_keys(
         blockers,
@@ -1087,6 +1173,8 @@ def validate_preflight_content(
     if not isinstance(payload, dict):
         add(blockers, f"{path_key}_not_object", path_key)
         return
+
+    validate_preflight_non_authorization_claims(payload, blockers, path_key=path_key)
 
     if payload.get("schema") != PREFLIGHT_SCHEMA:
         add(blockers, f"{path_key}_schema_mismatch", path_key, expected=PREFLIGHT_SCHEMA, actual=payload.get("schema"))
