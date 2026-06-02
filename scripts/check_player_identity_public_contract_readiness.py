@@ -506,7 +506,9 @@ FORBIDDEN_CANDIDATE_FIELD_PATTERNS = {
 }
 PUBLIC_CLAIM_KEYS = ("public_header_allowed", "promotion_ready", "public_sdk_ready", "runtime_ready")
 PUBLIC_HEADER_IDENTITY_IDENTIFIER_RE = re.compile(
-    r"identity|principal|steam_?id|steamid|player_?(?:id|handle|data_?id)|platform.*id|account.*id",
+    r"identity|principal|steam_?id|steamid|"
+    r"player_?(?:id|handle|data_?id|session|lifecycle|login|logout|connect|disconnect|join|leave|event|callback)|"
+    r"register_?player|obelisk_api_capability_player|platform.*id|account.*id",
     re.IGNORECASE,
 )
 PUBLIC_HEADER_IDENTITY_IDENTIFIER_ALLOWLIST = {

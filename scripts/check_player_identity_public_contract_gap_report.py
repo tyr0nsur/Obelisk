@@ -48,6 +48,22 @@ DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT = Path(
 )
 APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT = "runtime.lifecycle_evidence"
 APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER = "identity_public_contract_gate_missing"
+FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS = (
+    "request_pack",
+    "request-pack",
+    "preflight",
+    "window_manifest",
+    "window-manifest",
+    "operator_receipt",
+    "operator-receipt",
+    "operator_approval_receipt",
+    "operator-approval-receipt",
+    "sidecar",
+    "observer_env",
+    "observer-env",
+    "live_ops",
+    "live-ops",
+)
 REQUIRED_APPROVED_RUNTIME_EVIDENCE_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
 REQUIRED_APPROVED_RUNTIME_EVIDENCE_CHECKER = "scripts/check_player_identity_public_contract_readiness.py"
 REQUIRED_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM = (
@@ -253,7 +269,9 @@ HEADER_ALLOWLIST = {
     "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
 }
 HEADER_SYMBOL_RE = re.compile(
-    r"identity|principal|steam_?id|steamid|eos|unique_?net_?id|player_?data_?id",
+    r"identity|principal|steam_?id|steamid|eos|unique_?net_?id|"
+    r"player_?(?:data_?id|session|lifecycle|login|logout|connect|disconnect|join|leave|event|callback)|"
+    r"register_?player|obelisk_api_capability_player",
     re.IGNORECASE,
 )
 IDENTIFIER_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
@@ -1254,8 +1272,50 @@ def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[st
             value=report.get("runtime_evidence_ready"),
         )
         accepted = False
+    resolved_inputs = report.get("resolved_inputs")
+    if resolved_inputs is not None:
+        if not isinstance(resolved_inputs, list) or not all(isinstance(item, str) for item in resolved_inputs):
+            add(
+                blockers,
+                "approved_runtime_evidence_resolved_inputs_not_string_list",
+                "--approved-runtime-evidence.resolved_inputs",
+                value=resolved_inputs,
+            )
+            accepted = False
+        else:
+            forbidden_inputs = sorted(
+                item
+                for item in resolved_inputs
+                if any(token in item.lower() for token in FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS)
+            )
+            if forbidden_inputs:
+                add(
+                    blockers,
+                    "approved_runtime_evidence_non_promotional_inputs_claimed",
+                    "--approved-runtime-evidence.resolved_inputs",
+                    forbidden=forbidden_inputs,
+                )
+                accepted = False
+            unexpected_inputs = sorted(set(resolved_inputs) - {APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT})
+            if unexpected_inputs:
+                add(
+                    blockers,
+                    "approved_runtime_evidence_resolved_inputs_unexpected",
+                    "--approved-runtime-evidence.resolved_inputs",
+                    unexpected=unexpected_inputs,
+                )
+                accepted = False
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if report.get(key) is not False:
+            add(
+                blockers,
+                "approved_runtime_evidence_readiness_flag_not_false",
+                f"--approved-runtime-evidence.{key}",
+                value=report.get(key),
+            )
+            accepted = False
+    for key in ("public_abi_ready", "v1_completion_ready", "v1_completion_evidence"):
+        if key in report and report.get(key) is not False:
             add(
                 blockers,
                 "approved_runtime_evidence_readiness_flag_not_false",

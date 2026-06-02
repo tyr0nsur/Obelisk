@@ -97,7 +97,9 @@ REQUIRED_NON_CLAIMS = {
     "does not promote permissions/admin, command response, commands/replies, lookup, persistence, mutation, return override, or send-chat identity",
 }
 PUBLIC_HEADER_TOKEN_RE = re.compile(
-    r"identity|principal|steam_?id|steamid|eos|unique_?net|player_?(?:handle|data|id)",
+    r"identity|principal|steam_?id|steamid|eos|unique_?net|"
+    r"player_?(?:handle|data|id|session|lifecycle|login|logout|connect|disconnect|join|leave|event|callback)|"
+    r"register_?player|obelisk_api_capability_player",
     re.IGNORECASE,
 )
 IDENTIFIER_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")

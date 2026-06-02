@@ -301,8 +301,11 @@ BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
 PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
     BUNDLE_BUILDER_INPUTS_READY_SCOPE,
     "operator_approval_receipt_only",
+    "operator_receipt_only",
     "preflight_only",
     "request_pack_only",
+    "live_ops_sidecar_only",
+    "live_validation_sidecar_only",
     "window_manifest_only",
 }
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {

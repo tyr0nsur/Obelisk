@@ -5203,11 +5203,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "ready_scope": "operator_receipt_only",
+            },
+            {
+                **base_evidence,
                 "ready_scope": "preflight_only",
             },
             {
                 **base_evidence,
                 "ready_scope": "window_manifest_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "live_validation_sidecar_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "live_ops_sidecar_only",
             },
             {
                 **base_evidence,

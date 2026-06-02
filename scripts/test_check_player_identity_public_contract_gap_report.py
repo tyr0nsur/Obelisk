@@ -12,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -378,6 +379,80 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("runtime.lifecycle_evidence", report["remaining_contract_gate_inputs"])
         self.assertNotIn("runtime.lifecycle_evidence", report["contract_review_inputs_resolved"])
         self.assertFalse(report["approved_runtime_evidence"]["accepted_for_contract_review"])
+
+    def test_approved_runtime_evidence_rejects_non_promotional_resolved_inputs(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def overclaim_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "next_blocker": "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "resolved_inputs": [
+                    "runtime.lifecycle_evidence",
+                    "operator_approval_receipt",
+                    "preflight_readiness",
+                    "live_ops_sidecar",
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            runtime_path = Path(tempdir) / "approved-runtime-evidence.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.object(checker.approved_runtime_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_runtime_evidence, "build_report", side_effect=overclaim_report),
+            ):
+                runtime_report = checker.validate_approved_runtime_evidence(runtime_path, blockers)
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("approved_runtime_evidence_non_promotional_inputs_claimed", reasons)
+        self.assertIn("approved_runtime_evidence_resolved_inputs_unexpected", reasons)
+        self.assertFalse(runtime_report["accepted_for_contract_review"])
+
+    def test_approved_runtime_evidence_rejects_v1_completion_overclaim(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def overclaim_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "next_blocker": "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "public_abi_ready": False,
+                "v1_completion_ready": True,
+                "v1_completion_evidence": False,
+                "resolved_inputs": ["runtime.lifecycle_evidence"],
+            }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            runtime_path = Path(tempdir) / "approved-runtime-evidence.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.object(checker.approved_runtime_evidence, "validate_manifest", side_effect=accepted_validation),
+                mock.patch.object(checker.approved_runtime_evidence, "build_report", side_effect=overclaim_report),
+            ):
+                runtime_report = checker.validate_approved_runtime_evidence(runtime_path, blockers)
+
+        self.assertIn("approved_runtime_evidence_readiness_flag_not_false", [blocker["reason"] for blocker in blockers])
+        self.assertFalse(runtime_report["accepted_for_contract_review"])
 
     def test_rejects_missing_owner_token_sdk_consumer_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -788,8 +863,17 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "// ObeliskPlayerPrincipalEvent in a comment is ignored.",
                 "static const char* ignored = \"RegisterPlayerIdentity\";",
                 "#define OBELISK_API_CAPABILITY_PLAYER_IDENTITY (1ull << 12)",
+                "#define OBELISK_API_CAPABILITY_PLAYER_SESSION (1ull << 13)",
                 "typedef struct ObeliskPlayerPrincipalEvent { uint64_t principal_handle; } ObeliskPlayerPrincipalEvent;",
                 "typedef uint64_t ObeliskPlayerIdentityHandle;",
+                "typedef struct ObeliskPlayerSession { uint64_t x; } ObeliskPlayerSession;",
+                "typedef void (*ObeliskPlayerCallback)(void* userData);",
+                "uint64_t (*RegisterPlayerLifecycleWithOwnerToken)(uint64_t ownerToken);",
+                "uint64_t (*RegisterPlayerLogoutWithOwnerToken)(uint64_t ownerToken);",
+                "typedef struct ObeliskPlayerConnectEvent { uint64_t x; } ObeliskPlayerConnectEvent;",
+                "typedef struct ObeliskPlayerDisconnectEvent { uint64_t x; } ObeliskPlayerDisconnectEvent;",
+                "typedef struct ObeliskPlayerJoinEvent { uint64_t x; } ObeliskPlayerJoinEvent;",
+                "typedef struct ObeliskPlayerLeaveEvent { uint64_t x; } ObeliskPlayerLeaveEvent;",
             ]
         )
 
@@ -804,6 +888,15 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("ObeliskPlayerPrincipalEvent", detected)
         self.assertIn("principal_handle", detected)
         self.assertIn("ObeliskPlayerIdentityHandle", detected)
+        self.assertIn("OBELISK_API_CAPABILITY_PLAYER_SESSION", detected)
+        self.assertIn("ObeliskPlayerSession", detected)
+        self.assertIn("ObeliskPlayerCallback", detected)
+        self.assertIn("RegisterPlayerLifecycleWithOwnerToken", detected)
+        self.assertIn("RegisterPlayerLogoutWithOwnerToken", detected)
+        self.assertIn("ObeliskPlayerConnectEvent", detected)
+        self.assertIn("ObeliskPlayerDisconnectEvent", detected)
+        self.assertIn("ObeliskPlayerJoinEvent", detected)
+        self.assertIn("ObeliskPlayerLeaveEvent", detected)
         self.assertNotIn("OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY", detected)
 
     def test_rejects_forbidden_positive_identity_exposure_in_private_candidate(self) -> None:

@@ -2372,6 +2372,57 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## Player Identity Header Alias And Gap-Report Guardrails
+
+A supervised four-agent offline round audited player-identity public-header scanning,
+`check_player_identity_public_contract_gap_report.py`, SDK completion accounting, and a
+bounded header-scanner worker patch. No runtime/server operation or protected workspace
+write was authorized.
+
+Integrated hardening:
+
+- `check_player_identity_public_contract_readiness.py`,
+  `check_player_identity_public_contract_gap_report.py`, and
+  `check_player_identity_public_abi_preflight_candidate.py` now reject alternate public
+  player identity names while `obelisk.player_identity.v1` is blocked. The guarded alias
+  set includes player session, lifecycle, login, logout, connect, disconnect, join, leave,
+  event, callback, `RegisterPlayer*`, and `OBELISK_API_CAPABILITY_PLAYER*` forms in
+  addition to identity/principal/id/handle names.
+- `check_player_identity_public_contract_gap_report.py` now mirrors readiness behavior
+  for approved-runtime reports: `resolved_inputs` must be a string list containing only
+  `runtime.lifecycle_evidence`; request/preflight/window/operator/sidecar/observer/live-op
+  inputs fail closed. It also rejects secondary overclaims for `public_abi_ready`,
+  `v1_completion_ready`, and `v1_completion_evidence`.
+- `check_public_sdk_v1_completion.py` now treats `operator_receipt_only`,
+  `live_validation_sidecar_only`, and `live_ops_sidecar_only` ready scopes as
+  non-promotional evidence aliases.
+
+Validated offline:
+
+- Focused player-identity header/gap tests passed for the three affected checkers.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_public_abi_preflight_candidate.py --json`
+  reported no detected player-identity tokens in the real public header.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_public_contract_gap_report.py --json`
+  reported no detected player-identity tokens in the real public header and stayed at
+  `current_blocker=approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `current_route_blocker=approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, and P0 `0/4`.
+
+Deferred SDK accounting findings:
+
+- Secondary readiness reports for inventory, mission, structure census, and structure
+  build-policy should get a shared recursive overclaim scanner for public ABI, v1
+  completion, stable-claim, SDK, promotion, and runtime readiness aliases.
+- Mission/Transfer/Dino/Tribe per-leaf promotion evidence should reject non-promotional
+  schemas and invalid paths with the same strict evidence barriers used by top-level
+  promotion evidence.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
 ## P0 Certificate And Sidecar Non-Evidence Hardening
 
 A supervised four-agent offline round audited player-identity public-contract intake,

@@ -180,11 +180,37 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
         self.assertIn("required_owner_token_lifecycle_missing_required", report["blockers"])
 
     def test_rejects_public_header_identity_symbol(self) -> None:
-        result = self.run_checker(public_header_text="typedef struct ObeliskPlayerPrincipalEvent { int x; } ObeliskPlayerPrincipalEvent;\n")
+        result = self.run_checker(
+            public_header_text="\n".join(
+                [
+                    "typedef struct ObeliskPlayerPrincipalEvent { int x; } ObeliskPlayerPrincipalEvent;",
+                    "#define OBELISK_API_CAPABILITY_PLAYER_SESSION (1ull << 13)",
+                    "typedef struct ObeliskPlayerSession { uint64_t x; } ObeliskPlayerSession;",
+                    "typedef void (*ObeliskPlayerLifecycleCallback)(void* userData);",
+                    "uint64_t (*RegisterPlayerLoginWithOwnerToken)(uint64_t ownerToken);",
+                    "uint64_t (*RegisterPlayerLogoutWithOwnerToken)(uint64_t ownerToken);",
+                    "typedef struct ObeliskPlayerConnectEvent { uint64_t x; } ObeliskPlayerConnectEvent;",
+                    "typedef struct ObeliskPlayerDisconnectEvent { uint64_t x; } ObeliskPlayerDisconnectEvent;",
+                    "typedef struct ObeliskPlayerJoinEvent { uint64_t x; } ObeliskPlayerJoinEvent;",
+                    "typedef struct ObeliskPlayerLeaveEvent { uint64_t x; } ObeliskPlayerLeaveEvent;",
+                ]
+            )
+        )
         report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("public_header_identity_or_principal_symbols_detected", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "public_header_identity_or_principal_symbols_detected")
+        detected = {item["token"] for item in detail["detected"]}
+        self.assertIn("OBELISK_API_CAPABILITY_PLAYER_SESSION", detected)
+        self.assertIn("ObeliskPlayerSession", detected)
+        self.assertIn("ObeliskPlayerLifecycleCallback", detected)
+        self.assertIn("RegisterPlayerLoginWithOwnerToken", detected)
+        self.assertIn("RegisterPlayerLogoutWithOwnerToken", detected)
+        self.assertIn("ObeliskPlayerConnectEvent", detected)
+        self.assertIn("ObeliskPlayerDisconnectEvent", detected)
+        self.assertIn("ObeliskPlayerJoinEvent", detected)
+        self.assertIn("ObeliskPlayerLeaveEvent", detected)
 
     def test_rejects_private_layout_summary_drift(self) -> None:
         payload = self.manifest()

@@ -551,6 +551,15 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                         "typedef uint64_t ObeliskPlayerId;",
                         "typedef uint64_t ObeliskPlayerHandle;",
                         "uint64_t (*RegisterPlayerIdentityEventWithOwnerTokenHandle)(uint64_t ownerToken);",
+                        "#define OBELISK_API_CAPABILITY_PLAYER_SESSION (1ull << 13)",
+                        "typedef struct ObeliskPlayerSession { uint64_t x; } ObeliskPlayerSession;",
+                        "typedef void (*ObeliskPlayerLifecycleCallback)(void* userData);",
+                        "uint64_t (*RegisterPlayerLoginWithOwnerToken)(uint64_t ownerToken);",
+                        "uint64_t (*RegisterPlayerLogoutWithOwnerToken)(uint64_t ownerToken);",
+                        "typedef struct ObeliskPlayerConnectEvent { uint64_t x; } ObeliskPlayerConnectEvent;",
+                        "typedef struct ObeliskPlayerDisconnectEvent { uint64_t x; } ObeliskPlayerDisconnectEvent;",
+                        "typedef struct ObeliskPlayerJoinEvent { uint64_t x; } ObeliskPlayerJoinEvent;",
+                        "typedef struct ObeliskPlayerLeaveEvent { uint64_t x; } ObeliskPlayerLeaveEvent;",
                     ]
                 ),
                 encoding="utf-8",
@@ -579,6 +588,15 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("ObeliskPlayerId", detected)
         self.assertIn("ObeliskPlayerHandle", detected)
         self.assertIn("RegisterPlayerIdentityEventWithOwnerTokenHandle", detected)
+        self.assertIn("OBELISK_API_CAPABILITY_PLAYER_SESSION", detected)
+        self.assertIn("ObeliskPlayerSession", detected)
+        self.assertIn("ObeliskPlayerLifecycleCallback", detected)
+        self.assertIn("RegisterPlayerLoginWithOwnerToken", detected)
+        self.assertIn("RegisterPlayerLogoutWithOwnerToken", detected)
+        self.assertIn("ObeliskPlayerConnectEvent", detected)
+        self.assertIn("ObeliskPlayerDisconnectEvent", detected)
+        self.assertIn("ObeliskPlayerJoinEvent", detected)
+        self.assertIn("ObeliskPlayerLeaveEvent", detected)
 
     def test_public_header_scan_ignores_comments_strings_and_existing_no_identity_flag(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
