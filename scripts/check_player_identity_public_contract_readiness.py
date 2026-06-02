@@ -55,7 +55,8 @@ REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM = (
     "POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote "
     "player identity, or count toward v1 completion."
 )
-NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
+DECISION_GATE_ID = "identity_public_contract_gate"
+NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
 REQUIRED_DECISION_GATE_CURRENT_DECISION = (
     "no public header, no public capability bit, no plugin callback, no lookup, "
     "no downstream permission or command dependency may consume identity yet"
@@ -161,7 +162,7 @@ REQUIRED_PRIVATE_CANDIDATE_NON_CLAIMS = {
 REQUIRED_TEST_COVERAGE_BY_ID = {
     "manifest.guardrails": {
         "decision gate remains blocked/planning until every blocker is resolved",
-        "public_header_allowed remains false while unresolved blockers exist",
+        "public_contract_allowed and public_header_allowed remain false while unresolved blockers exist",
         "public_header_symbols_now remains empty",
         "approved runtime evidence is documented as necessary but insufficient",
         "non-claims forbid lookup, permissions/admin, command/chat response, persistence, mutation, and return override",
@@ -775,6 +776,7 @@ def principal_invalidation_policy_report(path: Path | None, blockers: list[dict[
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "public_contract_allowed": False,
         "public_header_allowed": False,
         "principal_invalidation_ready": False,
         "blockers": report.get("blockers", []),
@@ -937,6 +939,7 @@ def public_abi_preflight_candidate_report(
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "public_contract_allowed": False,
         "public_header_allowed": False,
         "public_abi_ready": False,
         "v1_completion_evidence": False,
@@ -1527,7 +1530,7 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
     if not isinstance(decision_gate, dict):
         add(blockers, "decision_gate_missing", "$.decision_gate")
     else:
-        if decision_gate.get("id") != NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE:
+        if decision_gate.get("id") != DECISION_GATE_ID:
             add(blockers, "decision_gate_id_mismatch", "$.decision_gate.id")
         if decision_gate.get("status") != "blocked/planning":
             add(blockers, "decision_gate_status_mismatch", "$.decision_gate.status")
@@ -1825,6 +1828,7 @@ def build_report(
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
+        "public_contract_allowed": False,
         "public_header_allowed": False,
         "public_header_symbols_now": decisions.get("public_header_symbols_now"),
         "public_capability_bits_now": decisions.get("public_capability_bits_now"),

@@ -1035,9 +1035,19 @@ def run_command_permission_route_gate(
     source_checker_ready = critical_path_phase.get("source_checker_ready")
     source_checker_internal_planning = critical_path_phase.get("source_checker_accepted_for_internal_planning")
     route_blockers = payload.get("blockers", [])
-    if current_blocker != "approved_runtime_evidence_missing":
+    expected_lock_by_blocker = {
+        "approved_runtime_evidence_missing": [
+            "approved_runtime_principal_lifecycle_evidence",
+            "reviewed_identity_public_contract",
+        ],
+        "identity_public_contract_gate_missing": [
+            "reviewed_identity_public_contract",
+        ],
+    }
+    expected_route_lock = expected_lock_by_blocker.get(current_blocker)
+    if current_blocker not in expected_lock_by_blocker:
         blockers.append("command_permission_route_gate_default_blocker_mismatch")
-    if source_checker_primary_blocker != "approved_runtime_evidence_missing":
+    if source_checker_primary_blocker != current_blocker or source_checker_primary_blocker not in expected_lock_by_blocker:
         blockers.append("command_permission_route_gate_default_source_blocker_mismatch")
     if source_checker_next_blocker is not None:
         blockers.append("command_permission_route_gate_default_source_next_blocker_unexpected")
@@ -1051,10 +1061,7 @@ def run_command_permission_route_gate(
         blockers.append("command_permission_route_gate_blockers_not_empty")
     if route_lock.get("locked") is not True:
         blockers.append("command_permission_route_gate_lock_unexpected")
-    if route_lock.get("blocked_until") != [
-        "approved_runtime_principal_lifecycle_evidence",
-        "reviewed_identity_public_contract",
-    ]:
+    if route_lock.get("blocked_until") != expected_route_lock:
         blockers.append("command_permission_route_gate_default_lock_blocked_until_unexpected")
     if public_or_runtime_claims:
         blockers.append("command_permission_route_gate_public_or_runtime_claims")

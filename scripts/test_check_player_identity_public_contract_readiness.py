@@ -116,6 +116,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_contract_allowed"])
         self.assertFalse(report["public_header_allowed"])
         self.assertEqual(report["public_header_symbols_now"], [])
         self.assertEqual(report["public_capability_bits_now"], [])
@@ -130,7 +131,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("sdk.consumer", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertNotIn("identity.fail_closed", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
-        self.assertEqual(report["next_blocker"], "identity_public_contract_gate")
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertNotEqual(report["next_blocker"], "public_readiness")
         self.assertEqual(report["blockers"], [])
         self.assertFalse(report["identifier_redaction_evidence"]["provided"])
@@ -304,7 +305,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "runtime_ready": False,
                     "public_header_allowed": False,
                     "remaining_blockers": [],
-                    "next_blocker": "identity_public_contract_gate",
+                    "next_blocker": "identity_public_contract_gate_missing",
                 },
             ):
                 report = checker.identifier_redaction_report(path, blockers)

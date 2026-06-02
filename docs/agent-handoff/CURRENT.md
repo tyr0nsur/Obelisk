@@ -196,9 +196,9 @@ This file is an active routing table only. Durable evidence belongs in
   the current turn.
 - Sub-agents are not alone in the codebase: do not revert unrelated changes; leave edits
   unstaged/uncommitted and report touched paths, validations, and risks.
-- Lead handles delegation directly when the user asks for agents. Keep the scoped
-  delegation fact in handoff/research notes before finishing so compaction does not erase
-  which work was delegated and which findings remain pending.
+- Lead handles delegation directly when the user asks for agents. Before finishing,
+  record delegated scopes, required/used skills, integrated findings, and pending
+  findings in handoff/research notes so compaction does not erase them.
 - Earlier identity route/evidence-hardening rounds made route validation accept
   `identity_public_contract_gate_missing` only as locked planning after approved runtime
   evidence, and route locks now dedupe
@@ -207,11 +207,11 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Recent delegated rounds closed command-response/report-root provenance, mission-leaf
-  accounting, permissions/admin certificate dependency, default identity source provenance,
-  request hygiene, Transfer `bAccept` test-only runtime-symbol absence, replay-doc
-  `--post-window-replay` wording, and Structure `excluded` scoped-v1 accounting.
-  Latest request-window hardening keeps completed `operator-approval-receipt.json`
-  usable only with post-window replay. Default route/SDK remain fail-closed:
-  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`. No runtime/server op.
+- Latest delegated round used `obelisk-agent-handoff`,
+  `obelisk-github-research-workflow`, `obelisk-live-ops`, and
+  `obelisk-continuous-learning`: public-contract readiness now reports
+  `public_contract_allowed=false` and post-evidence blocker
+  `identity_public_contract_gate_missing`; SDK completion accepts that locked state as
+  non-counting; approved-evidence tests cover receipt payload/sidecar/log/request drift.
+  Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`, SDK `0/12`,
+  P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.

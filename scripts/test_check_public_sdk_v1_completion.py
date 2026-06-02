@@ -303,7 +303,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "public_sdk_ready": False,
                     "runtime_ready": False,
                     "public_header_allowed": False,
-                    "next_blocker": "identity_public_contract_gate",
+                    "next_blocker": "identity_public_contract_gate_missing",
                     "blockers": [],
                     "resolved_inputs": ["runtime.lifecycle_evidence"],
                     "remaining_blockers": [
@@ -752,6 +752,50 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("command_permission_route_gate_invalid", payload["blockers"])
         self.assertNotIn("command_permission_route_gate_blockers_not_empty", payload["blockers"])
         self.assertTrue(payload["command_permission_route_gate"]["valid"])
+
+    def test_completion_gate_identity_public_contract_blocker_remains_non_counting(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                critical_path_phase={
+                    "current_blocker": "identity_public_contract_gate_missing",
+                    "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+                    "source_checker_next_blocker": None,
+                    "source_checker_status": "blocked",
+                    "source_checker_ready": False,
+                    "source_checker_accepted_for_internal_planning": False,
+                },
+                route_lock={
+                    "locked": True,
+                    "blocked_until": ["reviewed_identity_public_contract"],
+                },
+            )
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        route_gate = payload["command_permission_route_gate"]
+        progress = payload["v1_sdk_progress"]
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(route_gate["completion_gate_accepted"])
+        self.assertEqual(route_gate["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(route_gate["source_checker_primary_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(route_gate["route_lock_blocked_until"], ["reviewed_identity_public_contract"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertFalse(payload["stable_release_contract_claim_allowed"])
+        self.assertEqual(progress["completion_blockers_promoted_count"], 0)
+        self.assertEqual(progress["p0_chain_promoted_count"], 0)
+        self.assertEqual(progress["complete_sdk_claim_progress_percent"], 0)
+        for row in payload["v1_sdk_blocker_outcomes"]:
+            if row["surface"] in payload["v1_required_dependency_chain"]:
+                self.assertFalse(row["route_gate_claim_satisfied"], row)
+                self.assertTrue(row["unresolved_for_complete_sdk_claim"], row)
 
     def test_completion_gate_binds_executed_test_artifacts_to_selected_manifest_and_header(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))

@@ -858,6 +858,22 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_rejects_operator_receipt_payload_edit_without_manifest_sha_refresh(self) -> None:
+        payload = manifest()
+        receipt_artifact = payload["operational_window"]["operator_approval_receipt"]
+        receipt_path = Path(receipt_artifact["path"])
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["operator_reference"] = "edited-after-manifest"
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_artifact_sha256_mismatch", report["blockers"])
+        self.assertIn("operational_window_manifest_check_failed", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_rejects_operator_receipt_binding_and_non_authorization_drift_after_sha_refresh(self) -> None:
         cases = (
             (
@@ -866,9 +882,26 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 "operational_window_operator_approval_receipt_window_request_json_artifact_mismatch",
             ),
             (
+                "operator_request_sidecar_artifact",
+                lambda receipt: receipt["bound_artifacts"]["operator_approval_request_md"].update({"sha256": "0" * 64}),
+                "operational_window_operator_approval_receipt_operator_approval_request_md_artifact_mismatch",
+            ),
+            (
                 "manifest_path",
                 lambda receipt: receipt["bound_request_pack"].update({"window_manifest_path": "/tmp/window-manifest.env"}),
                 "operational_window_operator_approval_receipt_bound_request_window_manifest_path_mismatch",
+            ),
+            (
+                "copied_log_path",
+                lambda receipt: receipt["bound_request_pack"].update({"copied_log_path": "/tmp/Obelisk.log"}),
+                "operational_window_operator_approval_receipt_bound_request_copied_log_path_mismatch",
+            ),
+            (
+                "request_artifact_path",
+                lambda receipt: receipt["bound_artifacts"]["window_request_json"].update(
+                    {"path": receipt["bound_artifacts"]["observer_window_env"]["path"]}
+                ),
+                "operational_window_operator_approval_receipt_window_request_json_artifact_mismatch",
             ),
             (
                 "non_authorization_flag",

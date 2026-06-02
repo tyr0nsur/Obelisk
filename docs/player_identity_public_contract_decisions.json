@@ -271,7 +271,7 @@
       "status": "missing",
       "required_coverage": [
         "decision gate remains blocked/planning until every blocker is resolved",
-        "public_header_allowed remains false while unresolved blockers exist",
+        "public_contract_allowed and public_header_allowed remain false while unresolved blockers exist",
         "public_header_symbols_now remains empty",
         "approved runtime evidence is documented as necessary but insufficient",
         "non-claims forbid lookup, permissions/admin, command/chat response, persistence, mutation, and return override"

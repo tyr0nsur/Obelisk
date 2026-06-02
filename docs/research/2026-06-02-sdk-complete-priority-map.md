@@ -4,9 +4,9 @@ Date: 2026-06-02
 
 ## Scope
 
-Concise routing facts for future compactations. This note records priority and completion
-posture only; it is not runtime approval, release approval, Plugin Hub scope, or a public
-SDK readiness claim.
+Accumulated routing and blocker ledger for future compactations. This note records
+priority and completion posture only; it is not runtime approval, release approval,
+Plugin Hub scope, or a public SDK readiness claim.
 
 ## Current Completion Posture
 
@@ -2187,3 +2187,41 @@ insufficient: the next blocker is reviewed identity public contract, not permiss
 command response, commands/replies, public SDK readiness, runtime readiness, release
 readiness, or complete/stable SDK wording. No runtime/server operation, marker/env change,
 Discord, GitHub publication, or protected live-server operation was authorized.
+
+## Public Contract Route Blocker And SDK Non-Counting Hardening
+
+A delegated follow-up round split scope across public-contract gate audit, SDK/P0 route
+accounting, approved-evidence negative regressions, and handoff durability. Required/used
+skills were `obelisk-agent-handoff`, `obelisk-github-research-workflow`,
+`obelisk-live-ops`, and `obelisk-continuous-learning`.
+
+Integrated offline changes:
+
+- `check_player_identity_public_contract_readiness.py` now separates the internal
+  decision gate id `identity_public_contract_gate` from the route blocker
+  `identity_public_contract_gate_missing`, and reports `public_contract_allowed=false`
+  alongside other false public/runtime readiness flags.
+- `check_public_sdk_v1_completion.py` now accepts the locked post-evidence route state
+  `identity_public_contract_gate_missing` only when its route lock is
+  `blocked_until=[reviewed_identity_public_contract]`; the state remains non-counting for
+  complete SDK progress and P0 promotion.
+- `test_check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now adds
+  negative regressions for edited receipt payload SHA drift, operator approval request
+  sidecar mismatch, copied log path mismatch, and request artifact mismatch.
+- Handoff/compact context now records delegated scopes, required/used skills, integrated
+  findings, and pending findings so compaction does not erase coordination state.
+
+Deferred explorer recommendations:
+
+- `check_player_identity_public_contract_gap_report.py` could optionally consume approved
+  runtime evidence so its post-evidence report can set `runtime_evidence_missing=false`,
+  resolve only `runtime.lifecycle_evidence`, keep all readiness flags false, and retain
+  `identity_public_contract_gate_missing`.
+- The gap checker still validates private POD/preflight against default private-contract
+  inputs and could be tightened to honor supplied `--private-candidate-contract` drift.
+- The private-candidate forbidden exposure scan could be tightened so positive
+  identity-like terms are not hidden by a later unrelated negative clause.
+
+Validation remained offline-only. No runtime/server operation, marker/env change,
+ReflectionScanner, ptrace/gcore, Discord, GitHub publication, public ABI/header opening,
+promotion, release readiness, or stable/complete SDK claim was authorized.

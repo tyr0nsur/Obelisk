@@ -14,8 +14,8 @@ priorities, and do not use history files as the active source of truth.
 3. Close completed or obsolete internal agents before starting a new round.
 4. Continue direct supervised work with scoped sub-agent prompts when delegation is used.
    When the user asks for delegation, the lead must spawn/coordinate the agents directly
-   and record the delegated scopes plus integrated findings in handoff/research notes
-   before finishing so compaction does not lose them.
+   and record delegated scopes, required/used skills, integrated findings, and pending
+   findings in handoff/research notes before finishing so compaction does not lose them.
 
 ## Active Overrides
 
@@ -112,7 +112,7 @@ priorities, and do not use history files as the active source of truth.
   keeps all public/runtime/promotion/SDK readiness flags false; with accepted approved
   runtime evidence, the route may advance only to `identity_public_contract_gate_missing`,
   still locked/planning-only. Inventory copied signals remain the higher-value side lane
-  after identity -> permissions/admin -> commands/replies, while Structure census is
+  after identity -> permissions/admin -> command response -> commands/replies, while Structure census is
   explicitly excluded/non-counting and Structure build-policy remains offline planning only.
   The accepted lifecycle-anchor snapshot binding gap is closed in the current builder and
   default route: `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` source
@@ -1072,6 +1072,16 @@ priorities, and do not use history files as the active source of truth.
   advances only to `identity_public_contract_gate_missing`, keeps route lock
   `blocked_until=[reviewed_identity_public_contract]`, leaves all unlock/readiness flags
   false, and does not count P0. No runtime/server operation was performed.
+- 2026-06-02 delegated public-contract/SDK accounting pass used
+  `obelisk-agent-handoff`, `obelisk-github-research-workflow`, `obelisk-live-ops`, and
+  `obelisk-continuous-learning`. Integrated changes: public-contract readiness separates
+  internal decision id `identity_public_contract_gate` from route blocker
+  `identity_public_contract_gate_missing`, reports `public_contract_allowed=false`, SDK
+  completion accepts the locked post-evidence route as non-counting, and approved-evidence
+  tests reject receipt payload SHA, operator request sidecar, copied log path, and request
+  artifact drift. Remaining explorer recommendations: gap report could optionally consume
+  approved runtime evidence and custom private-candidate inputs, plus tighten forbidden
+  exposure scanning. No runtime/server operation was performed.
 
 ## Agent Coordination
 
