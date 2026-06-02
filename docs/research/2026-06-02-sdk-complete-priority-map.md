@@ -2372,6 +2372,60 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## PluginManager Init-Failure Retry Hardening
+
+A supervised four-agent follow-up split runtime/ABI, SDK/P0, reversing/offline evidence,
+and live-ops/docs safety review. The runtime/ABI auditor confirmed that the init-failure
+path could strand a mapped plugin outside `UnloadAll()` retry if callback cleanup or
+`dlclose` failed and retention tracking then failed after scope guards were dismissed.
+
+Integrated fix:
+
+- `PluginManager::LoadPlugins` now reserves one loaded-plugin slot and prebuilds the
+  init-failure retry `PluginInfo` before calling `ObeliskPlugin_Init`.
+- Callback-cleanup failure and init-failure `dlclose` failure now move that prebuilt
+  retry record into `m_LoadedPlugins`, preserving a manager-owned retry path without
+  repeating plugin shutdown.
+- A local `static_assert` protects the no-throw move assumption used by the pre-reserved
+  retry record.
+- `PluginManagerTests` now proves cleanup-failure retry and close-failure retry both
+  survive the retention-failure test hook and are later cleaned by `UnloadAll()`.
+- `test_plugin_manager_guardrails.py` now checks the prebuilt retry state and moved
+  retention record instead of expecting allocation-prone inline initializer pushes.
+
+Auditor outcomes:
+
+- SDK/P0 audit found no public SDK accounting change and no extra SDK guardrail needed;
+  `PluginManager` lifecycle hardening does not promote identity, permissions/admin,
+  command response, commands/replies, runtime readiness, or a stable SDK claim.
+- Live-ops/docs audit found no wording that implies server approval, marker/env changes,
+  runtime observers, production stability, or v1 SDK completion.
+- Reversing/offline audit rejected broad dump, FName, GObjects, core, serial, or
+  ResourceHandle rediscovery for this blocker; the useful evidence is local runtime/ABI
+  lifecycle validation.
+
+Validation stayed offline-only:
+
+- `cmake --build build -j"$(nproc)"` completed.
+- `ctest --test-dir build -R '^PluginManagerTests$' --output-on-failure` passed.
+- `python3 scripts/test_plugin_manager_guardrails.py` passed 24 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate`
+  passed 40 tests.
+- Focused SDK completion tests for fail-closed current manifest, route overclaims, P0
+  locked accounting, stable-release contract boundaries, and installed package-shape
+  non-claim evidence passed 6 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_research_doc_guardrails`
+  passed 23 tests.
+- `scripts/check_command_permission_route_gate.py --json` stayed valid/planning-only with
+  `critical_path_phase.current_blocker=approved_runtime_evidence_missing` and all
+  readiness flags false.
+- `scripts/check_public_sdk_v1_completion.py --json` exited 1 as expected with
+  `stable_claim_allowed=false`, status `blocked`, SDK 0/12, and P0 0/4.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
 ## Capture-Plan And SDK Manifest Non-Evidence Guardrail
 
 A supervised four-agent read-only round split SDK/P0 route auditing, live-ops/request-pack

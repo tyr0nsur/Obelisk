@@ -335,6 +335,9 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         )
         self.assertIsNotNone(match)
         body = extract_braced_body(text, match)
+        self.assertIn("m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1)", text)
+        self.assertIn("PluginInfo initFailureRetryPlugin", text)
+        self.assertIn("shutdownFunc,\n                    true,", text)
         failure_match = re.search(
             r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
             body,
@@ -347,8 +350,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             "handleCleanup.Dismiss()",
             "ownerTokenCleanup.Dismiss()",
             "initializingOwnerCleanup.Dismiss()",
-            "m_LoadedPlugins.push_back",
-            "true,",
+            "m_LoadedPlugins.push_back(std::move(initFailureRetryPlugin))",
             "retaining library mapped for retry",
         ):
             with self.subTest(token=token):

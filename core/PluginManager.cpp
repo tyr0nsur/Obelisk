@@ -25,6 +25,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -2719,6 +2720,18 @@ namespace Obelisk::Core
                     instanceId.c_str(),
                     pluginOwnerToken
                 };
+                m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1);
+                PluginInfo initFailureRetryPlugin{
+                    pluginName,
+                    metadata.plugin_id,
+                    handle,
+                    pluginOwner,
+                    pluginOwnerToken,
+                    shutdownFunc,
+                    true,
+                };
+                static_assert(std::is_nothrow_move_constructible_v<PluginInfo>,
+                              "init-failure retry state must move into pre-reserved storage without throwing");
 
                 bool initialized = false;
                 bool initAttempted = false;
@@ -2786,19 +2799,7 @@ namespace Obelisk::Core
                         initializingOwnerCleanup.Dismiss();
                         try
                         {
-#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
-                            if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
-                                throw std::runtime_error("injected plugin retention failure");
-#endif
-                            m_LoadedPlugins.push_back({
-                                pluginName,
-                                metadata.plugin_id,
-                                handle,
-                                pluginOwner,
-                                pluginOwnerToken,
-                                shutdownFunc,
-                                true,
-                            });
+                            m_LoadedPlugins.push_back(std::move(initFailureRetryPlugin));
                         }
                         catch (const std::exception& e)
                         {
@@ -2826,19 +2827,7 @@ namespace Obelisk::Core
                         initializingOwnerCleanup.Dismiss();
                         try
                         {
-#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
-                            if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
-                                throw std::runtime_error("injected plugin retention failure");
-#endif
-                            m_LoadedPlugins.push_back({
-                                pluginName,
-                                metadata.plugin_id,
-                                handle,
-                                pluginOwner,
-                                pluginOwnerToken,
-                                shutdownFunc,
-                                true,
-                            });
+                            m_LoadedPlugins.push_back(std::move(initFailureRetryPlugin));
                         }
                         catch (const std::exception& e)
                         {

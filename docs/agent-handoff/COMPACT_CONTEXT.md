@@ -1149,6 +1149,18 @@ priorities, and do not use history files as the active source of truth.
   completion tests OK, route gate JSON valid/planning-only, and SDK JSON failed closed
   as expected with `approved_runtime_evidence_missing`, SDK 0/12, P0 0/4,
   `stable_claim_allowed=false`. No runtime/server operation was performed.
+- 2026-06-02 supervised 4-agent runtime/ABI follow-up: lead integrated the
+  `PluginManager` init-failure retention fix locally. Retry state is now reserved and
+  prebuilt before plugin init, then moved into `m_LoadedPlugins` on callback-cleanup or
+  `dlclose` failure so later `UnloadAll()` can retry without repeating shutdown. Tests now
+  cover cleanup-failure retention retry and close-failure retry under the retention-failure
+  hook. SDK/P0 audit found no accounting change or extra guardrail need; live-ops/docs
+  audit found no approval/readiness overclaim; reversing audit kept broad dump/FName/GObjects
+  rediscovery rejected for this blocker. Validation stayed offline-only: build OK,
+  `PluginManagerTests` OK, PluginManager guardrails OK, route-gate tests OK, focused SDK
+  gate tests OK, route JSON locked at `approved_runtime_evidence_missing`, and SDK JSON
+  failed closed with SDK 0/12, P0 0/4, `stable_claim_allowed=false`. No runtime/server
+  operation was performed.
 
 ## Agent Coordination
 

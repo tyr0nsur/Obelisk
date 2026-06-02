@@ -207,13 +207,10 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest delegated/local rounds used handoff/workflow/live-ops/continuous-learning and
-  read-only reversing/runtime skills. Integrated: lifecycle request/receipt freshness,
-  sidecar-beside-manifest binding, SDK/P0 non-counting route visibility, capture-plan
-  docs/tests, and SDK manifest wording that request packs, preflight, manifests, env
-  files, and approval receipts do not satisfy approved runtime principal lifecycle
-  evidence. Four subagents ran this round; no reversing-only scan was useful. Pending
-  runtime/ABI follow-up: audit PluginManager init-failure retention so cleanup failures
-  cannot strand a mapped plugin outside `UnloadAll` retry. Default route/SDK remain fail-closed:
-  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
-  `stable_claim_allowed=false`. No runtime/server op.
+- Latest supervised round used four read-only subagents plus lead integration. Integrated
+  `PluginManager` init-failure retry hardening so callback-cleanup or `dlclose` failure
+  keeps mapped plugins in `UnloadAll` retry state without repeated shutdown; tests now
+  cover cleanup-failure and close-failure retry paths. SDK/P0 and live-ops audits found no
+  readiness overclaim; reversing audit rejected broad dump/FName/GObjects rediscovery for
+  this blocker. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
+  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
