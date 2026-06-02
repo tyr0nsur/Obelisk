@@ -105,21 +105,19 @@ priorities, and do not use history files as the active source of truth.
   text claims; nested public reply/send-chat, command routing, permissions/admin, ABI,
   runtime, or v1-completion claims block planning alignment even if a leaf report says
   `valid=true`.
-  While identity waits on source-bound lifecycle/principal planning artifacts, inventory
-  copied signals are the higher-value side lane. Neither side lane displaces identity ->
-  permissions/admin -> commands/replies. Prefer inventory copied-signal hygiene over
-  structure census when choosing one side lane, while structure census remains useful
-  offline planning/consume-only work.
-  If the current offline identity packs still pass, the default route is blocked first at
-  `lifecycle_anchor_first_evidence_provenance_unbound`. Only an explicit bound-wrapper
-  no-runtime-evidence route run may advance the blocker to
-  `approved_runtime_evidence_missing`; with accepted approved runtime evidence, the route
-  may advance only to `identity_public_contract_gate_missing`, still locked/planning-only.
+  Identity now has repo-local source-bound lifecycle/principal planning artifacts in
+  `docs/research/player-identity-planning-sources/`, generated from the current
+  first-evidence and sanitized lifecycle snapshots. The default no-runtime route is
+  blocked at `approved_runtime_evidence_missing`, remains locked/planning-only, and
+  keeps all public/runtime/promotion/SDK readiness flags false; with accepted approved
+  runtime evidence, the route may advance only to `identity_public_contract_gate_missing`,
+  still locked/planning-only. Inventory copied signals remain the higher-value side lane
+  after identity -> permissions/admin -> commands/replies, while structure census remains
+  useful offline planning/consume-only work.
   The accepted lifecycle-anchor snapshot binding gap is closed in the current builder and
-  bound-wrapper route: `ShooterGameMode.HandleNewPlayer` and
-  `ShooterGameMode.OnLogout` source hashes are checked against the actual
-  `--snapshot-root` files before an explicit no-runtime-evidence bound route may advance
-  to `approved_runtime_evidence_missing`.
+  default route: `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` source
+  hashes are checked against the actual `--snapshot-root` files before the route may
+  report `approved_runtime_evidence_missing`.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -361,10 +359,9 @@ priorities, and do not use history files as the active source of truth.
   is accepted by the offline artifact gate. Passing both lifecycle-anchor and
   principal-invalidation manifests to the first-evidence readiness checker is no longer
   sufficient unless those planning artifacts are bound to the same first-evidence source
-  artifact identity. The active aggregate blocker is
-  `lifecycle_anchor_first_evidence_provenance_unbound`; only after lifecycle/principal
-  source binding is produced should the route advance back to approved copied runtime
-  principal lifecycle evidence, reported as `approved_runtime_evidence_missing`.
+  artifact identity. The repo-local generated planning manifests now close that default
+  provenance gap, so the active aggregate blocker is approved copied runtime principal
+  lifecycle evidence, reported as `approved_runtime_evidence_missing`.
   `scripts/bind_player_identity_planning_sources.py` is the offline binder for that
   transition: it validates first-evidence, lifecycle-anchor, and principal-policy JSON,
   now rejects stale prebind provenance before writing outputs when lifecycle
@@ -374,19 +371,18 @@ priorities, and do not use history files as the active source of truth.
   protected output paths and symlinks. Bound outputs are planning provenance only; they do
   not approve runtime evidence, public identity, public SDK readiness, or v1 completion.
   Route-gate passthrough for these bound artifacts is explicit: the repo-default route
-  stays blocked on `lifecycle_anchor_first_evidence_provenance_unbound`, while a route run
-  with explicit bound lifecycle/principal inputs and no approved runtime evidence may
-  report `approved_runtime_evidence_missing` as the next blocker. With accepted approved
-  runtime evidence, the allowed locked blocker is `identity_public_contract_gate_missing`.
+  consumes the generated repo-local lifecycle/principal fallbacks and, with no approved
+  runtime evidence, reports `approved_runtime_evidence_missing` as the next blocker. With
+  accepted approved runtime evidence, the allowed locked blocker is
+  `identity_public_contract_gate_missing`.
   `scripts/check_command_permission_route_gate_bound_identity_sources.py` is the
   checker-style wrapper for that explicit route: it uses transient bound artifacts under a
   non-protected temp root and still authorizes no runtime/server work or SDK readiness.
   The historical `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
-  lifecycle/principal bundle remains standalone consume-only planning evidence but now
-  fails the stricter wrapper as not source-bound to generated first evidence; regenerate or
-  align source-bound manifests before expecting the no-runtime-evidence wrapper to advance
-  to `approved_runtime_evidence_missing`, or the post-evidence route to advance to
-  `identity_public_contract_gate_missing`.
+  lifecycle/principal bundle remains standalone consume-only planning evidence but is no
+  longer the default fallback. Regenerate or align source-bound manifests before expecting
+  non-default inputs to advance to `approved_runtime_evidence_missing`, or the
+  post-evidence route to advance to `identity_public_contract_gate_missing`.
   Later SDK-completion hardening also applies structured promotion-evidence requirements
   to command response and commands/replies: generic ABI/SDK paths plus prose terms no
   longer let those P0 rows count toward complete SDK accounting. Command response needs
@@ -692,7 +688,7 @@ priorities, and do not use history files as the active source of truth.
   regression test preserving candidate-only/non-promotion semantics. The raw layout helper
   rejects artifact roots under the repository to match
   `validate_player_identity_raw_inputs.py` and the offline preflight note.
-- Latest local integration checkpoint on 2026-06-02 hardened SDK/release accounting but
+- Earlier local integration checkpoint on 2026-06-02 hardened SDK/release accounting but
   did not change readiness:
   - `scripts/check_public_sdk_v1_completion.py` requires promoted P0
     `executed_test_report` evidence to be a repo-relative
@@ -700,8 +696,7 @@ priorities, and do not use history files as the active source of truth.
     current HEAD, surface id, command/argv, zero exit code, and output/provenance hash.
     Inline self-attested executed-test objects no longer satisfy P0 structured evidence.
   - P0 rows cannot count toward complete-SDK progress while the default
-    command/permission route gate remains
-    `lifecycle_anchor_first_evidence_provenance_unbound`; rows expose
+    command/permission route gate remains locked/planning-only; rows expose
     `route_gate_claim_satisfied=false` and promoted-looking rows are blocked by
     `p0_dependency_chain_route_gate_locked`.
   - `scripts/check_release_readiness.sh` rejects thin second-source readiness JSON that
@@ -742,8 +737,8 @@ priorities, and do not use history files as the active source of truth.
   - Latest validation for this round: `plugin_manager_tests` passed;
     `scripts.test_check_public_sdk_v1_completion` passed 136 tests;
     `scripts.test_validate_offline_artifact_gate` passed 354 tests;
-    `check_command_permission_route_gate.py --json` remained planning-only at
-    `lifecycle_anchor_first_evidence_provenance_unbound`; and
+    `check_command_permission_route_gate.py --json` remained planning-only at the then
+    current identity provenance blocker; and
     `check_public_sdk_v1_completion.py --json` remained fail-closed with
     `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
 - Delegated route/runtime rollback hardening on 2026-06-02 added four scoped outcomes and
@@ -764,9 +759,9 @@ priorities, and do not use history files as the active source of truth.
     code and owner cleanup still removes it. Test-only hooks cover both paths.
   - Validation: 86 focused Python tests passed, `plugin_manager_tests` passed,
     full `cmake --build build -j$(nproc)` passed, and `git diff --check` was clean.
-    Default route and SDK completion remain fail-closed at
-    `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
-    complete-SDK progress `0/12`, and P0 progress `0/4`.
+    Default route and SDK completion remained fail-closed at the then current identity
+    provenance blocker, with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+    and P0 progress `0/4`.
 - Delegated player-identity planning-source producer round on 2026-06-02 closed all
   sub-agents and added the offline tool for the current P0 provenance blocker:
   - `scripts/build_player_identity_planning_source_manifests.py` rebuilds
@@ -780,9 +775,8 @@ priorities, and do not use history files as the active source of truth.
     `valid=true`, `blockers=[]`, and
     `critical_path_phase.current_blocker=approved_runtime_evidence_missing`, with
     `runtime_work_authorized=false` and `server_operations_authorized=false`.
-  - The default route still remains blocked at
-    `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit aligned manifests
-    are supplied. SDK completion remains fail-closed:
+  - The default route now consumes the generated repo-local source-aligned manifests and
+    reports `approved_runtime_evidence_missing`. SDK completion remains fail-closed:
     `stable_claim_allowed=false`, complete-SDK progress `0/12`, P0 progress `0/4`.
   - Next true blocker is approved copied runtime principal lifecycle evidence; no runtime,
     marker/env/server action is authorized without a fresh live-ops brief.
@@ -797,9 +791,8 @@ priorities, and do not use history files as the active source of truth.
     stale or missing anchor `evidence.source_snapshot_sha256`.
   - `build_player_identity_planning_source_manifests.py` and
     `check_command_permission_route_gate_bound_identity_sources.py` both enforce and emit
-    `lifecycle_snapshot_root_binding`. A transient generated route remains valid only as
-    planning and advances to `approved_runtime_evidence_missing`; the default route still
-    remains blocked at `lifecycle_anchor_first_evidence_provenance_unbound`.
+    `lifecycle_snapshot_root_binding`. The default generated route remains valid only as
+    planning and advances to `approved_runtime_evidence_missing`.
   - SDK-route audit found no public SDK/runtime/permissions/admin/commands overclaim path
     from this provenance fix. SDK completion remains fail-closed with
     `stable_claim_allowed=false`.
@@ -909,6 +902,14 @@ priorities, and do not use history files as the active source of truth.
   readiness root. SDK structured promotion evidence for command response/replies now
   requires those planning-checker source-artifact bindings before promoted rows can
   count. This remains provenance-only, not response/replies readiness.
+- Follow-up default identity planning-source provenance closure generated repo-local
+  source-bound planning manifests in `docs/research/player-identity-planning-sources/`.
+  The default no-runtime route now reports
+  `critical_path_phase.current_blocker=approved_runtime_evidence_missing` while staying
+  locked/planning-only with all public/runtime/promotion/SDK readiness flags false. SDK
+  completion remains fail-closed with `stable_claim_allowed=false`, complete-SDK progress
+  `0/12`, and P0 progress `0/4`. Next true blocker is approved copied runtime principal
+  lifecycle evidence; no runtime/server operation is authorized by this planning closure.
 
 ## Agent Coordination
 

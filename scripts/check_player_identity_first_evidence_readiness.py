@@ -62,13 +62,17 @@ APPROVED_CANDIDATE_ROOT_FALLBACK = (
     / "focal-snapshots"
 )
 APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK = (
-    APPROVED_WORKSPACE_FALLBACK_ROOT
-    / "player-identity-principal-invalidation-policy-20260531T231247Z"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
     / "players-identity-lifecycle-anchor-candidates.json"
 )
 APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK = (
-    APPROVED_WORKSPACE_FALLBACK_ROOT
-    / "player-identity-principal-invalidation-policy-20260531T231247Z"
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
     / "players-identity-principal-invalidation-policy.json"
 )
 

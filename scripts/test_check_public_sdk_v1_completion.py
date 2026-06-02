@@ -390,8 +390,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "runtime_ready": False,
             "public_header_allowed": False,
             "critical_path_phase": {
-                "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
-                "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+                "current_blocker": "approved_runtime_evidence_missing",
+                "source_checker_primary_blocker": "approved_runtime_evidence_missing",
                 "source_checker_next_blocker": None,
                 "source_checker_status": "blocked",
                 "source_checker_ready": False,
@@ -400,7 +400,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "route_lock": {
                 "locked": True,
                 "blocked_until": [
-                    "bound_lifecycle_anchor_and_principal_policy_sources",
+                    "approved_runtime_principal_lifecycle_evidence",
                     "reviewed_identity_public_contract",
                 ],
             },
@@ -594,8 +594,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
                 "    'critical_path_phase': {\n"
-                "        'current_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound',\n"
-                "        'source_checker_primary_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound',\n"
+                "        'current_blocker': 'approved_runtime_evidence_missing',\n"
+                "        'source_checker_primary_blocker': 'approved_runtime_evidence_missing',\n"
                 "        'source_checker_next_blocker': None,\n"
                 "        'source_checker_status': 'blocked',\n"
                 "        'source_checker_ready': False,\n"
@@ -604,7 +604,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'route_lock': {\n"
                 "        'locked': True,\n"
                 "        'blocked_until': [\n"
-                "            'bound_lifecycle_anchor_and_principal_policy_sources',\n"
+                "            'approved_runtime_principal_lifecycle_evidence',\n"
                 "            'reviewed_identity_public_contract',\n"
                 "        ],\n"
                 "    },\n"
@@ -714,14 +714,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertNotIn("mission_transfer_dino_tribe_outcome_accounting_invalid", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
-        self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
+        self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(
             route_gate["source_checker_primary_blocker"],
-            "lifecycle_anchor_first_evidence_provenance_unbound",
+            "approved_runtime_evidence_missing",
         )
         self.assertEqual(
             route_gate["route_lock_blocked_until"],
-            ["bound_lifecycle_anchor_and_principal_policy_sources", "reviewed_identity_public_contract"],
+            ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
         )
         progress = payload["v1_sdk_progress"]
         self.assertEqual(progress["completion_blocker_total"], 12)
@@ -859,13 +859,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["release_statement_missing_blocker_outcomes"],
         )
         self.assertIn(
-            "supply bound lifecycle-anchor/principal-policy planning artifacts",
-            sections["next_v1_work"]["recommended_next_action"],
-        )
-        self.assertIn(
             "approved copied runtime principal lifecycle evidence",
             sections["next_v1_work"]["recommended_next_action"],
         )
+        self.assertNotIn("supply bound", sections["next_v1_work"]["recommended_next_action"])
         self.assertIn("prioritizes work only", sections["next_v1_work"]["non_claim"])
 
     def test_inventory_copied_signal_stability_checker_is_required(self) -> None:
@@ -1391,11 +1388,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    'runtime_ready': False,\n"
                 "    'public_header_allowed': False,\n"
                 "    'critical_path_phase': {\n"
-                "        'current_blocker': 'approved_runtime_evidence_missing',\n"
-                "        'source_checker_primary_blocker': 'approved_runtime_evidence_missing'\n"
+                "        'current_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound',\n"
+                "        'source_checker_primary_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound'\n"
                 "    },\n"
                 "    'route_lock': {\n"
-                "        'blocked_until': ['approved_runtime_principal_lifecycle_evidence', 'reviewed_identity_public_contract']\n"
+                "        'blocked_until': ['bound_lifecycle_anchor_and_principal_policy_sources', 'reviewed_identity_public_contract']\n"
                 "    },\n"
                 "    'checks': [],\n"
                 "    'blockers': []\n"
@@ -1416,11 +1413,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("command_permission_route_gate_default_blocker_mismatch", payload["blockers"])
         self.assertIn("command_permission_route_gate_default_source_blocker_mismatch", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
-        self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
-        self.assertEqual(route_gate["source_checker_primary_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
+        self.assertEqual(
+            route_gate["source_checker_primary_blocker"],
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+        )
         self.assertEqual(
             route_gate["route_lock_blocked_until"],
-            ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
+            ["bound_lifecycle_anchor_and_principal_policy_sources", "reviewed_identity_public_contract"],
         )
 
     def test_route_gate_claim_scanner_rejects_public_command_reply_aliases(self) -> None:

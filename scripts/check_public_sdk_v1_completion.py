@@ -972,9 +972,9 @@ def run_command_permission_route_gate(
     source_checker_ready = critical_path_phase.get("source_checker_ready")
     source_checker_internal_planning = critical_path_phase.get("source_checker_accepted_for_internal_planning")
     route_blockers = payload.get("blockers", [])
-    if current_blocker != "lifecycle_anchor_first_evidence_provenance_unbound":
+    if current_blocker != "approved_runtime_evidence_missing":
         blockers.append("command_permission_route_gate_default_blocker_mismatch")
-    if source_checker_primary_blocker != "lifecycle_anchor_first_evidence_provenance_unbound":
+    if source_checker_primary_blocker != "approved_runtime_evidence_missing":
         blockers.append("command_permission_route_gate_default_source_blocker_mismatch")
     if source_checker_next_blocker is not None:
         blockers.append("command_permission_route_gate_default_source_next_blocker_unexpected")
@@ -989,7 +989,7 @@ def run_command_permission_route_gate(
     if route_lock.get("locked") is not True:
         blockers.append("command_permission_route_gate_lock_unexpected")
     if route_lock.get("blocked_until") != [
-        "bound_lifecycle_anchor_and_principal_policy_sources",
+        "approved_runtime_principal_lifecycle_evidence",
         "reviewed_identity_public_contract",
     ]:
         blockers.append("command_permission_route_gate_default_lock_blocked_until_unexpected")
@@ -3119,10 +3119,9 @@ def categorized_v1_report_sections(
     dependency_chain_remaining = blocker_outcome_summary.get("dependency_chain_remaining", [])
     if dependency_chain_remaining:
         recommended_next_action = (
-            "resolve the player identity/principal critical path first: supply bound "
-            "lifecycle-anchor/principal-policy planning artifacts to the route gate, "
-            "then produce approved copied runtime principal lifecycle evidence before "
-            "any public identity, permissions/admin, command response, or commands/replies ABI"
+            "resolve the player identity/principal critical path first: produce approved "
+            "copied runtime principal lifecycle evidence before any public identity, "
+            "permissions/admin, command response, or commands/replies ABI"
         )
     elif manifest_outcome_missing:
         recommended_next_action = (

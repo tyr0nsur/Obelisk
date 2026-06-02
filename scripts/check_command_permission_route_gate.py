@@ -427,7 +427,7 @@ def expected_identity_lock_blocker_for_args(args: argparse.Namespace) -> str:
     principal = getattr(args, "player_identity_principal_invalidation_policy_manifest", None)
     if lifecycle is not None and principal is not None:
         return "approved_runtime_evidence_missing"
-    return "lifecycle_anchor_first_evidence_provenance_unbound"
+    return "approved_runtime_evidence_missing"
 
 
 def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any]) -> list[str]:
