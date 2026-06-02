@@ -692,6 +692,7 @@ REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS = {
     "obelisk.command_copied_response_intent_lifecycle.planning.v1": "command_copied_response_intent_lifecycle_planning_decisions.json",
 }
 CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES = CANONICAL_V1_COMPLETION_BLOCKERS
+REVIEWED_V1_COMPLETION_EQUIVALENTS: dict[str, tuple[str, ...]] = {}
 
 
 def parse_args() -> argparse.Namespace:
@@ -1599,6 +1600,10 @@ def surface_declares_completion_equivalent(surface: dict[str, Any], blocker_id: 
     return blocker_id in as_string_list(surface.get("v1_completion_equivalent_for"))
 
 
+def reviewed_completion_equivalent_allowed(blocker_id: str, equivalent_id: str) -> bool:
+    return equivalent_id in REVIEWED_V1_COMPLETION_EQUIVALENTS.get(blocker_id, ())
+
+
 def explicit_completion_equivalent_satisfies(
     blocker_id: str,
     equivalent_surface_ids: list[str],
@@ -1609,6 +1614,8 @@ def explicit_completion_equivalent_satisfies(
     for equivalent_id in equivalent_surface_ids:
         equivalent_surface = surfaces_by_id.get(equivalent_id)
         if not equivalent_surface:
+            continue
+        if not reviewed_completion_equivalent_allowed(blocker_id, equivalent_id):
             continue
         if equivalent_surface.get("status") != "promoted":
             continue

@@ -79,6 +79,22 @@ FORBIDDEN_READY_VALUE_KEYS = {
     "resource_handle",
     "ResourceHandle",
 }
+SURFACE_FORBIDDEN_TERM_RE = re.compile(
+    r"(?:resourcehandle|resource[_ -]?handle|object[_ -]?identity|object[_ -]?lookup|"
+    r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity)|"
+    r"(?:structure|item|inventory|dino|tribe|buff|mission|transfer|economy|mobility|area[_ -]?policy)[_ -]?handle)",
+    re.IGNORECASE,
+)
+SURFACE_POSITIVE_CLAIM_RE = re.compile(
+    r"(?:public[_ -]?sdk|ready|readiness|allowed|available|enabled|included|"
+    r"promoted|supported|lookup[_ -]?api|handle[_ -]?api)",
+    re.IGNORECASE,
+)
+SURFACE_NEGATED_CLAIM_RE = re.compile(
+    r"(?:\bno\b|\bnot\b|must[_ -]?not|cannot|blocked|excluded|post[_ -]?v1|"
+    r"without|not[_ -]?included|does[_ -]?not|do[_ -]?not)",
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -131,6 +147,28 @@ def walk_claims(value: Any, blockers: list[str], trail: str = "$") -> None:
     elif isinstance(value, list):
         for index, child in enumerate(value):
             walk_claims(child, blockers, f"{trail}[{index}]")
+
+
+def positive_surface_text_claim(text: str) -> bool:
+    if not SURFACE_FORBIDDEN_TERM_RE.search(text):
+        return False
+    if not SURFACE_POSITIVE_CLAIM_RE.search(text):
+        return False
+    return SURFACE_NEGATED_CLAIM_RE.search(text) is None
+
+
+def walk_surface_text_claims(value: Any, blockers: list[str], trail: str) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            walk_surface_text_claims(child, blockers, f"{trail}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            walk_surface_text_claims(child, blockers, f"{trail}[{index}]")
+    elif isinstance(value, str):
+        for clause_index, clause in enumerate(re.split(r"[.;\n]+", value)):
+            normalized = clause.strip()
+            if normalized and positive_surface_text_claim(normalized):
+                blockers.append(f"surface_positive_resource_handle_claim:{trail}[clause:{clause_index}]")
 
 
 def surface_entry(surfaces: Any, blockers: list[str]) -> dict[str, Any] | None:
@@ -201,6 +239,7 @@ def validate_surface(surfaces: Any, blockers: list[str]) -> None:
     for term in required_terms:
         if term not in blockers_text and term not in evidence_text:
             blockers.append(f"surface_missing_boundary_term:{term}")
+    walk_surface_text_claims(entry, blockers, f"$.surfaces[{SURFACE_ID}]")
 
 
 def validate_public_events(events: Any, blockers: list[str]) -> None:

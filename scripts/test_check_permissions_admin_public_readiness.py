@@ -912,6 +912,125 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("dependency_player_identity_public_contract_requirements_missing", report["blockers"])
 
+    def test_rejects_cache_key_field_drift_and_public_cache_abi_unblocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            cache = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "cache.generation_scope_keying"
+            )
+            cache["status"] = "resolved"
+            cache["public_cache_abi"] = "public"
+            cache["required_cache_key_fields"] = [
+                "plugin_owner_token",
+                "principal_handle",
+                "principal_generation",
+                "action",
+                "action",
+                "resource_scope",
+                "policy_epoch",
+            ]
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("cache_generation_scope_keying_status_not_unresolved", report["blockers"])
+        self.assertIn("cache_public_cache_abi_unblocked", report["blockers"])
+        self.assertIn("cache_key_fields_mismatch", report["blockers"])
+
+    def test_rejects_missing_cache_generation_scope_invalidation_behavior(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            cache = next(
+                item
+                for item in decisions["required_before_public_header"]
+                if item["id"] == "cache.generation_scope_keying"
+            )
+            for behavior in (
+                "cached decisions are invalidated on principal_scope_flags change",
+                "cached decisions are invalidated on policy_source_generation change",
+                "cached decisions are invalidated on authority_generation change",
+                "cached decisions are invalidated on plugin owner cleanup",
+                "stale cache entries return deny or unknown, never allow",
+            ):
+                cache["required_behavior"].remove(behavior)
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("cache_generation_scope_invalidation_requirements_missing", report["blockers"])
+
+    def test_rejects_decisions_public_header_mismatch_with_scanned_public_header(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["public_header"] = "include/obelisk/OtherApi.h"
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("decisions_public_header_mismatch", report["blockers"])
+        self.assertIn("decisions_public_header_not_scanned_header", report["blockers"])
+
+    def test_rejects_public_header_alias_symbols(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            header_path = root / "ObeliskApi.h"
+            header_path.write_text(
+                "typedef struct PermissionQuery PermissionQuery;\n"
+                "typedef uint64_t PermissionReasonFlags;\n"
+                "bool CheckPermission(void);\n",
+                encoding="utf-8",
+            )
+
+            result = run_checker("--public-header", str(header_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_header_contains_permissions_admin_symbol", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "public_header_contains_permissions_admin_symbol"
+        )
+        self.assertIn("PermissionQuery", detail["tokens"])
+        self.assertIn("PermissionReasonFlags", detail["tokens"])
+        self.assertIn("CheckPermission", detail["tokens"])
+
+    def test_rejects_public_header_under_protected_server_root(self) -> None:
+        result = run_checker(
+            "--public-header",
+            "/servidor/ark/ObeliskApi.h",
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_header_path_rejected", report["blockers"])
+
+    def test_rejects_public_header_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "ObeliskApi.h"
+            target.write_text("/* no permissions/admin public ABI */\n", encoding="utf-8")
+            link = root / "ObeliskApiLink.h"
+            link.symlink_to(target)
+
+            result = run_checker("--public-header", str(link), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_header_path_rejected", report["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()

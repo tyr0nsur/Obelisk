@@ -146,7 +146,14 @@
         "cache keys or entries must not cross the public ABI",
         "cache disabled unless all key fields are defined",
         "policy epoch mismatch fails closed",
-        "cached allow decisions are invalidated on principal generation change"
+        "cached allow decisions are invalidated on principal generation change",
+        "cached decisions are invalidated on principal_scope_flags change",
+        "cached decisions are invalidated on policy_epoch change",
+        "cached decisions are invalidated on policy_source_generation change",
+        "cached decisions are invalidated on authority_generation change",
+        "cached decisions are invalidated on plugin owner cleanup",
+        "scope mismatch bypasses cache and fails closed",
+        "stale cache entries return deny or unknown, never allow"
       ]
     },
     {

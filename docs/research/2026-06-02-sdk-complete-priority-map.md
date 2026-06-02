@@ -186,3 +186,53 @@ Validation:
 This hardening is routing and evidence-gate hygiene only. It does not approve runtime
 work, public permissions/admin ABI, public identity, command replies, release readiness,
 or a stable SDK claim.
+
+## Follow-Up Guardrail Round
+
+The next supervised round closed three additional offline overclaim paths:
+
+- `scripts/check_permissions_admin_public_readiness.py` now enforces the exact
+  permissions/admin cache key sequence, keeps public cache ABI blocked, requires explicit
+  generation/scope invalidation semantics, rejects mismatched manifest public-header
+  declarations, rejects protected or symlinked public-header inputs, and scans additional
+  permissions/admin header aliases such as `PermissionQuery`, `PermissionReasonFlags`,
+  and `CheckPermission`.
+- `scripts/check_public_sdk_v1_completion.py` now rejects all demand-family completion
+  equivalents unless an explicit reviewed allowlist names the blocker/equivalent pair.
+  The allowlist is empty, so synthetic `*_equivalent.v1` rows and foundation/package-shape
+  equivalents cannot satisfy complete-SDK demand-family gaps.
+- `scripts/check_object_identity_resource_handle_public_contract_readiness.py` now scans
+  the `obelisk.object_identity_resource_handle.v1` surface row in
+  `docs/public_sdk_surfaces.json` for positive ResourceHandle/object lookup/post-callback
+  claims. This closes a gap where the checker scanned public gameplay events for positive
+  claims but not the ResourceHandle blocker row itself.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness`
+  passed with 42 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 107 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+  passed with 8 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+  passed as planning-only with ResourceHandle/object identity still blocked.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+Remaining focused offline finding:
+
+- `scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py` should
+  replay or strongly compare the operational `window-manifest.env` and request/env/preflight
+  sidecars instead of trusting embedded operational-window metadata plus hashes alone.
+  The replay must tolerate expiry-only request-window blockers for already-captured
+  approved evidence only after confirming capture timestamps are inside the approved
+  window; target/window/env/preflight drift should fail with a top-level blocker such as
+  `operational_window_manifest_check_failed`.
+
+This round still does not approve runtime work, public permissions/admin ABI, public
+identity, command replies, ResourceHandle, release readiness, or a stable SDK claim.

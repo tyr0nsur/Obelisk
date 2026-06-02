@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import check_permissions_admin_query_failclosed_contract as query_failclosed_contract
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -18,6 +19,7 @@ REPO_ROOT = SCRIPT_DIR.parent
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "permissions_admin_public_contract_decisions.json"
 DEFAULT_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
 
 REPORT_SCHEMA = "obelisk.permissions-admin-public-readiness-check.v1"
 DECISIONS_SCHEMA = "obelisk.permissions-admin-public-contract-decisions.v1"
@@ -191,6 +193,32 @@ REQUIRED_POLICY_PROVENANCE_FIELDS = frozenset(
         "policy_epoch",
     )
 )
+REQUIRED_CACHE_KEY_FIELD_SEQUENCE = (
+    "plugin_owner_token",
+    "principal_handle",
+    "principal_generation",
+    "principal_scope_flags",
+    "action",
+    "resource_scope",
+    "policy_epoch",
+)
+REQUIRED_CACHE_PUBLIC_ABI_BLOCKER = "blocked_until_policy_epoch_generation_and_scope_semantics_are_promoted"
+REQUIRED_CACHE_BEHAVIOR = frozenset(
+    (
+        "no public permission cache ABI until policy_epoch and full generation/scope keying semantics are promoted",
+        "cache keys or entries must not cross the public ABI",
+        "cache disabled unless all key fields are defined",
+        "policy epoch mismatch fails closed",
+        "cached allow decisions are invalidated on principal generation change",
+        "cached decisions are invalidated on principal_scope_flags change",
+        "cached decisions are invalidated on policy_epoch change",
+        "cached decisions are invalidated on policy_source_generation change",
+        "cached decisions are invalidated on authority_generation change",
+        "cached decisions are invalidated on plugin owner cleanup",
+        "scope mismatch bypasses cache and fails closed",
+        "stale cache entries return deny or unknown, never allow",
+    )
+)
 REQUIRED_RECOGNIZED_AUTHORITY_KINDS = frozenset(("operator-config", "runtime-local"))
 REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS = frozenset(("runtime-local",))
 REQUIRED_POLICY_AUTHORITY_BEHAVIOR = frozenset(
@@ -294,13 +322,20 @@ REQUIRED_HEADER_ABSENT_TOKENS = frozenset(
         "OBELISK_ADMIN_REASON_",
         "ObeliskAdminAction",
         "ObeliskAuthorizationDecision",
+        "ObeliskAuthorizationReasonFlags",
         "ObeliskPermissionCache",
+        "PermissionCache",
         "ObeliskPermissionQuery",
+        "PermissionQuery",
         "ObeliskPermissionDecision",
+        "PermissionDecision",
         "ObeliskPermissionReasonFlags",
+        "PermissionReasonFlags",
         "ReasonFlags",
         "reason_flags",
+        "Authorize",
         "AuthorizePermission",
+        "CheckPermission",
         "CheckPermissionWithOwnerToken",
         "CheckPermissionCachedWithOwnerToken",
         "RegisterPermission",
@@ -533,11 +568,56 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         add(blockers, "positive_public_surface_claim", trail, value=value)
 
 
-def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def declared_header_path(value: Any) -> Path | None:
+    if not isinstance(value, str) or not value:
+        return None
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def scanned_header_is_repo_path(path: Path) -> bool:
+    try:
+        path.expanduser().resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        return False
+    return True
+
+
+def validate_public_header_declaration(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    source: str,
+    scanned_path: Path,
+) -> None:
+    declared = payload.get("public_header")
+    if declared != DEFAULT_PUBLIC_HEADER_DECL:
+        add(
+            blockers,
+            f"{source}_public_header_mismatch",
+            f"$.{source}.public_header",
+            expected=DEFAULT_PUBLIC_HEADER_DECL,
+            value=declared,
+        )
+    declared_path = declared_header_path(declared)
+    if declared_path is None:
+        return
+    if scanned_header_is_repo_path(scanned_path) and declared_path.resolve() != scanned_path.expanduser().resolve():
+        add(
+            blockers,
+            f"{source}_public_header_not_scanned_header",
+            f"$.{source}.public_header",
+            declared=str(declared_path),
+            scanned=str(scanned_path),
+        )
+
+
+def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]], public_header_path: Path) -> None:
     if payload.get("schema") != DECISIONS_SCHEMA:
         add(blockers, "decisions_schema_mismatch", "$.schema")
     if payload.get("surface") != SURFACE:
         add(blockers, "decisions_surface_mismatch", "$.surface")
+    validate_public_header_declaration(payload, blockers, source="decisions", scanned_path=public_header_path)
     if payload.get("status") != "blocked":
         add(blockers, "decisions_status_not_blocked", "$.status")
     for key in ("public_header_allowed", "public_cache_abi_allowed", "allow_without_policy_provenance_allowed"):
@@ -653,6 +733,44 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     properties = abi.get("required_properties") if isinstance(abi, dict) else None
     if not isinstance(properties, list) or not REQUIRED_QUERY_TEXT_FRAGMENTS.issubset(set(properties)):
         add(blockers, "query_text_boundary_properties_missing", "$.required_before_public_header")
+    cache = by_id.get("cache.generation_scope_keying")
+    if not isinstance(cache, dict):
+        add(
+            blockers,
+            "cache_generation_scope_keying_missing",
+            "$.required_before_public_header[cache.generation_scope_keying]",
+        )
+    else:
+        if cache.get("status") != "unresolved":
+            add(
+                blockers,
+                "cache_generation_scope_keying_status_not_unresolved",
+                "$.required_before_public_header[cache.generation_scope_keying].status",
+            )
+        if cache.get("public_cache_abi") != REQUIRED_CACHE_PUBLIC_ABI_BLOCKER:
+            add(
+                blockers,
+                "cache_public_cache_abi_unblocked",
+                "$.required_before_public_header[cache.generation_scope_keying].public_cache_abi",
+                expected=REQUIRED_CACHE_PUBLIC_ABI_BLOCKER,
+                value=cache.get("public_cache_abi"),
+            )
+        cache_key_fields = cache.get("required_cache_key_fields")
+        if cache_key_fields != list(REQUIRED_CACHE_KEY_FIELD_SEQUENCE):
+            add(
+                blockers,
+                "cache_key_fields_mismatch",
+                "$.required_before_public_header[cache.generation_scope_keying].required_cache_key_fields",
+                expected=list(REQUIRED_CACHE_KEY_FIELD_SEQUENCE),
+                value=cache_key_fields,
+            )
+        cache_behavior = cache.get("required_behavior")
+        if not isinstance(cache_behavior, list) or not REQUIRED_CACHE_BEHAVIOR.issubset(set(cache_behavior)):
+            add(
+                blockers,
+                "cache_generation_scope_invalidation_requirements_missing",
+                "$.required_before_public_header[cache.generation_scope_keying].required_behavior",
+            )
     policy = by_id.get("policy.authority_provenance_required")
     if not isinstance(policy, dict):
         add(
@@ -769,9 +887,10 @@ def validate_decisions(payload: dict[str, Any], blockers: list[dict[str, Any]]) 
     collect_overclaims(payload, blockers, "$.decisions")
 
 
-def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+def validate_surfaces(payload: dict[str, Any], blockers: list[dict[str, Any]], public_header_path: Path) -> None:
     if payload.get("schema") != SURFACES_SCHEMA:
         add(blockers, "surfaces_schema_mismatch", "$.schema")
+    validate_public_header_declaration(payload, blockers, source="surfaces", scanned_path=public_header_path)
     if SURFACE in string_set(payload.get("promoted_surfaces")):
         add(blockers, "permissions_admin_listed_as_promoted", "$.promoted_surfaces")
     if SURFACE not in string_set(payload.get("planning_surfaces")):
@@ -908,7 +1027,16 @@ def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bo
 
 
 def validate_header(path: Path, blockers: list[dict[str, Any]]) -> None:
-    text = strip_c_comments(path.read_text(encoding="utf-8"))
+    try:
+        reject_symlink_component(path, "public_header")
+        resolved = reject_protected_input_path(path, "public_header")
+        text = strip_c_comments(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, "public_header_path_rejected", "$.public_header", path=str(path), detail=str(exc))
+        return
+    except OSError as exc:
+        add(blockers, "public_header_unreadable", "$.public_header", path=str(path), detail=str(exc))
+        return
     present = sorted(
         token
         for token in REQUIRED_HEADER_ABSENT_EXACT_TOKENS
@@ -978,8 +1106,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     decisions = load_json(args.decisions)
     surfaces = load_json(args.surfaces)
-    validate_decisions(decisions, blockers)
-    validate_surfaces(surfaces, blockers)
+    validate_decisions(decisions, blockers, args.public_header)
+    validate_surfaces(surfaces, blockers, args.public_header)
     validate_header(args.public_header, blockers)
     query_artifact_schema = validate_query_artifact(args.query_failclosed_artifact, blockers)
     return {

@@ -1344,7 +1344,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(scoped_payload["scoped_release_statement"]["blocking_report_blockers"], [])
 
-    def test_minimum_promoted_demand_family_accepts_explicit_promoted_equivalent(self) -> None:
+    def test_minimum_promoted_demand_family_rejects_unreviewed_synthetic_equivalent(self) -> None:
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
@@ -1377,8 +1377,51 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             stable_contract,
         )
 
-        self.assertNotIn(blocker_id, gaps)
-        self.assertEqual(satisfied_by[blocker_id], equivalent_id)
+        self.assertEqual(module.REVIEWED_V1_COMPLETION_EQUIVALENTS, {})
+        self.assertFalse(module.reviewed_completion_equivalent_allowed(blocker_id, equivalent_id))
+        self.assertTrue(module.surface_declares_completion_equivalent(surfaces_by_id[equivalent_id], blocker_id))
+        self.assertIn(blocker_id, gaps)
+        self.assertNotIn(blocker_id, satisfied_by)
+
+    def test_minimum_promoted_demand_family_rejects_foundation_package_shape_equivalent(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        blocker_id = "obelisk.inventory_items_mutation.v1"
+        equivalent_id = "obelisk.plugin_hub_foundation_package_shape_equivalent.v1"
+        surfaces_by_id = {
+            surface_id: {"id": surface_id, "status": "promoted"}
+            for surface_id in module.CANONICAL_COMPLETE_SDK_MINIMUM_PROMOTED_DEMAND_FAMILIES
+        }
+        surfaces_by_id[blocker_id] = {"id": blocker_id, "status": "excluded"}
+        surfaces_by_id[equivalent_id] = {
+            "id": equivalent_id,
+            "status": "promoted",
+            "v1_completion_equivalent_for": [blocker_id],
+            "evidence": {
+                "tests": ["tests/sdk_consumer"],
+                "schemas": ["obelisk.plugin-hub-foundation-package-shape.v1"],
+            },
+        }
+        stable_contract = {
+            "promoted_demand_family_equivalents": {
+                blocker_id: equivalent_id,
+            }
+        }
+
+        gaps, satisfied_by = module.complete_sdk_minimum_promoted_demand_family_gaps(
+            surfaces_by_id,
+            stable_contract,
+        )
+
+        self.assertFalse(module.reviewed_completion_equivalent_allowed(blocker_id, equivalent_id))
+        self.assertIn(blocker_id, gaps)
+        self.assertNotIn(blocker_id, satisfied_by)
 
     def test_minimum_promoted_demand_family_rejects_p0_equivalent(self) -> None:
         import importlib.util

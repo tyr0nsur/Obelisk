@@ -102,10 +102,22 @@ This file is an active routing table only. Durable evidence belongs in
   non-approved request-pack paths while trying to validate sidecars. Validation passed
   with the P0 route suite; route gate remains planning-only and SDK completion still fails
   closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
+- 2026-06-02 follow-up guardrails: permissions/admin public readiness now enforces
+  cache key sequence, blocked public cache ABI, cache invalidation semantics, manifest
+  public-header path matching, protected/symlink public-header rejection, and additional
+  permissions/admin header aliases. SDK v1 completion now rejects all demand-family
+  equivalents unless an explicit reviewed allowlist names the blocker/equivalent pair;
+  the allowlist is intentionally empty. ResourceHandle readiness now scans the
+  `obelisk.object_identity_resource_handle.v1` surface row for positive public
+  ResourceHandle/object lookup/post-callback claims, not only public gameplay events.
+  Route gate remains planning-only with `approved_runtime_evidence_missing`; SDK
+  completion remains fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete
+  SDK `0/12`.
 - Deferred audited guardrails: player-identity approved evidence should rerun or strongly
-  verify its window/request sidecars beyond path/hash checks; permissions/admin should
-  validate cache generation semantics and expand public header alias/protected-path
-  coverage; SDK v1 completion should reject weak non-canonical demand-family equivalents.
+  verify its window/request sidecars beyond path/hash checks by replaying or strongly
+  comparing the operational window manifest and request sidecars. Expired request-window
+  checks need careful handling for already-captured approved evidence; drift such as
+  target/window/env/preflight mismatch must still fail.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
