@@ -740,6 +740,73 @@ command response, commands/replies, Inventory/Items SDKs, Structure SDK,
 Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a stable SDK
 claim.
 
+## Executed-Test Replay And Artifact-Gate Promote-Mode Closure
+
+The next supervised round split four scopes across sub-agents and closed two additional
+replay/promote-mode gaps while preserving fail-closed SDK accounting:
+
+- `scripts/check_public_sdk_v1_completion.py` now requires promoted P0 executed-test
+  artifacts to include canonical provenance:
+  `producer=obelisk.promoted-surface-test-execution-runner.v1`,
+  `checker=scripts/check_public_sdk_v1_completion.py`, and ISO-like `produced_at_utc`.
+  The same artifacts must bind inputs for `docs/public_sdk_surfaces.json` and
+  `include/obelisk/ObeliskApi.h` by repo-relative path and current SHA256. Otherwise
+  well-shaped local JSON artifacts no longer satisfy P0 structured evidence.
+- P0 row accounting now treats route-gate satisfaction as fail-closed. A P0 row cannot
+  count while the route gate is planning-only, locked, invalid, has blockers, carries any
+  current blocker, or lacks promotion/public/runtime readiness. This explicitly covers
+  both the default `lifecycle_anchor_first_evidence_provenance_unbound` blocker and the
+  explicit bound-route `approved_runtime_evidence_missing` blocker.
+- `scripts/validate_offline_artifact_gate.py` now blocks every
+  `obelisk.reflection-snapshot-readiness.v1` report in promote mode, including not-ready
+  reports. It also rejects `promotion_ready`, `public_sdk_ready`, and `runtime_ready`
+  overclaims on not-ready readiness reports.
+- The real producer path,
+  `scripts/compare_reflection_snapshots.py --readiness-report --json`, was audited. It
+  already emits `evidence_scope=second_source_layout_evidence_only`,
+  `not_promoted_surfaces`, `non_claims`, `ready_scope=layout_only` when ready,
+  `layout_ready`, and false promotion/public/runtime readiness. No producer change was
+  needed.
+- The artifact-gate full suite exposed a test drift in command response route planning:
+  `validate_offline_artifact_gate.py` called
+  `check_command_chat_response_public_readiness.validate_readiness` without the now
+  required `root` argument. The gate now passes `root=readiness_path.parent`.
+  The same full-suite run exposed that imported approved player-identity runtime
+  fixtures need the existing test-only
+  `OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES=1` opt-in; the artifact-gate tests now set that
+  env only around those fixture-backed tests.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 135 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_validate_offline_artifact_gate`
+  passed with 353 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  P0 progress `0/4`, and default blocker
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed with `valid=true`, `planning_only=true`, `promotion_ready=false`, and current
+  blocker `lifecycle_anchor_first_evidence_provenance_unbound`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_compare_reflection_snapshots`
+  was run by the readiness producer auditor and passed with 102 tests.
+- `git diff --check` passed.
+
+Remaining risks:
+
+- The executed-test artifact schema is now stricter, but future promotion should still
+  prefer a canonical runner that writes these artifacts from actual child check execution
+  rather than hand-authored JSON.
+- The route-gate accounting rule is intentionally conservative. Future work that wants P0
+  rows to count must first introduce a non-planning unlocked route-gate state with no
+  blocker and explicit promotion/public/runtime readiness semantics.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command response, commands/replies, Inventory/Items SDKs, Structure SDK,
+Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a stable SDK
+claim.
+
 ## Command/Replies Structured Promotion Evidence And Alias Closure
 
 The next supervised round closed the remaining P0 synthetic promotion-accounting gap for

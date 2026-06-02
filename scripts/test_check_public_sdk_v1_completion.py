@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -20,12 +21,19 @@ SCOPED_RELEASE_STATEMENT_TEMPLATE = (
 PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA = (
     "obelisk.promoted-surface-test-execution-artifact.v1"
 )
+PROMOTED_SURFACE_TEST_EXECUTION_PRODUCER = "obelisk.promoted-surface-test-execution-runner.v1"
+PROMOTED_SURFACE_TEST_EXECUTION_CHECKER = "scripts/check_public_sdk_v1_completion.py"
+PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 EXPERIMENTAL_EXCLUSION_DETAILS = {
     "obelisk.gameplay_policy_event.v1": "GameplayPolicyEvent is not included in v1.",
     "obelisk.chat_message.v1": "ChatMessageEvent is not included in v1.",
     "obelisk.chat.local_routing.v1": "chat routing is not included in v1.",
     "obelisk.inventory_item_copied_signals.v1": "inventory copied signals are not included in v1.",
 }
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def current_repo_head() -> str:
@@ -49,9 +57,22 @@ def write_executed_test_artifact(
     payload: dict[str, object] = {
         "schema": PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA,
         "surface_id": surface_id,
+        "producer": PROMOTED_SURFACE_TEST_EXECUTION_PRODUCER,
+        "checker": PROMOTED_SURFACE_TEST_EXECUTION_CHECKER,
+        "produced_at_utc": "2026-06-02T00:00:00+00:00",
         "obelisk_commit": current_repo_head(),
         "exit_code": 0,
         "output_sha256": "0" * 64,
+        "inputs": {
+            "public_sdk_surfaces": {
+                "path": str(PUBLIC_SDK_SURFACES.relative_to(REPO_ROOT)),
+                "sha256": sha256_file(PUBLIC_SDK_SURFACES),
+            },
+            "public_header": {
+                "path": str(PUBLIC_HEADER.relative_to(REPO_ROOT)),
+                "sha256": sha256_file(PUBLIC_HEADER),
+            },
+        },
     }
     if argv is not None:
         payload["argv"] = argv
@@ -5388,30 +5409,63 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             module.surface_missing_required_promotion_evidence = lambda surface: []
             module.surface_missing_structured_promotion_evidence = lambda surface: []
 
-            rows = module.completion_blocker_outcome_rows(
-                ["obelisk.player_identity.v1"],
-                {
-                    "obelisk.player_identity.v1": {
-                        "id": "obelisk.player_identity.v1",
-                        "status": "promoted",
-                        "evidence": {},
+            surface = {
+                "id": "obelisk.player_identity.v1",
+                "status": "promoted",
+                "evidence": {},
+            }
+
+            def row_for_route_gate(route_gate: dict[str, object]) -> dict[str, object]:
+                return module.completion_blocker_outcome_rows(
+                    ["obelisk.player_identity.v1"],
+                    {"obelisk.player_identity.v1": surface},
+                    set(),
+                    "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence.\n",
+                    route_gate,
+                )[0]
+
+            blocked_rows = [
+                row_for_route_gate(
+                    {
+                        "valid": True,
+                        "planning_only": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "route_lock_locked": True,
+                        "current_blocker": blocker,
+                        "blockers": [],
                     }
-                },
-                set(),
-                "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence.\n",
+                )
+                for blocker in (
+                    "lifecycle_anchor_first_evidence_provenance_unbound",
+                    "approved_runtime_evidence_missing",
+                )
+            ]
+            unlocked_row = row_for_route_gate(
                 {
-                    "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
-                },
+                    "valid": True,
+                    "planning_only": False,
+                    "promotion_ready": True,
+                    "public_sdk_ready": True,
+                    "runtime_ready": True,
+                    "route_lock_locked": False,
+                    "current_blocker": None,
+                    "blockers": [],
+                }
             )
         finally:
             module.surface_has_promotion_evidence = original_surface_has_promotion_evidence
             module.surface_missing_required_promotion_evidence = original_missing_required
             module.surface_missing_structured_promotion_evidence = original_missing_structured
 
-        self.assertTrue(rows[0]["promotion_evidence_satisfied"])
-        self.assertTrue(rows[0]["structured_promotion_evidence_satisfied"])
-        self.assertFalse(rows[0]["route_gate_claim_satisfied"])
-        self.assertFalse(rows[0]["counts_toward_complete_sdk_claim"])
+        for row in blocked_rows:
+            self.assertTrue(row["promotion_evidence_satisfied"])
+            self.assertTrue(row["structured_promotion_evidence_satisfied"])
+            self.assertFalse(row["route_gate_claim_satisfied"])
+            self.assertFalse(row["counts_toward_complete_sdk_claim"])
+        self.assertTrue(unlocked_row["route_gate_claim_satisfied"])
+        self.assertTrue(unlocked_row["counts_toward_complete_sdk_claim"])
 
     def test_commands_replies_requires_response_path_semantic_evidence_terms(self) -> None:
         import importlib.util
@@ -5557,6 +5611,74 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertEqual(missing, [])
+
+    def test_p0_executed_test_artifact_missing_canonical_provenance_is_rejected(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="ExecutedReportMissingProvenance",
+        ) as core_dir:
+            artifact = Path(core_dir) / "player_identity_executed_tests.json"
+            artifact_path = write_executed_test_artifact(
+                artifact,
+                "obelisk.player_identity.v1",
+                argv=["python3", "-m", "unittest", "player_identity_promotion"],
+            )
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            for key in ("producer", "checker", "produced_at_utc"):
+                payload.pop(key)
+            artifact.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+            missing = module.executed_test_report_missing(
+                {"executed_test_report": artifact_path},
+                "obelisk.player_identity.v1",
+            )
+
+        self.assertEqual(
+            missing,
+            [
+                "executed_test_report:producer_invalid",
+                "executed_test_report:checker_invalid",
+                "executed_test_report:produced_at_utc_invalid",
+            ],
+        )
+
+    def test_p0_executed_test_artifact_missing_input_bindings_is_rejected(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="ExecutedReportMissingInputs",
+        ) as core_dir:
+            artifact = Path(core_dir) / "permissions_admin_executed_tests.json"
+            artifact_path = write_executed_test_artifact(
+                artifact,
+                "obelisk.permissions_admin.v1",
+                argv=["python3", "-m", "unittest", "permissions_admin_promotion"],
+            )
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            payload.pop("inputs")
+            artifact.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+            missing = module.executed_test_report_missing(
+                {"executed_test_report": artifact_path},
+                "obelisk.permissions_admin.v1",
+            )
+
+        self.assertEqual(missing, ["executed_test_report:inputs_missing"])
 
     def test_commands_replies_accepts_complete_structured_command_response_dependency_evidence(self) -> None:
         import importlib.util

@@ -5958,6 +5958,53 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
 
         self.assertEqual(result["blockers"], [])
 
+    def test_blocks_not_ready_readiness_report_in_promote_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            write_json(manifest, readiness_report_manifest(ready=False))
+
+            result = gate.build_result(
+                args(root=workspace, protected_root=protected, manifests=[manifest], mode="promote")
+            )
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("promote_mode_readiness_report_layout_only", reasons)
+
+    def test_blocks_not_ready_readiness_report_with_promotion_ready_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            payload = readiness_report_manifest(ready=False)
+            payload["promotion_gate"]["promotion_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("readiness_report_promotion_ready_not_false", reasons)
+
+    def test_blocks_not_ready_readiness_report_with_runtime_or_public_sdk_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "readiness.json"
+            payload = readiness_report_manifest(ready=False)
+            payload["promotion_gate"]["public_sdk_ready"] = True
+            payload["promotion_gate"]["runtime_ready"] = True
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertEqual("blocked", result["status"])
+        self.assertIn("readiness_report_public_sdk_ready_not_false", reasons)
+        self.assertIn("readiness_report_runtime_ready_not_false", reasons)
+
     def test_blocks_ready_readiness_report_without_layout_boundaries(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"
@@ -7196,7 +7243,10 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("players_identity_runtime_principal_lifecycle_evidence_readiness_overclaim", reasons)
 
     def test_accepts_players_identity_runtime_principal_lifecycle_approved_evidence_for_consume_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+        ):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "players-identity-runtime-principal-lifecycle-approved-evidence.json"
@@ -7208,7 +7258,10 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertEqual(result["blockers"], [])
 
     def test_blocks_players_identity_runtime_principal_lifecycle_approved_evidence_in_promote_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+        ):
             protected = Path(tmp) / "server"
             workspace = protected / "workspace-offline"
             manifest = workspace / "players-identity-runtime-principal-lifecycle-approved-evidence.json"

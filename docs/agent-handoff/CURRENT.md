@@ -487,6 +487,22 @@ This file is an active routing table only. Durable evidence belongs in
     registration rollback: injected ItemReturn registration failure after earlier
     families returns handle `0` and leaves Structure/Inventory/ItemReturn subscription
     counts at zero.
+- Latest follow-up round tightened those same gates further:
+  - Promoted P0 executed-test artifacts must now carry canonical provenance
+    (`producer=obelisk.promoted-surface-test-execution-runner.v1`, checker path, and
+    `produced_at_utc`) plus SHA256-bound inputs for `docs/public_sdk_surfaces.json` and
+    `include/obelisk/ObeliskApi.h`. Well-shaped local JSON without those bindings is
+    rejected.
+  - P0 route-gate accounting now stays false for any planning-only, locked, invalid, or
+    blocker-bearing route gate, including the explicit
+    `approved_runtime_evidence_missing` blocker. Promoted-looking P0 rows cannot increase
+    progress while the route remains identity-blocked.
+  - `scripts/validate_offline_artifact_gate.py` now blocks every reflection snapshot
+    readiness report in promote mode, even when `promotion_gate.ready=false`, and rejects
+    `promotion_ready`/`public_sdk_ready`/`runtime_ready` overclaims on not-ready reports.
+  - The real `scripts/compare_reflection_snapshots.py --readiness-report --json`
+    producer was audited and already emits the required layout-only envelope; no producer
+    edit was needed.
 
 ## Priority Next Steps
 

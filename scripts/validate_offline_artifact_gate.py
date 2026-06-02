@@ -4267,6 +4267,15 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
 
     if payload.get("gate_mode") != "second_source_promotion":
         blockers.append({"reason": "readiness_report_gate_mode_not_second_source_promotion", "label": label})
+    for key, reason in (
+        ("promotion_ready", "readiness_report_promotion_ready_not_false"),
+        ("public_sdk_ready", "readiness_report_public_sdk_ready_not_false"),
+        ("runtime_ready", "readiness_report_runtime_ready_not_false"),
+    ):
+        if promotion_gate.get(key) not in (None, False):
+            blockers.append({"reason": reason, "label": label})
+    if mode == "promote":
+        blockers.append({"reason": "promote_mode_readiness_report_layout_only", "label": label})
     target_sets = payload.get("target_sets")
     if not isinstance(target_sets, list) or any(not isinstance(item, str) or not item for item in target_sets):
         blockers.append({"reason": "readiness_report_target_sets_invalid", "label": f"{label}:$.target_sets"})
@@ -4319,8 +4328,6 @@ def validate_readiness_report_manifest(payload: dict[str, Any], *, label: str, m
         surfaces = payload.get("not_promoted_surfaces")
         if not isinstance(surfaces, list) or set(surfaces) != REQUIRED_READINESS_NON_PROMOTED_SURFACES:
             blockers.append({"reason": "readiness_report_missing_non_promoted_surfaces", "label": label})
-        if mode == "promote":
-            blockers.append({"reason": "promote_mode_readiness_report_layout_only", "label": label})
     return blockers
 
 
@@ -4541,7 +4548,11 @@ def validate_command_chat_response_route_planning_manifest(
                 )
             )
             readiness_blockers: list[dict[str, Any]] = []
-            command_chat_response_public_readiness.validate_readiness(readiness_payload, readiness_blockers)
+            command_chat_response_public_readiness.validate_readiness(
+                readiness_payload,
+                readiness_blockers,
+                root=readiness_path.parent,
+            )
             blockers.extend(
                 {
                     "reason": f"command_chat_response_route_{blocker['reason']}",

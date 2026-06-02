@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -386,6 +387,12 @@ GENERIC_SCRIPT_EVIDENCE_DENYLIST = {
 PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA = (
     "obelisk.promoted-surface-test-execution-artifact.v1"
 )
+PROMOTED_SURFACE_TEST_EXECUTION_PRODUCER = "obelisk.promoted-surface-test-execution-runner.v1"
+PROMOTED_SURFACE_TEST_EXECUTION_CHECKER = "scripts/check_public_sdk_v1_completion.py"
+PROMOTED_SURFACE_TEST_EXECUTION_INPUT_BINDINGS = {
+    "public_sdk_surfaces": DEFAULT_MANIFEST,
+    "public_header": DEFAULT_PUBLIC_HEADER,
+}
 PROMOTED_SURFACE_TEST_EXECUTION_COMMIT_KEYS = (
     "head",
     "current_head",
@@ -401,6 +408,10 @@ PROMOTED_SURFACE_TEST_EXECUTION_HASH_KEYS = (
     "provenance_hash",
     "artifact_hash",
     "artifact_sha256",
+)
+SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
+UTC_TIMESTAMP_RE = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})"
 )
 AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:complete|full|production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
@@ -2121,6 +2132,53 @@ def executed_test_artifact_has_hash(report: dict[str, Any]) -> bool:
     return False
 
 
+def sha256_file(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def repo_relative_text(path: Path) -> str:
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def executed_test_artifact_missing_provenance(report: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    if report.get("producer") != PROMOTED_SURFACE_TEST_EXECUTION_PRODUCER:
+        missing.append("executed_test_report:producer_invalid")
+    if report.get("checker") != PROMOTED_SURFACE_TEST_EXECUTION_CHECKER:
+        missing.append("executed_test_report:checker_invalid")
+    produced_at = report.get("produced_at_utc")
+    if not isinstance(produced_at, str) or UTC_TIMESTAMP_RE.fullmatch(produced_at.strip()) is None:
+        missing.append("executed_test_report:produced_at_utc_invalid")
+    return missing
+
+
+def executed_test_artifact_missing_input_bindings(report: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    inputs = report.get("inputs")
+    if not isinstance(inputs, dict):
+        return ["executed_test_report:inputs_missing"]
+    for key, expected_path in PROMOTED_SURFACE_TEST_EXECUTION_INPUT_BINDINGS.items():
+        binding = inputs.get(key)
+        if not isinstance(binding, dict):
+            missing.append(f"executed_test_report:inputs.{key}_missing")
+            continue
+        expected_relative = repo_relative_text(expected_path)
+        if binding.get("path") != expected_relative:
+            missing.append(f"executed_test_report:inputs.{key}_path_invalid")
+        actual_sha256 = sha256_file(expected_path)
+        binding_sha256 = binding.get("sha256")
+        if not isinstance(binding_sha256, str) or SHA256_RE.fullmatch(binding_sha256.strip()) is None:
+            missing.append(f"executed_test_report:inputs.{key}_sha256_invalid")
+        elif actual_sha256 is None:
+            missing.append(f"executed_test_report:inputs.{key}_sha256_unavailable")
+        elif binding_sha256.lower() != actual_sha256:
+            missing.append(f"executed_test_report:inputs.{key}_sha256_mismatch")
+    return missing
+
+
 def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> list[str]:
     missing: list[str] = []
     executed, error = load_repo_relative_json_artifact(evidence.get("executed_test_report"))
@@ -2149,6 +2207,8 @@ def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> l
         missing.append("executed_test_report:exit_code_not_zero")
     if not executed_test_artifact_has_hash(executed):
         missing.append("executed_test_report:output_or_provenance_hash_missing")
+    missing.extend(executed_test_artifact_missing_provenance(executed))
+    missing.extend(executed_test_artifact_missing_input_bindings(executed))
     return missing
 
 
@@ -2442,11 +2502,18 @@ def completion_blocker_outcome_rows(
     rows: list[dict[str, Any]] = []
     counts_by_surface: dict[str, bool] = {}
     route_gate_current_blocker = None
-    route_gate_blocks_p0_promotion_accounting = False
+    route_gate_satisfies_p0_claim_accounting = False
     if isinstance(command_permission_route_gate, dict):
         route_gate_current_blocker = command_permission_route_gate.get("current_blocker")
-        route_gate_blocks_p0_promotion_accounting = (
-            route_gate_current_blocker == "lifecycle_anchor_first_evidence_provenance_unbound"
+        route_gate_satisfies_p0_claim_accounting = (
+            command_permission_route_gate.get("valid") is True
+            and command_permission_route_gate.get("planning_only") is False
+            and command_permission_route_gate.get("promotion_ready") is True
+            and command_permission_route_gate.get("public_sdk_ready") is True
+            and command_permission_route_gate.get("runtime_ready") is True
+            and command_permission_route_gate.get("route_lock_locked") is False
+            and route_gate_current_blocker is None
+            and command_permission_route_gate.get("blockers") == []
         )
     for index, surface_id in enumerate(completion_blockers, start=1):
         surface = surfaces_by_id.get(surface_id, {})
@@ -2472,8 +2539,8 @@ def completion_blocker_outcome_rows(
             is_p0_dependency_chain
             and manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
         )
-        route_gate_claim_satisfied = not (
-            is_p0_dependency_chain and route_gate_blocks_p0_promotion_accounting
+        route_gate_claim_satisfied = (
+            not is_p0_dependency_chain or route_gate_satisfies_p0_claim_accounting
         )
         dependency_claims_satisfied = True
         dependency_ids = as_string_list(surface.get("depends_on")) if surface else []

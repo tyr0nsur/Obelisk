@@ -695,6 +695,20 @@ priorities, and do not use history files as the active source of truth.
   - `PluginManagerTests` includes a test-only injected ItemReturn registration failure
     proving public `GameplayPolicyEvent` multi-dispatcher registration rolls back
     Structure/Inventory/ItemReturn subscriptions and returns handle `0`.
+- Follow-up on the same checkpoint tightened replay and promote-mode gaps:
+  - P0 executed-test artifacts now require canonical producer/checker/timestamp
+    provenance and SHA256-bound `docs/public_sdk_surfaces.json` plus
+    `include/obelisk/ObeliskApi.h` input bindings.
+  - P0 completion accounting stays route-gate-blocked for any planning-only, locked,
+    invalid, blocker-bearing, or identity-blocked route, including
+    `approved_runtime_evidence_missing`; only a non-planning, unlocked, promotion/public/
+    runtime-ready route with no current blocker can satisfy P0 claim accounting.
+  - `validate_offline_artifact_gate.py` blocks all reflection snapshot readiness reports
+    in promote mode, including `promotion_gate.ready=false`, and rejects
+    `promotion_ready`, `public_sdk_ready`, or `runtime_ready` overclaims on not-ready
+    reports.
+  - `compare_reflection_snapshots.py` was audited and already emits the required
+    layout-only readiness envelope; no producer edit was needed.
 
 ## Agent Coordination
 
