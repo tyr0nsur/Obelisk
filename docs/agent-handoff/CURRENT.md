@@ -69,7 +69,8 @@ This file is an active routing table only. Durable evidence belongs in
 - 2026-06-02 post-compaction reorganization checkpoint: the lead reran the canonical
   offline checks from the current worktree. `PYTHONDONTWRITEBYTECODE=1 python3
   scripts/check_command_permission_route_gate.py --json` passes as planning-only with
-  `approved_runtime_evidence_missing`; `PYTHONDONTWRITEBYTECODE=1 python3
+  `lifecycle_anchor_first_evidence_provenance_unbound` on the default route;
+  `PYTHONDONTWRITEBYTECODE=1 python3
   scripts/check_public_sdk_v1_completion.py --json` still fails closed with
   `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`;
   `PYTHONDONTWRITEBYTECODE=1 python3
@@ -91,8 +92,11 @@ This file is an active routing table only. Durable evidence belongs in
   now distinguish mixed positive claims after `but/then/however` from legitimate
   `before/until/only/never` non-claims. Commands/replies public readiness now requires the
   exact composed `command_chat_response_public_readiness` report and rejects raw
-  `obelisk.reflection-snapshot-readiness.v1` as a dependency artifact. Route gate remains
-  planning-only and still blocks at `approved_runtime_evidence_missing`.
+  `obelisk.reflection-snapshot-readiness.v1` as a dependency artifact. The default route
+  gate remains planning-only and blocks at
+  `lifecycle_anchor_first_evidence_provenance_unbound`; only explicit bound
+  lifecycle/principal planning artifacts may advance the route to
+  `approved_runtime_evidence_missing`.
 - 2026-06-02 identity/permissions evidence-gate hardening: the permissions/admin
   query fail-closed checker now rejects ABI order drift and duplicates for query fields,
   decision fields/results, fail-closed cases, and reason flags, including flag-name to
@@ -110,9 +114,9 @@ This file is an active routing table only. Durable evidence belongs in
   the allowlist is intentionally empty. ResourceHandle readiness now scans the
   `obelisk.object_identity_resource_handle.v1` surface row for positive public
   ResourceHandle/object lookup/post-callback claims, not only public gameplay events.
-  Route gate remains planning-only with `approved_runtime_evidence_missing`; SDK
-  completion remains fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete
-  SDK `0/12`.
+  The default route gate remains planning-only with
+  `lifecycle_anchor_first_evidence_provenance_unbound`; SDK completion remains
+  fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
 - 2026-06-02 approved-evidence and Mission frontier hardening: approved player-identity
   runtime evidence now replays the operational `window-manifest.env` and compares the
   replayed operational-window projection against the embedded report, so mutated
@@ -128,9 +132,10 @@ This file is an active routing table only. Durable evidence belongs in
   checker-emitted `readiness_path`, `decisions_path`, `surfaces_path`,
   `public_header_path`, and acceptable `surfaces_status` provenance fields. These embedded
   paths are treated as report provenance strings only; the checker validates the report
-  file itself and does not reopen temp-path provenance. Route gate remains planning-only
-  and still blocks at `approved_runtime_evidence_missing`; SDK completion remains
-  fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
+  file itself and does not reopen temp-path provenance. The default route gate now remains
+  planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`; an explicit
+  bound route may advance only to `approved_runtime_evidence_missing`. SDK completion
+  remains fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
 - 2026-06-02 Structure/P0/ResourceHandle guardrail hardening: structure build-policy
   offline intake now validates manifest-level `obelisk.structure_census.v1` posture
   against promoted/planning list placement, `status=planning`, `support_tier=blocked`, and
@@ -223,10 +228,12 @@ This file is an active routing table only. Durable evidence belongs in
   v1 completion readiness is promoted.
 - New deferred P0 offline route-provenance risk: command/chat response public readiness can
   still consume a well-shaped synthetic `--command-response-readiness` JSON that is not
-  bound to the supplied `--command-response-root` or regenerated snapshot provenance. The
-  aggregate route remains planning-only and still blocks at approved runtime principal
-  lifecycle evidence, but the next P0 guardrail target should bind or regenerate command
-  response readiness artifacts before the route treats them as aligned planning evidence.
+  bound to the supplied `--command-response-root` or regenerated snapshot provenance. This
+  was a downstream route-provenance risk only after explicit identity source binding; the
+  default aggregate route now remains planning-only at
+  `lifecycle_anchor_first_evidence_provenance_unbound`. The next P0 guardrail target was
+  to bind or regenerate command response readiness artifacts before the route treats them
+  as aligned planning evidence.
 - 2026-06-02 P0 command response provenance closure: command/chat response public
   readiness now binds the readiness JSON to its selected root, requires target-detail
   snapshot paths to be the expected files under `base-snapshots/`, and emits
@@ -278,6 +285,15 @@ This file is an active routing table only. Durable evidence belongs in
   the route gate with explicit bound inputs. A valid wrapper report may show only
   `approved_runtime_evidence_missing`; it still authorizes no runtime/server work and no
   public SDK/ABI/v1 readiness.
+- Latest bound-identity/default-route/SDK rerun: the default
+  `scripts/check_command_permission_route_gate.py --json` route remains planning-only and
+  blocks at `lifecycle_anchor_first_evidence_provenance_unbound` when explicit bound
+  lifecycle/principal manifests are not supplied. The explicit wrapper may advance only to
+  `approved_runtime_evidence_missing` with all public/runtime/promotion/v1 flags false.
+  `scripts/check_public_sdk_v1_completion.py --json` still fails closed with
+  `stable_claim_allowed=false`, complete-SDK `0/12`, and P0 `0/4`. This is offline
+  routing evidence only: no runtime/server work, public identity, permissions/admin,
+  command response, commands/replies, release readiness, or completion claim is promoted.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -361,11 +377,13 @@ This file is an active routing table only. Durable evidence belongs in
 
 ## Priority Next Steps
 
-- P0: run `scripts/check_command_permission_route_gate_bound_identity_sources.py` with
-  explicit lifecycle-anchor/principal-policy planning manifests; then, once that wrapper
-  reports `approved_runtime_evidence_missing`, request approved copied runtime principal
-  lifecycle evidence from a copied, redacted observer log; then review the public identity
-  contract before any permissions/admin, command response, or commands/replies ABI.
+- P0: first run `scripts/check_command_permission_route_gate_bound_identity_sources.py`
+  with explicit lifecycle-anchor/principal-policy planning manifests and confirm the
+  wrapper route blocker is only `approved_runtime_evidence_missing`. Do not treat the
+  default-route `lifecycle_anchor_first_evidence_provenance_unbound` blocker as
+  runtime-evidence work. After the runtime principal lifecycle evidence blocker is
+  cleared by future scoped evidence, review the identity contract before
+  permissions/admin, command response, or commands/replies ABI.
 - Offline: keep tightening guardrails around permissions/admin query-only provenance,
   command/principal contracts, command route drift, inventory copied-signal hygiene, and
   structure build-policy snapshot envelopes.

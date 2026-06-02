@@ -210,6 +210,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(inventory_stability["public_sdk_ready"])
         self.assertFalse(inventory_stability["v1_completion_ready"])
         self.assertNotIn("inventory_copied_signals_stability_invalid", payload["blockers"])
+        route_gate = payload["command_permission_route_gate"]
+        self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
+        self.assertEqual(
+            route_gate["source_checker_primary_blocker"],
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+        )
+        self.assertEqual(
+            route_gate["route_lock_blocked_until"],
+            ["bound_lifecycle_anchor_and_principal_policy_sources", "reviewed_identity_public_contract"],
+        )
         progress = payload["v1_sdk_progress"]
         self.assertEqual(progress["completion_blocker_total"], 12)
         self.assertEqual(progress["completion_blockers_promoted_count"], 0)
@@ -545,6 +555,53 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("command_permission_route_gate_schema_mismatch", payload["blockers"])
+
+    def test_completion_gate_rejects_default_route_gate_runtime_blocker_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = Path(temp_dir) / "fake_route_gate.py"
+            route_gate_path.write_text(
+                "import json\n"
+                "print(json.dumps({\n"
+                "    'schema': 'obelisk.command-permission-route-gate-check.v1',\n"
+                "    'valid': True,\n"
+                "    'accepted_for_planning': True,\n"
+                "    'planning_only': True,\n"
+                "    'promotion_ready': False,\n"
+                "    'public_sdk_ready': False,\n"
+                "    'public_abi_ready': False,\n"
+                "    'runtime_ready': False,\n"
+                "    'public_header_allowed': False,\n"
+                "    'critical_path_phase': {\n"
+                "        'current_blocker': 'approved_runtime_evidence_missing',\n"
+                "        'source_checker_primary_blocker': 'approved_runtime_evidence_missing'\n"
+                "    },\n"
+                "    'route_lock': {\n"
+                "        'blocked_until': ['approved_runtime_principal_lifecycle_evidence', 'reviewed_identity_public_contract']\n"
+                "    },\n"
+                "    'checks': [],\n"
+                "    'blockers': []\n"
+                "} ))\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_default_blocker_mismatch", payload["blockers"])
+        self.assertIn("command_permission_route_gate_default_source_blocker_mismatch", payload["blockers"])
+        route_gate = payload["command_permission_route_gate"]
+        self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(route_gate["source_checker_primary_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(
+            route_gate["route_lock_blocked_until"],
+            ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
+        )
 
     def test_route_gate_claim_scanner_rejects_public_command_reply_aliases(self) -> None:
         import importlib.util

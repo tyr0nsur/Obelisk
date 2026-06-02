@@ -28,6 +28,7 @@ RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
 GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 
 
 def future_window_fields() -> dict[str, str]:
@@ -129,7 +130,7 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         "approval_required": "current-turn operator-approved runtime window, not standing approval",
         "target": {"instance": target[0], "map": target[1]},
         "run_id": fields["run_id"],
-        "ark_binary_sha256": "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+        "ark_binary_sha256": ARK_SHA,
         "obelisk_commit": fields.get("obelisk_commit", "missing-obelisk-commit"),
         "approved_window": {
             "start_utc": fields["approved_window_start_utc"],
@@ -195,15 +196,21 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
                 "OBELISK_DISABLE_PLUGINS=1",
                 "OBELISK_WRAPPER_PROFILE=observer-debug",
                 "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
-                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520",
+                f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={ARK_SHA}",
                 "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
                 "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
                 "OBELISK_PE_TRACE_LIMIT=0",
             ]
         )
         + "\n",
-        "preflight_pre": "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
-        "preflight_post": "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+        "preflight_pre": (
+            "player_principal_lifecycle_preflight=ok "
+            f"mode=observer-window instance=arkserver2 binary_sha256={ARK_SHA}\n"
+        ),
+        "preflight_post": (
+            "player_principal_lifecycle_preflight=ok "
+            f"mode=stable instance=arkserver2 binary_sha256={ARK_SHA}\n"
+        ),
     }
     key_map = {
         "request_pack": ("request_pack_path", "request_pack_sha256"),
@@ -388,6 +395,76 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--copied-log is only valid with --emit-template", result.stderr)
+
+    def test_validate_preflight_content_requires_reviewed_binary_sha(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "window-manifest.env"
+            preflight_path = root / "preflight-pre.txt"
+            preflight_path.write_text(
+                "player_principal_lifecycle_preflight=ok "
+                f"mode=observer-window instance=arkserver2 binary_sha256={ARK_SHA}\n",
+                encoding="utf-8",
+            )
+            fields = {"preflight_pre_path": str(preflight_path)}
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                CHECKER.validate_preflight_content(
+                    fields,
+                    manifest_path,
+                    blockers,
+                    path_key="preflight_pre_path",
+                    expected_mode="observer-window",
+                    target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        self.assertEqual([], blockers)
+
+    def test_validate_preflight_content_rejects_missing_or_wrong_binary_sha(self) -> None:
+        for content, expected_reason in (
+            (
+                "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+                "preflight_pre_path_binary_sha256_missing",
+            ),
+            (
+                "player_principal_lifecycle_preflight=ok "
+                f"mode=observer-window instance=arkserver2 binary_sha256={'0' * 64}\n",
+                "preflight_pre_path_binary_sha256_mismatch",
+            ),
+        ):
+            with self.subTest(expected_reason=expected_reason):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    manifest_path = root / "window-manifest.env"
+                    preflight_path = root / "preflight-pre.txt"
+                    preflight_path.write_text(content, encoding="utf-8")
+                    fields = {"preflight_pre_path": str(preflight_path)}
+                    blockers: list[dict[str, object]] = []
+                    original_server_root = CHECKER.SERVER_ROOT
+                    original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+                    try:
+                        CHECKER.SERVER_ROOT = root / "protected"
+                        CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                        CHECKER.validate_preflight_content(
+                            fields,
+                            manifest_path,
+                            blockers,
+                            path_key="preflight_pre_path",
+                            expected_mode="observer-window",
+                            target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                        )
+                    finally:
+                        CHECKER.SERVER_ROOT = original_server_root
+                        CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+                self.assertIn(expected_reason, [item["reason"] for item in blockers])
 
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)

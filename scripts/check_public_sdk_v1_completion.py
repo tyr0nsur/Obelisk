@@ -804,6 +804,14 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
     for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
         if payload.get(key) is not False:
             blockers.append(f"command_permission_route_gate_{key}_not_false")
+    critical_path_phase = payload.get("critical_path_phase") if isinstance(payload.get("critical_path_phase"), dict) else {}
+    route_lock = payload.get("route_lock") if isinstance(payload.get("route_lock"), dict) else {}
+    current_blocker = critical_path_phase.get("current_blocker")
+    source_checker_primary_blocker = critical_path_phase.get("source_checker_primary_blocker")
+    if current_blocker != "lifecycle_anchor_first_evidence_provenance_unbound":
+        blockers.append("command_permission_route_gate_default_blocker_mismatch")
+    if source_checker_primary_blocker != "lifecycle_anchor_first_evidence_provenance_unbound":
+        blockers.append("command_permission_route_gate_default_source_blocker_mismatch")
     if public_or_runtime_claims:
         blockers.append("command_permission_route_gate_public_or_runtime_claims")
     return (
@@ -819,6 +827,9 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
             "public_abi_ready": payload.get("public_abi_ready"),
             "runtime_ready": payload.get("runtime_ready"),
             "public_header_allowed": payload.get("public_header_allowed"),
+            "current_blocker": current_blocker,
+            "source_checker_primary_blocker": source_checker_primary_blocker,
+            "route_lock_blocked_until": route_lock.get("blocked_until"),
             "public_or_runtime_claims": public_or_runtime_claims,
             "blockers": payload.get("blockers", []),
             "stderr": result.stderr.strip(),

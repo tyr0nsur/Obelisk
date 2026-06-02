@@ -42,6 +42,48 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             text=True,
         )
 
+    def test_identity_lock_mode_requires_default_route_to_stay_unbound(self) -> None:
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+        )
+        phase = {
+            "current_blocker": "approved_runtime_evidence_missing",
+            "source_checker_primary_blocker": "approved_runtime_evidence_missing",
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertIn(
+            "critical_path_identity_gate_mode_unexpected_blocker:'approved_runtime_evidence_missing'!='lifecycle_anchor_first_evidence_provenance_unbound'",
+            blockers,
+        )
+        self.assertIn(
+            "critical_path_identity_readiness_mode_unexpected_blocker:'approved_runtime_evidence_missing'!='lifecycle_anchor_first_evidence_provenance_unbound'",
+            blockers,
+        )
+
+    def test_identity_lock_mode_requires_bound_route_to_reach_runtime_blocker(self) -> None:
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+        )
+        phase = {
+            "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+            "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertIn(
+            "critical_path_identity_gate_mode_unexpected_blocker:'lifecycle_anchor_first_evidence_provenance_unbound'!='approved_runtime_evidence_missing'",
+            blockers,
+        )
+        self.assertIn(
+            "critical_path_identity_readiness_mode_unexpected_blocker:'lifecycle_anchor_first_evidence_provenance_unbound'!='approved_runtime_evidence_missing'",
+            blockers,
+        )
+
     def test_accepts_current_route_as_planning_only(self) -> None:
         result = self.run_checker("--json")
         report = json.loads(result.stdout)

@@ -84,9 +84,13 @@ evidence, and module side lanes are not substitutes for promotion of this chain.
 ## Identity Blocker
 
 Player identity is first. If the current offline identity packs continue to pass, the
-remaining blocker is an approved copied runtime principal lifecycle evidence window.
-Do not spend more rounds on broad offline rediscovery unless the binary/hash changes,
-the accepted packs fail, or a focused checker contradicts the current evidence.
+immediate default-route blocker is `lifecycle_anchor_first_evidence_provenance_unbound`.
+The next offline step is source-bound lifecycle-anchor/principal-policy planning artifacts,
+preferably through `scripts/check_command_permission_route_gate_bound_identity_sources.py`.
+A successful bound-wrapper run may advance only to `approved_runtime_evidence_missing`;
+that is the separate runtime principal lifecycle evidence blocker. Do not spend more
+rounds on broad offline rediscovery unless the binary/hash changes, the accepted packs
+fail, or a focused checker contradicts the current evidence.
 
 ## Post-P0 Target Map
 
@@ -774,6 +778,46 @@ The follow-up identity round added an offline binder for the aggregate provenanc
 Validation:
 
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_bind_player_identity_planning_sources scripts.test_check_player_identity_first_evidence_readiness`
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
+## Bound Route And Runtime Window Preflight Guardrails
+
+The next supervised round tightened the offline bridge between bound identity planning
+sources and a future runtime principal lifecycle window:
+
+- `prepare_player_principal_lifecycle_window_request.py` and
+  `check_player_principal_lifecycle_window_request.py` now emit explicit false
+  authorization/readiness flags on accepted request-pack reports:
+  `server_operations_authorized=false`, `runtime_work_authorized=false`,
+  `publication_authorized=false`, and all promotion/public/runtime/v1 readiness flags
+  false. A ready request pack is still only pre-window planning and its next blocker
+  remains `operator_current_turn_runtime_window_approval_required`.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now validates
+  the real text line emitted by `check_player_principal_lifecycle_preflight.sh`, including
+  the reviewed ARK `binary_sha256`. Legacy one-line preflight text without the binary hash
+  and refreshed sidecars with a wrong binary hash fail closed.
+- `check_command_permission_route_gate.py` now enforces the route mode split in code:
+  the default route must remain blocked at
+  `lifecycle_anchor_first_evidence_provenance_unbound`, while a route with explicit bound
+  lifecycle/principal manifests must advance only to `approved_runtime_evidence_missing`.
+- `check_public_sdk_v1_completion.py` now records the default route gate's
+  `current_blocker`, `source_checker_primary_blocker`, and `route_lock.blocked_until`,
+  and rejects SDK completion if the default route drifts away from
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_prepare_player_principal_lifecycle_window_request scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate scripts.test_check_command_permission_route_gate_bound_identity_sources`
+
+Deferred risk: the runtime preflight sidecars are still text sidecars rather than the
+full structured JSON emitted by `check_player_principal_lifecycle_preflight.sh --json`.
+The text path now binds the reviewed binary SHA, but a future guardrail round should
+consider requiring structured JSON sidecars with wrapper/env/marker posture fields before
+approved evidence promotion.
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,

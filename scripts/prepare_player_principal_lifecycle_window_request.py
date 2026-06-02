@@ -275,7 +275,16 @@ def main() -> int:
     report = {
         "schema": SCHEMA,
         "status": "prepared",
+        "planning_only": True,
         "approval_required": APPROVAL_TEXT,
+        "server_operations_authorized": False,
+        "runtime_work_authorized": False,
+        "publication_authorized": False,
+        "promotion_ready": False,
+        "public_abi_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "v1_completion_ready": False,
         "outputs": {
             "observer_env": artifact(env_path),
             "request_json": artifact(request_json_path),

@@ -102,13 +102,15 @@ priorities, and do not use history files as the active source of truth.
   text claims; nested public reply/send-chat, command routing, permissions/admin, ABI,
   runtime, or v1-completion claims block planning alignment even if a leaf report says
   `valid=true`.
-  While identity waits on approved copied runtime principal lifecycle evidence, inventory
+  While identity waits on source-bound lifecycle/principal planning artifacts, inventory
   copied signals are the higher-value side lane. Neither side lane displaces identity ->
   permissions/admin -> commands/replies. Prefer inventory copied-signal hygiene over
   structure census when choosing one side lane, while structure census remains useful
   offline planning/consume-only work.
-  If the current offline identity packs still pass, identity is blocked on an approved
-  runtime principal lifecycle window, not on more broad offline pack rebuilding.
+  If the current offline identity packs still pass, the default route is blocked first at
+  `lifecycle_anchor_first_evidence_provenance_unbound`. Only an explicit bound-wrapper
+  route run may advance the blocker to `approved_runtime_evidence_missing`; that is
+  missing runtime principal lifecycle evidence, not readiness or promotion.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied

@@ -377,6 +377,28 @@ def validate_identity_planning_binding_args(args: argparse.Namespace) -> list[st
     return []
 
 
+def expected_identity_lock_blocker_for_args(args: argparse.Namespace) -> str:
+    lifecycle = getattr(args, "player_identity_lifecycle_anchor_candidates_manifest", None)
+    principal = getattr(args, "player_identity_principal_invalidation_policy_manifest", None)
+    if lifecycle is not None and principal is not None:
+        return "approved_runtime_evidence_missing"
+    return "lifecycle_anchor_first_evidence_provenance_unbound"
+
+
+def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any]) -> list[str]:
+    expected = expected_identity_lock_blocker_for_args(args)
+    observed = phase.get("current_blocker")
+    source_observed = phase.get("source_checker_primary_blocker")
+    blockers: list[str] = []
+    if observed != expected:
+        blockers.append(f"critical_path_identity_gate_mode_unexpected_blocker:{observed!r}!={expected!r}")
+    if source_observed != expected:
+        blockers.append(
+            f"critical_path_identity_readiness_mode_unexpected_blocker:{source_observed!r}!={expected!r}"
+        )
+    return blockers
+
+
 def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]:
     claims: list[str] = []
 
@@ -625,6 +647,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append(f"{check['name']}: invalid route prerequisite")
     critical_path_phase = build_critical_path_phase(args)
     blockers.extend(validate_critical_path_phase(critical_path_phase))
+    blockers.extend(validate_identity_lock_mode(args, critical_path_phase))
 
     return {
         "schema": REPORT_SCHEMA,

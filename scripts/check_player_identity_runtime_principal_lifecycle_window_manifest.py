@@ -31,9 +31,19 @@ WINDOW_REQUEST_CHECKER = Path(__file__).resolve().parent / "check_player_princip
 SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
+EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+PREFLIGHT_TEXT_RE = re.compile(
+    r"^player_principal_lifecycle_preflight=ok mode=(?P<mode>[A-Za-z0-9_.-]+) "
+    r"instance=(?P<instance>[A-Za-z0-9_.-]+) "
+    r"binary_sha256=(?P<binary_sha256>[0-9a-f]{64})\n$"
+)
+LEGACY_PREFLIGHT_TEXT_RE = re.compile(
+    r"^player_principal_lifecycle_preflight=ok mode=(?P<mode>[A-Za-z0-9_.-]+) "
+    r"instance=(?P<instance>[A-Za-z0-9_.-]+)\n$"
+)
 SAFE_COMPONENT_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 FORBIDDEN_KEY_RE = re.compile(
@@ -430,18 +440,37 @@ def validate_preflight_content(
     )
     if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
         return
-    expected = f"player_principal_lifecycle_preflight=ok mode={expected_mode} instance={target.instance}\n"
     try:
         actual = status.resolved.read_text(encoding="utf-8")
     except OSError as exc:
         add(blockers, f"{path_key}_unreadable", path_key, detail=str(exc))
         return
-    if actual != expected:
+    match = PREFLIGHT_TEXT_RE.fullmatch(actual)
+    if match is None:
+        if LEGACY_PREFLIGHT_TEXT_RE.fullmatch(actual):
+            add(blockers, f"{path_key}_binary_sha256_missing", path_key)
         add(
             blockers,
             f"{path_key}_content_mismatch",
             path_key,
-            expected=expected.strip(),
+            expected=(
+                "player_principal_lifecycle_preflight=ok "
+                f"mode={expected_mode} instance={target.instance} "
+                f"binary_sha256={EXPECTED_BINARY_SHA256}"
+            ),
+        )
+        return
+    if match.group("mode") != expected_mode:
+        add(blockers, f"{path_key}_mode_mismatch", path_key, expected=expected_mode, actual=match.group("mode"))
+    if match.group("instance") != target.instance:
+        add(blockers, f"{path_key}_instance_mismatch", path_key, expected=target.instance, actual=match.group("instance"))
+    if match.group("binary_sha256") != EXPECTED_BINARY_SHA256:
+        add(
+            blockers,
+            f"{path_key}_binary_sha256_mismatch",
+            path_key,
+            expected=EXPECTED_BINARY_SHA256,
+            actual=match.group("binary_sha256"),
         )
 
 

@@ -78,6 +78,15 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(report["status"], "prepared")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertIn("no server operation", report["non_claim"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
+        self.assertFalse(report["publication_authorized"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["v1_completion_ready"])
         for name, filename in (
             ("observer_env", "observer-window.env"),
             ("request_json", "window-request.json"),
