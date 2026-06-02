@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <exception>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -39,6 +40,7 @@ namespace Obelisk::Core
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
+        std::atomic<int> g_PluginRetentionFailureAfterForTesting{-1};
         std::atomic_bool g_ForcePublicChatMessageInternalUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting{false};
@@ -2240,6 +2242,13 @@ namespace Obelisk::Core
     void SetPluginRetentionFailureForTesting(bool enabled)
     {
         g_ForcePluginRetentionFailureForTesting.store(enabled, std::memory_order_release);
+        g_PluginRetentionFailureAfterForTesting.store(-1, std::memory_order_release);
+    }
+
+    void SetPluginRetentionFailureAfterForTesting(int successfulRetentionsBeforeFailure)
+    {
+        g_ForcePluginRetentionFailureForTesting.store(false, std::memory_order_release);
+        g_PluginRetentionFailureAfterForTesting.store(successfulRetentionsBeforeFailure, std::memory_order_release);
     }
 
     void SetPublicChatMessageInternalUnregisterFailureForTesting(bool enabled)
@@ -2869,6 +2878,18 @@ namespace Obelisk::Core
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
                 if (g_ForcePluginRetentionFailureForTesting.load(std::memory_order_acquire))
                     throw std::runtime_error("injected plugin retention failure");
+                int expected = g_PluginRetentionFailureAfterForTesting.load(std::memory_order_acquire);
+                while (expected >= 0)
+                {
+                    if (expected == 0)
+                        throw std::runtime_error("injected delayed plugin retention failure");
+                    if (g_PluginRetentionFailureAfterForTesting.compare_exchange_weak(
+                            expected,
+                            expected - 1,
+                            std::memory_order_acq_rel,
+                            std::memory_order_acquire))
+                        break;
+                }
 #endif
                 retainedPlugins.push_back(plugin);
                 return true;
@@ -2887,11 +2908,16 @@ namespace Obelisk::Core
         for (auto it = m_LoadedPlugins.rbegin(); it != m_LoadedPlugins.rend(); ++it)
         {
             auto& plugin = *it;
-            const auto eraseProcessedClosedPluginsAndAbort = [&]() noexcept
+            const auto publishPartialUnloadStateAndAbort = [&]() noexcept
             {
                 try
                 {
-                    m_LoadedPlugins.erase(it.base(), m_LoadedPlugins.end());
+                    std::vector<PluginInfo> retryPlugins;
+                    retryPlugins.reserve(static_cast<size_t>(std::distance(m_LoadedPlugins.begin(), it.base())) +
+                                         retainedPlugins.size());
+                    retryPlugins.insert(retryPlugins.end(), m_LoadedPlugins.begin(), it.base());
+                    retryPlugins.insert(retryPlugins.end(), retainedPlugins.rbegin(), retainedPlugins.rend());
+                    m_LoadedPlugins = std::move(retryPlugins);
                 }
                 catch (const std::exception& e)
                 {
@@ -2958,7 +2984,7 @@ namespace Obelisk::Core
                         plugin,
                         "Plugin retention tracking failed after callback cleanup failure; aborting unload pass"))
                 {
-                    eraseProcessedClosedPluginsAndAbort();
+                    publishPartialUnloadStateAndAbort();
                     return;
                 }
                 continue;
@@ -2973,7 +2999,7 @@ namespace Obelisk::Core
                         plugin,
                         "Plugin retention tracking failed after library close failure; aborting unload pass"))
                 {
-                    eraseProcessedClosedPluginsAndAbort();
+                    publishPartialUnloadStateAndAbort();
                     return;
                 }
                 continue;

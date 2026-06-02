@@ -503,6 +503,25 @@ This file is an active routing table only. Durable evidence belongs in
   - The real `scripts/compare_reflection_snapshots.py --readiness-report --json`
     producer was audited and already emits the required layout-only envelope; no producer
     edit was needed.
+- 2026-06-02 delegated post-compaction hardening round:
+  - P0 executed-test artifacts now reject malformed top-level or nested
+    output/provenance hashes; non-empty strings are no longer enough to satisfy the
+    executed-test evidence shape.
+  - `scripts/validate_offline_artifact_gate.py` now recursively rejects generic true
+    public/runtime/release/v1/SDK/promotion claim aliases such as `public_sdk_ready`,
+    nested `runtime_ready`, `v1_complete`, and `complete_sdk` in candidate/consume
+    manifests and artifact-pack children.
+  - `PluginManager::UnloadAll()` now preserves plugins already retained for retry when a
+    later plugin's retention tracking fails mid-pass. The abort path rebuilds retry state
+    from the unprocessed prefix plus prior retained plugins instead of erasing the whole
+    processed tail. `PluginManagerTests` covers the delayed-retention-failure case.
+  - `CallProcessEvent` public docs/header wording now matches runtime behavior: ABI v1
+    is init-window debug-only; post-init/callback calls through captured API tables fail
+    closed and need a future owner-token ABI.
+  - Delegated read-only P0 accounting audit found no remaining route/progress bypass
+    after the previous route hardening. Validation kept the default route planning-only at
+    `lifecycle_anchor_first_evidence_provenance_unbound`; SDK completion remains
+    `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
 
 ## Priority Next Steps
 

@@ -224,6 +224,43 @@ READY_OVERCLAIM_KEYS = {
     "return_override_ready",
     "runtime_ready",
 }
+GENERIC_FORBIDDEN_TRUE_CLAIM_KEYS = {
+    "complete_sdk",
+    "full_sdk",
+    "lookup_ready",
+    "mutation_ready",
+    "promote_ready",
+    "promoted",
+    "promotion_ready",
+    "public_abi_ready",
+    "public_api_ready",
+    "public_header_allowed",
+    "public_ready",
+    "public_release_ready",
+    "public_runtime_ready",
+    "public_sdk_complete",
+    "public_sdk_ready",
+    "public_sdk_v1_complete",
+    "public_sdk_v1_ready",
+    "release_readiness",
+    "release_ready",
+    "return_override_ready",
+    "runtime_hook_ready",
+    "runtime_hooks_ready",
+    "runtime_promoted",
+    "runtime_promotion_ready",
+    "runtime_ready",
+    "sdk_complete",
+    "sdk_completion",
+    "sdk_ready",
+    "sdk_v1_complete",
+    "sdk_v1_ready",
+    "v1_complete",
+    "v1_completion",
+    "v1_ready",
+    "v1_sdk_complete",
+    "v1_sdk_ready",
+}
 RC_UFUNCTION_TARGET_SETS = (
     "minimal-second-source-intake",
     "structure-observer-intake",
@@ -1727,6 +1764,14 @@ def collect_ready_overclaims(value: object, *, trail: str = "$") -> list[tuple[s
         (child_trail, child)
         for child_trail, child in collect_bool_fields(value, trail=trail)
         if child is True and child_trail.rsplit(".", 1)[-1] in READY_OVERCLAIM_KEYS
+    ]
+
+
+def collect_generic_forbidden_true_claims(value: object, *, trail: str = "$") -> list[tuple[str, bool]]:
+    return [
+        (child_trail, child)
+        for child_trail, child in collect_bool_fields(value, trail=trail)
+        if child is True and child_trail.rsplit(".", 1)[-1] in GENERIC_FORBIDDEN_TRUE_CLAIM_KEYS
     ]
 
 
@@ -3479,6 +3524,8 @@ def validate_claims(payload: dict[str, Any], *, label: str, mode: str) -> list[d
             blockers.append({"reason": "promotion_ready_with_blockers", "label": label})
     if payload.get("status") == "research-candidate" and payload.get("runtime_ready") is True:
         blockers.append({"reason": "research_candidate_marked_runtime_ready", "label": label})
+    for trail, _ in collect_generic_forbidden_true_claims(payload):
+        blockers.append({"reason": "manifest_forbidden_true_claim_overclaim", "label": f"{label}:{trail}"})
 
     evidence_status = payload.get("evidence_status")
     if isinstance(evidence_status, dict):

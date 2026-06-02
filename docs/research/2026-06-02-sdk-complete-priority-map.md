@@ -672,6 +672,49 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Delegated Guardrail And Plugin Retention Hardening
+
+A later supervised round delegated four scoped audits/workers after compaction:
+
+- A P0 route/progress read-only audit found no remaining route-gate accounting bypass
+  after the previous `approved_runtime_evidence_missing` closure. P0 rows still require
+  promoted evidence, structured evidence, release-statement agreement, satisfied
+  dependencies, and an unlocked non-planning route gate before they can count.
+- P0 executed-test evidence now rejects malformed SHA-256 digest fields. Top-level
+  output/provenance hashes and nested `output.hash`/`output.sha256`/`output.digest` or
+  `provenance.*` digests must be valid SHA-256 values, not merely non-empty strings.
+  Residual risk: a fully hand-authored artifact with valid schema, current commit, bound
+  canonical input hashes, exit code `0`, and valid digest remains indistinguishable from
+  a genuine execution transcript until a dedicated runner/transcript flow exists.
+- Offline artifact validation now recursively rejects generic true public/runtime/
+  release/v1/SDK/promotion claim aliases in candidate and consume artifacts, including
+  nested `public_sdk_ready`, `runtime_ready`, `v1_complete`, and `complete_sdk` fields.
+  ResourceHandle-specific aliases remain intentionally outside the generic set where a
+  schema has an explicit promote-mode ResourceHandle evidence path.
+- A runtime/C ABI audit found a real retry-state bug in `PluginManager::UnloadAll()`: if
+  a later plugin was already retained for retry and a subsequent plugin's retention
+  tracking failed, the old abort path erased the processed tail before publishing the
+  retained vector. The fix rebuilds retry state from the unprocessed prefix plus retained
+  plugins in original order. Regression coverage uses delayed retention-failure injection.
+- Public `CallProcessEvent` docs/header text now matches the implementation: the legacy
+  ABI v1 slot is init-window debug-only, post-init calls through captured API tables fail
+  closed, and callback/runtime execution requires a future owner-token ABI.
+
+Validation:
+
+- `cmake --build build --target plugin_manager_tests -j$(nproc) && ./build/plugin_manager_tests`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_validate_offline_artifact_gate`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+- `git diff --check`
+
+The default route remains planning-only at
+`lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remains fail-closed:
+`stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`. This
+round does not approve runtime work, public identity, public permissions/admin, command
+response, commands/replies, release readiness, or a stable SDK claim.
+
 ## Executed-Test Artifact, Route-Gate, Release-Readiness, And ABI Rollback Closure
 
 The next supervised round closed four audit findings and added one runtime-core

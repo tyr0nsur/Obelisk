@@ -45,6 +45,7 @@ namespace Obelisk::Core
 {
     void SetPluginCallbackCleanupFailureForTesting(bool enabled);
     void SetPluginRetentionFailureForTesting(bool enabled);
+    void SetPluginRetentionFailureAfterForTesting(int successfulRetentionsBeforeFailure);
     void SetPublicChatMessageInternalUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(bool enabled);
@@ -5851,6 +5852,53 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllPreservesPreviouslyRetainedPluginWhenLaterRetentionFails()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_unload_partial_retention_fail");
+        ConfigureEnvironment(root);
+
+        FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false};
+        FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .throwOnClose = true};
+        FakePlugin pluginC{.filename = "c_third.so", .pluginId = "plugin_c", .hasShutdown = false, .throwOnClose = true};
+        FakeLoader loader;
+        loader.Add(pluginA);
+        loader.Add(pluginB);
+        loader.Add(pluginC);
+        TouchPlugin(root, pluginA.filename);
+        TouchPlugin(root, pluginB.filename);
+        TouchPlugin(root, pluginC.filename);
+        WritePluginConfig(root, pluginA.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginB.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+        WritePluginConfig(root, pluginC.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPluginRetentionFailureAfterForTesting(1);
+        manager.UnloadAll();
+
+        Require(pluginA.closeCalls == 0,
+                "unload continued to an earlier plugin after delayed retention tracking failed");
+        Require(pluginB.closeCalls == 1,
+                "delayed retention failure did not attempt the current throwing plugin close");
+        Require(pluginC.closeCalls == 1,
+                "previously retained plugin was not processed before delayed retention failure");
+
+        Obelisk::Core::SetPluginRetentionFailureAfterForTesting(-1);
+        pluginB.throwOnClose = false;
+        pluginC.throwOnClose = false;
+        manager.UnloadAll();
+
+        Require(pluginA.closeCalls == 1, "partial-retention retry did not close the earlier plugin");
+        Require(pluginB.closeCalls == 2, "partial-retention retry did not reattempt current retained plugin close");
+        Require(pluginC.closeCalls == 2, "previously retained plugin was lost before retry");
+
+        CleanupPlugin(pluginA);
+        CleanupPlugin(pluginB);
+        CleanupPlugin(pluginC);
+        fs::remove_all(root);
+    }
+
     void TestUnloadAllCleansAfterShutdownException()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_shutdown_throw");
@@ -6353,6 +6401,7 @@ int main()
     TestPluginApiMutationDoesNotPoisonLaterPlugins();
     TestUnloadAllContinuesAfterCloseException();
     TestUnloadAllStopsWhenCloseRetentionTrackingFails();
+    TestUnloadAllPreservesPreviouslyRetainedPluginWhenLaterRetentionFails();
     TestUnloadAllCleansAfterShutdownException();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();

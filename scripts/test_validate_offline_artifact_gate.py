@@ -5947,6 +5947,32 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("signature_manifest_signature_status_not_candidate_only", reasons)
         self.assertIn("signature_manifest_signature_readiness_overclaim", reasons)
 
+    def test_blocks_generic_public_runtime_v1_claim_aliases_in_candidate_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "signatures" / "signatures.json"
+            payload = redacted_signature_manifest()
+            payload["public_sdk_ready"] = True
+            payload["claim_aliases"] = {
+                "runtime_ready": True,
+                "v1_complete": True,
+                "complete_sdk": True,
+            }
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        labels = {
+            blocker["label"]
+            for blocker in result["blockers"]
+            if blocker["reason"] == "manifest_forbidden_true_claim_overclaim"
+        }
+        self.assertTrue(any(label.endswith("$.public_sdk_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.claim_aliases.runtime_ready") for label in labels))
+        self.assertTrue(any(label.endswith("$.claim_aliases.v1_complete") for label in labels))
+        self.assertTrue(any(label.endswith("$.claim_aliases.complete_sdk") for label in labels))
+
     def test_accepts_layout_only_readiness_report_for_consume_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

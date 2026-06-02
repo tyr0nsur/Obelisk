@@ -2116,20 +2116,35 @@ def executed_test_artifact_has_command(report: dict[str, Any]) -> bool:
     )
 
 
-def executed_test_artifact_has_hash(report: dict[str, Any]) -> bool:
+def executed_test_artifact_hash_problems(report: dict[str, Any]) -> list[str]:
+    observed = False
+    invalid: list[str] = []
     for key in PROMOTED_SURFACE_TEST_EXECUTION_HASH_KEYS:
         value = report.get(key)
-        if isinstance(value, str) and value.strip():
-            return True
+        if not isinstance(value, str) or not value.strip():
+            continue
+        observed = True
+        if SHA256_RE.fullmatch(value.strip()) is None:
+            invalid.append(key)
     for key in ("output", "provenance"):
         value = report.get(key)
         if not isinstance(value, dict):
             continue
         for nested_key in ("hash", "sha256", "digest"):
             nested_value = value.get(nested_key)
-            if isinstance(nested_value, str) and nested_value.strip():
-                return True
-    return False
+            if not isinstance(nested_value, str) or not nested_value.strip():
+                continue
+            observed = True
+            if SHA256_RE.fullmatch(nested_value.strip()) is None:
+                invalid.append(f"{key}.{nested_key}")
+    if not observed:
+        return ["executed_test_report:output_or_provenance_hash_missing"]
+    if invalid:
+        return [
+            f"executed_test_report:output_or_provenance_hash_invalid:{key}"
+            for key in sorted(invalid)
+        ]
+    return []
 
 
 def sha256_file(path: Path) -> str | None:
@@ -2205,8 +2220,7 @@ def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> l
         missing.append("executed_test_report:command_missing")
     if type(executed.get("exit_code")) is not int or executed.get("exit_code") != 0:
         missing.append("executed_test_report:exit_code_not_zero")
-    if not executed_test_artifact_has_hash(executed):
-        missing.append("executed_test_report:output_or_provenance_hash_missing")
+    missing.extend(executed_test_artifact_hash_problems(executed))
     missing.extend(executed_test_artifact_missing_provenance(executed))
     missing.extend(executed_test_artifact_missing_input_bindings(executed))
     return missing

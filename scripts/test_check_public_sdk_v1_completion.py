@@ -5680,6 +5680,49 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(missing, ["executed_test_report:inputs_missing"])
 
+    def test_p0_executed_test_artifact_malformed_output_hash_is_rejected(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        cases = (
+            (
+                {"output_sha256": "not-a-sha256"},
+                ["executed_test_report:output_or_provenance_hash_invalid:output_sha256"],
+            ),
+            (
+                {"output": {"sha256": "f" * 63}},
+                ["executed_test_report:output_or_provenance_hash_invalid:output.sha256"],
+            ),
+        )
+        for overrides, expected in cases:
+            with self.subTest(overrides=overrides):
+                with tempfile.TemporaryDirectory(
+                    dir=REPO_ROOT / "tests" / "core",
+                    prefix="ExecutedReportMalformedHash",
+                ) as core_dir:
+                    artifact = Path(core_dir) / "permissions_admin_executed_tests.json"
+                    artifact_path = write_executed_test_artifact(
+                        artifact,
+                        "obelisk.permissions_admin.v1",
+                        argv=["python3", "-m", "unittest", "permissions_admin_promotion"],
+                    )
+                    payload = json.loads(artifact.read_text(encoding="utf-8"))
+                    payload.pop("output_sha256")
+                    payload.update(overrides)
+                    artifact.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+                    missing = module.executed_test_report_missing(
+                        {"executed_test_report": artifact_path},
+                        "obelisk.permissions_admin.v1",
+                    )
+
+                self.assertEqual(missing, expected)
+
     def test_commands_replies_accepts_complete_structured_command_response_dependency_evidence(self) -> None:
         import importlib.util
 

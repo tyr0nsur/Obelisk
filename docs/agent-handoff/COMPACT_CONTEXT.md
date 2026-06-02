@@ -709,6 +709,24 @@ priorities, and do not use history files as the active source of truth.
     reports.
   - `compare_reflection_snapshots.py` was audited and already emits the required
     layout-only readiness envelope; no producer edit was needed.
+- Delegated post-compaction hardening on 2026-06-02 added three local guardrail/runtime
+  fixes without changing SDK readiness:
+  - P0 executed-test artifacts now require any top-level or nested output/provenance hash
+    to be a valid SHA-256 digest; malformed non-empty hash strings are rejected.
+  - Offline artifact validation now recursively rejects generic true public/runtime/
+    release/v1/SDK/promotion claim aliases in candidate/consume manifests and artifact
+    pack children.
+  - `PluginManager::UnloadAll()` preserves previously retained retry plugins if a later
+    retention-tracking failure aborts the pass, and public `CallProcessEvent` docs now
+    state the init-window-only behavior. No server/runtime run, GitHub publication, tag,
+    or Discord action was performed.
+  - Latest validation for this round: `plugin_manager_tests` passed;
+    `scripts.test_check_public_sdk_v1_completion` passed 136 tests;
+    `scripts.test_validate_offline_artifact_gate` passed 354 tests;
+    `check_command_permission_route_gate.py --json` remained planning-only at
+    `lifecycle_anchor_first_evidence_provenance_unbound`; and
+    `check_public_sdk_v1_completion.py --json` remained fail-closed with
+    `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
 
 ## Agent Coordination
 

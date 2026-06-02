@@ -276,11 +276,10 @@ typedef struct ObeliskApi {
     // fail closed. Plugins must check struct_size, capabilities, and this function pointer
     // before use.
     //
-    // Reentrancy contract: a pre-callback that calls this should return false. If it
-    // returns true, the runtime skips the automatic original call and warns to avoid
-    // double execution. Post-callback use is observationally after the original call and
-    // must not attempt to replay the same event. Stable plugins should prefer future
-    // higher-level APIs over direct ProcessEvent replay.
+    // Callback/runtime contract: copied API-table calls made after ObeliskPlugin_Init
+    // fail closed because ABI v1 has no owner-token call signature. Callback-time or
+    // other post-init execution needs a future owner-token ABI; stable plugins should
+    // prefer higher-level APIs over direct ProcessEvent replay.
     void (*CallProcessEvent)(void* caller, void* function, void* parms);
 
     // ABI metadata appended for compatibility with the original function table layout.
