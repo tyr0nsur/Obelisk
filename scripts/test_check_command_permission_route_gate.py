@@ -154,6 +154,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             check for check in report["checks"] if check["name"] == "commands_replies_public_readiness"
         )
         self.assertIn("--response-path-report", commands_replies_check["argv"])
+        self.assertIn("--response-path-report-root", commands_replies_check["argv"])
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)
@@ -988,7 +989,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 }
             if name == "commands_replies_public_readiness":
                 self.assertIn("--response-path-report", argv)
+                self.assertIn("--response-path-report-root", argv)
                 report_path = Path(argv[argv.index("--response-path-report") + 1])
+                report_root = Path(argv[argv.index("--response-path-report-root") + 1])
+                self.assertEqual(report_root / "command-chat-response-public-readiness.json", report_path)
                 composed = json.loads(report_path.read_text(encoding="utf-8"))
                 seen_response_path_report = True
                 if composed.get("promotion_ready") is True:

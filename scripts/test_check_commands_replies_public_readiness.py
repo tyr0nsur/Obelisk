@@ -76,10 +76,25 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
                 return f"/offline/{basename}"
             return str(root / "base-snapshots" / basename)
 
+        source_root = str(root) if root is not None else "/offline"
         return {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
             "evidence_scope": "second_source_layout_evidence_only",
             "gate_mode": "planning_layout_intake",
+            "source_root": source_root,
+            "producer": {
+                "script": "scripts/compare_reflection_snapshots.py",
+                "argv": [
+                    "scripts/compare_reflection_snapshots.py",
+                    "--base-root",
+                    source_root,
+                    "--target-set",
+                    "command-chat-response-route-planning",
+                    "--readiness-report",
+                    "--json",
+                ],
+                "output_name": "command-chat-response-route-planning-readiness.json",
+            },
             "second_source_status": "compared",
             "strict_identity_indices": False,
             "target_sets": ["command-chat-response-route-planning"],
@@ -176,7 +191,7 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             READINESS.response_path_readiness.DEFAULT_PUBLIC_HEADER,
             READINESS.response_path_readiness.DEFAULT_SURFACES,
         )
-        report_path = root / "response.json"
+        report_path = root / "command-chat-response-public-readiness.json"
         report_path.write_text(json.dumps(response_report), encoding="utf-8")
         return report_path
 
@@ -200,21 +215,28 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             "runtime_ready": False,
             "blockers": [],
         }
-        report_path = root / "response.json"
+        report_path = root / "command-chat-response-public-readiness.json"
         report_path.write_text(json.dumps(response_report), encoding="utf-8")
         return report_path
+
+    def response_path_args(self, report_path: Path, root: Path) -> list[str]:
+        return [
+            "--response-path-report",
+            str(report_path),
+            "--response-path-report-root",
+            str(report_path.parent),
+            "--response-path-root",
+            str(root),
+            "--response-path-readiness",
+            str(root / "command-chat-response-route-planning-readiness.json"),
+        ]
 
     def test_accepts_current_manifests_as_planning_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             report_path = self.write_response_report(root)
             result = self.run_checker(
-                "--response-path-report",
-                str(report_path),
-                "--response-path-root",
-                str(root),
-                "--response-path-readiness",
-                str(root / "command-chat-response-route-planning-readiness.json"),
+                *self.response_path_args(report_path, root),
                 "--json",
             )
         report = json.loads(result.stdout)
@@ -840,6 +862,31 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertTrue(report["accepted_for_planning"])
         self.assertFalse(report["public_readiness_ready"])
         self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_response_path_report_copied_outside_expected_report_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            source_root = base / "source-root"
+            copied_root = base / "report-copy-dir"
+            copied_root.mkdir()
+            report_path = self.write_response_report(source_root)
+            copied_report = copied_root / report_path.name
+            copied_report.write_text(report_path.read_text(encoding="utf-8"), encoding="utf-8")
+            result = self.run_checker(
+                "--response-path-report",
+                str(copied_report),
+                "--response-path-root",
+                str(source_root),
+                "--response-path-readiness",
+                str(source_root / "command-chat-response-route-planning-readiness.json"),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("response_path_report_path_mismatch", report["blockers"])
 
     def test_rejects_response_path_report_bound_to_unexpected_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

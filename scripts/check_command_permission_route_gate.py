@@ -648,16 +648,19 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     checks = []
     response_path_report: dict[str, Any] | None = None
     with tempfile.TemporaryDirectory(prefix="obelisk-command-route-gate-") as tmp:
-        response_path_report_path = Path(tmp) / "command-chat-response-public-readiness.json"
+        response_path_report_root = Path(tmp) / "command-chat-response-public-readiness"
+        response_path_report_path = response_path_report_root / "command-chat-response-public-readiness.json"
         for name, argv in route_checks(args):
             effective_argv = list(argv)
             if name == "commands_replies_public_readiness":
                 if response_path_report is not None:
+                    response_path_report_root.mkdir(parents=True, exist_ok=True)
                     response_path_report_path.write_text(
                         json.dumps(response_path_report, indent=2, sort_keys=True),
                         encoding="utf-8",
                     )
                     effective_argv.extend(["--response-path-report", str(response_path_report_path)])
+                    effective_argv.extend(["--response-path-report-root", str(response_path_report_root)])
                     response_root = args.command_response_root or response_path_report.get("readiness_root")
                     response_readiness = args.command_response_readiness or response_path_report.get("readiness_path")
                     if response_root is not None:

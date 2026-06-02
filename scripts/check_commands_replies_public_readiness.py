@@ -20,6 +20,7 @@ DEFAULT_DECISIONS = REPO_ROOT / "docs" / "commands_replies_public_contract_decis
 DEFAULT_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
+DEFAULT_RESPONSE_PATH_REPORT_NAME = "command-chat-response-public-readiness.json"
 
 REPORT_SCHEMA = "obelisk.commands-replies-public-readiness-check.v1"
 DECISIONS_SCHEMA = "obelisk.commands-replies-public-contract-decisions.v1"
@@ -347,6 +348,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--response-path-root", type=Path)
     parser.add_argument("--response-path-readiness", type=Path)
+    parser.add_argument("--response-path-report-root", type=Path)
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
 
@@ -425,6 +427,44 @@ def resolve_expected_path(path: Path, label: str, blockers: list[dict[str, Any]]
             detail=str(exc),
         )
         return None
+
+
+def validate_response_path_report_location(
+    report_path: Path | None,
+    blockers: list[dict[str, Any]],
+    *,
+    expected_report_root: Path | None,
+) -> Path | None:
+    if report_path is None:
+        return None
+    try:
+        reject_symlink_component(report_path, "response_path_report")
+        resolved_report_path = reject_protected_input_path(report_path, "response_path_report")
+    except SystemExit as exc:
+        add(
+            blockers,
+            "response_path_report_path_rejected",
+            "$.response_path_report_path",
+            path=str(report_path),
+            detail=str(exc),
+        )
+        return None
+    if expected_report_root is None:
+        add(blockers, "response_path_report_expected_report_root_required", "$.response_path_report_root")
+        return resolved_report_path
+    resolved_report_root = resolve_expected_path(expected_report_root, "response_path_report_root", blockers)
+    if resolved_report_root is None:
+        return resolved_report_path
+    expected_report_path = resolved_report_root / DEFAULT_RESPONSE_PATH_REPORT_NAME
+    if resolved_report_path != expected_report_path:
+        add(
+            blockers,
+            "response_path_report_path_mismatch",
+            "$.response_path_report_path",
+            expected=str(expected_report_path),
+            value=str(resolved_report_path),
+        )
+    return resolved_report_path
 
 
 def strings(value: Any) -> list[str]:
@@ -1192,8 +1232,15 @@ def build_report(
     response_path_report_path: Path | None,
     response_path_root: Path | None = None,
     response_path_readiness: Path | None = None,
+    response_path_report_root: Path | None = None,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
+    expected_report_root = response_path_report_root if response_path_report_root is not None else response_path_root
+    validate_response_path_report_location(
+        response_path_report_path,
+        blockers,
+        expected_report_root=expected_report_root,
+    )
     decisions = load_json(decisions_path, "decisions", blockers)
     surfaces = load_json(surfaces_path, "surfaces", blockers)
     response_path_report = (
@@ -1238,6 +1285,7 @@ def build_report(
         "surfaces_path": str(surfaces_path),
         "public_header_path": str(public_header_path),
         "response_path_report_path": str(response_path_report_path) if response_path_report_path is not None else None,
+        "response_path_report_root": str(expected_report_root) if expected_report_root is not None else None,
         "decisions_status": decisions.get("status") if isinstance(decisions, dict) else None,
         "commands_replies_surface_status": (
             next(
@@ -1265,6 +1313,7 @@ def main() -> int:
         response_path_report_path=args.response_path_report,
         response_path_root=args.response_path_root,
         response_path_readiness=args.response_path_readiness,
+        response_path_report_root=args.response_path_report_root,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1

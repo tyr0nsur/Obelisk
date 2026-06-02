@@ -902,9 +902,11 @@ priorities, and do not use history files as the active source of truth.
   `scripts/compare_reflection_snapshots.py` producer argv for
   `command-chat-response-route-planning`; default legacy offline readiness remains
   planning-only until regenerated. P0 identity build-report regression now proves valid
-  player-principal request packs do not satisfy approved runtime evidence. Remaining
-  command/replies hardening risk: a copied child response-path report outside the response
-  root can still be accepted if its source artifacts rebuild identically.
+  player-principal request packs do not satisfy approved runtime evidence. Follow-up
+  commands/replies hardening now requires the child response-path report at
+  `<response-path-report-root>/command-chat-response-public-readiness.json`, with the
+  route gate forwarding a temp report root while preserving the original response
+  readiness root. This remains provenance-only, not response/replies readiness.
 
 ## Agent Coordination
 

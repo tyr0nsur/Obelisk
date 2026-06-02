@@ -1992,10 +1992,29 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
 
-Deferred finding: `check_commands_replies_public_readiness.py` strongly revalidates child
-command-response report source artifacts, but the child report file itself may still be a
-copy outside the response root if its contents rebuild identically. A future guardrail
-should choose a canonical report path that does not break route-gate temp composition.
+Follow-up commands/replies hardening closed the deferred child-report location gap:
+
+- `scripts/check_commands_replies_public_readiness.py` now requires
+  `--response-path-report` to resolve exactly to
+  `<response-path-report-root>/command-chat-response-public-readiness.json`, falling back
+  to `--response-path-root` when no explicit report root is supplied.
+- `scripts/check_command_permission_route_gate.py` preserves temp composition by writing
+  the composed child report under its own temp report root and forwarding both
+  `--response-path-report` and `--response-path-report-root`.
+- Copied child reports outside the expected report root now fail with
+  `response_path_report_path_mismatch`, even when their source artifacts rebuild
+  identically.
+
+Additional validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+
+Residual future-promotion risk: SDK structured promotion evidence helpers for command
+response and commands/replies still validate summarized repo-relative evidence reports
+rather than replaying the full source-artifact rebinding performed by the planning
+readiness checkers. This does not create a current overclaim while the route gate remains
+locked and planning-only.
 
 This round does not authorize runtime/server work, `/servidor/ark` writes, marker/env
 changes, Discord, GitHub publication, release refs, public identity, permissions/admin

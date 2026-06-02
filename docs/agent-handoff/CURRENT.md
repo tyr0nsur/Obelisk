@@ -214,7 +214,7 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing` non-counting.
 - Latest guardrails closed command-response readiness provenance, mission-leaf umbrella
   accounting, permissions/admin identity-certificate dependency, and player-principal
-  request/window prep. Non-default command response readiness must bind source root and
-  producer argv; request packs remain planning-only. Default route and SDK accounting
-  remain unchanged: `lifecycle_anchor_first_evidence_provenance_unbound`,
+  request/window prep. Commands/replies now rejects copied child response-path reports
+  outside the canonical report-root path; this is provenance-only, not response/replies
+  readiness. Default route/SDK remain fail-closed: `lifecycle_anchor_first_evidence_provenance_unbound`,
   `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
