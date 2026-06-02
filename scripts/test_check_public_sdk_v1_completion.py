@@ -310,7 +310,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "public_header_symbols_now": [],
                     "public_capability_bits_now": [],
                     "public_callback_abi_now": [],
-                    "next_blocker": "identity_public_contract_gate",
+                    "next_blocker": "identity_public_contract_gate_missing",
                     "blockers": [],
                     "resolved_inputs": ["runtime.lifecycle_evidence"],
                     "remaining_blockers": [
@@ -1521,6 +1521,47 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn(expected, report["blockers"])
                 self.assertFalse(report["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_fake_mission_per_leaf_promoted_summary_without_manifest_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+            "surface": "obelisk.mission_transfer_dino_tribe.v1",
+            "ready": True,
+            "accounting_route": "per_leaf_promoted",
+            "candidate_only": False,
+            "v1_accounted": True,
+            "promotion_ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "missing_leaf_families": [],
+            "blockers": [],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_mission_accounting_checker(
+                Path(temp_dir) / "fake_mission_accounting.py",
+                payload,
+            )
+            result = self.run_checker(
+                "--mission-transfer-dino-tribe-outcome-accounting",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "mission_transfer_dino_tribe_per_leaf_promotion_evidence_unverified",
+            report["blockers"],
+        )
+        self.assertFalse(
+            report["mission_transfer_dino_tribe_outcome_accounting"][
+                "manifest_leaf_promotion_evidence_verified"
+            ]
+        )
+        self.assertFalse(report["stable_claim_allowed"])
 
     def test_completion_gate_rejects_mission_accounting_invalid_or_incomplete_report(self) -> None:
         base = {
@@ -2764,6 +2805,120 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(outcome["promotion_evidence_satisfied"])
         self.assertFalse(outcome["counts_toward_complete_sdk_claim"])
         self.assertIn(surface_id, payload["promoted_blockers_without_evidence"])
+
+    def mission_transfer_promoted_surface_with_leaf_evidence(
+        self,
+        core_root: Path,
+        sdk_root: Path,
+        *,
+        leaf_overrides: dict[str, dict[str, object]] | None = None,
+        use_promotion_evidence_by_leaf: bool = False,
+    ) -> dict[str, object]:
+        surface_id = "obelisk.mission_transfer_dino_tribe.v1"
+        leaf_ids = ("mission", "transfer", "dino_policy", "tribe_policy", "buff_status")
+        leaf_overrides = leaf_overrides or {}
+        evidence_by_leaf: dict[str, dict[str, object]] = {}
+        for leaf_id in leaf_ids:
+            abi_path = core_root / f"MissionTransferDinoTribe_{leaf_id}_PromotionTests.cpp"
+            sdk_path = sdk_root / f"mission_transfer_dino_tribe_{leaf_id}_promotion.c"
+            second_source_path = core_root / "docs" / "research" / f"mission_transfer_dino_tribe_{leaf_id}_second_source.json"
+            abi_path.parent.mkdir(parents=True, exist_ok=True)
+            sdk_path.parent.mkdir(parents=True, exist_ok=True)
+            second_source_path.parent.mkdir(parents=True, exist_ok=True)
+            abi_path.write_text("// ABI promotion fixture\n", encoding="utf-8")
+            sdk_path.write_text("/* SDK promotion fixture */\n", encoding="utf-8")
+            second_source_path.write_text("{}\n", encoding="utf-8")
+            evidence = {
+                "promotion_status": "promoted",
+                "promotion_ready": True,
+                "public_sdk_ready": True,
+                "runtime_ready": True,
+                "abi_tests": [str(abi_path.relative_to(REPO_ROOT))],
+                "sdk_consumer_tests": [str(sdk_path.relative_to(REPO_ROOT))],
+                "second_source_evidence": [str(second_source_path.relative_to(REPO_ROOT))],
+            }
+            evidence.update(leaf_overrides.get(leaf_id, {}))
+            evidence_by_leaf[leaf_id] = evidence
+
+        leaf_units = [{"id": leaf_id, "status": "promoted"} for leaf_id in leaf_ids]
+        if not use_promotion_evidence_by_leaf:
+            for leaf in leaf_units:
+                leaf["evidence"] = evidence_by_leaf[leaf["id"]]  # type: ignore[index]
+        return {
+            "id": surface_id,
+            "status": "promoted",
+            "evidence": {
+                "surface_id": surface_id,
+                "promotion_status": "promoted",
+                "public_sdk_ready": True,
+                "abi_tests": [str((core_root / "MissionTransferDinoTribe_surface_PromotionTests.cpp").relative_to(REPO_ROOT))],
+                "sdk_consumer_tests": [str((sdk_root / "mission_transfer_dino_tribe_surface_promotion.c").relative_to(REPO_ROOT))],
+            },
+            "leaf_decision_units": leaf_units,
+            "promotion_evidence_by_leaf": evidence_by_leaf if use_promotion_evidence_by_leaf else {},
+        }
+
+    def test_mission_transfer_dino_tribe_leaf_promotion_evidence_requires_strict_paths(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="MissionLeafEvidence") as core_dir, tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "sdk_consumer", prefix="MissionLeafEvidence") as sdk_dir:
+            core_root = Path(core_dir)
+            sdk_root = Path(sdk_dir)
+            surface_abi = core_root / "MissionTransferDinoTribe_surface_PromotionTests.cpp"
+            surface_sdk = sdk_root / "mission_transfer_dino_tribe_surface_promotion.c"
+            surface_abi.parent.mkdir(parents=True, exist_ok=True)
+            surface_sdk.parent.mkdir(parents=True, exist_ok=True)
+            surface_abi.write_text("// surface ABI fixture\n", encoding="utf-8")
+            surface_sdk.write_text("/* surface SDK fixture */\n", encoding="utf-8")
+
+            valid_surface = self.mission_transfer_promoted_surface_with_leaf_evidence(core_root, sdk_root)
+            missing_path_surface = self.mission_transfer_promoted_surface_with_leaf_evidence(
+                core_root,
+                sdk_root,
+                leaf_overrides={
+                    "transfer": {
+                        "abi_tests": ["tests/core/MissionTransferDinoTribe_transfer_missing.cpp"],
+                    }
+                },
+            )
+            generic_path_surface = self.mission_transfer_promoted_surface_with_leaf_evidence(
+                core_root,
+                sdk_root,
+                leaf_overrides={
+                    "dino_policy": {
+                        "abi_tests": [str(surface_abi.relative_to(REPO_ROOT))],
+                    }
+                },
+            )
+
+            self.assertTrue(surface_has_promotion_evidence(valid_surface))
+            self.assertFalse(surface_has_promotion_evidence(missing_path_surface))
+            self.assertFalse(surface_has_promotion_evidence(generic_path_surface))
+
+    def test_mission_transfer_dino_tribe_leaf_promotion_rejects_non_promotional_sidecars(self) -> None:
+        cases = (
+            {"ready_scope": "operator_receipt_only"},
+            {"source_kind": "operator_receipt"},
+            {"schema": "obelisk.live-ops-sidecar.v1"},
+            {"candidate_only": True},
+        )
+        for override in cases:
+            with self.subTest(override=override):
+                with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="MissionLeafSidecar") as core_dir, tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "sdk_consumer", prefix="MissionLeafSidecar") as sdk_dir:
+                    core_root = Path(core_dir)
+                    sdk_root = Path(sdk_dir)
+                    surface_abi = core_root / "MissionTransferDinoTribe_surface_PromotionTests.cpp"
+                    surface_sdk = sdk_root / "mission_transfer_dino_tribe_surface_promotion.c"
+                    surface_abi.parent.mkdir(parents=True, exist_ok=True)
+                    surface_sdk.parent.mkdir(parents=True, exist_ok=True)
+                    surface_abi.write_text("// surface ABI fixture\n", encoding="utf-8")
+                    surface_sdk.write_text("/* surface SDK fixture */\n", encoding="utf-8")
+                    surface = self.mission_transfer_promoted_surface_with_leaf_evidence(
+                        core_root,
+                        sdk_root,
+                        leaf_overrides={"mission": override},
+                        use_promotion_evidence_by_leaf=True,
+                    )
+
+                    self.assertFalse(surface_has_promotion_evidence(surface))
 
     def test_scoped_release_statement_template_passes_statement_scope_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -5498,6 +5653,42 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("public_contract_readiness_report:promotion_blockers_remaining", missing)
         self.assertIn("public_contract_readiness_report:private_candidate_contract_candidate_only", missing)
 
+    def test_identity_structured_contract_report_rejects_legacy_next_blocker_alias(self) -> None:
+        missing = self.identity_structured_missing_for_contract_report(
+            {
+                "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                "ready": True,
+                "ready_scope": "contract_review_input_only",
+                "surface": "obelisk.player_identity.v1",
+                "accepted_for_contract_review": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_contract_allowed": False,
+                "public_header_allowed": False,
+                "public_header_symbols_now": [],
+                "public_capability_bits_now": [],
+                "public_callback_abi_now": [],
+                "next_blocker": "identity_public_contract_gate",
+                "blockers": [],
+                "resolved_inputs": ["runtime.lifecycle_evidence"],
+                "remaining_blockers": [
+                    "runtime.lifecycle_evidence",
+                    "privacy.identifier_redaction",
+                    "lifetime.generation_scope_invalidation",
+                    "abi.public_pod_contract",
+                    "lifecycle.owner_cleanup",
+                    "separation.downstream_surfaces",
+                ],
+                "approved_runtime_evidence": {
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                },
+            }
+        )
+
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
+
     def test_identity_structured_contract_report_must_keep_full_blocker_set(self) -> None:
         missing = self.identity_structured_missing_for_contract_report(
             {
@@ -5508,7 +5699,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "public_sdk_ready": False,
                 "runtime_ready": False,
                 "public_header_allowed": False,
-                "next_blocker": "identity_public_contract_gate",
+                "next_blocker": "identity_public_contract_gate_missing",
                 "blockers": [],
                 "resolved_inputs": ["runtime.lifecycle_evidence"],
                 "remaining_blockers": ["privacy.identifier_redaction"],
@@ -5531,7 +5722,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "public_sdk_ready": False,
                 "runtime_ready": False,
                 "public_header_allowed": False,
-                "next_blocker": "identity_public_contract_gate",
+                "next_blocker": "identity_public_contract_gate_missing",
                 "blockers": ["public_header_allowed_not_false"],
                 "resolved_inputs": ["runtime.lifecycle_evidence"],
                 "remaining_blockers": [
@@ -6814,7 +7005,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_header_symbols_now": [],
                         "public_capability_bits_now": [],
                         "public_callback_abi_now": [],
-                        "next_blocker": "identity_public_contract_gate",
+                        "next_blocker": "identity_public_contract_gate_missing",
                         "blockers": [],
                         "resolved_inputs": ["runtime.lifecycle_evidence"],
                         "remaining_blockers": [

@@ -212,9 +212,9 @@ This file is an active routing table only. Durable evidence belongs in
 - Latest supervised rounds integrated route-gate summaries, retry-stable copied-event
   cleanup, live-ops sidecar non-claims, P0 certificate/accounting hardening, player
   identity header/gap-report guardrails, secondary-report overclaim scanning, and default
-  SDK route-boundary hardening. Inventory, Mission/Transfer/Dino/Tribe, Structure census,
-  Structure build-policy, ResourceHandle/object-identity, and route-gate secondary reports
-  now reject public/runtime/completion readiness overclaims; default SDK completion accepts
-  only `approved_runtime_evidence_missing` unless approved runtime evidence is explicit.
+  SDK route-boundary hardening. Secondary reports now reject public/runtime/completion
+  overclaims; Mission leaf promotion evidence now requires strict schema/path/leaf-token
+  checks and `per_leaf_promoted` summaries need manifest-verified leaf evidence. Bound
+  identity planning accepts only `approved_runtime_evidence_missing` without explicit runtime evidence; public-contract `next_blocker` uses `identity_public_contract_gate_missing`.
   Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`,
   P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.

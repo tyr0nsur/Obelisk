@@ -2455,6 +2455,72 @@ def report_is_limited_to_non_promotional_readiness(report: Any) -> bool:
     }
 
 
+def promotion_evidence_path_is_specific_to_leaf(raw_path: str, leaf_id: str) -> bool:
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return False
+    lowered = relative.as_posix().lower()
+    leaf_tokens = [token for token in leaf_id.replace("-", "_").split("_") if token]
+    return bool(leaf_tokens) and all(token.lower() in lowered for token in leaf_tokens)
+
+
+def strict_promotion_evidence_value_valid(
+    value: Any,
+    *,
+    surface_id: str,
+    evidence_key: str | None = None,
+    leaf_id: str | None = None,
+) -> bool:
+    def item_valid(item: str) -> bool:
+        relative = repo_relative_evidence_path(item)
+        if relative is None:
+            return False
+        relative_text = relative.as_posix()
+        if evidence_key in {"sdk_consumer_tests", "installed_sdk_consumer_tests"}:
+            if not (
+                relative_text == "tests/sdk_consumer"
+                or relative_text.startswith("tests/sdk_consumer/")
+                or relative_text == "tests/sdk_installed_consumer"
+                or relative_text.startswith("tests/sdk_installed_consumer/")
+            ):
+                return False
+        if evidence_key == "abi_tests":
+            if not (relative_text.startswith("tests/abi/") or relative_text.startswith("tests/core/")):
+                return False
+        if evidence_path_has_non_promotional_marker(item):
+            return False
+        if not evidence_path_exists(item, allow_generic_dirs=False):
+            return False
+        if not evidence_path_is_specific(item, surface_id):
+            return False
+        if leaf_id is not None and not promotion_evidence_path_is_specific_to_leaf(item, leaf_id):
+            return False
+        return True
+
+    if isinstance(value, list) and value:
+        return all(isinstance(item, str) and item_valid(item) for item in value)
+    return isinstance(value, str) and item_valid(value)
+
+
+def strict_promotion_evidence_has_valid_paths(
+    evidence: dict[str, Any],
+    *,
+    surface_id: str,
+    leaf_id: str | None = None,
+) -> bool:
+    return strict_promotion_evidence_value_valid(
+        evidence.get("abi_tests"),
+        surface_id=surface_id,
+        evidence_key="abi_tests",
+        leaf_id=leaf_id,
+    ) and strict_promotion_evidence_value_valid(
+        evidence.get("sdk_consumer_tests"),
+        surface_id=surface_id,
+        evidence_key="sdk_consumer_tests",
+        leaf_id=leaf_id,
+    )
+
+
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     if surface.get("status") != "promoted":
         return False
@@ -2485,6 +2551,10 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
                 return False
             if evidence_has_forbidden_ready_scope(leaf_evidence):
                 return False
+            if evidence_has_non_promotional_schema_marker(leaf_evidence):
+                return False
+            if report_is_limited_to_non_promotional_readiness(leaf_evidence):
+                return False
             if leaf_evidence.get("promotion_status") != "promoted":
                 return False
             for flag in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
@@ -2494,6 +2564,12 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
                 value = leaf_evidence.get(key)
                 if not isinstance(value, list) or not value:
                     return False
+            if not strict_promotion_evidence_has_valid_paths(
+                leaf_evidence,
+                surface_id=surface_id,
+                leaf_id=leaf_id,
+            ):
+                return False
     allow_generic_dirs = surface_id not in STRICT_PROMOTION_EVIDENCE_SURFACE_IDS
     if not allow_generic_dirs:
         if evidence.get("surface_id") != surface_id:
@@ -2509,6 +2585,13 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         if not isinstance(evidence.get("sdk_consumer_tests"), list) or not evidence["sdk_consumer_tests"]:
             return False
     def evidence_value_valid(value: Any, *, evidence_key: str | None = None) -> bool:
+        if not allow_generic_dirs:
+            return strict_promotion_evidence_value_valid(
+                value,
+                surface_id=surface_id,
+                evidence_key=evidence_key,
+            )
+
         def item_valid(item: str) -> bool:
             relative = repo_relative_evidence_path(item)
             if relative is None:
@@ -3126,7 +3209,7 @@ def player_identity_structured_promotion_evidence_missing(
             and contract_report.get("public_header_symbols_now") == []
             and contract_report.get("public_capability_bits_now") == []
             and contract_report.get("public_callback_abi_now") == []
-            and contract_report.get("next_blocker") == "identity_public_contract_gate"
+            and contract_report.get("next_blocker") == "identity_public_contract_gate_missing"
             and set(contract_report.get("remaining_blockers", []))
             == PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS
             and contract_report.get("blockers") == []
@@ -4258,6 +4341,17 @@ def build_report(
         for surface in surface_rows
         if isinstance(surface, dict) and isinstance(surface.get("id"), str)
     }
+    if mission_transfer_dino_tribe_outcome_accounting.get("accounting_route") == "per_leaf_promoted":
+        mission_surface = surfaces_by_id.get("obelisk.mission_transfer_dino_tribe.v1")
+        mission_manifest_leaf_evidence_verified = (
+            isinstance(mission_surface, dict)
+            and surface_has_promotion_evidence(mission_surface)
+        )
+        mission_transfer_dino_tribe_outcome_accounting[
+            "manifest_leaf_promotion_evidence_verified"
+        ] = mission_manifest_leaf_evidence_verified
+        if not mission_manifest_leaf_evidence_verified:
+            blockers.append("mission_transfer_dino_tribe_per_leaf_promotion_evidence_unverified")
     decision_backed_surface_ids = public_contract_decision_surfaces_for_header(
         public_header_path,
         contract_decisions_dir,

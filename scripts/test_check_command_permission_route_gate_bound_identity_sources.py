@@ -230,7 +230,7 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertFalse(phase["source_checker_accepted_for_internal_planning"])
         self.assertIn("no runtime or server operation was performed", report["non_claims"])
 
-    def test_bound_route_accepts_post_runtime_evidence_contract_blocker_as_locked_planning(self) -> None:
+    def test_bound_route_rejects_contract_blocker_without_explicit_runtime_evidence(self) -> None:
         route_report = self.base_route_report()
         phase = route_report["critical_path_phase"]
         phase["current_blocker"] = "identity_public_contract_gate_missing"
@@ -241,8 +241,8 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
 
         report = self.run_with_fake_route_report(route_report)
 
-        self.assertTrue(report["valid"])
-        self.assertTrue(report["accepted_for_planning"])
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
         self.assertTrue(report["planning_only"])
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
@@ -251,7 +251,9 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["server_operations_authorized"])
         self.assertFalse(report["runtime_work_authorized"])
-        self.assertEqual([], report["blockers"])
+        self.assertIn("route_gate_bound_identity_blocker_unexpected", report["blockers"])
+        self.assertIn("route_gate_bound_identity_primary_blocker_unexpected", report["blockers"])
+        self.assertIn("route_gate_lock_blocked_until_unexpected", report["blockers"])
         self.assertEqual("identity_public_contract_gate_missing", report["critical_path_phase"]["current_blocker"])
 
     def test_rejects_stale_lifecycle_anchor_snapshot_hash_before_binding(self) -> None:

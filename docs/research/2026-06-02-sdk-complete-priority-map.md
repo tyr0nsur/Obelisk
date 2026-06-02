@@ -2791,3 +2791,62 @@ Deferred read-only audit findings for future offline guardrail rounds:
 No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
+
+## Mission Leaf Evidence And Bound Route Hardening
+
+The next supervised round split one worker and three read-only audits: bound identity route
+runtime-boundary hardening, Mission leaf-evidence verification, player-identity
+public-contract blocker alias review, and offline reversing priority. The lead integrated
+the bounded SDK/P0 guardrails and closed all agents.
+
+Implemented changes:
+
+- `surface_has_promotion_evidence()` now validates Mission/Transfer/Dino/Tribe/Buff leaf
+  evidence with the strict path/schema checks already used by strict promoted surfaces:
+  non-promotional ready scopes and schema/source markers fail, ABI paths must live under
+  `tests/core/` or `tests/abi/`, SDK consumer paths must live under `tests/sdk_consumer/`
+  or `tests/sdk_installed_consumer/`, paths must exist, remain repo-relative, avoid
+  candidate/planning/evidence-only markers, match the umbrella surface, and include all
+  leaf-id tokens.
+- The SDK completion gate no longer trusts a secondary
+  `accounting_route=per_leaf_promoted` summary by booleans alone. If that route appears,
+  the loaded manifest must independently pass Mission leaf promotion evidence validation or
+  the gate adds `mission_transfer_dino_tribe_per_leaf_promotion_evidence_unverified`.
+- `player_identity_structured_promotion_evidence_missing()` now expects the public-contract
+  readiness report's route `next_blocker` to be
+  `identity_public_contract_gate_missing`, while the internal decision gate id remains
+  `identity_public_contract_gate`.
+- `check_command_permission_route_gate_bound_identity_sources.py` now accepts only
+  `approved_runtime_evidence_missing` without an explicit approved runtime evidence input;
+  `identity_public_contract_gate_missing` fails closed for the bound planning-wrapper path.
+- Offline reversing priority remains request/replay-pack audit and preparation for a future
+  approved runtime window. Broad FName/GObjects/core scans and ResourceHandle
+  rediscovery remain rejected as non-advancing for the current P0 blocker.
+
+Validation stayed offline-only:
+
+- Focused Mission leaf, identity alias, and bound route tests passed 12 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 189 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate_bound_identity_sources scripts.test_check_command_permission_route_gate`
+  passed 46 tests.
+- Bound identity route with repo-local lifecycle/principal planning manifests stayed
+  valid/planning-only at `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, and P0 `0/4`.
+
+Deferred work:
+
+- The standalone Mission/Transfer/Dino/Tribe accounting checker can still be tightened to
+  reject non-promotional report schemas/target sets and deny-marker paths inside future
+  `{path, sha256}` per-leaf report bindings.
+- The next offline P0-prep task is an end-to-end audit of player-principal lifecycle
+  request, preflight, post-window replay, bundle, and approved-evidence contracts. It
+  should improve reviewability for an operator-approved future window without asserting
+  runtime authorization or SDK readiness.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
