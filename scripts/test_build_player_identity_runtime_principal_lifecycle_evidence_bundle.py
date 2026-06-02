@@ -137,7 +137,7 @@ def preflight_payload(
         "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
-        "allow_stopped": True,
+        "allow_stopped": False,
         "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
@@ -458,16 +458,16 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(report["inputs"]["window_manifest"]["protected"])
         self.assertFalse(report["inputs"]["window_manifest_check"]["checked"])
 
-    def test_preflight_rejects_malformed_request_pack_sidecars_without_building(self) -> None:
+    def test_preflight_uses_canonical_sibling_sidecar_fallbacks_without_manifest(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
             evidence_dir = temp_dir / "live-validation-logs" / RUN_ID
-            sidecar_dir = evidence_dir / "sidecars" / RUN_ID
-            sidecar_dir.mkdir(parents=True)
-            (sidecar_dir / "window-request.json").write_text("{}", encoding="utf-8")
-            (sidecar_dir / "observer-window.env").write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
-            (sidecar_dir / "preflight-pre.txt").write_text("preflight=ok\n", encoding="utf-8")
-            (sidecar_dir / "preflight-post.txt").write_text("preflight=ok\n", encoding="utf-8")
+            evidence_dir.mkdir(parents=True)
+            (evidence_dir / "window-request.json").write_text("{}", encoding="utf-8")
+            (evidence_dir / "observer-window.env").write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            (evidence_dir / "preflight-pre.json").write_text("{}", encoding="utf-8")
+            (evidence_dir / "preflight-post.json").write_text("{}", encoding="utf-8")
+            (evidence_dir / "operator-approval-receipt.json").write_text("{}", encoding="utf-8")
 
             result = self.run_preflight(evidence_dir)
 
@@ -495,12 +495,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
         self.assertEqual(
             [artifact["present"] for artifact in report["next_required_artifacts"]],
-            [False, False, False, False],
+            [False, False, True, False],
         )
         self.assertIn("request_pack_check_failed", report["blockers"])
         self.assertIn("copied_log_missing", report["blockers"])
         self.assertIn("window_manifest_missing", report["blockers"])
         self.assertIn("approved_runtime_manifest_missing", report["blockers"])
+        self.assertEqual(
+            report["inputs"]["request_pack"]["path"],
+            str(evidence_dir / "window-request.json"),
+        )
+        self.assertEqual(
+            report["inputs"]["preflight_pre"]["path"],
+            str(evidence_dir / "preflight-pre.json"),
+        )
+        self.assertEqual(
+            report["inputs"]["preflight_post"]["path"],
+            str(evidence_dir / "preflight-post.json"),
+        )
+        self.assertEqual(
+            report["inputs"]["operator_approval_receipt"]["path"],
+            str(evidence_dir / "operator-approval-receipt.json"),
+        )
+        self.assertNotIn("preflight-pre.txt", json.dumps(report, sort_keys=True))
 
     def test_preflight_accepts_builder_inputs_before_approved_manifest(self) -> None:
         with self.temp_offline_workspace() as temp:

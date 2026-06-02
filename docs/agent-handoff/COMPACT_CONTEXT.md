@@ -1161,6 +1161,18 @@ priorities, and do not use history files as the active source of truth.
   gate tests OK, route JSON locked at `approved_runtime_evidence_missing`, and SDK JSON
   failed closed with SDK 0/12, P0 0/4, `stable_claim_allowed=false`. No runtime/server
   operation was performed.
+- 2026-06-02 supervised 4-agent offline P0-prep round: lead integrated window-manifest
+  preflight hardening. Accepted `preflight-pre.json`/`preflight-post.json` sidecars must
+  now report `offline_only=false` and `allow_stopped=false`; bundle preflight fallback
+  paths now use sibling JSON sidecars beside copied evidence instead of obsolete
+  `sidecars/<run-id>/*.txt` paths. SDK/P0 audit found no accounting drift for request
+  packs, planning manifests, route acceptance, or PluginManager hardening. Reversing audit
+  kept broad FName/GObjects/core rediscovery rejected and validated Mission copied-bool
+  side-lane as internal/non-public. Runtime/ABI audit found a pending follow-up:
+  copied-event `DestroyUserData` cleanup failures can be erased before successful retry,
+  allowing a later `dlclose`; next runtime round should make dispatcher destroy cleanup
+  retry-stable. Validation stayed offline-only and route/SDK remained fail-closed. No
+  runtime/server operation was performed.
 
 ## Agent Coordination
 

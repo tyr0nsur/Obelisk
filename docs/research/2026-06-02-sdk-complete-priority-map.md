@@ -2372,6 +2372,61 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## Window Preflight Sidecar Posture Guardrail
+
+A supervised four-agent round split live-ops/request-pack, SDK/P0 accounting,
+UE4/reversing side-lane, and runtime/ABI regression review.
+
+Integrated live-ops finding:
+
+- The window manifest checker now rejects `preflight-pre.json` or `preflight-post.json`
+  sidecars whose structured preflight output records `offline_only=true` or
+  `allow_stopped=true`.
+- Accepted approved-window replay must therefore prove the request-pack posture path that
+  checks a live stable server state; offline-only or stopped-allowed preflight output does
+  not satisfy the copied runtime evidence preparation boundary.
+- The approved evidence bundle preflight classifier now falls back to canonical sibling
+  JSON sidecars beside copied evidence (`window-request.json`, `observer-window.env`,
+  `operator-approval-receipt.json`, `preflight-pre.json`, `preflight-post.json`) instead
+  of stale `sidecars/<run-id>/*.txt` paths when the manifest is missing.
+- The runtime window brief template records that accepted preflight JSON sidecars must
+  carry `offline_only=false` and `allow_stopped=false`.
+
+Auditor outcomes:
+
+- SDK/P0 audit found no missing accounting guardrail for request packs, planning
+  manifests, route acceptance, or PluginManager hardening; SDK completion remained blocked.
+- Reversing/offline audit rejected broad dump/FName/GObjects/core rediscovery for the
+  current P0 blocker and validated Mission copied-bool checks as the highest-value
+  internal side-lane, with all public/runtime flags false.
+- Runtime/ABI audit found a separate pending follow-up: copied-event dispatcher
+  `DestroyUserData` cleanup failures can be erased before a successful retry, so a later
+  `UnloadAll()` may reach `dlclose` without proving user-data destruction. That was not
+  mixed into this offline live-ops patch.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+  passed 63 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+  passed 40 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_principal_lifecycle_window_request scripts.test_prepare_player_principal_lifecycle_window_request`
+  passed 48 tests.
+- `bash scripts/test_check_player_principal_lifecycle_preflight.sh` passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_research_doc_guardrails`
+  passed 23 tests.
+- Mission copied-bool readiness and Mission/Transfer/Dino/Tribe accounting checks passed
+  with public/runtime/promotion flags false.
+- `scripts/check_command_permission_route_gate.py --json` stayed valid/planning-only with
+  `critical_path_phase.current_blocker=approved_runtime_evidence_missing` and readiness
+  flags false.
+- `scripts/check_public_sdk_v1_completion.py --json` exited 1 as expected with status
+  `blocked`, SDK 0/12, P0 0/4, and `stable_claim_allowed=false`.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
 ## PluginManager Init-Failure Retry Hardening
 
 A supervised four-agent follow-up split runtime/ABI, SDK/P0, reversing/offline evidence,

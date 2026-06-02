@@ -229,7 +229,7 @@ def preflight_payload(
         "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
-        "allow_stopped": True,
+        "allow_stopped": False,
         "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
@@ -448,6 +448,18 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 preflight_path = root / preflight_path
             payload = json.loads(preflight_path.read_text(encoding="utf-8"))
             payload["checked_at_utc"] = checked_at_utc
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields[sha_key] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+        return mutate
+
+    def mutate_preflight_field(self, path_key: str, sha_key: str, field: str, value: object):
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            preflight_path = Path(fields[path_key])
+            if not preflight_path.is_absolute():
+                preflight_path = root / preflight_path
+            payload = json.loads(preflight_path.read_text(encoding="utf-8"))
+            payload[field] = value
             preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
             fields[sha_key] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
 
@@ -739,6 +751,38 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("preflight_post_path_checked_at_after_rollback_end", report["blockers"])
+
+    def test_rejects_preflight_sidecar_offline_only(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=self.mutate_preflight_field(
+                "preflight_pre_path",
+                "preflight_pre_sha256",
+                "offline_only",
+                True,
+            ),
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_offline_only_not_false", report["blockers"])
+
+    def test_rejects_preflight_sidecar_allow_stopped(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=self.mutate_preflight_field(
+                "preflight_pre_path",
+                "preflight_pre_sha256",
+                "allow_stopped",
+                True,
+            ),
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_allow_stopped_not_false", report["blockers"])
 
     def test_rejects_swapped_preflight_checked_at_order(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:

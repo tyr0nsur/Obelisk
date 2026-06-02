@@ -208,9 +208,10 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest supervised round used four read-only subagents plus lead integration. Integrated
-  `PluginManager` init-failure retry hardening so callback-cleanup or `dlclose` failure
-  keeps mapped plugins in `UnloadAll` retry state without repeated shutdown; tests now
-  cover cleanup-failure and close-failure retry paths. SDK/P0 and live-ops audits found no
-  readiness overclaim; reversing audit rejected broad dump/FName/GObjects rediscovery for
-  this blocker. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
-  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+  offline window-manifest hardening: accepted preflight sidecars must record
+  `offline_only=false` and `allow_stopped=false`, and bundle preflight fallbacks now use
+  sibling JSON sidecars beside copied evidence. SDK/P0 accounting still has no drift;
+  Mission side-lane checks remain internal/non-public. Pending runtime/ABI follow-up:
+  copied-event `DestroyUserData` cleanup failures should be retry-stable before `dlclose`.
+  Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`,
+  P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.

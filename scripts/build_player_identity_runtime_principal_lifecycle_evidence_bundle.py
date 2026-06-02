@@ -529,7 +529,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     request_pack = file_state(
         sidecar_path(
             "request_pack_path",
-            resolved / "sidecars" / run_id / "window-request.json",
+            resolved / "window-request.json",
         ),
         "request_pack",
         blockers,
@@ -537,7 +537,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     observer_env = file_state(
         sidecar_path(
             "observer_env_path",
-            resolved / "sidecars" / run_id / "observer-window.env",
+            resolved / "observer-window.env",
         ),
         "observer_env",
         blockers,
@@ -545,7 +545,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     preflight_pre = file_state(
         sidecar_path(
             "preflight_pre_path",
-            resolved / "sidecars" / run_id / "preflight-pre.txt",
+            resolved / "preflight-pre.json",
         ),
         "preflight_pre",
         blockers,
@@ -553,7 +553,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     preflight_post = file_state(
         sidecar_path(
             "preflight_post_path",
-            resolved / "sidecars" / run_id / "preflight-post.txt",
+            resolved / "preflight-post.json",
         ),
         "preflight_post",
         blockers,
@@ -561,7 +561,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     operator_approval_receipt = file_state(
         sidecar_path(
             "operator_approval_receipt_path",
-            resolved / "sidecars" / run_id / "operator-approval-receipt.json",
+            resolved / "operator-approval-receipt.json",
         ),
         "operator_approval_receipt",
         blockers,

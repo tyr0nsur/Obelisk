@@ -1094,6 +1094,10 @@ def validate_preflight_content(
         add(blockers, f"{path_key}_ready_not_true", path_key)
     if payload.get("posture_check") != "accepted":
         add(blockers, f"{path_key}_posture_check_not_accepted", path_key)
+    if payload.get("offline_only") is not False:
+        add(blockers, f"{path_key}_offline_only_not_false", path_key, actual=payload.get("offline_only"))
+    if payload.get("allow_stopped") is not False:
+        add(blockers, f"{path_key}_allow_stopped_not_false", path_key, actual=payload.get("allow_stopped"))
     if payload.get("mode") != expected_mode:
         add(blockers, f"{path_key}_mode_mismatch", path_key, expected=expected_mode, actual=payload.get("mode"))
     if payload.get("instance") != target.instance:

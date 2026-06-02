@@ -123,9 +123,11 @@ for the wrapper/preflight marker exclusivity checks.
 
 The same copied evidence directory must also contain sibling request/replay sidecars:
 `window-request.json`, `observer-window.env`, completed `operator-approval-receipt.json`,
-`preflight-pre.json`, and `preflight-post.json`. The receipt must bind the exact request
-pack digest and reject stale timing: approval before `prepared_at_utc` or at/after the
-approved window start is not valid current-turn approval.
+`preflight-pre.json`, and `preflight-post.json`. The preflight JSON sidecars must record
+`offline_only=false` and `allow_stopped=false`; offline-only or stopped-allowed preflight
+reports do not prove the required stable posture for approved evidence replay. The receipt
+must bind the exact request pack digest and reject stale timing: approval before
+`prepared_at_utc` or at/after the approved window start is not valid current-turn approval.
 
 The manifest must record the exact target, approved and actual timestamps, copied log
 path/SHA, pre/post posture, rollback timestamps, rollback delta, `log_budget=10`,
