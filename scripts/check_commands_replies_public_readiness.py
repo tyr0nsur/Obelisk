@@ -912,6 +912,8 @@ def validate_response_path_report(
     *,
     expected_root: Path | None = None,
     expected_readiness: Path | None = None,
+    expected_surfaces: Path | None = None,
+    expected_public_header: Path | None = None,
 ) -> None:
     schema = payload.get("schema")
     if schema == RESPONSE_PATH_REPORT_SCHEMA:
@@ -945,7 +947,9 @@ def validate_response_path_report(
                 resolved = resolve_source_artifact_path(Path(payload[key]), key, blockers)
                 if resolved is not None:
                     resolved_source_artifacts[key] = resolved
-        if expected_root is not None:
+        if expected_root is None:
+            add(blockers, "response_path_report_expected_root_required", "$.response_path_root")
+        else:
             resolved_expected_root = resolve_expected_path(expected_root, "response_path_root", blockers)
             if resolved_expected_root is not None and payload.get("readiness_root") != str(resolved_expected_root):
                 add(
@@ -955,7 +959,9 @@ def validate_response_path_report(
                     expected=str(resolved_expected_root),
                     value=payload.get("readiness_root"),
                 )
-        if expected_readiness is not None:
+        if expected_readiness is None:
+            add(blockers, "response_path_report_expected_readiness_required", "$.response_path_readiness")
+        else:
             resolved_expected_readiness = resolve_expected_path(expected_readiness, "response_path_readiness", blockers)
             if (
                 resolved_expected_readiness is not None
@@ -967,6 +973,32 @@ def validate_response_path_report(
                     "$.response_path_report.readiness_path",
                     expected=str(resolved_expected_readiness),
                     value=str(resolved_source_artifacts.get("readiness_path")),
+                )
+        if expected_surfaces is not None:
+            resolved_expected_surfaces = resolve_expected_path(expected_surfaces, "surfaces", blockers)
+            if (
+                resolved_expected_surfaces is not None
+                and resolved_source_artifacts.get("surfaces_path") != resolved_expected_surfaces
+            ):
+                add(
+                    blockers,
+                    "response_path_report_surfaces_path_mismatch",
+                    "$.response_path_report.surfaces_path",
+                    expected=str(resolved_expected_surfaces),
+                    value=str(resolved_source_artifacts.get("surfaces_path")),
+                )
+        if expected_public_header is not None:
+            resolved_expected_public_header = resolve_expected_path(expected_public_header, "public_header", blockers)
+            if (
+                resolved_expected_public_header is not None
+                and resolved_source_artifacts.get("public_header_path") != resolved_expected_public_header
+            ):
+                add(
+                    blockers,
+                    "response_path_report_public_header_path_mismatch",
+                    "$.response_path_report.public_header_path",
+                    expected=str(resolved_expected_public_header),
+                    value=str(resolved_source_artifacts.get("public_header_path")),
                 )
         if payload.get("valid") is not True or payload.get("accepted_for_planning") is not True:
             add(blockers, "response_path_report_not_accepted_for_planning", "$.response_path_report")
@@ -1125,6 +1157,8 @@ def build_report(
             blockers,
             expected_root=response_path_root,
             expected_readiness=response_path_readiness,
+            expected_surfaces=surfaces_path,
+            expected_public_header=public_header_path,
         )
 
     valid = not blockers

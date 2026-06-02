@@ -236,6 +236,23 @@ This file is an active routing table only. Durable evidence belongs in
   root/readiness when the route supplies that context. This is still planning-only; it
   does not promote command response, replies/send-chat ABI, command router, runtime
   readiness, or v1 completion.
+- 2026-06-02 P0 report replay and release-template guardrails: permissions/admin public
+  readiness no longer accepts checker reports as `--query-failclosed-artifact`; it accepts
+  only the candidate query manifest and revalidates it in consume mode. Commands/replies
+  public readiness now requires response-path reports to be bound to expected response
+  root/readiness and current surfaces/header inputs; the route gate forwards the freshly
+  composed command response report's root/readiness into replies. Release v1 public SDK
+  templates under `release/v1/public-sdk/*.md` are now scanned with the release-statement
+  broad-claim detector while `stable_claim_allowed=false`. This remains offline
+  guardrail work only; no public permissions/admin, command response, commands/replies,
+  runtime readiness, release readiness, or v1 completion is promoted.
+- New deferred P0 identity provenance risk: player-identity first-evidence can still
+  accept standalone lifecycle-anchor and principal-policy planning artifacts that are
+  valid in isolation without proving they came from the same accepted reflection
+  inventory, first-evidence output, snapshot root, or source artifact hashes. Treat the
+  next identity offline hardening target as aggregate artifact/source binding; do not
+  reinterpret this as runtime approval or as a reason to rerun broad lifecycle layout
+  discovery.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

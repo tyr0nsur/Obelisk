@@ -36,6 +36,7 @@ PUBLIC_SDK_V1_COMPATIBILITY_DOC = REPO_ROOT / "docs" / "SDK_V1_COMPATIBILITY.md"
 PLUGIN_HUB_PACKAGE_TEMPLATE_DOC = REPO_ROOT / "docs" / "PLUGIN_HUB_PACKAGE_TEMPLATE.md"
 PUBLIC_API_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 AGENT_SKILL_FILES = sorted((REPO_ROOT / "agent-skills").glob("*/SKILL.md"))
+RELEASE_V1_PUBLIC_SDK_DOC_FILES = sorted((REPO_ROOT / "release" / "v1" / "public-sdk").glob("*.md"))
 PUBLIC_DOC_FILES = [
     REPO_ROOT / "README.md",
     REPO_ROOT / "CONTRIBUTING.md",
@@ -5502,6 +5503,25 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_release_v1_public_sdk_templates_do_not_claim_broad_completion_before_gate(self) -> None:
+        completion_report = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        report = completion_report["build_report"](PUBLIC_SDK_SURFACES_MANIFEST)
+
+        if report["stable_claim_allowed"]:
+            return
+
+        offenders: list[str] = []
+        for path in RELEASE_V1_PUBLIC_SDK_DOC_FILES:
+            forbidden_claims = completion_report["release_statement_forbidden_broad_claims"](
+                path.read_text(encoding="utf-8")
+            )
+            offenders.extend(f"{path.relative_to(REPO_ROOT)}: {claim}" for claim in forbidden_claims)
+
+        self.assertEqual(offenders, [])
+
     def test_public_handoff_and_community_text_avoid_narrow_base_framing(self) -> None:
         narrow_base_framing = re.compile(
             r"\b(?:small|narrow|minimal|foundation(?:[- ]only)?|core[- ]only)\s+"
@@ -7116,15 +7136,18 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
         for event_kind in gameplay_policy.get("event_kinds", []):
             with self.subTest(event_kind=event_kind.get("kind", "<missing>")):
+                expected_event_kind_keys = {
+                    "kind",
+                    "stable_name",
+                    "resource_kind",
+                    "event_kind_mask",
+                    "field_mask",
+                }
+                if event_kind.get("resource_kind") == "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM":
+                    expected_event_kind_keys.add("required_flags")
                 self.assertEqual(
                     set(event_kind),
-                    {
-                        "kind",
-                        "stable_name",
-                        "resource_kind",
-                        "event_kind_mask",
-                        "field_mask",
-                    },
+                    expected_event_kind_keys,
                 )
 
         forbidden_public_field_names = {
@@ -7510,6 +7533,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     "stable_name": "inventory.remote_add_check",
                     "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
                     "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_REMOTE_ADD_CHECK",
+                    "required_flags": [
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+                    ],
                     "field_mask": [
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_REQUESTED_BY_PLAYER",
@@ -7520,6 +7547,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     "stable_name": "inventory.use_check",
                     "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
                     "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_CHECK",
+                    "required_flags": [
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+                    ],
                     "field_mask": [
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_IGNORE_COOLDOWN",
@@ -7530,6 +7561,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     "stable_name": "inventory_item.allow_equip_check",
                     "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
                     "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_ALLOW_EQUIP_ITEM_CHECK",
+                    "required_flags": [
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+                    ],
                     "field_mask": [
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
                     ],
@@ -7539,6 +7574,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     "stable_name": "inventory_item.can_repair_check",
                     "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
                     "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_CAN_REPAIR_CHECK",
+                    "required_flags": [
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+                    ],
                     "field_mask": [
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
                     ],
@@ -7548,6 +7587,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                     "stable_name": "inventory_item.use_onto_item_check",
                     "resource_kind": "OBELISK_GAMEPLAY_POLICY_RESOURCE_KIND_INVENTORY_ITEM",
                     "event_kind_mask": "OBELISK_GAMEPLAY_POLICY_EVENT_MASK_INVENTORY_USE_ITEM_ONTO_ITEM_CHECK",
+                    "required_flags": [
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_COPIED_PAYLOAD",
+                        "OBELISK_GAMEPLAY_POLICY_EVENT_FLAG_INVENTORY_BACKED",
+                    ],
                     "field_mask": [
                         "OBELISK_GAMEPLAY_POLICY_FIELD_MASK_RETURN_VALUE",
                     ],
@@ -9889,7 +9932,7 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 "near-term side lane than structure_census because it rides "
                 "promoted-experimental copied GameplayPolicyEvent signals; this must "
                 "not reorder the identity/principal -> permissions/admin -> "
-                "commands/replies dependency chain, promote inventory "
+                "command response -> commands/replies dependency chain, promote inventory "
                 "mutation/identity/lookup, or promote structure_census beyond "
                 "planning/consume-only."
             ),

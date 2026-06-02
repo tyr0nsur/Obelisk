@@ -65,7 +65,7 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["dependency"], "obelisk.player_identity.v1")
 
-    def test_accepts_candidate_query_failclosed_manifest_and_report_only_as_planning(self) -> None:
+    def test_accepts_candidate_query_failclosed_manifest_only_as_planning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest_path = root / "permissions-query.json"
@@ -86,6 +86,17 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             )
             self.assertFalse(report["public_sdk_ready"])
 
+    def test_rejects_query_failclosed_checker_report_as_planning_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "permissions-query.json"
+            subprocess.run(
+                [sys.executable, str(QUERY_CHECKER), "--emit-template", str(manifest_path)],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             report_path = root / "permissions-query-report.json"
             query_report = subprocess.run(
                 [sys.executable, str(QUERY_CHECKER), str(manifest_path), "--json"],
@@ -95,16 +106,18 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
                 text=True,
             )
             report_path.write_text(query_report.stdout, encoding="utf-8")
-            result = run_checker("--query-failclosed-artifact", str(report_path))
+            result = run_checker("--query-failclosed-artifact", str(report_path), check=False)
             report = json.loads(result.stdout)
-            self.assertEqual(result.returncode, 0)
-            self.assertTrue(report["accepted_for_planning"])
+
+            self.assertEqual(result.returncode, 1)
+            self.assertFalse(report["accepted_for_planning"])
+            self.assertIn("query_failclosed_report_not_accepted_as_artifact", report["blockers"])
             self.assertEqual(
                 report["query_failclosed_artifact_schema"],
-                "obelisk.permissions-admin-query-failclosed-contract-check.v1",
+                None,
             )
 
-    def test_rejects_fabricated_query_failclosed_report_without_contract_fingerprint(self) -> None:
+    def test_rejects_fabricated_query_failclosed_report_as_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             report_path = root / "fake-query-report.json"
@@ -128,9 +141,7 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             report = json.loads(result.stdout)
 
         self.assertEqual(1, result.returncode)
-        self.assertIn("query_failclosed_report_input_schema_mismatch", report["blockers"])
-        self.assertIn("query_failclosed_report_query_fields_mismatch", report["blockers"])
-        self.assertIn("query_failclosed_report_fail_closed_cases_mismatch", report["blockers"])
+        self.assertIn("query_failclosed_report_not_accepted_as_artifact", report["blockers"])
 
     def test_accepts_canonical_query_failclosed_manifest_as_planning_only(self) -> None:
         result = run_checker("--query-failclosed-artifact", str(CANONICAL_QUERY_CONTRACT))
@@ -645,14 +656,15 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             artifact = {
-                "schema": "obelisk.permissions-admin-query-failclosed-contract-check.v1",
-                "mode": "consume",
-                "ready": True,
+                "schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
+                "artifact_status": "candidate_only",
                 "promotion_ready": True,
+                "public_header_allowed": False,
+                "public_cache_abi_allowed": False,
                 "public_sdk_ready": True,
                 "runtime_ready": True,
             }
-            artifact_path = write_json(root, "query-report.json", artifact)
+            artifact_path = write_json(root, "query-manifest.json", artifact)
 
             result = run_checker("--query-failclosed-artifact", str(artifact_path), check=False)
             report = json.loads(result.stdout)

@@ -496,10 +496,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                         encoding="utf-8",
                     )
                     effective_argv.extend(["--response-path-report", str(response_path_report_path)])
-                    if args.command_response_root is not None:
-                        effective_argv.extend(["--response-path-root", str(args.command_response_root)])
-                    if args.command_response_readiness is not None:
-                        effective_argv.extend(["--response-path-readiness", str(args.command_response_readiness)])
+                    response_root = args.command_response_root or response_path_report.get("readiness_root")
+                    response_readiness = args.command_response_readiness or response_path_report.get("readiness_path")
+                    if response_root is not None:
+                        effective_argv.extend(["--response-path-root", str(response_root)])
+                    if response_readiness is not None:
+                        effective_argv.extend(["--response-path-readiness", str(response_readiness)])
             check = run_check(name, effective_argv)
             checks.append(check)
             if name == "command_chat_response_public_readiness":

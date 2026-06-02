@@ -202,8 +202,17 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
     def test_accepts_current_manifests_as_planning_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            report_path = self.write_response_report(Path(temp_dir))
-            result = self.run_checker("--response-path-report", str(report_path), "--json")
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            result = self.run_checker(
+                "--response-path-report",
+                str(report_path),
+                "--response-path-root",
+                str(root),
+                "--response-path-readiness",
+                str(root / "command-chat-response-route-planning-readiness.json"),
+                "--json",
+            )
         report = json.loads(result.stdout)
 
         self.assertTrue(report["valid"])
@@ -751,11 +760,31 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("migration_vocabulary_registration_semantics_missing", report["blockers"])
         self.assertIn("migration_vocabulary_non_compatibility_missing", report["blockers"])
 
-    def test_accepts_optional_response_path_planning_report_only(self) -> None:
+    def test_rejects_response_path_planning_report_without_expected_root_and_readiness(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             report_path = self.write_response_report(root)
-            result = self.run_checker("--response-path-report", str(report_path), "--json")
+            result = self.run_checker("--response-path-report", str(report_path), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_expected_root_required", report["blockers"])
+        self.assertIn("response_path_report_expected_readiness_required", report["blockers"])
+        self.assertFalse(report["valid"])
+
+    def test_accepts_response_path_planning_report_bound_to_expected_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            result = self.run_checker(
+                "--response-path-report",
+                str(report_path),
+                "--response-path-root",
+                str(root),
+                "--response-path-readiness",
+                str(root / "command-chat-response-route-planning-readiness.json"),
+                "--json",
+            )
 
         report = json.loads(result.stdout)
         self.assertTrue(report["valid"])

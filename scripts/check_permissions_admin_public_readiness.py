@@ -460,7 +460,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--query-failclosed-artifact",
         type=Path,
-        help="Optional candidate-only permissions/admin query manifest or checker report.",
+        help="Optional candidate-only permissions/admin query manifest.",
     )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
@@ -1058,47 +1058,25 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
         return None
     payload = load_json(path)
     schema = payload.get("schema")
-    if schema not in {QUERY_CONTRACT_SCHEMA, QUERY_CONTRACT_REPORT_SCHEMA}:
+    if schema == QUERY_CONTRACT_REPORT_SCHEMA:
+        add(blockers, "query_failclosed_report_not_accepted_as_artifact", str(path))
+        return None
+    if schema != QUERY_CONTRACT_SCHEMA:
         add(blockers, "query_failclosed_artifact_schema_mismatch", str(path), schema=schema)
         return None
     for key in QUERY_READY_FALSE_KEYS:
         if payload.get(key) is not False:
             add(blockers, f"query_failclosed_artifact_{key}_not_false", f"{path}:{key}")
-    if schema == QUERY_CONTRACT_REPORT_SCHEMA:
-        if payload.get("mode") != "consume":
-            add(blockers, "query_failclosed_report_mode_not_consume", f"{path}:mode")
-        if payload.get("ready") is not True:
-            add(blockers, "query_failclosed_report_not_ready_for_consume", f"{path}:ready")
-        expected_report_fields = {
-            "input_schema": QUERY_CONTRACT_SCHEMA,
-            "query_fields": list(query_failclosed_contract.REQUIRED_QUERY_FIELD_SEQUENCE),
-            "decision_fields": sorted(query_failclosed_contract.REQUIRED_DECISION_FIELDS),
-            "decisions": list(query_failclosed_contract.REQUIRED_DECISION_SEQUENCE),
-            "provenance_fields": sorted(query_failclosed_contract.REQUIRED_PROVENANCE_FIELDS),
-            "recognized_authority_kinds": sorted(query_failclosed_contract.REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
-            "allow_capable_authority_kinds": sorted(query_failclosed_contract.REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS),
-            "fail_closed_cases": list(query_failclosed_contract.REQUIRED_FAIL_CLOSED_CASE_SEQUENCE),
-        }
-        for key, expected in expected_report_fields.items():
-            if payload.get(key) != expected:
-                add(
-                    blockers,
-                    f"query_failclosed_report_{key}_mismatch",
-                    f"{path}:{key}",
-                    expected=expected,
-                    value=payload.get(key),
-                )
-    else:
-        if payload.get("artifact_status") != "candidate_only":
-            add(blockers, "query_failclosed_manifest_not_candidate_only", f"{path}:artifact_status")
-        validation = query_failclosed_contract.validate_manifest(payload, check_mode="consume")
-        if validation.blockers:
-            add(
-                blockers,
-                "query_failclosed_manifest_contract_invalid",
-                str(path),
-                reasons=[blocker["reason"] for blocker in validation.blockers],
-            )
+    if payload.get("artifact_status") != "candidate_only":
+        add(blockers, "query_failclosed_manifest_not_candidate_only", f"{path}:artifact_status")
+    validation = query_failclosed_contract.validate_manifest(payload, check_mode="consume")
+    if validation.blockers:
+        add(
+            blockers,
+            "query_failclosed_manifest_contract_invalid",
+            str(path),
+            reasons=[blocker["reason"] for blocker in validation.blockers],
+        )
     return str(schema)
 
 

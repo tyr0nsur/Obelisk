@@ -664,6 +664,42 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## P0 Report Provenance And Release Template Guardrails
+
+The next supervised P0/offline audit round closed two report replay paths and one release
+wording sink:
+
+- `scripts/check_permissions_admin_public_readiness.py` no longer accepts a
+  `obelisk.permissions-admin-query-failclosed-contract-check.v1` checker report as
+  `--query-failclosed-artifact`. The standalone public-readiness checker now accepts only
+  the candidate query manifest and revalidates it in consume mode, so a self-shaped report
+  cannot become planning evidence without the source artifact.
+- `scripts/check_commands_replies_public_readiness.py` now requires response-path reports
+  to be bound to expected response root/readiness inputs and verifies the embedded
+  response child `surfaces_path` and `public_header_path` against the aggregate checker's
+  current inputs. `scripts/check_command_permission_route_gate.py` forwards the freshly
+  composed command response report's `readiness_root` and `readiness_path` into replies,
+  preserving the planning-only route while blocking stale self-consistent response
+  bundles in standalone use.
+- `scripts/test_public_sdk_guardrails.py` now scans `release/v1/public-sdk/*.md` with the
+  release-statement broad-claim detector whenever `stable_claim_allowed=false`. This
+  covers scoped release statement templates without treating blocker wording as a generic
+  public-material false positive.
+- The same test update preserves the current inventory copied-signal guardrails by
+  allowing and asserting `required_flags` only for inventory-backed copied
+  `GameplayPolicyEvent` entries.
+
+Deferred P0 identity risk from the read-only audit remains open: player-identity
+first-evidence can still accept standalone lifecycle-anchor and principal-policy planning
+artifacts that are valid in isolation without proving they come from the same accepted
+reflection inventory, first-evidence output, snapshot root, or source artifact hashes.
+Treat that as the next offline identity provenance hardening target; it is not approved
+runtime evidence and does not change the current blocker.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Command Response Readiness Provenance Binding
 
 The next P0-focused supervised round closed the deferred synthetic readiness provenance
