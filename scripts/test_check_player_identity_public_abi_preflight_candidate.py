@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+"""Tests for check_player_identity_public_abi_preflight_candidate.py."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
+SCRIPT = SCRIPT_DIR / "check_player_identity_public_abi_preflight_candidate.py"
+MANIFEST = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources" / "player-identity-public-abi-preflight-candidate.json"
+
+
+class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
+    def manifest(self) -> dict:
+        return json.loads(MANIFEST.read_text(encoding="utf-8"))
+
+    def run_checker(self, payload: dict | None = None, *, public_header_text: str | None = None) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            path = root / "public-abi-preflight.json"
+            path.write_text(json.dumps(payload if payload is not None else self.manifest()), encoding="utf-8")
+            command = [sys.executable, str(SCRIPT), str(path), "--json"]
+            if public_header_text is not None:
+                header = root / "ObeliskApi.h"
+                header.write_text(public_header_text, encoding="utf-8")
+                command.extend(["--public-header", str(header)])
+            return subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+    def test_accepts_current_preflight_as_blocked_candidate_only(self) -> None:
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["status"], "blocked")
+        self.assertTrue(report["candidate_only"])
+        self.assertTrue(report["accepted_for_candidate_review"])
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["v1_completion_evidence"])
+        self.assertEqual(report["public_header_symbols_now"], [])
+        self.assertEqual(report["public_capability_bits_now"], [])
+        self.assertEqual(report["public_callback_abi_now"], [])
+        self.assertEqual(report["event_payload"]["struct_size"], 80)
+        self.assertEqual(report["descriptor"]["struct_size"], 48)
+        self.assertIn("runtime.lifecycle_evidence", report["required_before_public_abi"])
+        self.assertIn("abi.layout", report["required_before_public_abi"])
+        self.assertIn("sdk.consumer", report["required_before_public_abi"])
+        self.assertIn("v1_completion", report["does_not_resolve"])
+        self.assertEqual(report["blockers"], [])
+
+    def test_rejects_public_or_runtime_overclaim(self) -> None:
+        payload = self.manifest()
+        payload["promotion_ready"] = True
+        payload["public_sdk_ready"] = True
+        payload["runtime_ready"] = True
+        payload["public_header_allowed"] = True
+        payload["public_abi_ready"] = True
+        payload["v1_completion_evidence"] = True
+        payload["public_header_symbols_now"] = ["ObeliskPlayerPrincipalEvent"]
+        payload["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("promotion_ready_not_false", report["blockers"])
+        self.assertIn("public_sdk_ready_not_false", report["blockers"])
+        self.assertIn("runtime_ready_not_false", report["blockers"])
+        self.assertIn("public_header_allowed_not_false", report["blockers"])
+        self.assertIn("public_abi_ready_not_false", report["blockers"])
+        self.assertIn("v1_completion_evidence_not_false", report["blockers"])
+        self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
+        self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
+
+    def test_rejects_missing_runtime_owner_or_capability_requirements(self) -> None:
+        payload = self.manifest()
+        payload["required_before_public_abi"].remove("runtime.lifecycle_evidence")
+        payload["does_not_resolve"].remove("runtime.lifecycle_evidence")
+        payload["required_capability_policy"] = ["missing capability fails closed"]
+        payload["required_owner_token_lifecycle"] = ["nonzero plugin_owner_token required"]
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required_before_public_abi_missing_required", report["blockers"])
+        self.assertIn("does_not_resolve_missing_required", report["blockers"])
+        self.assertIn("required_capability_policy_missing_required", report["blockers"])
+        self.assertIn("required_owner_token_lifecycle_missing_required", report["blockers"])
+
+    def test_rejects_public_header_identity_symbol(self) -> None:
+        result = self.run_checker(public_header_text="typedef struct ObeliskPlayerPrincipalEvent { int x; } ObeliskPlayerPrincipalEvent;\n")
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_header_identity_or_principal_symbols_detected", report["blockers"])
+
+    def test_rejects_private_layout_summary_drift(self) -> None:
+        payload = self.manifest()
+        payload["event_payload"]["struct_size"] = 88
+        payload["descriptor"]["fields"] = list(reversed(payload["descriptor"]["fields"]))
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("event_payload_private_layout_mismatch", report["blockers"])
+        self.assertIn("descriptor_fields_private_layout_mismatch", report["blockers"])
+
+
+if __name__ == "__main__":
+    unittest.main()

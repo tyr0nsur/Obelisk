@@ -17,6 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import check_player_identity_identifier_redaction_evidence as redaction_checker
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
+import check_player_identity_public_abi_preflight_candidate as public_abi_preflight_candidate
 import check_player_identity_private_pod_layout_candidate as private_pod_layout_candidate
 
 
@@ -37,6 +38,9 @@ DEFAULT_PRINCIPAL_INVALIDATION_POLICY = Path(
 DEFAULT_PRIVATE_CONTRACT = Path("docs/research/2026-06-01-player-identity-private-candidate-contract.json")
 DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE = Path(
     "docs/research/player-identity-planning-sources/player-identity-private-pod-layout-candidate.json"
+)
+DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE = Path(
+    "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json"
 )
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
@@ -290,6 +294,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         help="Candidate-only private POD layout evidence consumed as ABI contract-review input only.",
+    )
+    parser.add_argument(
+        "--public-abi-preflight-candidate",
+        type=Path,
+        default=DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
+        help="Candidate-only public ABI preflight routing artifact; never promotion evidence.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     return parser.parse_args()
@@ -1064,6 +1074,69 @@ def validate_private_pod_layout_candidate(path: Path, blockers: list[dict[str, A
     }
 
 
+def validate_public_abi_preflight_candidate(
+    path: Path,
+    private_pod_layout_path: Path,
+    public_header_path: Path,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    try:
+        payload = public_abi_preflight_candidate.load_json(path)
+        private_payload = private_pod_layout_candidate.load_json(private_pod_layout_path)
+        private_contract = private_pod_layout_candidate.load_json(private_pod_layout_candidate.DEFAULT_PRIVATE_CONTRACT)
+        private_blockers = private_pod_layout_candidate.validate_manifest(private_payload, private_contract)
+        private_report = private_pod_layout_candidate.build_report(private_payload, private_blockers)
+    except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        add(
+            blockers,
+            "public_abi_preflight_candidate_unreadable_or_rejected",
+            "--public-abi-preflight-candidate",
+            path=str(path),
+            error=str(exc),
+        )
+        return {
+            "status": "blocked",
+            "candidate_only": True,
+            "accepted_for_candidate_review": False,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "blockers": ["public_abi_preflight_candidate_unreadable_or_rejected"],
+        }
+    candidate_blockers: list[dict[str, Any]] = []
+    if private_blockers:
+        public_abi_preflight_candidate.add(
+            candidate_blockers,
+            "private_pod_layout_candidate_not_accepted",
+            "--private-pod-layout-candidate",
+            layout_blockers=private_report["blockers"],
+        )
+    header_scan = public_abi_preflight_candidate.scan_public_header(public_header_path, candidate_blockers)
+    public_abi_preflight_candidate.validate_manifest(payload, private_payload, candidate_blockers)
+    report = public_abi_preflight_candidate.build_report(
+        payload,
+        candidate_blockers,
+        header_scan=header_scan,
+        private_layout_report=private_report,
+    )
+    if candidate_blockers:
+        add(
+            blockers,
+            "public_abi_preflight_candidate_not_accepted",
+            "--public-abi-preflight-candidate",
+            path=str(path),
+            preflight_blockers=report["blockers"],
+        )
+    return report
+
+
 def build_report(
     args: argparse.Namespace,
     blockers: list[dict[str, Any]],
@@ -1074,6 +1147,7 @@ def build_report(
     identifier_redaction_evidence: dict[str, Any],
     principal_invalidation_policy_report: dict[str, Any],
     private_pod_layout_report: dict[str, Any],
+    public_abi_preflight_report: dict[str, Any],
 ) -> dict[str, Any]:
     redaction_accepted = identifier_redaction_evidence.get("accepted_for_contract_review") is True
     principal_policy_accepted = principal_invalidation_policy_report.get("accepted_for_policy_review") is True
@@ -1096,6 +1170,7 @@ def build_report(
     ]
     if not redaction_accepted:
         remaining_contract_gate_inputs.insert(1, PRIMARY_OFFLINE_GAP)
+    private_layout_accepted = private_pod_layout_report.get("accepted_for_contract_review_input") is True
     next_offline_actions = [
         {
             "id": "lifetime.generation_scope_invalidation",
@@ -1116,7 +1191,7 @@ def build_report(
         {
             "id": "abi.public_pod_contract",
             "status": "blocked",
-            "private_layout_candidate_accepted": private_pod_layout_report.get("accepted_for_contract_review_input") is True,
+            "private_layout_candidate_accepted": private_layout_accepted,
             "next_input": "contract review of private POD payload, descriptor, capability, owner-token, and append-only layout-test plan",
             "does_not_resolve": ["abi.public_pod_contract", "abi.layout", "sdk.consumer"],
             "non_claim": (
@@ -1140,6 +1215,7 @@ def build_report(
         "primary_offline_gap": primary_offline_gap,
         "contract_review_inputs_resolved": resolved_inputs,
         "remaining_contract_gate_inputs": remaining_contract_gate_inputs,
+        "public_abi_promotion_preflight": public_abi_preflight_report,
         "next_offline_actions": next_offline_actions,
         "runtime_evidence_missing": True,
         "inputs": {
@@ -1150,6 +1226,7 @@ def build_report(
             "identifier_redaction_evidence": str(args.identifier_redaction_evidence),
             "principal_invalidation_policy": str(args.principal_invalidation_policy),
             "private_pod_layout_candidate": str(args.private_pod_layout_candidate),
+            "public_abi_preflight_candidate": str(args.public_abi_preflight_candidate),
         },
         "decisions": {
             "schema": decisions.get("schema"),
@@ -1205,6 +1282,12 @@ def main() -> int:
     identifier_redaction_evidence = validate_identifier_redaction_evidence(args.identifier_redaction_evidence, blockers)
     principal_invalidation_policy_report = validate_principal_invalidation_policy(args.principal_invalidation_policy, blockers)
     private_pod_layout_report = validate_private_pod_layout_candidate(args.private_pod_layout_candidate, blockers)
+    public_abi_preflight_report = validate_public_abi_preflight_candidate(
+        args.public_abi_preflight_candidate,
+        args.private_pod_layout_candidate,
+        args.public_header,
+        blockers,
+    )
     header_scan = scan_public_header(args.public_header, blockers)
 
     report = build_report(
@@ -1217,6 +1300,7 @@ def main() -> int:
         identifier_redaction_evidence,
         principal_invalidation_policy_report,
         private_pod_layout_report,
+        public_abi_preflight_report,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

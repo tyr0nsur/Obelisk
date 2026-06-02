@@ -1032,6 +1032,14 @@ priorities, and do not use history files as the active source of truth.
   replay project it as verified provenance only. Receipt verification does not unlock
   runtime evidence, route gates, P0 accounting, or SDK completion. No runtime/server
   operation was performed.
+- 2026-06-02 delegated public-ABI preflight round: lead delegated ABI, live-ops, SDK/P0,
+  and reversing evidence audits. Added
+  `player-identity-public-abi-preflight-candidate.json` plus checker/tests and wired the
+  gap report/first-evidence route to consume it as candidate-only routing. It documents
+  accepted identifier-redaction, principal-invalidation policy, and private POD layout
+  review inputs, while keeping header symbols, capability bits, callback ABI, promotion,
+  runtime readiness, SDK readiness, route credit, and v1 completion false. Runtime
+  evidence remains the P0 blocker; no runtime/server operation was performed.
 
 ## Agent Coordination
 

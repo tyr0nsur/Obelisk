@@ -65,6 +65,20 @@
     "default_manifest": "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json",
     "non_claim": "A valid principal-invalidation policy manifest is candidate-only contract-review evidence; it does not resolve the full lifetime/generation/scope blocker, prove runtime lifecycle ordering, promote public player identity, or open ABI."
   },
+  "public_abi_preflight_candidate_intake": {
+    "id": "public_abi_preflight_candidate",
+    "status": "repo_candidate_preflight_required",
+    "resolved_input": "abi.public_pod_contract.public_abi_preflight_candidate",
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false,
+    "public_header_allowed": false,
+    "public_abi_ready": false,
+    "v1_completion_evidence": false,
+    "required_checker": "scripts/check_player_identity_public_abi_preflight_candidate.py",
+    "default_manifest": "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json",
+    "non_claim": "A valid public ABI preflight candidate is offline routing evidence only; it does not resolve the public POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote player identity, or count toward v1 completion."
+  },
   "approved_runtime_evidence_not_sufficient": {
     "decision": "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.",
     "why": [

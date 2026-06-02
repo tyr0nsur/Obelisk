@@ -213,6 +213,7 @@ This file is an active routing table only. Durable evidence belongs in
   `operator-approval-receipt.template.json`; window manifests require a completed,
   digest-bound `operator-approval-receipt.json`; bundle and approved-evidence replay keep
   it verified without counting it as runtime evidence, route unlock, P0 credit, or SDK
-  progress. Tests cover prepare/request, window manifest, bundle, approved evidence,
-  first-evidence, route, and SDK fail-closed state. Runtime evidence and SDK/P0 completion
-  remain unresolved; no runtime/server op.
+  progress. Latest delegated ABI round added a candidate-only public ABI preflight
+  artifact/checker for player identity; it documents accepted review inputs but keeps
+  header symbols, capability bits, callback ABI, promotion, SDK, and v1 completion false.
+  Runtime evidence and SDK/P0 completion remain unresolved; no runtime/server op.

@@ -599,6 +599,27 @@
               "does not promote command response or commands/replies",
               "does not unlock v1 SDK completion"
             ]
+          },
+          {
+            "schema": "obelisk.player-identity-public-abi-preflight-candidate.v1",
+            "status": "planning",
+            "support_tier": "candidate-only",
+            "path": "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json",
+            "public_sdk_ready": false,
+            "promotion_ready": false,
+            "runtime_ready": false,
+            "public_header_allowed": false,
+            "public_abi_ready": false,
+            "v1_completion_evidence": false,
+            "route": "identity/principal -> permissions/admin -> command response -> commands/replies",
+            "non_claims": [
+              "does not add public header symbols",
+              "does not add capability bits",
+              "does not add callback ABI",
+              "does not resolve runtime lifecycle evidence",
+              "does not resolve abi.public_pod_contract, abi.layout, sdk.consumer, lifecycle.owner_cleanup, or v1 completion",
+              "does not promote permissions/admin, command response, commands/replies, lookup, persistence, mutation, return override, or send-chat identity"
+            ]
           }
         ]
       },
