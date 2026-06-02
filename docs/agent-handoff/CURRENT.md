@@ -336,13 +336,17 @@ This file is an active routing table only. Durable evidence belongs in
   therefore fails before writing bound outputs if planning inputs carry runtime/server
   authorization claims. This remains offline planning-only validation and does not
   authorize runtime/server work or promote public identity.
-- Deferred SDK-completion audit risk: non-default SDK completion invocations still need
-  tighter evidence binding before any future promotion accounting can trust synthetic
-  promoted evidence. Audit found that placeholder promoted-surface evidence can satisfy
-  some term checks without proving approved runtime evidence, public-contract readiness,
-  or executed ABI/SDK tests, and that SDK completion does not forward non-default
-  manifest/header inputs into the route gate. Treat this as the next offline guardrail
-  target, not current readiness evidence.
+- 2026-06-02 SDK completion evidence-routing hardening: `check_public_sdk_v1_completion.py`
+  now forwards its selected `--manifest` and `--public-header` to the command/permission
+  route gate, validates required public-contract decision manifests even for non-default
+  `--contract-decisions-dir`, and requires promoted `obelisk.player_identity.v1` evidence
+  to include structured approved-runtime, public-contract-readiness, and executed ABI/SDK
+  test evidence instead of relying on placeholder paths plus prose terms. This does not
+  promote player identity or v1 completion; default SDK completion still fails closed with
+  `stable_claim_allowed=false`, complete-SDK `0/12`, and P0 `0/4`.
+- Deferred SDK-completion audit risk: extend the same structured promotion-evidence
+  binding beyond player identity before any future permissions/admin, command response,
+  or commands/replies promotion accounting can trust synthetic promoted evidence.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

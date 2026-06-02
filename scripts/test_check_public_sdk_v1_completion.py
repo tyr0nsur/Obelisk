@@ -223,6 +223,100 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             finally:
                 module.DEFAULT_CONTRACT_DECISIONS_DIR = original_default
 
+    def test_non_default_contract_decisions_dir_still_requires_manifests(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            decisions_dir = Path(temp_dir) / "custom-decisions"
+            decisions_dir.mkdir()
+
+            missing = module.missing_required_contract_decision_manifests(decisions_dir)
+
+        self.assertEqual(
+            missing,
+            {
+                **module.REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
+                **module.REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS,
+                **module.REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS,
+            },
+        )
+
+    def test_completion_gate_passes_selected_manifest_and_header_to_route_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            manifest_path = temp_path / "custom-public-sdk-surfaces.json"
+            header_path = temp_path / "CustomObeliskApi.h"
+            route_gate_path = temp_path / "fake_route_gate.py"
+            manifest_path.write_text(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"), encoding="utf-8")
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            route_gate_path.write_text(
+                "import json\n"
+                "import sys\n"
+                f"expected_manifest = {str(manifest_path)!r}\n"
+                f"expected_header = {str(header_path)!r}\n"
+                "argv = sys.argv[1:]\n"
+                "ok = (\n"
+                "    '--public-sdk-surfaces' in argv\n"
+                "    and argv[argv.index('--public-sdk-surfaces') + 1] == expected_manifest\n"
+                "    and '--public-header' in argv\n"
+                "    and argv[argv.index('--public-header') + 1] == expected_header\n"
+                "    and '--json' in argv\n"
+                ")\n"
+                "payload = {\n"
+                "    'schema': 'obelisk.command-permission-route-gate-check.v1',\n"
+                "    'valid': ok,\n"
+                "    'accepted_for_planning': True,\n"
+                "    'planning_only': True,\n"
+                "    'promotion_ready': False,\n"
+                "    'public_sdk_ready': False,\n"
+                "    'public_abi_ready': False,\n"
+                "    'runtime_ready': False,\n"
+                "    'public_header_allowed': False,\n"
+                "    'critical_path_phase': {\n"
+                "        'current_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound',\n"
+                "        'source_checker_primary_blocker': 'lifecycle_anchor_first_evidence_provenance_unbound',\n"
+                "        'source_checker_next_blocker': None,\n"
+                "        'source_checker_status': 'blocked',\n"
+                "        'source_checker_ready': False,\n"
+                "        'source_checker_accepted_for_internal_planning': False,\n"
+                "    },\n"
+                "    'route_lock': {\n"
+                "        'locked': True,\n"
+                "        'blocked_until': [\n"
+                "            'bound_lifecycle_anchor_and_principal_policy_sources',\n"
+                "            'reviewed_identity_public_contract',\n"
+                "        ],\n"
+                "    },\n"
+                "    'checks': [],\n"
+                "    'blockers': [] if ok else ['argv_mismatch'],\n"
+                "}\n"
+                "print(json.dumps(payload, sort_keys=True))\n"
+                "sys.exit(0 if ok else 1)\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertNotIn("command_permission_route_gate_invalid", payload["blockers"])
+        self.assertNotIn("command_permission_route_gate_blockers_not_empty", payload["blockers"])
+        self.assertTrue(payload["command_permission_route_gate"]["valid"])
+
     def test_current_manifest_fails_closed_for_v1_completion(self) -> None:
         result = self.run_checker("--json", check=False)
         payload = json.loads(result.stdout)
@@ -3380,6 +3474,89 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
                 "approved runtime principal lifecycle evidence",
                 "principal privacy, invalidation, and cross-instance semantics",
+            ],
+        )
+
+    def test_player_identity_required_terms_do_not_replace_structured_promotion_evidence(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PlayerIdentityPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="player_identity_promotion",
+            ) as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity SDK placeholder\n", encoding="utf-8")
+            manifest, release_statement = complete_excluded_manifest()
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "obelisk.core-dump-evidence-pack.v1",
+                            "obelisk.reflection-inventory-pack.v1",
+                            "ServerListPlayers",
+                            "ServerKickPlayer",
+                            "approved runtime principal lifecycle evidence",
+                            "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                            "principal privacy, invalidation, and cross-instance semantics",
+                            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
+                        ],
+                    }
+                    break
+            manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id != "obelisk.player_identity.v1"
+            ]
+            release_statement = "\n".join(
+                (
+                    "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence."
+                    if line.startswith("obelisk.player_identity.v1:")
+                    else line
+                )
+                for line in release_statement.splitlines()
+            ) + "\n"
+            manifest_path = Path(core_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(core_dir) / "RELEASE_STATEMENT.md"
+            header_path = Path(core_dir) / "ObeliskApi.h"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            header_path.write_text("#pragma once\n", encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertNotIn("promoted_surface_required_evidence_terms_missing", payload["blockers"])
+        self.assertIn("promoted_surface_structured_evidence_missing", payload["blockers"])
+        self.assertEqual(
+            payload["promoted_surfaces_missing_structured_evidence"]["obelisk.player_identity.v1"],
+            [
+                "approved_runtime_evidence_report:missing",
+                "executed_test_report:missing",
+                "public_contract_readiness_report:missing",
             ],
         )
 

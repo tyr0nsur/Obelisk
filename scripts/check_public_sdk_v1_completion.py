@@ -124,6 +124,10 @@ CANONICAL_INSTALLED_SDK_PACKAGE_SHAPE = {
     ),
 }
 SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
+    "command_permission_route_gate_blockers_not_empty",
+    "command_permission_route_gate_invalid",
+    "command_permission_route_gate_lock_unexpected",
+    "command_permission_route_gate_not_planning_only",
     "complete_sdk_claim_requires_promoted_demand_families",
     "stable_release_contract_claim_not_allowed",
     "v1_completion_required_false",
@@ -763,10 +767,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[str]]:
+def run_command_permission_route_gate(
+    path: Path,
+    public_sdk_surfaces_path: Path,
+    public_header_path: Path,
+) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
     result = subprocess.run(
-        [sys.executable, str(path), "--json"],
+        [
+            sys.executable,
+            str(path),
+            "--public-sdk-surfaces",
+            str(public_sdk_surfaces_path),
+            "--public-header",
+            str(public_header_path),
+            "--json",
+        ],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
@@ -1076,16 +1092,6 @@ def contract_decision_paths(decisions_dir: Path) -> list[Path]:
 
 
 def missing_required_contract_decision_manifests(decisions_dir: Path) -> dict[str, str]:
-    try:
-        if decisions_dir.resolve() != DEFAULT_CONTRACT_DECISIONS_DIR.resolve():
-            return {}
-    except OSError:
-        return {
-            **REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
-            **REQUIRED_ROUTE_GUARDRAIL_DECISION_MANIFESTS,
-            **REQUIRED_PLANNING_GUARDRAIL_DECISION_MANIFESTS,
-        }
-
     missing: dict[str, str] = {}
     required_manifests = {
         **REQUIRED_PUBLIC_CONTRACT_DECISION_MANIFESTS,
@@ -1805,6 +1811,101 @@ def surface_missing_required_promotion_evidence(surface: dict[str, Any]) -> list
     return [term for term in required_terms if not evidence_value_contains_positive_term(evidence, term)]
 
 
+def load_repo_relative_json_evidence(raw_path: Any) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(raw_path, str) or not raw_path:
+        return None, "missing"
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return None, "path_not_repo_relative"
+    path = REPO_ROOT / relative
+    if not path.is_file():
+        return None, "path_not_file"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "json_unreadable"
+    if not isinstance(payload, dict):
+        return None, "json_not_object"
+    return payload, None
+
+
+def player_identity_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    runtime_report, runtime_error = load_repo_relative_json_evidence(evidence.get("approved_runtime_evidence_report"))
+    if runtime_error is not None:
+        missing.append(f"approved_runtime_evidence_report:{runtime_error}")
+    elif not (
+        runtime_report.get("schema")
+        == "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+        and runtime_report.get("approved_runtime_evidence_present") is True
+        and runtime_report.get("runtime_evidence_ready") is True
+        and runtime_report.get("promotion_ready") is False
+        and runtime_report.get("public_sdk_ready") is False
+        and runtime_report.get("runtime_ready") is False
+        and runtime_report.get("next_blocker") == "identity_public_contract_gate_missing"
+    ):
+        missing.append("approved_runtime_evidence_report:fields_invalid")
+
+    contract_report, contract_error = load_repo_relative_json_evidence(evidence.get("public_contract_readiness_report"))
+    if contract_error is not None:
+        missing.append(f"public_contract_readiness_report:{contract_error}")
+    else:
+        approved_runtime = contract_report.get("approved_runtime_evidence")
+        approved_runtime = approved_runtime if isinstance(approved_runtime, dict) else {}
+        if not (
+            contract_report.get("schema") == "obelisk.player-identity-public-contract-readiness-check.v1"
+            and contract_report.get("surface") == "obelisk.player_identity.v1"
+            and contract_report.get("accepted_for_contract_review") is True
+            and contract_report.get("promotion_ready") is False
+            and contract_report.get("public_sdk_ready") is False
+            and contract_report.get("runtime_ready") is False
+            and contract_report.get("public_header_allowed") is False
+            and approved_runtime.get("approved_runtime_evidence_present") is True
+            and approved_runtime.get("runtime_evidence_ready") is True
+        ):
+            missing.append("public_contract_readiness_report:fields_invalid")
+
+    executed = evidence.get("executed_test_report")
+    if not isinstance(executed, dict):
+        missing.append("executed_test_report:missing")
+    else:
+        abi_tests = executed.get("abi_tests")
+        sdk_tests = executed.get("sdk_consumer_tests")
+        if executed.get("schema") != "obelisk.promoted-surface-test-execution.v1":
+            missing.append("executed_test_report:schema_invalid")
+        if executed.get("surface_id") != "obelisk.player_identity.v1":
+            missing.append("executed_test_report:surface_id_invalid")
+        if not isinstance(abi_tests, list) or not abi_tests:
+            missing.append("executed_test_report:abi_tests_missing")
+        if not isinstance(sdk_tests, list) or not sdk_tests:
+            missing.append("executed_test_report:sdk_consumer_tests_missing")
+        for key, tests in (("abi_tests", abi_tests), ("sdk_consumer_tests", sdk_tests)):
+            if not isinstance(tests, list):
+                continue
+            for index, item in enumerate(tests):
+                if not isinstance(item, dict):
+                    missing.append(f"executed_test_report:{key}[{index}]:not_object")
+                    continue
+                if item.get("status") != "passed":
+                    missing.append(f"executed_test_report:{key}[{index}]:status_not_passed")
+                if not isinstance(item.get("command"), str) or not item["command"].strip():
+                    missing.append(f"executed_test_report:{key}[{index}]:command_missing")
+                path = item.get("path")
+                if not isinstance(path, str) or not evidence_path_exists(path, allow_generic_dirs=False):
+                    missing.append(f"executed_test_report:{key}[{index}]:path_invalid")
+    return missing
+
+
+def surface_missing_structured_promotion_evidence(surface: dict[str, Any]) -> list[str]:
+    surface_id = surface.get("id")
+    if surface_id != "obelisk.player_identity.v1" or surface.get("status") != "promoted":
+        return []
+    evidence = surface.get("evidence")
+    if not isinstance(evidence, dict):
+        return ["evidence:missing"]
+    return player_identity_structured_promotion_evidence_missing(evidence)
+
+
 def unresolved_promoted_surface_dependencies(
     surface: dict[str, Any],
     surfaces_by_id: dict[str, dict[str, Any]],
@@ -2240,7 +2341,9 @@ def build_report(
 ) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     command_permission_route_gate, route_gate_blockers = run_command_permission_route_gate(
-        command_permission_route_gate_path
+        command_permission_route_gate_path,
+        manifest_path,
+        public_header_path,
     )
     blockers.extend(route_gate_blockers)
     inventory_copied_signals_stability, inventory_stability_blockers = (
@@ -2410,6 +2513,7 @@ def build_report(
     debug_only_promoted: list[str] = []
     promoted_dependency_failures: dict[str, list[str]] = {}
     promoted_missing_required_evidence_terms: dict[str, list[str]] = {}
+    promoted_missing_structured_evidence: dict[str, list[str]] = {}
     non_promoted_with_public_abi: list[str] = []
     unpromoted_required_dependency_chain = [
         surface_id
@@ -2521,6 +2625,9 @@ def build_report(
             missing_required_terms = surface_missing_required_promotion_evidence(surface)
             if missing_required_terms:
                 promoted_missing_required_evidence_terms[surface_id] = missing_required_terms
+            missing_structured_evidence = surface_missing_structured_promotion_evidence(surface)
+            if missing_structured_evidence:
+                promoted_missing_structured_evidence[surface_id] = missing_structured_evidence
         elif status == "planning":
             unresolved_planning_surfaces.append(surface_id)
         elif status != "promoted-experimental-only" and contract_items:
@@ -2573,6 +2680,8 @@ def build_report(
         blockers.append("promoted_surface_evidence_missing")
     if promoted_missing_required_evidence_terms:
         blockers.append("promoted_surface_required_evidence_terms_missing")
+    if promoted_missing_structured_evidence:
+        blockers.append("promoted_surface_structured_evidence_missing")
     if promoted_dependency_failures:
         blockers.append("promoted_surface_dependency_unresolved")
     if missing_dependency_declarations:
@@ -2759,6 +2868,10 @@ def build_report(
         "promoted_surfaces_missing_required_evidence_terms": {
             surface_id: sorted(set(terms))
             for surface_id, terms in sorted(promoted_missing_required_evidence_terms.items())
+        },
+        "promoted_surfaces_missing_structured_evidence": {
+            surface_id: sorted(set(items))
+            for surface_id, items in sorted(promoted_missing_structured_evidence.items())
         },
         "promoted_surfaces_with_unresolved_dependencies": {
             surface_id: sorted(set(dependencies))
@@ -2973,6 +3086,10 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "promoted_surface_required_evidence_terms_missing": [
             "Promoted surfaces are missing required named evidence terms.",
             "Action: add the required terms to the manifest evidence or keep the surface non-promoted.",
+        ],
+        "promoted_surface_structured_evidence_missing": [
+            "Promoted player identity lacks structured runtime, contract-readiness, or executed-test evidence.",
+            "Action: bind promotion accounting to checker reports and passed ABI/SDK test execution, or keep the surface non-promoted.",
         ],
         "promoted_surface_dependency_unresolved": [
             "A public ABI surface is promoted while required dependency surfaces are not promoted.",

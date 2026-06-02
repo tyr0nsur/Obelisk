@@ -990,6 +990,49 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## SDK Completion Evidence Routing Hardening
+
+The next SDK-completion guardrail round closed three fail-open paths in the v1 completion
+checker:
+
+- `scripts/check_public_sdk_v1_completion.py` now forwards the selected `--manifest` and
+  `--public-header` into `scripts/check_command_permission_route_gate.py` as
+  `--public-sdk-surfaces` and `--public-header`, so non-default completion invocations no
+  longer validate aggregate SDK accounting against one manifest/header while the route gate
+  checks repo defaults.
+- `missing_required_contract_decision_manifests()` now validates required public-contract,
+  route-guardrail, and planning decision manifests against the supplied
+  `--contract-decisions-dir` even when that directory is non-default. Empty or partial
+  custom decision directories therefore fail closed with
+  `required_public_contract_decision_manifest_missing`.
+- Promoted `obelisk.player_identity.v1` rows now require structured promotion evidence:
+  repo-relative approved-runtime evidence checker report, repo-relative public-contract
+  readiness checker report, and an executed-test report for ABI and SDK consumer tests.
+  Placeholder files under `tests/core` and `tests/sdk_consumer` plus the required prose
+  terms no longer clear promotion accounting; they trigger
+  `promoted_surface_structured_evidence_missing`.
+
+Read-only explorer agents confirmed the three audited gaps before integration:
+placeholder promoted evidence could satisfy path/term checks, completion did not forward
+non-default manifest/header inputs to the route gate, and non-default decision directories
+skipped required-manifest enforcement. A fourth audit identified the player-identity
+checker schemas and fields used for the new structured-evidence binding.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+- `git diff --check`
+
+The default route remains planning-only at
+`lifecycle_anchor_first_evidence_provenance_unbound`. The default SDK completion check
+still fails closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`, and
+P0 progress `0/4`. This round does not approve runtime work, public identity, public
+permissions/admin, command response, commands/replies, release readiness, or a stable SDK
+claim.
+
 ## Command Response Readiness Provenance Binding
 
 The next P0-focused supervised round closed the deferred synthetic readiness provenance
