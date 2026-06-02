@@ -323,15 +323,26 @@ PUBLIC_GAMEPLAY_EVENTS_READINESS_KEYS = {
 }
 PUBLIC_GAMEPLAY_EVENTS_READINESS_TEXT_KEYS = PUBLIC_GAMEPLAY_EVENTS_READINESS_KEYS | {
     "inventory_sdk_readiness",
+    "inventory_sdk_status",
     "items_sdk_readiness",
+    "items_sdk_status",
+    "promotion_status",
     "promotion_readiness",
     "public_inventory_sdk_readiness",
+    "public_inventory_sdk_status",
     "public_items_sdk_readiness",
+    "public_items_sdk_status",
     "public_sdk_readiness",
+    "public_sdk_status",
     "runtime_readiness",
+    "runtime_status",
     "stable_sdk_readiness",
+    "stable_sdk_status",
     "v1_completion_readiness",
+    "v1_completion_status",
+    "v1_sdk_status",
     "v1_readiness",
+    "v1_status",
 }
 PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_PHRASES = (
     "inventory sdk ready",
@@ -343,6 +354,26 @@ PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_PHRASES = (
     "stable sdk ready",
     "v1 completion ready",
     "v1 ready",
+)
+PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_VALUES = {
+    "allowed",
+    "available",
+    "complete",
+    "enabled",
+    "live",
+    "promoted",
+    "ready",
+    "stable",
+    "supported",
+    "true",
+    "validated",
+    "yes",
+}
+PUBLIC_GAMEPLAY_EVENTS_STATUS_CLAIM_KEY_RE = re.compile(
+    r"(?:inventory_sdk|items_sdk|public_(?:inventory_sdk|items_sdk|sdk)|stable_sdk|"
+    r"v1(?:_sdk|_completion)?|runtime|promotion|identity|lookup|mutation|"
+    r"resource_handle|return_override).*(?:status|readiness|ready|promotion)$",
+    re.IGNORECASE,
 )
 
 
@@ -496,6 +527,16 @@ def scan_public_gameplay_event_readiness_claims(
                 )
             if key in PUBLIC_GAMEPLAY_EVENTS_READINESS_TEXT_KEYS and isinstance(child, str):
                 lowered = child.casefold()
+                if lowered in PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_VALUES:
+                    append_blocker(
+                        blockers,
+                        "public_gameplay_events_readiness_claim_enabled",
+                        path=child_path,
+                        field=key,
+                        value=child,
+                    )
+                    scan_public_gameplay_event_readiness_claims(child, blockers, child_path)
+                    continue
                 for phrase in PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_PHRASES:
                     if phrase in lowered:
                         append_blocker(
@@ -507,6 +548,19 @@ def scan_public_gameplay_event_readiness_claims(
                             value=child,
                         )
                         break
+            if (
+                key not in PUBLIC_GAMEPLAY_EVENTS_READINESS_TEXT_KEYS
+                and isinstance(child, str)
+                and PUBLIC_GAMEPLAY_EVENTS_STATUS_CLAIM_KEY_RE.search(key)
+                and child.casefold() in PUBLIC_GAMEPLAY_EVENTS_POSITIVE_READINESS_VALUES
+            ):
+                append_blocker(
+                    blockers,
+                    "public_gameplay_events_readiness_claim_enabled",
+                    path=child_path,
+                    field=key,
+                    value=child,
+                )
             scan_public_gameplay_event_readiness_claims(child, blockers, child_path)
     elif isinstance(value, list):
         for index, child in enumerate(value):

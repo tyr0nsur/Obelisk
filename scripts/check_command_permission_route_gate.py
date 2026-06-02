@@ -367,6 +367,38 @@ def validate_command_response_readiness_binding(args: argparse.Namespace) -> lis
     return []
 
 
+def validate_command_response_child_readiness_context(
+    args: argparse.Namespace,
+    payload: dict[str, Any] | None,
+) -> list[str]:
+    if payload is None:
+        return []
+    readiness_root = payload.get("readiness_root")
+    readiness_path = payload.get("readiness_path")
+    blockers: list[str] = []
+    if not isinstance(readiness_root, str) or not readiness_root:
+        blockers.append("command_chat_response_public_readiness: child readiness_root missing or unverifiable")
+    if not isinstance(readiness_path, str) or not readiness_path:
+        blockers.append("command_chat_response_public_readiness: child readiness_path missing or unverifiable")
+    if blockers:
+        return blockers
+
+    child_root = Path(readiness_root).resolve()
+    child_readiness = Path(readiness_path).resolve()
+    expected_child_readiness = child_root / COMMAND_RESPONSE_DEFAULT_READINESS_NAME
+    if child_readiness != expected_child_readiness:
+        blockers.append(
+            "command_chat_response_public_readiness: child readiness_path is not bound to readiness_root"
+        )
+    if args.command_response_root is not None and child_root != args.command_response_root.resolve():
+        blockers.append("command_chat_response_public_readiness: child readiness_root does not match caller root")
+    if args.command_response_readiness is not None and child_readiness != args.command_response_readiness.resolve():
+        blockers.append(
+            "command_chat_response_public_readiness: child readiness_path does not match caller readiness"
+        )
+    return blockers
+
+
 def validate_identity_planning_binding_args(args: argparse.Namespace) -> list[str]:
     lifecycle = getattr(args, "player_identity_lifecycle_anchor_candidates_manifest", None)
     principal = getattr(args, "player_identity_principal_invalidation_policy_manifest", None)
@@ -628,6 +660,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 if isinstance(payload, dict):
                     response_path_report = payload
     blockers = validate_command_response_readiness_binding(args)
+    blockers.extend(validate_command_response_child_readiness_context(args, response_path_report))
     blockers.extend(validate_identity_planning_binding_args(args))
     for check in checks:
         if check["name"] == "commands_replies_public_readiness" and "--response-path-report" not in check["argv"]:

@@ -672,6 +672,49 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Delegated Route Runtime Rollback Hardening
+
+The next delegated round kept the lead-owned integration model and split four scoped
+tasks across sub-agents:
+
+- Command route readiness binding: `scripts/check_command_permission_route_gate.py` now
+  rejects command response child reports whose embedded readiness path is not bound to
+  their embedded readiness root, or whose embedded readiness context disagrees with the
+  route caller. This tightens composition without changing the route from planning-only
+  evidence.
+- Item-return side-lane overclaim closure:
+  `scripts/check_item_return_only_readiness.py` now rejects positive status strings in
+  public gameplay metadata that imply public SDK, runtime, ResourceHandle, v1, release,
+  or promotion readiness. Scoped non-ready status text remains acceptable.
+- Player-identity offline next action:
+  `scripts/check_player_identity_first_evidence_readiness.py` now emits a structured
+  `planning_provenance.next_action` when the active blocker is
+  `lifecycle_anchor_first_evidence_provenance_unbound`. The only recommended step is to
+  regenerate or select lifecycle/principal planning manifests bound to the current
+  first-evidence source, then run the bound identity route wrapper. The expected next
+  blocker after correct alignment is `approved_runtime_evidence_missing`.
+- Runtime/ABI rollback hardening: `core/PluginManager.cpp` now makes released public
+  chat and gameplay-policy callback state inert before rollback after public tracking
+  failure. If dispatcher rollback unregister also fails, any retained internal
+  subscription cannot invoke plugin code and owner cleanup still removes it.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate scripts.test_check_item_return_only_readiness scripts.test_check_player_identity_first_evidence_readiness`
+- `cmake --build build --target plugin_manager_tests -j$(nproc) && ./build/plugin_manager_tests`
+- `cmake --build build -j$(nproc)`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+- `git diff --check`
+
+The default route remains planning-only with current blocker
+`lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remains fail-closed:
+`stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+This round does not approve runtime work, public identity, public permissions/admin,
+command response, command replies, Inventory/Items SDKs, Structure SDK,
+Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a stable SDK
+claim.
+
 ## Delegated Guardrail And Plugin Retention Hardening
 
 A later supervised round delegated four scoped audits/workers after compaction:

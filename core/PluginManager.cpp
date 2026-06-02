@@ -41,8 +41,12 @@ namespace Obelisk::Core
         std::atomic_bool g_ForcePluginCallbackCleanupFailureForTesting{false};
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
         std::atomic<int> g_PluginRetentionFailureAfterForTesting{-1};
+        std::atomic_bool g_ForcePublicChatMessageTrackingFailureForTesting{false};
         std::atomic_bool g_ForcePublicChatMessageInternalUnregisterFailureForTesting{false};
+        std::atomic_bool g_ForcePublicChatMessageRollbackUnregisterFailureForTesting{false};
+        std::atomic_bool g_ForcePublicGameplayPolicyTrackingFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting{false};
+        std::atomic_bool g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting{false};
 #endif
 
@@ -1059,6 +1063,15 @@ namespace Obelisk::Core
             delete static_cast<GameplayPolicyEventCallbackState*>(userData);
         }
 
+        void InertGameplayPolicyEventCallbackState(GameplayPolicyEventCallbackState* state)
+        {
+            if (!state)
+                return;
+            state->EventKindMask = 0;
+            state->Callback = nullptr;
+            state->UserData = nullptr;
+        }
+
         void InvokeGameplayPolicyEventCallback(const GameplayPolicyEventCallbackState& state,
                                                const ObeliskGameplayPolicyEvent& event)
         {
@@ -1174,6 +1187,14 @@ namespace Obelisk::Core
             delete static_cast<ChatMessageEventCallbackState*>(userData);
         }
 
+        void InertChatMessageEventCallbackState(ChatMessageEventCallbackState* state)
+        {
+            if (!state)
+                return;
+            state->Callback = nullptr;
+            state->UserData = nullptr;
+        }
+
         void InvokeChatMessageEventCallback(const ChatMessageEventCallbackState& state,
                                             const ObeliskChatMessageEvent& event)
         {
@@ -1249,6 +1270,7 @@ namespace Obelisk::Core
 
             auto state = std::make_unique<ChatMessageEventCallbackState>(
                 ChatMessageEventCallbackState{callback, userData});
+            ChatMessageEventCallbackState* statePtr = state.get();
             const uint64_t internalRegistrationId = dispatcher->Register(
                 owner,
                 ChatMessageSubscription{
@@ -1262,6 +1284,10 @@ namespace Obelisk::Core
 
             try
             {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (g_ForcePublicChatMessageTrackingFailureForTesting.load(std::memory_order_acquire))
+                    throw std::runtime_error("injected public chat message tracking failure");
+#endif
                 std::lock_guard<std::mutex> lock(ChatMessageRegistrationMutex());
                 ChatMessageRegistrations()[publicRegistrationId] = ChatMessageRegistration{
                     .Owner = owner,
@@ -1271,7 +1297,21 @@ namespace Obelisk::Core
             }
             catch (...)
             {
-                (void)dispatcher->Unregister(internalRegistrationId);
+                InertChatMessageEventCallbackState(statePtr);
+                bool unregistered = false;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (!g_ForcePublicChatMessageRollbackUnregisterFailureForTesting.load(
+                        std::memory_order_acquire))
+#endif
+                {
+                    unregistered = dispatcher->Unregister(internalRegistrationId);
+                }
+                if (!unregistered)
+                {
+                    SafeLogErrorNoThrow(
+                        "Public chat message registration rollback failed; callback state was made inert",
+                        "dispatcher unregister failed");
+                }
                 throw;
             }
             return publicRegistrationId;
@@ -1374,11 +1414,78 @@ namespace Obelisk::Core
                 .InventoryRegistrationId = 0,
                 .ItemReturnRegistrationId = 0,
             };
+            GameplayPolicyEventCallbackState* structureState = nullptr;
+            GameplayPolicyEventCallbackState* inventoryState = nullptr;
+            GameplayPolicyEventCallbackState* itemReturnState = nullptr;
+            const auto rollbackStructure = [&]() {
+                if (registration.StructureRegistrationId == 0)
+                    return;
+                InertGameplayPolicyEventCallbackState(structureState);
+                bool unregistered = false;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (!g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting.load(
+                        std::memory_order_acquire))
+#endif
+                {
+                    unregistered = StructureEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.StructureRegistrationId);
+                }
+                if (!unregistered)
+                {
+                    SafeLogErrorNoThrow(
+                        "Public gameplay policy structure registration rollback failed; callback state was made inert",
+                        "dispatcher unregister failed");
+                }
+            };
+            const auto rollbackInventory = [&]() {
+                if (registration.InventoryRegistrationId == 0)
+                    return;
+                InertGameplayPolicyEventCallbackState(inventoryState);
+                bool unregistered = false;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (!g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting.load(
+                        std::memory_order_acquire))
+#endif
+                {
+                    unregistered = InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.InventoryRegistrationId);
+                }
+                if (!unregistered)
+                {
+                    SafeLogErrorNoThrow(
+                        "Public gameplay policy inventory registration rollback failed; callback state was made inert",
+                        "dispatcher unregister failed");
+                }
+            };
+            const auto rollbackItemReturn = [&]() {
+                if (registration.ItemReturnRegistrationId == 0)
+                    return;
+                InertGameplayPolicyEventCallbackState(itemReturnState);
+                bool unregistered = false;
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (!g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting.load(
+                        std::memory_order_acquire))
+#endif
+                {
+                    unregistered = ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
+                        owner,
+                        registration.ItemReturnRegistrationId);
+                }
+                if (!unregistered)
+                {
+                    SafeLogErrorNoThrow(
+                        "Public gameplay policy item-return registration rollback failed; callback state was made inert",
+                        "dispatcher unregister failed");
+                }
+            };
 
             if ((eventKindMask & OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL_STRUCTURES) != 0)
             {
                 auto state = std::make_unique<GameplayPolicyEventCallbackState>(
                     GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+                structureState = state.get();
                 registration.StructureRegistrationId = StructureEventDispatcher::Get().Register(
                     owner,
                     StructureEventSubscription{
@@ -1400,6 +1507,7 @@ namespace Obelisk::Core
                 {
                     auto state = std::make_unique<GameplayPolicyEventCallbackState>(
                         GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+                    inventoryState = state.get();
                     registration.InventoryRegistrationId = InventoryPolicyEventDispatcher::Get().Register(
                         owner,
                         InventoryPolicyEventSubscription{
@@ -1409,12 +1517,7 @@ namespace Obelisk::Core
                         });
                     if (registration.InventoryRegistrationId == 0)
                     {
-                        if (registration.StructureRegistrationId != 0)
-                        {
-                            (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                                owner,
-                                registration.StructureRegistrationId);
-                        }
+                        rollbackStructure();
                         return 0;
                     }
                     (void)state.release();
@@ -1428,6 +1531,7 @@ namespace Obelisk::Core
                 {
                     auto state = std::make_unique<GameplayPolicyEventCallbackState>(
                         GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+                    itemReturnState = state.get();
 #ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
                     if (g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting.load(
                             std::memory_order_acquire))
@@ -1445,18 +1549,8 @@ namespace Obelisk::Core
                         });
                     if (registration.ItemReturnRegistrationId == 0)
                     {
-                        if (registration.StructureRegistrationId != 0)
-                        {
-                            (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                                owner,
-                                registration.StructureRegistrationId);
-                        }
-                        if (registration.InventoryRegistrationId != 0)
-                        {
-                            (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
-                                owner,
-                                registration.InventoryRegistrationId);
-                        }
+                        rollbackStructure();
+                        rollbackInventory();
                         return 0;
                     }
                     (void)state.release();
@@ -1464,52 +1558,26 @@ namespace Obelisk::Core
             }
             catch (...)
             {
-                if (registration.StructureRegistrationId != 0)
-                {
-                    (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.StructureRegistrationId);
-                }
-                if (registration.InventoryRegistrationId != 0)
-                {
-                    (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.InventoryRegistrationId);
-                }
-                if (registration.ItemReturnRegistrationId != 0)
-                {
-                    (void)ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.ItemReturnRegistrationId);
-                }
+                rollbackStructure();
+                rollbackInventory();
+                rollbackItemReturn();
                 throw;
             }
 
             try
             {
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                if (g_ForcePublicGameplayPolicyTrackingFailureForTesting.load(std::memory_order_acquire))
+                    throw std::runtime_error("injected public gameplay policy tracking failure");
+#endif
                 std::lock_guard<std::mutex> lock(GameplayPolicyRegistrationMutex());
                 GameplayPolicyRegistrations()[publicRegistrationId] = registration;
             }
             catch (...)
             {
-                if (registration.StructureRegistrationId != 0)
-                {
-                    (void)StructureEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.StructureRegistrationId);
-                }
-                if (registration.InventoryRegistrationId != 0)
-                {
-                    (void)InventoryPolicyEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.InventoryRegistrationId);
-                }
-                if (registration.ItemReturnRegistrationId != 0)
-                {
-                    (void)ItemReturnEventDispatcher::Get().UnregisterCallbackForOwner(
-                        owner,
-                        registration.ItemReturnRegistrationId);
-                }
+                rollbackStructure();
+                rollbackInventory();
+                rollbackItemReturn();
                 throw;
             }
             return publicRegistrationId;
@@ -2256,9 +2324,29 @@ namespace Obelisk::Core
         g_ForcePublicChatMessageInternalUnregisterFailureForTesting.store(enabled, std::memory_order_release);
     }
 
+    void SetPublicChatMessageRollbackUnregisterFailureForTesting(bool enabled)
+    {
+        g_ForcePublicChatMessageRollbackUnregisterFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void SetPublicChatMessageTrackingFailureForTesting(bool enabled)
+    {
+        g_ForcePublicChatMessageTrackingFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
     void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled)
     {
         g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(bool enabled)
+    {
+        g_ForcePublicGameplayPolicyRollbackUnregisterFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void SetPublicGameplayPolicyTrackingFailureForTesting(bool enabled)
+    {
+        g_ForcePublicGameplayPolicyTrackingFailureForTesting.store(enabled, std::memory_order_release);
     }
 
     void SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(bool enabled)

@@ -462,6 +462,29 @@ class CheckItemReturnOnlyReadinessTests(unittest.TestCase):
             {blocker["path"] for blocker in readiness_blockers},
         )
 
+    def test_public_gameplay_events_rejects_positive_status_readiness_values(self) -> None:
+        public_events = self.make_public_gameplay_events()
+        event = public_events["promoted_events"][0]
+        event["v1_sdk_status"] = "ready"
+        event["runtime_status"] = "available"
+        event["resource_handle_status"] = "promoted"
+        blockers: list[dict] = []
+
+        readiness.validate_public_gameplay_events(public_events, blockers)
+
+        readiness_blockers = [
+            blocker for blocker in blockers if blocker["reason"] == "public_gameplay_events_readiness_claim_enabled"
+        ]
+        self.assertEqual(3, len(readiness_blockers), blockers)
+        self.assertEqual(
+            {
+                "$.promoted_events[0].v1_sdk_status",
+                "$.promoted_events[0].runtime_status",
+                "$.promoted_events[0].resource_handle_status",
+            },
+            {blocker["path"] for blocker in readiness_blockers},
+        )
+
     def test_policy_rejects_sdk_runtime_and_v1_claim_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "pack"

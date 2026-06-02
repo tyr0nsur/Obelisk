@@ -46,8 +46,12 @@ namespace Obelisk::Core
     void SetPluginCallbackCleanupFailureForTesting(bool enabled);
     void SetPluginRetentionFailureForTesting(bool enabled);
     void SetPluginRetentionFailureAfterForTesting(int successfulRetentionsBeforeFailure);
+    void SetPublicChatMessageTrackingFailureForTesting(bool enabled);
     void SetPublicChatMessageInternalUnregisterFailureForTesting(bool enabled);
+    void SetPublicChatMessageRollbackUnregisterFailureForTesting(bool enabled);
+    void SetPublicGameplayPolicyTrackingFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled);
+    void SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(bool enabled);
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token);
 }
@@ -2222,6 +2226,53 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestGameplayPolicyTrackingFailureInertsRollbackOrphan()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_tracking_rollback_orphan");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_tracking_rollback_orphan.so",
+            .pluginId = "gameplay_policy_tracking_rollback_orphan",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPublicGameplayPolicyTrackingFailureForTesting(true);
+        Obelisk::Core::SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(true);
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_STRUCTURE_ACCESS_CHECK,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Obelisk::Core::SetPublicGameplayPolicyRollbackUnregisterFailureForTesting(false);
+        Obelisk::Core::SetPublicGameplayPolicyTrackingFailureForTesting(false);
+
+        Require(registrationId == 0,
+                "gameplay policy tracking failure did not reject public registration");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "gameplay rollback-failure orphan was not retained for owner cleanup");
+
+        const std::vector<Obelisk::Core::StructureScalarValue> scalars = MakeStructureScalars();
+        (void)Obelisk::Core::StructureEventDispatcher::Get().Dispatch(MakeStructureEvent(scalars));
+        Require(plugin.gameplayPolicyEventCalls == 0,
+                "inert gameplay rollback orphan invoked plugin callback after public registration returned zero");
+
+        manager.UnloadAll();
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "inert gameplay rollback orphan survived plugin owner cleanup");
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestOwnerTokenGameplayPolicyRegistrationRejectedDuringShutdown()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_gameplay_policy_shutdown_register");
@@ -3370,6 +3421,63 @@ namespace
                 "throwing chat message callback was removed during dispatch");
 
         manager.UnloadAll();
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestChatMessageTrackingFailureInertsRollbackOrphan()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_tracking_rollback_orphan");
+        ConfigureEnvironment(root);
+        setenv("OBELISK_ENABLE_CHAT_EVENTS", "1", 1);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+        {
+            std::ofstream marker(root / "state" / "instances" / "arkserver" / "enable-chat-events");
+            Require(marker.is_open(), "failed to create chat events marker");
+        }
+
+        FakePlugin plugin{
+            .filename = "chat_tracking_rollback_orphan.so",
+            .pluginId = "chat_tracking_rollback_orphan",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Obelisk::Core::SetPublicChatMessageTrackingFailureForTesting(true);
+        Obelisk::Core::SetPublicChatMessageRollbackUnregisterFailureForTesting(true);
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterChatMessageEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                FakeChatMessageEventCallback,
+                &plugin);
+        Obelisk::Core::SetPublicChatMessageRollbackUnregisterFailureForTesting(false);
+        Obelisk::Core::SetPublicChatMessageTrackingFailureForTesting(false);
+
+        Require(registrationId == 0, "chat tracking failure did not reject public registration");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "chat rollback-failure orphan was not retained for owner cleanup");
+
+        const Obelisk::Core::ChatMessageView message{
+            .Message = "!orphan",
+            .SenderName = "ignored",
+            .SenderPlatformId = "ignored",
+            .SendMode = Obelisk::Core::ChatSendMode::Global,
+            .SenderNameIndex = 777,
+        };
+        (void)chatDispatcher.Dispatch(message);
+        Require(plugin.chatMessageEventCalls == 0,
+                "inert chat rollback orphan invoked plugin callback after public registration returned zero");
+
+        manager.UnloadAll();
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "inert chat rollback orphan survived plugin owner cleanup");
         CleanupPlugin(plugin);
         fs::remove_all(root);
     }
@@ -6335,6 +6443,7 @@ int main()
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyMultiDispatcherRegistrationRollback();
+    TestGameplayPolicyTrackingFailureInertsRollbackOrphan();
     TestOwnerTokenGameplayPolicyRegistrationRejectedDuringShutdown();
     TestOwnerTokenGameplayPolicyUnregisterAllowedDuringShutdown();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
@@ -6353,6 +6462,7 @@ int main()
     TestChatMessageRegistrationRejectedWhenCapabilityWasNotAdvertised();
     TestChatMessageCallbackCleansOnInitFailureAndException();
     TestChatMessageCallbackExceptionDoesNotEscapeDispatch();
+    TestChatMessageTrackingFailureInertsRollbackOrphan();
     TestChatMessageRegistrationUsesOwnerCapabilitySnapshotAcrossManagers();
     TestGameplayPolicyCallbackCanSelfUnregisterDuringDispatch();
     TestGameplayPolicyCallbackExceptionDoesNotEscapeDispatch();

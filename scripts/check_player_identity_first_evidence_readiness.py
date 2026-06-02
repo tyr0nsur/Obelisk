@@ -1215,6 +1215,77 @@ def planning_provenance_blockers(
     return []
 
 
+def planning_provenance_next_action(
+    *,
+    blockers: list[str],
+    lifecycle_anchor_candidates_manifest: Path | None,
+    principal_invalidation_policy_manifest: Path | None,
+) -> dict[str, Any]:
+    active = "lifecycle_anchor_first_evidence_provenance_unbound" in blockers
+    required_artifacts: list[dict[str, Any]] = []
+    if active:
+        if any(blocker.startswith("lifecycle_anchor_") for blocker in blockers):
+            required_artifacts.append(
+                {
+                    "artifact": "lifecycle_anchor_candidates",
+                    "schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
+                    "current_path": (
+                        str(lifecycle_anchor_candidates_manifest)
+                        if lifecycle_anchor_candidates_manifest
+                        else None
+                    ),
+                    "required_alignment": (
+                        "artifact_identity.source_artifact_ids and accepted anchor "
+                        "source_snapshot_sha256 values must match the current first-evidence report"
+                    ),
+                }
+            )
+        if any(blocker.startswith("principal_policy_") for blocker in blockers):
+            required_artifacts.append(
+                {
+                    "artifact": "principal_invalidation_policy",
+                    "schema": "obelisk.players-identity-principal-invalidation-policy.v1",
+                    "current_path": (
+                        str(principal_invalidation_policy_manifest)
+                        if principal_invalidation_policy_manifest
+                        else None
+                    ),
+                    "required_alignment": (
+                        "lifecycle_layout_source.source_binding must match the bound lifecycle "
+                        "manifest schema, source artifact ids, and accepted start/end anchors"
+                    ),
+                }
+            )
+    return {
+        "active": active,
+        "safe_offline_only": True,
+        "recommended_next_step": (
+            "regenerate_or_select_lifecycle_and_principal_planning_manifests_bound_to_current_first_evidence"
+            if active
+            else None
+        ),
+        "required_artifacts": required_artifacts,
+        "verification_command": (
+            "PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate_bound_identity_sources.py "
+            "--lifecycle-anchor-candidates-manifest <bound-lifecycle-json> "
+            "--principal-invalidation-policy-manifest <bound-principal-json> --json"
+            if active
+            else None
+        ),
+        "expected_next_blocker_after_alignment": "approved_runtime_evidence_missing" if active else None,
+        "forbidden_shortcuts": [
+            "do not hand-edit stale source bindings into readiness",
+            "do not reinterpret standalone lifecycle/principal manifests as bound evidence",
+            "do not request or run runtime/server capture for this provenance blocker",
+            "do not claim public identity, permissions/admin, command response, commands/replies, SDK readiness, or v1 completion",
+        ],
+        "non_claim": (
+            "diagnostic routing only; this does not create evidence, approve runtime capture, "
+            "or promote player identity/public SDK readiness"
+        ),
+    }
+
+
 def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -> dict[str, Any]:
     base: dict[str, Any] = {
         "provided": path is not None,
@@ -2274,6 +2345,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         lifecycle_candidate_diagnosis=lifecycle_candidate_diagnosis,
         principal_policy_diagnosis=principal_policy_diagnosis,
     )
+    planning_provenance_action = planning_provenance_next_action(
+        blockers=planning_provenance,
+        lifecycle_anchor_candidates_manifest=effective_lifecycle_anchor_candidates_manifest,
+        principal_invalidation_policy_manifest=effective_principal_invalidation_policy_manifest,
+    )
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
@@ -2644,6 +2720,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "planning_provenance": {
                 "ready": not planning_provenance,
                 "blockers": planning_provenance,
+                "next_action": planning_provenance_action,
                 "non_claim": (
                     "aggregate provenance binding only; does not promote runtime evidence, "
                     "public identity, permissions/admin, commands, SDK readiness, or v1 completion"

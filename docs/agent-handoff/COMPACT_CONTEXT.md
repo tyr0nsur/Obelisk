@@ -727,6 +727,27 @@ priorities, and do not use history files as the active source of truth.
     `lifecycle_anchor_first_evidence_provenance_unbound`; and
     `check_public_sdk_v1_completion.py --json` remained fail-closed with
     `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+- Delegated route/runtime rollback hardening on 2026-06-02 added four scoped outcomes and
+  closed all sub-agents:
+  - Command route gate now verifies the command response child readiness report is bound
+    to its embedded `readiness_root` and agrees with caller-supplied response root/path
+    context.
+  - Item-return standalone readiness now rejects positive public gameplay status strings
+    that imply public SDK, runtime, ResourceHandle, v1, release, or promotion readiness.
+  - Player-identity first-evidence readiness now emits a structured offline
+    `planning_provenance.next_action` for
+    `lifecycle_anchor_first_evidence_provenance_unbound`: regenerate or select
+    lifecycle/principal planning manifests bound to current first-evidence, then verify
+    with the bound identity route wrapper. Expected next blocker after correct alignment
+    is `approved_runtime_evidence_missing`.
+  - Public chat and gameplay-policy registration rollback now inerts released callback
+    state before rollback. If rollback unregister fails, the orphan cannot invoke plugin
+    code and owner cleanup still removes it. Test-only hooks cover both paths.
+  - Validation: 86 focused Python tests passed, `plugin_manager_tests` passed,
+    full `cmake --build build -j$(nproc)` passed, and `git diff --check` was clean.
+    Default route and SDK completion remain fail-closed at
+    `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
+    complete-SDK progress `0/12`, and P0 progress `0/4`.
 
 ## Agent Coordination
 

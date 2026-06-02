@@ -1172,6 +1172,25 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(provenance["ready"])
         self.assertIn("lifecycle_anchor_source_artifact_identity_mismatch", provenance["blockers"])
         self.assertIn("principal_policy_lifecycle_source_binding_missing", provenance["blockers"])
+        next_action = provenance["next_action"]
+        self.assertTrue(next_action["active"])
+        self.assertTrue(next_action["safe_offline_only"])
+        self.assertEqual(
+            next_action["recommended_next_step"],
+            "regenerate_or_select_lifecycle_and_principal_planning_manifests_bound_to_current_first_evidence",
+        )
+        self.assertEqual(next_action["expected_next_blocker_after_alignment"], "approved_runtime_evidence_missing")
+        self.assertIn("check_command_permission_route_gate_bound_identity_sources.py", next_action["verification_command"])
+        required_artifacts = {item["artifact"]: item for item in next_action["required_artifacts"]}
+        self.assertEqual(
+            required_artifacts["lifecycle_anchor_candidates"]["current_path"],
+            str(lifecycle_manifest),
+        )
+        self.assertEqual(
+            required_artifacts["principal_invalidation_policy"]["current_path"],
+            str(principal_manifest),
+        )
+        self.assertIn("do not request or run runtime/server capture", "\n".join(next_action["forbidden_shortcuts"]))
 
     def test_blocks_self_consistent_stale_lifecycle_source_before_runtime_blocker(self) -> None:
         first_evidence = players_identity_first_evidence_manifest()

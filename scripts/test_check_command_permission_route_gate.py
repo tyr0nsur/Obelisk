@@ -663,6 +663,55 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertEqual([], blockers)
 
+    def test_route_rejects_command_response_child_readiness_context_split_from_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            expected_root = base / "expected-root"
+            stale_root = base / "stale-root"
+            expected_root.mkdir()
+            stale_root.mkdir()
+            args = SimpleNamespace(
+                command_response_root=None,
+                command_response_readiness=None,
+            )
+            payload = {
+                "readiness_root": str(expected_root),
+                "readiness_path": str(stale_root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME),
+            }
+
+            blockers = ROUTE_GATE.validate_command_response_child_readiness_context(args, payload)
+
+        self.assertEqual(
+            ["command_chat_response_public_readiness: child readiness_path is not bound to readiness_root"],
+            blockers,
+        )
+
+    def test_route_rejects_command_response_child_readiness_context_mismatching_caller(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            expected_root = base / "expected-root"
+            stale_root = base / "stale-root"
+            expected_root.mkdir()
+            stale_root.mkdir()
+            args = SimpleNamespace(
+                command_response_root=expected_root,
+                command_response_readiness=expected_root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME,
+            )
+            payload = {
+                "readiness_root": str(stale_root),
+                "readiness_path": str(stale_root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME),
+            }
+
+            blockers = ROUTE_GATE.validate_command_response_child_readiness_context(args, payload)
+
+        self.assertEqual(
+            [
+                "command_chat_response_public_readiness: child readiness_root does not match caller root",
+                "command_chat_response_public_readiness: child readiness_path does not match caller readiness",
+            ],
+            blockers,
+        )
+
     def test_route_check_rejects_schema_drift_even_when_otherwise_valid(self) -> None:
         original = ROUTE_GATE.run_check
 
@@ -948,6 +997,82 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["accepted_for_planning"])
         self.assertIn("commands_replies_public_readiness: checker exited 1", report["blockers"])
         self.assertIn("commands_replies_public_readiness: invalid route prerequisite", report["blockers"])
+
+    def test_route_gate_rejects_split_command_response_child_context_even_if_children_pass(self) -> None:
+        original = ROUTE_GATE.run_check
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            expected_root = base / "expected-root"
+            stale_root = base / "stale-root"
+            expected_root.mkdir()
+            stale_root.mkdir()
+
+            def fake_run_check(name: str, argv: list[str]) -> dict[str, object]:
+                report_payload = {
+                    "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "runtime_ready": False,
+                    "blockers": [],
+                }
+                if name == "command_chat_response_public_readiness":
+                    report_payload.update(
+                        {
+                            "readiness_root": str(expected_root),
+                            "readiness_path": str(
+                                stale_root / ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME
+                            ),
+                        }
+                    )
+                return {
+                    "name": name,
+                    "argv": argv,
+                    "exit_code": 0,
+                    "valid": True,
+                    "report_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                    "planning_only": True,
+                    "accepted_for_planning": True,
+                    "public_or_runtime_claims": [],
+                    "blockers": [],
+                    "parse_error": None,
+                    "stderr": "",
+                    "report_payload": report_payload,
+                }
+
+            args = SimpleNamespace(
+                query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+                player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+                public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+                player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+                public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+                command_response_root=None,
+                command_response_readiness=None,
+                player_identity_artifact_root=None,
+                player_identity_snapshot_root=None,
+                player_identity_candidate_root=None,
+                player_identity_lifecycle_anchor_candidates_manifest=None,
+                player_identity_principal_invalidation_policy_manifest=None,
+                player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+                json=True,
+            )
+            try:
+                ROUTE_GATE.run_check = fake_run_check
+                report = ROUTE_GATE.build_report(args)
+            finally:
+                ROUTE_GATE.run_check = original
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["accepted_for_planning"])
+        self.assertIn(
+            "command_chat_response_public_readiness: child readiness_path is not bound to readiness_root",
+            report["blockers"],
+        )
 
     def test_route_gate_forwards_shared_surfaces_and_header_to_p0_child_checks(self) -> None:
         args = SimpleNamespace(

@@ -522,6 +522,40 @@ This file is an active routing table only. Durable evidence belongs in
     after the previous route hardening. Validation kept the default route planning-only at
     `lifecycle_anchor_first_evidence_provenance_unbound`; SDK completion remains
     `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+- 2026-06-02 delegated route/runtime rollback hardening round:
+  - Four sub-agents were delegated and closed. Worker scopes covered command route
+    readiness binding and item-return/public-gameplay overclaim scanning; read-only
+    scopes covered runtime/ABI callback rollback risk and the next player-identity
+    reversing step.
+  - `scripts/check_command_permission_route_gate.py` now rejects command response child
+    readiness reports whose embedded `readiness_path` is not bound to the embedded
+    `readiness_root`, or whose embedded context disagrees with caller-supplied
+    `--command-response-root` / `--command-response-readiness`.
+  - `scripts/check_item_return_only_readiness.py` now rejects positive public gameplay
+    status strings such as ready/available/promoted wording when they imply public SDK,
+    runtime, resource-handle, v1, or release readiness from copied item-return evidence.
+  - `scripts/check_player_identity_first_evidence_readiness.py` now emits an explicit
+    offline `planning_provenance.next_action` when the active blocker is
+    `lifecycle_anchor_first_evidence_provenance_unbound`. The next action is to
+    regenerate or select lifecycle/principal planning manifests bound to the current
+    first-evidence source, then verify with
+    `scripts/check_command_permission_route_gate_bound_identity_sources.py`. The expected
+    next blocker after correct alignment is `approved_runtime_evidence_missing`; no
+    runtime/server capture is authorized by this diagnostic.
+  - `core/PluginManager.cpp` now makes public chat and gameplay-policy callback state
+    inert before rollback when public registration tracking fails. If dispatcher rollback
+    unregister also fails, the orphaned internal subscription cannot call plugin code and
+    owner cleanup still removes it. Test-only rollback failure hooks and
+    `PluginManagerTests` cover both chat and gameplay-policy paths.
+  - Validation for this round: `python3 -m unittest
+    scripts.test_check_command_permission_route_gate
+    scripts.test_check_item_return_only_readiness
+    scripts.test_check_player_identity_first_evidence_readiness` passed 86 tests;
+    `plugin_manager_tests` passed; `cmake --build build -j$(nproc)` passed;
+    `git diff --check` was clean. The default route remains planning-only at
+    `lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remains
+    fail-closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0
+    progress `0/4`.
 
 ## Priority Next Steps
 
