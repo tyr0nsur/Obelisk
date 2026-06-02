@@ -1010,6 +1010,14 @@ priorities, and do not use history files as the active source of truth.
   permissions/admin certificates replay the same identity validator. Next offline delta is
   a private candidate POD layout evidence lane for `abi.public_pod_contract`, still leaving
   `abi.layout`/SDK consumer coverage missing until a real public ABI promotion path exists.
+- 2026-06-02 follow-up private POD layout lane: added
+  `player-identity-private-pod-layout-candidate.json` plus checker/tests. The candidate
+  pins `PlayerPrincipalEventCandidate` (`sizeof=80`, `align=8`) and
+  `PlayerPrincipalDescriptorCandidate` (`sizeof=48`, `align=8`) as private fixed-width POD
+  review input only. Gap report summarizes it under `private_pod_layout_candidate` and keeps
+  `abi.public_pod_contract`, `abi.layout`, SDK consumer, runtime evidence, and P0 completion
+  unresolved. SDK completion rejects the private layout as structured promotion evidence or
+  `abi_tests`; route gate remains planning-only at `approved_runtime_evidence_missing`.
 
 ## Agent Coordination
 

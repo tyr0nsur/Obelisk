@@ -2836,6 +2836,8 @@ def player_identity_structured_promotion_evidence_missing(
         remaining_blockers = set(contract_report.get("remaining_blockers", []))
         private_candidate_contract = contract_report.get("private_candidate_contract")
         private_candidate_contract = private_candidate_contract if isinstance(private_candidate_contract, dict) else {}
+        private_pod_layout_candidate = contract_report.get("private_pod_layout_candidate")
+        private_pod_layout_candidate = private_pod_layout_candidate if isinstance(private_pod_layout_candidate, dict) else {}
         if not (
             contract_report.get("schema") == "obelisk.player-identity-public-contract-readiness-check.v1"
             and contract_report.get("surface") == "obelisk.player_identity.v1"
@@ -2864,6 +2866,11 @@ def player_identity_structured_promotion_evidence_missing(
         for key in ("promotion_ready", "public_sdk_ready", "public_header_allowed"):
             if private_candidate_contract.get(key) is False:
                 missing.append(f"public_contract_readiness_report:private_candidate_contract_{key}_false")
+        if private_pod_layout_candidate.get("candidate_only") is True:
+            missing.append("public_contract_readiness_report:private_pod_layout_candidate_candidate_only")
+        for key in ("promotion_ready", "public_sdk_ready", "public_header_allowed", "public_abi_ready"):
+            if private_pod_layout_candidate.get(key) is False:
+                missing.append(f"public_contract_readiness_report:private_pod_layout_candidate_{key}_false")
 
     missing.extend(
         executed_test_report_missing(

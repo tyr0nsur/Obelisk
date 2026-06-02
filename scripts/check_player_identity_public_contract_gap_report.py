@@ -17,6 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import check_player_identity_identifier_redaction_evidence as redaction_checker
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
+import check_player_identity_private_pod_layout_candidate as private_pod_layout_candidate
 
 
 SCHEMA = "obelisk.player-identity-public-contract-gap-report.v1"
@@ -32,6 +33,10 @@ DEFAULT_IDENTIFIER_REDACTION_EVIDENCE = Path(
 )
 DEFAULT_PRINCIPAL_INVALIDATION_POLICY = Path(
     "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json"
+)
+DEFAULT_PRIVATE_CONTRACT = Path("docs/research/2026-06-01-player-identity-private-candidate-contract.json")
+DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE = Path(
+    "docs/research/player-identity-planning-sources/player-identity-private-pod-layout-candidate.json"
 )
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
@@ -279,6 +284,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_PRINCIPAL_INVALIDATION_POLICY,
         help="Candidate-only principal invalidation policy consumed as lifetime/generation/scope review input only.",
+    )
+    parser.add_argument(
+        "--private-pod-layout-candidate",
+        type=Path,
+        default=DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
+        help="Candidate-only private POD layout evidence consumed as ABI contract-review input only.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     return parser.parse_args()
@@ -989,6 +1000,70 @@ def validate_principal_invalidation_policy(path: Path, blockers: list[dict[str, 
     }
 
 
+def validate_private_pod_layout_candidate(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    try:
+        payload = private_pod_layout_candidate.load_json(path)
+        private_contract = private_pod_layout_candidate.load_json(DEFAULT_PRIVATE_CONTRACT)
+    except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        add(
+            blockers,
+            "private_pod_layout_candidate_unreadable_or_rejected",
+            "--private-pod-layout-candidate",
+            path=str(path),
+            error=str(exc),
+        )
+        return {
+            "path": str(path),
+            "provided": False,
+            "accepted_for_contract_review_input": False,
+            "review_input": private_pod_layout_candidate.RESOLVED_INPUT,
+            "candidate_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "does_not_resolve": ["abi.public_pod_contract", "abi.layout", "sdk.consumer"],
+            "blockers": ["private_pod_layout_candidate_unreadable_or_rejected"],
+        }
+    candidate_blockers = private_pod_layout_candidate.validate_manifest(payload, private_contract)
+    report = private_pod_layout_candidate.build_report(payload, candidate_blockers)
+    if candidate_blockers:
+        add(
+            blockers,
+            "private_pod_layout_candidate_not_accepted",
+            "--private-pod-layout-candidate",
+            path=str(path),
+            layout_blockers=report["blockers"],
+        )
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+        if report.get(key) is not False:
+            add(
+                blockers,
+                "private_pod_layout_candidate_readiness_flag_not_false",
+                f"--private-pod-layout-candidate.{key}",
+                value=report.get(key),
+            )
+    return {
+        "path": str(path),
+        "provided": True,
+        "accepted_for_contract_review_input": report.get("accepted_for_contract_review") is True,
+        "review_input": private_pod_layout_candidate.RESOLVED_INPUT,
+        "candidate_only": True,
+        "layout_candidate_ready": False,
+        "event_payload": report.get("event_payload", {}),
+        "descriptor": report.get("descriptor", {}),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "does_not_resolve": ["abi.public_pod_contract", "abi.layout", "sdk.consumer"],
+        "blockers": report.get("blockers", []),
+        "non_claims": report.get("non_claims", []),
+    }
+
+
 def build_report(
     args: argparse.Namespace,
     blockers: list[dict[str, Any]],
@@ -998,6 +1073,7 @@ def build_report(
     candidate: dict[str, Any],
     identifier_redaction_evidence: dict[str, Any],
     principal_invalidation_policy_report: dict[str, Any],
+    private_pod_layout_report: dict[str, Any],
 ) -> dict[str, Any]:
     redaction_accepted = identifier_redaction_evidence.get("accepted_for_contract_review") is True
     principal_policy_accepted = principal_invalidation_policy_report.get("accepted_for_policy_review") is True
@@ -1037,6 +1113,18 @@ def build_report(
             "next_input": "approved copied runtime principal lifecycle evidence",
             "non_claim": "offline planning inputs do not authorize runtime work or public SDK readiness",
         },
+        {
+            "id": "abi.public_pod_contract",
+            "status": "blocked",
+            "private_layout_candidate_accepted": private_pod_layout_report.get("accepted_for_contract_review_input") is True,
+            "next_input": "contract review of private POD payload, descriptor, capability, owner-token, and append-only layout-test plan",
+            "does_not_resolve": ["abi.public_pod_contract", "abi.layout", "sdk.consumer"],
+            "non_claim": (
+                "private layout candidate acceptance does not add public header symbols, "
+                "capability bits, callbacks, ABI layout guarantees, SDK consumer readiness, "
+                "route credit, v1 completion evidence, or promotion readiness"
+            ),
+        },
     ]
     return {
         "schema": SCHEMA,
@@ -1061,6 +1149,7 @@ def build_report(
             "public_header": str(args.public_header),
             "identifier_redaction_evidence": str(args.identifier_redaction_evidence),
             "principal_invalidation_policy": str(args.principal_invalidation_policy),
+            "private_pod_layout_candidate": str(args.private_pod_layout_candidate),
         },
         "decisions": {
             "schema": decisions.get("schema"),
@@ -1088,12 +1177,14 @@ def build_report(
         },
         "identifier_redaction_evidence": identifier_redaction_evidence,
         "principal_invalidation_policy": principal_invalidation_policy_report,
+        "private_pod_layout_candidate": private_pod_layout_report,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": [
             "offline gap report does not require approved runtime evidence",
             "identifier-redaction evidence is contract-review input only and does not resolve the full privacy blocker",
             "principal invalidation policy is candidate-only review input and does not resolve the full lifetime/generation/scope blocker",
+            "private POD layout candidate is contract-review input only and does not resolve the public ABI layout or SDK consumer gates",
             "blocked player identity state does not add public header symbols, capability bits, callbacks, lookup, persistence, mutation, return override, or v1 SDK readiness",
         ],
     }
@@ -1113,6 +1204,7 @@ def main() -> int:
         validate_private_candidate(candidate, blockers)
     identifier_redaction_evidence = validate_identifier_redaction_evidence(args.identifier_redaction_evidence, blockers)
     principal_invalidation_policy_report = validate_principal_invalidation_policy(args.principal_invalidation_policy, blockers)
+    private_pod_layout_report = validate_private_pod_layout_candidate(args.private_pod_layout_candidate, blockers)
     header_scan = scan_public_header(args.public_header, blockers)
 
     report = build_report(
@@ -1124,6 +1216,7 @@ def main() -> int:
         candidate,
         identifier_redaction_evidence,
         principal_invalidation_policy_report,
+        private_pod_layout_report,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

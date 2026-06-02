@@ -215,6 +215,6 @@ This file is an active routing table only. Durable evidence belongs in
   lifetime scope/invalidation/reconnect policy, and `abi.public_pod_contract`.
   SDK accounting rejects planning route credit and rejects candidate-only/private identity
   contract reports as promoted evidence, including through permissions/admin certificates.
-  Request packs emit checked `post_window_replay_contract` sidecars and reject sidecar/check
-  drift; next offline P0 task is a candidate-only private POD layout evidence lane for
-  `abi.public_pod_contract`, without marking `abi.layout` covered. No runtime/server op.
+  Private POD layout candidate evidence now pins event/descriptor byte layout as review-only
+  input for `abi.public_pod_contract`; `abi.public_pod_contract`, `abi.layout`, SDK consumer,
+  runtime evidence, and SDK/P0 completion remain unresolved. No runtime/server op.

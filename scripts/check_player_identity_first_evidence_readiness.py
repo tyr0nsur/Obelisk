@@ -1614,6 +1614,10 @@ def player_identity_public_contract_gap_diagnosis(
         principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
         report_blockers,
     )
+    private_pod_layout_report = public_contract_gap_report.validate_private_pod_layout_candidate(
+        public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
+        report_blockers,
+    )
     header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
     args = argparse.Namespace(
         decisions=decisions,
@@ -1621,6 +1625,7 @@ def player_identity_public_contract_gap_diagnosis(
         private_candidate_contract=private_candidate_contract,
         identifier_redaction_evidence=identifier_redaction_evidence,
         principal_invalidation_policy=principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
+        private_pod_layout_candidate=public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_header=public_header,
     )
     report = public_contract_gap_report.build_report(
@@ -1632,6 +1637,7 @@ def player_identity_public_contract_gap_diagnosis(
         candidate_payload,
         redaction_diagnosis,
         principal_policy_gap_report,
+        private_pod_layout_report,
     )
 
     if report.get("schema") != public_contract_gap_report.SCHEMA:

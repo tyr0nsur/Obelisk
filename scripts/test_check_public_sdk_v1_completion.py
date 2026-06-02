@@ -316,6 +316,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_sdk_ready": False,
                         "public_header_allowed": False,
                     },
+                    "private_pod_layout_candidate": {
+                        "candidate_only": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                    },
                     "approved_runtime_evidence": {
                         "approved_runtime_evidence_present": True,
                         "runtime_evidence_ready": True,
@@ -4936,6 +4943,32 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
 
+    def test_private_pod_layout_candidate_report_does_not_promote_identity_abi_tests(self) -> None:
+        manifest, _ = complete_excluded_manifest()
+        private_layout = "docs/research/player-identity-planning-sources/player-identity-private-pod-layout-candidate.json"
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["status"] = "promoted"
+                surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                surface["evidence"] = {
+                    "surface_id": "obelisk.player_identity.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [private_layout],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/player_identity_promotion_plugin.c"],
+                }
+                break
+        manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.player_identity.v1"])
+
     def test_static_orientation_report_does_not_promote_completion_blocker(self) -> None:
         manifest, _ = complete_excluded_manifest()
         for surface in manifest["surfaces"]:
@@ -6162,6 +6195,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "public_sdk_ready": False,
                             "public_header_allowed": False,
                         },
+                        "private_pod_layout_candidate": {
+                            "candidate_only": True,
+                            "promotion_ready": False,
+                            "public_sdk_ready": False,
+                            "public_header_allowed": False,
+                            "public_abi_ready": False,
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -6875,6 +6915,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "player_identity_public_contract_readiness_report:private_candidate_contract_promotion_ready_false",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_public_sdk_ready_false",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_public_header_allowed_false",
+                "player_identity_public_contract_readiness_report:private_pod_layout_candidate_candidate_only",
+                "player_identity_public_contract_readiness_report:private_pod_layout_candidate_promotion_ready_false",
+                "player_identity_public_contract_readiness_report:private_pod_layout_candidate_public_sdk_ready_false",
+                "player_identity_public_contract_readiness_report:private_pod_layout_candidate_public_header_allowed_false",
+                "player_identity_public_contract_readiness_report:private_pod_layout_candidate_public_abi_ready_false",
             ],
         )
         self.assertIn("player_identity_promotion_certificate:fields_invalid", bad_surface_missing)
