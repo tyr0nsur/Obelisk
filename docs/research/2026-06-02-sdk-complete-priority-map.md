@@ -672,6 +672,40 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Identity Public Contract Post-Evidence Route Modeling
+
+The next supervised P0 round closed the route-accounting gap after approved runtime
+principal lifecycle evidence:
+
+- Four read-only sub-agent scopes were lead-delegated and closed: public-contract
+  gap/readiness, route composition, privacy/redaction, and handoff/research continuity.
+- `scripts/check_player_identity_public_contract_gap_report.py` remains the current
+  no-runtime-evidence gap report. It is intentionally not the post-evidence intake path:
+  it keeps `accepted_for_contract_review=false`, `runtime_evidence_missing=true`, and
+  primary offline gap `privacy.identifier_redaction`.
+- `scripts/check_player_identity_public_contract_readiness.py` remains the post-evidence
+  path. It consumes approved runtime evidence only as contract-review input and keeps
+  promotion, public SDK, runtime, and public header readiness false.
+- `scripts/check_command_permission_route_gate.py` now includes
+  `identity_public_contract_gate_missing` as an allowed identity lock blocker. Validation
+  still requires planning-only posture and all downstream unlock/readiness flags false.
+- `scripts/check_command_permission_route_gate_bound_identity_sources.py` accepts the same
+  post-evidence blocker as locked planning. This is not runtime authorization and does not
+  create server-operation authority.
+- `scripts/check_public_sdk_v1_completion.py` now rejects optimistic/minimal player
+  identity contract reports unless they retain `next_blocker=identity_public_contract_gate`
+  and unresolved `privacy.identifier_redaction`.
+
+The current default route remains blocked at
+`lifecycle_anchor_first_evidence_provenance_unbound`; the transient bound route without
+approved runtime evidence remains blocked at `approved_runtime_evidence_missing`. If
+approved runtime evidence is later accepted, the next allowed route blocker is only
+`identity_public_contract_gate_missing`, still locked and planning-only.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command response, commands/replies, public header symbols, release readiness, or a stable
+SDK claim.
+
 ## Approved Evidence Operational-Window Projection Binding
 
 The next supervised round closed the semantic-drop gap between an accepted

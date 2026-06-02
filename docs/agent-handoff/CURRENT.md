@@ -26,9 +26,10 @@ This file is an active routing table only. Durable evidence belongs in
   can produce source-aligned planning manifests for the bound identity route. It now
   proves accepted lifecycle anchor `source_snapshot_sha256` values against the current
   `--snapshot-root` files before a bound proof may advance only to
-  `approved_runtime_evidence_missing`; the default route remains blocked first at
-  `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit aligned manifests
-  are supplied.
+  `approved_runtime_evidence_missing`; after accepted approved runtime evidence, the route
+  may report only `identity_public_contract_gate_missing`. The default route remains
+  blocked first at `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit
+  aligned manifests are supplied.
 
 ## Hard Overrides
 
@@ -94,6 +95,10 @@ This file is an active routing table only. Durable evidence belongs in
   first-evidence source and current snapshot-root hashes for `ShooterGameMode.HandleNewPlayer`
   and `ShooterGameMode.OnLogout`. A transient bound route proof with those outputs reports
   `approved_runtime_evidence_missing`, with runtime/server authorization false.
+  If future accepted approved runtime evidence is supplied, aggregate and bound route
+  validation may accept `identity_public_contract_gate_missing` only as locked,
+  planning-only state with identity, permissions/admin, command response, commands/replies,
+  public SDK, public header, and runtime readiness still false.
 - Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` remains the safe
   offline pack route. It requires a non-protected complete
@@ -144,9 +149,10 @@ This file is an active routing table only. Durable evidence belongs in
   `operator_live_ops_brief`, reviewed server binary path/SHA, explicit pre/post evidence
   paths, exact env/marker boundaries, and canonical rollback delta; acceptance still only
   advances to current-turn operator approval required.
-- P0 public contract: after approved runtime principal lifecycle evidence exists, review
-  the player identity contract before permissions/admin, command response, or
-  commands/replies ABI.
+- P0 public contract: after approved runtime principal lifecycle evidence exists, the
+  next blocker is `identity_public_contract_gate_missing`; review the player identity
+  contract before permissions/admin, command response, or commands/replies ABI. The
+  primary offline gap remains `privacy.identifier_redaction`.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.
@@ -193,3 +199,11 @@ This file is an active routing table only. Durable evidence belongs in
   `operational_window`; every allowed `operational_window` key is covered by replay.
   This remains consume-only evidence and does not authorize runtime/server work or public
   SDK readiness.
+- Latest identity-public-contract route round used four lead-scoped read-only agents:
+  public-contract gap/readiness, route composition, privacy/redaction, and
+  handoff/research continuity. Integrated result: route and bound-route validation now
+  accept `identity_public_contract_gate_missing` only as locked planning after approved
+  runtime evidence, SDK completion requires the public-contract readiness report to keep
+  `next_blocker=identity_public_contract_gate` plus unresolved
+  `privacy.identifier_redaction`, and no permissions/admin, command, runtime, public
+  header, or stable SDK readiness is unlocked.

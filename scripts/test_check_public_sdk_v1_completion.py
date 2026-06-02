@@ -7,12 +7,19 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = REPO_ROOT / "scripts"
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from check_public_sdk_v1_completion import player_identity_structured_promotion_evidence_missing
+
 SCRIPT = REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"
 PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 SCOPED_RELEASE_STATEMENT_TEMPLATE = (
@@ -3906,6 +3913,59 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_identity_structured_contract_report_must_keep_public_contract_blocker(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            root = Path(core_dir)
+            runtime_report = root / "player_identity_approved_runtime_report.json"
+            contract_report = root / "player_identity_public_contract_readiness_report.json"
+            executed_report = root / "player_identity_executed_tests.json"
+            runtime_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            contract_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                        "surface": "obelisk.player_identity.v1",
+                        "accepted_for_contract_review": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "public_header_allowed": False,
+                        "approved_runtime_evidence": {
+                            "approved_runtime_evidence_present": True,
+                            "runtime_evidence_ready": True,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            executed_report_path = write_executed_test_artifact(
+                executed_report,
+                "obelisk.player_identity.v1",
+                argv=["python3", "-m", "unittest", "player_identity_promotion"],
+            )
+            missing = player_identity_structured_promotion_evidence_missing(
+                {
+                    "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
+                    "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
+                    "executed_test_report": executed_report_path,
+                }
+            )
+
+        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+
     def test_candidate_only_player_identity_preflight_test_does_not_promote_completion_blocker(self) -> None:
         manifest, _ = complete_excluded_manifest()
         for surface in manifest["surfaces"]:
@@ -5134,6 +5194,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_sdk_ready": False,
                         "runtime_ready": False,
                         "public_header_allowed": False,
+                        "next_blocker": "identity_public_contract_gate",
+                        "remaining_blockers": [
+                            "runtime.lifecycle_evidence",
+                            "privacy.identifier_redaction",
+                            "lifetime.generation_scope_invalidation",
+                            "abi.public_pod_contract",
+                            "lifecycle.owner_cleanup",
+                            "separation.downstream_surfaces",
+                        ],
                         "approved_runtime_evidence": {
                             "approved_runtime_evidence_present": True,
                             "runtime_evidence_ready": True,

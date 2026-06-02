@@ -842,6 +842,23 @@ priorities, and do not use history files as the active source of truth.
   - This is consume-only runtime evidence hardening. It does not authorize runtime/server
     operations, marker/env edits, Discord, publication, public identity, permissions,
     commands, or stable SDK claims.
+- Delegated identity-public-contract route round on 2026-06-02 closed the post-approved
+  runtime-evidence route modeling gap:
+  - Four read-only sub-agent scopes were lead-delegated and closed: public-contract
+    gap/readiness, route composition, privacy/redaction, and handoff/research continuity.
+  - The gap report remains the correct current no-runtime-evidence blocker and keeps
+    `privacy.identifier_redaction` as the primary offline gap. The readiness checker is
+    the post-evidence path and already rejects public-header/readiness overclaims.
+  - `check_command_permission_route_gate.py` now accepts
+    `identity_public_contract_gate_missing` as an allowed identity lock blocker only while
+    planning-only/downstream unlock flags remain false. The bound identity wrapper accepts
+    the same post-evidence blocker as locked planning, not runtime approval.
+  - `check_public_sdk_v1_completion.py` now requires player-identity structured contract
+    evidence to retain `next_blocker=identity_public_contract_gate` and unresolved
+    `privacy.identifier_redaction`; a minimal optimistic contract report is invalid.
+  - This round does not authorize runtime/server operations, marker/env edits, Discord,
+    publication, public identity, permissions/admin, command response, commands/replies,
+    public header symbols, or stable SDK claims.
 
 ## Agent Coordination
 

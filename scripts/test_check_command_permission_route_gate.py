@@ -328,14 +328,15 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         phase["source_checker_primary_blocker"] = "approved_runtime_evidence_missing"
         phase["current_blocker"] = "identity_public_contract_gate_missing"
-        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
-        self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
-        self.assertIn("critical_path_runtime_evidence_blocker_must_remain_current", blockers)
+        phase["source_checker_primary_blocker"] = "identity_public_contract_gate_missing"
+        phase["source_checker_blockers"] = ["identity_public_contract_gate_missing"]
+        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
 
         phase["current_blocker"] = "identity_public_contract_gate"
+        phase["source_checker_primary_blocker"] = "identity_public_contract_gate"
+        phase["source_checker_blockers"] = ["identity_public_contract_gate"]
         blockers = ROUTE_GATE.validate_critical_path_phase(phase)
         self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
-        self.assertIn("critical_path_runtime_evidence_blocker_must_remain_current", blockers)
 
     def test_critical_path_phase_rejects_unlocked_commands_or_unknown_blocker(self) -> None:
         phase = {

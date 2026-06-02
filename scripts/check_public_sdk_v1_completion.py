@@ -2263,6 +2263,8 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
             and contract_report.get("public_sdk_ready") is False
             and contract_report.get("runtime_ready") is False
             and contract_report.get("public_header_allowed") is False
+            and contract_report.get("next_blocker") == "identity_public_contract_gate"
+            and "privacy.identifier_redaction" in contract_report.get("remaining_blockers", [])
             and approved_runtime.get("approved_runtime_evidence_present") is True
             and approved_runtime.get("runtime_evidence_ready") is True
         ):

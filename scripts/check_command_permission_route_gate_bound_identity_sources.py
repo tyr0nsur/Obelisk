@@ -328,9 +328,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
             if route_report.get(key) is not False:
                 blockers.append(f"route_gate_{key}_overclaim")
-        if current_blocker != "approved_runtime_evidence_missing":
+        if current_blocker not in {"approved_runtime_evidence_missing", "identity_public_contract_gate_missing"}:
             blockers.append("route_gate_bound_identity_blocker_unexpected")
-        if source_checker_primary_blocker != "approved_runtime_evidence_missing":
+        if source_checker_primary_blocker not in {"approved_runtime_evidence_missing", "identity_public_contract_gate_missing"}:
             blockers.append("route_gate_bound_identity_primary_blocker_unexpected")
         if source_checker_status != "blocked":
             blockers.append("route_gate_identity_readiness_status_unexpected")
@@ -340,10 +340,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append("route_gate_identity_readiness_internal_planning_overclaim")
         if not isinstance(route_lock, dict) or route_lock.get("locked") is not True:
             blockers.append("route_gate_lock_unexpected")
-        if not isinstance(route_lock, dict) or route_lock.get("blocked_until") != [
-            "approved_runtime_principal_lifecycle_evidence",
-            "reviewed_identity_public_contract",
-        ]:
+        expected_blocked_until = (
+            ["reviewed_identity_public_contract", "reviewed_identity_public_contract"]
+            if current_blocker == "identity_public_contract_gate_missing"
+            else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
+        )
+        if not isinstance(route_lock, dict) or route_lock.get("blocked_until") != expected_blocked_until:
             blockers.append("route_gate_lock_blocked_until_unexpected")
 
     critical_path_phase = (

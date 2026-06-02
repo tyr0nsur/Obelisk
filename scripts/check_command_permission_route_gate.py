@@ -55,6 +55,10 @@ ALLOWED_IDENTITY_LOCK_BLOCKERS = {
         "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
         "blocked_until": "approved_runtime_principal_lifecycle_evidence",
     },
+    "identity_public_contract_gate_missing": {
+        "next_action": "review_identity_public_contract_gate",
+        "blocked_until": "reviewed_identity_public_contract",
+    },
 }
 FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "promotion_ready",
@@ -614,8 +618,6 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_primary_blocker_not_in_blockers")
     if phase.get("current_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
-    if phase.get("current_blocker") in {"identity_public_contract_gate", "identity_public_contract_gate_missing"}:
-        blockers.append("critical_path_runtime_evidence_blocker_must_remain_current")
     for key in (
         "permissions_admin_unlocked",
         "command_response_unlocked",
