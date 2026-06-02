@@ -943,13 +943,13 @@ def validate_query_artifact(path: Path | None, blockers: list[dict[str, Any]]) -
             add(blockers, "query_failclosed_report_not_ready_for_consume", f"{path}:ready")
         expected_report_fields = {
             "input_schema": QUERY_CONTRACT_SCHEMA,
-            "query_fields": sorted(query_failclosed_contract.REQUIRED_QUERY_FIELDS),
+            "query_fields": list(query_failclosed_contract.REQUIRED_QUERY_FIELD_SEQUENCE),
             "decision_fields": sorted(query_failclosed_contract.REQUIRED_DECISION_FIELDS),
-            "decisions": sorted(query_failclosed_contract.REQUIRED_DECISIONS),
+            "decisions": list(query_failclosed_contract.REQUIRED_DECISION_SEQUENCE),
             "provenance_fields": sorted(query_failclosed_contract.REQUIRED_PROVENANCE_FIELDS),
             "recognized_authority_kinds": sorted(query_failclosed_contract.REQUIRED_RECOGNIZED_AUTHORITY_KINDS),
             "allow_capable_authority_kinds": sorted(query_failclosed_contract.REQUIRED_ALLOW_CAPABLE_AUTHORITY_KINDS),
-            "fail_closed_cases": sorted(query_failclosed_contract.REQUIRED_FAIL_CLOSED_CASES),
+            "fail_closed_cases": list(query_failclosed_contract.REQUIRED_FAIL_CLOSED_CASE_SEQUENCE),
         }
         for key, expected in expected_report_fields.items():
             if payload.get(key) != expected:

@@ -455,7 +455,7 @@ def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers:
         protected_root=SERVER_ROOT,
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
-    if not status.resolved.is_file():
+    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
         return
     try:
         payload = json.loads(status.resolved.read_text(encoding="utf-8"))

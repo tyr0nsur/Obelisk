@@ -93,11 +93,19 @@ This file is an active routing table only. Durable evidence belongs in
   exact composed `command_chat_response_public_readiness` report and rejects raw
   `obelisk.reflection-snapshot-readiness.v1` as a dependency artifact. Route gate remains
   planning-only and still blocks at `approved_runtime_evidence_missing`.
+- 2026-06-02 identity/permissions evidence-gate hardening: the permissions/admin
+  query fail-closed checker now rejects ABI order drift and duplicates for query fields,
+  decision fields/results, fail-closed cases, and reason flags, including flag-name to
+  bit-index drift. Permissions/admin public readiness now fingerprints the sequence-aware
+  report. Player-identity first-evidence request diagnosis preserves observer env parse
+  blockers, and the runtime window-manifest checker no longer reads protected or
+  non-approved request-pack paths while trying to validate sidecars. Validation passed
+  with the P0 route suite; route gate remains planning-only and SDK completion still fails
+  closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
 - Deferred audited guardrails: player-identity approved evidence should rerun or strongly
-  verify its window/request sidecars; first-evidence request diagnosis should preserve env
-  parse blockers; permissions/admin should validate cache generation semantics, header
-  alias/protected-path coverage, and query field ordering/duplicates; SDK v1 completion
-  should reject weak non-canonical demand-family equivalents.
+  verify its window/request sidecars beyond path/hash checks; permissions/admin should
+  validate cache generation semantics and expand public header alias/protected-path
+  coverage; SDK v1 completion should reject weak non-canonical demand-family equivalents.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

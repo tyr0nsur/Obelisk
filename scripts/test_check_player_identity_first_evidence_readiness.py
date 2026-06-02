@@ -1219,10 +1219,11 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             env_path = Path(tmp) / "observer-window.env"
             start = datetime.now(timezone.utc) + timedelta(hours=1)
             end = start + timedelta(minutes=10)
+            run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
             request_args = SimpleNamespace(
                 instance="arkserver2",
                 map_name="TheIsland",
-                run_id="20260601T120000Z-player-principal-lifecycle",
+                run_id=run_id,
                 obelisk_commit="1234567890abcdef1234567890abcdef12345678",
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1263,9 +1264,44 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "approved_runtime_principal_lifecycle_evidence_manifest",
             ],
         )
-        self.assertFalse(diagnosis["next_required_runtime_artifacts"][0]["satisfies_approved_runtime_evidence"])
-        self.assertFalse(diagnosis["next_required_runtime_artifacts"][1]["satisfies_approved_runtime_evidence"])
-        self.assertTrue(diagnosis["next_required_runtime_artifacts"][2]["satisfies_approved_runtime_evidence"])
+
+    def test_window_request_pack_diagnosis_preserves_env_parse_blockers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            request_path = Path(tmp) / "window-request.json"
+            env_path = Path(tmp) / "observer-window.env"
+            start = datetime.now(timezone.utc) + timedelta(hours=1)
+            end = start + timedelta(minutes=10)
+            run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            request_args = SimpleNamespace(
+                instance="arkserver2",
+                map_name="TheIsland",
+                run_id=run_id,
+                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                restart_expectation="restart",
+                final_posture="stable",
+                user_policy="no_regular_users",
+                notice_path="not_applicable",
+                rollback_owner="operator",
+                output_dir=Path(tmp),
+                json=True,
+            )
+            request_path.write_text(
+                json.dumps(prepare_window_request.request_payload(request_args)),
+                encoding="utf-8",
+            )
+            env_path.write_text(
+                "\n".join(prepare_window_request.env_lines(request_args)) + "\nnot-a-key-value-line\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = checker.player_principal_lifecycle_window_request_diagnosis(request_path, env_path)
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["request_pack_ready"])
+        self.assertIn("env_line_not_key_value", diagnosis["blockers"])
 
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

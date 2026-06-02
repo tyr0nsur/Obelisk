@@ -5,20 +5,60 @@ from __future__ import annotations
 
 import json
 import hashlib
+import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+SPEC = importlib.util.spec_from_file_location("check_player_identity_runtime_principal_lifecycle_window_manifest", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+CHECKER = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = CHECKER
+SPEC.loader.exec_module(CHECKER)
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
 GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+
+
+def future_window_fields() -> dict[str, str]:
+    start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+    capture_start = start + timedelta(minutes=1)
+    capture_end = start + timedelta(minutes=8)
+    rollback_end = start + timedelta(minutes=10)
+    run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+    return {
+        "run_id": run_id,
+        "approved_window_start_utc": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "approved_window_end_utc": rollback_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "actual_capture_start_utc": capture_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "actual_capture_end_utc": capture_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "rollback_start_utc": capture_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "rollback_end_utc": rollback_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+def rewrite_lines_for_window(lines: list[str], fields: dict[str, str]) -> list[str]:
+    rewritten = []
+    for line in lines:
+        if "=" not in line:
+            rewritten.append(line)
+            continue
+        key, value = line.split("=", 1)
+        if key in fields:
+            value = fields[key]
+        value = value.replace(RUN_ID, fields["run_id"])
+        rewritten.append(f"{key}={value}")
+    return rewritten
 
 
 def manifest_lines(**overrides: str | None) -> list[str]:
@@ -226,13 +266,15 @@ class WindowManifestCheckerTests(unittest.TestCase):
             self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
         with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
             root = Path(tmp)
-            exact_dir = root / "live-validation-logs" / RUN_ID
+            window_fields = future_window_fields()
+            run_id = window_fields["run_id"]
+            exact_dir = root / "live-validation-logs" / run_id
             exact_log = exact_dir / "Obelisk.log"
             exact_manifest = exact_dir / "window-manifest.env"
             exact_dir.mkdir(parents=True, exist_ok=True)
             rewritten_lines = []
-            for line in lines:
-                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+            for line in rewrite_lines_for_window(lines, window_fields):
+                if line == f"copied_log_path=live-validation-logs/{run_id}/Obelisk.log":
                     rewritten_lines.append(f"copied_log_path={exact_log}")
                 else:
                     rewritten_lines.append(line)
@@ -377,6 +419,39 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("copied_log_path_under_protected_server_root", report["blockers"])
         self.assertEqual(report["next_blocker"], "window_manifest_not_accepted")
         self.assertFalse(report["ready"])
+
+    def test_validate_request_pack_does_not_read_protected_request_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected = root / "protected"
+            approved = root / "approved"
+            protected.mkdir()
+            approved.mkdir()
+            request_pack = protected / "window-request.json"
+            request_pack.write_text("{not json", encoding="utf-8")
+            manifest_path = approved / "window-manifest.env"
+            fields = {"request_pack_path": str(request_pack)}
+            blockers: list[dict[str, object]] = [
+                {
+                    "reason": "request_pack_path_under_protected_server_root",
+                    "label": "request_pack_path",
+                }
+            ]
+
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = protected
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (approved,)
+                CHECKER.validate_request_pack(fields, manifest_path, blockers)
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("request_pack_path_under_protected_server_root", reasons)
+        self.assertNotIn("request_pack_json_invalid", reasons)
+        self.assertNotIn("request_pack_schema_mismatch", reasons)
 
     def test_rejects_missing_copied_log_and_placeholder_sha(self) -> None:
         result = self.run_checker(

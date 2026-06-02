@@ -736,7 +736,18 @@ def validate_query_contract(contract: Any, blockers: list[dict[str, Any]]) -> li
     missing = REQUIRED_QUERY_FIELDS - set(names)
     if missing:
         add(blockers, "query_fields_missing_required", "$.query_contract.fields", missing=sorted(missing))
-    return sorted(names)
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        add(blockers, "query_fields_duplicate", "$.query_contract.fields", fields=duplicates)
+    if names != list(REQUIRED_QUERY_FIELD_SEQUENCE):
+        add(
+            blockers,
+            "query_fields_sequence_mismatch",
+            "$.query_contract.fields",
+            expected=list(REQUIRED_QUERY_FIELD_SEQUENCE),
+            value=names,
+        )
+    return names
 
 
 def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) -> tuple[list[str], list[str], list[str]]:
@@ -772,6 +783,17 @@ def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) ->
                 "$.decision_contract.decision_fields",
                 missing=sorted(missing),
             )
+        duplicates = sorted({name for name in field_names if field_names.count(name) > 1})
+        if duplicates:
+            add(blockers, "decision_fields_duplicate", "$.decision_contract.decision_fields", fields=duplicates)
+        if field_names != list(REQUIRED_DECISION_FIELD_SEQUENCE):
+            add(
+                blockers,
+                "decision_fields_sequence_mismatch",
+                "$.decision_contract.decision_fields",
+                expected=list(REQUIRED_DECISION_FIELD_SEQUENCE),
+                value=field_names,
+            )
 
     result_names: list[str] = []
     results = contract.get("results")
@@ -797,6 +819,17 @@ def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) ->
     missing_results = REQUIRED_DECISIONS - set(result_names)
     if missing_results:
         add(blockers, "decision_results_missing_required", "$.decision_contract.results", missing=sorted(missing_results))
+    duplicates = sorted({name for name in result_names if result_names.count(name) > 1})
+    if duplicates:
+        add(blockers, "decision_results_duplicate", "$.decision_contract.results", decisions=duplicates)
+    if result_names != list(REQUIRED_DECISION_SEQUENCE):
+        add(
+            blockers,
+            "decision_results_sequence_mismatch",
+            "$.decision_contract.results",
+            expected=list(REQUIRED_DECISION_SEQUENCE),
+            value=result_names,
+        )
 
     provenance = contract.get("provenance_fields")
     if not isinstance(provenance, list):
@@ -822,8 +855,11 @@ def validate_decision_contract(contract: Any, blockers: list[dict[str, Any]]) ->
                 "$.decision_contract.provenance_fields",
                 missing=sorted(missing),
             )
+        duplicates = sorted({name for name in provenance_names if provenance_names.count(name) > 1})
+        if duplicates:
+            add(blockers, "provenance_fields_duplicate", "$.decision_contract.provenance_fields", fields=duplicates)
 
-    return sorted(result_names), sorted(field_names), sorted(provenance_names)
+    return result_names, field_names, sorted(provenance_names)
 
 
 def validate_authority_kind_list(
@@ -847,7 +883,7 @@ def validate_authority_kind_list(
     unexpected = set(names) - required
     if unexpected:
         add(blockers, unexpected_reason, label, authority_kinds=sorted(unexpected))
-    return sorted(names)
+    return names
 
 
 def validate_authority_policy(policy: Any, blockers: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
@@ -1058,7 +1094,18 @@ def validate_fail_closed_cases(cases: Any, blockers: list[dict[str, Any]]) -> li
     missing = REQUIRED_FAIL_CLOSED_CASES - set(names)
     if missing:
         add(blockers, "fail_closed_cases_missing_required", "$.fail_closed_cases", missing=sorted(missing))
-    return sorted(names)
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        add(blockers, "fail_closed_cases_duplicate", "$.fail_closed_cases", cases=duplicates)
+    if names != list(REQUIRED_FAIL_CLOSED_CASE_SEQUENCE):
+        add(
+            blockers,
+            "fail_closed_cases_sequence_mismatch",
+            "$.fail_closed_cases",
+            expected=list(REQUIRED_FAIL_CLOSED_CASE_SEQUENCE),
+            value=names,
+        )
+    return names
 
 
 def validate_reason_flags(contract: Any, blockers: list[dict[str, Any]]) -> list[str]:
@@ -1146,9 +1193,32 @@ def validate_reason_flags(contract: Any, blockers: list[dict[str, Any]]) -> list
     missing = REQUIRED_FAIL_CLOSED_CASES - set(names)
     if missing:
         add(blockers, "reason_flags_missing_required", f"{label}.flags", missing=sorted(missing))
+    name_duplicates = sorted({name for name in names if names.count(name) > 1})
+    if name_duplicates:
+        add(blockers, "reason_flags_duplicate", f"{label}.flags", flags=name_duplicates)
+    if names != list(REQUIRED_REASON_FLAG_SEQUENCE):
+        add(
+            blockers,
+            "reason_flags_sequence_mismatch",
+            f"{label}.flags",
+            expected=list(REQUIRED_REASON_FLAG_SEQUENCE),
+            value=names,
+        )
     duplicates = sorted({bit for bit in bit_indexes if bit_indexes.count(bit) > 1})
     if duplicates:
         add(blockers, "reason_flag_bit_index_duplicate", f"{label}.flags", bit_indexes=duplicates)
+    expected_bit_by_name = {name: index for index, name in enumerate(REQUIRED_REASON_FLAG_SEQUENCE)}
+    for name, bit_index in zip(names, bit_indexes):
+        expected_bit = expected_bit_by_name.get(name)
+        if expected_bit is not None and bit_index != expected_bit:
+            add(
+                blockers,
+                "reason_flag_bit_index_name_mismatch",
+                f"{label}.flags",
+                flag=name,
+                expected=expected_bit,
+                value=bit_index,
+            )
     expected_bits = set(range(len(REQUIRED_REASON_FLAG_SEQUENCE)))
     actual_bits = set(bit_indexes)
     if actual_bits and actual_bits != expected_bits:
@@ -1159,7 +1229,7 @@ def validate_reason_flags(contract: Any, blockers: list[dict[str, Any]]) -> list
             missing=sorted(expected_bits - actual_bits),
             unexpected=sorted(actual_bits - expected_bits),
         )
-    return sorted(names)
+    return names
 
 
 def validate_negative_exclusions(exclusions: Any, blockers: list[dict[str, Any]]) -> None:

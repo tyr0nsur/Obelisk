@@ -140,12 +140,49 @@ Validation:
 Deferred audit findings for future focused rounds:
 
 - Player-identity approved evidence should rerun or strongly verify the window manifest
-  and request-pack sidecars instead of trusting embedded metadata and hashes alone.
-- `check_player_identity_first_evidence_readiness.py` should preserve env parse blockers
-  from the request checker when producing combined request-pack diagnosis.
-- Permissions/admin should validate cache generation/scope invalidation semantics, expand
-  public header alias/protected-path coverage, and enforce query-field ordering and
-  duplicate rejection in the query fail-closed contract checker.
+  and request-pack sidecars beyond path/hash checks before accepting promoted runtime
+  evidence.
+- Permissions/admin should validate cache generation/scope invalidation semantics and
+  expand public header alias/protected-path coverage.
 - `scripts/check_public_sdk_v1_completion.py` should reject weak non-canonical demand
   family equivalents unless a reviewed allowlist and surface-specific evidence prove the
   equivalent is legitimate.
+
+## Identity And Permissions Evidence-Gate Hardening
+
+A follow-up supervised audit round closed several high-value offline guardrails without
+changing runtime or SDK readiness:
+
+- `scripts/check_permissions_admin_query_failclosed_contract.py` now rejects duplicate and
+  reordered query fields, decision fields/results, fail-closed cases, and reason flags.
+  Reason flags must also keep the canonical flag-name to bit-index mapping.
+- `scripts/check_permissions_admin_public_readiness.py` now fingerprints the
+  sequence-aware query fail-closed checker report, so fabricated readiness JSON cannot
+  pass by presenting sorted or drifted contract lists.
+- `scripts/check_player_identity_first_evidence_readiness.py` preserves observer env parse
+  blockers from the player-principal lifecycle request checker when reporting request-pack
+  diagnosis.
+- `scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py` no longer
+  reads protected or non-approved request-pack paths while validating sidecars. This keeps
+  protected-path blockers from being masked by JSON/schema validation side effects.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+  passed with 28 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_query_failclosed_contract scripts.test_check_permissions_admin_public_readiness`
+  passed with 73 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+  passed with 59 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate scripts.test_check_permissions_admin_query_failclosed_contract scripts.test_check_permissions_admin_public_readiness scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+  passed with 147 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+This hardening is routing and evidence-gate hygiene only. It does not approve runtime
+work, public permissions/admin ABI, public identity, command replies, release readiness,
+or a stable SDK claim.

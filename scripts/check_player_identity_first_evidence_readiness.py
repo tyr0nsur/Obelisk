@@ -1242,12 +1242,13 @@ def player_principal_lifecycle_window_request_diagnosis(
         return {**base, "blockers": blockers}
     try:
         payload = player_principal_lifecycle_window_request.read_json(request_path)
-        env = player_principal_lifecycle_window_request.read_env(env_path, [])
+        env_blockers: list[dict[str, Any]] = []
+        env = player_principal_lifecycle_window_request.read_env(env_path, env_blockers)
     except SystemExit as exc:
         return {**base, "blockers": ["player_principal_lifecycle_window_request_unreadable"], "error": str(exc)}
     validation = player_principal_lifecycle_window_request.validate_payload(payload, env)
     report = player_principal_lifecycle_window_request.build_report(validation)
-    blockers = [blocker["reason"] for blocker in validation.blockers]
+    blockers = [blocker["reason"] for blocker in [*env_blockers, *validation.blockers]]
     ready = not blockers and report.get("request_pack_ready") is True
     return {
         **base,

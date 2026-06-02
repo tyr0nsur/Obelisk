@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import subprocess
 import sys
@@ -15,6 +16,13 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_permissions_admin_query_failclosed_contract.py"
+
+sys.path.insert(0, str(SCRIPT_DIR))
+SPEC = importlib.util.spec_from_file_location("check_permissions_admin_query_failclosed_contract", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+CHECKER = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = CHECKER
+SPEC.loader.exec_module(CHECKER)
 
 
 def query_field(name: str, field_type: str) -> dict:
@@ -342,18 +350,18 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertEqual(
             report["query_fields"],
             [
+                "plugin_owner_token",
+                "principal_handle",
+                "principal_generation",
+                "principal_scope_flags",
                 "action",
                 "action_size",
-                "plugin_owner_token",
-                "principal_generation",
-                "principal_handle",
-                "principal_scope_flags",
-                "request_flags",
                 "resource_scope",
                 "resource_scope_size",
+                "request_flags",
             ],
         )
-        self.assertEqual(report["decisions"], ["allow", "deny", "unknown"])
+        self.assertEqual(report["decisions"], ["deny", "allow", "unknown"])
         self.assertEqual(report["decision_fields"], ["decision", "reason_flags"])
         self.assertEqual(
             report["provenance_fields"],
@@ -369,48 +377,7 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertEqual(report["allow_capable_authority_kinds"], ["runtime-local"])
         self.assertEqual(
             report["fail_closed_cases"],
-            [
-                "action_size_exceeds_max",
-                "authority_generation_mismatch",
-                "command_text_permission_claim",
-                "command_text_policy_provenance_claim",
-                "command_text_principal_claim",
-                "malformed_action_size",
-                "malformed_resource_scope_size",
-                "missing_action",
-                "missing_authority_generation",
-                "missing_authority_kind",
-                "missing_capability",
-                "missing_plugin_owner_token",
-                "missing_policy_epoch",
-                "missing_policy_source",
-                "missing_policy_source_generation",
-                "missing_principal",
-                "missing_principal_generation",
-                "missing_principal_handle",
-                "missing_principal_provenance",
-                "missing_principal_scope_flags",
-                "missing_runtime_principal_identity",
-                "operator_config_allow_capability_claim",
-                "operator_config_permission_claim",
-                "operator_config_policy_provenance_claim",
-                "operator_config_principal_claim",
-                "plugin_supplied_principal_tuple",
-                "plugin_supplied_provenance",
-                "policy_source_generation_mismatch",
-                "principal_generation_mismatch",
-                "process_mismatch",
-                "rate_limit_exceeded",
-                "resource_scope_size_exceeds_max",
-                "scope_mismatch",
-                "server_process_epoch_mismatch",
-                "stale_principal",
-                "unknown_authority",
-                "unknown_plugin_owner_token",
-                "unloading_plugin_owner_token",
-                "unsupported_principal_scope_flags",
-                "zero_plugin_owner_token",
-            ],
+            list(CHECKER.REQUIRED_FAIL_CLOSED_CASE_SEQUENCE),
         )
         self.assertEqual(report["reason_flags"], report["fail_closed_cases"])
 
@@ -507,6 +474,19 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1)
                 self.assertIn("query_fields_missing_required", report["blockers"])
 
+    def test_rejects_reordered_or_duplicate_query_fields(self) -> None:
+        payload = manifest()
+        fields = payload["query_contract"]["fields"]
+        fields.append(copy.deepcopy(fields[1]))
+        fields.append(fields.pop(0))
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("query_fields_duplicate", report["blockers"])
+        self.assertIn("query_fields_sequence_mismatch", report["blockers"])
+
     def test_rejects_malformed_action_and_action_size_field_types(self) -> None:
         payload = manifest()
         for field in payload["query_contract"]["fields"]:
@@ -520,6 +500,21 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("query_field_type_mismatch", report["blockers"])
+
+    def test_rejects_reordered_or_duplicate_decision_fields_and_results(self) -> None:
+        payload = manifest()
+        payload["decision_contract"]["decision_fields"] = ["reason_flags", "decision", "decision"]
+        payload["decision_contract"]["results"].append(copy.deepcopy(payload["decision_contract"]["results"][0]))
+        payload["decision_contract"]["results"].append(payload["decision_contract"]["results"].pop(0))
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("decision_fields_duplicate", report["blockers"])
+        self.assertIn("decision_fields_sequence_mismatch", report["blockers"])
+        self.assertIn("decision_results_duplicate", report["blockers"])
+        self.assertIn("decision_results_sequence_mismatch", report["blockers"])
 
     def test_rejects_missing_decision_field_and_provenance_fields(self) -> None:
         payload = manifest()
@@ -586,6 +581,31 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("reason_flag_consumer_result_not_denied_or_unknown", report["blockers"])
         self.assertIn("reason_flag_allow_not_forbidden", report["blockers"])
         self.assertIn("reason_flag_not_fail_closed", report["blockers"])
+
+    def test_rejects_duplicate_or_reordered_fail_closed_cases(self) -> None:
+        payload = manifest()
+        payload["fail_closed_cases"].append(copy.deepcopy(payload["fail_closed_cases"][0]))
+        payload["fail_closed_cases"].append(payload["fail_closed_cases"].pop(0))
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("fail_closed_cases_duplicate", report["blockers"])
+        self.assertIn("fail_closed_cases_sequence_mismatch", report["blockers"])
+
+    def test_rejects_reason_flag_name_order_and_bit_name_drift(self) -> None:
+        payload = manifest()
+        flags = payload["fail_closed_reason_flags"]["flags"]
+        flags[0], flags[1] = flags[1], flags[0]
+        flags[2]["bit_index"], flags[3]["bit_index"] = flags[3]["bit_index"], flags[2]["bit_index"]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("reason_flags_sequence_mismatch", report["blockers"])
+        self.assertIn("reason_flag_bit_index_name_mismatch", report["blockers"])
 
     def test_rejects_allow_without_policy_provenance(self) -> None:
         payload = manifest()
