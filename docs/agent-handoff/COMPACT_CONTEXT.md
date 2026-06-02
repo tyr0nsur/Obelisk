@@ -1131,6 +1131,24 @@ priorities, and do not use history files as the active source of truth.
   valid/planning-only, and SDK JSON failed closed as expected with
   `approved_runtime_evidence_missing`, SDK 0/12, P0 0/4, `stable_claim_allowed=false`.
   No runtime/server operation was performed.
+- 2026-06-02 supervised 4-agent round after slots were cleared: SDK/P0, live-ops,
+  reversing/offline, and runtime/ABI auditors ran read-only. Integrated offline-only
+  findings: capture-plan/runtime brief docs now require prepared request packs,
+  `prepared_at_utc`, completed receipt timing after preparation and before window start,
+  sibling request/receipt/preflight sidecars, and approved-evidence bundle replay instead
+  of raw copied-log consumption; window-manifest tests reject receipts approved at window
+  start; `docs/public_sdk_surfaces.json` and SDK completion checker now require the
+  player-identity surface to state that request packs, preflight readiness, window
+  manifests, observer env files, and operator approval receipts are operational
+  preparation only and do not satisfy approved runtime principal lifecycle evidence.
+  Reversing audit rejected broad FName/GObjects/core/admin/lifecycle rediscovery as
+  non-advancing. Pending runtime/ABI follow-up from the auditor: inspect/fix
+  PluginManager init-failure retention so cleanup-failure mapped plugins cannot be
+  stranded outside `UnloadAll` retry. Validation stayed offline-only: 189
+  request/manifest/approved/bundle tests OK, 23 research doc guardrails OK, 179 SDK
+  completion tests OK, route gate JSON valid/planning-only, and SDK JSON failed closed
+  as expected with `approved_runtime_evidence_missing`, SDK 0/12, P0 0/4,
+  `stable_claim_allowed=false`. No runtime/server operation was performed.
 
 ## Agent Coordination
 

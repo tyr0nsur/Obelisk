@@ -512,6 +512,27 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["operator_approval_receipt"]["verified"])
         self.assertIn("operator_approval_receipt_approved_before_request_prepared", report["blockers"])
 
+    def test_rejects_receipt_approved_at_window_start(self) -> None:
+        def mutate_receipt(exact_dir: Path, fields: dict[str, str]) -> None:
+            receipt = Path(fields["operator_approval_receipt_path"])
+            if not receipt.is_absolute():
+                receipt = exact_dir / receipt
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["operator_completion"]["approval_recorded_at_utc"] = fields["approved_window_start_utc"]
+            receipt.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate_receipt,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["operator_approval_receipt"]["verified"])
+        self.assertIn("operator_approval_receipt_approved_at_or_after_window_start", report["blockers"])
+
     def test_rejects_operator_approval_receipt_completion_metadata_drift(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:
             receipt_path = Path(fields["operator_approval_receipt_path"])

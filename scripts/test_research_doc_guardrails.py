@@ -704,6 +704,17 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         text = note.read_text(encoding="utf-8")
         log_copying = text.split("## Log Copying", 1)[1].split("## Manifest And Checker", 1)[0]
 
+        self.assertIn("prepare_player_principal_lifecycle_window_request.py", text)
+        self.assertIn("check_player_principal_lifecycle_window_request.py", text)
+        self.assertIn("prepared_at_utc", text)
+        self.assertIn("approval_recorded_at_utc", text)
+        self.assertIn("--map <map> \\\n  --mode stable", text)
+        self.assertIn("--target-map <map>", text)
+        self.assertIn("--mode observer-window", text)
+        self.assertIn("--env-file /servidor/ark/workspace-offline/live-validation-logs/<run-id>/observer-window.env", text)
+        self.assertIn("--window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env", text)
+        self.assertIn("--copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log", text)
+        self.assertIn("--evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>", text)
         self.assertIn(
             "check_player_identity_runtime_principal_lifecycle_window_manifest.py",
             log_copying,

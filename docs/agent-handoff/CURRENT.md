@@ -208,13 +208,12 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest delegated/local rounds used handoff/workflow/live-ops/continuous-learning and
-  read-only reversing skills. Integrated: approved runtime evidence is contract-review
-  input only; private-candidate drift/forbidden identity exposure are guarded; SDK/P0
-  reports expose non-counting rows and current route blockers; lifecycle request preflight
-  rejects public ABI/header/list overclaims; window sidecars must sit beside the copied
-  `window-manifest.env`; request packs now bind `prepared_at_utc` and reject receipts
-  approved before preparation or at/after window start. Fresh sub-agent verification was
-  attempted again but blocked by agent thread limit; lead integrated locally. Default
-  route/SDK remain fail-closed:
+  read-only reversing/runtime skills. Integrated: lifecycle request/receipt freshness,
+  sidecar-beside-manifest binding, SDK/P0 non-counting route visibility, capture-plan
+  docs/tests, and SDK manifest wording that request packs, preflight, manifests, env
+  files, and approval receipts do not satisfy approved runtime principal lifecycle
+  evidence. Four subagents ran this round; no reversing-only scan was useful. Pending
+  runtime/ABI follow-up: audit PluginManager init-failure retention so cleanup failures
+  cannot strand a mapped plugin outside `UnloadAll` retry. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`. No runtime/server op.

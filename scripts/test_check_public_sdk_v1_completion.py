@@ -1088,6 +1088,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             sections["next_v1_work"]["route_gate_current_blockers"],
             ["approved_runtime_evidence_missing"],
         )
+        self.assertEqual(payload["player_identity_request_pack_non_evidence_terms_missing"], [])
         self.assertEqual(
             sections["promoted_demand_gaps"]["minimum_promoted_demand_family_gaps"],
             payload["minimum_promoted_demand_family_gaps"],
@@ -1575,6 +1576,30 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn(omitted, payload["missing_canonical_completion_blockers"])
         self.assertEqual(payload["v1_sdk_progress"]["completion_blocker_total"], 12)
         self.assertIn(omitted, [row["surface"] for row in payload["v1_sdk_blocker_outcomes"]])
+
+    def test_player_identity_manifest_must_keep_request_pack_non_evidence_boundary(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        for surface in manifest["surfaces"]:
+            if surface["id"] == "obelisk.player_identity.v1":
+                surface["blockers"] = [
+                    item
+                    for item in surface.get("blockers", [])
+                    if "Prepared request packs" not in item
+                ]
+                break
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = self.run_checker("--manifest", str(manifest_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("player_identity_request_pack_non_evidence_manifest_terms_missing", payload["blockers"])
+        self.assertIn("prepared_at_utc", payload["player_identity_request_pack_non_evidence_terms_missing"])
+        self.assertIn(
+            "do not satisfy approved runtime principal lifecycle evidence",
+            payload["player_identity_request_pack_non_evidence_terms_missing"],
+        )
 
     def test_human_output_names_actionable_v1_blocker_details(self) -> None:
         result = self.run_checker(check=False)

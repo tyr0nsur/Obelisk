@@ -23,10 +23,12 @@ Approve one consume-only PlayerPrincipalLifecycleObserver runtime evidence windo
 target instance=<instance-id>
 target map=<map>
 run_id=<YYYYMMDDThhmmssZ-player-principal-lifecycle>
+prepared_at_utc=<request-pack prepared_at_utc>
 ARK binary path=<path>
 ARK binary SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 Obelisk commit/build=<reviewed build containing PlayerPrincipalLifecycleObserver>
 approved UTC window=<start/end>
+operator approval receipt=<completed operator-approval-receipt.json with approval_recorded_at_utc after prepared_at_utc and before the approved window start>
 restart expectation=<none|start|restart>
 final posture=stable
 connected-user policy=<no_regular_users|operator_approved_beta_users>
@@ -118,6 +120,12 @@ copied, generate the initial sidecar with
 the approved-workspace copy rather than manual transcription. The manifest checker
 validates offline sidecar posture only; it does not approve the run and cannot substitute
 for the wrapper/preflight marker exclusivity checks.
+
+The same copied evidence directory must also contain sibling request/replay sidecars:
+`window-request.json`, `observer-window.env`, completed `operator-approval-receipt.json`,
+`preflight-pre.json`, and `preflight-post.json`. The receipt must bind the exact request
+pack digest and reject stale timing: approval before `prepared_at_utc` or at/after the
+approved window start is not valid current-turn approval.
 
 The manifest must record the exact target, approved and actual timestamps, copied log
 path/SHA, pre/post posture, rollback timestamps, rollback delta, `log_budget=10`,

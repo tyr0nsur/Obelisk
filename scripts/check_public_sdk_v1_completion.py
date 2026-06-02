@@ -331,6 +331,14 @@ PROMOTION_EVIDENCE_REQUIRED_TERMS = {
         "copied append-only command/reply ABI with capability gates, owner-scoped cleanup, and SDK consumer tests",
     ),
 }
+PLAYER_IDENTITY_REQUEST_PACK_NON_EVIDENCE_TERMS = (
+    "prepared_at_utc",
+    "request packs",
+    "preflight readiness",
+    "window manifests",
+    "operator approval receipts",
+    "do not satisfy approved runtime principal lifecycle evidence",
+)
 REQUIRED_PROMOTED_SURFACE_DEPENDENCIES = {
     "obelisk.permissions_admin.v1": (
         "obelisk.player_identity.v1",
@@ -3338,6 +3346,20 @@ def missing_required_dependency_declarations(
     return missing
 
 
+def player_identity_request_pack_non_evidence_terms_missing(
+    surfaces_by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    surface = surfaces_by_id.get("obelisk.player_identity.v1")
+    if not isinstance(surface, dict):
+        return list(PLAYER_IDENTITY_REQUEST_PACK_NON_EVIDENCE_TERMS)
+    text = json.dumps(surface, sort_keys=True).lower()
+    return [
+        term
+        for term in PLAYER_IDENTITY_REQUEST_PACK_NON_EVIDENCE_TERMS
+        if term.lower() not in text
+    ]
+
+
 def v1_dependency_sequence_mismatches(
     manifest: dict[str, Any],
     surfaces_by_id: dict[str, dict[str, Any]],
@@ -4199,6 +4221,9 @@ def build_report(
     promoted_missing_required_evidence_terms: dict[str, list[str]] = {}
     promoted_missing_structured_evidence: dict[str, list[str]] = {}
     non_promoted_with_public_abi: list[str] = []
+    player_identity_request_pack_non_evidence_missing = (
+        player_identity_request_pack_non_evidence_terms_missing(surfaces_by_id)
+    )
     unpromoted_required_dependency_chain = [
         surface_id
         for surface_id in CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN
@@ -4374,6 +4399,8 @@ def build_report(
         blockers.append("promoted_surface_dependency_unresolved")
     if missing_dependency_declarations:
         blockers.append("required_surface_dependency_declaration_missing")
+    if player_identity_request_pack_non_evidence_missing:
+        blockers.append("player_identity_request_pack_non_evidence_manifest_terms_missing")
     if dependency_sequence_mismatches:
         blockers.append("v1_dependency_sequence_mismatch")
     if required_dependency_chain != list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN):
@@ -4596,6 +4623,9 @@ def build_report(
             surface_id: sorted(set(dependencies))
             for surface_id, dependencies in sorted(missing_dependency_declarations.items())
         },
+        "player_identity_request_pack_non_evidence_terms_missing": (
+            player_identity_request_pack_non_evidence_missing
+        ),
         "v1_dependency_sequence": as_string_list(manifest.get("v1_dependency_sequence")),
         "v1_dependency_sequence_expected": list(CANONICAL_V1_DEPENDENCY_SEQUENCE),
         "v1_dependency_sequence_mismatches": sorted(set(dependency_sequence_mismatches)),
@@ -4858,6 +4888,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "promoted_surface_required_evidence_terms_missing": [
             "Promoted surfaces are missing required named evidence terms.",
             "Action: add the required terms to the manifest evidence or keep the surface non-promoted.",
+        ],
+        "player_identity_request_pack_non_evidence_manifest_terms_missing": [
+            "The player identity surface is missing the request-pack non-evidence boundary.",
+            f"Missing terms: {format_human_list(report.get('player_identity_request_pack_non_evidence_terms_missing'))}.",
+            "Action: restore wording that freshness-bound request packs, preflight, manifests, env sidecars, and approval receipts do not satisfy approved runtime principal lifecycle evidence.",
         ],
         "promoted_surface_structured_evidence_missing": [
             "Promoted dependency-chain surfaces lack structured runtime, readiness, or executed-test evidence.",

@@ -185,17 +185,34 @@ marker/env changes, rollback owner, copied-log destination, stable-posture verif
 and final shutdown or restored-posture expectation. This note does not grant that
 approval.
 
-After an approved run, copy the bounded observer log to a non-protected offline evidence
-root and analyze the copied file:
+After an approved run, copy the bounded observer log and all request sidecars to a
+non-protected offline evidence root. Do not consume a raw copied log by itself. The
+post-window evidence path is accepted only when the same run directory contains the
+freshness-bound `window-request.json`, `observer-window.env`, completed
+`operator-approval-receipt.json`, checked `window-manifest.env`, and pre/post preflight
+JSON sidecars beside the copied log. The request pack must include `prepared_at_utc`, and
+the completed receipt's `approval_recorded_at_utc` must be after `prepared_at_utc` and
+before the approved window start.
+
+Validate the copied window manifest and then build the approved runtime evidence bundle:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/analyze_runtime_observer_log.py \
-  <copied-redacted-observer-log> \
-  > <offline-evidence-root>/player-principal-runtime-observer-summary.json
-
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_runtime_principal_lifecycle_evidence.py \
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py \
   --json \
-  <offline-evidence-root>/player-principal-runtime-principal-lifecycle.json
+  --post-window-replay \
+  <offline-evidence-root>/window-manifest.env
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py \
+  --copied-log <offline-evidence-root>/Obelisk.log \
+  --window-manifest <offline-evidence-root>/window-manifest.env \
+  --output-dir <offline-evidence-root>/approved-bundle \
+  --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
+  --reviewed-by <reviewer> \
+  --json
+
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py \
+  --json \
+  <offline-evidence-root>/approved-bundle/approved-runtime-principal-lifecycle-evidence.json
 ```
 
 The reviewed manifest must remain `promotion_ready=false`, `public_sdk_ready=false`, and

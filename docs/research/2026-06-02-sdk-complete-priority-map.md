@@ -2371,3 +2371,54 @@ tool reported agent thread limit reached; lead integration continued locally.
 No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
+
+## Capture-Plan And SDK Manifest Non-Evidence Guardrail
+
+A supervised four-agent read-only round split SDK/P0 route auditing, live-ops/request-pack
+auditing, reversing/offline evidence triage, and runtime/ABI guardrail review. The lead
+integrated the bounded offline findings.
+
+Integrated changes:
+
+- `docs/research/2026-06-01-player-principal-runtime-capture-plan.md`,
+  `docs/research/2026-06-01-player-principal-offline-to-runtime-plan.md`, and
+  `docs/research/2026-06-01-player-principal-runtime-window-brief-template.md` now route
+  future runtime consumption through prepared request packs, `prepared_at_utc`, completed
+  receipt timing after preparation and before window start, sidecars beside copied
+  `window-manifest.env`, post-window replay, and approved-evidence bundle checks instead
+  of raw copied-log consumption.
+- `test_check_player_identity_runtime_principal_lifecycle_window_manifest.py` now covers
+  the sibling negative case where a completed receipt is approved at the window start.
+- `docs/public_sdk_surfaces.json` now states that prepared request packs, preflight
+  readiness, window manifests, observer env files, and operator approval receipts are
+  freshness-bound operational preparation only and do not satisfy approved runtime
+  principal lifecycle evidence.
+- `check_public_sdk_v1_completion.py` enforces that player-identity manifest wording via
+  `player_identity_request_pack_non_evidence_manifest_terms_missing`.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+  passed 189 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_research_doc_guardrails`
+  passed 23 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 179 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected, with SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`;
+  `player_identity_request_pack_non_evidence_terms_missing=[]`.
+
+Rejected reversing work: broad FName/GObjects/core/admin/lifecycle rediscovery and
+ResourceHandle zero-serial/serial/GObjects scans do not advance the active P0 blocker.
+The missing item remains approved copied runtime principal lifecycle evidence under a
+current-turn approved live-ops window.
+
+Pending runtime/ABI follow-up: audit `PluginManager` init-failure retention. The auditor
+reported a possible cleanup-failure path where a mapped plugin could be stranded outside
+`UnloadAll` retry if retention tracking allocation fails.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.

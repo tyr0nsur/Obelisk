@@ -85,7 +85,33 @@ final_posture=stable
 copied_evidence_dir=/servidor/ark/workspace-offline/live-validation-logs/<run-id>/
 ```
 
-Before any marker/env activation, run the read-only stable preflight for the same target:
+Before any marker/env activation, prepare and check the request pack offline. The
+generated request must include `prepared_at_utc`; completed receipts are valid only when
+`approval_recorded_at_utc` is after `prepared_at_utc` and before the approved window
+start.
+
+```bash
+python3 scripts/prepare_player_principal_lifecycle_window_request.py \
+  --instance <instance-id> \
+  --map <map> \
+  --run-id <run-id> \
+  --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
+  --approved-window-start-utc <YYYY-MM-DDThh:mm:ssZ> \
+  --approved-window-end-utc <YYYY-MM-DDThh:mm:ssZ> \
+  --restart-expectation restart \
+  --final-posture stable \
+  --user-policy no_regular_users \
+  --rollback-owner <operator> \
+  --output-dir /servidor/ark/workspace-offline/player-principal-preflight/<run-id> \
+  --json
+
+python3 scripts/check_player_principal_lifecycle_window_request.py \
+  /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/window-request.json \
+  --env-file /servidor/ark/workspace-offline/player-principal-preflight/<run-id>/observer-window.env \
+  --json
+```
+
+Then run the read-only stable preflight for the same target:
 
 ```bash
 scripts/check_player_principal_lifecycle_preflight.sh \
@@ -107,9 +133,13 @@ effective env snapshot:
 ```bash
 scripts/check_player_principal_lifecycle_preflight.sh \
   --instance <instance-id> \
-  --map <map> \
+  --target-map <map> \
   --mode observer-window \
   --env-file <reviewed-effective-window-env> \
+  --run-id <run-id> \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id> \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 ```
 
@@ -258,8 +288,13 @@ scripts/check_player_principal_lifecycle_preflight.sh \
 
 scripts/check_player_principal_lifecycle_preflight.sh \
   --instance <instance-id> \
-  --map <map> \
-  --mode stable \
+  --target-map <map> \
+  --mode observer-window \
+  --env-file /servidor/ark/workspace-offline/live-validation-logs/<run-id>/observer-window.env \
+  --run-id <run-id> \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id> \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 ```
 
