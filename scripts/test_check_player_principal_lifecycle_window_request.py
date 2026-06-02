@@ -73,11 +73,22 @@ def prepare_pack(output_dir: Path) -> None:
     )
 
 
-def write_completed_receipt(output_dir: Path, receipt_path: Path | None = None) -> Path:
+def add_seconds(timestamp: str, seconds: int) -> str:
+    dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(timezone.utc)
+    return (dt + timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def write_completed_receipt(
+    output_dir: Path,
+    receipt_path: Path | None = None,
+    *,
+    approved_at_utc: str | None = None,
+) -> Path:
     request_path = output_dir / "window-request.json"
     env_path = output_dir / "observer-window.env"
     operator_request_path = output_dir / "operator-approval-request.md"
     request = json.loads(request_path.read_text(encoding="utf-8"))
+    approval_time = approved_at_utc or add_seconds(request["prepared_at_utc"], 1)
     receipt = operator_approval_receipt_payload(
         request,
         request_json_path=request_path,
@@ -85,7 +96,7 @@ def write_completed_receipt(output_dir: Path, receipt_path: Path | None = None) 
         env_path=env_path,
         operator_approved=True,
         operator_reference="operator",
-        approved_at_utc="2026-06-01T00:00:00Z",
+        approved_at_utc=approval_time,
     )
     path = receipt_path or (output_dir / "operator-approval-receipt.json")
     path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
@@ -139,6 +150,8 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_ready"])
         self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
+        self.assertRegex(request["prepared_at_utc"], r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+        self.assertLess(request["prepared_at_utc"], request["approved_window"]["start_utc"])
         self.assertTrue(report["operator_request_verified"])
         self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
@@ -213,6 +226,57 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_request_pack_missing_prepared_at_utc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request.pop("prepared_at_utc")
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_missing_required", report["blockers"])
+        self.assertIn("prepared_at_utc_not_string", report["blockers"])
+
+    def test_rejects_receipt_approved_before_request_prepared(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir, approved_at_utc="2026-06-01T00:00:00Z")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_approved_before_request_prepared", report["blockers"])
+
+    def test_rejects_receipt_approved_at_or_after_window_start(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
+            receipt_path = write_completed_receipt(
+                output_dir,
+                approved_at_utc=request["approved_window"]["start_utc"],
+            )
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_approved_at_or_after_window_start", report["blockers"])
 
     def test_rejects_operator_request_markdown_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -303,6 +367,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request = json.loads(json.dumps(request).replace(old_run_id, "20260101T000000Z-player-principal-lifecycle"))
             request["approved_window"]["start_utc"] = "2026-01-01T00:00:00Z"
             request["approved_window"]["end_utc"] = "2026-01-01T00:10:00Z"
+            request["prepared_at_utc"] = "2025-12-31T23:55:00Z"
             request["run_id"] = "20260101T000000Z-player-principal-lifecycle"
             request["operator_live_ops_brief"]["start_restart_stop_window"]["start_utc"] = "2026-01-01T00:00:00Z"
             request["operator_live_ops_brief"]["start_restart_stop_window"]["end_utc"] = "2026-01-01T00:10:00Z"
@@ -318,7 +383,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            receipt_path = write_completed_receipt(output_dir)
+            receipt_path = write_completed_receipt(output_dir, approved_at_utc="2025-12-31T23:56:00Z")
             result = self.run_checker(
                 output_dir,
                 extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
@@ -342,6 +407,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request = json.loads(json.dumps(request).replace(old_run_id, "20260101T000000Z-player-principal-lifecycle"))
             request["approved_window"]["start_utc"] = "2026-01-01T00:00:00Z"
             request["approved_window"]["end_utc"] = "2026-01-01T00:10:00Z"
+            request["prepared_at_utc"] = "2025-12-31T23:55:00Z"
             request["run_id"] = "20260101T000000Z-player-principal-lifecycle"
             request["operator_live_ops_brief"]["start_restart_stop_window"]["start_utc"] = "2026-01-01T00:00:00Z"
             request["operator_live_ops_brief"]["start_restart_stop_window"]["end_utc"] = "2026-01-01T00:10:00Z"
@@ -358,7 +424,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
                 ).replace("dispatch limit=0", "dispatch limit=1"),
                 encoding="utf-8",
             )
-            receipt_path = write_completed_receipt(output_dir)
+            receipt_path = write_completed_receipt(output_dir, approved_at_utc="2025-12-31T23:56:00Z")
             result = self.run_checker(
                 output_dir,
                 check=False,

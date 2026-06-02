@@ -139,10 +139,18 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     if not copied_log_path.is_absolute():
         copied_log_path = base / copied_log_path
     window_manifest_path = base / "window-manifest.env"
+    approved_start = datetime.fromisoformat(
+        fields["approved_window_start_utc"].replace("Z", "+00:00")
+    ).astimezone(timezone.utc)
+    prepared_at_utc = fields.get(
+        "prepared_at_utc",
+        (approved_start - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
     payload = {
         "schema": "obelisk.player-principal-lifecycle-window-request.v1",
         "status": "candidate_only_request_pack",
         "approval_required": "current-turn operator-approved runtime window, not standing approval",
+        "prepared_at_utc": prepared_at_utc,
         "target": {"instance": target[0], "map": target[1]},
         "run_id": fields["run_id"],
         "ark_binary_sha256": ARK_SHA,
@@ -321,7 +329,12 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
             env_path=observer_env_path,
             operator_approved=True,
             operator_reference="test-current-turn-approval",
-            approved_at_utc=fields["approved_window_start_utc"],
+            approved_at_utc=fields.get(
+                "approval_recorded_at_utc",
+                (datetime.fromisoformat(fields["approved_window_start_utc"].replace("Z", "+00:00"))
+                .astimezone(timezone.utc)
+                - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ),
         )
         receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
         updated["operator_approval_receipt_path"] = str(receipt_path)
@@ -477,6 +490,27 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("request_pack_path_not_beside_window_manifest", report["blockers"])
         self.assertEqual(report["remaining_blockers"], ["window_manifest_not_accepted"])
         self.assertEqual(report["next_blocker"], "window_manifest_not_accepted")
+
+    def test_rejects_receipt_approved_before_request_prepared(self) -> None:
+        def mutate_receipt(exact_dir: Path, fields: dict[str, str]) -> None:
+            receipt = Path(fields["operator_approval_receipt_path"])
+            if not receipt.is_absolute():
+                receipt = exact_dir / receipt
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["operator_completion"]["approval_recorded_at_utc"] = "2026-06-01T00:00:00Z"
+            receipt.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate_receipt,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["operator_approval_receipt"]["verified"])
+        self.assertIn("operator_approval_receipt_approved_before_request_prepared", report["blockers"])
 
     def test_rejects_operator_approval_receipt_completion_metadata_drift(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:
@@ -1268,6 +1302,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 },
                 "bound_request_pack": {
                     "run_id": RUN_ID,
+                    "prepared_at_utc": "2026-06-01T11:55:00Z",
                     "target": {"instance": "arkserver2", "map": "TheIsland"},
                     "approved_window": {
                         "start_utc": "2026-06-01T12:00:00Z",
@@ -1281,7 +1316,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 "bound_artifacts": {},
                 "request_pack_digest": "not-evaluated",
                 "operator_completion": {
-                    "approval_recorded_at_utc": "2026-06-01T12:00:00Z",
+                    "approval_recorded_at_utc": "2026-06-01T11:56:00Z",
                     "approved_by_role": "operator",
                     "approval_source": "current_turn_operator_message",
                     "attestation": "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY",

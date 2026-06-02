@@ -45,11 +45,15 @@ OTHER_TEST_COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
 
 def future_window() -> dict[str, str]:
     start = WINDOW_START
+    prepared = start - timedelta(minutes=5)
+    approval = start - timedelta(minutes=4)
     actual_start = start + timedelta(minutes=1)
     actual_end = start + timedelta(minutes=9)
     end = start + timedelta(minutes=10)
     return {
         "start": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "prepared": prepared.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "approval": approval.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "actual_start": actual_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "actual_end": actual_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "end": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -181,6 +185,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             "run_id": RUN_ID,
             "status": "candidate_only_request_pack",
             "approval_required": APPROVAL_TEXT,
+            "prepared_at_utc": window["prepared"],
             "ark_binary_sha256": EXPECTED_BINARY_SHA256,
             "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
             "obelisk_commit": TEST_COMMIT,
@@ -228,7 +233,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     env_path=observer_env,
                     operator_approved=True,
                     operator_reference="test-current-turn-approval",
-                    approved_at_utc=window["start"],
+                    approved_at_utc=window["approval"],
                 ),
                 sort_keys=True,
             )

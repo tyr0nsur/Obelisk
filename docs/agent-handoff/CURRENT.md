@@ -212,8 +212,9 @@ This file is an active routing table only. Durable evidence belongs in
   input only; private-candidate drift/forbidden identity exposure are guarded; SDK/P0
   reports expose non-counting rows and current route blockers; lifecycle request preflight
   rejects public ABI/header/list overclaims; window sidecars must sit beside the copied
-  `window-manifest.env`. Fresh sub-agent verification was attempted but blocked by agent
-  thread limit; lead integrated locally. Pending: bind request-pack freshness with
-  `prepared_at_utc`. Default route/SDK remain fail-closed:
+  `window-manifest.env`; request packs now bind `prepared_at_utc` and reject receipts
+  approved before preparation or at/after window start. Fresh sub-agent verification was
+  attempted again but blocked by agent thread limit; lead integrated locally. Default
+  route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`. No runtime/server op.

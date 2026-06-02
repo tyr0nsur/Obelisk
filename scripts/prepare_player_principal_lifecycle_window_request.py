@@ -201,10 +201,12 @@ def env_lines(args: argparse.Namespace) -> list[str]:
 
 def request_payload(args: argparse.Namespace) -> dict[str, Any]:
     evidence_dir = EVIDENCE_ROOT / args.run_id
+    prepared_at_utc = datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "schema": SCHEMA,
         "status": "candidate_only_request_pack",
         "approval_required": APPROVAL_TEXT,
+        "prepared_at_utc": prepared_at_utc,
         "target": {"instance": args.instance, "map": args.map_name},
         "run_id": args.run_id,
         "ark_binary_sha256": args.binary_sha256,
@@ -405,6 +407,7 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         f"target instance={target['instance']}",
         f"target map={target['map']}",
         f"run_id={payload['run_id']}",
+        f"prepared_at_utc={payload['prepared_at_utc']}",
         f"ARK binary SHA256={payload['ark_binary_sha256']}",
         f"ARK binary path={payload['server_binary_path']}",
         f"Obelisk commit/build={payload['obelisk_commit']}",
@@ -539,6 +542,7 @@ def operator_approval_receipt_payload(
         },
         "bound_request_pack": {
             "run_id": payload["run_id"],
+            "prepared_at_utc": payload["prepared_at_utc"],
             "target": payload["target"],
             "approved_window": payload["approved_window"],
             "obelisk_commit": payload["obelisk_commit"],

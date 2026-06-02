@@ -127,6 +127,7 @@ EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCOPE_KEYS = frozenset(
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS = frozenset(
     (
         "run_id",
+        "prepared_at_utc",
         "target",
         "approved_window",
         "obelisk_commit",
@@ -788,8 +789,11 @@ def validate_operator_approval_receipt(
         add(blockers, "operator_approval_receipt_operator_completion_missing", "operator_approval_receipt_path")
         completion = {}
     approved_at = completion.get("approval_recorded_at_utc")
+    approved_at_dt = None
     if not isinstance(approved_at, str) or UTC_TIMESTAMP_RE.fullmatch(approved_at) is None:
         add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt_path")
+    else:
+        approved_at_dt = parse_utc_timestamp(approved_at)
     approved_by_role = completion.get("approved_by_role")
     if not isinstance(approved_by_role, str) or not approved_by_role.strip():
         add(blockers, "operator_approval_receipt_approved_by_role_invalid", "operator_approval_receipt_path")
@@ -845,6 +849,40 @@ def validate_operator_approval_receipt(
             )
     if bound_request.get("run_id") != fields.get("run_id"):
         add(blockers, "operator_approval_receipt_run_id_mismatch", "operator_approval_receipt_path")
+    prepared_at = request_payload.get("prepared_at_utc") if request_payload else None
+    prepared_at_dt = None
+    if not isinstance(prepared_at, str) or UTC_TIMESTAMP_RE.fullmatch(prepared_at) is None:
+        add(blockers, "operator_approval_receipt_prepared_at_utc_invalid", "operator_approval_receipt_path")
+    else:
+        prepared_at_dt = parse_utc_timestamp(prepared_at)
+    if request_payload and bound_request.get("prepared_at_utc") != prepared_at:
+        add(blockers, "operator_approval_receipt_prepared_at_utc_mismatch", "operator_approval_receipt_path")
+    approved_window_start = (
+        request_payload.get("approved_window", {}).get("start_utc")
+        if isinstance(request_payload.get("approved_window"), dict)
+        else None
+    )
+    approved_window_start_dt = (
+        parse_utc_timestamp(approved_window_start)
+        if isinstance(approved_window_start, str) and UTC_TIMESTAMP_RE.fullmatch(approved_window_start)
+        else None
+    )
+    if approved_at_dt is not None and prepared_at_dt is not None and approved_at_dt < prepared_at_dt:
+        add(
+            blockers,
+            "operator_approval_receipt_approved_before_request_prepared",
+            "operator_approval_receipt_path",
+            prepared_at_utc=prepared_at,
+            approval_recorded_at_utc=approved_at,
+        )
+    if approved_at_dt is not None and approved_window_start_dt is not None and approved_at_dt >= approved_window_start_dt:
+        add(
+            blockers,
+            "operator_approval_receipt_approved_at_or_after_window_start",
+            "operator_approval_receipt_path",
+            approved_window_start_utc=approved_window_start,
+            approval_recorded_at_utc=approved_at,
+        )
     if bound_request.get("obelisk_commit") != fields.get("obelisk_commit"):
         add(blockers, "operator_approval_receipt_obelisk_commit_mismatch", "operator_approval_receipt_path")
     if bound_request.get("ark_binary_sha256") != EXPECTED_BINARY_SHA256:

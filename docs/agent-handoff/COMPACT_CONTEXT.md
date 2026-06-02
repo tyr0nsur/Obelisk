@@ -1120,6 +1120,17 @@ priorities, and do not use history files as the active source of truth.
   Pending live-ops hardening: add prepared-request freshness provenance
   (`prepared_at_utc`) so operator approval receipts cannot replay stale request packs.
   No runtime/server operation was performed.
+- 2026-06-02 request-pack freshness hardening pass: lead attempted a new 4-agent round
+  with gpt-5.5/high, but the multi-agent tool again reported agent thread limit reached.
+  Lead integrated locally. `prepare_player_principal_lifecycle_window_request.py` now
+  emits `prepared_at_utc` in `window-request.json`, the human approval request, and
+  `bound_request_pack`; request/window checkers require it, bind it into receipt/digest
+  validation, and reject receipts approved before request preparation or at/after approved
+  window start. Validation stayed offline-only: 148 request/manifest/bundle tests OK,
+  52 approved-evidence tests OK, 178 SDK completion tests OK, route gate JSON
+  valid/planning-only, and SDK JSON failed closed as expected with
+  `approved_runtime_evidence_missing`, SDK 0/12, P0 0/4, `stable_claim_allowed=false`.
+  No runtime/server operation was performed.
 
 ## Agent Coordination
 

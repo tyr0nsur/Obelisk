@@ -184,6 +184,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         "start_utc": "2026-06-01T12:00:00Z",
         "end_utc": "2026-06-01T12:10:00Z",
     }
+    prepared_at_utc = "2026-06-01T11:55:00Z"
     request_args = type(
         "Args",
         (),
@@ -198,6 +199,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         "schema": "obelisk.player-principal-lifecycle-window-request.v1",
         "status": "candidate_only_request_pack",
         "approval_required": APPROVAL_TEXT,
+        "prepared_at_utc": prepared_at_utc,
         "target": target,
         "run_id": RUN_ID,
         "ark_binary_sha256": SHA,
@@ -247,7 +249,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
                 env_path=observer_env_path,
                 operator_approved=True,
                 operator_reference="test-current-turn-approval",
-                approved_at_utc=approved_window["start_utc"],
+                approved_at_utc="2026-06-01T11:56:00Z",
             ),
             sort_keys=True,
         )

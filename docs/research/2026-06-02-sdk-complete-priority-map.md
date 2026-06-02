@@ -2339,8 +2339,34 @@ Validation stayed offline-only:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   exited 1 as expected, with SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
 
-Pending follow-up: bind request-pack freshness with `prepared_at_utc` so a completed
-operator approval receipt cannot be replayed against stale pre-window preparation.
+Freshness follow-up integrated after this boundary pass:
+
+- `prepare_player_principal_lifecycle_window_request.py` now records `prepared_at_utc` in
+  `window-request.json`, the human approval request, and the receipt's
+  `bound_request_pack`.
+- `check_player_principal_lifecycle_window_request.py` requires `prepared_at_utc` before
+  the approved window start, includes it in the expected bound request, and rejects
+  completed receipts whose `approval_recorded_at_utc` is before request preparation or
+  at/after the approved window start.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` performs the
+  same replay-time freshness checks so window-manifest validation cannot accept a stale
+  receipt through a different path.
+
+Validation stayed offline-only after freshness hardening:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_prepare_player_principal_lifecycle_window_request scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+  passed 148 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed 52 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 178 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected, with SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+
+A fresh 4-agent delegation round was attempted for this follow-up, but the multi-agent
+tool reported agent thread limit reached; lead integration continued locally.
 
 No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
 GitHub publication, public ABI/header opening, promotion, release readiness, or

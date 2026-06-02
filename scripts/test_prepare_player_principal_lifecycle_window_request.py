@@ -129,6 +129,10 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(request["schema"], "obelisk.player-principal-lifecycle-window-request.v1")
         self.assertEqual(request["status"], "candidate_only_request_pack")
         self.assertEqual(request["approval_required"], "current-turn operator-approved runtime window, not standing approval")
+        self.assertRegex(request["prepared_at_utc"], r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+        self.assertLess(request["prepared_at_utc"], request["approved_window"]["start_utc"])
+        self.assertEqual(receipt_template["bound_request_pack"]["prepared_at_utc"], request["prepared_at_utc"])
+        self.assertIn(f"prepared_at_utc={request['prepared_at_utc']}", markdown)
         self.assertEqual(request["copied_log_path"], f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/Obelisk.log")
         replay_contract = request["post_window_replay_contract"]
         self.assertTrue(replay_contract["required"])

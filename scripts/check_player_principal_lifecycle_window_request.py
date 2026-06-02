@@ -57,6 +57,7 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
         "schema",
         "status",
         "approval_required",
+        "prepared_at_utc",
         "target",
         "run_id",
         "ark_binary_sha256",
@@ -173,6 +174,7 @@ EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCOPE_KEYS = frozenset(
 EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS = frozenset(
     (
         "run_id",
+        "prepared_at_utc",
         "target",
         "approved_window",
         "obelisk_commit",
@@ -763,6 +765,14 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             if not isinstance(value, str) or not SAFE_TOKEN_RE.fullmatch(value):
                 add(blockers, f"target_{key}_invalid", f"target.{key}")
     window = require_keys(payload.get("approved_window"), required=EXPECTED_WINDOW_KEYS, label="approved_window", blockers=blockers)
+    prepared_at_dt: datetime | None = None
+    prepared_at = payload.get("prepared_at_utc")
+    if not isinstance(prepared_at, str):
+        add(blockers, "prepared_at_utc_not_string", "prepared_at_utc")
+    else:
+        prepared_at_dt = parse_utc(prepared_at)
+        if prepared_at_dt is None:
+            add(blockers, "prepared_at_utc_invalid", "prepared_at_utc")
     if window:
         start = window.get("start_utc")
         end = window.get("end_utc")
@@ -774,6 +784,8 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "approved_window_end_utc_invalid", "approved_window.end_utc")
         if start_dt is not None and end_dt is not None and not start_dt < end_dt:
             add(blockers, "approved_window_order_invalid", "approved_window")
+        if prepared_at_dt is not None and start_dt is not None and prepared_at_dt >= start_dt:
+            add(blockers, "prepared_at_utc_not_before_approved_window", "prepared_at_utc")
         now = datetime.now(timezone.utc)
         if start_dt is not None and start_dt <= now and (end_dt is None or end_dt > now):
             add(blockers, "approved_window_already_started", "approved_window.start_utc", value=start)
@@ -888,6 +900,7 @@ def expected_bound_request_pack(payload: dict[str, Any]) -> dict[str, Any] | Non
     try:
         return {
             "run_id": payload["run_id"],
+            "prepared_at_utc": payload["prepared_at_utc"],
             "target": payload["target"],
             "approved_window": payload["approved_window"],
             "obelisk_commit": payload["obelisk_commit"],
@@ -976,8 +989,31 @@ def validate_operator_approval_receipt(
         label="operator_approval_receipt_completion",
         blockers=blockers,
     ) or {}
-    if not isinstance(completion.get("approval_recorded_at_utc"), str) or parse_utc(completion.get("approval_recorded_at_utc")) is None:
+    approval_recorded_at = completion.get("approval_recorded_at_utc")
+    approval_recorded_dt = parse_utc(approval_recorded_at) if isinstance(approval_recorded_at, str) else None
+    if approval_recorded_dt is None:
         add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt")
+    request_prepared_dt = parse_utc(payload.get("prepared_at_utc")) if isinstance(payload.get("prepared_at_utc"), str) else None
+    approved_window = payload.get("approved_window")
+    window_start_dt = None
+    if isinstance(approved_window, dict) and isinstance(approved_window.get("start_utc"), str):
+        window_start_dt = parse_utc(approved_window["start_utc"])
+    if approval_recorded_dt is not None and request_prepared_dt is not None and approval_recorded_dt < request_prepared_dt:
+        add(
+            blockers,
+            "operator_approval_receipt_approved_before_request_prepared",
+            "operator_approval_receipt",
+            prepared_at_utc=payload.get("prepared_at_utc"),
+            approval_recorded_at_utc=approval_recorded_at,
+        )
+    if approval_recorded_dt is not None and window_start_dt is not None and approval_recorded_dt >= window_start_dt:
+        add(
+            blockers,
+            "operator_approval_receipt_approved_at_or_after_window_start",
+            "operator_approval_receipt",
+            approved_window_start_utc=approved_window.get("start_utc") if isinstance(approved_window, dict) else None,
+            approval_recorded_at_utc=approval_recorded_at,
+        )
     if not isinstance(completion.get("approved_by_role"), str) or not completion.get("approved_by_role", "").strip():
         add(blockers, "operator_approval_receipt_approved_by_role_invalid", "operator_approval_receipt")
     if completion.get("approval_source") != "current_turn_operator_message":
