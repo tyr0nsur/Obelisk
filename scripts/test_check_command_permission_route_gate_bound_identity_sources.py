@@ -52,6 +52,36 @@ def align_lifecycle_to_snapshot_root(lifecycle: dict, snapshot_root: Path) -> di
     return lifecycle
 
 
+def route_manifest_sources() -> dict:
+    lifecycle = Path("/tmp/bound/players-identity-lifecycle-anchor-candidates.json")
+    principal = Path("/tmp/bound/players-identity-principal-invalidation-policy.json")
+    return {
+        "mode": "cli_bound",
+        "report_available": True,
+        "expected_manifests_received": True,
+        "manifests": {
+            "lifecycle_anchor_candidates": {
+                "source": "cli_bound",
+                "provided_by_cli": True,
+                "expected_path": str(lifecycle),
+                "expected_resolved_path": str(lifecycle.resolve()),
+                "observed_path": str(lifecycle),
+                "observed_resolved_path": str(lifecycle.resolve()),
+                "matched": True,
+            },
+            "principal_invalidation_policy": {
+                "source": "cli_bound",
+                "provided_by_cli": True,
+                "expected_path": str(principal),
+                "expected_resolved_path": str(principal.resolve()),
+                "observed_path": str(principal),
+                "observed_resolved_path": str(principal.resolve()),
+                "matched": True,
+            },
+        },
+    }
+
+
 class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase):
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
@@ -99,6 +129,7 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                 "source_checker_status": "blocked",
                 "source_checker_ready": False,
                 "source_checker_accepted_for_internal_planning": False,
+                "source_checker_manifest_sources": route_manifest_sources(),
             },
             "route_lock": {
                 "locked": True,
@@ -190,6 +221,8 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertFalse(route["public_header_allowed"])
         phase = route["critical_path_phase"]
         self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
+        self.assertEqual("cli_bound", phase["source_checker_manifest_sources"]["mode"])
+        self.assertTrue(phase["source_checker_manifest_sources"]["expected_manifests_received"])
         self.assertFalse(phase["permissions_admin_unlocked"])
         self.assertFalse(phase["command_response_unlocked"])
         self.assertFalse(phase["commands_replies_unlocked"])
@@ -282,6 +315,18 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             (
                 lambda report: report.update({"blockers": ["critical_path_identity_readiness_ready_flag_overclaim"]}),
                 "route_gate_blockers_not_empty",
+            ),
+            (
+                lambda report: report["critical_path_phase"].update(
+                    {"source_checker_manifest_sources": {"mode": "repo_local_default"}}
+                ),
+                "route_gate_bound_identity_manifest_source_mode_unexpected",
+            ),
+            (
+                lambda report: report["critical_path_phase"]["source_checker_manifest_sources"].update(
+                    {"expected_manifests_received": False}
+                ),
+                "route_gate_bound_identity_expected_manifests_missing",
             ),
         )
         for mutate, expected in cases:

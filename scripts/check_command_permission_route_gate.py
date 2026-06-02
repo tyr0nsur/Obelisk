@@ -21,6 +21,20 @@ DEFAULT_PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE = (
     REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json"
 )
+DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
+    / "players-identity-lifecycle-anchor-candidates.json"
+)
+DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
+    / "players-identity-principal-invalidation-policy.json"
+)
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 COMMAND_RESPONSE_DEFAULT_READINESS_NAME = "command-chat-response-route-planning-readiness.json"
 
@@ -428,10 +442,9 @@ def validate_identity_planning_binding_args(args: argparse.Namespace) -> list[st
 
 
 def expected_identity_lock_blocker_for_args(args: argparse.Namespace) -> str:
-    lifecycle = getattr(args, "player_identity_lifecycle_anchor_candidates_manifest", None)
-    principal = getattr(args, "player_identity_principal_invalidation_policy_manifest", None)
-    if lifecycle is not None and principal is not None:
-        return "approved_runtime_evidence_missing"
+    approved_runtime = getattr(args, "player_identity_approved_runtime_principal_lifecycle_evidence_manifest", None)
+    if approved_runtime is not None:
+        return "identity_public_contract_gate_missing"
     return "approved_runtime_evidence_missing"
 
 
@@ -549,6 +562,57 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
     }
 
 
+def resolved_path_text(value: Any) -> str | None:
+    if not isinstance(value, (str, Path)) or not str(value):
+        return None
+    return str(Path(value).resolve())
+
+
+def identity_manifest_source_diagnostics(
+    args: argparse.Namespace | None,
+    source_report: dict[str, Any] | None,
+) -> dict[str, Any]:
+    source_specs = {
+        "lifecycle_anchor_candidates": {
+            "arg": "player_identity_lifecycle_anchor_candidates_manifest",
+            "report_key": "lifecycle_anchor_candidates_manifest",
+            "default": DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES,
+        },
+        "principal_invalidation_policy": {
+            "arg": "player_identity_principal_invalidation_policy_manifest",
+            "report_key": "principal_invalidation_policy_manifest",
+            "default": DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY,
+        },
+    }
+    manifests: dict[str, Any] = {}
+    for name, spec in source_specs.items():
+        cli_value = getattr(args, spec["arg"], None) if args is not None else None
+        expected_path = cli_value or spec["default"]
+        observed_path = source_report.get(spec["report_key"]) if source_report is not None else None
+        expected_resolved = resolved_path_text(expected_path)
+        observed_resolved = resolved_path_text(observed_path)
+        manifests[name] = {
+            "source": "cli_bound" if cli_value is not None else "repo_local_default",
+            "provided_by_cli": cli_value is not None,
+            "expected_path": str(expected_path),
+            "expected_resolved_path": expected_resolved,
+            "observed_path": observed_path,
+            "observed_resolved_path": observed_resolved,
+            "matched": expected_resolved is not None and expected_resolved == observed_resolved,
+        }
+    mode = "cli_bound" if all(item["provided_by_cli"] for item in manifests.values()) else "repo_local_default"
+    return {
+        "mode": mode,
+        "report_available": source_report is not None,
+        "expected_manifests_received": all(item["matched"] for item in manifests.values()),
+        "manifests": manifests,
+        "non_claim": (
+            "manifest source diagnostics bind identity planning inputs only; they do not promote "
+            "public identity, permissions, commands, runtime readiness, or SDK completion"
+        ),
+    }
+
+
 def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[str, Any]:
     result = subprocess.run(
         identity_readiness_argv(args),
@@ -576,6 +640,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
         next_blocker = report.get("next_blocker")
     source_blockers = report.get("blockers") if report is not None else None
     current_blocker = primary_blocker or next_blocker
+    manifest_sources = identity_manifest_source_diagnostics(args, report)
 
     blocker_route = ALLOWED_IDENTITY_LOCK_BLOCKERS.get(str(current_blocker), {})
     return {
@@ -598,6 +663,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
             report.get("accepted_for_internal_planning") if report is not None else None
         ),
         "source_checker_blockers": source_blockers,
+        "source_checker_manifest_sources": manifest_sources,
         "planning_only": True,
         "promotion_ready": report.get("promotion_ready") is True if report is not None else None,
         "public_sdk_ready": report.get("public_sdk_ready") is True if report is not None else None,
@@ -624,12 +690,19 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
     if phase.get("source_checker_primary_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_readiness_blocker_missing")
+    manifest_sources = phase.get("source_checker_manifest_sources")
+    if not isinstance(manifest_sources, dict):
+        blockers.append("critical_path_identity_readiness_manifest_sources_missing")
+    elif manifest_sources.get("expected_manifests_received") is not True:
+        blockers.append("critical_path_identity_readiness_expected_manifests_missing")
     source_blockers = phase.get("source_checker_blockers")
     primary_blocker = phase.get("source_checker_primary_blocker")
     if not isinstance(source_blockers, list):
         blockers.append("critical_path_identity_readiness_blockers_missing")
     elif primary_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS and primary_blocker not in source_blockers:
         blockers.append("critical_path_identity_readiness_primary_blocker_not_in_blockers")
+    if phase.get("current_blocker") is None:
+        blockers.append("critical_path_identity_gate_current_blocker_missing")
     if phase.get("current_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
     for key in (

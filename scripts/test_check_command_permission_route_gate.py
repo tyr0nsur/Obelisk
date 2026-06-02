@@ -32,6 +32,45 @@ from test_check_player_identity_lifecycle_anchor_candidates import accepted_life
 from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
 
 
+def identity_manifest_sources(
+    *,
+    mode: str = "repo_local_default",
+    lifecycle: Path | None = None,
+    principal: Path | None = None,
+) -> dict:
+    lifecycle_path = lifecycle or ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES
+    principal_path = principal or ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY
+    return {
+        "mode": mode,
+        "report_available": True,
+        "expected_manifests_received": True,
+        "manifests": {
+            "lifecycle_anchor_candidates": {
+                "source": mode,
+                "provided_by_cli": mode == "cli_bound",
+                "expected_path": str(lifecycle_path),
+                "expected_resolved_path": str(lifecycle_path.resolve()),
+                "observed_path": str(lifecycle_path),
+                "observed_resolved_path": str(lifecycle_path.resolve()),
+                "matched": True,
+            },
+            "principal_invalidation_policy": {
+                "source": mode,
+                "provided_by_cli": mode == "cli_bound",
+                "expected_path": str(principal_path),
+                "expected_resolved_path": str(principal_path.resolve()),
+                "observed_path": str(principal_path),
+                "observed_resolved_path": str(principal_path.resolve()),
+                "matched": True,
+            },
+        },
+        "non_claim": (
+            "manifest source diagnostics bind identity planning inputs only; they do not promote "
+            "public identity, permissions, commands, runtime readiness, or SDK completion"
+        ),
+    }
+
+
 class CommandPermissionRouteGateTests(unittest.TestCase):
     def run_checker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -77,6 +116,21 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             blockers,
         )
 
+    def test_identity_lock_mode_allows_approved_runtime_evidence_to_reach_public_contract_gate(self) -> None:
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=Path("approved-runtime.json"),
+        )
+        phase = {
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertEqual([], blockers)
+
     def test_accepts_current_route_as_planning_only(self) -> None:
         result = self.run_checker("--json")
         report = json.loads(result.stdout)
@@ -120,6 +174,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "source_checker_blockers": [
                     "approved_runtime_evidence_missing",
                 ],
+                "source_checker_manifest_sources": identity_manifest_sources(),
                 "planning_only": True,
                 "promotion_ready": False,
                 "public_sdk_ready": False,
@@ -211,6 +266,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         phase = report["critical_path_phase"]
         self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
         self.assertEqual("approved_runtime_evidence_missing", phase["source_checker_primary_blocker"])
+        self.assertEqual("cli_bound", phase["source_checker_manifest_sources"]["mode"])
+        self.assertTrue(phase["source_checker_manifest_sources"]["expected_manifests_received"])
         self.assertEqual("produce_approved_runtime_principal_lifecycle_evidence", phase["next_action"])
         self.assertEqual("identity_public_contract_gate_missing", phase["next_after_runtime_evidence"])
         self.assertFalse(phase["permissions_admin_unlocked"])
@@ -304,6 +361,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_ready": False,
             "source_checker_accepted_for_internal_planning": False,
             "source_checker_blockers": ["approved_runtime_evidence_missing"],
+            "source_checker_manifest_sources": identity_manifest_sources(),
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -363,6 +421,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_ready": False,
             "source_checker_accepted_for_internal_planning": False,
             "source_checker_blockers": ["unexpected"],
+            "source_checker_manifest_sources": identity_manifest_sources(),
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": True,
@@ -383,6 +442,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_parse_error": None,
             "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
             "source_checker_blockers": [],
+            "source_checker_manifest_sources": identity_manifest_sources(),
             "source_checker_exit_code": 1,
             "source_checker_status": "blocked",
             "source_checker_ready": False,
@@ -415,6 +475,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_ready": False,
             "source_checker_accepted_for_internal_planning": False,
             "source_checker_blockers": ["approved_runtime_evidence_missing"],
+            "source_checker_manifest_sources": identity_manifest_sources(),
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -473,6 +534,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "schema": "obelisk.player-identity-first-evidence-readiness.v1",
                         "primary_blocker": "approved_runtime_evidence_missing",
                         "blockers": ["approved_runtime_evidence_missing"],
+                        "lifecycle_anchor_candidates_manifest": "/tmp/bound/lifecycle.json",
+                        "principal_invalidation_policy_manifest": "/tmp/bound/principal.json",
                         "status": "blocked",
                         "ready": False,
                         "accepted_for_internal_planning": False,
@@ -503,6 +566,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
         self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
         self.assertEqual("produce_approved_runtime_principal_lifecycle_evidence", phase["next_action"])
+        self.assertEqual("cli_bound", phase["source_checker_manifest_sources"]["mode"])
+        self.assertTrue(phase["source_checker_manifest_sources"]["expected_manifests_received"])
         for flag, expected in (
             ("--artifact-root", "/tmp/identity-artifacts"),
             ("--snapshot-root", "/tmp/identity-snapshots"),
@@ -526,6 +591,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "schema": "obelisk.player-identity-first-evidence-readiness.v1",
                         "primary_blocker": "approved_runtime_evidence_missing",
                         "blockers": ["approved_runtime_evidence_missing"],
+                        "lifecycle_anchor_candidates_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES
+                        ),
+                        "principal_invalidation_policy_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY
+                        ),
                         "status": "blocked",
                         "ready": False,
                         "accepted_for_internal_planning": False,
@@ -560,6 +631,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "schema": "obelisk.player-identity-first-evidence-readiness.v1",
                         "primary_blocker": "approved_runtime_evidence_missing",
                         "blockers": ["approved_runtime_evidence_missing"],
+                        "lifecycle_anchor_candidates_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_LIFECYCLE_ANCHOR_CANDIDATES
+                        ),
+                        "principal_invalidation_policy_manifest": str(
+                            ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRINCIPAL_INVALIDATION_POLICY
+                        ),
                         "status": "ready",
                         "ready": True,
                         "accepted_for_internal_planning": True,

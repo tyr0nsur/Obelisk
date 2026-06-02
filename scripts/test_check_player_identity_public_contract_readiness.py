@@ -167,10 +167,32 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         )
         self.assertIn("lifecycle.owner_cleanup", abi_preflight["sdk_consumer_contract"]["does_not_resolve"])
         owner_contract = report["owner_token_sdk_consumer_contract"]
-        self.assertIn(owner_contract["source"], {"owner_token_sdk_consumer_contract", "public_abi_preflight_derived_stub"})
+        self.assertEqual(owner_contract["source"], "owner_token_sdk_consumer_contract")
         self.assertFalse(owner_contract["accepted_for_contract_review"])
         self.assertFalse(owner_contract["public_sdk_ready"])
         self.assertFalse(owner_contract["runtime_ready"])
+
+    def test_rejects_missing_owner_token_sdk_consumer_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            missing_contract = Path(tempdir) / "missing-owner-token-sdk-consumer.json"
+
+            result = self.run_checker(
+                self.decisions(),
+                approved_manifest(),
+                "--owner-token-sdk-consumer-contract",
+                str(missing_contract),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("owner_token_sdk_consumer_contract_missing", report["blockers"])
+        owner_contract = report["owner_token_sdk_consumer_contract"]
+        self.assertFalse(owner_contract["provided"])
+        self.assertEqual(owner_contract["source"], "missing_owner_token_sdk_consumer_contract")
+        self.assertFalse(owner_contract["accepted_for_candidate_review"])
+        self.assertFalse(owner_contract["public_sdk_ready"])
+        self.assertEqual(owner_contract["blockers"], ["owner_token_sdk_consumer_contract_missing"])
 
     def test_accepts_identifier_redaction_evidence_for_contract_review_only(self) -> None:
         result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction_manifest())

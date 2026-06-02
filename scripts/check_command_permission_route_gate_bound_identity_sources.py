@@ -317,6 +317,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         source_checker_internal_planning = (
             phase.get("source_checker_accepted_for_internal_planning") if isinstance(phase, dict) else None
         )
+        manifest_sources = phase.get("source_checker_manifest_sources") if isinstance(phase, dict) else None
         if route_report.get("schema") != ROUTE_GATE_SCHEMA:
             blockers.append("route_gate_schema_mismatch")
         if route_report.get("valid") is not True or route_report.get("accepted_for_planning") is not True:
@@ -330,6 +331,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 blockers.append(f"route_gate_{key}_overclaim")
         if current_blocker not in {"approved_runtime_evidence_missing", "identity_public_contract_gate_missing"}:
             blockers.append("route_gate_bound_identity_blocker_unexpected")
+        if current_blocker is None:
+            blockers.append("route_gate_bound_identity_current_blocker_missing")
         if source_checker_primary_blocker not in {"approved_runtime_evidence_missing", "identity_public_contract_gate_missing"}:
             blockers.append("route_gate_bound_identity_primary_blocker_unexpected")
         if source_checker_status != "blocked":
@@ -338,6 +341,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             blockers.append("route_gate_identity_readiness_ready_flag_overclaim")
         if source_checker_internal_planning is not False:
             blockers.append("route_gate_identity_readiness_internal_planning_overclaim")
+        if not isinstance(manifest_sources, dict):
+            blockers.append("route_gate_bound_identity_manifest_sources_missing")
+        else:
+            if manifest_sources.get("mode") != "cli_bound":
+                blockers.append("route_gate_bound_identity_manifest_source_mode_unexpected")
+            if manifest_sources.get("expected_manifests_received") is not True:
+                blockers.append("route_gate_bound_identity_expected_manifests_missing")
+            manifests = manifest_sources.get("manifests")
+            if not isinstance(manifests, dict):
+                blockers.append("route_gate_bound_identity_manifest_details_missing")
+            else:
+                for key in ("lifecycle_anchor_candidates", "principal_invalidation_policy"):
+                    manifest = manifests.get(key)
+                    if not isinstance(manifest, dict) or manifest.get("source") != "cli_bound":
+                        blockers.append(f"route_gate_bound_identity_{key}_source_unexpected")
+                    elif manifest.get("matched") is not True:
+                        blockers.append(f"route_gate_bound_identity_{key}_path_mismatch")
         if not isinstance(route_lock, dict) or route_lock.get("locked") is not True:
             blockers.append("route_gate_lock_unexpected")
         expected_blocked_until = (

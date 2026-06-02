@@ -1599,6 +1599,27 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("command_permission_route_gate_schema_mismatch", payload["blockers"])
 
+    def test_completion_gate_rejects_route_gate_parse_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = Path(temp_dir) / "fake_route_gate.py"
+            route_gate_path.write_text("print('not json')\n", encoding="utf-8")
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_output_invalid", payload["blockers"])
+        self.assertIn("stdout_json_decode_error", payload["command_permission_route_gate"]["parse_error"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertEqual(0, payload["v1_sdk_progress"]["completion_blockers_promoted_count"])
+        self.assertEqual(0, payload["v1_sdk_progress"]["p0_chain_promoted_count"])
+
     def test_completion_gate_rejects_route_gate_nonempty_blockers_even_when_valid(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             route_gate_path = self.write_fake_route_gate(
@@ -6592,8 +6613,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertTrue(planning_only_accepted_row["is_p0_dependency_chain"])
         self.assertFalse(planning_only_accepted_row["route_gate_claim_satisfied"])
         self.assertFalse(planning_only_accepted_row["counts_toward_complete_sdk_claim"])
-        self.assertTrue(unlocked_row["route_gate_claim_satisfied"])
-        self.assertTrue(unlocked_row["counts_toward_complete_sdk_claim"])
+        self.assertFalse(unlocked_row["route_gate_claim_satisfied"])
+        self.assertFalse(unlocked_row["counts_toward_complete_sdk_claim"])
 
     def test_route_gate_locked_guidance_points_to_runtime_evidence_not_closed_binding(self) -> None:
         guidance = "\n".join(

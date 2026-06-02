@@ -203,14 +203,6 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated identity/SDK guardrail round wired player identity public ABI preflight
-  into public-contract readiness/gap and first-evidence route diagnostics. The preflight
-  now replays private POD layout, identifier-redaction, principal-invalidation, and public
-  header checks before accepting claimed review inputs; it remains candidate-only and
-  grants no public ABI, SDK, runtime, promotion, or v1 credit. Operator approval receipts
-  now require exact canonical shape/non-claims and reject positive authorization/readiness
-  text. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
-  `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`; no runtime/server op.
 - Latest delegated owner-token/SDK-consumer round added a candidate-only player identity
   planning contract plus checker/test for `abi.layout`, `sdk.consumer`,
   `lifecycle.owner_cleanup`, and downstream separation. Public ABI preflight, gap, and
@@ -218,3 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   public symbols/capability bits/callback ABI/runtime/SDK/v1 credit. Validated with
   focused unittest/checker/gap/diff checks; next useful no-runtime action is to align
   route/SDK-completion diagnostics around the explicit bound identity manifests.
+- Latest delegated route/SDK diagnostic round made identity route reports expose
+  `source_checker_manifest_sources` as `repo_local_default` or `cli_bound`; route and
+  bound wrapper now fail closed if expected identity manifests are missing/mismatched or
+  `current_blocker` disappears. SDK completion no longer lets route-gate payloads count
+  P0/complete-SDK credit, and gap/readiness require the dedicated owner-token SDK-consumer
+  contract instead of accepting a preflight-derived stub. Validated: 274 focused tests,
+  `diff --check`, route default/bound valid at `approved_runtime_evidence_missing`, SDK
+  `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.

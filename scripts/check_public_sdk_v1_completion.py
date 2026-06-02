@@ -3277,20 +3277,8 @@ def completion_blocker_outcome_rows(
     rows: list[dict[str, Any]] = []
     counts_by_surface: dict[str, bool] = {}
     route_gate_current_blocker = None
-    route_gate_satisfies_p0_claim_accounting = False
     if isinstance(command_permission_route_gate, dict):
         route_gate_current_blocker = command_permission_route_gate.get("current_blocker")
-        route_gate_satisfies_p0_claim_accounting = (
-            command_permission_route_gate.get("completion_gate_accepted") is True
-            and command_permission_route_gate.get("valid") is True
-            and command_permission_route_gate.get("planning_only") is False
-            and command_permission_route_gate.get("promotion_ready") is True
-            and command_permission_route_gate.get("public_sdk_ready") is True
-            and command_permission_route_gate.get("runtime_ready") is True
-            and command_permission_route_gate.get("route_lock_locked") is False
-            and route_gate_current_blocker is None
-            and command_permission_route_gate.get("blockers") == []
-        )
     for index, surface_id in enumerate(completion_blockers, start=1):
         surface = surfaces_by_id.get(surface_id, {})
         status = surface.get("status", "missing")
@@ -3320,9 +3308,7 @@ def completion_blocker_outcome_rows(
             is_p0_dependency_chain
             and manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
         )
-        route_gate_claim_satisfied = (
-            not is_p0_dependency_chain or route_gate_satisfies_p0_claim_accounting
-        )
+        route_gate_claim_satisfied = not is_p0_dependency_chain
         dependency_claims_satisfied = True
         dependency_ids = as_string_list(surface.get("depends_on")) if surface else []
         for required_dependency_id in REQUIRED_PROMOTED_SURFACE_DEPENDENCIES.get(surface_id, ()):

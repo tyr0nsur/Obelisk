@@ -1231,11 +1231,22 @@ def validate_owner_token_sdk_consumer_contract(
 ) -> dict[str, Any]:
     checker_path = SCRIPT_DIR / "check_player_identity_owner_token_sdk_consumer_contract.py"
     if not checker_path.exists() or not path.exists():
+        missing = []
+        if not checker_path.exists():
+            missing.append(str(checker_path))
+        if not path.exists():
+            missing.append(str(path))
+        add(
+            blockers,
+            "owner_token_sdk_consumer_contract_missing",
+            "--owner-token-sdk-consumer-contract",
+            missing=missing,
+        )
         return {
             "provided": False,
-            "source": "public_abi_preflight_derived_stub",
-            "ready": public_abi_preflight_report.get("accepted_for_candidate_review") is True,
-            "accepted_for_candidate_review": public_abi_preflight_report.get("accepted_for_candidate_review") is True,
+            "source": "missing_owner_token_sdk_consumer_contract",
+            "ready": False,
+            "accepted_for_candidate_review": False,
             "accepted_for_contract_review": False,
             "promotion_ready": False,
             "public_sdk_ready": False,
@@ -1251,7 +1262,7 @@ def validate_owner_token_sdk_consumer_contract(
                 "required_checks": public_abi_preflight_report.get("required_owner_token_lifecycle", []),
             },
             "does_not_resolve": ["sdk.consumer", "lifecycle.owner_cleanup", "v1_completion"],
-            "blockers": public_abi_preflight_report.get("blockers", []),
+            "blockers": ["owner_token_sdk_consumer_contract_missing"],
         }
 
     try:
