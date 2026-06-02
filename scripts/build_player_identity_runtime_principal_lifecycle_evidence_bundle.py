@@ -280,6 +280,8 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
             exit_code == 0
             and payload.get("ready") is True
             and payload.get("operational_window_manifest_ready") is True
+            and payload.get("blockers", []) == []
+            and payload.get("remaining_blockers", []) == []
         )
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")
@@ -571,6 +573,8 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
         raise SystemExit("window manifest check schema mismatch")
     if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
         raise SystemExit("window manifest check is not ready")
+    if window.get("blockers") not in (None, []) or window.get("remaining_blockers") not in (None, []):
+        raise SystemExit("window manifest check reported blockers despite ready status")
     copied = window.get("copied_log")
     if not isinstance(copied, dict):
         raise SystemExit("window manifest check missing copied_log")

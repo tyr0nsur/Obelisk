@@ -20,6 +20,7 @@ DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 PRIVATE_CANDIDATE = REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json"
 IDENTIFIER_REDACTION_EVIDENCE = REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json"
+PRINCIPAL_INVALIDATION_POLICY = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources" / "players-identity-principal-invalidation-policy.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 SPEC = importlib.util.spec_from_file_location("player_identity_gap_report_checker", SCRIPT)
@@ -42,6 +43,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
     def load_identifier_redaction_evidence(self) -> dict:
         return json.loads(IDENTIFIER_REDACTION_EVIDENCE.read_text(encoding="utf-8"))
 
+    def load_principal_invalidation_policy(self) -> dict:
+        return json.loads(PRINCIPAL_INVALIDATION_POLICY.read_text(encoding="utf-8"))
+
     def player_identity_surface(self, surfaces: dict) -> dict:
         return next(item for item in surfaces["surfaces"] if item["id"] == checker.SURFACE)
 
@@ -51,6 +55,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         surfaces: dict | None = None,
         candidate: dict | None = None,
         identifier_redaction_evidence: dict | None = None,
+        principal_invalidation_policy: dict | None = None,
         header_text: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -59,6 +64,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             surfaces_path = root / "surfaces.json"
             candidate_path = root / "private-candidate.json"
             redaction_path = root / "identifier-redaction-evidence.json"
+            principal_policy_path = root / "principal-invalidation-policy.json"
             header_path = root / "ObeliskApi.h"
 
             decisions_path.write_text(json.dumps(decisions if decisions is not None else self.load_decisions()), encoding="utf-8")
@@ -69,6 +75,14 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                     identifier_redaction_evidence
                     if identifier_redaction_evidence is not None
                     else self.load_identifier_redaction_evidence()
+                ),
+                encoding="utf-8",
+            )
+            principal_policy_path.write_text(
+                json.dumps(
+                    principal_invalidation_policy
+                    if principal_invalidation_policy is not None
+                    else self.load_principal_invalidation_policy()
                 ),
                 encoding="utf-8",
             )
@@ -86,6 +100,8 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                     str(candidate_path),
                     "--identifier-redaction-evidence",
                     str(redaction_path),
+                    "--principal-invalidation-policy",
+                    str(principal_policy_path),
                     "--public-header",
                     str(header_path),
                     "--json",
@@ -104,6 +120,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         surfaces_path: Path,
         candidate_path: Path,
         redaction_path: Path,
+        principal_policy_path: Path,
         header_path: Path,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -118,6 +135,8 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 str(candidate_path),
                 "--identifier-redaction-evidence",
                 str(redaction_path),
+                "--principal-invalidation-policy",
+                str(principal_policy_path),
                 "--public-header",
                 str(header_path),
                 "--json",
@@ -144,13 +163,29 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
         self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
-        self.assertEqual(report["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        self.assertEqual(
+            report["contract_review_inputs_resolved"],
+            [
+                "privacy.identifier_redaction",
+                "lifetime.generation_scope_invalidation.candidate_policy",
+            ],
+        )
         self.assertTrue(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
         self.assertEqual(report["identifier_redaction_evidence"]["resolved_inputs"], ["privacy.identifier_redaction"])
         self.assertFalse(report["identifier_redaction_evidence"]["promotion_ready"])
         self.assertFalse(report["identifier_redaction_evidence"]["public_sdk_ready"])
         self.assertFalse(report["identifier_redaction_evidence"]["runtime_ready"])
         self.assertFalse(report["identifier_redaction_evidence"]["public_header_allowed"])
+        self.assertTrue(report["principal_invalidation_policy"]["accepted_for_policy_review"])
+        self.assertEqual(
+            report["principal_invalidation_policy"]["resolved_input"],
+            "lifetime.generation_scope_invalidation.candidate_policy",
+        )
+        self.assertFalse(report["principal_invalidation_policy"]["promotion_ready"])
+        self.assertFalse(report["principal_invalidation_policy"]["public_sdk_ready"])
+        self.assertFalse(report["principal_invalidation_policy"]["runtime_ready"])
+        self.assertFalse(report["principal_invalidation_policy"]["public_header_allowed"])
+        self.assertFalse(report["principal_invalidation_policy"]["principal_invalidation_ready"])
         self.assertTrue(report["runtime_evidence_missing"])
         self.assertEqual(report["surface_manifest"]["status"], "planning")
         self.assertEqual(report["surface_manifest"]["public_contract"], [])
@@ -213,10 +248,30 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(report["primary_offline_gap"], "privacy.identifier_redaction")
-        self.assertEqual(report["contract_review_inputs_resolved"], [])
+        self.assertEqual(
+            report["contract_review_inputs_resolved"],
+            ["lifetime.generation_scope_invalidation.candidate_policy"],
+        )
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
         self.assertIn("promotion_ready_not_false", report["identifier_redaction_evidence"]["blockers"])
         self.assertIn("required_identifier_class_not_redacted", report["identifier_redaction_evidence"]["blockers"])
+
+    def test_rejects_invalid_principal_invalidation_policy(self) -> None:
+        policy = self.load_principal_invalidation_policy()
+        policy["negative_consumer_rules"] = [
+            item
+            for item in policy["negative_consumer_rules"]
+            if item.get("rule") != "fail_closed_on_invalid_or_stale"
+        ]
+
+        result = self.run_checker(principal_invalidation_policy=policy)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
+        self.assertEqual(report["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        self.assertIn("principal_invalidation_policy_not_accepted", report["blockers"])
+        self.assertIn("negative_consumer_rules_missing_required", report["principal_invalidation_policy"]["blockers"])
 
     def test_rejects_symlinked_identifier_redaction_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -226,12 +281,14 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             candidate_path = root / "private-candidate.json"
             evidence_target = root / "identifier-redaction-target.json"
             redaction_link = root / "identifier-redaction-link.json"
+            principal_policy_path = root / "principal-invalidation-policy.json"
             header_path = root / "ObeliskApi.h"
 
             decisions_path.write_text(json.dumps(self.load_decisions()), encoding="utf-8")
             surfaces_path.write_text(json.dumps(self.load_surfaces()), encoding="utf-8")
             candidate_path.write_text(json.dumps(self.load_private_candidate()), encoding="utf-8")
             evidence_target.write_text(json.dumps(self.load_identifier_redaction_evidence()), encoding="utf-8")
+            principal_policy_path.write_text(json.dumps(self.load_principal_invalidation_policy()), encoding="utf-8")
             redaction_link.symlink_to(evidence_target)
             header_path.write_text(HEADER.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -240,6 +297,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 surfaces_path=surfaces_path,
                 candidate_path=candidate_path,
                 redaction_path=redaction_link,
+                principal_policy_path=principal_policy_path,
                 header_path=header_path,
             )
         report = json.loads(result.stdout)

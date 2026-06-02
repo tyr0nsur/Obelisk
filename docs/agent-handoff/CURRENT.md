@@ -208,10 +208,10 @@ This file is an active routing table only. Durable evidence belongs in
   evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
   build-policy now passes planning-only with no central `structure_*` blockers. SDK
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated identity/gap round integrated four read-only agents. The public-contract
-  gap report now consumes sanitized `privacy.identifier_redaction` evidence as
-  contract-review-only input and reports next offline gap
-  `lifetime.generation_scope_invalidation`; first-evidence/route/SDK remain fail-closed at
-  `approved_runtime_evidence_missing`. Runtime request-pack audit found post-window bundle
-  replay should tolerate only nested `approved_window_expired`; builder now uses explicit
-  `--post-window-replay`. No runtime/server op.
+- Latest delegated identity/gap rounds integrated read-only agents. Gap/readiness reports
+  consume sanitized `privacy.identifier_redaction` and repo-local
+  `players-identity-principal-invalidation-policy` as contract/policy review inputs only;
+  visible gap stays `lifetime.generation_scope_invalidation`, `principal_invalidation_ready=false`,
+  and first-evidence/route/SDK remain fail-closed at `approved_runtime_evidence_missing`.
+  Runtime bundle replay uses explicit `--post-window-replay` and rejects ready reports with
+  retained blockers. No runtime/server op.

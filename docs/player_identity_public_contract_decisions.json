@@ -52,6 +52,19 @@
     "required_checker": "scripts/check_player_identity_identifier_redaction_evidence.py",
     "non_claim": "A valid identifier-redaction evidence manifest is sanitized contract-review evidence only; it does not resolve the full privacy blocker, promote public player identity, or open ABI."
   },
+  "principal_invalidation_policy_evidence_intake": {
+    "id": "principal_invalidation_policy_evidence",
+    "status": "repo_candidate_policy_required",
+    "resolved_input": "lifetime.generation_scope_invalidation.candidate_policy",
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false,
+    "public_header_allowed": false,
+    "principal_invalidation_ready": false,
+    "required_checker": "scripts/check_player_identity_principal_invalidation_policy.py",
+    "default_manifest": "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json",
+    "non_claim": "A valid principal-invalidation policy manifest is candidate-only contract-review evidence; it does not resolve the full lifetime/generation/scope blocker, prove runtime lifecycle ordering, promote public player identity, or open ABI."
+  },
   "approved_runtime_evidence_not_sufficient": {
     "decision": "Approved runtime principal lifecycle evidence would be necessary evidence, but it is not sufficient to publish obelisk.player_identity.v1.",
     "why": [

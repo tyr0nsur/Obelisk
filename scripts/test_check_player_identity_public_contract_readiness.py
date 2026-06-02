@@ -84,7 +84,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
         self.assertTrue(report["ready"])
         self.assertTrue(report["accepted_for_contract_review"])
-        self.assertEqual(report["resolved_inputs"], ["runtime.lifecycle_evidence"])
+        self.assertEqual(
+            report["resolved_inputs"],
+            [
+                "runtime.lifecycle_evidence",
+                "lifetime.generation_scope_invalidation.candidate_policy",
+            ],
+        )
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
@@ -102,6 +108,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["blockers"], [])
         self.assertFalse(report["identifier_redaction_evidence"]["provided"])
         self.assertFalse(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
+        self.assertTrue(report["principal_invalidation_policy"]["provided"])
+        self.assertTrue(report["principal_invalidation_policy"]["accepted_for_policy_review"])
+        self.assertEqual(
+            report["principal_invalidation_policy"]["resolved_input"],
+            "lifetime.generation_scope_invalidation.candidate_policy",
+        )
+        self.assertFalse(report["principal_invalidation_policy"]["principal_invalidation_ready"])
 
     def test_accepts_identifier_redaction_evidence_for_contract_review_only(self) -> None:
         result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction_manifest())
@@ -111,7 +124,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertTrue(report["accepted_for_contract_review"])
         self.assertEqual(
             report["resolved_inputs"],
-            ["runtime.lifecycle_evidence", "privacy.identifier_redaction"],
+            [
+                "runtime.lifecycle_evidence",
+                "privacy.identifier_redaction",
+                "lifetime.generation_scope_invalidation.candidate_policy",
+            ],
         )
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])

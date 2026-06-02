@@ -17,6 +17,7 @@ from typing import Any
 
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence
 import check_player_identity_identifier_redaction_evidence as identifier_redaction
+import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -34,6 +35,11 @@ REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
 REQUIRED_IDENTIFIER_REDACTION_INTAKE_ID = "identifier_redaction_evidence"
 REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT = "privacy.identifier_redaction"
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
+PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT = "lifetime.generation_scope_invalidation.candidate_policy"
+REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
+DEFAULT_PRINCIPAL_INVALIDATION_POLICY = Path(
+    "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json"
+)
 NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
 REQUIRED_DECISION_GATE_CURRENT_DECISION = (
     "no public header, no public capability bit, no plugin callback, no lookup, "
@@ -484,6 +490,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional sanitized identifier-redaction evidence manifest for contract-review intake only.",
     )
+    parser.add_argument(
+        "--principal-invalidation-policy",
+        type=Path,
+        default=DEFAULT_PRINCIPAL_INVALIDATION_POLICY,
+        help="Candidate-only principal invalidation policy for lifetime/generation/scope review intake only.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     parser.add_argument(
         "--public-header",
@@ -673,6 +685,65 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
         "accepted_for_contract_review": report.get("accepted_for_contract_review") is True,
         "resolved_inputs": report.get("resolved_inputs") if isinstance(report.get("resolved_inputs"), list) else [],
         "remaining_blockers": report.get("remaining_blockers") if isinstance(report.get("remaining_blockers"), list) else [],
+    }
+
+
+def principal_invalidation_policy_report(path: Path | None, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    if path is None:
+        return {
+            "provided": False,
+            "accepted_for_policy_review": False,
+            "resolved_input": None,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "principal_invalidation_ready": False,
+            "blockers": ["principal_invalidation_policy_missing"],
+        }
+    try:
+        payload = principal_invalidation_policy.load_json(path)
+    except (OSError, SystemExit) as exc:
+        add(blockers, "principal_invalidation_policy_unreadable", "$.principal_invalidation_policy", error=str(exc))
+        return {
+            "provided": True,
+            "accepted_for_policy_review": False,
+            "resolved_input": None,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "principal_invalidation_ready": False,
+            "blockers": ["principal_invalidation_policy_unreadable"],
+        }
+
+    validation = principal_invalidation_policy.validate_manifest(payload, check_mode="consume")
+    report = principal_invalidation_policy.build_report(payload, validation, check_mode="consume")
+    if validation.blockers:
+        add(
+            blockers,
+            "principal_invalidation_policy_not_accepted",
+            "$.principal_invalidation_policy",
+            reasons=[blocker["reason"] for blocker in validation.blockers],
+        )
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "principal_invalidation_ready"):
+        if report.get(key) is not False:
+            add(blockers, f"principal_invalidation_policy_{key}_not_false", f"$.principal_invalidation_policy.{key}")
+    return {
+        "provided": True,
+        "accepted_for_policy_review": not validation.blockers,
+        "resolved_input": PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT if not validation.blockers else None,
+        "mode": report.get("mode"),
+        "candidate_only": report.get("candidate_only") is True,
+        "principal_fields": report.get("principal_fields", []),
+        "invalidation_cases": report.get("invalidation_cases", []),
+        "negative_consumer_rules": report.get("negative_consumer_rules", []),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "principal_invalidation_ready": False,
+        "blockers": report.get("blockers", []),
     }
 
 
@@ -1222,6 +1293,23 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
             if redaction_intake.get(key) is not False:
                 add(blockers, f"identifier_redaction_evidence_intake_{key}_not_false", f"$.identifier_redaction_evidence_intake.{key}")
+    principal_policy_intake = decisions.get("principal_invalidation_policy_evidence_intake")
+    if not isinstance(principal_policy_intake, dict):
+        add(blockers, "principal_invalidation_policy_evidence_intake_missing", "$.principal_invalidation_policy_evidence_intake")
+    else:
+        if principal_policy_intake.get("id") != "principal_invalidation_policy_evidence":
+            add(blockers, "principal_invalidation_policy_evidence_intake_id_mismatch", "$.principal_invalidation_policy_evidence_intake.id")
+        if principal_policy_intake.get("status") != "repo_candidate_policy_required":
+            add(blockers, "principal_invalidation_policy_evidence_intake_status_mismatch", "$.principal_invalidation_policy_evidence_intake.status")
+        if principal_policy_intake.get("resolved_input") != PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT:
+            add(blockers, "principal_invalidation_policy_evidence_intake_resolved_input_mismatch", "$.principal_invalidation_policy_evidence_intake.resolved_input")
+        if principal_policy_intake.get("required_checker") != REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER:
+            add(blockers, "principal_invalidation_policy_evidence_intake_checker_mismatch", "$.principal_invalidation_policy_evidence_intake.required_checker")
+        if principal_policy_intake.get("default_manifest") != str(DEFAULT_PRINCIPAL_INVALIDATION_POLICY):
+            add(blockers, "principal_invalidation_policy_evidence_intake_default_manifest_mismatch", "$.principal_invalidation_policy_evidence_intake.default_manifest")
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed", "principal_invalidation_ready"):
+            if principal_policy_intake.get(key) is not False:
+                add(blockers, f"principal_invalidation_policy_evidence_intake_{key}_not_false", f"$.principal_invalidation_policy_evidence_intake.{key}")
 
     not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
     if not isinstance(not_sufficient, dict):
@@ -1344,7 +1432,9 @@ def build_report(
     public_header_report: dict[str, Any],
     blockers: list[dict[str, Any]],
     check_mode: str,
+    principal_policy_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    principal_policy_report = principal_policy_report or {}
     runtime_ready = (
         runtime_report.get("approved_runtime_evidence_present") is True
         and runtime_report.get("runtime_evidence_ready") is True
@@ -1368,6 +1458,8 @@ def build_report(
         resolved_inputs.append(REQUIRED_RESOLVED_INPUT)
         if redaction_report.get("accepted_for_contract_review") is True:
             resolved_inputs.append(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
+        if principal_policy_report.get("accepted_for_policy_review") is True:
+            resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
     return {
         "schema": REPORT_SCHEMA,
         "surface": decisions.get("surface"),
@@ -1429,9 +1521,21 @@ def build_report(
             "runtime_ready": False,
             "public_header_allowed": False,
         },
+        "principal_invalidation_policy": {
+            "provided": principal_policy_report.get("provided") is True,
+            "accepted_for_policy_review": principal_policy_report.get("accepted_for_policy_review") is True,
+            "resolved_input": principal_policy_report.get("resolved_input"),
+            "candidate_only": principal_policy_report.get("candidate_only") is True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "principal_invalidation_ready": False,
+        },
         "non_claims": [
             "approved runtime evidence intake does not add public header symbols, capability bits, callbacks, lookup, mutation, return override, or v1 SDK readiness",
             "identifier-redaction evidence intake does not resolve the full privacy blocker, add public header symbols, or make player identity promotion-ready",
+            "principal invalidation policy intake is candidate-only and does not resolve the full lifetime/generation/scope blocker or prove runtime lifecycle ordering",
         ],
     }
 
@@ -1447,6 +1551,7 @@ def main() -> int:
     public_header_report = validate_public_header(decisions, args.public_header, blockers)
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
     redaction_report = identifier_redaction_report(args.identifier_redaction_evidence, blockers)
+    principal_policy_report = principal_invalidation_policy_report(args.principal_invalidation_policy, blockers)
     report = build_report(
         decisions,
         runtime_report,
@@ -1455,6 +1560,7 @@ def main() -> int:
         public_header_report,
         blockers,
         check_mode,
+        principal_policy_report,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

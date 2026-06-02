@@ -460,8 +460,15 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         public_contract_gap = payload["first_evidence"]["public_contract_gap_report"]
         self.assertTrue(public_contract_gap["ready"])
         self.assertEqual(public_contract_gap["primary_offline_gap"], "lifetime.generation_scope_invalidation")
-        self.assertEqual(public_contract_gap["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        self.assertEqual(
+            public_contract_gap["contract_review_inputs_resolved"],
+            [
+                "privacy.identifier_redaction",
+                "lifetime.generation_scope_invalidation.candidate_policy",
+            ],
+        )
         self.assertTrue(public_contract_gap["identifier_redaction_evidence"]["accepted_for_contract_review"])
+        self.assertTrue(public_contract_gap["principal_invalidation_policy"]["accepted_for_policy_review"])
         self.assertFalse(public_contract_gap["promotion_ready"])
         self.assertFalse(public_contract_gap["public_sdk_ready"])
         self.assertFalse(public_contract_gap["runtime_ready"])

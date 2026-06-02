@@ -1585,6 +1585,7 @@ def player_identity_public_contract_gap_diagnosis(
     surfaces: Path,
     private_candidate_contract: Path,
     identifier_redaction_evidence: Path,
+    principal_invalidation_policy_manifest: Path | None,
     public_header: Path,
 ) -> dict[str, Any]:
     blockers: list[str] = []
@@ -1609,12 +1610,17 @@ def player_identity_public_contract_gap_diagnosis(
         identifier_redaction_evidence,
         report_blockers,
     )
+    principal_policy_gap_report = public_contract_gap_report.validate_principal_invalidation_policy(
+        principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
+        report_blockers,
+    )
     header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
     args = argparse.Namespace(
         decisions=decisions,
         surfaces=surfaces,
         private_candidate_contract=private_candidate_contract,
         identifier_redaction_evidence=identifier_redaction_evidence,
+        principal_invalidation_policy=principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
         public_header=public_header,
     )
     report = public_contract_gap_report.build_report(
@@ -1625,6 +1631,7 @@ def player_identity_public_contract_gap_diagnosis(
         header_scan,
         candidate_payload,
         redaction_diagnosis,
+        principal_policy_gap_report,
     )
 
     if report.get("schema") != public_contract_gap_report.SCHEMA:
@@ -1654,6 +1661,7 @@ def player_identity_public_contract_gap_diagnosis(
         "primary_offline_gap": report.get("primary_offline_gap"),
         "contract_review_inputs_resolved": report.get("contract_review_inputs_resolved", []),
         "identifier_redaction_evidence": report.get("identifier_redaction_evidence", {}),
+        "principal_invalidation_policy": report.get("principal_invalidation_policy", {}),
         "runtime_evidence_missing": report.get("runtime_evidence_missing"),
         "accepted_for_contract_review": False,
         "promotion_ready": False,
@@ -2383,6 +2391,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "player_identity_identifier_redaction_evidence",
             REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json",
         ),
+        principal_invalidation_policy_manifest=effective_principal_invalidation_policy_manifest,
         public_header=getattr(args, "public_header", REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"),
     )
     approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True

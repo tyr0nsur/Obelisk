@@ -983,6 +983,12 @@ priorities, and do not use history files as the active source of truth.
   building now calls the window-manifest checker with explicit `--post-window-replay`,
   which tolerates only nested `approved_window_expired` after the capture window; normal
   pre-window request approval remains strict. No runtime/server operation was performed.
+- 2026-06-02 follow-up delegated lifetime/P0 audit: public-contract gap/readiness now also
+  consume the existing repo-local `players-identity-principal-invalidation-policy` in
+  consume mode as `lifetime.generation_scope_invalidation.candidate_policy`. This is
+  candidate-only policy review evidence; `lifetime.generation_scope_invalidation` remains
+  the visible gap, `principal_invalidation_ready=false`, and SDK/P0 remain fail-closed.
+  Bundle post-window replay also rejects contradictory ready reports with retained blockers.
 
 ## Agent Coordination
 
