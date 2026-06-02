@@ -267,6 +267,7 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
             sys.executable,
             str(WINDOW_MANIFEST_CHECKER),
             "--json",
+            "--post-window-replay",
             str(window_manifest["path"]),
         ]
     )
@@ -663,6 +664,7 @@ def main() -> int:
                 sys.executable,
                 str(WINDOW_MANIFEST_CHECKER),
                 "--json",
+                "--post-window-replay",
                 str(args.window_manifest),
             ],
             stdout_path=window_check_path,

@@ -647,8 +647,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def test_window_manifest_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:
         original = bundle_builder.run_json_check
         blockers: list[dict] = []
+        observed_commands: list[list[str]] = []
 
-        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+        def fake_run_json_check(command: list[str]) -> tuple[int, dict, str]:
+            observed_commands.append(command)
             return (
                 1,
                 {
@@ -675,6 +677,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(state["checker_ready"])
         self.assertFalse(state["ready"])
         self.assertIn("window_manifest_check_failed", [blocker["reason"] for blocker in blockers])
+        self.assertTrue(observed_commands)
+        self.assertIn("--post-window-replay", observed_commands[0])
 
     def test_builds_complete_consume_only_bundle(self) -> None:
         with self.temp_offline_workspace() as temp:

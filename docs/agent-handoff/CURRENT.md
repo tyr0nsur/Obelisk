@@ -208,8 +208,10 @@ This file is an active routing table only. Durable evidence belongs in
   evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
   build-policy now passes planning-only with no central `structure_*` blockers. SDK
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated identity-redaction round added sanitized repo-local
-  `privacy.identifier_redaction` evidence and hardened its checker against unredacted
-  required classes, raw material anywhere in the evidence manifest, and policy-wording
-  drift. Public-contract readiness consumes it only as contract-review input; SDK/P0
-  remain fail-closed at `approved_runtime_evidence_missing`.
+- Latest delegated identity/gap round integrated four read-only agents. The public-contract
+  gap report now consumes sanitized `privacy.identifier_redaction` evidence as
+  contract-review-only input and reports next offline gap
+  `lifetime.generation_scope_invalidation`; first-evidence/route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`. Runtime request-pack audit found post-window bundle
+  replay should tolerate only nested `approved_window_expired`; builder now uses explicit
+  `--post-window-replay`. No runtime/server op.

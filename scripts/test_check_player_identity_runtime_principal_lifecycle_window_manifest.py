@@ -308,6 +308,16 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
 
 
 class WindowManifestCheckerTests(unittest.TestCase):
+    def test_post_window_replay_expiry_exception_is_exact(self) -> None:
+        self.assertTrue(CHECKER.request_check_failed_only_because_window_expired(["approved_window_expired"]))
+        self.assertFalse(CHECKER.request_check_failed_only_because_window_expired([]))
+        self.assertFalse(
+            CHECKER.request_check_failed_only_because_window_expired(
+                ["approved_window_expired", "operator_markdown_drift"]
+            )
+        )
+        self.assertFalse(CHECKER.request_check_failed_only_because_window_expired("approved_window_expired"))
+
     def run_checker(
         self,
         lines: list[str],

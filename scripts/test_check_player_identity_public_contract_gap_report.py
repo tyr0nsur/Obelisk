@@ -19,6 +19,7 @@ SCRIPT = SCRIPT_DIR / "check_player_identity_public_contract_gap_report.py"
 DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
 SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 PRIVATE_CANDIDATE = REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json"
+IDENTIFIER_REDACTION_EVIDENCE = REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 
 SPEC = importlib.util.spec_from_file_location("player_identity_gap_report_checker", SCRIPT)
@@ -38,6 +39,9 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
     def load_private_candidate(self) -> dict:
         return json.loads(PRIVATE_CANDIDATE.read_text(encoding="utf-8"))
 
+    def load_identifier_redaction_evidence(self) -> dict:
+        return json.loads(IDENTIFIER_REDACTION_EVIDENCE.read_text(encoding="utf-8"))
+
     def player_identity_surface(self, surfaces: dict) -> dict:
         return next(item for item in surfaces["surfaces"] if item["id"] == checker.SURFACE)
 
@@ -46,6 +50,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         decisions: dict | None = None,
         surfaces: dict | None = None,
         candidate: dict | None = None,
+        identifier_redaction_evidence: dict | None = None,
         header_text: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -53,11 +58,20 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             decisions_path = root / "decisions.json"
             surfaces_path = root / "surfaces.json"
             candidate_path = root / "private-candidate.json"
+            redaction_path = root / "identifier-redaction-evidence.json"
             header_path = root / "ObeliskApi.h"
 
             decisions_path.write_text(json.dumps(decisions if decisions is not None else self.load_decisions()), encoding="utf-8")
             surfaces_path.write_text(json.dumps(surfaces if surfaces is not None else self.load_surfaces()), encoding="utf-8")
             candidate_path.write_text(json.dumps(candidate if candidate is not None else self.load_private_candidate()), encoding="utf-8")
+            redaction_path.write_text(
+                json.dumps(
+                    identifier_redaction_evidence
+                    if identifier_redaction_evidence is not None
+                    else self.load_identifier_redaction_evidence()
+                ),
+                encoding="utf-8",
+            )
             header_path.write_text(header_text if header_text is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
 
             return subprocess.run(
@@ -70,6 +84,8 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                     str(surfaces_path),
                     "--private-candidate-contract",
                     str(candidate_path),
+                    "--identifier-redaction-evidence",
+                    str(redaction_path),
                     "--public-header",
                     str(header_path),
                     "--json",
@@ -80,6 +96,38 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 check=False,
             )
+
+    def run_checker_with_paths(
+        self,
+        *,
+        decisions_path: Path,
+        surfaces_path: Path,
+        candidate_path: Path,
+        redaction_path: Path,
+        header_path: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--decisions",
+                str(decisions_path),
+                "--surfaces",
+                str(surfaces_path),
+                "--private-candidate-contract",
+                str(candidate_path),
+                "--identifier-redaction-evidence",
+                str(redaction_path),
+                "--public-header",
+                str(header_path),
+                "--json",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
 
     def test_accepts_current_blocked_state_without_runtime_evidence(self) -> None:
         result = self.run_checker()
@@ -95,7 +143,14 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
-        self.assertEqual(report["primary_offline_gap"], "privacy.identifier_redaction")
+        self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
+        self.assertEqual(report["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        self.assertTrue(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
+        self.assertEqual(report["identifier_redaction_evidence"]["resolved_inputs"], ["privacy.identifier_redaction"])
+        self.assertFalse(report["identifier_redaction_evidence"]["promotion_ready"])
+        self.assertFalse(report["identifier_redaction_evidence"]["public_sdk_ready"])
+        self.assertFalse(report["identifier_redaction_evidence"]["runtime_ready"])
+        self.assertFalse(report["identifier_redaction_evidence"]["public_header_allowed"])
         self.assertTrue(report["runtime_evidence_missing"])
         self.assertEqual(report["surface_manifest"]["status"], "planning")
         self.assertEqual(report["surface_manifest"]["public_contract"], [])
@@ -147,6 +202,55 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("decisions_identifier_redaction_evidence_intake_missing", report["blockers"])
+
+    def test_rejects_invalid_identifier_redaction_evidence(self) -> None:
+        evidence = self.load_identifier_redaction_evidence()
+        evidence["promotion_ready"] = True
+        evidence["fields"][0]["field_class"] = "recognition-only"
+
+        result = self.run_checker(identifier_redaction_evidence=evidence)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["primary_offline_gap"], "privacy.identifier_redaction")
+        self.assertEqual(report["contract_review_inputs_resolved"], [])
+        self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
+        self.assertIn("promotion_ready_not_false", report["identifier_redaction_evidence"]["blockers"])
+        self.assertIn("required_identifier_class_not_redacted", report["identifier_redaction_evidence"]["blockers"])
+
+    def test_rejects_symlinked_identifier_redaction_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            decisions_path = root / "decisions.json"
+            surfaces_path = root / "surfaces.json"
+            candidate_path = root / "private-candidate.json"
+            evidence_target = root / "identifier-redaction-target.json"
+            redaction_link = root / "identifier-redaction-link.json"
+            header_path = root / "ObeliskApi.h"
+
+            decisions_path.write_text(json.dumps(self.load_decisions()), encoding="utf-8")
+            surfaces_path.write_text(json.dumps(self.load_surfaces()), encoding="utf-8")
+            candidate_path.write_text(json.dumps(self.load_private_candidate()), encoding="utf-8")
+            evidence_target.write_text(json.dumps(self.load_identifier_redaction_evidence()), encoding="utf-8")
+            redaction_link.symlink_to(evidence_target)
+            header_path.write_text(HEADER.read_text(encoding="utf-8"), encoding="utf-8")
+
+            result = self.run_checker_with_paths(
+                decisions_path=decisions_path,
+                surfaces_path=surfaces_path,
+                candidate_path=candidate_path,
+                redaction_path=redaction_link,
+                header_path=header_path,
+            )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(report["primary_offline_gap"], "privacy.identifier_redaction")
+        self.assertIn("identifier_redaction_evidence_unreadable_or_rejected", report["blockers"])
+        self.assertEqual(
+            report["identifier_redaction_evidence"]["blockers"],
+            ["identifier_redaction_evidence_unreadable_or_rejected"],
+        )
 
     def test_rejects_missing_runtime_and_privacy_promotion_blockers(self) -> None:
         decisions = self.load_decisions()

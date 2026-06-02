@@ -11,6 +11,12 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import check_player_identity_identifier_redaction_evidence as redaction_checker
+
 
 SCHEMA = "obelisk.player-identity-public-contract-gap-report.v1"
 DECISIONS_SCHEMA = "obelisk.player-identity-public-contract-decisions.v1"
@@ -18,6 +24,10 @@ SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 PRIVATE_CANDIDATE_SCHEMA = "obelisk.player-identity-private-candidate-contract.v1"
 SURFACE = "obelisk.player_identity.v1"
 PRIMARY_OFFLINE_GAP = "privacy.identifier_redaction"
+PRIMARY_OFFLINE_GAP_AFTER_IDENTIFIER_REDACTION = "lifetime.generation_scope_invalidation"
+DEFAULT_IDENTIFIER_REDACTION_EVIDENCE = Path(
+    "docs/research/2026-06-02-player-identity-identifier-redaction-evidence.json"
+)
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PROMOTION_BLOCKERS = {
     "runtime.lifecycle_evidence",
@@ -251,6 +261,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("include/obelisk/ObeliskApi.h"),
         help="Public SDK header to scan for accidental identity/principal symbols.",
+    )
+    parser.add_argument(
+        "--identifier-redaction-evidence",
+        type=Path,
+        default=DEFAULT_IDENTIFIER_REDACTION_EVIDENCE,
+        help="Sanitized identifier-redaction evidence manifest consumed as contract-review input only.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     return parser.parse_args()
@@ -821,6 +837,68 @@ def validate_private_candidate(candidate: dict[str, Any], blockers: list[dict[st
     )
 
 
+def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    try:
+        payload = redaction_checker.load_evidence(path)
+    except (OSError, json.JSONDecodeError, SystemExit) as exc:
+        add(
+            blockers,
+            "identifier_redaction_evidence_unreadable_or_rejected",
+            "--identifier-redaction-evidence",
+            path=str(path),
+            error=str(exc),
+        )
+        return {
+            "path": str(path),
+            "present": False,
+            "accepted_for_contract_review": False,
+            "resolved_inputs": [],
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "blockers": ["identifier_redaction_evidence_unreadable_or_rejected"],
+        }
+
+    redaction_blockers = redaction_checker.validate_evidence(payload)
+    report = redaction_checker.build_report(payload, redaction_blockers)
+    if redaction_blockers:
+        add(
+            blockers,
+            "identifier_redaction_evidence_not_accepted",
+            "--identifier-redaction-evidence",
+            path=str(path),
+            evidence_blockers=report["blockers"],
+        )
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+        if report.get(key) is not False:
+            add(
+                blockers,
+                "identifier_redaction_evidence_readiness_flag_not_false",
+                f"--identifier-redaction-evidence.{key}",
+                value=report.get(key),
+            )
+    if report.get("accepted_for_contract_review") and report.get("resolved_inputs") != [PRIMARY_OFFLINE_GAP]:
+        add(
+            blockers,
+            "identifier_redaction_evidence_resolved_inputs_mismatch",
+            "--identifier-redaction-evidence.resolved_inputs",
+            value=report.get("resolved_inputs"),
+        )
+    return {
+        "path": str(path),
+        "present": True,
+        "accepted_for_contract_review": report.get("accepted_for_contract_review") is True,
+        "resolved_inputs": report.get("resolved_inputs", []),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "blockers": report.get("blockers", []),
+        "non_claims": report.get("non_claims", []),
+    }
+
+
 def build_report(
     args: argparse.Namespace,
     blockers: list[dict[str, Any]],
@@ -828,7 +906,14 @@ def build_report(
     surface: dict[str, Any],
     header_scan: dict[str, Any],
     candidate: dict[str, Any],
+    identifier_redaction_evidence: dict[str, Any],
 ) -> dict[str, Any]:
+    redaction_accepted = identifier_redaction_evidence.get("accepted_for_contract_review") is True
+    primary_offline_gap = (
+        PRIMARY_OFFLINE_GAP_AFTER_IDENTIFIER_REDACTION
+        if redaction_accepted
+        else PRIMARY_OFFLINE_GAP
+    )
     return {
         "schema": SCHEMA,
         "surface": SURFACE,
@@ -840,13 +925,19 @@ def build_report(
         "public_sdk_ready": False,
         "runtime_ready": False,
         "public_header_allowed": False,
-        "primary_offline_gap": PRIMARY_OFFLINE_GAP,
+        "primary_offline_gap": primary_offline_gap,
+        "contract_review_inputs_resolved": (
+            [PRIMARY_OFFLINE_GAP]
+            if redaction_accepted
+            else []
+        ),
         "runtime_evidence_missing": True,
         "inputs": {
             "decisions": str(args.decisions),
             "surfaces": str(args.surfaces),
             "private_candidate_contract": str(args.private_candidate_contract),
             "public_header": str(args.public_header),
+            "identifier_redaction_evidence": str(args.identifier_redaction_evidence),
         },
         "decisions": {
             "schema": decisions.get("schema"),
@@ -872,10 +963,12 @@ def build_report(
             "runtime_ready": False,
             "public_header_allowed": False,
         },
+        "identifier_redaction_evidence": identifier_redaction_evidence,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": [
             "offline gap report does not require approved runtime evidence",
+            "identifier-redaction evidence is contract-review input only and does not resolve the full privacy blocker",
             "blocked player identity state does not add public header symbols, capability bits, callbacks, lookup, persistence, mutation, return override, or v1 SDK readiness",
         ],
     }
@@ -893,9 +986,10 @@ def main() -> int:
     surface = validate_surfaces(surfaces, blockers) if surfaces else {}
     if candidate:
         validate_private_candidate(candidate, blockers)
+    identifier_redaction_evidence = validate_identifier_redaction_evidence(args.identifier_redaction_evidence, blockers)
     header_scan = scan_public_header(args.public_header, blockers)
 
-    report = build_report(args, blockers, decisions, surface, header_scan, candidate)
+    report = build_report(args, blockers, decisions, surface, header_scan, candidate, identifier_redaction_evidence)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif blockers:

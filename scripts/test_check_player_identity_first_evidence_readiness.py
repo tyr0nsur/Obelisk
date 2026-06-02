@@ -457,6 +457,15 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertTrue(payload["static_orientation"]["valid"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
+        public_contract_gap = payload["first_evidence"]["public_contract_gap_report"]
+        self.assertTrue(public_contract_gap["ready"])
+        self.assertEqual(public_contract_gap["primary_offline_gap"], "lifetime.generation_scope_invalidation")
+        self.assertEqual(public_contract_gap["contract_review_inputs_resolved"], ["privacy.identifier_redaction"])
+        self.assertTrue(public_contract_gap["identifier_redaction_evidence"]["accepted_for_contract_review"])
+        self.assertFalse(public_contract_gap["promotion_ready"])
+        self.assertFalse(public_contract_gap["public_sdk_ready"])
+        self.assertFalse(public_contract_gap["runtime_ready"])
+        self.assertFalse(public_contract_gap["public_header_allowed"])
 
     def test_rejected_artifact_root_does_not_emit_copy_paste_protected_recipe_paths(self) -> None:
         result = self.run_checker(

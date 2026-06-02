@@ -171,6 +171,12 @@ def parse_args() -> argparse.Namespace:
         help="Private candidate-only identity contract for the offline gap guardrail.",
     )
     parser.add_argument(
+        "--player-identity-identifier-redaction-evidence",
+        type=Path,
+        default=REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json",
+        help="Sanitized identifier-redaction evidence consumed as contract-review input only.",
+    )
+    parser.add_argument(
         "--public-header",
         type=Path,
         default=REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h",
@@ -1578,6 +1584,7 @@ def player_identity_public_contract_gap_diagnosis(
     decisions: Path,
     surfaces: Path,
     private_candidate_contract: Path,
+    identifier_redaction_evidence: Path,
     public_header: Path,
 ) -> dict[str, Any]:
     blockers: list[str] = []
@@ -1598,11 +1605,16 @@ def player_identity_public_contract_gap_diagnosis(
     )
     if candidate_payload:
         public_contract_gap_report.validate_private_candidate(candidate_payload, report_blockers)
+    redaction_diagnosis = public_contract_gap_report.validate_identifier_redaction_evidence(
+        identifier_redaction_evidence,
+        report_blockers,
+    )
     header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
     args = argparse.Namespace(
         decisions=decisions,
         surfaces=surfaces,
         private_candidate_contract=private_candidate_contract,
+        identifier_redaction_evidence=identifier_redaction_evidence,
         public_header=public_header,
     )
     report = public_contract_gap_report.build_report(
@@ -1612,6 +1624,7 @@ def player_identity_public_contract_gap_diagnosis(
         surface,
         header_scan,
         candidate_payload,
+        redaction_diagnosis,
     )
 
     if report.get("schema") != public_contract_gap_report.SCHEMA:
@@ -1620,7 +1633,11 @@ def player_identity_public_contract_gap_diagnosis(
         blockers.append("player_identity_public_contract_gap_guardrail_not_passed")
     if report.get("status") != "blocked":
         blockers.append("player_identity_public_contract_gap_status_not_blocked")
-    if report.get("primary_offline_gap") != public_contract_gap_report.PRIMARY_OFFLINE_GAP:
+    allowed_primary_gaps = {
+        public_contract_gap_report.PRIMARY_OFFLINE_GAP,
+        public_contract_gap_report.PRIMARY_OFFLINE_GAP_AFTER_IDENTIFIER_REDACTION,
+    }
+    if report.get("primary_offline_gap") not in allowed_primary_gaps:
         blockers.append("player_identity_public_contract_gap_primary_gap_mismatch")
     if report.get("runtime_evidence_missing") is not True:
         blockers.append("player_identity_public_contract_gap_runtime_evidence_missing_not_true")
@@ -1635,6 +1652,8 @@ def player_identity_public_contract_gap_diagnosis(
         "guardrail_passed": report.get("guardrail_passed") is True,
         "status": report.get("status"),
         "primary_offline_gap": report.get("primary_offline_gap"),
+        "contract_review_inputs_resolved": report.get("contract_review_inputs_resolved", []),
+        "identifier_redaction_evidence": report.get("identifier_redaction_evidence", {}),
         "runtime_evidence_missing": report.get("runtime_evidence_missing"),
         "accepted_for_contract_review": False,
         "promotion_ready": False,
@@ -2358,6 +2377,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             args,
             "player_identity_private_candidate_contract",
             REPO_ROOT / "docs" / "research" / "2026-06-01-player-identity-private-candidate-contract.json",
+        ),
+        identifier_redaction_evidence=getattr(
+            args,
+            "player_identity_identifier_redaction_evidence",
+            REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json",
         ),
         public_header=getattr(args, "public_header", REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"),
     )

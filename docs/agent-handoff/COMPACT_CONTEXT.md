@@ -976,6 +976,13 @@ priorities, and do not use history files as the active source of truth.
   `resolved_inputs=[privacy.identifier_redaction]` and all readiness/header flags false.
   Public-contract readiness consumes it only as contract-review input; SDK and route gates
   remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`.
+- 2026-06-02 delegated gap/runtime audit round: public-contract gap report now consumes
+  the sanitized redaction evidence and moves the visible offline gap to
+  `lifetime.generation_scope_invalidation` without opening readiness. First-evidence,
+  route, and SDK aggregation were updated for the new report shape. Runtime evidence bundle
+  building now calls the window-manifest checker with explicit `--post-window-replay`,
+  which tolerates only nested `approved_window_expired` after the capture window; normal
+  pre-window request approval remains strict. No runtime/server operation was performed.
 
 ## Agent Coordination
 

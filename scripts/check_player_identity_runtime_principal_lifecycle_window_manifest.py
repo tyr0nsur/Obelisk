@@ -167,6 +167,15 @@ def parse_args() -> argparse.Namespace:
             "and run_id from an existing approved-workspace live-validation log copy."
         ),
     )
+    parser.add_argument(
+        "--post-window-replay",
+        action="store_true",
+        help=(
+            "Validate a completed copied evidence window after its approved runtime window "
+            "has expired. This tolerates only the nested approved_window_expired request "
+            "checker blocker; pre-window approval checks remain strict by default."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -613,7 +622,17 @@ def read_preflight_checked_at_utc(
     return parse_utc_timestamp(checked_at_utc)
 
 
-def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers: list[dict[str, Any]]) -> None:
+def request_check_failed_only_because_window_expired(request_check_blockers: Any) -> bool:
+    return isinstance(request_check_blockers, list) and set(request_check_blockers) == {"approved_window_expired"}
+
+
+def validate_request_pack(
+    fields: dict[str, str],
+    manifest_path: Path,
+    blockers: list[dict[str, Any]],
+    *,
+    post_window_replay: bool = False,
+) -> None:
     path_text = fields.get("request_pack_path")
     if not path_text:
         return
@@ -739,7 +758,16 @@ def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers:
                 payload_check = parsed
         except json.JSONDecodeError:
             payload_check = None
-    if (
+    request_check_blockers = (payload_check or {}).get("blockers", [])
+    replay_tolerated_expiry = (
+        post_window_replay
+        and result.returncode != 0
+        and isinstance(payload_check, dict)
+        and payload_check.get("ready") is not True
+        and payload_check.get("request_pack_ready") is not True
+        and request_check_failed_only_because_window_expired(request_check_blockers)
+    )
+    if not replay_tolerated_expiry and (
         result.returncode != 0
         or not isinstance(payload_check, dict)
         or payload_check.get("ready") is not True
@@ -750,7 +778,7 @@ def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers:
             "request_pack_window_request_check_failed",
             "request_pack_path",
             exit_code=result.returncode,
-            request_check_blockers=(payload_check or {}).get("blockers", []),
+            request_check_blockers=request_check_blockers,
         )
 
 
@@ -771,7 +799,12 @@ def validate_user_policy(fields: dict[str, str], blockers: list[dict[str, Any]])
     return value
 
 
-def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation:
+def validate_manifest(
+    fields: dict[str, str],
+    manifest_path: Path,
+    *,
+    post_window_replay: bool = False,
+) -> Validation:
     blockers: list[dict[str, Any]] = []
     timestamps: dict[str, datetime] = {}
     for key in sorted(fields):
@@ -858,7 +891,7 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
         expected_mode="stable",
         target=target,
     )
-    validate_request_pack(fields, manifest_path, blockers)
+    validate_request_pack(fields, manifest_path, blockers, post_window_replay=post_window_replay)
     user_policy = validate_user_policy(fields, blockers)
 
     for key in ("pre_posture", "post_posture"):
@@ -1107,7 +1140,13 @@ def write_template(path: Path, copied_log: Path | None = None) -> None:
     resolved.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def build_report(fields: dict[str, str], validation: Validation, manifest_path: Path) -> dict[str, Any]:
+def build_report(
+    fields: dict[str, str],
+    validation: Validation,
+    manifest_path: Path,
+    *,
+    post_window_replay: bool = False,
+) -> dict[str, Any]:
     accepted = not validation.blockers
     manifest_status = protected_paths.protected_path_status(
         manifest_path,
@@ -1143,6 +1182,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
         "schema": REPORT_SCHEMA,
         "ready": accepted,
         "operational_window_manifest_ready": accepted,
+        "post_window_replay": post_window_replay,
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
@@ -1245,8 +1285,8 @@ def main() -> int:
     if args.manifest is None:
         raise SystemExit("manifest is required unless --emit-template is used")
     fields = load_manifest(args.manifest)
-    validation = validate_manifest(fields, args.manifest)
-    report = build_report(fields, validation, args.manifest)
+    validation = validate_manifest(fields, args.manifest, post_window_replay=args.post_window_replay)
+    report = build_report(fields, validation, args.manifest, post_window_replay=args.post_window_replay)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif validation.blockers:
