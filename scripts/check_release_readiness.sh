@@ -542,6 +542,27 @@ else:
         errors.append("promotion_gate.ready must be true")
     if promotion_gate.get("blockers") != []:
         errors.append("promotion_gate.blockers must be empty")
+    if promotion_gate.get("ready_scope") != "layout_only":
+        errors.append("promotion_gate.ready_scope must be layout_only")
+    if promotion_gate.get("layout_ready") is not True:
+        errors.append("promotion_gate.layout_ready must be true")
+    if promotion_gate.get("promotion_ready") is not False:
+        errors.append("promotion_gate.promotion_ready must be false")
+    if promotion_gate.get("public_sdk_ready") is not False:
+        errors.append("promotion_gate.public_sdk_ready must be false")
+    if promotion_gate.get("runtime_ready") is not False:
+        errors.append("promotion_gate.runtime_ready must be false")
+
+if report.get("evidence_scope") != "second_source_layout_evidence_only":
+    errors.append("evidence_scope must be second_source_layout_evidence_only")
+
+not_promoted_surfaces = report.get("not_promoted_surfaces")
+if not isinstance(not_promoted_surfaces, list) or not not_promoted_surfaces:
+    errors.append("not_promoted_surfaces must be a non-empty list")
+
+non_claims = report.get("non_claims")
+if not isinstance(non_claims, list) or not non_claims:
+    errors.append("non_claims must be a non-empty list")
 
 target_sets = report.get("target_sets")
 if not isinstance(target_sets, list) or target_set not in target_sets:

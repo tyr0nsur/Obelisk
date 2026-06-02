@@ -464,6 +464,29 @@ This file is an active routing table only. Durable evidence belongs in
   reuse/wraparound semantics with a future-runtime-observation-plan only after an
   operator-approved live-ops brief names the exact debug target.
 - Transfer `bAccept` and transfer planning does not authorize Transfer runtime work.
+- Latest supervised guardrail round hardened P0/release accounting without changing
+  readiness:
+  - `scripts/check_public_sdk_v1_completion.py` now requires
+    `evidence.executed_test_report` for promoted P0 surfaces to be a repo-relative JSON
+    artifact using schema `obelisk.promoted-surface-test-execution-artifact.v1`, matching
+    the surface id, current HEAD, command/argv, `exit_code=0`, and a nonempty output or
+    provenance hash. Inline self-attested executed-test objects no longer satisfy
+    player identity, permissions/admin, command response, or commands/replies.
+  - P0 blocker rows now carry `route_gate_claim_satisfied=false` while the default
+    command/permission route gate remains
+    `lifecycle_anchor_first_evidence_provenance_unbound`; promoted-looking P0 evidence
+    cannot count toward complete-SDK progress until the route gate is unlocked.
+  - `scripts/check_release_readiness.sh` now rejects second-source readiness JSON that
+    omits the layout-only non-promotion envelope
+    (`ready_scope=layout_only`, `layout_ready=true`, promotion/public/runtime false,
+    `evidence_scope=second_source_layout_evidence_only`, non-promoted surfaces, and
+    non-claims).
+  - Release-statement broad-claim scanning now treats `not only`/`not merely` wording as
+    affirmative context, not as safe negation.
+  - `PluginManagerTests` covers partial `GameplayPolicyEvent` multi-dispatcher
+    registration rollback: injected ItemReturn registration failure after earlier
+    families returns handle `0` and leaves Structure/Inventory/ItemReturn subscription
+    counts at zero.
 
 ## Priority Next Steps
 

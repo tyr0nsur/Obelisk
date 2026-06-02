@@ -672,6 +672,74 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Executed-Test Artifact, Route-Gate, Release-Readiness, And ABI Rollback Closure
+
+The next supervised round closed four audit findings and added one runtime-core
+regression test without changing SDK readiness:
+
+- Promoted P0 `executed_test_report` evidence in
+  `scripts/check_public_sdk_v1_completion.py` must now be a repo-relative JSON artifact
+  using schema `obelisk.promoted-surface-test-execution-artifact.v1`. The artifact must
+  match the promoted surface id, name the current repository HEAD through one of the
+  accepted commit keys, include a nonempty command or argv, report `exit_code=0`, and
+  include a nonempty output/provenance hash. Inline
+  `obelisk.promoted-surface-test-execution.v1` objects no longer satisfy player identity,
+  permissions/admin, command response, or commands/replies structured evidence.
+- P0 completion accounting now receives the command/permission route-gate state. While
+  the default route remains `lifecycle_anchor_first_evidence_provenance_unbound`, P0 rows
+  expose `route_gate_claim_satisfied=false` and cannot increment complete-SDK or P0
+  promoted counts even if promoted-looking local evidence is present. If such rows appear,
+  the report emits `p0_dependency_chain_route_gate_locked`.
+- Release-statement broad-claim scanning now treats `not only`, `not merely`, `not just`,
+  and `not simply` as affirmative context instead of safe negation. Scoped release
+  statements containing phrases such as `Not only is Inventory SDK ready for v1` are
+  rejected.
+- `scripts/check_release_readiness.sh` now rejects thin second-source readiness JSON that
+  only says `promotion_gate.ready=true` with empty blockers. Accepted readiness reports
+  must keep the layout-only/non-promotion envelope:
+  `ready_scope=layout_only`, `layout_ready=true`, `promotion_ready=false`,
+  `public_sdk_ready=false`, `runtime_ready=false`,
+  `evidence_scope=second_source_layout_evidence_only`, non-promoted surfaces, and
+  non-claims.
+- `PluginManagerTests` now covers public `GameplayPolicyEvent` multi-dispatcher rollback.
+  A test-only seam injects ItemReturn registration failure after earlier Structure and
+  Inventory registrations. `RegisterGameplayPolicyEventWithOwnerTokenHandle(... MASK_ALL
+  ...)` returns `0`, and Structure, Inventory, and ItemReturn subscription counts remain
+  zero.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile scripts/check_public_sdk_v1_completion.py scripts/test_check_public_sdk_v1_completion.py`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 133 tests.
+- `bash scripts/test_check_release_readiness_options.sh` passed.
+- `cmake --build build --target plugin_manager_tests` passed.
+- `./build/plugin_manager_tests` passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed as expected with `stable_claim_allowed=false`, complete-SDK
+  progress `0/12`, and P0 progress `0/4`.
+- `git diff --check` passed.
+
+Remaining risks:
+
+- P0 promotion artifacts are now harder to replay, but future promoted artifacts should
+  still prefer canonical producer outputs or checker-rerun binding over manually authored
+  local JSON.
+- The default route remains blocked on source-bound lifecycle-anchor/principal-policy
+  planning provenance. Do not treat the new executed-test artifact contract as a route
+  unlock.
+- Second-source readiness acceptance is now fail-closed for the layout-only envelope, but
+  future producer changes should keep this boundary in both generated reports and release
+  gate validation.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command response, commands/replies, Inventory/Items SDKs, Structure SDK,
+Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a stable SDK
+claim.
+
 ## Command/Replies Structured Promotion Evidence And Alias Closure
 
 The next supervised round closed the remaining P0 synthetic promotion-accounting gap for

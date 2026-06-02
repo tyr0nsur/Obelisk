@@ -47,6 +47,7 @@ namespace Obelisk::Core
     void SetPluginRetentionFailureForTesting(bool enabled);
     void SetPublicChatMessageInternalUnregisterFailureForTesting(bool enabled);
     void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled);
+    void SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(bool enabled);
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token);
 }
 
@@ -2165,6 +2166,58 @@ namespace
 
         CleanupPlugin(plugin);
         CleanupPlugin(otherPlugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenGameplayPolicyMultiDispatcherRegistrationRollback()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_partial_registration_rollback");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_partial_registration_rollback.so",
+            .pluginId = "gameplay_policy_partial_registration_rollback",
+            .captureApi = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "rollback plugin was not initialized");
+        Require(plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle != nullptr,
+                "gameplay policy registration function was not exposed");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "rollback test started with structure subscriptions");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "rollback test started with inventory subscriptions");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "rollback test started with item-return subscriptions");
+
+        Obelisk::Core::SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(true);
+        const uint64_t registrationId =
+            plugin.capturedApi.RegisterGameplayPolicyEventWithOwnerTokenHandle(
+                plugin.initOwnerToken,
+                OBELISK_GAMEPLAY_POLICY_EVENT_MASK_ALL,
+                FakeGameplayPolicyEventCallback,
+                &plugin);
+        Obelisk::Core::SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(false);
+
+        Require(registrationId == 0,
+                "partial gameplay policy multi-dispatcher registration did not fail closed");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "partial gameplay policy registration left structure subscription behind");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "partial gameplay policy registration left inventory subscription behind");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "partial gameplay policy registration left item-return subscription behind");
+
+        manager.UnloadAll();
+        CleanupPlugin(plugin);
         fs::remove_all(root);
     }
 
@@ -6233,6 +6286,7 @@ int main()
     TestInitExceptionCleansInitThreadOwnerTokenCallbackAndToken();
     TestOwnerTokenHandleRegistrationCanUnregister();
     TestOwnerTokenGameplayPolicyEventRegistrationCanUnregister();
+    TestOwnerTokenGameplayPolicyMultiDispatcherRegistrationRollback();
     TestOwnerTokenGameplayPolicyRegistrationRejectedDuringShutdown();
     TestOwnerTokenGameplayPolicyUnregisterAllowedDuringShutdown();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();

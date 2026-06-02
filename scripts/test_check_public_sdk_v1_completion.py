@@ -17,12 +17,69 @@ PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
 SCOPED_RELEASE_STATEMENT_TEMPLATE = (
     REPO_ROOT / "release" / "v1" / "public-sdk" / "scoped-release-statement-template.md"
 )
+PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA = (
+    "obelisk.promoted-surface-test-execution-artifact.v1"
+)
 EXPERIMENTAL_EXCLUSION_DETAILS = {
     "obelisk.gameplay_policy_event.v1": "GameplayPolicyEvent is not included in v1.",
     "obelisk.chat_message.v1": "ChatMessageEvent is not included in v1.",
     "obelisk.chat.local_routing.v1": "chat routing is not included in v1.",
     "obelisk.inventory_item_copied_signals.v1": "inventory copied signals are not included in v1.",
 }
+
+
+def current_repo_head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ).stdout.strip()
+
+
+def write_executed_test_artifact(
+    path: Path,
+    surface_id: str,
+    *,
+    command: str | None = None,
+    argv: list[str] | None = None,
+) -> str:
+    payload: dict[str, object] = {
+        "schema": PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA,
+        "surface_id": surface_id,
+        "obelisk_commit": current_repo_head(),
+        "exit_code": 0,
+        "output_sha256": "0" * 64,
+    }
+    if argv is not None:
+        payload["argv"] = argv
+    else:
+        payload["command"] = command or f"python3 -m unittest {surface_id}"
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    return str(path.relative_to(REPO_ROOT))
+
+
+def inline_executed_test_report(surface_id: str, abi_path: Path, sdk_path: Path) -> dict[str, object]:
+    return {
+        "schema": "obelisk.promoted-surface-test-execution.v1",
+        "surface_id": surface_id,
+        "abi_tests": [
+            {
+                "path": str(abi_path.relative_to(REPO_ROOT)),
+                "command": f"python3 -m unittest {surface_id}.abi",
+                "status": "passed",
+            }
+        ],
+        "sdk_consumer_tests": [
+            {
+                "path": str(sdk_path.relative_to(REPO_ROOT)),
+                "command": f"cmake --build {surface_id}.sdk_consumer",
+                "status": "passed",
+            }
+        ],
+    }
 
 
 def complete_excluded_manifest() -> tuple[dict, str]:
@@ -1856,6 +1913,35 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "This is not just a runtime RC and the complete SDK is ready.",
             "\n".join(payload["release_statement_forbidden_broad_claims"]),
         )
+
+    def test_scoped_release_statement_scope_rejects_affirmative_not_only_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "Not only is Inventory SDK ready for v1, command response is ready too.\n"
+                + "Not merely is the complete SDK ready, it is stable.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        forbidden_claims = "\n".join(payload["release_statement_forbidden_broad_claims"])
+        self.assertIn("Not only is Inventory SDK ready for v1", forbidden_claims)
+        self.assertIn("Not merely is the complete SDK ready", forbidden_claims)
 
     def test_scoped_release_statement_scope_rejects_v1_stable_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4964,6 +5050,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             permissions_sdk_test = sdk_path / "permissions_admin_promotion_plugin.c"
             identity_runtime_report = core_path / "player_identity_approved_runtime_report.json"
             identity_contract_report = core_path / "player_identity_public_contract_readiness_report.json"
+            identity_executed_report = core_path / "player_identity_executed_tests.json"
             for path in (identity_abi_test, identity_sdk_test, permissions_abi_test, permissions_sdk_test):
                 path.write_text("// synthetic promotion evidence fixture\n", encoding="utf-8")
             identity_runtime_report.write_text(
@@ -4998,6 +5085,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            identity_executed_report_path = write_executed_test_artifact(
+                identity_executed_report,
+                "obelisk.player_identity.v1",
+                argv=["python3", "-m", "unittest", "player_identity_promotion"],
+            )
 
             manifest, release_statement = complete_excluded_manifest()
             promoted_ids = {"obelisk.player_identity.v1", "obelisk.permissions_admin.v1"}
@@ -5013,24 +5105,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "sdk_consumer_tests": [str(identity_sdk_test.relative_to(REPO_ROOT))],
                         "approved_runtime_evidence_report": str(identity_runtime_report.relative_to(REPO_ROOT)),
                         "public_contract_readiness_report": str(identity_contract_report.relative_to(REPO_ROOT)),
-                        "executed_test_report": {
-                            "schema": "obelisk.promoted-surface-test-execution.v1",
-                            "surface_id": "obelisk.player_identity.v1",
-                            "abi_tests": [
-                                {
-                                    "path": str(identity_abi_test.relative_to(REPO_ROOT)),
-                                    "command": "python3 -m unittest player_identity_abi",
-                                    "status": "passed",
-                                }
-                            ],
-                            "sdk_consumer_tests": [
-                                {
-                                    "path": str(identity_sdk_test.relative_to(REPO_ROOT)),
-                                    "command": "cmake --build player_identity_sdk_consumer",
-                                    "status": "passed",
-                                }
-                            ],
-                        },
+                        "executed_test_report": identity_executed_report_path,
                         "terms": [
                             "obelisk.core-dump-evidence-pack.v1",
                             "obelisk.reflection-inventory-pack.v1",
@@ -5296,6 +5371,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(rows[0]["structured_promotion_evidence_satisfied"])
         self.assertFalse(rows[0]["counts_toward_complete_sdk_claim"])
 
+    def test_p0_row_does_not_count_while_route_gate_identity_locked(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        original_surface_has_promotion_evidence = module.surface_has_promotion_evidence
+        original_missing_required = module.surface_missing_required_promotion_evidence
+        original_missing_structured = module.surface_missing_structured_promotion_evidence
+        try:
+            module.surface_has_promotion_evidence = lambda surface: True
+            module.surface_missing_required_promotion_evidence = lambda surface: []
+            module.surface_missing_structured_promotion_evidence = lambda surface: []
+
+            rows = module.completion_blocker_outcome_rows(
+                ["obelisk.player_identity.v1"],
+                {
+                    "obelisk.player_identity.v1": {
+                        "id": "obelisk.player_identity.v1",
+                        "status": "promoted",
+                        "evidence": {},
+                    }
+                },
+                set(),
+                "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence.\n",
+                {
+                    "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+                },
+            )
+        finally:
+            module.surface_has_promotion_evidence = original_surface_has_promotion_evidence
+            module.surface_missing_required_promotion_evidence = original_missing_required
+            module.surface_missing_structured_promotion_evidence = original_missing_structured
+
+        self.assertTrue(rows[0]["promotion_evidence_satisfied"])
+        self.assertTrue(rows[0]["structured_promotion_evidence_satisfied"])
+        self.assertFalse(rows[0]["route_gate_claim_satisfied"])
+        self.assertFalse(rows[0]["counts_toward_complete_sdk_claim"])
+
     def test_commands_replies_requires_response_path_semantic_evidence_terms(self) -> None:
         import importlib.util
 
@@ -5368,6 +5485,79 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_inline_executed_reports_do_not_satisfy_p0_structured_evidence(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        surfaces = (
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+            "obelisk.commands_replies.v1",
+        )
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="InlineExecutedReport",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="inline_executed_report",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            for surface_id in surfaces:
+                abi_test = core_path / f"{surface_id.removeprefix('obelisk.').removesuffix('.v1')}_abi.cpp"
+                sdk_test = sdk_path / f"{surface_id.removeprefix('obelisk.').removesuffix('.v1')}_plugin.c"
+                abi_test.write_text("// inline report fixture\n", encoding="utf-8")
+                sdk_test.write_text("// inline report fixture\n", encoding="utf-8")
+
+                missing = module.executed_test_report_missing(
+                    {
+                        "executed_test_report": inline_executed_test_report(
+                            surface_id,
+                            abi_test,
+                            sdk_test,
+                        )
+                    },
+                    surface_id,
+                )
+
+                self.assertEqual(missing, ["executed_test_report:missing"])
+
+    def test_repo_relative_executed_test_artifact_satisfies_subcheck(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="ExecutedReportArtifact",
+        ) as core_dir:
+            artifact = Path(core_dir) / "permissions_admin_executed_tests.json"
+            artifact_path = write_executed_test_artifact(
+                artifact,
+                "obelisk.permissions_admin.v1",
+                argv=["python3", "-m", "unittest", "permissions_admin_promotion"],
+            )
+
+            missing = module.executed_test_report_missing(
+                {"executed_test_report": artifact_path},
+                "obelisk.permissions_admin.v1",
+            )
+
+        self.assertEqual(missing, [])
+
     def test_commands_replies_accepts_complete_structured_command_response_dependency_evidence(self) -> None:
         import importlib.util
 
@@ -5393,6 +5583,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             response_sdk = sdk_path / "command_chat_response_promotion_plugin.c"
             replies_abi = core_path / "CommandsRepliesPromotionTests.cpp"
             replies_sdk = sdk_path / "commands_replies_promotion_plugin.c"
+            response_executed_report = core_path / "command_response_executed_tests.json"
+            replies_executed_report = core_path / "commands_replies_executed_tests.json"
             for path in (response_abi, response_sdk, replies_abi, replies_sdk):
                 path.write_text("// synthetic executed promotion fixture\n", encoding="utf-8")
             response_report = core_path / "command_response_public_readiness.json"
@@ -5447,42 +5639,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            response_executed = {
-                "schema": "obelisk.promoted-surface-test-execution.v1",
-                "surface_id": "obelisk.command_chat_response_path.v1",
-                "abi_tests": [
-                    {
-                        "path": str(response_abi.relative_to(REPO_ROOT)),
-                        "command": "python3 -m unittest command_response_abi",
-                        "status": "passed",
-                    }
-                ],
-                "sdk_consumer_tests": [
-                    {
-                        "path": str(response_sdk.relative_to(REPO_ROOT)),
-                        "command": "cmake --build command_response_sdk_consumer",
-                        "status": "passed",
-                    }
-                ],
-            }
-            replies_executed = {
-                "schema": "obelisk.promoted-surface-test-execution.v1",
-                "surface_id": "obelisk.commands_replies.v1",
-                "abi_tests": [
-                    {
-                        "path": str(replies_abi.relative_to(REPO_ROOT)),
-                        "command": "python3 -m unittest commands_replies_abi",
-                        "status": "passed",
-                    }
-                ],
-                "sdk_consumer_tests": [
-                    {
-                        "path": str(replies_sdk.relative_to(REPO_ROOT)),
-                        "command": "cmake --build commands_replies_sdk_consumer",
-                        "status": "passed",
-                    }
-                ],
-            }
+            response_executed = write_executed_test_artifact(
+                response_executed_report,
+                "obelisk.command_chat_response_path.v1",
+                command="python3 -m unittest command_response_promotion",
+            )
+            replies_executed = write_executed_test_artifact(
+                replies_executed_report,
+                "obelisk.commands_replies.v1",
+                argv=["cmake", "--build", "commands_replies_sdk_consumer"],
+            )
 
             missing = module.surface_missing_structured_promotion_evidence(
                 {

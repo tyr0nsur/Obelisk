@@ -408,7 +408,18 @@ assert_readiness_json_validates() {
   "schema": "obelisk.reflection-snapshot-readiness.v1",
   "gate_mode": "second_source_promotion",
   "second_source_status": "compared",
-  "promotion_gate": {"ready": true, "blockers": []},
+  "evidence_scope": "second_source_layout_evidence_only",
+  "not_promoted_surfaces": ["ObeliskApi.RegisterCommandResponseCallback"],
+  "non_claims": ["layout evidence only; not public SDK readiness"],
+  "promotion_gate": {
+    "ready": true,
+    "blockers": [],
+    "ready_scope": "layout_only",
+    "layout_ready": true,
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false
+  },
   "target_sets": ["minimal-second-source-intake"],
   "totals": {
     "targets": 1,
@@ -475,12 +486,57 @@ assert_readiness_json_rejected \
     '{"promotion_gate":{"ready":true}}' \
     "schema must be obelisk.reflection-snapshot-readiness.v1"
 assert_readiness_json_rejected \
-    "wrong-target-set" \
+    "thin-ready-without-layout-boundary" \
     '{
   "schema": "obelisk.reflection-snapshot-readiness.v1",
   "gate_mode": "second_source_promotion",
   "second_source_status": "compared",
   "promotion_gate": {"ready": true, "blockers": []},
+  "target_sets": ["minimal-second-source-intake"],
+  "totals": {
+    "targets": 1,
+    "comparable": 1,
+    "blocked": 0,
+    "second_source_accepted": 1,
+    "second_source_rejected": 0,
+    "second_source_inconclusive": 0,
+    "second_source_missing": 0
+  },
+  "modules": [{
+    "schema": "ufunction",
+    "module": "sdk_inventory",
+    "targets": 1,
+    "comparable": 1,
+    "blocked": 0,
+    "second_source": {"accepted": 1, "rejected": 0, "inconclusive": 0, "missing": 0},
+    "target_details": [{
+      "target": "obelisk.ufunction-chain.snapshot.v1:PrimalItem.CanUse",
+      "path": "sha/sdk_inventory/PrimalItem.CanUse.json",
+      "comparable": true,
+      "block_reasons": [],
+      "second_source_status": "accepted"
+    }]
+  }]
+}' \
+    "promotion_gate.ready_scope must be layout_only"
+assert_readiness_json_rejected \
+    "wrong-target-set" \
+    '{
+  "schema": "obelisk.reflection-snapshot-readiness.v1",
+  "gate_mode": "second_source_promotion",
+  "second_source_status": "compared",
+  "evidence_scope": "second_source_layout_evidence_only",
+  "not_promoted_surfaces": ["ObeliskApi.RegisterCommandResponseCallback"],
+  "non_claims": ["layout evidence only; not public SDK readiness"],
+  "promotion_gate": {
+    "ready": true,
+    "blockers": [],
+    "ready_scope": "layout_only",
+    "layout_ready": true,
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false
+  },
   "target_sets": ["buff-compact-intake"],
   "totals": {
     "targets": 1,
@@ -548,7 +604,18 @@ assert_readiness_json_rejected \
   "schema": "obelisk.reflection-snapshot-readiness.v1",
   "gate_mode": "second_source_promotion",
   "second_source_status": "compared",
-  "promotion_gate": {"ready": true, "blockers": []},
+  "evidence_scope": "second_source_layout_evidence_only",
+  "not_promoted_surfaces": ["ObeliskApi.RegisterCommandResponseCallback"],
+  "non_claims": ["layout evidence only; not public SDK readiness"],
+  "promotion_gate": {
+    "ready": true,
+    "blockers": [],
+    "ready_scope": "layout_only",
+    "layout_ready": true,
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false
+  },
   "target_sets": ["minimal-second-source-intake"],
   "totals": {"targets": 0}
 }' \
@@ -681,7 +748,18 @@ assert_scriptstruct_readiness_json_validates() {
   "schema": "obelisk.reflection-snapshot-readiness.v1",
   "gate_mode": "second_source_promotion",
   "second_source_status": "compared",
-  "promotion_gate": {"ready": true, "blockers": []},
+  "evidence_scope": "second_source_layout_evidence_only",
+  "not_promoted_surfaces": ["ObeliskApi.RegisterTransferPolicyCallback"],
+  "non_claims": ["layout evidence only; not public SDK readiness"],
+  "promotion_gate": {
+    "ready": true,
+    "blockers": [],
+    "ready_scope": "layout_only",
+    "layout_ready": true,
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false
+  },
   "target_sets": ["transfer-scriptstruct"],
   "totals": {
     "targets": 1,
@@ -816,7 +894,18 @@ assert_run_second_source_uses_temp_report_dir_and_validates_json() {
   "schema": "obelisk.reflection-snapshot-readiness.v1",
   "gate_mode": "second_source_promotion",
   "second_source_status": "compared",
-  "promotion_gate": {"ready": true, "blockers": []},
+  "evidence_scope": "second_source_layout_evidence_only",
+  "not_promoted_surfaces": ["ObeliskApi.RegisterCommandResponseCallback"],
+  "non_claims": ["layout evidence only; not public SDK readiness"],
+  "promotion_gate": {
+    "ready": true,
+    "blockers": [],
+    "ready_scope": "layout_only",
+    "layout_ready": true,
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "runtime_ready": false
+  },
   "target_sets": ["minimal-second-source-intake"],
   "totals": {
     "targets": 1,

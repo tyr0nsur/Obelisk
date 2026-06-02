@@ -673,6 +673,28 @@ priorities, and do not use history files as the active source of truth.
   regression test preserving candidate-only/non-promotion semantics. The raw layout helper
   rejects artifact roots under the repository to match
   `validate_player_identity_raw_inputs.py` and the offline preflight note.
+- Latest local integration checkpoint on 2026-06-02 hardened SDK/release accounting but
+  did not change readiness:
+  - `scripts/check_public_sdk_v1_completion.py` requires promoted P0
+    `executed_test_report` evidence to be a repo-relative
+    `obelisk.promoted-surface-test-execution-artifact.v1` JSON artifact tied to the
+    current HEAD, surface id, command/argv, zero exit code, and output/provenance hash.
+    Inline self-attested executed-test objects no longer satisfy P0 structured evidence.
+  - P0 rows cannot count toward complete-SDK progress while the default
+    command/permission route gate remains
+    `lifecycle_anchor_first_evidence_provenance_unbound`; rows expose
+    `route_gate_claim_satisfied=false` and promoted-looking rows are blocked by
+    `p0_dependency_chain_route_gate_locked`.
+  - `scripts/check_release_readiness.sh` rejects thin second-source readiness JSON that
+    omits the explicit layout-only/non-promotion envelope. Valid release readiness
+    fixtures now include `ready_scope=layout_only`, `layout_ready=true`,
+    promotion/public/runtime false, `evidence_scope=second_source_layout_evidence_only`,
+    `not_promoted_surfaces`, and `non_claims`.
+  - Release statement scanning treats `not only`/`not merely` as affirmative overclaim
+    context.
+  - `PluginManagerTests` includes a test-only injected ItemReturn registration failure
+    proving public `GameplayPolicyEvent` multi-dispatcher registration rolls back
+    Structure/Inventory/ItemReturn subscriptions and returns handle `0`.
 
 ## Agent Coordination
 

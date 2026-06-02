@@ -41,6 +41,7 @@ namespace Obelisk::Core
         std::atomic_bool g_ForcePluginRetentionFailureForTesting{false};
         std::atomic_bool g_ForcePublicChatMessageInternalUnregisterFailureForTesting{false};
         std::atomic_bool g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting{false};
+        std::atomic_bool g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting{false};
 #endif
 
         struct GameplayPolicyRegistration
@@ -1425,6 +1426,14 @@ namespace Obelisk::Core
                 {
                     auto state = std::make_unique<GameplayPolicyEventCallbackState>(
                         GameplayPolicyEventCallbackState{eventKindMask, callback, userData});
+#ifdef OBELISK_PLUGIN_MANAGER_ENABLE_TEST_HOOKS
+                    if (g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting.load(
+                            std::memory_order_acquire))
+                    {
+                        throw std::runtime_error(
+                            "injected public gameplay policy item-return registration failure");
+                    }
+#endif
                     registration.ItemReturnRegistrationId = ItemReturnEventDispatcher::Get().Register(
                         owner,
                         ItemReturnEventSubscription{
@@ -2241,6 +2250,13 @@ namespace Obelisk::Core
     void SetPublicGameplayPolicyInternalUnregisterFailureForTesting(bool enabled)
     {
         g_ForcePublicGameplayPolicyInternalUnregisterFailureForTesting.store(enabled, std::memory_order_release);
+    }
+
+    void SetPublicGameplayPolicyItemReturnRegistrationThrowForTesting(bool enabled)
+    {
+        g_ForcePublicGameplayPolicyItemReturnRegistrationThrowForTesting.store(
+            enabled,
+            std::memory_order_release);
     }
 
     void ClearPluginOwnerLifecycleForTesting(void* owner, uint64_t token)

@@ -383,6 +383,25 @@ GENERIC_SCRIPT_EVIDENCE_DENYLIST = {
     "scripts/check_release_readiness.sh",
     "scripts/check_public_sdk_v1_completion.py",
 }
+PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA = (
+    "obelisk.promoted-surface-test-execution-artifact.v1"
+)
+PROMOTED_SURFACE_TEST_EXECUTION_COMMIT_KEYS = (
+    "head",
+    "current_head",
+    "git_head",
+    "obelisk_commit",
+)
+PROMOTED_SURFACE_TEST_EXECUTION_HASH_KEYS = (
+    "output_hash",
+    "output_sha256",
+    "stdout_sha256",
+    "stderr_sha256",
+    "combined_output_sha256",
+    "provenance_hash",
+    "artifact_hash",
+    "artifact_sha256",
+)
 AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"\b(?:complete|full|production|stable)\s+(?:[a-z0-9_/+-]+\s+){0,5}(?:sdk|api|support)\b",
     r"\b(?:sdk|api|surface|capability|support)\s+"
@@ -484,6 +503,10 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS = re.compile(
     r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|limited|"
     r"must\s+not|no|not|post-v1|post v1)\b",
+    re.IGNORECASE,
+)
+FORBIDDEN_RELEASE_STATEMENT_AFFIRMATIVE_NOT_PHRASE = re.compile(
+    r"\bnot\s+(?:only|merely|just|simply)\b",
     re.IGNORECASE,
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER = re.compile(
@@ -1570,9 +1593,18 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                 claim_clause = lowered[clause_start : match.end()]
                 claim_remainder = lowered[match.end() : clause_end]
                 full_clause = lowered[clause_start:clause_end]
-                if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix):
+                affirmative_not_phrase = FORBIDDEN_RELEASE_STATEMENT_AFFIRMATIVE_NOT_PHRASE.search(
+                    full_clause
+                )
+                if (
+                    FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_prefix)
+                    and affirmative_not_phrase is None
+                ):
                     continue
-                if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_clause):
+                if (
+                    FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATORS.search(claim_clause)
+                    and affirmative_not_phrase is None
+                ):
                     continue
                 if FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_NEGATED_REMAINDER.search(claim_remainder):
                     continue
@@ -1586,7 +1618,7 @@ def release_statement_forbidden_broad_claims(text: str) -> list[str]:
                     r"\s*(?:blocked|cannot|does\s+not|do\s+not|excluded|insufficient|"
                     r"limited|must\s+not|no|not|post-v1|post v1)\b",
                     claim_clause,
-                ):
+                ) and affirmative_not_phrase is None:
                     continue
                 offenders.append(f"line {line_number}: {line.strip()}")
                 break
@@ -2019,6 +2051,107 @@ def load_repo_relative_json_evidence(raw_path: Any) -> tuple[dict[str, Any] | No
     return payload, None
 
 
+def current_repo_head() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    head = result.stdout.strip()
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", head):
+        return None
+    return head
+
+
+def load_repo_relative_json_artifact(raw_path: Any) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None, "missing"
+    if Path(raw_path).is_absolute():
+        return None, "path_not_repo_relative"
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return None, "path_not_repo_relative"
+    path = REPO_ROOT / relative
+    if not path.is_file():
+        return None, "path_not_file"
+    if path.suffix.lower() != ".json":
+        return None, "path_not_json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "json_unreadable"
+    if not isinstance(payload, dict):
+        return None, "json_not_object"
+    return payload, None
+
+
+def executed_test_artifact_has_command(report: dict[str, Any]) -> bool:
+    command = report.get("command")
+    if isinstance(command, str) and command.strip():
+        return True
+    argv = report.get("argv")
+    return (
+        isinstance(argv, list)
+        and bool(argv)
+        and all(isinstance(item, str) and item.strip() for item in argv)
+    )
+
+
+def executed_test_artifact_has_hash(report: dict[str, Any]) -> bool:
+    for key in PROMOTED_SURFACE_TEST_EXECUTION_HASH_KEYS:
+        value = report.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+    for key in ("output", "provenance"):
+        value = report.get(key)
+        if not isinstance(value, dict):
+            continue
+        for nested_key in ("hash", "sha256", "digest"):
+            nested_value = value.get(nested_key)
+            if isinstance(nested_value, str) and nested_value.strip():
+                return True
+    return False
+
+
+def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> list[str]:
+    missing: list[str] = []
+    executed, error = load_repo_relative_json_artifact(evidence.get("executed_test_report"))
+    if error is not None:
+        return [f"executed_test_report:{error}"]
+    if executed.get("schema") != PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA:
+        missing.append("executed_test_report:schema_invalid")
+    if executed.get("surface_id") != surface_id:
+        missing.append("executed_test_report:surface_id_invalid")
+    current_head = current_repo_head()
+    if current_head is None:
+        missing.append("executed_test_report:current_head_unavailable")
+    else:
+        commit_values = [
+            executed.get(key)
+            for key in PROMOTED_SURFACE_TEST_EXECUTION_COMMIT_KEYS
+            if isinstance(executed.get(key), str) and executed.get(key).strip()
+        ]
+        if not commit_values:
+            missing.append("executed_test_report:commit_missing")
+        elif current_head not in commit_values:
+            missing.append("executed_test_report:commit_mismatch")
+    if not executed_test_artifact_has_command(executed):
+        missing.append("executed_test_report:command_missing")
+    if type(executed.get("exit_code")) is not int or executed.get("exit_code") != 0:
+        missing.append("executed_test_report:exit_code_not_zero")
+    if not executed_test_artifact_has_hash(executed):
+        missing.append("executed_test_report:output_or_provenance_hash_missing")
+    return missing
+
+
 def player_identity_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
     missing: list[str] = []
     runtime_report, runtime_error = load_repo_relative_json_evidence(evidence.get("approved_runtime_evidence_report"))
@@ -2055,66 +2188,7 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
         ):
             missing.append("public_contract_readiness_report:fields_invalid")
 
-    executed = evidence.get("executed_test_report")
-    if not isinstance(executed, dict):
-        missing.append("executed_test_report:missing")
-    else:
-        abi_tests = executed.get("abi_tests")
-        sdk_tests = executed.get("sdk_consumer_tests")
-        if executed.get("schema") != "obelisk.promoted-surface-test-execution.v1":
-            missing.append("executed_test_report:schema_invalid")
-        if executed.get("surface_id") != "obelisk.player_identity.v1":
-            missing.append("executed_test_report:surface_id_invalid")
-        if not isinstance(abi_tests, list) or not abi_tests:
-            missing.append("executed_test_report:abi_tests_missing")
-        if not isinstance(sdk_tests, list) or not sdk_tests:
-            missing.append("executed_test_report:sdk_consumer_tests_missing")
-        for key, tests in (("abi_tests", abi_tests), ("sdk_consumer_tests", sdk_tests)):
-            if not isinstance(tests, list):
-                continue
-            for index, item in enumerate(tests):
-                if not isinstance(item, dict):
-                    missing.append(f"executed_test_report:{key}[{index}]:not_object")
-                    continue
-                if item.get("status") != "passed":
-                    missing.append(f"executed_test_report:{key}[{index}]:status_not_passed")
-                if not isinstance(item.get("command"), str) or not item["command"].strip():
-                    missing.append(f"executed_test_report:{key}[{index}]:command_missing")
-                path = item.get("path")
-                if not isinstance(path, str) or not evidence_path_exists(path, allow_generic_dirs=False):
-                    missing.append(f"executed_test_report:{key}[{index}]:path_invalid")
-    return missing
-
-
-def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> list[str]:
-    missing: list[str] = []
-    executed = evidence.get("executed_test_report")
-    if not isinstance(executed, dict):
-        return ["executed_test_report:missing"]
-    abi_tests = executed.get("abi_tests")
-    sdk_tests = executed.get("sdk_consumer_tests")
-    if executed.get("schema") != "obelisk.promoted-surface-test-execution.v1":
-        missing.append("executed_test_report:schema_invalid")
-    if executed.get("surface_id") != surface_id:
-        missing.append("executed_test_report:surface_id_invalid")
-    if not isinstance(abi_tests, list) or not abi_tests:
-        missing.append("executed_test_report:abi_tests_missing")
-    if not isinstance(sdk_tests, list) or not sdk_tests:
-        missing.append("executed_test_report:sdk_consumer_tests_missing")
-    for key, tests in (("abi_tests", abi_tests), ("sdk_consumer_tests", sdk_tests)):
-        if not isinstance(tests, list):
-            continue
-        for index, item in enumerate(tests):
-            if not isinstance(item, dict):
-                missing.append(f"executed_test_report:{key}[{index}]:not_object")
-                continue
-            if item.get("status") != "passed":
-                missing.append(f"executed_test_report:{key}[{index}]:status_not_passed")
-            if not isinstance(item.get("command"), str) or not item["command"].strip():
-                missing.append(f"executed_test_report:{key}[{index}]:command_missing")
-            path = item.get("path")
-            if not isinstance(path, str) or not evidence_path_exists(path, allow_generic_dirs=False):
-                missing.append(f"executed_test_report:{key}[{index}]:path_invalid")
+    missing.extend(executed_test_report_missing(evidence, "obelisk.player_identity.v1"))
     return missing
 
 
@@ -2363,9 +2437,17 @@ def completion_blocker_outcome_rows(
     surfaces_by_id: dict[str, dict[str, Any]],
     post_v1_or_excluded: set[str],
     release_statement_text: str | None,
+    command_permission_route_gate: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     counts_by_surface: dict[str, bool] = {}
+    route_gate_current_blocker = None
+    route_gate_blocks_p0_promotion_accounting = False
+    if isinstance(command_permission_route_gate, dict):
+        route_gate_current_blocker = command_permission_route_gate.get("current_blocker")
+        route_gate_blocks_p0_promotion_accounting = (
+            route_gate_current_blocker == "lifecycle_anchor_first_evidence_provenance_unbound"
+        )
     for index, surface_id in enumerate(completion_blockers, start=1):
         surface = surfaces_by_id.get(surface_id, {})
         status = surface.get("status", "missing")
@@ -2390,6 +2472,9 @@ def completion_blocker_outcome_rows(
             is_p0_dependency_chain
             and manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
         )
+        route_gate_claim_satisfied = not (
+            is_p0_dependency_chain and route_gate_blocks_p0_promotion_accounting
+        )
         dependency_claims_satisfied = True
         dependency_ids = as_string_list(surface.get("depends_on")) if surface else []
         for required_dependency_id in REQUIRED_PROMOTED_SURFACE_DEPENDENCIES.get(surface_id, ()):
@@ -2405,6 +2490,7 @@ def completion_blocker_outcome_rows(
             and not missing_structured_evidence
             and release_statement_contract_satisfied
             and manifest_outcome == "promoted"
+            and route_gate_claim_satisfied
             and dependency_claims_satisfied
         )
         counts_by_surface[surface_id] = counts_toward_complete_sdk_claim
@@ -2425,6 +2511,8 @@ def completion_blocker_outcome_rows(
                 "structured_promotion_evidence_satisfied": not missing_structured_evidence,
                 "missing_structured_promotion_evidence": missing_structured_evidence,
                 "dependency_claims_satisfied": dependency_claims_satisfied,
+                "route_gate_claim_satisfied": route_gate_claim_satisfied,
+                "route_gate_current_blocker": route_gate_current_blocker,
                 "scoped_non_complete_outcome_only": scoped_non_complete_outcome_only,
                 "counts_toward_complete_sdk_claim": counts_toward_complete_sdk_claim,
                 "unresolved_for_complete_sdk_claim": not counts_toward_complete_sdk_claim,
@@ -3135,6 +3223,7 @@ def build_report(
         surfaces_by_id,
         post_v1_or_excluded,
         release_statement_text,
+        command_permission_route_gate,
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
     p0_scoped_non_complete_outcomes = blocker_outcome_summary["p0_scoped_non_complete_outcomes"]
@@ -3149,11 +3238,22 @@ def build_report(
         if row.get("is_p0_dependency_chain") is True
         and row.get("counts_toward_complete_sdk_claim") is True
     )
+    p0_route_gate_locked_promoted_surfaces = sorted(
+        row["surface"]
+        for row in blocker_outcome_rows
+        if row.get("is_p0_dependency_chain") is True
+        and row.get("manifest_outcome") == "promoted"
+        and row.get("promotion_evidence_satisfied") is True
+        and row.get("structured_promotion_evidence_satisfied") is True
+        and row.get("route_gate_claim_satisfied") is not True
+    )
     required_dependency_chain_unresolved_for_claim = blocker_outcome_summary[
         "dependency_chain_remaining"
     ]
     if p0_scoped_non_complete_outcomes:
         blockers.append("p0_dependency_chain_outcomes_scoped_non_complete_only")
+    if p0_route_gate_locked_promoted_surfaces:
+        blockers.append("p0_dependency_chain_route_gate_locked")
     ready = not blockers
     stable_claim_allowed = manifest_stable_claim_allowed and ready
     report_sections = categorized_v1_report_sections(
@@ -3255,6 +3355,7 @@ def build_report(
         "v1_required_dependency_chain_expected": list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
         "p0_dependency_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
         "p0_dependency_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
+        "p0_dependency_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,
         "unpromoted_required_dependency_chain": required_dependency_chain_unresolved_for_claim,
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
@@ -3277,6 +3378,7 @@ def build_report(
             "p0_chain_promoted_count": len(p0_chain_counting_toward_claim),
             "p0_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
             "p0_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
+            "p0_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,
             "p0_chain_scoped_non_complete_note": (
                 "P0 excluded/post-v1 outcomes are scoped release-statement accounting only and do not "
                 "increase p0_chain_promoted_count or complete_sdk_claim_progress_percent."
@@ -3421,6 +3523,11 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "A P0 dependency-chain surface is recorded as excluded/post-v1.",
             f"Surfaces: {format_human_list(report.get('p0_dependency_chain_scoped_non_complete_outcomes'))}.",
             "Action: treat this only as scoped non-complete release-statement accounting; promote the P0 chain with evidence before complete/full/production SDK wording.",
+        ],
+        "p0_dependency_chain_route_gate_locked": [
+            "A P0 dependency-chain surface has promoted-looking evidence while the command/permission route gate remains identity-locked.",
+            f"Surfaces: {format_human_list(report.get('p0_dependency_chain_route_gate_locked_surfaces'))}.",
+            "Action: bind lifecycle-anchor provenance and unlock the route gate before counting identity, permissions, command response, or commands/replies toward complete SDK wording.",
         ],
         "complete_sdk_claim_requires_promoted_demand_families": [
             "The complete/full/production SDK claim requires promoted demand families, not only excluded or post-v1 outcomes.",
