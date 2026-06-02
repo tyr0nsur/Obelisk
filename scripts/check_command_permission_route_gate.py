@@ -112,6 +112,15 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "v1_completion_ready",
     "stable_claim_allowed",
 }
+BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE = re.compile(
+    r"^(?:"
+    r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
+    r"(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
+    r"(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
+    r")$"
+)
 
 
 def route_lock_blocked_until(current_blocker: Any) -> list[str]:
@@ -138,6 +147,12 @@ POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
     r")\b(?:\s+(?:is|are))?\s+"
     r"\b(?:public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
+    re.IGNORECASE,
+)
+POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED = re.compile(
+    r"\b(?:public[_ -]?(?:api|abi)|sdk|api|support)\b\s+"
+    r"(?:is|are|now|becomes?|became)\s+"
+    r"\b(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?|public|ready|supported)\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_PREFIX_RE = re.compile(
@@ -182,15 +197,21 @@ def preceding_claim_scope(text: str, start: int) -> str:
 
 
 def is_negated_text_claim(text: str, match: re.Match[str]) -> bool:
-    if NEGATED_CLAIM_PREFIX_RE.search(preceding_claim_scope(text, match.start())):
+    prefix = preceding_claim_scope(text, match.start())
+    if NEGATED_CLAIM_PREFIX_RE.search(prefix) and not re.search(
+        r"\b(?:claims?|reports?|says|states?)\b[^,.;:\n\r]*$",
+        prefix,
+        re.IGNORECASE,
+    ):
         return True
     return bool(NEGATED_CLAIM_SUFFIX_RE.match(text[match.end() :]))
 
 
 def contains_positive_public_or_runtime_text_claim(text: str) -> bool:
-    for match in POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE.finditer(text):
-        if not is_negated_text_claim(text, match):
-            return True
+    for pattern in (POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE, POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED):
+        for match in pattern.finditer(text):
+            if not is_negated_text_claim(text, match):
+                return True
     return False
 
 
@@ -486,7 +507,10 @@ def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]
         for key, item in value.items():
             item_path = f"{path}.{key}" if path else str(key)
             key_name = normalized_key(key)
-            if key_name in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS and is_positive_claim_value(item):
+            if (
+                key_name in FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS
+                or BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE.fullmatch(key_name)
+            ) and is_positive_claim_value(item):
                 claims.append(item_path)
             if key_name in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS and contains_forbidden_claim_source(item):
                 claims.append(item_path)

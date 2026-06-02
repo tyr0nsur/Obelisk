@@ -900,18 +900,27 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             {
                 "notes": [
                     "public SDK is ready",
-                "public header is allowed",
-                "v1 completion is ready",
-                "stable claim is ready",
-                "stable SDK is ready",
-                "complete SDK is ready",
-                "full SDK is supported",
-                "production SDK is supported",
-            ],
+                    "public header is allowed",
+                    "v1 completion is ready",
+                    "stable claim is ready",
+                    "stable SDK is ready",
+                    "complete SDK is ready",
+                    "full SDK is supported",
+                    "production SDK is supported",
+                    "SDK is stable",
+                    "API is production ready",
+                    "planning-only report says stable SDK is ready",
+                    "stable SDK remains blocked",
+                ],
                 "stable_claim_allowed": True,
                 "v1_completion_ready": True,
                 "publicSdkReady": True,
                 "publicHeaderReady": "ready",
+                "complete_sdk_ready": True,
+                "full_api_supported": True,
+                "production_support_ready": True,
+                "stable_sdk_allowed": "ready",
+                "public_api_allowed": "allowed",
             }
         )
 
@@ -923,10 +932,19 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("notes[5]:positive_text_claim", claims)
         self.assertIn("notes[6]:positive_text_claim", claims)
         self.assertIn("notes[7]:positive_text_claim", claims)
+        self.assertIn("notes[8]:positive_text_claim", claims)
+        self.assertIn("notes[9]:positive_text_claim", claims)
+        self.assertIn("notes[10]:positive_text_claim", claims)
+        self.assertNotIn("notes[11]:positive_text_claim", claims)
         self.assertIn("stable_claim_allowed", claims)
         self.assertIn("v1_completion_ready", claims)
         self.assertIn("publicSdkReady", claims)
         self.assertIn("publicHeaderReady", claims)
+        self.assertIn("complete_sdk_ready", claims)
+        self.assertIn("full_api_supported", claims)
+        self.assertIn("production_support_ready", claims)
+        self.assertIn("stable_sdk_allowed", claims)
+        self.assertIn("public_api_allowed", claims)
 
     def test_collect_public_or_runtime_claims_accepts_negated_runtime_ready_text(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):

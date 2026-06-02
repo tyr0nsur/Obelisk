@@ -232,6 +232,15 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "v1_completion_ready",
     "stable_claim_allowed",
 )
+BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
+    r"^(?:"
+    r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
+    r"(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
+    r"(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
+    r")$"
+)
 ROUTE_GATE_OVERRIDE_TEST_ENV = "OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS"
 OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS = (
     "promotion_ready",
@@ -272,6 +281,12 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
     r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
     r")\b",
+    re.IGNORECASE,
+)
+COMMAND_PERMISSION_ROUTE_GATE_BROAD_REVERSED_CLAIM_RE = re.compile(
+    r"\b(?:public[-\s_]+(?:api|abi)|sdk|api|support)\b\s+"
+    r"(?:is|are|now|becomes?|became)\s+"
+    r"\b(?:complete|full|stable|production[-\s]?(?:ready|grade)|public|ready|supported)\b",
     re.IGNORECASE,
 )
 COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE = re.compile(
@@ -491,6 +506,9 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
     r"\b(?:sdk|api|support)\s+v?1(?:\.0)?\s*[:,-]\s*"
     r"(?:complete|full|production[- ]?ready|stable)\b",
+    r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+"
+    r"(?:is|are|remains?|stays?)\s+"
+    r"(?:complete|full|production[- ]?ready|production[- ]?grade|stable|ready|supported|public)\b",
     r"\b(?:ga|generally[- ]available)\s+(?:sdk|api|support)\b.{0,80}"
     r"\b(?:available|published|ready|released|shipped)\b",
     r"\b(?:sdk|api|support)\b.{0,40}\b(?:ga|generally[- ]available)\b",
@@ -1095,6 +1113,7 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         if not (
             COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE.search(text)
             or COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED.search(text)
+            or COMMAND_PERMISSION_ROUTE_GATE_BROAD_REVERSED_CLAIM_RE.search(text)
         ):
             return False
         claim_start = min(
@@ -1103,19 +1122,30 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
                 for pattern in (
                     COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE,
                     COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED,
+                    COMMAND_PERMISSION_ROUTE_GATE_BROAD_REVERSED_CLAIM_RE,
                 )
                 for match in pattern.finditer(text)
             ]
             or [0]
         )
         context = text[max(0, claim_start - 48) : min(len(text), claim_start + 128)]
-        return not COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE.search(context)
+        if COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE.search(context) and not re.search(
+            r"\b(?:claims?|reports?|says|states?)\b[^,.;:\n\r]*$",
+            text[max(0, claim_start - 48) : claim_start],
+            re.IGNORECASE,
+        ):
+            return False
+        return True
 
     def visit(value: Any, path: str) -> None:
         if isinstance(value, dict):
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
-                if normalized_key(key) in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS and is_positive_claim_value(item):
+                key_name = normalized_key(key)
+                if (
+                    key_name in COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS
+                    or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(key_name)
+                ) and is_positive_claim_value(item):
                     claims.append(item_path)
                 if key == "public_or_runtime_claims" and isinstance(item, list):
                     for claim in item:
@@ -1656,6 +1686,21 @@ def load_public_header_symbols(path: Path) -> tuple[set[str], list[str]]:
     symbols: set[str] = set()
     symbols.update(re.findall(r"^\s*#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\b", text, flags=re.MULTILINE))
     symbols.update(re.findall(r"\btypedef\s+(?:struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b", text))
+    symbols.update(
+        re.findall(
+            r"\btypedef\s+(?:struct|enum)\s+[A-Za-z_][A-Za-z0-9_]*\s*\*?\s*"
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*;",
+            text,
+        )
+    )
+    symbols.update(
+        re.findall(
+            r"\btypedef\s+(?:const\s+)?(?:void|bool|char|u?int(?:8|16|32|64)_t|size_t|"
+            r"[A-Za-z_][A-Za-z0-9_]*)\s*\*?\s*([A-Za-z_][A-Za-z0-9_]*)\s*;",
+            text,
+        )
+    )
+    symbols.update(re.findall(r"}\s*([A-Za-z_][A-Za-z0-9_]*)\s*;", text))
     symbols.update(re.findall(r"\btypedef\b[^;{]*\(\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", text))
     symbols.update(re.findall(r"\(\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)", text))
     symbols.update(re.findall(r"\b(OBELISK_[A-Z0-9_]+)\b", text))

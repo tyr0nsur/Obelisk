@@ -203,11 +203,10 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest no-runtime delegated hardening rounds bound request/window sidecars, required
-  receipt/post-window replay through manifest checker post-window mode, emitted flat
-  copied-log sidecar template paths, rejected planning/candidate/ready-scope reports and
-  broad nested stable/complete/full/production SDK text claims, and added PluginManager
-  direct player-principal unload fencing. Validated lifecycle/window, route, SDK, and
-  PluginManager gates; blocker remains `approved_runtime_evidence_missing`, SDK `0/12`,
-  P0 `0/4`, no runtime/server op. Next no-runtime side-lane candidate: Mission copied-bool
-  lifecycle frontier cleanup guardrail before public/runtime Mission wiring.
+- Latest delegated no-runtime round added Mission copied-bool public-frontier cleanup
+  guardrails, SDK/header typedef-alias drift detection, and broader stable/complete/full/
+  production SDK claim-key/reversed-text scanners. Validated Mission, route, SDK, and
+  PluginManager gates; SDK checker remains fail-closed with `stable_claim_allowed=false`,
+  SDK `0/12`, P0 `0/4`, and route blocker `approved_runtime_evidence_missing`. No
+  runtime/server op. Next no-runtime side-lane candidate: Transfer `bAccept` test-only
+  hook helper.

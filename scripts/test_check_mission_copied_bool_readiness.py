@@ -287,9 +287,13 @@ class CheckMissionCopiedBoolReadinessTests(unittest.TestCase):
         cmake: str | None = None,
         api_header: str | None = None,
         public_gameplay_events: dict | None = None,
+        plugin_manager: str | None = None,
+        plugin_manager_guardrails: str | None = None,
     ) -> None:
         (root / "include" / "obelisk").mkdir(parents=True, exist_ok=True)
+        (root / "core").mkdir(parents=True, exist_ok=True)
         (root / "docs").mkdir(parents=True, exist_ok=True)
+        (root / "scripts").mkdir(parents=True, exist_ok=True)
         (root / "CMakeLists.txt").write_text(
             cmake
             if cmake is not None
@@ -325,6 +329,34 @@ typedef struct ObeliskGameplayPolicyEvent ObeliskGameplayPolicyEvent;
                 },
                 sort_keys=True,
             ),
+            encoding="utf-8",
+        )
+        (root / "core" / "PluginManager.cpp").write_text(
+            plugin_manager
+            if plugin_manager is not None
+            else """
+namespace Obelisk {
+bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
+{
+    return EventManager::Get().UnregisterCallbacksForOwner(owner) == 0 || true;
+}
+}
+""",
+            encoding="utf-8",
+        )
+        (root / "scripts" / "test_plugin_manager_guardrails.py").write_text(
+            plugin_manager_guardrails
+            if plugin_manager_guardrails is not None
+            else """
+COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
+    "MissionCopiedBoolEventDispatcher": (
+        "internal/test-only copied lifecycle dispatcher; not plugin-facing until owner cleanup"
+    ),
+}
+COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
+    "MissionCopiedBoolEventDispatcher": ("RegisterMission", "UnregisterMission"),
+}
+""",
             encoding="utf-8",
         )
 
@@ -733,6 +765,109 @@ typedef struct ObeliskMissionEvent ObeliskMissionEvent;
         self.assertEqual(frontier["status"], "blocked")
         self.assertIn("public_mission_sdk_symbol_in_api_header", reasons)
         self.assertIn("public_mission_gameplay_event_or_descriptor", reasons)
+        self.assertIn("mission_public_frontier_missing_plugin_manager_owner_cleanup", reasons)
+        self.assertIn("mission_public_frontier_missing_owner_cleanup_guardrail", reasons)
+
+    def test_repo_frontier_blocks_register_mission_api_without_owner_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                api_header="""
+#pragma once
+typedef unsigned long long uint64_t;
+typedef struct ObeliskApi {
+    uint64_t (*RegisterMissionCopiedBoolEventWithOwnerTokenHandle)(void* token);
+    bool (*UnregisterMissionCopiedBoolEventWithOwnerToken)(void* token, uint64_t handle);
+} ObeliskApi;
+""",
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        api_symbols = {blocker.get("symbol") for blocker in blockers}
+        self.assertEqual(frontier["status"], "blocked")
+        self.assertFalse(frontier["mission_internal_test_only"])
+        self.assertIn("public_mission_sdk_symbol_in_api_header", reasons)
+        self.assertIn("mission_public_frontier_missing_plugin_manager_owner_cleanup", reasons)
+        self.assertIn("mission_public_frontier_missing_owner_cleanup_guardrail", reasons)
+        self.assertIn(
+            "mission_public_frontier_still_internal_test_only_cleanup_exception",
+            reasons,
+        )
+        self.assertIn("RegisterMissionCopiedBoolEventWithOwnerTokenHandle", api_symbols)
+        self.assertTrue(frontier["mission_public_frontier_owner_cleanup"]["public_frontier_detected"])
+        self.assertFalse(frontier["mission_public_frontier_owner_cleanup"]["owner_cleanup_present"])
+
+    def test_repo_frontier_blocks_plugin_manager_mission_wiring_without_owner_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                plugin_manager="""
+namespace Obelisk {
+uint64_t PluginRegisterMissionCopiedBoolEventWithOwnerTokenHandle(void* token) { return 0; }
+bool PluginUnregisterMissionCopiedBoolEventWithOwnerToken(void* token, uint64_t handle) { return false; }
+bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
+{
+    return EventManager::Get().UnregisterCallbacksForOwner(owner) == 0 || true;
+}
+PluginManager::PluginManager()
+{
+    m_Api.RegisterMissionCopiedBoolEventWithOwnerTokenHandle =
+        &PluginRegisterMissionCopiedBoolEventWithOwnerTokenHandle;
+}
+}
+""",
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        symbols = {blocker.get("symbol") for blocker in blockers}
+        self.assertEqual(frontier["status"], "blocked")
+        self.assertIn("mission_plugin_facing_wiring_in_plugin_manager", reasons)
+        self.assertIn("mission_public_frontier_missing_plugin_manager_owner_cleanup", reasons)
+        self.assertIn("mission_public_frontier_missing_owner_cleanup_guardrail", reasons)
+        self.assertIn("PluginRegisterMissionCopiedBoolEventWithOwnerTokenHandle", symbols)
+        self.assertTrue(frontier["mission_public_frontier_owner_cleanup"]["public_frontier_detected"])
+
+    def test_repo_frontier_requires_matching_guardrail_when_owner_cleanup_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            self.write_minimal_public_frontier_repo(
+                repo_root,
+                api_header="""
+#pragma once
+typedef unsigned long long uint64_t;
+typedef struct ObeliskApi {
+    uint64_t (*RegisterMissionCopiedBoolEventWithOwnerTokenHandle)(void* token);
+} ObeliskApi;
+""",
+                plugin_manager="""
+namespace Obelisk {
+bool PluginManager::UnregisterPluginCallbacks(const std::string& pluginName, void* owner, const char* reason)
+{
+    MissionCopiedBoolEventDispatcher::Get().UnregisterCallbacksForOwner(owner);
+    return true;
+}
+}
+""",
+            )
+            blockers: list[dict] = []
+            frontier = checker.validate_offline_repo_frontier(repo_root, blockers)
+
+        reasons = {blocker["reason"] for blocker in blockers}
+        self.assertEqual(frontier["status"], "blocked")
+        self.assertIn("public_mission_sdk_symbol_in_api_header", reasons)
+        self.assertNotIn("mission_public_frontier_missing_plugin_manager_owner_cleanup", reasons)
+        self.assertIn("mission_public_frontier_missing_owner_cleanup_guardrail", reasons)
+        self.assertIn(
+            "mission_public_frontier_still_internal_test_only_cleanup_exception",
+            reasons,
+        )
+        self.assertTrue(frontier["mission_public_frontier_owner_cleanup"]["owner_cleanup_present"])
 
     def test_report_readiness_frontier_blocks_public_runtime_identity_mutation_and_return_override(self) -> None:
         report = {

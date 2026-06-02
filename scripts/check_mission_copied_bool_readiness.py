@@ -33,6 +33,12 @@ FIXTURE_SNAPSHOT_ROOT = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 MISSION_HOOK_SOURCE = "hooks/ProcessEventMissionReflection.cpp"
 PUBLIC_API_HEADER = Path("include/obelisk/ObeliskApi.h")
 PUBLIC_GAMEPLAY_EVENTS_DOC = Path("docs/public_gameplay_events.json")
+PLUGIN_MANAGER_SOURCE = Path("core/PluginManager.cpp")
+PLUGIN_MANAGER_GUARDRAIL_TEST = Path("scripts/test_plugin_manager_guardrails.py")
+MISSION_COPIED_BOOL_DISPATCHER = "MissionCopiedBoolEventDispatcher"
+MISSION_COPIED_BOOL_OWNER_CLEANUP = (
+    "MissionCopiedBoolEventDispatcher::Get().UnregisterCallbacksForOwner(owner)"
+)
 EXPECTED_INPUT_TARGETS = {
     "MissionType.AddPlayerToMission",
     "MissionType.BPAllowPlayerToLeaveMission",
@@ -124,9 +130,17 @@ MISSION_CANDIDATE_FORBIDDEN_CLAIM_PHRASES = {
     "version 1 complete": "v1_completion",
 }
 PUBLIC_MISSION_C_API_RE = re.compile(
-    r"\b(?:OBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*|"
+    r"\b(?:(?:Register|Unregister)Mission[A-Za-z0-9_]*|"
+    r"OBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*|"
     r"Obelisk[A-Za-z0-9_]*Mission[A-Za-z0-9_]*|"
     r"Mission[A-Za-z0-9_]*(?:Event|Descriptor|Callback|Resource|Policy)[A-Za-z0-9_]*)\b"
+)
+PLUGIN_MANAGER_MISSION_WIRING_RE = re.compile(
+    r"\b(?:(?:Plugin)?(?:Register|Unregister|Describe|Dispatch)Mission[A-Za-z0-9_]*|"
+    r"OBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*|"
+    r"Obelisk[A-Za-z0-9_]*Mission[A-Za-z0-9_]*|"
+    r"Mission[A-Za-z0-9_]*(?:Event|Descriptor|Callback|Resource|Policy)[A-Za-z0-9_]*)\b|"
+    r"MissionCopiedBoolEventDispatcher::Get\(\)\.(?!UnregisterCallbacksForOwner\b)[A-Za-z_][A-Za-z0-9_]*"
 )
 PUBLIC_MISSION_DOC_RE = re.compile(
     r"\bmission\b|\bMission[A-Za-z0-9_]*\b|\bOBELISK_[A-Z0-9_]*MISSION[A-Z0-9_]*\b"
@@ -318,6 +332,52 @@ def strip_c_comments(text: str) -> str:
     return re.sub(r"//.*", "", text)
 
 
+def extract_braced_body_after(text: str, start: int) -> str | None:
+    body_start = text.find("{", start)
+    if body_start == -1:
+        return None
+    depth = 0
+    in_string = False
+    in_char = False
+    escaped = False
+    for index in range(body_start, len(text)):
+        char = text[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if in_string:
+            if char == '"':
+                in_string = False
+            continue
+        if in_char:
+            if char == "'":
+                in_char = False
+            continue
+        if char == '"':
+            in_string = True
+            continue
+        if char == "'":
+            in_char = True
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[body_start + 1:index]
+    return None
+
+
+def extract_plugin_manager_unregister_body(text: str) -> str | None:
+    match = re.search(r"\bbool\s+PluginManager::UnregisterPluginCallbacks\s*\(", text)
+    if match is None:
+        return None
+    return extract_braced_body_after(text, match.end())
+
+
 def validate_public_api_header_mission_boundary(repo_root: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     header_path = repo_root / PUBLIC_API_HEADER
     text = read_text_file(header_path, blockers, str(PUBLIC_API_HEADER))
@@ -333,6 +393,107 @@ def validate_public_api_header_mission_boundary(repo_root: Path, blockers: list[
             symbol=symbol,
         )
     return {"status": "accepted" if not matches else "blocked", "path": str(header_path), "matches": matches}
+
+
+def plugin_manager_guardrail_exception_mentions_mission_dispatcher(text: str) -> bool:
+    match = re.search(
+        r"\bCOPIED_DISPATCHER_CLEANUP_EXCEPTIONS\s*=\s*\{(?P<body>.*?)\n\}",
+        text,
+        re.DOTALL,
+    )
+    return match is not None and MISSION_COPIED_BOOL_DISPATCHER in match.group("body")
+
+
+def validate_mission_public_frontier_owner_cleanup(
+    repo_root: Path,
+    blockers: list[dict[str, Any]],
+    *,
+    public_api_matches: list[str],
+    public_gameplay_event_matches: list[dict[str, str]],
+) -> dict[str, Any]:
+    blocker_count_before = len(blockers)
+    plugin_manager_path = repo_root / PLUGIN_MANAGER_SOURCE
+    plugin_manager_text = read_text_file(plugin_manager_path, blockers, str(PLUGIN_MANAGER_SOURCE))
+    if plugin_manager_text is None:
+        return {
+            "status": "blocked",
+            "path": str(plugin_manager_path),
+            "public_frontier_detected": bool(public_api_matches or public_gameplay_event_matches),
+            "plugin_manager_wiring_matches": [],
+            "owner_cleanup_present": False,
+            "owner_cleanup_guardrail_present": False,
+        }
+
+    stripped_plugin_manager = strip_c_comments(plugin_manager_text)
+    plugin_manager_wiring_matches = sorted(
+        {match.group(0) for match in PLUGIN_MANAGER_MISSION_WIRING_RE.finditer(stripped_plugin_manager)}
+    )
+    for symbol in plugin_manager_wiring_matches:
+        append_blocker(
+            blockers,
+            "mission_plugin_facing_wiring_in_plugin_manager",
+            path=str(plugin_manager_path),
+            symbol=symbol,
+        )
+
+    cleanup_body = extract_plugin_manager_unregister_body(stripped_plugin_manager)
+    cleanup_body_found = cleanup_body is not None
+    owner_cleanup_present = cleanup_body_found and MISSION_COPIED_BOOL_OWNER_CLEANUP in cleanup_body
+    public_frontier_detected = bool(
+        public_api_matches or public_gameplay_event_matches or plugin_manager_wiring_matches
+    )
+
+    guardrail_text: str | None = None
+    owner_cleanup_guardrail_present = False
+    stale_internal_exception = False
+    if public_frontier_detected:
+        if not cleanup_body_found:
+            append_blocker(
+                blockers,
+                "plugin_manager_unregister_callbacks_unparseable",
+                path=str(plugin_manager_path),
+            )
+        if not owner_cleanup_present:
+            append_blocker(
+                blockers,
+                "mission_public_frontier_missing_plugin_manager_owner_cleanup",
+                path=str(plugin_manager_path),
+                required=MISSION_COPIED_BOOL_OWNER_CLEANUP,
+                public_api_matches=public_api_matches,
+                public_gameplay_event_matches=public_gameplay_event_matches,
+                plugin_manager_wiring_matches=plugin_manager_wiring_matches,
+            )
+
+        guardrail_path = repo_root / PLUGIN_MANAGER_GUARDRAIL_TEST
+        guardrail_text = read_text_file(guardrail_path, blockers, str(PLUGIN_MANAGER_GUARDRAIL_TEST))
+        if guardrail_text is not None:
+            owner_cleanup_guardrail_present = MISSION_COPIED_BOOL_OWNER_CLEANUP in guardrail_text
+            stale_internal_exception = plugin_manager_guardrail_exception_mentions_mission_dispatcher(guardrail_text)
+        if not owner_cleanup_guardrail_present:
+            append_blocker(
+                blockers,
+                "mission_public_frontier_missing_owner_cleanup_guardrail",
+                path=str(guardrail_path),
+                required=MISSION_COPIED_BOOL_OWNER_CLEANUP,
+            )
+        if stale_internal_exception:
+            append_blocker(
+                blockers,
+                "mission_public_frontier_still_internal_test_only_cleanup_exception",
+                path=str(guardrail_path),
+                dispatcher=MISSION_COPIED_BOOL_DISPATCHER,
+            )
+
+    return {
+        "status": "accepted" if len(blockers) == blocker_count_before else "blocked",
+        "path": str(plugin_manager_path),
+        "public_frontier_detected": public_frontier_detected,
+        "plugin_manager_wiring_matches": plugin_manager_wiring_matches,
+        "owner_cleanup_required": public_frontier_detected,
+        "owner_cleanup_present": owner_cleanup_present,
+        "owner_cleanup_guardrail_present": owner_cleanup_guardrail_present,
+        "stale_internal_test_only_exception": stale_internal_exception,
+    }
 
 
 def collect_json_mission_doc_matches(value: Any, path: str = "$") -> list[dict[str, str]]:
@@ -379,12 +540,19 @@ def validate_offline_repo_frontier(repo_root: Path, blockers: list[dict[str, Any
     cmake = validate_cmake_mission_hook_boundary(repo_root, blockers)
     api_header = validate_public_api_header_mission_boundary(repo_root, blockers)
     public_gameplay_events = validate_public_gameplay_events_mission_boundary(repo_root, blockers)
+    owner_cleanup = validate_mission_public_frontier_owner_cleanup(
+        repo_root,
+        blockers,
+        public_api_matches=api_header.get("matches", []),
+        public_gameplay_event_matches=public_gameplay_events.get("matches", []),
+    )
     return {
         "status": "accepted" if len(blockers) == frontier_blockers_before else "blocked",
         "mission_internal_test_only": len(blockers) == frontier_blockers_before,
         "cmake": cmake,
         "api_header": api_header,
         "public_gameplay_events": public_gameplay_events,
+        "mission_public_frontier_owner_cleanup": owner_cleanup,
     }
 
 

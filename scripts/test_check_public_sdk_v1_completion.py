@@ -1880,6 +1880,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "runtime_ready": False,
                 "public_header_allowed": False,
                 "public_header_ready": True,
+                "complete_sdk_ready": True,
+                "full_api_supported": True,
+                "production_support_ready": True,
+                "stable_sdk_allowed": "ready",
+                "public_api_allowed": "allowed",
                 "checks": [
                     {
                         "name": "commands_replies_public_readiness",
@@ -1911,6 +1916,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "stable SDK is ready",
                             "complete SDK is ready",
                             "production SDK is supported",
+                            "SDK is stable",
+                            "API is production ready",
+                            "planning-only report says stable SDK is ready",
+                            "stable SDK remains blocked",
                         ],
                     }
                 ],
@@ -1944,6 +1953,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[7]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[8]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[9]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[10]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[11]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[12]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[13]:positive_text_claim", claims)
+        self.assertIn("complete_sdk_ready", claims)
+        self.assertIn("full_api_supported", claims)
+        self.assertIn("production_support_ready", claims)
+        self.assertIn("stable_sdk_allowed", claims)
+        self.assertIn("public_api_allowed", claims)
 
     def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2003,6 +2021,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "    uint32_t abi_version;\n"
                 "    uint64_t principal_handle;\n"
                 "} ObeliskPlayerIdentity;\n"
+                "typedef struct ObeliskOpaque* ObeliskPlayerHandle;\n"
+                "typedef void* ObeliskPermissionHandle;\n"
+                "typedef ObeliskResourceKind ObeliskPlayerKind;\n"
                 "typedef struct ObeliskApi {\n"
                 "    uint64_t (*RegisterPlayerIdentityWithOwnerTokenHandle)(uint64_t ownerToken);\n"
                 "} ObeliskApi;\n",
@@ -2616,7 +2637,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
             statement_path.write_text(
                 SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
-                + "Inventory SDK is ready in v1.\n",
+                + "Inventory SDK is ready in v1.\n"
+                + "SDK is stable.\n"
+                + "API is production ready.\n",
                 encoding="utf-8",
             )
 
