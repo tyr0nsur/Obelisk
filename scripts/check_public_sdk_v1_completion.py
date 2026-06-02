@@ -1574,6 +1574,12 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
     report_blockers = payload.get("blockers", [])
     if report_blockers:
         blockers.append("mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty")
+    allowed_per_leaf_promoted_claims = {"promotion_ready", "public_sdk_ready", "runtime_ready"}
+    unexpected_public_or_runtime_claims = [
+        claim
+        for claim in public_or_runtime_claims
+        if accounting_route != "per_leaf_promoted" or claim not in allowed_per_leaf_promoted_claims
+    ]
     if accounting_route == "candidate_only":
         if payload.get("candidate_only") is not True or payload.get("v1_accounted") is not False:
             blockers.append("mission_transfer_dino_tribe_candidate_only_accounting_mismatch")
@@ -1602,8 +1608,8 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
         for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
             if payload.get(key) is not False:
                 blockers.append(f"mission_transfer_dino_tribe_{key}_not_false")
-        if public_or_runtime_claims:
-            blockers.append("mission_transfer_dino_tribe_public_or_runtime_claims")
+    if unexpected_public_or_runtime_claims:
+        blockers.append("mission_transfer_dino_tribe_public_or_runtime_claims")
     if completion_claims_without_blocker:
         blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 

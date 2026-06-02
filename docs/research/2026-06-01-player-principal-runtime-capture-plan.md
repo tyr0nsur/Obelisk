@@ -117,20 +117,9 @@ python3 scripts/check_player_principal_lifecycle_window_request.py \
   --json
 ```
 
-Then write the structured read-only stable preflight sidecar for the same target:
-
-```bash
-scripts/check_player_principal_lifecycle_preflight.sh \
-  --instance <instance-id> \
-  --map <map> \
-  --mode stable \
-  --run-id <run-id> \
-  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
-  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
-  --evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id> \
-  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
-  --json > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/preflight-post.json
-```
+Do not write `preflight-post.json` before marker/env activation. It is post-capture and
+post-rollback evidence only, timestamped after `actual_capture_end_utc` and no later than
+`rollback_end_utc`.
 
 Request packs for this lane must not use `final_posture=stopped` or
 `restart_expectation=stop-after-window`; the downstream window manifest and
@@ -406,6 +395,22 @@ counts as replay evidence; post-window replay requires completed
 If users are involved, the manifest may record only a notice path label and a sanitized
 notice digest. It must not record endpoints, webhooks, tokens, message URLs, player
 identity, raw chat text, or private user data.
+
+After the copied log exists and rollback has restored stable posture, write the
+structured read-only stable postflight sidecar for the same target:
+
+```bash
+scripts/check_player_principal_lifecycle_preflight.sh \
+  --instance <instance-id> \
+  --map <map> \
+  --mode stable \
+  --run-id <run-id> \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id> \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --json > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/preflight-post.json
+```
 
 The copied log must include enough context to prove pre-check posture, observer enable,
 bounded events, rollback, and post-check posture. A cropped event-only excerpt is useful

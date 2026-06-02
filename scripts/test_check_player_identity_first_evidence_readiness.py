@@ -1362,6 +1362,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 "public docs preserve lookup, persistence, permissions/admin, commands, mutation, return override, and cross-process non-claims",
             ],
         )
+        public_contract_gap = payload["first_evidence"]["public_contract_gap_report"]
+        self.assertTrue(public_contract_gap["ready"])
+        self.assertFalse(public_contract_gap["runtime_evidence_missing"])
+        self.assertEqual(public_contract_gap["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(public_contract_gap["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertIn("runtime.lifecycle_evidence", public_contract_gap["contract_review_inputs_resolved"])
+        self.assertTrue(public_contract_gap["approved_runtime_evidence"]["accepted_for_contract_review"])
         self.assertFalse(payload["promotion_ready"])
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
@@ -2548,6 +2555,35 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_report_v1_completion_ready_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_capability_bits_now_not_empty", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_callback_abi_now_not_empty", diagnosis["blockers"])
+
+    def test_approved_runtime_manifest_diagnosis_rejects_legacy_public_contract_gate_alias(self) -> None:
+        original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
+
+        def stale_alias_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["next_blocker"] = "identity_public_contract_gate"
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                checker.approved_runtime_principal_lifecycle_evidence,
+                "build_report",
+                side_effect=stale_alias_report,
+            ), mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    approved_manifest
+                )
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertIn(
+            "approved_runtime_report_next_blocker_not_identity_public_contract_gate_missing",
+            diagnosis["blockers"],
+        )
 
 
 if __name__ == "__main__":

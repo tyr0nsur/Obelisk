@@ -873,24 +873,52 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
 
     def test_rejects_sidecar_public_sdk_or_runtime_readiness_overclaim(self) -> None:
-        payload = manifest()
-        request_artifact = payload["operational_window"]["request_pack"]
-        request_path = Path(request_artifact["path"])
-        request = json.loads(request_path.read_text(encoding="utf-8"))
-        request["public_sdk_ready"] = True
-        self.rewrite_sidecar_and_refresh_identity(
-            payload,
-            request_artifact,
-            json.dumps(request, sort_keys=True) + "\n",
+        cases = (
+            (
+                "request_public_sdk_ready",
+                lambda payload: payload["operational_window"]["request_pack"],
+                lambda sidecar: sidecar.update({"public_sdk_ready": True}),
+                "operational_window_sidecar_readiness_flag_overclaim",
+            ),
+            (
+                "request_stable_camel_case",
+                lambda payload: payload["operational_window"]["request_pack"],
+                lambda sidecar: sidecar.update({"stableClaimAllowed": True}),
+                "operational_window_sidecar_readiness_flag_overclaim",
+            ),
+            (
+                "receipt_stable_release_contract",
+                lambda payload: payload["operational_window"]["operator_approval_receipt"],
+                lambda sidecar: sidecar.update({"stable_release_contract_claim_allowed": True}),
+                "operational_window_sidecar_readiness_flag_overclaim",
+            ),
+            (
+                "preflight_stable_claim_text",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"note": "stable SDK claim is allowed"}),
+                "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
+            ),
         )
+        for name, artifact_for_payload, mutate, expected in cases:
+            with self.subTest(name=name):
+                payload = manifest()
+                artifact = artifact_for_payload(payload)
+                sidecar_path = Path(artifact["path"])
+                sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+                mutate(sidecar)
+                self.rewrite_sidecar_and_refresh_identity(
+                    payload,
+                    artifact,
+                    json.dumps(sidecar, sort_keys=True) + "\n",
+                )
 
-        result = self.run_checker(payload, check=False)
-        report = json.loads(result.stdout)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("operational_window_sidecar_readiness_flag_overclaim", report["blockers"])
-        self.assertFalse(report["public_sdk_ready"])
-        self.assertFalse(report["runtime_ready"])
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, report["blockers"])
+                self.assertFalse(report["public_sdk_ready"])
+                self.assertFalse(report["runtime_ready"])
 
     def test_rejects_operator_receipt_verified_flag_not_true(self) -> None:
         payload = manifest()

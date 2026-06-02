@@ -253,6 +253,8 @@ NEGATIVE_EVIDENCE_RE = re.compile(
 )
 NON_PROMOTIONAL_SCHEMA_KEYS = {"schema", "artifact_schema", "evidence_schema", "report_schema"}
 NON_PROMOTIONAL_SCHEMA_TOKENS = {
+    "approved_bundle",
+    "approved_runtime_bundle",
     "candidate",
     "consume",
     "planning",
@@ -263,6 +265,8 @@ NON_PROMOTIONAL_SCHEMA_TOKENS = {
     "sidecar",
 }
 NON_PROMOTIONAL_PATH_MARKERS = (
+    "approved_bundle",
+    "approved_runtime_bundle",
     "candidate",
     "consume",
     "planning",
@@ -540,6 +544,8 @@ def evidence_path_has_non_promotional_marker(raw_path: str) -> bool:
         return True
     parts = [part.lower().replace("-", "_") for part in relative.parts]
     for part in parts:
+        if "approved_bundle" in part or "approved_runtime_bundle" in part:
+            return True
         tokens = {token for token in part.split("_") if token}
         for marker in NON_PROMOTIONAL_PATH_MARKERS:
             if marker in tokens or part.startswith(f"{marker}_") or part.endswith(f"_{marker}"):
@@ -564,6 +570,9 @@ def evidence_has_non_promotional_schema_marker(value: Any, *, parent_key: str | 
             text = json.dumps(value, sort_keys=True)
         except TypeError:
             text = str(value)
+        normalized_text = text.lower().replace("-", "_").replace(" ", "_")
+        if "approved_bundle" in normalized_text or "approved_runtime_bundle" in normalized_text:
+            return True
         schema_tokens = {token for token in re.split(r"[^a-z0-9]+", text.lower()) if token}
         if schema_tokens & NON_PROMOTIONAL_SCHEMA_TOKENS:
             return True

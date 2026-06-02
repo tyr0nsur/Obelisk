@@ -95,9 +95,16 @@ REQUIRED_OBSERVER_ENV_VALUES = {
 }
 FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
     (
+        "complete_sdk_allowed",
+        "complete_sdk_ready",
+        "public_header_ready",
         "runtime_work_authorized",
         "server_operations_authorized",
         "runtime_ready",
+        "stable_claim_allowed",
+        "stable_release_contract_claim_allowed",
+        "stable_v1_sdk_claim",
+        "stable_v1_sdk_claim_allowed",
         "public_sdk_ready",
         "public_abi_ready",
         "public_header_allowed",
@@ -353,7 +360,10 @@ FORBIDDEN_KEY_RE = re.compile(
     re.IGNORECASE,
 )
 POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
-    r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
+    r"(?:public[_ -]?(?:sdk|player[_ -]?identity|header)|"
+    r"(?:stable|complete|full|production)[_ -]?(?:v1[_ -]?)?(?:sdk[_ -]?)?claim[_ -]?(?:allowed|ready|enabled|supported)|"
+    r"(?:stable|complete|full|production)[_ -]?sdk[_ -]?(?:ready|allowed|claim)|"
+    r"stable[_ -]?release[_ -]?contract[_ -]?claim[_ -]?allowed|"
     r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
     r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
     r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
@@ -766,10 +776,17 @@ def request_pack_digest(
 
 
 def validate_no_sidecar_overclaims(value: Any, label: str, blockers: list[dict[str, Any]], trail: str = "$") -> None:
+    def normalized_claim_key(key: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+        return separated.casefold().replace("-", "_").replace(" ", "_")
+
+    forbidden_keys = {normalized_claim_key(key) for key in FORBIDDEN_POSITIVE_FLAG_KEYS}
+
     if isinstance(value, dict):
         for key, child in value.items():
             child_trail = f"{trail}.{key}"
-            if key in FORBIDDEN_POSITIVE_FLAG_KEYS and child is not False:
+            key_name = normalized_claim_key(key)
+            if key_name in forbidden_keys and child is not False:
                 add(
                     blockers,
                     "operational_window_sidecar_readiness_flag_overclaim",

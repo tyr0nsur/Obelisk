@@ -155,12 +155,14 @@ This file is an active routing table only. Durable evidence belongs in
   work only: request-pack acceptance keeps `server_operations_authorized=false`,
   `runtime_work_authorized=false`, public/runtime/promotion/v1 readiness false, and
   `next_blocker=operator_current_turn_runtime_window_approval_required`. Preserve checked
-  `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, completed
-  `operator-approval-receipt.json` only for post-window replay, reviewed server binary
-  path/SHA, exact env/marker boundaries, sibling JSON `preflight-pre.json`/
-  `preflight-post.json` with false auth/readiness flags, post-run checks, rollback delta,
-  and no runtime/server authorization. Request packs are pre-window only: already-started
-  or expired approved windows fail closed; receipt templates never count.
+  `operator_live_ops_brief`, reviewed server binary path/SHA, exact env/marker
+  boundaries, and sibling `window-request.json`, `observer-window.env`,
+  `operator-approval-request.md`, completed `operator-approval-receipt.json`,
+  `preflight-pre.json`, `preflight-post.json`, `window-manifest.env`, and copied log.
+  Receipts count only for post-window replay; preflight sidecars keep false auth/readiness
+  flags; preserve post-run checks, rollback delta, and no runtime/server authorization.
+  Request packs are pre-window only: started/expired windows fail closed; receipt
+  templates never count.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
@@ -209,11 +211,9 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest supervised rounds integrated route-gate summaries, retry-stable copied-event
-  cleanup, live-ops sidecar non-claims, P0 certificate/accounting hardening, player
-  identity header/gap-report guardrails, secondary-report overclaim scanning, default SDK
-  route-boundary hardening, request receipt-template rejection, approved-evidence sidecar
-  replay validation, approved-bundle SDK non-evidence markers, and Mission report checks. Bound
-  identity planning accepts only `approved_runtime_evidence_missing` without explicit runtime evidence; public-contract `next_blocker` uses `identity_public_contract_gate_missing`.
-  Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`,
-  P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+- Latest supervised rounds integrated route gates, copied-event cleanup retry, live-ops
+  sidecar non-claims, P0 certificate/accounting hardening, approved-evidence replay,
+  approved-bundle non-evidence markers, Mission overclaim checks, and player-identity
+  gap/header guardrails. Default route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`. No runtime/server op.

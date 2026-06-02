@@ -1385,7 +1385,7 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
             if report.get(key, []) != []:
                 blockers.append(f"approved_runtime_report_{key}_not_empty")
         if report.get("next_blocker") != "identity_public_contract_gate_missing":
-            blockers.append("approved_runtime_report_next_blocker_not_identity_public_contract_gate")
+            blockers.append("approved_runtime_report_next_blocker_not_identity_public_contract_gate_missing")
     ready = not blockers
     return {
         **base,
@@ -1606,6 +1606,7 @@ def player_identity_public_contract_gap_diagnosis(
     private_candidate_contract: Path,
     identifier_redaction_evidence: Path,
     principal_invalidation_policy_manifest: Path | None,
+    approved_runtime_evidence_manifest: Path | None,
     public_header: Path,
 ) -> dict[str, Any]:
     blockers: list[str] = []
@@ -1635,7 +1636,7 @@ def player_identity_public_contract_gap_diagnosis(
         report_blockers,
     )
     approved_runtime_evidence_gap_report = public_contract_gap_report.validate_approved_runtime_evidence(
-        None,
+        approved_runtime_evidence_manifest,
         report_blockers,
     )
     private_pod_layout_report = public_contract_gap_report.validate_private_pod_layout_candidate(
@@ -1669,7 +1670,7 @@ def player_identity_public_contract_gap_diagnosis(
         private_pod_layout_candidate=public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_abi_preflight_candidate=public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
         owner_token_sdk_consumer_contract=public_contract_gap_report.DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
-        approved_runtime_evidence=None,
+        approved_runtime_evidence=approved_runtime_evidence_manifest,
         public_header=public_header,
     )
     report = public_contract_gap_report.build_report(
@@ -1699,8 +1700,14 @@ def player_identity_public_contract_gap_diagnosis(
     }
     if report.get("primary_offline_gap") not in allowed_primary_gaps:
         blockers.append("player_identity_public_contract_gap_primary_gap_mismatch")
-    if report.get("runtime_evidence_missing") is not True:
-        blockers.append("player_identity_public_contract_gap_runtime_evidence_missing_not_true")
+    runtime_evidence_accepted = approved_runtime_evidence_gap_report.get("accepted_for_contract_review") is True
+    expected_runtime_missing = not runtime_evidence_accepted
+    if report.get("runtime_evidence_missing") is not expected_runtime_missing:
+        blockers.append("player_identity_public_contract_gap_runtime_evidence_missing_mismatch")
+    if runtime_evidence_accepted and report.get("current_blocker") != "identity_public_contract_gate_missing":
+        blockers.append("player_identity_public_contract_gap_current_blocker_mismatch")
+    if runtime_evidence_accepted and report.get("next_blocker") != "identity_public_contract_gate_missing":
+        blockers.append("player_identity_public_contract_gap_next_blocker_mismatch")
     for key in ("accepted_for_contract_review", "promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if report.get(key) is not False:
             blockers.append(f"player_identity_public_contract_gap_{key}_not_false")
@@ -1713,8 +1720,11 @@ def player_identity_public_contract_gap_diagnosis(
         "status": report.get("status"),
         "primary_offline_gap": report.get("primary_offline_gap"),
         "contract_review_inputs_resolved": report.get("contract_review_inputs_resolved", []),
+        "current_blocker": report.get("current_blocker"),
+        "next_blocker": report.get("next_blocker"),
         "identifier_redaction_evidence": report.get("identifier_redaction_evidence", {}),
         "principal_invalidation_policy": report.get("principal_invalidation_policy", {}),
+        "approved_runtime_evidence": report.get("approved_runtime_evidence", {}),
         "runtime_evidence_missing": report.get("runtime_evidence_missing"),
         "accepted_for_contract_review": False,
         "promotion_ready": False,
@@ -2445,6 +2455,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json",
         ),
         principal_invalidation_policy_manifest=effective_principal_invalidation_policy_manifest,
+        approved_runtime_evidence_manifest=getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None),
         public_header=getattr(args, "public_header", REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"),
     )
     approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True

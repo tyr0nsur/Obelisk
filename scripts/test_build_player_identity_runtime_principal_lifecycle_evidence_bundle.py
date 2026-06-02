@@ -582,6 +582,55 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(report["inputs"]["approved_runtime_manifest_check"]["exit_code"], 0)
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checker_ready"])
 
+    def test_preflight_surfaces_approved_checker_blockers_after_operator_sidecar_drift(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = copied_log.parent / "approved-bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            fields = dict(
+                line.split("=", 1)
+                for line in window_manifest.read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#")
+            )
+            operator_approval_receipt = Path(fields["operator_approval_receipt_path"])
+            operator_approval_receipt.write_text("{not-valid-json\n", encoding="utf-8")
+
+            preflight = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(preflight.returncode, 1)
+        report = json.loads(preflight.stdout)
+        self.assertFalse(report["ready"])
+        self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+        self.assertIn("window_manifest_check_failed", report["blockers"])
+        self.assertIn("approved_runtime_manifest_check_failed", report["blockers"])
+        approved_check = report["inputs"]["approved_runtime_manifest_check"]
+        self.assertTrue(approved_check["checked"])
+        self.assertFalse(approved_check["ready"])
+        self.assertEqual(approved_check["exit_code"], 1)
+        self.assertIn(
+            "operational_window_operator_approval_receipt_json_invalid",
+            approved_check["blockers"],
+        )
+        self.assertIn(
+            "operational_window_operator_approval_receipt_json_invalid",
+            next(
+                blocker["approved_runtime_check_blockers"]
+                for blocker in report["blocker_details"]
+                if blocker["reason"] == "approved_runtime_manifest_check_failed"
+            ),
+        )
+        self.assertNotIn(
+            "operational_window_operator_approval_receipt_json_invalid",
+            report["inputs"]["window_manifest_check"]["blockers"],
+        )
+
     def test_preflight_rejects_window_manifest_sidecar_outside_copied_log_dir(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

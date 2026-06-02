@@ -1872,6 +1872,7 @@ def build_report(
             resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
         if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
             resolved_inputs.append(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
+    runtime_input_resolved = REQUIRED_RESOLVED_INPUT in resolved_inputs
     return {
         "schema": REPORT_SCHEMA,
         "surface": decisions.get("surface"),
@@ -1904,6 +1905,7 @@ def build_report(
             blocker["id"]
             for blocker in decisions.get("promotion_blockers", [])
             if isinstance(blocker, dict)
+            and not (runtime_input_resolved and blocker.get("id") == REQUIRED_RESOLVED_INPUT)
         ],
         "next_blocker": (
             NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE

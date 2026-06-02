@@ -2369,6 +2369,63 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## Approved Evidence Replay And Public-Claim Guardrails
+
+This supervised round resumed after conversation compaction with four delegated agents:
+bundle-builder regression worker, player-identity public-contract auditor, SDK/P0
+secondary-report auditor, and docs/skill consistency auditor. The lead integrated their
+findings; sub-agents did not commit, push, touch servers, or widen runtime scope.
+
+Implemented changes:
+
+- Bundle preflight now has a regression proving operator sidecar drift is surfaced through
+  approved-evidence replay blockers instead of being hidden by window-manifest blockers.
+- Player identity first-evidence routing now passes accepted approved runtime evidence
+  into the public-contract gap report, keeps the next blocker as
+  `identity_public_contract_gate_missing`, and rejects the stale
+  `identity_public_contract_gate` alias.
+- Public-contract readiness now removes resolved `runtime.lifecycle_evidence` from
+  `remaining_blockers` without removing still-unresolved contract blockers such as
+  `privacy.identifier_redaction`.
+- Approved runtime principal lifecycle sidecar validation now normalizes claim keys and
+  rejects stable/complete/full/production SDK, public-header, and stable-release-contract
+  overclaims across request, receipt, preflight, and other sidecars.
+- Mission/Transfer/Dino/Tribe accounting now treats approved-bundle markers as
+  non-promotional evidence and the SDK completion gate rejects public/header overclaims
+  even on a future `per_leaf_promoted` report; only the aggregate
+  `promotion_ready`, `public_sdk_ready`, and `runtime_ready` report flags are tolerated
+  there for accounting.
+- Runtime-capture docs and live-ops/tooling skills now require the full sibling sidecar
+  set for approved replay, completed receipts only in `--post-window-replay`, receipt
+  templates never counting, log limit exactly `10` for first approved evidence, and
+  `preflight-post.json` only after capture, rollback, and copied-log availability.
+- `CURRENT.md` was kept as active routing only and remains under the 220-line guardrail.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_mission_transfer_dino_tribe_v1_outcome_accounting`
+  passed 17 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+  passed 41 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed 54 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_player_identity_public_contract_readiness`
+  passed 81 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_research_doc_guardrails scripts.test_agent_handoff_guardrails`
+  passed 37 tests; `CURRENT.md` was 219 lines.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 190 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`, and
+  route blocker `approved_runtime_evidence_missing`.
+- `git diff --check` passed.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
 ## Player Identity Header Alias And Gap-Report Guardrails
 
 A supervised four-agent offline round audited player-identity public-header scanning,

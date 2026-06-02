@@ -1563,6 +1563,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertFalse(report["stable_claim_allowed"])
 
+    def test_completion_gate_rejects_mission_per_leaf_promoted_public_header_overclaims(self) -> None:
+        payload = {
+            "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+            "surface": "obelisk.mission_transfer_dino_tribe.v1",
+            "ready": True,
+            "accounting_route": "per_leaf_promoted",
+            "candidate_only": False,
+            "v1_accounted": True,
+            "promotion_ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "public_header_allowed": True,
+            "public_header_ready": True,
+            "claim": "public header is ready",
+            "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "missing_leaf_families": [],
+            "blockers": [],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_mission_accounting_checker(
+                Path(temp_dir) / "fake_mission_accounting.py",
+                payload,
+            )
+            result = self.run_checker(
+                "--mission-transfer-dino-tribe-outcome-accounting",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_transfer_dino_tribe_public_or_runtime_claims", report["blockers"])
+        self.assertIn(
+            "mission_transfer_dino_tribe_per_leaf_promotion_evidence_unverified",
+            report["blockers"],
+        )
+        self.assertFalse(report["stable_claim_allowed"])
+
     def test_completion_gate_rejects_mission_accounting_invalid_or_incomplete_report(self) -> None:
         base = {
             "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",

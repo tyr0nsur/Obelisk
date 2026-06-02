@@ -420,6 +420,51 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("promoted_leaf_gate_report_non_promotional_schema", payload["blockers"])
         self.assertIn("promoted_leaf_evidence_path_not_leaf_specific", payload["blockers"])
 
+    def test_future_per_leaf_promoted_route_rejects_approved_bundle_evidence_markers(self) -> None:
+        evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
+        evidence_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
+            evidence_root = Path(temp_dir)
+            manifest = load_manifest()
+            gameplay = surface(manifest)
+            gameplay["status"] = "promoted"
+            for leaf in gameplay["leaf_decision_units"]:
+                leaf["status"] = "promoted"
+                leaf["public_contract"] = [f"Copied {leaf['id']} policy event"]
+                leaf["evidence"] = {
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "promotion_ready": True,
+                    "runtime_ready": True,
+                    "abi_tests": [write_promoted_leaf_report(evidence_root, leaf["id"], "abi_tests")],
+                    "sdk_consumer_tests": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "sdk_consumer_tests")
+                    ],
+                    "second_source_evidence": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "second_source_evidence")
+                    ],
+                }
+            mission_entry = gameplay["leaf_decision_units"][0]["evidence"]["abi_tests"][0]
+            mission_path = REPO_ROOT / mission_entry["path"]
+            mission_report = json.loads(mission_path.read_text(encoding="utf-8"))
+            mission_report["schema"] = "obelisk.mission-approved-bundle.v1"
+            mission_path.write_text(json.dumps(mission_report, sort_keys=True), encoding="utf-8")
+            mission_entry["sha256"] = hashlib.sha256(mission_path.read_bytes()).hexdigest()
+
+            transfer_entry = gameplay["leaf_decision_units"][1]["evidence"]["abi_tests"][0]
+            transfer_path = REPO_ROOT / transfer_entry["path"]
+            renamed_transfer_path = transfer_path.with_name("transfer-approved_bundle-abi_tests.json")
+            transfer_path.rename(renamed_transfer_path)
+            transfer_entry["path"] = str(renamed_transfer_path.relative_to(REPO_ROOT))
+            transfer_entry["sha256"] = hashlib.sha256(renamed_transfer_path.read_bytes()).hexdigest()
+
+            result = self.run_checker(manifest=manifest, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_leaf_gate_report_non_promotional_schema", payload["blockers"])
+        self.assertIn("promoted_leaf_evidence_path_non_promotional", payload["blockers"])
+
     def test_future_per_leaf_promoted_route_rejects_missing_or_candidate_evidence(self) -> None:
         evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
         evidence_parent.mkdir(parents=True, exist_ok=True)
