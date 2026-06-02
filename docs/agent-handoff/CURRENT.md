@@ -214,7 +214,7 @@ This file is an active routing table only. Durable evidence belongs in
   stays `lifetime.generation_scope_invalidation`, with explicit remaining inputs
   `runtime.lifecycle_evidence`, `lifetime.principal_scope`, `lifetime.invalidation_events`,
   `lifetime.reconnect_duplicate_stale_policy`, and `abi.public_pod_contract`.
-  SDK accounting now tests that route `completion_gate_accepted=true` while
-  `planning_only=true` still gives P0 route credit `0/4`. Runtime bundle replay uses explicit
-  `--post-window-replay`; next request-pack guard is a generated pre-window
-  `post_window_replay_contract` tying request/env/preflight/manifest sidecars. No runtime/server op.
+  SDK accounting tests route `completion_gate_accepted=true` plus `planning_only=true` as
+  P0 route credit `0/4`. Request packs now emit checked `post_window_replay_contract`
+  sidecars and manifest replay rejects sidecar/check drift; next offline P0 task is
+  lifetime/scope/invalidation plus private ABI contract review. No runtime/server op.

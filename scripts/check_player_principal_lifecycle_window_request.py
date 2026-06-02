@@ -36,6 +36,7 @@ from prepare_player_principal_lifecycle_window_request import (
     WINDOW_MARKERS,
     env_lines,
     markdown_request,
+    post_window_replay_contract,
     post_run_verification_commands,
     run_id_for_window_start,
 )
@@ -66,6 +67,7 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
         "copied_log_path",
         "window_manifest_path",
         "observer_env_file",
+        "post_window_replay_contract",
         "marker_set",
         "forbidden_markers",
         "operator_live_ops_brief",
@@ -125,6 +127,17 @@ EXPECTED_POST_RUN_KEYS = frozenset(
         "verification_commands",
     )
 )
+EXPECTED_REPLAY_CONTRACT_KEYS = frozenset(("required", "offline_only", "sidecars", "checks", "non_authorization"))
+EXPECTED_REPLAY_CONTRACT_SIDECAR_KEYS = frozenset(
+    (
+        "request_pack_path",
+        "observer_env_path",
+        "preflight_pre_path",
+        "preflight_post_path",
+        "window_manifest_path",
+    )
+)
+EXPECTED_REPLAY_CONTRACT_CHECK_KEYS = frozenset(("window_manifest_replay",))
 ALLOWED_RESTART_EXPECTATIONS = frozenset(("none", "start", "restart", "stop-after-window"))
 ALLOWED_FINAL_POSTURES = frozenset(("stable", "stopped"))
 ALLOWED_USER_POLICIES = frozenset(("no_regular_users", "operator_approved_beta_users"))
@@ -326,7 +339,12 @@ def find_forbidden_claim(value: Any, trail: str = "$") -> tuple[str, str] | None
 
 
 def validate_secret_free(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
-    if trail in ("$.forbidden_markers", "$.non_claims", "$.operator_live_ops_brief.marker_changes.forbidden"):
+    if trail in (
+        "$.forbidden_markers",
+        "$.non_claims",
+        "$.operator_live_ops_brief.marker_changes.forbidden",
+        "$.post_window_replay_contract",
+    ):
         return
     if isinstance(value, dict):
         for key, child in value.items():
@@ -392,6 +410,64 @@ def validate_paths(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> N
             add(blockers, f"{key}_not_approved_offline_workspace", key, resolved=str(status.resolved))
         if status.resolved != expected.resolve():
             add(blockers, f"{key}_not_exact_expected_path", key, expected=str(expected), resolved=str(status.resolved))
+
+
+def validate_post_window_replay_contract(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    contract = require_keys(
+        payload.get("post_window_replay_contract"),
+        required=EXPECTED_REPLAY_CONTRACT_KEYS,
+        label="post_window_replay_contract",
+        blockers=blockers,
+    )
+    if contract is None:
+        return
+    require_keys(
+        contract.get("sidecars"),
+        required=EXPECTED_REPLAY_CONTRACT_SIDECAR_KEYS,
+        label="post_window_replay_contract_sidecars",
+        blockers=blockers,
+    )
+    require_keys(
+        contract.get("checks"),
+        required=EXPECTED_REPLAY_CONTRACT_CHECK_KEYS,
+        label="post_window_replay_contract_checks",
+        blockers=blockers,
+    )
+    try:
+        expected = post_window_replay_contract(payload)
+    except (KeyError, TypeError):
+        return
+    if contract != expected:
+        add(blockers, "post_window_replay_contract_mismatch", "post_window_replay_contract", expected=expected, actual=contract)
+    sidecars = contract.get("sidecars")
+    if not isinstance(sidecars, dict):
+        return
+    for key, expected_name in (
+        ("request_pack_path", "window-request.json"),
+        ("observer_env_path", "observer-window.env"),
+        ("preflight_pre_path", "preflight-pre.json"),
+        ("preflight_post_path", "preflight-post.json"),
+        ("window_manifest_path", "window-manifest.env"),
+    ):
+        value = sidecars.get(key)
+        if not isinstance(value, str):
+            add(blockers, f"post_window_replay_contract_{key}_not_string", f"post_window_replay_contract.sidecars.{key}")
+            continue
+        path = Path(value).expanduser()
+        symlink = first_symlink_component(path)
+        if symlink is not None:
+            add(blockers, f"post_window_replay_contract_{key}_symlink_component", f"post_window_replay_contract.sidecars.{key}", symlink=str(symlink))
+        status = protected_paths.protected_path_status(
+            path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        if status.protected:
+            add(blockers, f"post_window_replay_contract_{key}_under_protected_server_root", f"post_window_replay_contract.sidecars.{key}", resolved=str(status.resolved))
+        if not status.approved_offline_workspace:
+            add(blockers, f"post_window_replay_contract_{key}_not_approved_offline_workspace", f"post_window_replay_contract.sidecars.{key}", resolved=str(status.resolved))
+        if status.resolved.name != expected_name:
+            add(blockers, f"post_window_replay_contract_{key}_filename_mismatch", f"post_window_replay_contract.sidecars.{key}", expected=expected_name, actual=status.resolved.name)
 
 
 def args_for_env(payload: dict[str, Any]) -> argparse.Namespace:
@@ -505,6 +581,7 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
         add(blockers, "non_claims_mismatch", "non_claims")
     if payload.get("observer_env_file") != "observer-window.env":
         add(blockers, "observer_env_file_mismatch", "observer_env_file")
+    validate_post_window_replay_contract(payload, blockers)
     validate_operator_live_ops_brief(payload, env, blockers)
     target = require_keys(payload.get("target"), required=EXPECTED_TARGET_KEYS, label="target", blockers=blockers)
     if target:

@@ -623,7 +623,100 @@ def read_preflight_checked_at_utc(
 
 
 def request_check_failed_only_because_window_expired(request_check_blockers: Any) -> bool:
-    return isinstance(request_check_blockers, list) and set(request_check_blockers) == {"approved_window_expired"}
+    return isinstance(request_check_blockers, list) and request_check_blockers == ["approved_window_expired"]
+
+
+def validate_request_pack_replay_contract(
+    fields: dict[str, str],
+    manifest_path: Path,
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    contract = payload.get("post_window_replay_contract")
+    if not isinstance(contract, dict):
+        add(blockers, "request_pack_post_window_replay_contract_missing", "request_pack_path")
+        return
+    if contract.get("required") is not True:
+        add(blockers, "request_pack_post_window_replay_contract_required_mismatch", "request_pack_path")
+    if contract.get("offline_only") is not True:
+        add(blockers, "request_pack_post_window_replay_contract_offline_only_mismatch", "request_pack_path")
+    if contract.get("non_authorization") != "post-window replay contract only; does not authorize runtime work":
+        add(blockers, "request_pack_post_window_replay_contract_non_authorization_mismatch", "request_pack_path")
+    sidecars = contract.get("sidecars")
+    if not isinstance(sidecars, dict):
+        add(blockers, "request_pack_post_window_replay_contract_sidecars_missing", "request_pack_path")
+        return
+    checks = contract.get("checks")
+    if not isinstance(checks, dict):
+        add(blockers, "request_pack_post_window_replay_contract_checks_missing", "request_pack_path")
+    else:
+        expected_command = [
+            "scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py",
+            "--json",
+            "--post-window-replay",
+            str(
+                protected_paths.protected_path_status(
+                    manifest_path,
+                    protected_root=SERVER_ROOT,
+                    approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+                ).resolved
+            ),
+        ]
+        if checks.get("window_manifest_replay") != expected_command:
+            add(
+                blockers,
+                "request_pack_post_window_replay_contract_check_mismatch",
+                "request_pack_path",
+                expected=expected_command,
+                actual=checks.get("window_manifest_replay"),
+            )
+    expected_manifest_path = protected_paths.protected_path_status(
+        manifest_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    ).resolved
+    expected_by_contract_key: dict[str, Path | None] = {
+        "request_pack_path": manifest_relative_path(fields["request_pack_path"], manifest_path)
+        if fields.get("request_pack_path")
+        else None,
+        "observer_env_path": manifest_relative_path(fields["observer_env_path"], manifest_path)
+        if fields.get("observer_env_path")
+        else None,
+        "preflight_pre_path": manifest_relative_path(fields["preflight_pre_path"], manifest_path)
+        if fields.get("preflight_pre_path")
+        else None,
+        "preflight_post_path": manifest_relative_path(fields["preflight_post_path"], manifest_path)
+        if fields.get("preflight_post_path")
+        else None,
+        "window_manifest_path": expected_manifest_path,
+    }
+    for key, expected_path in expected_by_contract_key.items():
+        actual = sidecars.get(key)
+        if not isinstance(actual, str):
+            add(blockers, "request_pack_post_window_replay_contract_mismatch", "request_pack_path", sidecar=key, actual=actual)
+            continue
+        if expected_path is None:
+            add(blockers, "request_pack_post_window_replay_contract_mismatch", "request_pack_path", sidecar=key, actual=actual)
+            continue
+        status = protected_paths.protected_path_status(
+            Path(actual),
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        expected_status = protected_paths.protected_path_status(
+            expected_path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        if status.resolved != expected_status.resolved:
+            add(
+                blockers,
+                "request_pack_post_window_replay_contract_mismatch",
+                "request_pack_path",
+                sidecar=key,
+                expected=str(expected_status.resolved),
+                actual=str(status.resolved),
+            )
 
 
 def validate_request_pack(
@@ -731,6 +824,7 @@ def validate_request_pack(
             add(blockers, "request_pack_approved_window_end_mismatch", "request_pack_path")
     else:
         add(blockers, "request_pack_approved_window_missing", "request_pack_path")
+    validate_request_pack_replay_contract(fields, manifest_path, payload, blockers)
 
     observer_env_text = fields.get("observer_env_path")
     if not observer_env_text:

@@ -197,6 +197,42 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["operator_request_verified"])
         self.assertIn("operator_request_markdown_mismatch", report["blockers"])
 
+    def test_rejects_missing_post_window_replay_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request.pop("post_window_replay_contract")
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_missing_required", report["blockers"])
+
+    def test_rejects_post_window_replay_contract_path_outside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["post_window_replay_contract"]["sidecars"]["observer_env_path"] = "/tmp/observer-window.env"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "operator-approval-request.md").write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
+        self.assertIn("post_window_replay_contract_observer_env_path_not_approved_offline_workspace", report["blockers"])
+
     def test_rejects_missing_operator_request_markdown_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"

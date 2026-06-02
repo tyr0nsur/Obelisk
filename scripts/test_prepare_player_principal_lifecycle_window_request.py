@@ -113,6 +113,19 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(request["status"], "candidate_only_request_pack")
         self.assertEqual(request["approval_required"], "current-turn operator-approved runtime window, not standing approval")
         self.assertEqual(request["copied_log_path"], f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/Obelisk.log")
+        replay_contract = request["post_window_replay_contract"]
+        self.assertTrue(replay_contract["required"])
+        self.assertTrue(replay_contract["offline_only"])
+        self.assertEqual(
+            replay_contract["sidecars"]["request_pack_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/window-request.json",
+        )
+        self.assertEqual(
+            replay_contract["sidecars"]["preflight_pre_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/preflight-pre.json",
+        )
+        self.assertIn("--post-window-replay", replay_contract["checks"]["window_manifest_replay"])
+        self.assertIn("does not authorize runtime work", replay_contract["non_authorization"])
         self.assertIn("enable-player-principal-lifecycle-observer", request["marker_set"])
         self.assertIn("enable-reflection-scanner", request["forbidden_markers"])
         self.assertIn("does not claim stable principal identity", request["non_claims"])
@@ -157,6 +170,9 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("This is a request pack only. It does not authorize server operations.", markdown)
         self.assertIn("dispatch limit=0", markdown)
         self.assertIn("log limit=10", markdown)
+        self.assertIn("Post-window replay contract:", markdown)
+        self.assertIn("preflight_pre_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
+        self.assertIn("--post-window-replay", markdown)
         self.assertIn(
             "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --map TheIsland "
             f"--mode stable --expected-binary-sha256 {SHA}",

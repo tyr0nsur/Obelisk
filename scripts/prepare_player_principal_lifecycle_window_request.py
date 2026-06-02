@@ -218,8 +218,35 @@ def request_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "non_claims": NON_CLAIMS,
     }
+    payload["post_window_replay_contract"] = post_window_replay_contract(payload)
     payload["operator_live_ops_brief"] = operator_live_ops_brief(payload, env_lines(args))
     return payload
+
+
+def post_window_replay_contract(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    evidence_dir = Path(payload["copied_evidence_dir"])
+    return {
+        "required": True,
+        "offline_only": True,
+        "sidecars": {
+            "request_pack_path": str(evidence_dir / "window-request.json"),
+            "observer_env_path": str(evidence_dir / "observer-window.env"),
+            "preflight_pre_path": str(evidence_dir / "preflight-pre.json"),
+            "preflight_post_path": str(evidence_dir / "preflight-post.json"),
+            "window_manifest_path": str(evidence_dir / "window-manifest.env"),
+        },
+        "checks": {
+            "window_manifest_replay": [
+                "scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py",
+                "--json",
+                "--post-window-replay",
+                str(evidence_dir / "window-manifest.env"),
+            ],
+        },
+        "non_authorization": "post-window replay contract only; does not authorize runtime work",
+    }
 
 
 def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str, Any]:
@@ -303,6 +330,7 @@ def post_run_verification_commands(payload: dict[str, Any]) -> list[list[str]]:
 def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
     target = payload["target"]
     window = payload["approved_window"]
+    replay_sidecars = payload["post_window_replay_contract"]["sidecars"]
     lines = [
         "# Player Principal Lifecycle Window Request",
         "",
@@ -334,6 +362,23 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         "",
         "```text",
         *[" ".join(command) for command in post_run_verification_commands(payload)],
+        "```",
+        "",
+        "Post-window replay contract:",
+        "",
+        "```text",
+        *[
+            f"{key}={replay_sidecars[key]}"
+            for key in (
+                "request_pack_path",
+                "observer_env_path",
+                "preflight_pre_path",
+                "preflight_post_path",
+                "window_manifest_path",
+            )
+        ],
+        " ".join(payload["post_window_replay_contract"]["checks"]["window_manifest_replay"]),
+        payload["post_window_replay_contract"]["non_authorization"],
         "```",
         "",
         "Exact observer env snapshot:",

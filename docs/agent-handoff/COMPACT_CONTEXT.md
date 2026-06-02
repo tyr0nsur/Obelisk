@@ -997,9 +997,11 @@ priorities, and do not use history files as the active source of truth.
   candidate principal-invalidation policy does not resolve full
   `lifetime.generation_scope_invalidation`; remaining inputs include runtime lifecycle
   evidence, principal scope, invalidation events, reconnect/duplicate stale policy, and
-  ABI POD contract. Delegated request-pack audit identified the next offline guard:
-  generate and validate a pre-window `post_window_replay_contract` that binds the exact
-  request/env/preflight/window-manifest sidecars later required by post-window replay.
+  ABI POD contract. Delegated request-pack audit then added a generated pre-window
+  `post_window_replay_contract`: request packs project it into JSON/markdown, the request
+  checker validates it, and window-manifest replay compares request/env/preflight/manifest
+  sidecars plus the `--post-window-replay` command before tolerating an expiry-only nested
+  request check. No runtime/server operation was authorized.
 
 ## Agent Coordination
 

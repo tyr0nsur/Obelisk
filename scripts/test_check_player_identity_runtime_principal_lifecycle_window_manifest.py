@@ -32,6 +32,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     env_lines,
     markdown_request,
     operator_live_ops_brief,
+    post_window_replay_contract,
 )
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
@@ -84,13 +85,13 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "actual_capture_end_utc": "2026-06-01T12:09:00Z",
         "copied_log_path": f"live-validation-logs/{RUN_ID}/Obelisk.log",
         "copied_log_sha256": GOOD_SHA,
-        "request_pack_path": f"sidecars/{RUN_ID}/window-request.json",
+        "request_pack_path": "window-request.json",
         "request_pack_sha256": "0" * 64,
-        "observer_env_path": f"sidecars/{RUN_ID}/observer-window.env",
+        "observer_env_path": "observer-window.env",
         "observer_env_sha256": "0" * 64,
-        "preflight_pre_path": f"sidecars/{RUN_ID}/preflight-pre.json",
+        "preflight_pre_path": "preflight-pre.json",
         "preflight_pre_sha256": "0" * 64,
-        "preflight_post_path": f"sidecars/{RUN_ID}/preflight-post.json",
+        "preflight_post_path": "preflight-post.json",
         "preflight_post_sha256": "0" * 64,
         "pre_posture": "stable",
         "post_posture": "stable",
@@ -173,6 +174,7 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         },
     )()
     payload["operator_live_ops_brief"] = operator_live_ops_brief(payload, env_lines(args))
+    payload["post_window_replay_contract"] = post_window_replay_contract(payload)
     return payload
 
 
@@ -248,13 +250,14 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
     if not request_pack_path.is_absolute():
         request_pack_path = base / request_pack_path
     operator_request_path = request_pack_path.parent / "operator-approval-request.md"
+    request_payload = request_pack_payload(fields, base)
     contents = {
-        "request_pack": json.dumps(request_pack_payload(fields, base), sort_keys=True) + "\n",
+        "request_pack": json.dumps(request_payload, sort_keys=True) + "\n",
         "operator_request": markdown_request(
-            request_pack_payload(fields, base),
+            request_payload,
             observer_env_text.splitlines(),
-            ),
-            "observer_env": observer_env_text,
+        ),
+        "observer_env": observer_env_text,
         "preflight_pre": json.dumps(
             preflight_payload(
                 mode="observer-window",
@@ -311,6 +314,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
     def test_post_window_replay_expiry_exception_is_exact(self) -> None:
         self.assertTrue(CHECKER.request_check_failed_only_because_window_expired(["approved_window_expired"]))
         self.assertFalse(CHECKER.request_check_failed_only_because_window_expired([]))
+        self.assertFalse(
+            CHECKER.request_check_failed_only_because_window_expired(
+                ["approved_window_expired", "approved_window_expired"]
+            )
+        )
         self.assertFalse(
             CHECKER.request_check_failed_only_because_window_expired(
                 ["approved_window_expired", "operator_markdown_drift"]
@@ -1163,6 +1171,68 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("request_pack_window_request_check_failed", report["blockers"])
         self.assertTrue(details)
         self.assertIn("operator_request_markdown_mismatch", details[0]["request_check_blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_post_window_replay_contract_sidecar_drift(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["post_window_replay_contract"]["sidecars"]["preflight_pre_path"] = "/tmp/preflight-pre.json"
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            observer_env = Path(fields["observer_env_path"])
+            if not observer_env.is_absolute():
+                observer_env = root / observer_env
+            operator_request = request_pack.parent / "operator-approval-request.md"
+            operator_request.write_text(
+                markdown_request(payload, observer_env.read_text(encoding="utf-8").splitlines()),
+                encoding="utf-8",
+            )
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_post_window_replay_contract_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_post_window_replay_contract_check_drift(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["post_window_replay_contract"]["checks"]["window_manifest_replay"] = [
+                "scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py",
+                "--json",
+                str(root / "window-manifest.env"),
+            ]
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            observer_env = Path(fields["observer_env_path"])
+            if not observer_env.is_absolute():
+                observer_env = root / observer_env
+            operator_request = request_pack.parent / "operator-approval-request.md"
+            operator_request.write_text(
+                markdown_request(payload, observer_env.read_text(encoding="utf-8").splitlines()),
+                encoding="utf-8",
+            )
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_post_window_replay_contract_check_mismatch", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_request_pack_obelisk_commit_mismatch(self) -> None:
