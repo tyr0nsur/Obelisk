@@ -782,6 +782,23 @@ priorities, and do not use history files as the active source of truth.
     `stable_claim_allowed=false`, complete-SDK progress `0/12`, P0 progress `0/4`.
   - Next true blocker is approved copied runtime principal lifecycle evidence; no runtime,
     marker/env/server action is authorized without a fresh live-ops brief.
+- Delegated lifecycle-anchor snapshot provenance round on 2026-06-02 closed the remaining
+  offline hash-binding gap in the explicit bound identity route:
+  - Four read-only sub-agent scopes were lead-delegated and closed: offline identity
+    provenance, SDK-route overclaim audit, UE4 snapshot fixture provenance, and
+    handoff/knowledge continuity.
+  - `bind_player_identity_planning_sources.py` resolves required accepted lifecycle
+    anchors through `snapshot-root/manifest.json`, rejects duplicate/missing/protected or
+    target-mismatched snapshot rows, hashes the real snapshot files, and fails closed on
+    stale or missing anchor `evidence.source_snapshot_sha256`.
+  - `build_player_identity_planning_source_manifests.py` and
+    `check_command_permission_route_gate_bound_identity_sources.py` both enforce and emit
+    `lifecycle_snapshot_root_binding`. A transient generated route remains valid only as
+    planning and advances to `approved_runtime_evidence_missing`; the default route still
+    remains blocked at `lifecycle_anchor_first_evidence_provenance_unbound`.
+  - SDK-route audit found no public SDK/runtime/permissions/admin/commands overclaim path
+    from this provenance fix. SDK completion remains fail-closed with
+    `stable_claim_allowed=false`.
 
 ## Agent Coordination
 

@@ -672,6 +672,65 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Lifecycle Anchor Snapshot Provenance Binding
+
+The next P0-focused supervised round closed the remaining offline provenance gap for the
+explicit bound player-identity route. The lead delegated four read-only scopes and kept
+integration ownership:
+
+- offline identity provenance audit;
+- SDK-route overclaim audit;
+- UE4 snapshot fixture/provenance audit;
+- handoff and knowledge-continuity audit.
+
+Integrated changes:
+
+- `scripts/bind_player_identity_planning_sources.py` now resolves required accepted
+  lifecycle anchors through the selected `--snapshot-root/manifest.json`, validates
+  manifest schema/source/status and exact snapshot target identity, rejects duplicate or
+  missing focal targets, rejects symlink/protected/out-of-root paths, hashes the real
+  snapshot files, and fails closed when accepted `ShooterGameMode.HandleNewPlayer` or
+  `ShooterGameMode.OnLogout` anchor `evidence.source_snapshot_sha256` is stale or
+  missing.
+- `scripts/build_player_identity_planning_source_manifests.py` now self-checks and emits
+  `source_alignment.lifecycle_snapshot_root_binding` so generated planning artifacts show
+  the snapshot-root binding used for the bound route.
+- `scripts/check_command_permission_route_gate_bound_identity_sources.py` now enforces the
+  same snapshot-root binding after schema/prebind validation and before lifecycle
+  normalization, then emits `lifecycle_snapshot_root_binding` in the wrapper report.
+- Tests cover successful explicit bound-route advancement, stale accepted-anchor snapshot
+  hash rejection, missing focal snapshot rejection, duplicate focal manifest-row
+  rejection, and builder report binding visibility.
+
+Read-only findings preserved:
+
+- The original gap was real: before this change, stale accepted-anchor snapshot hashes
+  could still yield a valid explicit bound wrapper with
+  `critical_path_phase.current_blocker=approved_runtime_evidence_missing`.
+- The SDK-route audit found no guardrail path where this provenance fix promotes public
+  SDK, runtime, permissions/admin, command response, or commands/replies readiness.
+- The authoritative fixture resolution is manifest-based, not glob-based. Current focal
+  snapshot file hashes are:
+  `ShooterGameMode.HandleNewPlayer` =
+  `a9b3049dc221f128924ff0c6eb45287bf630dfaea4e4ab33bbf93647a5d3361b` and
+  `ShooterGameMode.OnLogout` =
+  `e79e416a408bbe652a31f58c710cfeb03daa0acf2e0ebef55a7ba61c83a414aa`.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate_bound_identity_sources scripts.test_build_player_identity_planning_source_manifests scripts.test_bind_player_identity_planning_sources`
+- Real transient build plus bound wrapper:
+  `build_valid=true`, `snapshot_binding_ready=true`, `route_valid=true`, and
+  `route_current_blocker=approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  remains default-planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  remains fail-closed with `stable_claim_allowed=false`.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Delegated Runtime And Inventory Guardrail Round
 
 The next supervised round was delegated by the lead into four scoped read-only lanes:

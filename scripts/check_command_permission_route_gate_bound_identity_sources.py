@@ -157,6 +157,10 @@ def build_transient_binding(
     lifecycle, lifecycle_path = binder.load_json(lifecycle_manifest, "lifecycle-anchor-candidates")
     principal, principal_path = binder.load_json(principal_manifest, "principal-invalidation-policy")
     binder.validate_inputs(first_evidence=first_evidence, lifecycle=lifecycle, principal=principal)
+    lifecycle_snapshot_root_binding = binder.validate_lifecycle_anchor_snapshot_root(
+        lifecycle=lifecycle,
+        snapshot_root=snapshot_root,
+    )
 
     output_dir = binder.prepare_output_dir(temp_root / "bound")
     lifecycle_output = output_dir / binder.LIFECYCLE_OUTPUT_NAME
@@ -194,7 +198,7 @@ def build_transient_binding(
         bound_principal=bound_principal,
     )
     write_json(report_output, binding_report)
-    return binding_report, lifecycle_output, principal_output
+    return binding_report, lifecycle_output, principal_output, lifecycle_snapshot_root_binding
 
 
 def run_route_gate(
@@ -276,7 +280,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         temp_root = Path(temp_dir)
         reject_symlink_component(temp_root, "temp-root")
         reject_protected_output_path(temp_root, "temp-root")
-        binding_report, lifecycle_output, principal_output = build_transient_binding(
+        (
+            binding_report,
+            lifecycle_output,
+            principal_output,
+            lifecycle_snapshot_root_binding,
+        ) = build_transient_binding(
             snapshot_root=snapshot_root,
             lifecycle_manifest=lifecycle_manifest,
             principal_manifest=principal_manifest,
@@ -368,6 +377,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "critical_path_phase": critical_path_phase,
         "route_lock": route_lock,
         "binding_report": binding_report,
+        "lifecycle_snapshot_root_binding": lifecycle_snapshot_root_binding,
         "route_gate": {
             "returncode": route_returncode,
             "stderr": route_stderr,

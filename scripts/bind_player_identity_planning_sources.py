@@ -24,6 +24,10 @@ REPORT_SCHEMA = "obelisk.player-identity-planning-source-binding-report.v1"
 LIFECYCLE_OUTPUT_NAME = "players-identity-lifecycle-anchor-candidates.json"
 PRINCIPAL_OUTPUT_NAME = "players-identity-principal-invalidation-policy.json"
 REPORT_OUTPUT_NAME = "player-identity-planning-source-binding-report.json"
+REQUIRED_LIFECYCLE_SNAPSHOT_TARGETS = (
+    "ShooterGameMode.HandleNewPlayer",
+    "ShooterGameMode.OnLogout",
+)
 NON_CLAIMS = [
     "no runtime or server operation was performed",
     "no ARK process was started, stopped, restarted, attached, or observed",
@@ -124,6 +128,120 @@ def first_evidence_snapshot_by_target(first_evidence: dict[str, Any]) -> dict[st
         if isinstance(target, str) and isinstance(snapshot_id, str) and isinstance(snapshot_sha256, str):
             result[target] = {"id": snapshot_id, "sha256": snapshot_sha256}
     return result
+
+
+def snapshot_manifest_target_paths(snapshot_root: Path) -> dict[str, Path]:
+    manifest_payload, manifest_path = load_json(snapshot_root / "manifest.json", "snapshot manifest")
+    if manifest_payload.get("schema") != "obelisk.ufunction-snapshot-manifest.v1":
+        raise SystemExit("snapshot manifest schema mismatch")
+    for key, expected in (("source", "offline_core"), ("status", "candidate-only")):
+        if manifest_payload.get(key) != expected:
+            raise SystemExit(f"snapshot manifest {key} mismatch")
+    if not isinstance(manifest_payload.get("ark_binary_sha256"), str) or not manifest_payload["ark_binary_sha256"]:
+        raise SystemExit("snapshot manifest ark_binary_sha256 missing")
+    sha_prefix = manifest_payload.get("sha_prefix")
+    targets = manifest_payload.get("targets")
+    if not isinstance(sha_prefix, str) or not sha_prefix:
+        raise SystemExit("snapshot manifest sha_prefix missing")
+    if not isinstance(targets, list):
+        raise SystemExit("snapshot manifest targets must be a list")
+    root = snapshot_root.resolve()
+    result: dict[str, Path] = {}
+    for entry in targets:
+        if not isinstance(entry, dict):
+            continue
+        outer = entry.get("outer")
+        name = entry.get("name")
+        module = entry.get("module")
+        file_name = entry.get("file")
+        if not all(isinstance(value, str) and value for value in (outer, name, module, file_name)):
+            continue
+        target = f"{outer}.{name}"
+        if target in result:
+            raise SystemExit(f"snapshot manifest contains duplicate target: {target}")
+        path = manifest_path.parent / sha_prefix / module / file_name
+        reject_symlink_component(path, f"snapshot-root:{target}")
+        resolved = reject_protected_input_path(path, f"snapshot-root:{target}")
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise SystemExit(f"snapshot-root:{target} resolves outside snapshot-root: {resolved}") from exc
+        result[target] = resolved
+    return result
+
+
+def validate_snapshot_file_identity(path: Path, target: str) -> None:
+    payload, _ = load_json(path, f"snapshot-root:{target}")
+    if payload.get("schema") != "obelisk.ufunction-chain.snapshot.v1":
+        raise SystemExit(f"snapshot-root:{target} schema mismatch")
+    targets = payload.get("targets")
+    if not isinstance(targets, list) or len(targets) != 1 or not isinstance(targets[0], dict):
+        raise SystemExit(f"snapshot-root:{target} must contain exactly one target")
+    identity = targets[0].get("target")
+    if not isinstance(identity, dict):
+        raise SystemExit(f"snapshot-root:{target} target identity missing")
+    observed = f"{identity.get('outer_name')}.{identity.get('name')}"
+    if observed != target:
+        raise SystemExit(f"snapshot-root:{target} target mismatch: observed {observed}")
+
+
+def lifecycle_anchor_snapshot_root_diagnosis(
+    *,
+    lifecycle: dict[str, Any],
+    snapshot_root: Path,
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    expected_by_target: dict[str, str] = {}
+    try:
+        paths_by_target = snapshot_manifest_target_paths(snapshot_root)
+    except SystemExit:
+        raise
+    anchors = lifecycle.get("candidate_anchors")
+    anchors_by_target = {
+        anchor.get("target"): anchor
+        for anchor in anchors
+        if isinstance(anchor, dict) and anchor.get("accepted") is True and isinstance(anchor.get("target"), str)
+    } if isinstance(anchors, list) else {}
+
+    for target in REQUIRED_LIFECYCLE_SNAPSHOT_TARGETS:
+        snapshot_path = paths_by_target.get(target)
+        if snapshot_path is None:
+            blockers.append("lifecycle_anchor_snapshot_root_manifest_target_missing")
+            continue
+        if not snapshot_path.is_file():
+            blockers.append("lifecycle_anchor_snapshot_root_file_missing")
+            continue
+        validate_snapshot_file_identity(snapshot_path, target)
+        expected_sha256 = sha256_file(snapshot_path)
+        expected_by_target[target] = expected_sha256
+        anchor = anchors_by_target.get(target)
+        evidence = anchor.get("evidence") if isinstance(anchor, dict) else None
+        observed_sha256 = evidence.get("source_snapshot_sha256") if isinstance(evidence, dict) else None
+        if not isinstance(observed_sha256, str) or not observed_sha256:
+            blockers.append("lifecycle_anchor_source_snapshot_evidence_missing")
+        elif observed_sha256 != expected_sha256:
+            blockers.append("lifecycle_anchor_source_snapshot_root_mismatch")
+
+    return {
+        "ready": not blockers,
+        "blockers": sorted(set(blockers)),
+        "required_targets": list(REQUIRED_LIFECYCLE_SNAPSHOT_TARGETS),
+        "expected_snapshot_sha256_by_target": expected_by_target,
+    }
+
+
+def validate_lifecycle_anchor_snapshot_root(
+    *,
+    lifecycle: dict[str, Any],
+    snapshot_root: Path,
+) -> dict[str, Any]:
+    diagnosis = lifecycle_anchor_snapshot_root_diagnosis(lifecycle=lifecycle, snapshot_root=snapshot_root)
+    if diagnosis["blockers"]:
+        raise SystemExit(
+            "player identity planning source binding failed snapshot-root provenance: "
+            + json.dumps({"lifecycle_anchor_candidates": diagnosis["blockers"]}, sort_keys=True)
+        )
+    return diagnosis
 
 
 def validation_reasons(blockers: list[dict[str, Any]]) -> list[str]:

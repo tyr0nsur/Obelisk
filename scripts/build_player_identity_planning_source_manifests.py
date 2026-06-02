@@ -520,6 +520,7 @@ def build_report(
     lifecycle: dict[str, Any],
     principal: dict[str, Any],
     binder_report: dict[str, Any],
+    lifecycle_snapshot_root_binding: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema": REPORT_SCHEMA,
@@ -549,6 +550,7 @@ def build_report(
             "principal_lifecycle_source_binding": copy.deepcopy(
                 principal["lifecycle_layout_source"]["source_binding"]
             ),
+            "lifecycle_snapshot_root_binding": copy.deepcopy(lifecycle_snapshot_root_binding),
             "binder_ready": binder_report.get("ready") is True,
             "binder_blockers": binder_report.get("blockers", []),
         },
@@ -580,6 +582,10 @@ def main() -> int:
             "generated lifecycle-anchor candidates failed validation: "
             + json.dumps(validation_reasons(lifecycle_blockers), sort_keys=True)
         )
+    lifecycle_snapshot_root_binding = binder.validate_lifecycle_anchor_snapshot_root(
+        lifecycle=lifecycle,
+        snapshot_root=snapshot_root,
+    )
 
     principal = build_principal_manifest(lifecycle)
     principal_blockers = principal_checker.validate_manifest(principal, check_mode="consume").blockers
@@ -620,6 +626,7 @@ def main() -> int:
         lifecycle=lifecycle,
         principal=principal,
         binder_report=binder_report,
+        lifecycle_snapshot_root_binding=lifecycle_snapshot_root_binding,
     )
     binder.atomic_write_json(report_path, report)
     if args.json:

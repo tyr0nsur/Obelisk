@@ -67,6 +67,13 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
                 ["ShooterGameMode.OnLogout"],
                 principal["lifecycle_layout_source"]["source_binding"]["accepted_end_targets"],
             )
+            snapshot_binding = report["source_alignment"]["lifecycle_snapshot_root_binding"]
+            self.assertTrue(snapshot_binding["ready"])
+            self.assertEqual([], snapshot_binding["blockers"])
+            self.assertEqual(
+                ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
+                snapshot_binding["required_targets"],
+            )
 
             bound = subprocess.run(
                 [
@@ -140,6 +147,30 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("snapshot manifest does not contain required lifecycle target", result.stderr)
+
+    def test_rejects_duplicate_focal_lifecycle_snapshot_manifest_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshot_root = root / "snapshots"
+            subprocess.run(
+                ["cp", "-a", str(REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"), str(snapshot_root)],
+                check=True,
+            )
+            manifest_path = snapshot_root / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for target in manifest["targets"]:
+                if f"{target.get('outer')}.{target.get('name')}" == "ShooterGameMode.HandleNewPlayer":
+                    manifest["targets"].append(dict(target))
+                    break
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            result = self.run_tool(
+                ["--snapshot-root", str(snapshot_root), "--output-dir", str(root / "out")],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("duplicate snapshot manifest target: ShooterGameMode.HandleNewPlayer", result.stderr)
 
 
 if __name__ == "__main__":

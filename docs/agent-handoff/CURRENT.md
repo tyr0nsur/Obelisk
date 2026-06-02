@@ -23,10 +23,12 @@ This file is an active routing table only. Durable evidence belongs in
 - Current accounting: SDK completion remains fail-closed with complete-SDK progress
   `0/12`, P0 promoted count `0/4`, and `stable_claim_allowed=false`.
 - Current identity status: `scripts/build_player_identity_planning_source_manifests.py`
-  can produce source-aligned planning manifests for the bound identity route. A bound
-  proof may advance only to `approved_runtime_evidence_missing`; the default route remains
-  blocked first at `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit
-  aligned manifests are supplied.
+  can produce source-aligned planning manifests for the bound identity route. It now
+  proves accepted lifecycle anchor `source_snapshot_sha256` values against the current
+  `--snapshot-root` files before a bound proof may advance only to
+  `approved_runtime_evidence_missing`; the default route remains blocked first at
+  `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit aligned manifests
+  are supplied.
 
 ## Hard Overrides
 
@@ -89,7 +91,8 @@ This file is an active routing table only. Durable evidence belongs in
   emits planning-only `players-identity-first-evidence.json`,
   `players-identity-lifecycle-anchor-candidates.json`, and
   `players-identity-principal-invalidation-policy.json` bound to the current
-  first-evidence source. A transient bound route proof with those outputs reports
+  first-evidence source and current snapshot-root hashes for `ShooterGameMode.HandleNewPlayer`
+  and `ShooterGameMode.OnLogout`. A transient bound route proof with those outputs reports
   `approved_runtime_evidence_missing`, with runtime/server authorization false.
 - Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` remains the safe
@@ -130,10 +133,10 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 identity: use `scripts/build_player_identity_planning_source_manifests.py` when a
   bound route proof is needed, then run
   `scripts/check_command_permission_route_gate_bound_identity_sources.py` and confirm the
-  wrapper blocker is only `approved_runtime_evidence_missing`. Before runtime evidence,
-  close the remaining offline provenance gap: accepted `ShooterGameMode.HandleNewPlayer`
-  and `ShooterGameMode.OnLogout` lifecycle-anchor snapshot hashes must match the current
-  `--snapshot-root`, not only shared source artifact ids.
+  wrapper blocker is only `approved_runtime_evidence_missing`. The previous offline
+  provenance gap for accepted lifecycle-anchor snapshot hashes is closed in the builder
+  and bound wrapper; stale standalone manifests still fail closed unless regenerated or
+  explicitly aligned to the current `--snapshot-root`.
 - P0 runtime evidence: prepare, but do not run, a fresh live-ops brief for approved copied
   runtime principal lifecycle evidence. It must name target instance/map, feature gates,
   marker/env changes, restart/start window, notice path if players are involved, evidence
@@ -162,3 +165,7 @@ This file is an active routing table only. Durable evidence belongs in
 - Lead handles delegation directly when the user asks for agents. Keep the scoped
   delegation fact in handoff/research notes before finishing so compaction does not erase
   which work was delegated and which findings remain pending.
+- Latest delegated round used four lead-scoped read-only agents: offline identity
+  provenance, SDK-route overclaim audit, UE4 snapshot fixture provenance, and handoff
+  continuity. Integrated result: snapshot-root hash binding is enforced before bound
+  identity route advancement; no public SDK/runtime/permissions overclaim path was found.

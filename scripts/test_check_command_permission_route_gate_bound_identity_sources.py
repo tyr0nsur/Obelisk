@@ -40,6 +40,15 @@ def align_lifecycle_to_snapshot_root(lifecycle: dict, snapshot_root: Path) -> di
     lifecycle["artifact_identity"]["source_artifact_ids"] = first_evidence["artifact_identity"][
         "source_artifact_ids"
     ]
+    diagnosis = CHECKER.binder.lifecycle_anchor_snapshot_root_diagnosis(
+        lifecycle=lifecycle,
+        snapshot_root=snapshot_root,
+    )
+    expected = diagnosis["expected_snapshot_sha256_by_target"]
+    for anchor in lifecycle["candidate_anchors"]:
+        target = anchor.get("target")
+        if target in expected:
+            anchor["evidence"]["source_snapshot_sha256"] = expected[target]
     return lifecycle
 
 
@@ -164,6 +173,8 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertEqual([], report["blockers"])
         self.assertTrue(report["binding_report"]["ready"])
         self.assertEqual([], report["binding_report"]["blockers"])
+        self.assertTrue(report["lifecycle_snapshot_root_binding"]["ready"])
+        self.assertEqual([], report["lifecycle_snapshot_root_binding"]["blockers"])
         self.assertEqual("approved_runtime_evidence_missing", report["critical_path_phase"]["current_blocker"])
         self.assertEqual(
             ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
@@ -185,6 +196,34 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertFalse(phase["source_checker_ready"])
         self.assertFalse(phase["source_checker_accepted_for_internal_planning"])
         self.assertIn("no runtime or server operation was performed", report["non_claims"])
+
+    def test_rejects_stale_lifecycle_anchor_snapshot_hash_before_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
+            principal_path = root / "players-identity-principal-invalidation-policy.json"
+            lifecycle = align_lifecycle_to_snapshot_root(
+                accepted_lifecycle_anchor_manifest(),
+                CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
+            )
+            lifecycle["candidate_anchors"][0]["evidence"]["source_snapshot_sha256"] = "0" * 64
+            write_json(lifecycle_path, lifecycle)
+            write_json(principal_path, principal_policy_manifest())
+
+            result = self.run_checker(
+                [
+                    "--lifecycle-anchor-candidates-manifest",
+                    str(lifecycle_path),
+                    "--principal-invalidation-policy",
+                    str(principal_path),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("snapshot-root provenance", result.stderr)
+        self.assertIn("lifecycle_anchor_source_snapshot_root_mismatch", result.stderr)
 
     def test_rejects_route_gate_valid_true_with_bound_provenance_drift(self) -> None:
         cases = (
