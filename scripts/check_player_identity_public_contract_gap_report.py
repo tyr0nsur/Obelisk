@@ -84,6 +84,16 @@ REQUIRED_DECISION_GATE_CURRENT_DECISION = (
     "no public header, no public capability bit, no plugin callback, no lookup, "
     "no downstream permission or command dependency may consume identity yet"
 )
+REQUIRED_DECISION_GATE_SCOPE = (
+    "v1 copied opaque player principal blocker; excludes lookup and downstream "
+    "permission/command/storage surfaces until separately promoted."
+)
+REQUIRED_DECISION_GATE_ALLOWED_NOW = {
+    "document blockers",
+    "document candidate POD shape",
+    "document non-claims",
+    "document tests required before promotion",
+}
 REQUIRED_DECISION_GATE_FORBIDDEN_NOW = {
     "C++ ABI edits",
     "public header symbols",
@@ -694,6 +704,29 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
                 "decisions_decision_gate_current_decision_mismatch",
                 "$.decision_gate.current_decision",
                 value=decision_gate.get("current_decision"),
+            )
+        if decision_gate.get("scope") != REQUIRED_DECISION_GATE_SCOPE:
+            add(
+                blockers,
+                "decisions_decision_gate_scope_mismatch",
+                "$.decision_gate.scope",
+                value=decision_gate.get("scope"),
+            )
+        allowed_now = string_list(decision_gate.get("allowed_now"))
+        if allowed_now is None:
+            add(
+                blockers,
+                "decisions_decision_gate_allowed_now_not_string_list",
+                "$.decision_gate.allowed_now",
+                value=decision_gate.get("allowed_now"),
+            )
+        elif set(allowed_now) != REQUIRED_DECISION_GATE_ALLOWED_NOW:
+            add(
+                blockers,
+                "decisions_decision_gate_allowed_now_mismatch",
+                "$.decision_gate.allowed_now",
+                expected=sorted(REQUIRED_DECISION_GATE_ALLOWED_NOW),
+                observed=sorted(allowed_now),
             )
         forbidden_now = string_list(decision_gate.get("forbidden_now"))
         if forbidden_now is None or not REQUIRED_DECISION_GATE_FORBIDDEN_NOW.issubset(set(forbidden_now)):

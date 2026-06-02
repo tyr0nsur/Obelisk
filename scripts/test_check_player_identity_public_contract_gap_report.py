@@ -585,6 +585,12 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
     def test_rejects_public_contract_gate_or_runtime_evidence_limit_weakened(self) -> None:
         decisions = self.load_decisions()
         decisions["decision_gate"]["current_decision"] = "runtime evidence accepted; identity can unlock permissions"
+        decisions["decision_gate"]["scope"] = "identity runtime route is ready for downstream permissions"
+        decisions["decision_gate"]["allowed_now"] = [
+            "document blockers",
+            "document candidate POD shape",
+            "public readiness",
+        ]
         decisions["decision_gate"]["forbidden_now"].remove("permission/admin API")
         decisions["forbidden_public_contract"].remove("UE pointers")
         decisions["approved_runtime_evidence_not_sufficient"]["why"].remove(
@@ -600,6 +606,8 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         for blocker in (
             "decisions_decision_gate_current_decision_mismatch",
+            "decisions_decision_gate_scope_mismatch",
+            "decisions_decision_gate_allowed_now_mismatch",
             "decisions_decision_gate_forbidden_now_missing_required",
             "decisions_forbidden_public_contract_missing_required",
             "decisions_approved_runtime_evidence_not_sufficient_why_missing",

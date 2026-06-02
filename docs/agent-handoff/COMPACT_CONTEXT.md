@@ -1046,6 +1046,14 @@ priorities, and do not use history files as the active source of truth.
   review inputs, while keeping header symbols, capability bits, callback ABI, promotion,
   runtime readiness, SDK readiness, route credit, and v1 completion false. Runtime
   evidence remains the P0 blocker; no runtime/server operation was performed.
+- 2026-06-02 no-runtime Transfer/replay hardening: lead delegated Transfer, release-scope,
+  SDK/P0, request-pack, and handoff audits. Transfer `bAccept` now has a CTest-only
+  hook-side helper and tests, absent from runtime/public/ops surfaces. Follow-up replay
+  docs require `--post-window-replay`, completed digest-bound
+  `operator-approval-receipt.json`, stable-only final posture, and live-validation sidecar
+  paths. Default route/SDK still fail closed at `approved_runtime_evidence_missing`,
+  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`; no runtime/server operation was
+  performed.
 
 ## Agent Coordination
 
