@@ -1421,10 +1421,27 @@ def player_principal_lifecycle_window_request_diagnosis(
         env = player_principal_lifecycle_window_request.read_env(env_path, env_blockers)
     except SystemExit as exc:
         return {**base, "blockers": ["player_principal_lifecycle_window_request_unreadable"], "error": str(exc)}
+    operator_request_path = request_path.parent / "operator-approval-request.md"
+    operator_request_markdown = player_principal_lifecycle_window_request.read_text_sidecar(
+        operator_request_path,
+        "operator_request",
+        env_blockers,
+    )
     validation = player_principal_lifecycle_window_request.validate_payload(payload, env)
     report = player_principal_lifecycle_window_request.build_report(validation)
-    blockers = [blocker["reason"] for blocker in [*env_blockers, *validation.blockers]]
-    ready = not blockers and report.get("request_pack_ready") is True
+    validation.blockers[:0] = env_blockers
+    operator_request_verified = player_principal_lifecycle_window_request.validate_operator_request_markdown(
+        payload,
+        env,
+        operator_request_markdown,
+        validation.blockers,
+    )
+    report = player_principal_lifecycle_window_request.build_report(
+        validation,
+        operator_request_verified=operator_request_verified,
+    )
+    blockers = [blocker["reason"] for blocker in validation.blockers]
+    ready = not blockers and report.get("request_pack_ready") is True and operator_request_verified
     return {
         **base,
         "ready": ready,
@@ -1432,6 +1449,8 @@ def player_principal_lifecycle_window_request_diagnosis(
         "bundle_inputs_ready": False,
         "operator_current_turn_runtime_window_approval_required": ready,
         "blockers": blockers,
+        "operator_request_path": str(operator_request_path),
+        "operator_request_verified": operator_request_verified,
         "next_blocker": report.get("next_blocker"),
         "target": report.get("target"),
         "run_id": report.get("run_id"),

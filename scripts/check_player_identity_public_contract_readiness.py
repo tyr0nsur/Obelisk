@@ -657,10 +657,13 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
                 "$.identifier_redaction_evidence.resolved_inputs",
                 value=report.get("resolved_inputs"),
             )
-        if report.get("next_blocker") != NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE:
+        if report.get("next_blocker") in {
+            "identity_public_contract_gate",
+            NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+        }:
             add(
                 blockers,
-                "identifier_redaction_evidence_next_blocker_mismatch",
+                "identifier_redaction_evidence_route_unlock_claimed",
                 "$.identifier_redaction_evidence.next_blocker",
                 value=report.get("next_blocker"),
             )

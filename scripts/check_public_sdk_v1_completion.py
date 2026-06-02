@@ -14,6 +14,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_principal_lifecycle_evidence
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
@@ -1886,8 +1888,11 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
     status = surface.get("status")
     if not isinstance(surface_id, str) or status not in {"excluded", "post-v1"}:
         return False
-    expected = "post-v1" if status == "post-v1" else "excluded"
-    record = release_statement_surface_record(text, surface_id, expected)
+    allowed_outcomes = required_release_statement_outcomes(surface)
+    recorded_outcome = release_statement_recorded_outcome(text, surface_id)
+    if recorded_outcome not in allowed_outcomes:
+        return False
+    record = release_statement_surface_record(text, surface_id, recorded_outcome)
     if record is None:
         return False
     lowered = record.lower()
@@ -2576,6 +2581,25 @@ def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> l
 
 def player_identity_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
     missing: list[str] = []
+    runtime_manifest, runtime_manifest_errors = load_hash_bound_json_artifact_binding(
+        evidence.get("approved_runtime_evidence_manifest"),
+        "approved_runtime_evidence_manifest",
+    )
+    missing.extend(runtime_manifest_errors)
+    replayed_runtime_report: dict[str, Any] | None = None
+    if runtime_manifest is not None:
+        validation = approved_runtime_principal_lifecycle_evidence.validate_manifest(
+            runtime_manifest,
+            check_mode="consume",
+        )
+        replayed_runtime_report = approved_runtime_principal_lifecycle_evidence.build_report(
+            runtime_manifest,
+            validation,
+            check_mode="consume",
+        )
+        if validation.blockers:
+            missing.append("approved_runtime_evidence_manifest:validation_failed")
+
     runtime_report, runtime_error = load_repo_relative_json_evidence(evidence.get("approved_runtime_evidence_report"))
     if runtime_error is not None:
         missing.append(f"approved_runtime_evidence_report:{runtime_error}")
@@ -2590,6 +2614,18 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
         and runtime_report.get("next_blocker") == "identity_public_contract_gate_missing"
     ):
         missing.append("approved_runtime_evidence_report:fields_invalid")
+    elif replayed_runtime_report is not None:
+        for key in (
+            "schema",
+            "approved_runtime_evidence_present",
+            "runtime_evidence_ready",
+            "promotion_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "next_blocker",
+        ):
+            if runtime_report.get(key) != replayed_runtime_report.get(key):
+                missing.append(f"approved_runtime_evidence_report:replay_mismatch:{key}")
 
     contract_report, contract_error = load_repo_relative_json_evidence(evidence.get("public_contract_readiness_report"))
     if contract_error is not None:
@@ -2979,9 +3015,10 @@ def completion_blocker_outcome_rows(
         if status == "promoted":
             release_statement_contract_satisfied = release_statement_outcome == "promoted"
         elif status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
+            allowed_outcomes = required_release_statement_outcomes(surface)
             release_statement_contract_satisfied = (
                 release_statement_text is not None
-                and release_statement_outcome == status
+                and release_statement_outcome in allowed_outcomes
                 and release_statement_satisfies_exclusion_contract(release_statement_text, surface)
             )
         required_outcomes = sorted(required_release_statement_outcomes(surface)) if surface else []
@@ -3565,12 +3602,12 @@ def build_report(
                 release_statement_missing_blockers.append(surface_id)
             continue
         if status in {"post-v1", "excluded"} and surface_id in post_v1_or_excluded:
+            allowed_outcomes = required_release_statement_outcomes(surface)
             if surface_id in CANONICAL_V1_COMPLETION_BLOCKERS:
                 contract = surface.get("v1_decision_contract")
                 if not isinstance(contract, dict) or not as_string_list(contract.get("exclusion_requires")):
                     missing_completion_blocker_exclusion_contracts.append(surface_id)
                     continue
-                allowed_outcomes = required_release_statement_outcomes(surface)
                 if status not in allowed_outcomes:
                     release_statement_missing_contracts.append(surface_id)
                     continue
@@ -3578,7 +3615,7 @@ def build_report(
                 release_statement_missing_blockers.append(surface_id)
             elif release_statement_duplicate_or_mixed_records(release_statement_text, surface_id):
                 release_statement_duplicate_records.append(surface_id)
-            elif not release_statement_names_outcome(release_statement_text, surface_id, status):
+            elif release_statement_recorded_outcome(release_statement_text, surface_id) not in allowed_outcomes:
                 release_statement_missing_blockers.append(surface_id)
             elif not release_statement_satisfies_exclusion_contract(release_statement_text, surface):
                 release_statement_missing_contracts.append(surface_id)

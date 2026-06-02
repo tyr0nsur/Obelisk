@@ -135,6 +135,35 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("identifier_redaction_evidence_public_sdk_ready_not_false", report["blockers"])
         self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
 
+    def test_rejects_identifier_redaction_evidence_route_unlock_claim(self) -> None:
+        redaction = redaction_manifest()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "identifier-redaction.json"
+            path.write_text(json.dumps(redaction), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.object(
+                checker.identifier_redaction,
+                "build_report",
+                return_value={
+                    "ready": True,
+                    "accepted_for_contract_review": True,
+                    "resolved_inputs": ["privacy.identifier_redaction"],
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "public_header_allowed": False,
+                    "remaining_blockers": [],
+                    "next_blocker": "identity_public_contract_gate",
+                },
+            ):
+                report = checker.identifier_redaction_report(path, blockers)
+
+        self.assertTrue(report["accepted_for_contract_review"])
+        self.assertIn(
+            "identifier_redaction_evidence_route_unlock_claimed",
+            [blocker["reason"] for blocker in blockers],
+        )
+
     def test_accepts_candidate_only_pod_abi_shape(self) -> None:
         decisions = self.decisions()
         candidate = decisions["proposed_public_pod_abi_candidate"]

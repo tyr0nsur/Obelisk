@@ -24,6 +24,9 @@ from check_public_sdk_v1_completion import (
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
 )
+from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
+    manifest as approved_runtime_principal_lifecycle_manifest,
+)
 
 SCRIPT = REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"
 PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
@@ -178,6 +181,16 @@ def complete_excluded_manifest() -> tuple[dict, str]:
 
 
 class PublicSdkV1CompletionCheckTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._old_test_workspace_prefixes = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+        os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+
+    def tearDown(self) -> None:
+        if self._old_test_workspace_prefixes is None:
+            os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+        else:
+            os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = self._old_test_workspace_prefixes
+
     def run_checker(
         self,
         *args: str,
@@ -203,12 +216,22 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def route_gate_override_env(self) -> dict[str, str]:
         return {"OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS": "1"}
 
+    def write_approved_runtime_manifest_binding(self, path: Path) -> dict[str, str]:
+        data = json.dumps(approved_runtime_principal_lifecycle_manifest(), sort_keys=True).encode("utf-8")
+        path.write_bytes(data)
+        return {
+            "path": str(path.relative_to(REPO_ROOT)),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+
     def identity_structured_missing_for_contract_report(self, contract_payload: dict[str, object]) -> list[str]:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
             root = Path(core_dir)
+            runtime_manifest = root / "approved-runtime-principal-lifecycle-evidence.json"
             runtime_report = root / "player_identity_approved_runtime_report.json"
             contract_report = root / "player_identity_public_contract_readiness_report.json"
             executed_report = root / "player_identity_executed_tests.json"
+            runtime_manifest_binding = self.write_approved_runtime_manifest_binding(runtime_manifest)
             runtime_report.write_text(
                 json.dumps(
                     {
@@ -231,6 +254,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
             return player_identity_structured_promotion_evidence_missing(
                 {
+                    "approved_runtime_evidence_manifest": runtime_manifest_binding,
                     "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
                     "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
                     "executed_test_report": executed_report_path,
@@ -238,9 +262,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
     def write_player_identity_structured_promotion_artifacts(self, root: Path) -> dict[str, str]:
+        runtime_manifest = root / "approved-runtime-principal-lifecycle-evidence.json"
         runtime_report = root / "player_identity_approved_runtime_report.json"
         contract_report = root / "player_identity_public_contract_readiness_report.json"
         executed_report = root / "player_identity_executed_tests.json"
+        runtime_manifest_binding = self.write_approved_runtime_manifest_binding(runtime_manifest)
         runtime_report.write_text(
             json.dumps(
                 {
@@ -290,6 +316,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             argv=["python3", "-m", "unittest", "player_identity_promotion"],
         )
         return {
+            "approved_runtime_evidence_manifest": runtime_manifest_binding,
             "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
             "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
             "executed_test_report": executed_report_path,
@@ -2193,6 +2220,38 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(full_gate.returncode, 1)
         self.assertFalse(full_payload["ready"])
         self.assertIn("v1_completion_required_false", full_payload["blockers"])
+
+    def test_scoped_release_statement_allows_alternate_non_complete_outcome_when_contract_allows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement = SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8").replace(
+                "obelisk.inventory_items_mutation.v1: post-v1 -",
+                "obelisk.inventory_items_mutation.v1: excluded -",
+            )
+            statement_path.write_text(statement, encoding="utf-8")
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+            )
+
+        payload = json.loads(result.stdout)
+        row = next(
+            row
+            for row in payload["v1_sdk_blocker_outcomes"]
+            if row["surface"] == "obelisk.inventory_items_mutation.v1"
+        )
+        self.assertTrue(payload["scoped_release_statement"]["ready"])
+        self.assertEqual(row["manifest_outcome"], "post-v1")
+        self.assertEqual(row["release_statement_outcome"], "excluded")
+        self.assertEqual(row["required_release_statement_outcomes"], ["excluded", "post-v1"])
+        self.assertTrue(row["release_statement_contract_satisfied"])
+        self.assertFalse(row["counts_toward_complete_sdk_claim"])
+        self.assertNotIn("obelisk.inventory_items_mutation.v1", payload["release_statement_missing_blocker_outcomes"])
+        self.assertFalse(payload["stable_claim_allowed"])
+        self.assertIn("v1_completion_required_false", payload["blockers"])
 
     def test_scoped_release_statement_scope_rejects_broad_v1_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -4374,6 +4433,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             payload["promoted_surfaces_missing_structured_evidence"]["obelisk.player_identity.v1"],
             [
+                "approved_runtime_evidence_manifest:missing",
                 "approved_runtime_evidence_report:missing",
                 "executed_test_report:missing",
                 "public_contract_readiness_report:missing",
@@ -4383,9 +4443,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_identity_structured_contract_report_must_keep_public_contract_blocker(self) -> None:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
             root = Path(core_dir)
+            runtime_manifest = root / "approved-runtime-principal-lifecycle-evidence.json"
             runtime_report = root / "player_identity_approved_runtime_report.json"
             contract_report = root / "player_identity_public_contract_readiness_report.json"
             executed_report = root / "player_identity_executed_tests.json"
+            runtime_manifest_binding = self.write_approved_runtime_manifest_binding(runtime_manifest)
             runtime_report.write_text(
                 json.dumps(
                     {
@@ -4425,6 +4487,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
             missing = player_identity_structured_promotion_evidence_missing(
                 {
+                    "approved_runtime_evidence_manifest": runtime_manifest_binding,
                     "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
                     "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
                     "executed_test_report": executed_report_path,
@@ -4432,6 +4495,26 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+
+    def test_player_identity_structured_promotion_rejects_source_less_runtime_report(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            artifacts.pop("approved_runtime_evidence_manifest")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("approved_runtime_evidence_manifest:missing", missing)
+
+    def test_player_identity_structured_promotion_rejects_runtime_manifest_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            binding = dict(artifacts["approved_runtime_evidence_manifest"])
+            binding["sha256"] = "0" * 64
+            artifacts["approved_runtime_evidence_manifest"] = binding
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("approved_runtime_evidence_manifest:sha256_mismatch", missing)
 
     def test_identity_structured_contract_report_must_keep_full_blocker_set(self) -> None:
         missing = self.identity_structured_missing_for_contract_report(
@@ -5685,11 +5768,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             identity_sdk_test = sdk_path / "player_identity_promotion_plugin.c"
             permissions_abi_test = core_path / "PermissionsAdminPromotionTests.cpp"
             permissions_sdk_test = sdk_path / "permissions_admin_promotion_plugin.c"
+            identity_runtime_manifest = core_path / "approved-runtime-principal-lifecycle-evidence.json"
             identity_runtime_report = core_path / "player_identity_approved_runtime_report.json"
             identity_contract_report = core_path / "player_identity_public_contract_readiness_report.json"
             identity_executed_report = core_path / "player_identity_executed_tests.json"
             for path in (identity_abi_test, identity_sdk_test, permissions_abi_test, permissions_sdk_test):
                 path.write_text("// synthetic promotion evidence fixture\n", encoding="utf-8")
+            identity_runtime_manifest_binding = self.write_approved_runtime_manifest_binding(identity_runtime_manifest)
             identity_runtime_report.write_text(
                 json.dumps(
                     {
@@ -5751,6 +5836,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "public_sdk_ready": True,
                         "abi_tests": [str(identity_abi_test.relative_to(REPO_ROOT))],
                         "sdk_consumer_tests": [str(identity_sdk_test.relative_to(REPO_ROOT))],
+                        "approved_runtime_evidence_manifest": identity_runtime_manifest_binding,
                         "approved_runtime_evidence_report": str(identity_runtime_report.relative_to(REPO_ROOT)),
                         "public_contract_readiness_report": str(identity_contract_report.relative_to(REPO_ROOT)),
                         "executed_test_report": identity_executed_report_path,

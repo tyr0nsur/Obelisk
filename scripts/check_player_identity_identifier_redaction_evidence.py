@@ -19,6 +19,7 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_c
 SCHEMA = "obelisk.player-identity-identifier-redaction-evidence.v1"
 REPORT_SCHEMA = "obelisk.player-identity-identifier-redaction-evidence-check.v1"
 RESOLVED_INPUT = "privacy.identifier_redaction"
+NEXT_BLOCKER_CONTRACT_REVIEW_ONLY = "not_applicable_contract_review_input_only"
 ALLOWED_FIELD_CLASSES = {
     "copied opaque principal",
     "recognition-only",
@@ -242,7 +243,11 @@ def build_report(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> dic
         "runtime_ready": False,
         "public_header_allowed": False,
         "remaining_blockers": [] if ready else [RESOLVED_INPUT],
-        "next_blocker": "identity_public_contract_gate" if ready else "privacy_identifier_redaction_evidence_not_accepted",
+        "next_blocker": (
+            NEXT_BLOCKER_CONTRACT_REVIEW_ONLY
+            if ready
+            else "privacy_identifier_redaction_evidence_not_accepted"
+        ),
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": [

@@ -214,7 +214,7 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated guardrail round integrated privacy/redaction intake, approved-evidence
-  path hash short-circuiting, request/window exit-code gates, private-candidate stale-handle
-  semantics, inventory evidence accounting, and bare complete/full/production/stable SDK
-  claim rejection. SDK remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
+- Latest delegated guardrail round integrated first-evidence sidecar replay, redaction
+  non-routing, SDK scoped outcome accounting, and player-identity runtime manifest
+  hash-binding for structured promotion intake. Next side-lane: central structure checks.
+  SDK remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.

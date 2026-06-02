@@ -116,7 +116,11 @@ class PlayerIdentityIdentifierRedactionEvidenceTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
         self.assertEqual(report["remaining_blockers"], [])
-        self.assertEqual(report["next_blocker"], "identity_public_contract_gate")
+        self.assertEqual(report["next_blocker"], "not_applicable_contract_review_input_only")
+        self.assertNotIn(
+            report["next_blocker"],
+            {"identity_public_contract_gate", "identity_public_contract_gate_missing"},
+        )
 
     def test_rejects_unsanitized_evidence(self) -> None:
         payload = evidence()

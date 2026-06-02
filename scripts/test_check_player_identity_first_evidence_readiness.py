@@ -1374,12 +1374,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 output_dir=Path(tmp),
                 json=True,
             )
-            request_path.write_text(
-                json.dumps(prepare_window_request.request_payload(request_args)),
-                encoding="utf-8",
-            )
-            env_path.write_text(
-                "\n".join(prepare_window_request.env_lines(request_args)) + "\n",
+            request_payload = prepare_window_request.request_payload(request_args)
+            env_lines = prepare_window_request.env_lines(request_args)
+            request_path.write_text(json.dumps(request_payload), encoding="utf-8")
+            env_path.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+            (Path(tmp) / "operator-approval-request.md").write_text(
+                prepare_window_request.markdown_request(request_payload, env_lines),
                 encoding="utf-8",
             )
 
@@ -1387,6 +1387,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         self.assertTrue(diagnosis["ready"])
         self.assertTrue(diagnosis["request_pack_ready"])
+        self.assertTrue(diagnosis["operator_request_verified"])
         self.assertFalse(diagnosis["bundle_inputs_ready"])
         self.assertFalse(diagnosis["request_pack_is_runtime_evidence"])
         self.assertTrue(diagnosis["operator_current_turn_runtime_window_approval_required"])
@@ -1468,12 +1469,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 output_dir=root,
                 json=True,
             )
-            request_path.write_text(
-                json.dumps(prepare_window_request.request_payload(request_args)),
-                encoding="utf-8",
-            )
-            env_path.write_text(
-                "\n".join(prepare_window_request.env_lines(request_args)) + "\n",
+            request_payload = prepare_window_request.request_payload(request_args)
+            env_lines = prepare_window_request.env_lines(request_args)
+            request_path.write_text(json.dumps(request_payload), encoding="utf-8")
+            env_path.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+            (root / "operator-approval-request.md").write_text(
+                prepare_window_request.markdown_request(request_payload, env_lines),
                 encoding="utf-8",
             )
             args = SimpleNamespace(
@@ -1505,6 +1506,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertEqual(payload["blockers"], ["approved_runtime_evidence_missing"])
         self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
         self.assertTrue(window_request["request_pack_ready"])
+        self.assertTrue(window_request["operator_request_verified"])
         self.assertFalse(window_request["bundle_inputs_ready"])
         self.assertFalse(window_request["request_pack_is_runtime_evidence"])
         self.assertTrue(window_request["operator_current_turn_runtime_window_approval_required"])
@@ -1554,6 +1556,46 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(diagnosis["ready"])
         self.assertFalse(diagnosis["request_pack_ready"])
         self.assertIn("env_line_not_key_value", diagnosis["blockers"])
+
+    def test_window_request_pack_diagnosis_requires_operator_request_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            request_path = Path(tmp) / "window-request.json"
+            env_path = Path(tmp) / "observer-window.env"
+            start = datetime.now(timezone.utc) + timedelta(hours=1)
+            end = start + timedelta(minutes=10)
+            run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            request_args = SimpleNamespace(
+                instance="arkserver2",
+                map_name="TheIsland",
+                run_id=run_id,
+                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                server_binary_path=prepare_window_request.EXPECTED_SERVER_BINARY_PATH,
+                restart_expectation="restart",
+                final_posture="stable",
+                user_policy="no_regular_users",
+                notice_path="not_applicable",
+                rollback_owner="operator",
+                output_dir=Path(tmp),
+                json=True,
+            )
+            request_path.write_text(
+                json.dumps(prepare_window_request.request_payload(request_args)),
+                encoding="utf-8",
+            )
+            env_path.write_text(
+                "\n".join(prepare_window_request.env_lines(request_args)) + "\n",
+                encoding="utf-8",
+            )
+
+            diagnosis = checker.player_principal_lifecycle_window_request_diagnosis(request_path, env_path)
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["request_pack_ready"])
+        self.assertFalse(diagnosis["operator_request_verified"])
+        self.assertIn("operator_request_unreadable", diagnosis["blockers"])
 
     def test_artifact_root_diagnosis_summarizes_non_matching_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

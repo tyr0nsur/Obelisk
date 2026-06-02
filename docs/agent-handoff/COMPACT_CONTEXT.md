@@ -948,6 +948,12 @@ priorities, and do not use history files as the active source of truth.
   "complete/full/production/stable SDK" claims. Canonical route gate remains
   planning-only at `approved_runtime_evidence_missing`; SDK completion remains expected
   fail-closed with `stable_claim_allowed=false`, complete SDK `0/12`, and P0 `0/4`.
+- Follow-up delegated guardrail pass integrated first-evidence request-pack sidecar replay,
+  identifier-redaction evidence as non-routing contract-review input only, release
+  statement accounting for alternate allowed scoped outcomes, and hash-bound replay of the
+  raw approved runtime-principal manifest before player-identity structured promotion
+  evidence can count. A side-lane finding remains pending: central SDK completion should
+  run/report structure census and structure build-policy checkers like inventory/mission.
 
 ## Agent Coordination
 
