@@ -2156,3 +2156,34 @@ Validation remained offline-only. Targeted tests and checkers confirmed
 policy public SDK/runtime/promotion/enforcement flags all false. No runtime/server work,
 `/servidor/ark` writes, marker/env edits, Discord, public ABI/header readiness, promotion,
 release readiness, or stable/complete SDK claim was authorized.
+
+## Runtime Evidence Replay Receipt Hardening
+
+A delegated runtime-evidence replay round split work across live-ops request-window audit,
+approved-evidence manifest hardening, SDK/P0 invariants, and handoff durability. Integrated
+offline changes:
+
+- `check_player_principal_lifecycle_window_request.py` now rejects a completed
+  `operator-approval-receipt.json` unless the checker is running in `--post-window-replay`
+  mode. This keeps a pre-window request-pack check from treating receipt presence as
+  runtime authorization.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now forwards
+  `--post-window-replay --operator-approval-receipt <receipt>` to the nested request-pack
+  checker during post-window manifest replay, aligning manifest replay with bundle
+  preflight.
+- `check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now directly
+  revalidates the operational-window receipt: `verified=true`, exact false scope and
+  non-authorization flags, bound request/window/log fields, and request/env/operator
+  request sidecar artifact hashes.
+- `test_check_command_permission_route_gate.py` now exercises a real accepted approved
+  runtime evidence manifest through the route gate and asserts it reaches only
+  `identity_public_contract_gate_missing`, with route lock
+  `blocked_until=[reviewed_identity_public_contract]`, P0 unlock flags false, and all
+  public/runtime/promotion readiness flags false.
+
+Validation remained offline-only. The request/window/approved-evidence suites passed, and
+the route-gate regression confirmed approved runtime evidence is necessary but still
+insufficient: the next blocker is reviewed identity public contract, not permissions/admin,
+command response, commands/replies, public SDK readiness, runtime readiness, release
+readiness, or complete/stable SDK wording. No runtime/server operation, marker/env change,
+Discord, GitHub publication, or protected live-server operation was authorized.

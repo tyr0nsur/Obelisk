@@ -134,10 +134,10 @@ This file is an active routing table only. Durable evidence belongs in
   `InventoryComp`, `anActor`, and raw params. Item return-only public shape remains three
   copied `GameplayPolicyEvent` `ReturnValue` kinds only; no public Inventory SDK, Items
   SDK, identity, mutation, return override, or ResourceHandle.
-- Structure census, Structure build-policy, Mission/Transfer/Dino/Tribe,
-  ResourceHandle, economy/storage/operator ingress, and gameplay tick surfaces remain
-  planning, post-v1, or blocked unless a future route explicitly promotes them with
-  evidence.
+- Structure census is explicitly `excluded`/non-counting for scoped v1 accounting;
+  Structure build-policy remains offline/planning-only. Mission/Transfer/Dino/Tribe,
+  ResourceHandle, economy/storage/operator ingress, and gameplay tick remain planning,
+  post-v1, or blocked unless a future route explicitly promotes them with evidence.
 
 ## Priority Next Steps
 - P0 identity: use `scripts/build_player_identity_planning_source_manifests.py` when a
@@ -207,14 +207,11 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest guardrails closed command-response/report-root provenance, mission-leaf
+- Recent delegated rounds closed command-response/report-root provenance, mission-leaf
   accounting, permissions/admin certificate dependency, default identity source provenance,
-  and request hygiene.
-- Latest delegated no-runtime round landed Transfer `bAccept` test-only helper out of
-  runtime/public/ops, updated Transfer research, restored release-scope handoff guardrails,
-  and hardened release-statement wording for v1 surface verbs.
-  Validated Transfer, release-scope, SDK focused gates, build, ctest, and runtime-symbol
-  absence. Latest delegated replay-doc audit closed `--post-window-replay` examples,
-  stable-only final posture wording, receipt/replay handoff drift, and manifest template
-  sidecar paths. Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`,
-  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+  request hygiene, Transfer `bAccept` test-only runtime-symbol absence, replay-doc
+  `--post-window-replay` wording, and Structure `excluded` scoped-v1 accounting.
+  Latest request-window hardening keeps completed `operator-approval-receipt.json`
+  usable only with post-window replay. Default route/SDK remain fail-closed:
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`. No runtime/server op.

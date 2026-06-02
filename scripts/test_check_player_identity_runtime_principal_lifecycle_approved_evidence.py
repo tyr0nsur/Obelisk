@@ -675,6 +675,32 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         payload.pop("output_artifact_identity", None)
         add_output_artifact_identity(payload)
 
+    def rewrite_receipt_and_manifest_sha(
+        self,
+        payload: dict,
+        mutate_receipt,
+    ) -> None:
+        receipt_artifact = payload["operational_window"]["operator_approval_receipt"]
+        receipt_path = Path(receipt_artifact["path"])
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        mutate_receipt(receipt)
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+        receipt_artifact["sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        manifest_artifact = payload["operational_window"]["manifest"]
+        manifest_path = Path(manifest_artifact["path"])
+        manifest_lines = []
+        for line in manifest_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("operator_approval_receipt_sha256="):
+                manifest_lines.append(f"operator_approval_receipt_sha256={receipt_artifact['sha256']}")
+            else:
+                manifest_lines.append(line)
+        manifest_path.write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
+        manifest_artifact["sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+        payload.pop("output_artifact_identity", None)
+        add_output_artifact_identity(payload)
+
     def test_operational_window_replay_delegates_manifest_post_window_mode(self) -> None:
         checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_replay_post_window")
         window = {"manifest": {"path": "/tmp/window-manifest.env"}}
@@ -816,6 +842,49 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("operational_window_manifest_check_failed", report["blockers"])
                 self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
+                self.assertFalse(report["public_sdk_ready"])
+                self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_operator_receipt_verified_flag_not_true(self) -> None:
+        payload = manifest()
+        payload["operational_window"]["operator_approval_receipt"]["verified"] = False
+        payload.pop("output_artifact_identity", None)
+        add_output_artifact_identity(payload)
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_operator_approval_receipt_verified_not_true", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_operator_receipt_binding_and_non_authorization_drift_after_sha_refresh(self) -> None:
+        cases = (
+            (
+                "request_artifact",
+                lambda receipt: receipt["bound_artifacts"]["window_request_json"].update({"sha256": "0" * 64}),
+                "operational_window_operator_approval_receipt_window_request_json_artifact_mismatch",
+            ),
+            (
+                "manifest_path",
+                lambda receipt: receipt["bound_request_pack"].update({"window_manifest_path": "/tmp/window-manifest.env"}),
+                "operational_window_operator_approval_receipt_bound_request_window_manifest_path_mismatch",
+            ),
+            (
+                "non_authorization_flag",
+                lambda receipt: receipt["non_authorization_flags"].update({"runtime_ready": True}),
+                "operational_window_operator_approval_receipt_runtime_ready_not_false",
+            ),
+        )
+        for name, mutate, blocker in cases:
+            with self.subTest(name=name):
+                payload = manifest()
+                self.rewrite_receipt_and_manifest_sha(payload, mutate)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(blocker, report["blockers"])
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
 

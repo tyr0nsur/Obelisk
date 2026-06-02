@@ -1474,15 +1474,27 @@ def validate_request_pack(
         missing_reason="request_pack_observer_env_file_missing",
     ):
         return
+    command = [
+        sys.executable,
+        str(WINDOW_REQUEST_CHECKER),
+        "--json",
+        str(status.resolved),
+        "--env-file",
+        str(observer_env_status.resolved),
+    ]
+    if post_window_replay:
+        command.append("--post-window-replay")
+        receipt_text = fields.get("operator_approval_receipt_path")
+        if receipt_text:
+            receipt_status = protected_paths.protected_path_status(
+                manifest_relative_path(receipt_text, manifest_path),
+                protected_root=SERVER_ROOT,
+                approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+            )
+            if content_readable_status(receipt_status):
+                command.extend(["--operator-approval-receipt", str(receipt_status.resolved)])
     result = subprocess.run(
-        [
-            sys.executable,
-            str(WINDOW_REQUEST_CHECKER),
-            "--json",
-            str(status.resolved),
-            "--env-file",
-            str(observer_env_status.resolved),
-        ],
+        command,
         check=False,
         text=True,
         stdout=subprocess.PIPE,

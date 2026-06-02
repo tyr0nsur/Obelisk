@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -30,6 +31,9 @@ SPEC.loader.exec_module(ROUTE_GATE)
 import build_redacted_ufunction_signatures
 from test_check_player_identity_lifecycle_anchor_candidates import accepted_lifecycle_anchor_manifest
 from test_check_player_identity_principal_invalidation_policy import manifest as principal_policy_manifest
+from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
+    manifest as approved_runtime_principal_lifecycle_manifest,
+)
 
 
 def identity_manifest_sources(
@@ -207,6 +211,53 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             self.assertTrue(check["valid"], check)
             self.assertEqual([], check["public_or_runtime_claims"], check)
             self.assertEqual(check["expected_schema"], check["report_schema"], check)
+
+    def test_approved_runtime_evidence_routes_to_identity_public_contract_gate_without_unlocking_p0(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            approved_runtime = Path(temp_dir) / "approved-runtime-principal-lifecycle.json"
+            approved_runtime.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--approved-runtime-principal-lifecycle-evidence-manifest",
+                    str(approved_runtime),
+                    "--json",
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            )
+        report = json.loads(result.stdout)
+        phase = report["critical_path_phase"]
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["planning_only"])
+        self.assertEqual([], report["blockers"])
+        self.assertEqual("identity_public_contract_gate_missing", phase["current_blocker"])
+        self.assertEqual("identity_public_contract_gate_missing", phase["source_checker_primary_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], phase["source_checker_blockers"])
+        self.assertFalse(phase["permissions_admin_unlocked"])
+        self.assertFalse(phase["command_response_unlocked"])
+        self.assertFalse(phase["commands_replies_unlocked"])
+        self.assertFalse(phase["promotion_ready"])
+        self.assertFalse(phase["public_sdk_ready"])
+        self.assertFalse(phase["public_abi_ready"])
+        self.assertFalse(phase["runtime_ready"])
+        self.assertEqual(
+            {
+                "locked": True,
+                "blocked_until": ["reviewed_identity_public_contract"],
+                "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
+            },
+            report["route_lock"],
+        )
 
     def test_accepts_bound_player_identity_planning_sources_as_planning_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

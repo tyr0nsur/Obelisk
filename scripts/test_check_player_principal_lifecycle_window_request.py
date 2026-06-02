@@ -383,6 +383,24 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertIn("operator_approval_receipt_required_for_post_window_replay", report["blockers"])
 
+    def test_rejects_completed_receipt_without_post_window_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["post_window_replay"])
+        self.assertFalse(report["post_window_replay_expiry_tolerated"])
+        self.assertIn("operator_approval_receipt_requires_post_window_replay", report["blockers"])
+
     def test_rejects_receipt_replay_across_request_pack_bindings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"

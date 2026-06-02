@@ -112,8 +112,8 @@ priorities, and do not use history files as the active source of truth.
   keeps all public/runtime/promotion/SDK readiness flags false; with accepted approved
   runtime evidence, the route may advance only to `identity_public_contract_gate_missing`,
   still locked/planning-only. Inventory copied signals remain the higher-value side lane
-  after identity -> permissions/admin -> commands/replies, while structure census remains
-  useful offline planning/consume-only work.
+  after identity -> permissions/admin -> commands/replies, while Structure census is
+  explicitly excluded/non-counting and Structure build-policy remains offline planning only.
   The accepted lifecycle-anchor snapshot binding gap is closed in the current builder and
   default route: `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` source
   hashes are checked against the actual `--snapshot-root` files before the route may
@@ -1063,6 +1063,15 @@ priorities, and do not use history files as the active source of truth.
   false. SDK completion with the scoped statement remains blocked at
   `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`; no runtime/server operation was
   performed.
+- 2026-06-02 delegated runtime-evidence replay hardening pass: request-window checking now
+  rejects a completed `operator-approval-receipt.json` unless `--post-window-replay` is
+  used; window-manifest replay forwards `--post-window-replay --operator-approval-receipt`
+  to the nested request checker; approved runtime evidence replay directly revalidates the
+  receipt verified flag, false authorization flags, scope flags, and bound sidecar
+  artifacts. A real accepted-runtime-evidence route-gate regression now proves the route
+  advances only to `identity_public_contract_gate_missing`, keeps route lock
+  `blocked_until=[reviewed_identity_public_contract]`, leaves all unlock/readiness flags
+  false, and does not count P0. No runtime/server operation was performed.
 
 ## Agent Coordination
 

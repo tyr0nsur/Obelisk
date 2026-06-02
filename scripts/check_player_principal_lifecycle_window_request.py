@@ -1150,6 +1150,12 @@ def main() -> int:
             receipt_path=args.operator_approval_receipt,
             blockers=blockers,
         )
+        if not args.post_window_replay:
+            add(
+                blockers,
+                "operator_approval_receipt_requires_post_window_replay",
+                "operator_approval_receipt",
+            )
     elif args.post_window_replay:
         add(
             blockers,

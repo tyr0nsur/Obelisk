@@ -1037,6 +1037,54 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("request_pack_copied_evidence_dir_manifest_mismatch", reasons)
         self.assertIn("request_pack_window_manifest_path_manifest_mismatch", reasons)
 
+    def test_validate_request_pack_post_window_replay_passes_completed_receipt_to_nested_checker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved = root / "approved"
+            exact_dir = approved / "live-validation-logs" / RUN_ID
+            exact_log = exact_dir / "Obelisk.log"
+            exact_manifest = exact_dir / "window-manifest.env"
+            exact_dir.mkdir(parents=True)
+            lines = []
+            for line in manifest_lines():
+                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                    lines.append(f"copied_log_path={exact_log}")
+                else:
+                    lines.append(line)
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            fields = write_sidecars(exact_manifest.parent, fields)
+            exact_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            nested_payload = {
+                "ready": True,
+                "request_pack_ready": True,
+                "blockers": [],
+            }
+            nested_result = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=json.dumps(nested_payload),
+                stderr="",
+            )
+
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (approved,)
+                with mock.patch.object(CHECKER.subprocess, "run", return_value=nested_result) as run:
+                    CHECKER.validate_request_pack(fields, exact_manifest, blockers, post_window_replay=True)
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        self.assertEqual([], blockers)
+        command = run.call_args.args[0]
+        self.assertIn("--post-window-replay", command)
+        self.assertIn("--operator-approval-receipt", command)
+        receipt_index = command.index("--operator-approval-receipt") + 1
+        self.assertEqual(str(Path(fields["operator_approval_receipt_path"]).resolve()), command[receipt_index])
+
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)
         lines.append("users_policy=no_regular_users")

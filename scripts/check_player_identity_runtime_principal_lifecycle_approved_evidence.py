@@ -140,6 +140,29 @@ REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS = frozenset(
         "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
     )
 )
+OPERATOR_APPROVAL_RECEIPT_SCOPE_FALSE_FLAGS = (
+    "standing_approval",
+    "reusable",
+    "future_windows_authorized",
+    "scope_expansion_authorized",
+    "unbound_artifacts_authorized",
+)
+OPERATOR_APPROVAL_RECEIPT_NON_AUTHORIZATION_FLAGS = (
+    "request_pack_acceptance_authorizes_runtime",
+    "generated_template_authorizes_runtime",
+    "server_operations_authorized_by_template",
+    "runtime_work_authorized_by_template",
+    "discord_authorized",
+    "github_publication_authorized",
+    "publication_authorized",
+    "promotion_ready",
+    "public_abi_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "v1_completion_ready",
+    "secrets_included",
+    "player_private_data_included",
+)
 OPERATIONAL_WINDOW_REPLAY_KEYS = (
     "schema",
     "ready",
@@ -590,6 +613,195 @@ def validate_operational_window_artifact(
             expected=sha256,
             actual=actual_sha256,
         )
+
+
+def approved_artifact_status(artifact: Any) -> protected_paths.ProtectedPathStatus | None:
+    if not isinstance(artifact, dict):
+        return None
+    path_text = artifact.get("path")
+    if not isinstance(path_text, str) or not path_text:
+        return None
+    if symlink_component_for_path_text(path_text) is not None:
+        return None
+    status = protected_paths.protected_path_status(
+        Path(path_text).expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected or not status.approved_offline_workspace:
+        return None
+    return status
+
+
+def bound_artifact_from_status(status: protected_paths.ProtectedPathStatus) -> dict[str, Any] | None:
+    try:
+        return {
+            "path": str(status.resolved),
+            "sha256": sha256_file(status.resolved),
+            "size_bytes": status.resolved.stat().st_size,
+        }
+    except (FileNotFoundError, OSError):
+        return None
+
+
+def resolved_artifact_path(artifact: Any) -> str | None:
+    status = approved_artifact_status(artifact)
+    return None if status is None else str(status.resolved)
+
+
+def operator_request_sidecar_artifact(window: dict[str, Any]) -> dict[str, Any] | None:
+    request_status = approved_artifact_status(window.get("request_pack"))
+    if request_status is None:
+        return None
+    operator_request_path = request_status.resolved.parent / "operator-approval-request.md"
+    if first_symlink_component(operator_request_path) is not None:
+        return None
+    operator_request_status = protected_paths.protected_path_status(
+        operator_request_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if operator_request_status.protected or not operator_request_status.approved_offline_workspace:
+        return None
+    return bound_artifact_from_status(operator_request_status)
+
+
+def load_operator_approval_receipt_payload(
+    window: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    receipt = window.get("operator_approval_receipt")
+    if not isinstance(receipt, dict):
+        return None
+    if receipt.get("verified") is not True:
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_verified_not_true",
+            "$.operational_window.operator_approval_receipt.verified",
+        )
+    status = approved_artifact_status(receipt)
+    if status is None:
+        return None
+    try:
+        payload = json.loads(status.resolved.read_text(encoding="utf-8"))
+    except OSError as exc:
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_unreadable",
+            "$.operational_window.operator_approval_receipt.path",
+            error=str(exc),
+        )
+        return None
+    except json.JSONDecodeError as exc:
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_json_invalid",
+            "$.operational_window.operator_approval_receipt.path",
+            error=str(exc),
+        )
+        return None
+    if not isinstance(payload, dict):
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_not_object",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+        return None
+    return payload
+
+
+def validate_operator_approval_receipt_binding(
+    window: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> None:
+    payload = load_operator_approval_receipt_payload(window, blockers)
+    if payload is None:
+        return
+
+    scope = payload.get("approval_scope")
+    if not isinstance(scope, dict):
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_scope_missing",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+        scope = {}
+    for key in OPERATOR_APPROVAL_RECEIPT_SCOPE_FALSE_FLAGS:
+        if scope.get(key) is not False:
+            add(
+                blockers,
+                f"operational_window_operator_approval_receipt_scope_{key}_not_false",
+                "$.operational_window.operator_approval_receipt.path",
+            )
+
+    flags = payload.get("non_authorization_flags")
+    if not isinstance(flags, dict):
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_non_authorization_flags_missing",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+        flags = {}
+    for key in OPERATOR_APPROVAL_RECEIPT_NON_AUTHORIZATION_FLAGS:
+        if flags.get(key) is not False:
+            add(
+                blockers,
+                f"operational_window_operator_approval_receipt_{key}_not_false",
+                "$.operational_window.operator_approval_receipt.path",
+            )
+
+    bound_request = payload.get("bound_request_pack")
+    if not isinstance(bound_request, dict):
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_bound_request_pack_missing",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+        bound_request = {}
+    expected_bound_values = {
+        "run_id": window.get("run_id"),
+        "obelisk_commit": window.get("obelisk_commit"),
+        "target": window.get("target"),
+        "approved_window": window.get("approved_window"),
+        "copied_log_path": resolved_artifact_path(window.get("copied_log")),
+        "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+    }
+    for key, expected in expected_bound_values.items():
+        if expected is not None and bound_request.get(key) != expected:
+            add(
+                blockers,
+                f"operational_window_operator_approval_receipt_bound_request_{key}_mismatch",
+                "$.operational_window.operator_approval_receipt.path",
+                expected=expected,
+                actual=bound_request.get(key),
+            )
+
+    bound_artifacts = payload.get("bound_artifacts")
+    if not isinstance(bound_artifacts, dict):
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_bound_artifacts_missing",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+        return
+    expected_artifacts = {
+        "window_request_json": bound_artifact_from_status(status)
+        if (status := approved_artifact_status(window.get("request_pack"))) is not None
+        else None,
+        "observer_window_env": bound_artifact_from_status(status)
+        if (status := approved_artifact_status(window.get("observer_env"))) is not None
+        else None,
+        "operator_approval_request_md": operator_request_sidecar_artifact(window),
+    }
+    for key, expected in expected_artifacts.items():
+        if expected is not None and bound_artifacts.get(key) != expected:
+            add(
+                blockers,
+                f"operational_window_operator_approval_receipt_{key}_artifact_mismatch",
+                "$.operational_window.operator_approval_receipt.path",
+                expected=expected,
+                actual=bound_artifacts.get(key),
+            )
 
 
 def replay_operational_window_manifest(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -1119,6 +1331,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         run_id=run_id,
         expected_name="operator-approval-receipt.json",
     )
+    validate_operator_approval_receipt_binding(window, blockers)
     preflight = window.get("preflight")
     if not isinstance(preflight, dict):
         add(blockers, "operational_window_preflight_missing", f"{label}.preflight")
