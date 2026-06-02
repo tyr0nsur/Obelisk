@@ -38,6 +38,8 @@ SERVER_ROOT = Path("/servidor/ark")
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+EXPECTED_OBELISK_ROOT = "/servidor/ark/obelisk"
+EXPECTED_INSTALLED_WRAPPER_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh"
 
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -793,24 +795,58 @@ def validate_preflight_content(
     server_binary = payload.get("server_binary")
     if not isinstance(server_binary, dict):
         add(blockers, f"{path_key}_server_binary_missing", path_key)
-    elif server_binary.get("sha256") != EXPECTED_BINARY_SHA256:
+    else:
+        if server_binary.get("path") != EXPECTED_SERVER_BINARY_PATH:
+            add(
+                blockers,
+                f"{path_key}_server_binary_path_mismatch",
+                path_key,
+                expected=EXPECTED_SERVER_BINARY_PATH,
+                actual=server_binary.get("path"),
+            )
+        if server_binary.get("sha256") != EXPECTED_BINARY_SHA256:
+            add(
+                blockers,
+                f"{path_key}_binary_sha256_mismatch",
+                path_key,
+                expected=EXPECTED_BINARY_SHA256,
+                actual=server_binary.get("sha256"),
+            )
+
+    if payload.get("obelisk_root") != EXPECTED_OBELISK_ROOT:
         add(
             blockers,
-            f"{path_key}_binary_sha256_mismatch",
+            f"{path_key}_obelisk_root_mismatch",
             path_key,
-            expected=EXPECTED_BINARY_SHA256,
-            actual=server_binary.get("sha256"),
+            expected=EXPECTED_OBELISK_ROOT,
+            actual=payload.get("obelisk_root"),
         )
 
     installed_wrapper = payload.get("installed_wrapper")
     if not isinstance(installed_wrapper, dict):
         add(blockers, f"{path_key}_installed_wrapper_missing", path_key)
-    elif SHA256_RE.fullmatch(str(installed_wrapper.get("sha256", ""))) is None:
-        add(blockers, f"{path_key}_installed_wrapper_sha256_invalid", path_key)
+    else:
+        if installed_wrapper.get("path") != EXPECTED_INSTALLED_WRAPPER_PATH:
+            add(
+                blockers,
+                f"{path_key}_installed_wrapper_path_mismatch",
+                path_key,
+                expected=EXPECTED_INSTALLED_WRAPPER_PATH,
+                actual=installed_wrapper.get("path"),
+            )
+        if SHA256_RE.fullmatch(str(installed_wrapper.get("sha256", ""))) is None:
+            add(blockers, f"{path_key}_installed_wrapper_sha256_invalid", path_key)
 
     marker_dir = payload.get("marker_dir")
-    if not isinstance(marker_dir, str) or not marker_dir.endswith(f"/state/instances/{target.instance}"):
-        add(blockers, f"{path_key}_marker_dir_instance_mismatch", path_key, actual=marker_dir)
+    expected_marker_dir = f"{EXPECTED_OBELISK_ROOT}/state/instances/{target.instance}"
+    if marker_dir != expected_marker_dir:
+        add(
+            blockers,
+            f"{path_key}_marker_dir_instance_mismatch",
+            path_key,
+            expected=expected_marker_dir,
+            actual=marker_dir,
+        )
 
     env_file = payload.get("env_file")
     if expected_mode == "observer-window":

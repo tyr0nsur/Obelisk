@@ -4481,6 +4481,23 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, compact)
 
+    def test_research_index_player_identity_route_blocker_matches_current_source_bound_route(self) -> None:
+        readme = RESEARCH_MODULE_BOUNDARY_README.read_text(encoding="utf-8")
+        compact = normalized(readme)
+
+        self.assertNotIn(
+            "default aggregate route now blocks first on `lifecycle_anchor_first_evidence_provenance_unbound`",
+            compact,
+        )
+        for text in (
+            "source-bound repo-local lifecycle/principal consume manifests",
+            "blocks at `approved_runtime_evidence_missing`",
+            "locked planning blocker `identity_public_contract_gate_missing`",
+            "request packs and replay checks remain offline guardrails, not runtime approval",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(normalized(text), compact)
+
     def test_plugin_hub_planning_uses_arkapi_sources_as_demand_dictionary_only(self) -> None:
         texts = {
             path.relative_to(REPO_ROOT).as_posix(): path.read_text(encoding="utf-8")

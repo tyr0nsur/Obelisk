@@ -697,11 +697,12 @@ principal lifecycle evidence:
   identity contract reports unless they retain `next_blocker=identity_public_contract_gate`
   and unresolved `privacy.identifier_redaction`.
 
-The current default route remains blocked at
+At this historical checkpoint, the default route remained blocked at
 `lifecycle_anchor_first_evidence_provenance_unbound`; the transient bound route without
-approved runtime evidence remains blocked at `approved_runtime_evidence_missing`. If
-approved runtime evidence is later accepted, the next allowed route blocker is only
-`identity_public_contract_gate_missing`, still locked and planning-only.
+approved runtime evidence remained blocked at `approved_runtime_evidence_missing`. Later
+repo-local source-bound planning artifacts closed the default-route provenance blocker;
+the current default route is documented in the later
+`Default Identity Planning-Source Provenance Closure` section.
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command response, commands/replies, public header symbols, release readiness, or a stable
@@ -886,7 +887,7 @@ Validation:
   `build_valid=true`, `snapshot_binding_ready=true`, `route_valid=true`, and
   `route_current_blocker=approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  remains default-planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`.
+  then remained default-planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   remains fail-closed with `stable_claim_allowed=false`.
 
@@ -1039,8 +1040,8 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
 - `git diff --check`
 
-The default route remains planning-only with current blocker
-`lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remains fail-closed:
+At this checkpoint, the default route remained planning-only with then-current blocker
+`lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remained fail-closed:
 `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
 This round does not approve runtime work, public identity, public permissions/admin,
 command response, command replies, Inventory/Items SDKs, Structure SDK,
@@ -1075,8 +1076,8 @@ The transient bound route proof returned `valid=true`, `blockers=[]`, and
 `critical_path_phase.current_blocker=approved_runtime_evidence_missing`, with
 `promotion_ready=false`, `public_sdk_ready=false`, `runtime_ready=false`,
 `runtime_work_authorized=false`, and `server_operations_authorized=false`. The default
-route remains planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`
-unless explicit aligned manifests are supplied. SDK completion remains fail-closed:
+route remained planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`
+unless explicit aligned manifests were supplied. SDK completion remained fail-closed:
 `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
 
 This round does not approve runtime work, public identity, public permissions/admin,
@@ -1123,8 +1124,8 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
 - `git diff --check`
 
-The default route remains planning-only at
-`lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remains fail-closed:
+At this checkpoint, the default route remained planning-only at
+`lifecycle_anchor_first_evidence_provenance_unbound`. SDK completion remained fail-closed:
 `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`. This
 round does not approve runtime work, public identity, public permissions/admin, command
 response, commands/replies, release readiness, or a stable SDK claim.
@@ -1143,7 +1144,7 @@ regression test without changing SDK readiness:
   `obelisk.promoted-surface-test-execution.v1` objects no longer satisfy player identity,
   permissions/admin, command response, or commands/replies structured evidence.
 - P0 completion accounting now receives the command/permission route-gate state. While
-  the default route remains `lifecycle_anchor_first_evidence_provenance_unbound`, P0 rows
+  this checkpoint's default route remained `lifecycle_anchor_first_evidence_provenance_unbound`, P0 rows
   expose `route_gate_claim_satisfied=false` and cannot increment complete-SDK or P0
   promoted counts even if promoted-looking local evidence is present. If such rows appear,
   the report emits `p0_dependency_chain_route_gate_locked`.
@@ -1173,7 +1174,7 @@ Validation:
 - `cmake --build build --target plugin_manager_tests` passed.
 - `./build/plugin_manager_tests` passed.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker
+  passed as planning-only with then-current blocker
   `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed as expected with `stable_claim_allowed=false`, complete-SDK
@@ -1241,10 +1242,10 @@ Validation:
   passed with 353 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
-  P0 progress `0/4`, and default blocker
+  P0 progress `0/4`, and then-current default blocker
   `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed with `valid=true`, `planning_only=true`, `promotion_ready=false`, and current
+  passed with `valid=true`, `planning_only=true`, `promotion_ready=false`, and then-current
   blocker `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_compare_reflection_snapshots`
   was run by the readiness producer auditor and passed with 102 tests.
@@ -1628,10 +1629,12 @@ The follow-up identity round added an offline binder for the aggregate provenanc
   `approved_runtime_evidence_missing`, invalid first-evidence rejection, protected output
   rejection, self-consistent stale lifecycle source rejection, and principal source
   binding mismatch rejection.
-- Route-gate consumption of bound lifecycle/principal artifacts is explicit. The default
-  repo route remains blocked on `lifecycle_anchor_first_evidence_provenance_unbound` until
-  bound artifacts are supplied; with explicit bound artifacts, route aggregation may
-  advance only to `approved_runtime_evidence_missing`.
+- Route-gate consumption of bound lifecycle/principal artifacts is explicit. At this
+  checkpoint, the default repo route still blocked on
+  `lifecycle_anchor_first_evidence_provenance_unbound` until bound artifacts were
+  supplied; later repo-local source-bound planning artifacts closed that default-route
+  provenance blocker. With no approved runtime evidence, route aggregation may advance
+  only to `approved_runtime_evidence_missing`.
 - `scripts/check_command_permission_route_gate_bound_identity_sources.py` composes that
   explicit route without leaving durable artifacts: it builds transient first-evidence,
   binds supplied lifecycle/principal planning manifests in a private non-protected temp
@@ -1666,10 +1669,10 @@ sources and a future runtime principal lifecycle window:
   the real text line emitted by `check_player_principal_lifecycle_preflight.sh`, including
   the reviewed ARK `binary_sha256`. Legacy one-line preflight text without the binary hash
   and refreshed sidecars with a wrong binary hash fail closed.
-- `check_command_permission_route_gate.py` now enforces the route mode split in code:
-  the default route must remain blocked at
-  `lifecycle_anchor_first_evidence_provenance_unbound`, while a route with explicit bound
-  lifecycle/principal manifests must advance only to `approved_runtime_evidence_missing`.
+- `check_command_permission_route_gate.py` enforced the then-current route mode split:
+  before default source-bound artifact generation, the default route had to remain blocked
+  at `lifecycle_anchor_first_evidence_provenance_unbound`, while a route with explicit
+  bound lifecycle/principal manifests had to advance only to `approved_runtime_evidence_missing`.
 - `check_public_sdk_v1_completion.py` now records the default route gate's
   `current_blocker`, `source_checker_primary_blocker`, and `route_lock.blocked_until`,
   and rejects SDK completion if the default route drifts away from
@@ -1758,7 +1761,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
 - `git diff --check`
 
-The default route remains planning-only at
+At this checkpoint, the default route remained planning-only at
 `lifecycle_anchor_first_evidence_provenance_unbound`. The default SDK completion check
 still fails closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`, and
 P0 progress `0/4`. This round does not approve runtime work, public identity, public
@@ -1923,7 +1926,7 @@ Validation:
 This is accounting-only. It does not authorize runtime/server work, marker/env changes,
 Discord, public identity, public permissions/admin ABI, command response,
 commands/replies, ResourceHandle, release readiness, or stable/complete SDK wording.
-Default route and SDK accounting remain fail-closed with
+At this checkpoint, default route and SDK accounting remained fail-closed with
 `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
 complete-SDK progress `0/12`, and P0 progress `0/4` at this checkpoint.
 
@@ -1959,10 +1962,10 @@ work, `/servidor/ark` writes, marker/env changes, start/stop/restart, Discord,
 publication, tags, release refs, public identity, permissions/admin ABI, command
 response, commands/replies, public header symbols, ResourceHandle, release readiness, or
 stable/complete SDK wording. Request-pack, preflight, and window-manifest readiness are
-not approved runtime evidence. The default route remains
-`lifecycle_anchor_first_evidence_provenance_unbound`; an explicit bound no-runtime route
-may only reach `approved_runtime_evidence_missing`; accepted runtime evidence may only
-advance to `identity_public_contract_gate_missing`.
+not approved runtime evidence. At this checkpoint, the default route remained
+`lifecycle_anchor_first_evidence_provenance_unbound`; after the later default source-bound
+artifact closure, a no-runtime route may only reach `approved_runtime_evidence_missing`,
+and accepted runtime evidence may only advance to `identity_public_contract_gate_missing`.
 
 ## Command Response Readiness Provenance Guardrail
 

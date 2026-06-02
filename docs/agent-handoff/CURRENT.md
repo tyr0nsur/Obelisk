@@ -203,18 +203,13 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated SDK guardrail round bound P0 executed-test and readiness source
-  artifacts to active `--manifest`/`--public-header`, including nested command-response
-  evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
-  build-policy now passes planning-only with no central `structure_*` blockers. SDK
-  remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated identity/runtime round: operator approval receipt lane remains
-  request/window provenance only and is now bound into the post-window replay contract.
-  Preparation emits only `operator-approval-receipt.template.json`; replay requires a
-  completed `operator-approval-receipt.json`, exact current-turn completion metadata, full
-  bound-request parity, and post-window request checks that tolerate only
-  `approved_window_expired`. This does not count as runtime evidence, route unlock, P0
-  credit, SDK progress, or server approval. Latest delegated ABI round added a
-  candidate-only public ABI preflight artifact/checker for player identity; it keeps
-  header symbols, capability bits, callback ABI, promotion, SDK, and v1 completion false.
-  Runtime evidence and SDK/P0 completion remain unresolved; no runtime/server op.
+- Latest delegated identity/SDK guardrail round aligned stale SDK route docs to the
+  source-bound default blocker (`approved_runtime_evidence_missing`) and hardened
+  principal lifecycle preflight replay to exact runtime path bindings:
+  `server_binary.path`, `obelisk_root`, installed wrapper path, and per-instance marker
+  dir. This is offline/request hygiene only; no runtime/server op, route unlock, SDK/P0
+  credit, or public ABI promotion.
+- Pending delegated audit findings to preserve after compaction: wire player identity
+  public ABI preflight into public-contract readiness/gap gates; tighten operator receipt
+  exact shape/positive-claim rejection; reject unapproved/protected receipt sidecars
+  before reading or hashing them.

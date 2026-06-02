@@ -781,6 +781,59 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
                 self.assertIn(expected_reason, [item["reason"] for item in blockers])
 
+    def test_validate_preflight_content_rejects_runtime_path_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "window-manifest.env"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            copied_log = root / "Obelisk.log"
+            preflight_path = root / "preflight-pre.json"
+            payload = preflight_payload(
+                mode="observer-window",
+                instance="arkserver2",
+                window_manifest_path=manifest_path,
+                copied_log_path=copied_log,
+                env_file=observer_env,
+                env_sha256=observer_env_sha256,
+            )
+            payload["server_binary"]["path"] = "/servidor/ark/serverfiles/Other/ShooterGameServer"
+            payload["obelisk_root"] = "/tmp/obelisk"
+            payload["installed_wrapper"]["path"] = "/tmp/ObeliskRun.sh"
+            payload["marker_dir"] = "/tmp/obelisk/state/instances/arkserver2"
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(copied_log),
+                "preflight_pre_path": str(preflight_path),
+                "observer_env_path": str(observer_env),
+                "observer_env_sha256": observer_env_sha256,
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root,)
+                CHECKER.validate_preflight_content(
+                    fields,
+                    manifest_path,
+                    blockers,
+                    path_key="preflight_pre_path",
+                    expected_mode="observer-window",
+                    target=CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("preflight_pre_path_server_binary_path_mismatch", reasons)
+        self.assertIn("preflight_pre_path_obelisk_root_mismatch", reasons)
+        self.assertIn("preflight_pre_path_installed_wrapper_path_mismatch", reasons)
+        self.assertIn("preflight_pre_path_marker_dir_instance_mismatch", reasons)
+
     def test_validate_preflight_content_rejects_observer_env_path_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -256,8 +256,11 @@ lifecycle evidence, accepted lifecycle ordering, principal privacy/invalidation 
 and cross-instance scope behavior exist. An offline `ShooterGameServer` binary, copied
 core, manual FName/GObjects roots, or direct core/bin planning alone is insufficient.
 Candidate fixtures or second-source layout acceptance alone are also insufficient and
-must not be described as public SDK, runtime-readiness, or promotion evidence. Future
-promotion also needs accepted lifecycle anchors and independent second-source evidence.
+must not be described as public SDK, runtime-readiness, or promotion evidence. Source-bound
+lifecycle anchors and independent second-source layout evidence are accepted as
+candidate-only planning inputs; remaining promotion blockers include approved runtime
+principal lifecycle evidence, lifecycle semantics/privacy/scope review, public ABI/SDK
+consumer coverage, and owner/lifecycle cleanup gates.
 The future `obelisk.players-identity-principal-invalidation-policy.v1` artifact is a
 candidate-only policy input; it does not promote player identity/principal,
 permissions/admin, command response paths, commands/replies, runtime readiness, or v1 SDK
