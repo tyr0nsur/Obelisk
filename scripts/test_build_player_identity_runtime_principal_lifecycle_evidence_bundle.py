@@ -510,10 +510,15 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         report = json.loads(result.stdout)
         self.assertTrue(report["ready"])
+        self.assertEqual(report["ready_scope"], "bundle_builder_inputs_only")
         self.assertTrue(report["bundle_inputs_ready"])
         self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["v1_completion_ready"])
         self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
         self.assertEqual(
             [artifact["present"] for artifact in report["next_required_artifacts"]],

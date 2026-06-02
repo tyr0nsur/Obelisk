@@ -6511,6 +6511,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             missing,
             [
+                "permissions_admin_player_identity_promotion_certificate:missing",
+                "permissions_admin_query_failclosed_report:missing",
+                "permissions_admin_public_readiness_report:missing",
+                "permissions_admin_executed_test_report:missing",
                 "public_readiness_report:missing",
                 "executed_test_report:missing",
             ],
@@ -6699,6 +6703,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             missing,
             [
                 "public_readiness_report:missing",
+                "command_response_permissions_admin_player_identity_promotion_certificate:missing",
+                "command_response_permissions_admin_query_failclosed_report:missing",
+                "command_response_permissions_admin_public_readiness_report:missing",
+                "command_response_permissions_admin_executed_test_report:missing",
                 "command_response_public_readiness_report:missing",
                 "command_response_executed_test_report:missing",
                 "executed_test_report:missing",
@@ -7061,7 +7069,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
                 self.assertEqual(missing, expected)
 
-    def test_commands_replies_accepts_complete_structured_command_response_dependency_evidence(self) -> None:
+    def test_commands_replies_rejects_planning_response_report_without_permissions_admin_promotion(self) -> None:
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
@@ -7205,7 +7213,110 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 }
             )
 
-        self.assertEqual(missing, [])
+        self.assertEqual(
+            missing,
+            [
+                "command_response_permissions_admin_player_identity_promotion_certificate:missing",
+                "command_response_permissions_admin_query_failclosed_report:missing",
+                "command_response_permissions_admin_public_readiness_report:missing",
+                "command_response_permissions_admin_executed_test_report:missing",
+            ],
+        )
+
+    def test_command_response_rejects_public_readiness_without_permissions_admin_promotion(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandResponsePermissionsDependency",
+        ) as core_dir:
+            root = Path(core_dir)
+            response_readiness = root / "command-chat-response-route-planning-readiness.json"
+            response_readiness.write_text(
+                json.dumps(
+                    {
+                        "source_root": str(root),
+                        "producer": {
+                            "script": "scripts/compare_reflection_snapshots.py",
+                            "output_name": "command-chat-response-route-planning-readiness.json",
+                            "argv": [
+                                "scripts/compare_reflection_snapshots.py",
+                                "--target-set",
+                                "command-chat-response-route-planning",
+                                "--readiness-report",
+                                str(response_readiness),
+                                "--json",
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_report_root = root / "command-chat-response-public-readiness"
+            response_report_root.mkdir()
+            response_report = response_report_root / "command-chat-response-public-readiness.json"
+            response_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "target_set": "command-chat-response-route-planning",
+                        "readiness_status": "compared",
+                        "decisions_status": "blocked",
+                        "surfaces_status": "planning",
+                        "readiness_root": str(root),
+                        "readiness_path": str(response_readiness),
+                        "decisions_path": str(
+                            REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+                        ),
+                        "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                        "public_header_path": str(PUBLIC_HEADER),
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_executed = write_executed_test_artifact(
+                root / "command_response_executed_tests.json",
+                "obelisk.command_chat_response_path.v1",
+                command="python3 -m unittest command_response_promotion",
+            )
+
+            missing = module.surface_missing_structured_promotion_evidence(
+                {
+                    "id": "obelisk.command_chat_response_path.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
+                        "executed_test_report": response_executed,
+                    },
+                }
+            )
+
+        self.assertEqual(
+            missing,
+            [
+                "permissions_admin_player_identity_promotion_certificate:missing",
+                "permissions_admin_query_failclosed_report:missing",
+                "permissions_admin_public_readiness_report:missing",
+                "permissions_admin_executed_test_report:missing",
+            ],
+        )
 
     def test_commands_replies_nested_command_response_executed_tests_use_active_inputs(self) -> None:
         import importlib.util

@@ -1819,6 +1819,7 @@ def build_report(
         "surface": decisions.get("surface"),
         "mode": check_mode,
         "ready": accepted_for_contract_review and check_mode == "consume",
+        "ready_scope": "contract_review_input_only",
         "accepted_for_contract_review": accepted_for_contract_review,
         "resolved_inputs": resolved_inputs,
         "promotion_ready": False,

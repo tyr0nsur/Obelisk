@@ -647,6 +647,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         report = json.loads(result.stdout)
 
         self.assertTrue(report["ready"])
+        self.assertEqual(report["ready_scope"], "runtime_evidence_only")
         self.assertTrue(report["approved_runtime_evidence_present"])
         self.assertTrue(report["runtime_evidence_ready"])
         self.assertFalse(report["promotion_ready"])

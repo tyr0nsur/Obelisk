@@ -27,8 +27,8 @@ ARK binary path=<path>
 ARK binary SHA256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 Obelisk commit/build=<reviewed build containing PlayerPrincipalLifecycleObserver>
 approved UTC window=<start/end>
-restart expectation=<none|start|restart|stop-after-window>
-final posture=<stable|stopped>
+restart expectation=<none|start|restart>
+final posture=stable
 connected-user policy=<no_regular_users|operator_approved_beta_users>
 notice path=<not_applicable|operator-approved notice path label>
 copied evidence dir=/servidor/ark/workspace-offline/live-validation-logs/<run-id>/
@@ -42,6 +42,10 @@ Approval must state that plugins stay disabled, dispatch limit stays `0`, log li
 and the resulting evidence is consume-only with no public SDK, lookup, permissions,
 commands, `ResourceHandle`, mutation, return override, plugin delivery,
 runtime-readiness, or release claim.
+
+`stop-after-window` and `final posture=stopped` are not valid for this lifecycle evidence
+chain because the downstream window manifest and approved-evidence route require stable
+post posture.
 
 ## Required Window Contract
 

@@ -1497,6 +1497,7 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "input_schema": payload.get("schema"),
         "mode": check_mode,
         "ready": accepted,
+        "ready_scope": "runtime_evidence_only",
         "approved_runtime_evidence_present": evidence_accepted,
         "runtime_evidence_ready": evidence_accepted,
         "promotion_ready": False,

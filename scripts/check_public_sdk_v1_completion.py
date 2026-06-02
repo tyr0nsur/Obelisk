@@ -3030,6 +3030,22 @@ def command_response_structured_promotion_evidence_missing(
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
+    permissions_admin_evidence = evidence.get("permissions_admin_promotion_evidence")
+    if not isinstance(permissions_admin_evidence, dict):
+        permissions_admin_evidence = {
+            "player_identity_promotion_certificate": evidence.get("player_identity_promotion_certificate"),
+            "query_failclosed_report": evidence.get("permissions_admin_query_failclosed_report"),
+            "public_readiness_report": evidence.get("permissions_admin_public_readiness_report"),
+            "executed_test_report": evidence.get("permissions_admin_executed_test_report"),
+        }
+    dependency_missing = permissions_admin_structured_promotion_evidence_missing(
+        permissions_admin_evidence,
+        manifest_path,
+        public_header_path,
+    )
+    for reason in dependency_missing:
+        missing.append(f"permissions_admin_{reason}")
+
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
         missing.append(f"public_readiness_report:{readiness_error}")

@@ -80,7 +80,7 @@ ark_binary_sha256=7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c5
 obelisk_commit=<reviewed 40-character lowercase Git SHA containing PlayerPrincipalLifecycleObserver>
 run_id=<YYYYMMDDThhmmssZ-player-principal-lifecycle>
 window=<approved start/end UTC>
-final_posture=<stable|stopped>
+final_posture=stable
 copied_evidence_dir=/servidor/ark/workspace-offline/live-validation-logs/<run-id>/
 ```
 
@@ -94,9 +94,11 @@ scripts/check_player_principal_lifecycle_preflight.sh \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 ```
 
-If the approved target is intentionally stopped before launch, the preflight may be run
-with `--allow-stopped`. Do not use `--offline-only` against live install paths; that mode
-is for offline copies and rejects live server paths by design.
+Request packs for this lane must not use `final_posture=stopped` or
+`restart_expectation=stop-after-window`; the downstream window manifest and
+approved-evidence route require stable post posture. Do not use `--offline-only` against
+live install paths; that mode is for offline copies and rejects live server paths by
+design.
 
 For the observer-window marker posture, the preflight must also receive a secret-free
 effective env snapshot:
@@ -104,9 +106,9 @@ effective env snapshot:
 ```bash
 scripts/check_player_principal_lifecycle_preflight.sh \
   --instance <instance-id> \
+  --map <map> \
   --mode observer-window \
   --env-file <reviewed-effective-window-env> \
-  --allow-stopped \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 ```
 
@@ -255,7 +257,6 @@ scripts/check_player_principal_lifecycle_preflight.sh \
   --instance <instance-id> \
   --map <map> \
   --mode stable \
-  --allow-stopped \
   --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
 ```
 

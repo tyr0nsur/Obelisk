@@ -578,11 +578,16 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
         "ready": ready,
+        "ready_scope": "bundle_builder_inputs_only",
         "bundle_inputs_ready": bool(bundle_inputs_ready),
         "request_pack_ready": bool(request_pack_ready),
         "request_pack_is_runtime_evidence": False,
         "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
         "approved_runtime_evidence_ready": bool(approved_bundle_check["ready"]),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "v1_completion_ready": False,
         "next_blocker": (
             "identity_public_contract_gate_missing"
             if approved_bundle_check["ready"]

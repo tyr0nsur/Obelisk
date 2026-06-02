@@ -203,10 +203,12 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest no-runtime delegated hardening round bound request-pack sidecars to canonical
-  sibling files, stopped bundle preflight checkers from reading protected sidecars,
-  rejected duplicate/unsafe window-manifest keys, required approved evidence manifests to
-  carry explicit no-public-header/no-v1/no-capability/no-callback fields, and made
-  `enable-inventory-action-redacted-observer` explicitly forbidden in preflight/briefs.
-  Validated focused request/bundle/approved-evidence/public-v1 suites; blocker remains
-  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, no runtime/server op.
+- Latest no-runtime delegated hardening rounds bound request-pack sidecars to canonical
+  siblings, stopped protected sidecar reads, rejected unsafe/duplicate window-manifest
+  keys, required explicit no-public-header/no-v1/no-capability/no-callback fields,
+  forced lifecycle request packs to stable final posture only, labeled ambiguous
+  `ready=true` reports with narrow `ready_scope`, and made command response SDK
+  completion depend on promoted permissions/admin evidence. UE4 audit rejected further
+  offline broad rediscovery for this blocker. Validated 448 focused tests plus route/SDK
+  gates; blocker remains `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, no
+  runtime/server op.

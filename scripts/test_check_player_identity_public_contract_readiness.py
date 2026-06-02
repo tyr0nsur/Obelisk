@@ -103,6 +103,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         report = json.loads(result.stdout)
 
         self.assertTrue(report["ready"])
+        self.assertEqual(report["ready_scope"], "contract_review_input_only")
         self.assertTrue(report["accepted_for_contract_review"])
         self.assertEqual(
             report["resolved_inputs"],

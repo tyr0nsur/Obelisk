@@ -31,6 +31,11 @@ SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 MAX_APPROVED_WINDOW_SECONDS = 600
 APPROVAL_TEXT = "current-turn operator-approved runtime window, not standing approval"
+POSTURE_GUARDRAIL_TEXT = (
+    "player-principal lifecycle request packs require --final-posture stable; "
+    "stopped/stop-after-window is not supported because downstream manifest and "
+    "approved evidence checks require stable post posture"
+)
 EVIDENCE_ROOT = Path("/servidor/ark/workspace-offline/live-validation-logs")
 REQUIRED_ENV = {
     "OBELISK_ENABLE_PROCESS_EVENT_HOOK": "1",
@@ -100,9 +105,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--restart-expectation",
         required=True,
-        choices=("none", "start", "restart", "stop-after-window"),
+        metavar="{none,start,restart}",
+        help="Expected server lifecycle action; stop-after-window is not supported for this evidence chain.",
     )
-    parser.add_argument("--final-posture", required=True, choices=("stable", "stopped"))
+    parser.add_argument(
+        "--final-posture",
+        required=True,
+        metavar="{stable}",
+        help="Required post-window posture; stopped is not supported for this evidence chain.",
+    )
     parser.add_argument(
         "--user-policy",
         required=True,
@@ -153,10 +164,10 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--approved-window-end-utc must be in the future")
     if (end - start).total_seconds() > MAX_APPROVED_WINDOW_SECONDS:
         raise SystemExit("--approved-window duration must not exceed 10 minutes")
-    if args.restart_expectation == "stop-after-window" and args.final_posture != "stopped":
-        raise SystemExit("--restart-expectation stop-after-window requires --final-posture stopped")
-    if args.restart_expectation in {"none", "start", "restart"} and args.final_posture != "stable":
-        raise SystemExit("--restart-expectation none/start/restart requires --final-posture stable")
+    if args.restart_expectation not in {"none", "start", "restart"}:
+        raise SystemExit(POSTURE_GUARDRAIL_TEXT)
+    if args.final_posture != "stable":
+        raise SystemExit(POSTURE_GUARDRAIL_TEXT)
     expected_run_id = run_id_for_window_start(start)
     if args.run_id != expected_run_id:
         raise SystemExit(f"--run-id timestamp must match --approved-window-start-utc exactly: {expected_run_id}")
@@ -319,8 +330,6 @@ def post_run_verification_commands(payload: dict[str, Any]) -> list[list[str]]:
         "--expected-binary-sha256",
         payload["ark_binary_sha256"],
     ]
-    if payload["final_posture"] == "stopped":
-        return [preflight + ["--allow-stopped"]]
     return [
         preflight,
         [
