@@ -1305,8 +1305,13 @@ def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -
         "approved_runtime_evidence_present": False,
         "runtime_evidence_ready": False,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "blockers": [],
         "remaining_blockers": ["approved_runtime_evidence_missing"],
         "non_claims": [
@@ -1366,9 +1371,19 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
             blockers.append("approved_runtime_report_evidence_present_not_true")
         if report.get("runtime_evidence_ready") is not True:
             blockers.append("approved_runtime_report_runtime_evidence_ready_not_true")
-        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
-            if report.get(key) is not False:
+        for key in (
+            "promotion_ready",
+            "public_header_allowed",
+            "public_sdk_ready",
+            "public_abi_ready",
+            "v1_completion_ready",
+            "runtime_ready",
+        ):
+            if report.get(key, False) is not False:
                 blockers.append(f"approved_runtime_report_{key}_not_false")
+        for key in ("public_capability_bits_now", "public_callback_abi_now"):
+            if report.get(key, []) != []:
+                blockers.append(f"approved_runtime_report_{key}_not_empty")
         if report.get("next_blocker") != "identity_public_contract_gate_missing":
             blockers.append("approved_runtime_report_next_blocker_not_identity_public_contract_gate")
     ready = not blockers
@@ -1378,8 +1393,13 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "approved_runtime_evidence_present": ready,
         "runtime_evidence_ready": ready,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "remaining_blockers": [] if ready else ["approved_runtime_evidence_missing"],
         "blockers": blockers,
         "observed_runtime_cases": report["observed_runtime_cases"],
@@ -1923,7 +1943,7 @@ def next_actionable_blocker(
         }
     return {
         **base,
-        "code": "identity_public_contract_gate",
+        "code": "identity_public_contract_gate_missing",
         "blocked_until": "reviewed_identity_public_contract",
         "why": "runtime evidence is accepted for the player-principal lane, but public identity still requires the reviewed public contract gate",
         "decision_manifest": "docs/player_identity_public_contract_decisions.json",

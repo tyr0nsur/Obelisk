@@ -2253,11 +2253,55 @@ Auditor findings:
   or lifecycle-layout task left for this P0 blocker. Existing copied player-principal
   lifecycle artifacts cannot clear `approved_runtime_evidence_missing` because the
   canonical route shape is missing approved window/request/receipt evidence.
-- SDK/P0 auditor recommended the next accounting hardening: add mixed P0 non-counting
-  visibility for combinations of `identity_public_contract_gate_missing`, scoped P0
-  excluded/post-v1 release-statement records, and manifest-promoted-but-non-counting P0
-  rows. That remains pending.
+- SDK/P0 auditor recommended mixed P0 non-counting visibility for combinations of
+  `identity_public_contract_gate_missing`, scoped P0 excluded/post-v1 release-statement
+  records, and manifest-promoted-but-non-counting P0 rows. A later pass integrated that
+  visibility; see the following section.
 
 Validation remained offline-only. No runtime/server operation, marker/env change,
 ReflectionScanner, ptrace/gcore, Discord, GitHub publication, public ABI/header opening,
 promotion, release readiness, or stable/complete SDK claim was authorized.
+
+## SDK/P0 Non-Counting Visibility And Identity Overclaim Hardening
+
+A delegated follow-up round split scope across SDK/P0 implementation, identity-route
+audit, reversing/offline evidence audit, and handoff/gate audit. The lead integrated the
+code and kept all sub-agents out of GitHub, Discord, runtime/server operations, and
+protected live-server writes.
+
+Integrated offline changes:
+
+- `check_public_sdk_v1_completion.py` now exposes per-row `non_counting_reasons`,
+  `manifest_promoted_but_non_counting`,
+  `release_statement_scoped_non_complete_bookkeeping`, and
+  `route_gate_non_counting_blocker`. Summary/progress/report sections now surface P0
+  manifest-promoted-but-non-counting rows, P0 scoped release-statement bookkeeping, non-P0
+  post-v1/excluded bookkeeping, and route-gate non-counting blocker codes/surfaces.
+- The SDK report's `next_v1_work.recommended_next_action` now changes from producing
+  runtime lifecycle evidence to reviewing the player identity public contract when the
+  route blocker is `identity_public_contract_gate_missing`.
+- `check_player_identity_first_evidence_readiness.py` now treats approved-runtime evidence
+  report drift in `public_header_allowed`, `public_abi_ready`, `v1_completion_ready`,
+  `public_capability_bits_now`, and `public_callback_abi_now` as overclaims. Missing
+  fields remain equivalent to closed/empty for compatibility.
+- The first-evidence fallback blocker now uses the active route vocabulary
+  `identity_public_contract_gate_missing`, not stale `identity_public_contract_gate`.
+
+Offline reversing/evidence audit:
+
+- The stale canonical 20260601 player-principal lifecycle directory under
+  `/servidor/ark/workspace-offline/live-validation-logs/20260601T120000Z-player-principal-lifecycle`
+  was checked with `build_player_identity_runtime_principal_lifecycle_evidence_bundle.py
+  --preflight-only`. It remains insufficient: no `Obelisk.log`, `window-manifest.env`,
+  completed `operator-approval-receipt.json`, or
+  `approved-bundle/approved-runtime-principal-lifecycle-evidence.json`.
+- A better-looking test-style tree under
+  `/servidor/ark/workspace-offline/obelisk-test-player-principal-mkgkym0g/...` also stays
+  insufficient because exact copied paths/sidecars do not match the canonical approved run
+  binding. It should not be normalized into evidence.
+
+Validation remained offline-only. `scripts.test_check_public_sdk_v1_completion` passed
+178 tests after the SDK/P0 visibility patch; targeted identity-route overclaim tests also
+passed. No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
+Discord, GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.

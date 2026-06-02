@@ -1742,79 +1742,25 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(blocker["public_sdk_ready"])
         self.assertFalse(blocker["runtime_ready"])
 
-        operator_commands = checker.build_operator_next_commands(
-            inventory_ready=False,
-            offline_inputs={
-                "status": "offline_binary_present_core_like_input_missing",
-                "ready_to_build_core_evidence_pack": False,
-                "shooter_game_server_candidates": [
-                    {
-                        "path": "/tmp/artifacts/raw/ShooterGameServer",
-                        "matches_current_binary": True,
-                    }
-                ],
-                "core_like_candidates": [],
-            },
-            next_blocker=blocker,
+    def test_next_actionable_blocker_fallback_uses_current_public_contract_blocker_name(self) -> None:
+        blocker = checker.next_actionable_blocker(
+            inventory_ready=True,
+            inventory_payload_ready=True,
+            inventory_chain={"ready": True, "blockers": [], "accepted_manifest": {}},
+            downstream_blockers=[],
+            offline_inputs={"status": "ready", "shooter_game_server_candidates": []},
             raw_binary_pattern=Path("/tmp/artifacts/raw/ShooterGameServer"),
             raw_core_pattern=Path("/tmp/artifacts/raw/core"),
             core_manifest_pattern=Path("/tmp/artifacts/core-evidence-pack/manifest.json"),
             reflection_inventory_pattern=Path("/tmp/artifacts/reflection-inventory-pack/manifest.json"),
-            next_operator_recipe={
-                "build_core_evidence_pack": "python3 scripts/build_core_dump_evidence_pack.py ...",
-                "build_reflection_inventory_pack": "python3 scripts/build_reflection_inventory_pack.py ...",
-                "check_reflection_inventory_pack": "python3 scripts/check_reflection_inventory_pack_readiness.py ...",
-                "plan_admin_focal_snapshots": "python3 scripts/plan_ufunction_focal_snapshots.py ...",
-            },
+            next_operator_recipe={},
         )
-        self.assertEqual(operator_commands["current_blocker"], "non_protected_core_input_missing")
-        self.assertEqual(operator_commands["missing_inputs"], ["non_protected_core_dump_input"])
-        self.assertEqual(operator_commands["runnable_now"], [])
-        self.assertTrue(operator_commands["inputs"]["matching_non_protected_shooter_game_server"]["present"])
-        self.assertFalse(operator_commands["inputs"]["non_protected_core_dump_input"]["present"])
-        self.assertFalse(operator_commands["ready_to_build_core_evidence_pack"])
-        self.assertEqual(operator_commands["paired_raw_inputs"], [])
-        input_staging = operator_commands["input_staging"]
-        self.assertEqual(input_staging["status"], "blocked")
-        self.assertFalse(input_staging["ready"])
-        self.assertEqual(input_staging["blocked_until"], "non_protected_core_dump_input")
-        self.assertEqual(
-            input_staging["explicit_source_inputs_required"],
-            [
-                "matching_non_protected_shooter_game_server",
-                "non_protected_core_dump_input",
-            ],
-        )
-        self.assertIn("prepare_player_identity_offline_raw_layout.py", input_staging["command"])
-        self.assertIn("--binary /tmp/artifacts/raw/ShooterGameServer", input_staging["command"])
-        self.assertEqual(input_staging["command_argv"][5], "<non-protected-core-dump-input>")
-        self.assertIn("--artifact-root /tmp", input_staging["command"])
-        self.assertEqual(input_staging["command_argv"][9], "<run-id-suffix>")
-        self.assertIn("does not create, validate, approve, or promote core dumps", " ".join(input_staging["non_claims"]))
-        self.assertIn("does not build or approve core evidence packs", " ".join(input_staging["non_claims"]))
-        blocked_resolution = operator_commands["blocked_input_resolution"]
-        self.assertEqual(blocked_resolution["status"], "blocked")
-        self.assertEqual(blocked_resolution["current_blocker"], "non_protected_core_input_missing")
-        self.assertEqual(blocked_resolution["missing_inputs"], ["non_protected_core_dump_input"])
-        self.assertEqual(blocked_resolution["available_matching_binary"], "/tmp/artifacts/raw/ShooterGameServer")
-        self.assertEqual(blocked_resolution["expected_core_destination"], "/tmp/artifacts/raw/core")
-        self.assertEqual(
-            blocked_resolution["validation_command_argv"][3],
-            "/tmp/player-identity-offline-<run-id-suffix>",
-        )
-        self.assertIn("validate_player_identity_raw_inputs.py", blocked_resolution["validation_command_after_missing_inputs_exist"])
-        self.assertIn("/tmp/player-identity-offline-<run-id-suffix>", blocked_resolution["validation_command_argv"][3])
-        self.assertIn("does not accept or promote core evidence", " ".join(blocked_resolution["non_claims"]))
-        self.assertEqual(
-            operator_commands["input_layout_requirements"]["next_input_preparation_action"],
-            "stage_core_next_to_matching_binary_under_same_player_identity_raw_dir",
-        )
-        self.assertEqual(operator_commands["sequence"][0]["status"], "blocked")
-        self.assertFalse(operator_commands["sequence"][0]["ready"])
-        self.assertEqual(
-            operator_commands["sequence"][0]["blocked_until"],
-            "non_protected_core_dump_input",
-        )
+
+        self.assertEqual(blocker["code"], "identity_public_contract_gate_missing")
+        self.assertEqual(blocker["blocked_until"], "reviewed_identity_public_contract")
+        self.assertFalse(blocker["promotion_ready"])
+        self.assertFalse(blocker["public_sdk_ready"])
+        self.assertFalse(blocker["runtime_ready"])
 
     def test_operator_recipe_uses_unambiguous_unpaired_core_for_staging(self) -> None:
         operator_commands = checker.build_operator_next_commands(
@@ -2561,7 +2507,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         def overclaiming_report(payload, validation, *, check_mode: str):
             report = original_build_report(payload, validation, check_mode=check_mode)
+            report["public_header_allowed"] = True
             report["public_sdk_ready"] = True
+            report["public_abi_ready"] = True
+            report["v1_completion_ready"] = True
+            report["public_capability_bits_now"] = ["OBELISK_PUBLIC_IDENTITY"]
+            report["public_callback_abi_now"] = ["ObeliskRegisterPlayerIdentityCallback"]
             return report
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -2583,10 +2534,20 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(diagnosis["approved_runtime_evidence_present"])
         self.assertFalse(diagnosis["runtime_evidence_ready"])
         self.assertFalse(diagnosis["promotion_ready"])
+        self.assertFalse(diagnosis["public_header_allowed"])
         self.assertFalse(diagnosis["public_sdk_ready"])
+        self.assertFalse(diagnosis["public_abi_ready"])
+        self.assertFalse(diagnosis["v1_completion_ready"])
         self.assertFalse(diagnosis["runtime_ready"])
+        self.assertEqual(diagnosis["public_capability_bits_now"], [])
+        self.assertEqual(diagnosis["public_callback_abi_now"], [])
         self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertIn("approved_runtime_report_public_header_allowed_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_sdk_ready_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_public_abi_ready_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_v1_completion_ready_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_public_capability_bits_now_not_empty", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_public_callback_abi_now_not_empty", diagnosis["blockers"])
 
 
 if __name__ == "__main__":

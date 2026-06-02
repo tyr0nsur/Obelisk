@@ -1092,6 +1092,21 @@ priorities, and do not use history files as the active source of truth.
   artifacts cannot clear `approved_runtime_evidence_missing`. Pending SDK auditor item:
   mixed P0 non-counting visibility fields/tests. No runtime/server operation was
   performed.
+- 2026-06-02 delegated SDK/P0 visibility + identity hardening pass: lead spawned SDK
+  worker, identity-route auditor, reversing/offline auditor, and handoff/gate auditor.
+  Integrated lead-owned changes expose `non_counting_reasons`,
+  `manifest_promoted_but_non_counting`,
+  `release_statement_scoped_non_complete_bookkeeping`, and route-gate non-counting
+  blocker/surface buckets in `check_public_sdk_v1_completion.py`; the recommended action
+  now switches to identity public-contract review when the route blocker is
+  `identity_public_contract_gate_missing`. `check_player_identity_first_evidence_readiness.py`
+  now rejects approved-runtime report overclaims for public header, public ABI, v1
+  completion, and public ABI lists, and its fallback blocker name is
+  `identity_public_contract_gate_missing`. Offline reversing audit reran the stale
+  20260601 lifecycle bundle preflight and confirmed existing artifacts are insufficient:
+  missing `Obelisk.log`, `window-manifest.env`, completed
+  `operator-approval-receipt.json`, and approved evidence manifest. No runtime/server
+  operation was performed.
 
 ## Agent Coordination
 

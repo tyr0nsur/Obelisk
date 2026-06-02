@@ -303,7 +303,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "public_sdk_ready": False,
                     "runtime_ready": False,
                     "public_header_allowed": False,
-                    "next_blocker": "identity_public_contract_gate_missing",
+                    "next_blocker": "identity_public_contract_gate",
                     "blockers": [],
                     "resolved_inputs": ["runtime.lifecycle_evidence"],
                     "remaining_blockers": [
@@ -792,6 +792,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(progress["completion_blockers_promoted_count"], 0)
         self.assertEqual(progress["p0_chain_promoted_count"], 0)
         self.assertEqual(progress["complete_sdk_claim_progress_percent"], 0)
+        self.assertEqual(progress["route_gate_non_counting_blockers"], [])
+        self.assertEqual(progress["route_gate_non_counting_surfaces"], [])
+        self.assertEqual(progress["p0_manifest_promoted_non_counting"], [])
+        self.assertEqual(
+            payload["v1_sdk_report_sections"]["next_v1_work"]["recommended_next_action"],
+            (
+                "review the player identity public contract before any public identity, "
+                "permissions/admin, command response, or commands/replies ABI; approved copied "
+                "runtime principal lifecycle evidence is only a contract-review input"
+            ),
+        )
+        self.assertNotIn(
+            "produce approved runtime principal lifecycle evidence",
+            payload["v1_sdk_report_sections"]["next_v1_work"]["recommended_next_action"],
+        )
         for row in payload["v1_sdk_blocker_outcomes"]:
             if row["surface"] in payload["v1_required_dependency_chain"]:
                 self.assertFalse(row["route_gate_claim_satisfied"], row)
@@ -1549,7 +1564,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("The stable v1 SDK claim remains disabled", result.stdout)
-        self.assertIn("12-blocker outcome accounting: 6 need manifest outcomes; 6 need release-statement outcomes", result.stdout)
+        self.assertIn("12-blocker outcome accounting: 5 need manifest outcomes; 7 need release-statement outcomes", result.stdout)
         self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
         self.assertIn("obelisk.player_identity.v1", result.stdout)
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
@@ -2414,7 +2429,6 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.mission_transfer_dino_tribe.v1",
                 "obelisk.permissions_admin.v1",
                 "obelisk.player_identity.v1",
-                "obelisk.structure_census.v1",
             ],
         )
         self.assertEqual(
@@ -6903,12 +6917,166 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.assertTrue(row["promotion_evidence_satisfied"])
             self.assertTrue(row["structured_promotion_evidence_satisfied"])
             self.assertFalse(row["route_gate_claim_satisfied"])
+            self.assertTrue(row["manifest_promoted_but_non_counting"])
+            self.assertEqual(row["route_gate_non_counting_blocker"], row["route_gate_current_blocker"])
+            self.assertIn(
+                f"route_gate_blocker:{row['route_gate_current_blocker']}",
+                row["non_counting_reasons"],
+            )
             self.assertFalse(row["counts_toward_complete_sdk_claim"])
         self.assertTrue(planning_only_accepted_row["is_p0_dependency_chain"])
         self.assertFalse(planning_only_accepted_row["route_gate_claim_satisfied"])
+        self.assertTrue(planning_only_accepted_row["manifest_promoted_but_non_counting"])
+        self.assertEqual(
+            planning_only_accepted_row["route_gate_non_counting_blocker"],
+            "approved_runtime_evidence_missing",
+        )
         self.assertFalse(planning_only_accepted_row["counts_toward_complete_sdk_claim"])
         self.assertFalse(unlocked_row["route_gate_claim_satisfied"])
+        self.assertTrue(unlocked_row["manifest_promoted_but_non_counting"])
         self.assertFalse(unlocked_row["counts_toward_complete_sdk_claim"])
+
+    def test_mixed_p0_non_counting_reasons_are_visible(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        original_surface_has_promotion_evidence = module.surface_has_promotion_evidence
+        original_missing_required = module.surface_missing_required_promotion_evidence
+        original_missing_structured = module.surface_missing_structured_promotion_evidence
+        try:
+            module.surface_has_promotion_evidence = lambda surface: surface.get("status") == "promoted"
+            module.surface_missing_required_promotion_evidence = lambda surface: []
+            module.surface_missing_structured_promotion_evidence = (
+                lambda surface, manifest_path=PUBLIC_SDK_SURFACES, public_header_path=PUBLIC_HEADER: []
+            )
+
+            surfaces = {
+                "obelisk.player_identity.v1": {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "promoted",
+                    "evidence": {},
+                },
+                "obelisk.permissions_admin.v1": {
+                    "id": "obelisk.permissions_admin.v1",
+                    "status": "excluded",
+                    "v1_decision_contract": {
+                        "exclusion_requires": [
+                            "the v1 release statement names obelisk.permissions_admin.v1 as excluded",
+                            "the v1 release statement states that no permissions/admin API is included in v1",
+                        ],
+                    },
+                },
+                "obelisk.command_chat_response_path.v1": {
+                    "id": "obelisk.command_chat_response_path.v1",
+                    "status": "post-v1",
+                    "v1_decision_contract": {
+                        "exclusion_requires": [
+                            "the v1 release statement names obelisk.command_chat_response_path.v1 as post-v1",
+                            "the v1 release statement states that no command response API is included in v1",
+                        ],
+                    },
+                },
+                "obelisk.commands_replies.v1": {
+                    "id": "obelisk.commands_replies.v1",
+                    "status": "planning",
+                },
+            }
+            release_statement = "\n".join(
+                [
+                    "obelisk.player_identity.v1: promoted - reviewed ABI and SDK evidence.",
+                    (
+                        "obelisk.permissions_admin.v1: excluded - no permissions/admin API "
+                        "is included in v1."
+                    ),
+                    (
+                        "obelisk.command_chat_response_path.v1: post-v1 - no command response "
+                        "API is included in v1."
+                    ),
+                ]
+            )
+            rows = module.completion_blocker_outcome_rows(
+                [
+                    "obelisk.player_identity.v1",
+                    "obelisk.permissions_admin.v1",
+                    "obelisk.command_chat_response_path.v1",
+                    "obelisk.commands_replies.v1",
+                ],
+                surfaces,
+                {
+                    "obelisk.permissions_admin.v1",
+                    "obelisk.command_chat_response_path.v1",
+                },
+                release_statement,
+                {
+                    "valid": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "route_lock_locked": True,
+                    "current_blocker": "identity_public_contract_gate_missing",
+                    "blockers": [],
+                },
+            )
+        finally:
+            module.surface_has_promotion_evidence = original_surface_has_promotion_evidence
+            module.surface_missing_required_promotion_evidence = original_missing_required
+            module.surface_missing_structured_promotion_evidence = original_missing_structured
+
+        by_surface = {row["surface"]: row for row in rows}
+        promoted_locked = by_surface["obelisk.player_identity.v1"]
+        excluded = by_surface["obelisk.permissions_admin.v1"]
+        post_v1 = by_surface["obelisk.command_chat_response_path.v1"]
+        planning = by_surface["obelisk.commands_replies.v1"]
+        summary = module.completion_blocker_outcome_summary(rows)
+
+        self.assertTrue(promoted_locked["manifest_promoted_but_non_counting"])
+        self.assertEqual(
+            promoted_locked["route_gate_non_counting_blocker"],
+            "identity_public_contract_gate_missing",
+        )
+        self.assertIn(
+            "route_gate_blocker:identity_public_contract_gate_missing",
+            promoted_locked["non_counting_reasons"],
+        )
+        self.assertIn("identity public contract", promoted_locked["next_action"])
+        self.assertTrue(excluded["scoped_non_complete_outcome_only"])
+        self.assertTrue(excluded["release_statement_scoped_non_complete_bookkeeping"])
+        self.assertIn("p0_scoped_non_complete_outcome", excluded["non_counting_reasons"])
+        self.assertTrue(post_v1["scoped_non_complete_outcome_only"])
+        self.assertTrue(post_v1["release_statement_scoped_non_complete_bookkeeping"])
+        self.assertIn("p0_scoped_non_complete_outcome", post_v1["non_counting_reasons"])
+        self.assertIsNone(planning["manifest_outcome"])
+        self.assertIn("manifest_promoted_outcome_missing", planning["non_counting_reasons"])
+        self.assertEqual(
+            summary["manifest_promoted_but_non_counting"],
+            ["obelisk.player_identity.v1"],
+        )
+        self.assertEqual(
+            summary["p0_manifest_promoted_non_counting"],
+            ["obelisk.player_identity.v1"],
+        )
+        self.assertEqual(
+            summary["release_statement_scoped_non_complete_bookkeeping"],
+            ["obelisk.permissions_admin.v1", "obelisk.command_chat_response_path.v1"],
+        )
+        self.assertEqual(
+            summary["p0_release_statement_scoped_non_complete_outcomes"],
+            ["obelisk.permissions_admin.v1", "obelisk.command_chat_response_path.v1"],
+        )
+        self.assertEqual(
+            summary["route_gate_non_counting_surfaces"],
+            ["obelisk.player_identity.v1"],
+        )
+        self.assertEqual(
+            summary["route_gate_non_counting_blockers"],
+            ["identity_public_contract_gate_missing"],
+        )
 
     def test_route_gate_locked_guidance_points_to_runtime_evidence_not_closed_binding(self) -> None:
         guidance = "\n".join(

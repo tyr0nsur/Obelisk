@@ -3373,7 +3373,19 @@ def blocker_outcome_next_action(
     release_statement_outcome: str | None,
     release_statement_contract_satisfied: bool,
     promotion_evidence_satisfied: bool,
+    route_gate_current_blocker: str | None = None,
+    route_gate_non_counting_blocker: str | None = None,
 ) -> str:
+    if route_gate_non_counting_blocker is not None:
+        if route_gate_non_counting_blocker == "identity_public_contract_gate_missing":
+            return (
+                "review the identity public contract before counting identity, "
+                "permissions, command response, or commands/replies toward complete SDK wording"
+            )
+        return (
+            "resolve the command/permission route gate before counting this P0 row "
+            "toward complete SDK wording"
+        )
     if status == "promoted":
         if not promotion_evidence_satisfied:
             return "keep blocked; promoted status lacks acceptable ABI and SDK-consumer evidence"
@@ -3453,6 +3465,40 @@ def completion_blocker_outcome_rows(
             if dependency_id in completion_blockers and counts_by_surface.get(dependency_id) is not True:
                 dependency_claims_satisfied = False
                 break
+        route_gate_non_counting_active = (
+            is_p0_dependency_chain
+            and manifest_outcome == "promoted"
+            and promotion_evidence_satisfied
+            and not missing_required_terms
+            and not missing_structured_evidence
+            and release_statement_contract_satisfied
+            and route_gate_claim_satisfied is not True
+        )
+        route_gate_non_counting_blocker = (
+            route_gate_current_blocker
+            if route_gate_non_counting_active and isinstance(route_gate_current_blocker, str)
+            else None
+        )
+        non_counting_reasons: list[str] = []
+        if not promotion_evidence_satisfied:
+            non_counting_reasons.append("promotion_evidence_missing")
+        if missing_required_terms:
+            non_counting_reasons.append("required_promotion_evidence_terms_missing")
+        if missing_structured_evidence:
+            non_counting_reasons.append("structured_promotion_evidence_missing")
+        if release_statement_contract_satisfied is not True:
+            non_counting_reasons.append("release_statement_outcome_or_contract_missing")
+        if manifest_outcome != "promoted":
+            if scoped_non_complete_outcome_only:
+                non_counting_reasons.append("p0_scoped_non_complete_outcome")
+            elif manifest_outcome in {"post-v1", "excluded"}:
+                non_counting_reasons.append("scoped_non_complete_outcome")
+            else:
+                non_counting_reasons.append("manifest_promoted_outcome_missing")
+        if route_gate_non_counting_blocker is not None:
+            non_counting_reasons.append(f"route_gate_blocker:{route_gate_non_counting_blocker}")
+        if not dependency_claims_satisfied:
+            non_counting_reasons.append("dependency_claims_not_satisfied")
         counts_toward_complete_sdk_claim = (
             promotion_evidence_satisfied
             and not missing_required_terms
@@ -3462,6 +3508,16 @@ def completion_blocker_outcome_rows(
             and route_gate_claim_satisfied
             and dependency_claims_satisfied
         )
+        manifest_promoted_but_non_counting = (
+            manifest_outcome == "promoted"
+            and not counts_toward_complete_sdk_claim
+        )
+        release_statement_scoped_non_complete_bookkeeping = (
+            manifest_outcome in P0_DEPENDENCY_CHAIN_SCOPED_NON_COMPLETE_ALLOWED_OUTCOMES
+            and release_statement_contract_satisfied
+            and not counts_toward_complete_sdk_claim
+        )
+        non_counting_reasons = [] if counts_toward_complete_sdk_claim else non_counting_reasons
         counts_by_surface[surface_id] = counts_toward_complete_sdk_claim
         rows.append(
             {
@@ -3483,6 +3539,12 @@ def completion_blocker_outcome_rows(
                 "route_gate_claim_satisfied": route_gate_claim_satisfied,
                 "route_gate_current_blocker": route_gate_current_blocker,
                 "scoped_non_complete_outcome_only": scoped_non_complete_outcome_only,
+                "non_counting_reasons": non_counting_reasons,
+                "manifest_promoted_but_non_counting": manifest_promoted_but_non_counting,
+                "release_statement_scoped_non_complete_bookkeeping": (
+                    release_statement_scoped_non_complete_bookkeeping
+                ),
+                "route_gate_non_counting_blocker": route_gate_non_counting_blocker,
                 "counts_toward_complete_sdk_claim": counts_toward_complete_sdk_claim,
                 "unresolved_for_complete_sdk_claim": not counts_toward_complete_sdk_claim,
                 "next_action": blocker_outcome_next_action(
@@ -3492,6 +3554,10 @@ def completion_blocker_outcome_rows(
                     release_statement_outcome=release_statement_outcome,
                     release_statement_contract_satisfied=release_statement_contract_satisfied,
                     promotion_evidence_satisfied=promotion_evidence_satisfied,
+                    route_gate_current_blocker=(
+                        route_gate_current_blocker if isinstance(route_gate_current_blocker, str) else None
+                    ),
+                    route_gate_non_counting_blocker=route_gate_non_counting_blocker,
                 ),
                 "non_claim": "Accounting row only; it does not authorize complete/full/production/stable SDK wording.",
             }
@@ -3521,14 +3587,89 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         if row.get("is_p0_dependency_chain") is True
         and row.get("scoped_non_complete_outcome_only") is True
     ]
+    manifest_promoted_but_non_counting = [
+        row["surface"]
+        for row in rows
+        if row.get("manifest_promoted_but_non_counting") is True
+    ]
+    release_statement_scoped_non_complete_bookkeeping = [
+        row["surface"]
+        for row in rows
+        if row.get("release_statement_scoped_non_complete_bookkeeping") is True
+    ]
+    route_gate_non_counting_surfaces = [
+        row["surface"]
+        for row in rows
+        if row.get("route_gate_non_counting_blocker") is not None
+    ]
+    route_gate_non_counting_blockers = sorted(
+        {
+            row["route_gate_non_counting_blocker"]
+            for row in rows
+            if isinstance(row.get("route_gate_non_counting_blocker"), str)
+        }
+    )
+    route_gate_current_blockers = sorted(
+        {
+            row["route_gate_current_blocker"]
+            for row in rows
+            if isinstance(row.get("route_gate_current_blocker"), str)
+        }
+    )
+    p0_manifest_promoted_non_counting = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is True
+        and row.get("manifest_promoted_but_non_counting") is True
+    ]
+    p0_release_statement_scoped_non_complete_outcomes = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is True
+        and row.get("release_statement_scoped_non_complete_bookkeeping") is True
+    ]
+    non_p0_release_statement_post_v1_or_excluded_outcomes = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is not True
+        and row.get("release_statement_scoped_non_complete_bookkeeping") is True
+    ]
     return {
         "total": len(rows),
         "manifest_outcome_missing_count": len(manifest_outcome_missing),
         "release_statement_outcome_missing_count": len(release_statement_outcome_missing),
         "p0_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
+        "manifest_promoted_but_non_counting_count": len(manifest_promoted_but_non_counting),
+        "p0_manifest_promoted_non_counting_count": len(p0_manifest_promoted_non_counting),
+        "release_statement_scoped_non_complete_bookkeeping_count": len(
+            release_statement_scoped_non_complete_bookkeeping
+        ),
+        "p0_release_statement_scoped_non_complete_outcome_count": (
+            len(p0_release_statement_scoped_non_complete_outcomes)
+        ),
+        "non_p0_release_statement_post_v1_or_excluded_outcome_count": (
+            len(non_p0_release_statement_post_v1_or_excluded_outcomes)
+        ),
+        "route_gate_non_counting_surface_count": len(route_gate_non_counting_surfaces),
+        "route_gate_non_counting_blocker_count": len(route_gate_non_counting_blockers),
         "manifest_outcome_missing": manifest_outcome_missing,
         "release_statement_outcome_missing": release_statement_outcome_missing,
         "p0_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
+        "manifest_promoted_but_non_counting": manifest_promoted_but_non_counting,
+        "completion_blockers_with_manifest_promoted_non_counting": manifest_promoted_but_non_counting,
+        "p0_manifest_promoted_non_counting": p0_manifest_promoted_non_counting,
+        "release_statement_scoped_non_complete_bookkeeping": (
+            release_statement_scoped_non_complete_bookkeeping
+        ),
+        "p0_release_statement_scoped_non_complete_outcomes": (
+            p0_release_statement_scoped_non_complete_outcomes
+        ),
+        "non_p0_release_statement_post_v1_or_excluded_outcomes": (
+            non_p0_release_statement_post_v1_or_excluded_outcomes
+        ),
+        "route_gate_non_counting_surfaces": route_gate_non_counting_surfaces,
+        "route_gate_non_counting_blockers": route_gate_non_counting_blockers,
+        "route_gate_current_blockers": route_gate_current_blockers,
         "p0_scoped_non_complete_note": (
             "P0 dependency-chain excluded/post-v1 outcomes are scoped non-complete "
             "bookkeeping only; they remain unresolved for complete/full/production SDK claims."
@@ -3575,7 +3716,18 @@ def categorized_v1_report_sections(
 
     manifest_outcome_missing = blocker_outcome_summary.get("manifest_outcome_missing", [])
     dependency_chain_remaining = blocker_outcome_summary.get("dependency_chain_remaining", [])
-    if dependency_chain_remaining:
+    route_gate_current_blockers = blocker_outcome_summary.get("route_gate_current_blockers", [])
+    if (
+        dependency_chain_remaining
+        and isinstance(route_gate_current_blockers, list)
+        and "identity_public_contract_gate_missing" in route_gate_current_blockers
+    ):
+        recommended_next_action = (
+            "review the player identity public contract before any public identity, "
+            "permissions/admin, command response, or commands/replies ABI; approved copied "
+            "runtime principal lifecycle evidence is only a contract-review input"
+        )
+    elif dependency_chain_remaining:
         recommended_next_action = (
             "resolve the player identity/principal critical path first: produce approved "
             "copied runtime principal lifecycle evidence before any public identity, "
@@ -3652,6 +3804,30 @@ def categorized_v1_report_sections(
                 "p0_scoped_non_complete_outcome_count",
                 0,
             ),
+            "release_statement_scoped_non_complete_bookkeeping": blocker_outcome_summary.get(
+                "release_statement_scoped_non_complete_bookkeeping",
+                [],
+            ),
+            "release_statement_scoped_non_complete_bookkeeping_count": blocker_outcome_summary.get(
+                "release_statement_scoped_non_complete_bookkeeping_count",
+                0,
+            ),
+            "p0_release_statement_scoped_non_complete_outcomes": blocker_outcome_summary.get(
+                "p0_release_statement_scoped_non_complete_outcomes",
+                [],
+            ),
+            "p0_release_statement_scoped_non_complete_outcome_count": blocker_outcome_summary.get(
+                "p0_release_statement_scoped_non_complete_outcome_count",
+                0,
+            ),
+            "non_p0_release_statement_post_v1_or_excluded_outcomes": blocker_outcome_summary.get(
+                "non_p0_release_statement_post_v1_or_excluded_outcomes",
+                [],
+            ),
+            "non_p0_release_statement_post_v1_or_excluded_outcome_count": blocker_outcome_summary.get(
+                "non_p0_release_statement_post_v1_or_excluded_outcome_count",
+                0,
+            ),
             "missing_blocker_outcomes": sorted(set(release_statement_missing_blockers)),
             "missing_exclusion_contracts": sorted(set(release_statement_missing_contracts)),
             "missing_experimental_outcomes": sorted(
@@ -3694,6 +3870,38 @@ def categorized_v1_report_sections(
                 "p0_scoped_non_complete_outcome_count",
                 0,
             ),
+            "manifest_promoted_but_non_counting": blocker_outcome_summary.get(
+                "manifest_promoted_but_non_counting",
+                [],
+            ),
+            "manifest_promoted_but_non_counting_count": blocker_outcome_summary.get(
+                "manifest_promoted_but_non_counting_count",
+                0,
+            ),
+            "p0_manifest_promoted_non_counting": blocker_outcome_summary.get(
+                "p0_manifest_promoted_non_counting",
+                [],
+            ),
+            "p0_manifest_promoted_non_counting_count": blocker_outcome_summary.get(
+                "p0_manifest_promoted_non_counting_count",
+                0,
+            ),
+            "route_gate_non_counting_surfaces": blocker_outcome_summary.get(
+                "route_gate_non_counting_surfaces",
+                [],
+            ),
+            "route_gate_non_counting_surface_count": blocker_outcome_summary.get(
+                "route_gate_non_counting_surface_count",
+                0,
+            ),
+            "route_gate_non_counting_blockers": blocker_outcome_summary.get(
+                "route_gate_non_counting_blockers",
+                [],
+            ),
+            "route_gate_non_counting_blocker_count": blocker_outcome_summary.get(
+                "route_gate_non_counting_blocker_count",
+                0,
+            ),
             "manifest_outcome_missing": blocker_outcome_summary.get(
                 "manifest_outcome_missing",
                 [],
@@ -3726,6 +3934,30 @@ def categorized_v1_report_sections(
         "next_v1_work": {
             "critical_path": list(dependency_chain_remaining),
             "release_statement_bookkeeping_required": sorted(set(release_statement_missing_blockers)),
+            "manifest_promoted_but_non_counting": blocker_outcome_summary.get(
+                "manifest_promoted_but_non_counting",
+                [],
+            ),
+            "p0_manifest_promoted_non_counting": blocker_outcome_summary.get(
+                "p0_manifest_promoted_non_counting",
+                [],
+            ),
+            "release_statement_scoped_non_complete_bookkeeping": blocker_outcome_summary.get(
+                "release_statement_scoped_non_complete_bookkeeping",
+                [],
+            ),
+            "p0_release_statement_scoped_non_complete_outcomes": blocker_outcome_summary.get(
+                "p0_release_statement_scoped_non_complete_outcomes",
+                [],
+            ),
+            "route_gate_non_counting_surfaces": blocker_outcome_summary.get(
+                "route_gate_non_counting_surfaces",
+                [],
+            ),
+            "route_gate_non_counting_blockers": blocker_outcome_summary.get(
+                "route_gate_non_counting_blockers",
+                [],
+            ),
             "product_decision_required": list(manifest_outcome_missing),
             "runtime_or_promotion_required": sorted(
                 set(unresolved_completion_blockers)
@@ -4223,6 +4455,15 @@ def build_report(
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
     p0_scoped_non_complete_outcomes = blocker_outcome_summary["p0_scoped_non_complete_outcomes"]
+    manifest_promoted_but_non_counting = blocker_outcome_summary[
+        "manifest_promoted_but_non_counting"
+    ]
+    release_statement_scoped_non_complete_bookkeeping = blocker_outcome_summary[
+        "release_statement_scoped_non_complete_bookkeeping"
+    ]
+    route_gate_non_counting_blockers = blocker_outcome_summary[
+        "route_gate_non_counting_blockers"
+    ]
     completion_blockers_counting_toward_claim = sorted(
         row["surface"]
         for row in blocker_outcome_rows
@@ -4354,6 +4595,18 @@ def build_report(
         "v1_required_dependency_chain_expected": list(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
         "p0_dependency_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
         "p0_dependency_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
+        "manifest_promoted_but_non_counting_completion_blockers": manifest_promoted_but_non_counting,
+        "manifest_promoted_but_non_counting_completion_blocker_count": len(
+            manifest_promoted_but_non_counting
+        ),
+        "release_statement_scoped_non_complete_bookkeeping_blockers": (
+            release_statement_scoped_non_complete_bookkeeping
+        ),
+        "release_statement_scoped_non_complete_bookkeeping_blocker_count": len(
+            release_statement_scoped_non_complete_bookkeeping
+        ),
+        "route_gate_non_counting_blockers": route_gate_non_counting_blockers,
+        "route_gate_non_counting_blocker_count": len(route_gate_non_counting_blockers),
         "p0_dependency_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,
         "unpromoted_required_dependency_chain": required_dependency_chain_unresolved_for_claim,
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
@@ -4378,6 +4631,44 @@ def build_report(
             "p0_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
             "p0_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
             "p0_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,
+            "manifest_promoted_but_non_counting_completion_blockers": (
+                manifest_promoted_but_non_counting
+            ),
+            "manifest_promoted_but_non_counting_completion_blocker_count": len(
+                manifest_promoted_but_non_counting
+            ),
+            "p0_manifest_promoted_non_counting": blocker_outcome_summary[
+                "p0_manifest_promoted_non_counting"
+            ],
+            "p0_manifest_promoted_non_counting_count": blocker_outcome_summary[
+                "p0_manifest_promoted_non_counting_count"
+            ],
+            "release_statement_scoped_non_complete_bookkeeping_blockers": (
+                release_statement_scoped_non_complete_bookkeeping
+            ),
+            "release_statement_scoped_non_complete_bookkeeping_blocker_count": len(
+                release_statement_scoped_non_complete_bookkeeping
+            ),
+            "p0_release_statement_scoped_non_complete_outcomes": blocker_outcome_summary[
+                "p0_release_statement_scoped_non_complete_outcomes"
+            ],
+            "p0_release_statement_scoped_non_complete_outcome_count": blocker_outcome_summary[
+                "p0_release_statement_scoped_non_complete_outcome_count"
+            ],
+            "non_p0_release_statement_post_v1_or_excluded_outcomes": blocker_outcome_summary[
+                "non_p0_release_statement_post_v1_or_excluded_outcomes"
+            ],
+            "non_p0_release_statement_post_v1_or_excluded_outcome_count": blocker_outcome_summary[
+                "non_p0_release_statement_post_v1_or_excluded_outcome_count"
+            ],
+            "route_gate_non_counting_surfaces": blocker_outcome_summary[
+                "route_gate_non_counting_surfaces"
+            ],
+            "route_gate_non_counting_surface_count": blocker_outcome_summary[
+                "route_gate_non_counting_surface_count"
+            ],
+            "route_gate_non_counting_blockers": route_gate_non_counting_blockers,
+            "route_gate_non_counting_blocker_count": len(route_gate_non_counting_blockers),
             "p0_chain_scoped_non_complete_note": (
                 "P0 excluded/post-v1 outcomes are scoped release-statement accounting only and do not "
                 "increase p0_chain_promoted_count or complete_sdk_claim_progress_percent."
