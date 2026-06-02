@@ -73,6 +73,11 @@ wrapper="${TMP_DIR}/ObeliskRun.sh"
 cp "${REPO_ROOT}/packaging/linuxgsm/ObeliskRun.sh" "${wrapper}"
 server_binary="${TMP_DIR}/ShooterGameServer"
 server_sha="$(make_server_binary "${server_binary}")"
+run_id="20260601T120000Z-player-principal-lifecycle"
+evidence_dir="${TMP_DIR}/live-validation-logs/${run_id}"
+copied_log="${evidence_dir}/Obelisk.log"
+window_manifest="${evidence_dir}/window-manifest.env"
+mkdir -p "${evidence_dir}"
 
 root_stable="${TMP_DIR}/root-stable"
 prepare_root "${root_stable}"
@@ -88,25 +93,39 @@ prepare_root "${root_stable}"
 
 "${CHECK}" \
     --instance arkserver2 \
+    --target-map TheIsland \
     --mode stable \
     --obelisk-root "${root_stable}" \
     --installed-wrapper "${wrapper}" \
     --server-binary "${server_binary}" \
     --expected-binary-sha256 "${server_sha}" \
+    --run-id "${run_id}" \
+    --window-manifest "${window_manifest}" \
+    --copied-log "${copied_log}" \
+    --evidence-dir "${evidence_dir}" \
+    --offline-only \
     --allow-stopped \
     --json > "${TMP_DIR}/stable-preflight.json"
-python3 - "${TMP_DIR}/stable-preflight.json" "${server_sha}" <<'PY'
+python3 - "${TMP_DIR}/stable-preflight.json" "${server_sha}" "${run_id}" "${window_manifest}" "${copied_log}" "${evidence_dir}" <<'PY'
+from datetime import datetime, timezone
 import json
 import sys
 
-path, server_sha = sys.argv[1:]
+path, server_sha, run_id, window_manifest, copied_log, evidence_dir = sys.argv[1:]
 payload = json.loads(open(path, encoding="utf-8").read())
 assert payload["schema"] == "obelisk.player-principal-lifecycle-preflight.v1"
 assert payload["ready"] is True
 assert payload["mode"] == "stable"
 assert payload["instance"] == "arkserver2"
+assert payload["map"] == "TheIsland"
+assert payload["run_id"] == run_id
+assert payload["target"] == {"instance": "arkserver2", "map": "TheIsland"}
+assert payload["window_manifest_path"] == window_manifest
+assert payload["copied_log_path"] == copied_log
+assert payload["copied_evidence_dir"] == evidence_dir
 assert payload["server_binary"]["sha256"] == server_sha
 assert payload["env_file"] is None
+assert datetime.fromisoformat(payload["checked_at_utc"].removesuffix("Z") + "+00:00").tzinfo == timezone.utc
 assert "not runtime approval" in payload["non_claim"]
 PY
 
@@ -143,22 +162,29 @@ write_observer_env "${observer_env}" "${server_sha}"
 
 "${CHECK}" \
     --instance arkserver2 \
+    --target-map TheIsland \
     --mode observer-window \
     --obelisk-root "${root_window}" \
     --installed-wrapper "${wrapper}" \
     --server-binary "${server_binary}" \
     --expected-binary-sha256 "${server_sha}" \
     --env-file "${observer_env}" \
+    --run-id "${run_id}" \
+    --window-manifest "${window_manifest}" \
+    --copied-log "${copied_log}" \
+    --evidence-dir "${evidence_dir}" \
     --allow-stopped \
     --json > "${TMP_DIR}/observer-preflight.json"
-python3 - "${TMP_DIR}/observer-preflight.json" "${observer_env}" <<'PY'
+python3 - "${TMP_DIR}/observer-preflight.json" "${observer_env}" "${run_id}" <<'PY'
 import hashlib
 import json
 import sys
 
-path, env_path = sys.argv[1:]
+path, env_path, run_id = sys.argv[1:]
 payload = json.loads(open(path, encoding="utf-8").read())
 assert payload["mode"] == "observer-window"
+assert payload["run_id"] == run_id
+assert payload["target"] == {"instance": "arkserver2", "map": "TheIsland"}
 assert payload["env_file"]["path"] == env_path
 assert payload["env_file"]["sha256"] == hashlib.sha256(open(env_path, "rb").read()).hexdigest()
 assert payload["posture_check"] == "accepted"
@@ -368,6 +394,89 @@ assert_fail unsafe-map "${CHECK}" \
     --expected-binary-sha256 "${server_sha}" \
     --allow-stopped
 grep -F 'Invalid map name' "${TMP_DIR}/unsafe-map.err" >/dev/null
+
+assert_fail unsafe-target-map "${CHECK}" \
+    --instance arkserver2 \
+    --target-map 'TheIsland.*' \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --allow-stopped
+grep -F 'Invalid target map name' "${TMP_DIR}/unsafe-target-map.err" >/dev/null
+
+assert_fail partial-binding "${CHECK}" \
+    --instance arkserver2 \
+    --target-map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --run-id "${run_id}" \
+    --allow-stopped
+grep -F 'Evidence binding requires' "${TMP_DIR}/partial-binding.err" >/dev/null
+
+assert_fail bad-run-id "${CHECK}" \
+    --instance arkserver2 \
+    --target-map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --run-id "bad-run" \
+    --window-manifest "${window_manifest}" \
+    --copied-log "${copied_log}" \
+    --evidence-dir "${evidence_dir}" \
+    --allow-stopped
+grep -F 'Invalid run id' "${TMP_DIR}/bad-run-id.err" >/dev/null
+
+assert_fail bad-evidence-dir-shape "${CHECK}" \
+    --instance arkserver2 \
+    --target-map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --run-id "${run_id}" \
+    --window-manifest "${window_manifest}" \
+    --copied-log "${copied_log}" \
+    --evidence-dir "${TMP_DIR}/wrong/${run_id}" \
+    --allow-stopped
+grep -F -- '--evidence-dir must end with live-validation-logs' "${TMP_DIR}/bad-evidence-dir-shape.err" >/dev/null
+
+assert_fail copied-log-mismatch "${CHECK}" \
+    --instance arkserver2 \
+    --target-map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --run-id "${run_id}" \
+    --window-manifest "${window_manifest}" \
+    --copied-log "${evidence_dir}/Other.log" \
+    --evidence-dir "${evidence_dir}" \
+    --allow-stopped
+grep -F -- '--copied-log must equal --evidence-dir/Obelisk.log' "${TMP_DIR}/copied-log-mismatch.err" >/dev/null
+
+assert_fail window-manifest-mismatch "${CHECK}" \
+    --instance arkserver2 \
+    --target-map TheIsland \
+    --mode stable \
+    --obelisk-root "${root_stable}" \
+    --installed-wrapper "${wrapper}" \
+    --server-binary "${server_binary}" \
+    --expected-binary-sha256 "${server_sha}" \
+    --run-id "${run_id}" \
+    --window-manifest "${evidence_dir}/other.env" \
+    --copied-log "${copied_log}" \
+    --evidence-dir "${evidence_dir}" \
+    --allow-stopped
+grep -F -- '--window-manifest must equal --evidence-dir/window-manifest.env' "${TMP_DIR}/window-manifest-mismatch.err" >/dev/null
 
 assert_fail offline-only-live-path "${CHECK}" \
     --instance arkserver2 \

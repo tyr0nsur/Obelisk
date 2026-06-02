@@ -1379,6 +1379,51 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Player-Principal Preflight Sidecar Window Binding
+
+The next supervised round closed the remaining stale/swapped preflight sidecar gap before
+any runtime request. The lead delegated four read-only scopes and kept integration
+ownership:
+
+- preflight JSON schema/binding audit;
+- window manifest and approved-evidence replay audit;
+- live-ops/runtime authorization-safety audit;
+- handoff and knowledge-continuity audit.
+
+Integrated changes:
+
+- `check_player_principal_lifecycle_preflight.sh --json` now accepts evidence-binding
+  inputs for `--run-id`, `--target-map`, `--window-manifest`, `--copied-log`, and
+  `--evidence-dir`/`--copied-evidence-dir`. `--target-map` binds the sidecar target
+  without triggering procfs posture inspection, while `--map` keeps its existing
+  running-process posture meaning.
+- Evidence binding is all-or-nothing: partial binding args fail closed, unsafe target
+  maps fail, and the copied evidence shape must be
+  `.../live-validation-logs/<run-id>/`, with `Obelisk.log` and `window-manifest.env`
+  beside each other under that directory.
+- Structured preflight JSON now records `run_id`, flat legacy `instance`/`map`, canonical
+  `target`, `window_manifest_path`, `copied_log_path`, `copied_evidence_dir`, and
+  `checked_at_utc` in addition to the posture, binary, wrapper, marker, and env fields.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now validates
+  those preflight anchors against the loaded manifest target, run id, resolved manifest
+  path, copied log path, copied evidence directory, and UTC timestamp shape. A stale or
+  swapped preflight sidecar fails even if `preflight_*_sha256` is recomputed in the
+  manifest.
+- Request-pack binding remains separate and indirect through the window manifest sidecar
+  and request-check replay. Do not claim a `request_pack_path` field inside preflight
+  JSON.
+
+Validation:
+
+- `bash scripts/test_check_player_principal_lifecycle_preflight.sh`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence scripts.test_build_player_identity_runtime_principal_lifecycle_approved_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_principal_lifecycle_window_request`
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Player Identity Aggregate Provenance Closure
 
 The next supervised P0 identity round closed the deferred aggregate provenance gap:
@@ -1524,11 +1569,10 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_prepare_player_principal_lifecycle_window_request scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate scripts.test_check_command_permission_route_gate_bound_identity_sources`
 
-Deferred risk: the runtime preflight sidecars are still text sidecars rather than the
-full structured JSON emitted by `check_player_principal_lifecycle_preflight.sh --json`.
-The text path now binds the reviewed binary SHA, but a future guardrail round should
-consider requiring structured JSON sidecars with wrapper/env/marker posture fields before
-approved evidence promotion.
+Closed in later guardrail rounds: runtime preflight sidecars are now structured JSON and
+the later sidecar window-binding round requires run id, target map, copied log, copied
+evidence dir, manifest path, and UTC check timestamp to match the window manifest before
+approved evidence can consume the window.
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,

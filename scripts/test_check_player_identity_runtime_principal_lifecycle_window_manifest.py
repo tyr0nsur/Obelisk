@@ -179,15 +179,28 @@ def preflight_payload(
     *,
     mode: str,
     instance: str,
+    run_id: str = RUN_ID,
+    map_name: str = "TheIsland",
+    window_manifest_path: Path | None = None,
+    copied_log_path: Path | None = None,
     env_file: Path | None = None,
     env_sha256: str | None = None,
 ) -> dict:
+    if window_manifest_path is None:
+        window_manifest_path = Path("/servidor/ark/workspace-offline/live-validation-logs") / run_id / "window-manifest.env"
+    if copied_log_path is None:
+        copied_log_path = Path("/servidor/ark/workspace-offline/live-validation-logs") / run_id / "Obelisk.log"
     return {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
         "ready": True,
         "mode": mode,
+        "run_id": run_id,
         "instance": instance,
-        "map": None,
+        "map": map_name,
+        "target": {"instance": instance, "map": map_name},
+        "window_manifest_path": str(window_manifest_path),
+        "copied_log_path": str(copied_log_path),
+        "copied_evidence_dir": str(copied_log_path.parent),
         "server_binary": {
             "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
             "sha256": ARK_SHA,
@@ -201,6 +214,7 @@ def preflight_payload(
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": True,
+        "checked_at_utc": "2026-06-01T12:00:00Z",
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
     }
@@ -224,6 +238,10 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
         ]
     ) + "\n"
     observer_env_sha256 = hashlib.sha256(observer_env_text.encode("utf-8")).hexdigest()
+    copied_log_path = Path(fields["copied_log_path"])
+    if not copied_log_path.is_absolute():
+        copied_log_path = base / copied_log_path
+    window_manifest_path = base / "window-manifest.env"
     contents = {
         "request_pack": json.dumps(request_pack_payload(fields, base), sort_keys=True) + "\n",
         "observer_env": observer_env_text,
@@ -231,13 +249,28 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
             preflight_payload(
                 mode="observer-window",
                 instance="arkserver2",
+                run_id=fields["run_id"],
+                map_name=fields.get("map") or fields.get("map_name") or fields.get("target", "arkserver2/TheIsland").split("/", 1)[1],
+                window_manifest_path=window_manifest_path,
+                copied_log_path=copied_log_path,
                 env_file=observer_env_path,
                 env_sha256=observer_env_sha256,
             ),
             sort_keys=True,
         )
         + "\n",
-        "preflight_post": json.dumps(preflight_payload(mode="stable", instance="arkserver2"), sort_keys=True) + "\n",
+        "preflight_post": json.dumps(
+            preflight_payload(
+                mode="stable",
+                instance="arkserver2",
+                run_id=fields["run_id"],
+                map_name=fields.get("map") or fields.get("map_name") or fields.get("target", "arkserver2/TheIsland").split("/", 1)[1],
+                window_manifest_path=window_manifest_path,
+                copied_log_path=copied_log_path,
+            ),
+            sort_keys=True,
+        )
+        + "\n",
     }
     key_map = {
         "request_pack": ("request_pack_path", "request_pack_sha256"),
@@ -430,12 +463,15 @@ class WindowManifestCheckerTests(unittest.TestCase):
             observer_env = root / "observer-window.env"
             observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
             observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            copied_log = root / "Obelisk.log"
             preflight_path = root / "preflight-pre.json"
             preflight_path.write_text(
                 json.dumps(
                     preflight_payload(
                         mode="observer-window",
                         instance="arkserver2",
+                        window_manifest_path=manifest_path,
+                        copied_log_path=copied_log,
                         env_file=observer_env,
                         env_sha256=observer_env_sha256,
                     ),
@@ -445,6 +481,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(copied_log),
                 "preflight_pre_path": str(preflight_path),
                 "observer_env_path": str(observer_env),
                 "observer_env_sha256": observer_env_sha256,
@@ -470,17 +508,12 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertEqual([], blockers)
 
     def test_validate_preflight_content_rejects_text_or_wrong_binary_sha(self) -> None:
-        wrong_sha_payload = preflight_payload(mode="observer-window", instance="arkserver2")
-        wrong_sha_payload["server_binary"]["sha256"] = "0" * 64
         for content, expected_reason in (
             (
                 "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
                 "preflight_pre_path_json_invalid",
             ),
-            (
-                json.dumps(wrong_sha_payload, sort_keys=True) + "\n",
-                "preflight_pre_path_binary_sha256_mismatch",
-            ),
+            (None, "preflight_pre_path_binary_sha256_mismatch"),
         ):
             with self.subTest(expected_reason=expected_reason):
                 with tempfile.TemporaryDirectory() as tmp:
@@ -489,9 +522,23 @@ class WindowManifestCheckerTests(unittest.TestCase):
                     observer_env = root / "observer-window.env"
                     observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
                     observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+                    copied_log = root / "Obelisk.log"
                     preflight_path = root / "preflight-pre.json"
+                    if content is None:
+                        wrong_sha_payload = preflight_payload(
+                            mode="observer-window",
+                            instance="arkserver2",
+                            window_manifest_path=manifest_path,
+                            copied_log_path=copied_log,
+                            env_file=observer_env,
+                            env_sha256=observer_env_sha256,
+                        )
+                        wrong_sha_payload["server_binary"]["sha256"] = "0" * 64
+                        content = json.dumps(wrong_sha_payload, sort_keys=True) + "\n"
                     preflight_path.write_text(content, encoding="utf-8")
                     fields = {
+                        "run_id": RUN_ID,
+                        "copied_log_path": str(copied_log),
                         "preflight_pre_path": str(preflight_path),
                         "observer_env_path": str(observer_env),
                         "observer_env_sha256": observer_env_sha256,
@@ -523,12 +570,15 @@ class WindowManifestCheckerTests(unittest.TestCase):
             observer_env = root / "observer-window.env"
             observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
             observer_env_sha256 = hashlib.sha256(observer_env.read_bytes()).hexdigest()
+            copied_log = root / "Obelisk.log"
             preflight_path = root / "preflight-pre.json"
             preflight_path.write_text(
                 json.dumps(
                     preflight_payload(
                         mode="observer-window",
                         instance="arkserver2",
+                        window_manifest_path=manifest_path,
+                        copied_log_path=copied_log,
                         env_file=root / "stale-observer-window.env",
                         env_sha256=observer_env_sha256,
                     ),
@@ -538,6 +588,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(copied_log),
                 "preflight_pre_path": str(preflight_path),
                 "observer_env_path": str(observer_env),
                 "observer_env_sha256": observer_env_sha256,
@@ -1037,6 +1089,64 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("preflight_pre_path_json_invalid", report["blockers"])
         self.assertFalse(report["ready"])
+
+    def test_rejects_preflight_sidecar_anchor_drift_even_with_matching_sha(self) -> None:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        cases = (
+            ("run_id", "20260601T121111Z-player-principal-lifecycle", "preflight_pre_path_run_id_mismatch"),
+            ("map", "Ragnarok", "preflight_pre_path_map_mismatch"),
+            ("target.map", "Ragnarok", "preflight_pre_path_target_map_mismatch"),
+            ("window_manifest_path", "stale/window-manifest.env", "preflight_pre_path_window_manifest_path_mismatch"),
+            ("copied_log_path", "stale/Obelisk.log", "preflight_pre_path_copied_log_path_mismatch"),
+            ("copied_evidence_dir", "stale", "preflight_pre_path_copied_evidence_dir_mismatch"),
+            ("checked_at_utc", "not-utc", "preflight_pre_path_checked_at_utc_invalid"),
+        )
+        for key, value, reason in cases:
+            with self.subTest(reason=reason):
+                with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
+                    root = Path(tmp)
+                    exact_dir = root / "live-validation-logs" / RUN_ID
+                    exact_log = exact_dir / "Obelisk.log"
+                    exact_manifest = exact_dir / "window-manifest.env"
+                    exact_dir.mkdir(parents=True, exist_ok=True)
+                    lines = []
+                    for line in manifest_lines():
+                        if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                            lines.append(f"copied_log_path={exact_log}")
+                        else:
+                            lines.append(line)
+                    fields = dict(line.split("=", 1) for line in lines if "=" in line)
+                    fields = write_sidecars(exact_manifest.parent, fields)
+                    preflight_pre = Path(fields["preflight_pre_path"])
+                    if not preflight_pre.is_absolute():
+                        preflight_pre = exact_manifest.parent / preflight_pre
+                    payload = json.loads(preflight_pre.read_text(encoding="utf-8"))
+                    if key == "target.map":
+                        payload["target"]["map"] = value
+                    else:
+                        payload[key] = value
+                    preflight_pre.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+                    fields["preflight_pre_sha256"] = hashlib.sha256(preflight_pre.read_bytes()).hexdigest()
+                    exact_manifest.write_text(
+                        "\n".join(f"{field_key}={field_value}" for field_key, field_value in fields.items()) + "\n",
+                        encoding="utf-8",
+                    )
+                    exact_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                    )
+
+                report = json.loads(result.stdout)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(reason, report["blockers"])
+                self.assertFalse(report["ready"])
 
     def test_rejects_capture_outside_approved_window_and_bad_rollback_order(self) -> None:
         result = self.run_checker(

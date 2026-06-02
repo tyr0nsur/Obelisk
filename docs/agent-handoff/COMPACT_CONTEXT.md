@@ -114,10 +114,11 @@ priorities, and do not use history files as the active source of truth.
   `lifecycle_anchor_first_evidence_provenance_unbound`. Only an explicit bound-wrapper
   route run may advance the blocker to `approved_runtime_evidence_missing`; that is
   missing runtime principal lifecycle evidence, not readiness or promotion.
-  A remaining offline provenance gap is accepted lifecycle-anchor snapshot binding:
-  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` must be checked against
-  actual `--snapshot-root` file hashes, not only shared source artifact ids, before that
-  bound route should be trusted as the final pre-runtime posture.
+  The accepted lifecycle-anchor snapshot binding gap is closed in the current builder and
+  bound-wrapper route: `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout` source hashes are checked against the actual
+  `--snapshot-root` files before an explicit bound route may advance to
+  `approved_runtime_evidence_missing`.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -813,10 +814,22 @@ priorities, and do not use history files as the active source of truth.
     `obelisk_commit`/binary drift before evidence can be accepted.
   - Window/approved evidence now preserves and validates canonical rollback delta
     `removed_observer_env_and_markers_preserved_disable_plugins`.
-  - Remaining future-only gaps: bind preflight sidecars more strongly to run id/target/map
-    and copied evidence paths, then request an exact current-turn runtime window only if
-    the operator approves it. No runtime/server/marker/env work is authorized by these
-    artifacts.
+- Delegated preflight-provenance round on 2026-06-02 closed the next stale/swapped
+  sidecar gap before any runtime request:
+  - Four read-only sub-agent scopes were lead-delegated and closed: preflight JSON
+    schema/binding, window manifest/evidence replay, live-ops safety, and
+    handoff/knowledge continuity.
+  - `check_player_principal_lifecycle_preflight.sh --json` now accepts all-or-nothing
+    evidence binding via `--run-id`, `--target-map`, `--window-manifest`,
+    `--copied-log`, and `--evidence-dir`/`--copied-evidence-dir`. `--target-map` binds
+    sidecar provenance without triggering procfs posture checks.
+  - Preflight JSON now records run id, target instance/map, copied log, copied evidence
+    dir, window manifest path, and `checked_at_utc`; the window-manifest checker compares
+    those anchors against the resolved manifest and copied log. A stale or swapped
+    preflight sidecar fails even if the outer manifest SHA is refreshed.
+  - Request-pack binding remains indirect through manifest sidecar validation and
+    request-check replay; there is no preflight `request_pack_path` field. No
+    runtime/server/marker/env work is authorized by these artifacts.
 
 ## Agent Coordination
 

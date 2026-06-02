@@ -119,6 +119,10 @@ def preflight_payload(
     *,
     mode: str,
     instance: str,
+    run_id: str,
+    map_name: str,
+    window_manifest_path: Path,
+    copied_log_path: Path,
     env_file: Path | None = None,
     env_sha256: str | None = None,
 ) -> str:
@@ -126,8 +130,13 @@ def preflight_payload(
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
         "ready": True,
         "mode": mode,
+        "run_id": run_id,
         "instance": instance,
-        "map": None,
+        "map": map_name,
+        "target": {"instance": instance, "map": map_name},
+        "window_manifest_path": str(window_manifest_path),
+        "copied_log_path": str(copied_log_path),
+        "copied_evidence_dir": str(copied_log_path.parent),
         "server_binary": {
             "path": "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer",
             "sha256": SHA,
@@ -141,6 +150,7 @@ def preflight_payload(
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": True,
+        "checked_at_utc": "2026-06-01T12:00:00Z",
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
     }
@@ -215,13 +225,24 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         preflight_payload(
             mode="observer-window",
             instance="arkserver2",
+            run_id=RUN_ID,
+            map_name="TheIsland",
+            window_manifest_path=manifest_path,
+            copied_log_path=copied_log,
             env_file=observer_env_path,
             env_sha256=observer_env["sha256"],
         ),
     )
     preflight_post = write_sidecar(
         preflight_post_path,
-        preflight_payload(mode="stable", instance="arkserver2"),
+        preflight_payload(
+            mode="stable",
+            instance="arkserver2",
+            run_id=RUN_ID,
+            map_name="TheIsland",
+            window_manifest_path=manifest_path,
+            copied_log_path=copied_log,
+        ),
     )
     manifest = write_sidecar(
         manifest_path,

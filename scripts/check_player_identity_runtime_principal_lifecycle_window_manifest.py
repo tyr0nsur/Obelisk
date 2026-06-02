@@ -455,6 +455,76 @@ def validate_preflight_content(
         add(blockers, f"{path_key}_mode_mismatch", path_key, expected=expected_mode, actual=payload.get("mode"))
     if payload.get("instance") != target.instance:
         add(blockers, f"{path_key}_instance_mismatch", path_key, expected=target.instance, actual=payload.get("instance"))
+    if payload.get("run_id") != fields.get("run_id"):
+        add(blockers, f"{path_key}_run_id_mismatch", path_key, expected=fields.get("run_id"), actual=payload.get("run_id"))
+    if payload.get("map") != target.map_name:
+        add(blockers, f"{path_key}_map_mismatch", path_key, expected=target.map_name, actual=payload.get("map"))
+
+    preflight_target = payload.get("target")
+    if not isinstance(preflight_target, dict):
+        add(blockers, f"{path_key}_target_missing", path_key)
+    else:
+        if preflight_target.get("instance") != target.instance:
+            add(
+                blockers,
+                f"{path_key}_target_instance_mismatch",
+                path_key,
+                expected=target.instance,
+                actual=preflight_target.get("instance"),
+            )
+        if preflight_target.get("map") != target.map_name:
+            add(
+                blockers,
+                f"{path_key}_target_map_mismatch",
+                path_key,
+                expected=target.map_name,
+                actual=preflight_target.get("map"),
+            )
+
+    checked_at_utc = payload.get("checked_at_utc")
+    if not isinstance(checked_at_utc, str) or UTC_TIMESTAMP_RE.fullmatch(checked_at_utc) is None:
+        add(blockers, f"{path_key}_checked_at_utc_invalid", path_key, actual=checked_at_utc)
+
+    manifest_status = protected_paths.protected_path_status(
+        manifest_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    expected_manifest_path = str(manifest_status.resolved)
+    if payload.get("window_manifest_path") != expected_manifest_path:
+        add(
+            blockers,
+            f"{path_key}_window_manifest_path_mismatch",
+            path_key,
+            expected=expected_manifest_path,
+            actual=payload.get("window_manifest_path"),
+        )
+
+    copied_log_text = fields.get("copied_log_path")
+    if copied_log_text:
+        copied_log_status = protected_paths.protected_path_status(
+            manifest_relative_path(copied_log_text, manifest_path),
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        expected_copied_log_path = str(copied_log_status.resolved)
+        expected_evidence_dir = str(copied_log_status.resolved.parent)
+        if payload.get("copied_log_path") != expected_copied_log_path:
+            add(
+                blockers,
+                f"{path_key}_copied_log_path_mismatch",
+                path_key,
+                expected=expected_copied_log_path,
+                actual=payload.get("copied_log_path"),
+            )
+        if payload.get("copied_evidence_dir") != expected_evidence_dir:
+            add(
+                blockers,
+                f"{path_key}_copied_evidence_dir_mismatch",
+                path_key,
+                expected=expected_evidence_dir,
+                actual=payload.get("copied_evidence_dir"),
+            )
 
     server_binary = payload.get("server_binary")
     if not isinstance(server_binary, dict):

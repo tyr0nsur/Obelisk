@@ -177,3 +177,11 @@ This file is an active routing table only. Durable evidence belongs in
   handoff continuity. Integrated result: request packs now include a validated
   operator-live-ops brief, forbid the inventory-action observer marker, bind request-pack
   commit/binary fields to the window manifest, and preserve canonical rollback delta.
+- Latest preflight-provenance round used four lead-scoped read-only agents: preflight
+  JSON schema/binding, window manifest/evidence replay, live-ops safety, and handoff
+  continuity. Integrated result: `check_player_principal_lifecycle_preflight.sh --json`
+  can bind `run_id`, target map, copied log, evidence dir, window manifest path, and
+  `checked_at_utc`; the window-manifest checker now rejects stale or swapped preflight
+  sidecars even when their outer manifest SHA is refreshed. Request-pack binding remains
+  indirect through manifest sidecar validation and request-check replay, not a preflight
+  JSON field.

@@ -13,12 +13,17 @@ start, stop, restart, or modify ARK/Obelisk state.
 Options:
   --instance <id>                 Obelisk instance id. Required.
   --map <name>                    Map prefix for running-process posture checks.
+  --target-map <name>             Target map to bind into --json sidecar without procfs checks.
   --mode <stable|observer-window> Marker posture to verify. Default: stable.
   --obelisk-root <path>           Obelisk root. Default: /servidor/ark/obelisk.
   --installed-wrapper <path>      Installed LinuxGSM wrapper path.
   --server-binary <path>          ShooterGameServer binary path.
   --expected-binary-sha256 <sha>  Required ShooterGameServer SHA256.
   --env-file <path>               Effective key=value env snapshot for observer-window mode.
+  --run-id <id>                   Runtime window run id to bind into --json sidecar.
+  --window-manifest <path>        Expected copied window manifest path for --json sidecar.
+  --copied-log <path>             Expected copied Obelisk log path for --json sidecar.
+  --evidence-dir <path>           Expected copied evidence directory for --json sidecar.
   --proc-root <path>              Procfs root for posture checks. Default: /proc.
   --allow-stopped                 Accept no running process after marker/SHA checks.
   --offline-only                  Reject live server paths and running-process checks.
@@ -29,12 +34,17 @@ EOF
 
 INSTANCE=""
 MAP=""
+TARGET_MAP=""
 MODE="stable"
 OBELISK_ROOT="/servidor/ark/obelisk"
 INSTALLED_WRAPPER="/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ObeliskRun.sh"
 SERVER_BINARY="/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
 EXPECTED_BINARY_SHA256=""
 ENV_FILE=""
+RUN_ID=""
+WINDOW_MANIFEST=""
+COPIED_LOG=""
+EVIDENCE_DIR=""
 PROC_ROOT="/proc"
 ALLOW_STOPPED=0
 OFFLINE_ONLY=0
@@ -50,6 +60,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --map)
             MAP="${2:?missing map}"
+            shift 2
+            ;;
+        --target-map)
+            TARGET_MAP="${2:?missing target map}"
             shift 2
             ;;
         --mode)
@@ -74,6 +88,22 @@ while [[ $# -gt 0 ]]; do
             ;;
         --env-file)
             ENV_FILE="${2:?missing env file}"
+            shift 2
+            ;;
+        --run-id)
+            RUN_ID="${2:?missing run id}"
+            shift 2
+            ;;
+        --window-manifest)
+            WINDOW_MANIFEST="${2:?missing window manifest path}"
+            shift 2
+            ;;
+        --copied-log)
+            COPIED_LOG="${2:?missing copied log path}"
+            shift 2
+            ;;
+        --evidence-dir|--copied-evidence-dir)
+            EVIDENCE_DIR="${2:?missing evidence directory path}"
             shift 2
             ;;
         --proc-root)
@@ -109,6 +139,54 @@ done
 if [[ -n "${MAP}" && ! "${MAP}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
     echo "Invalid map name: ${MAP}" >&2
     exit 1
+fi
+if [[ -n "${TARGET_MAP}" && ! "${TARGET_MAP}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+    echo "Invalid target map name: ${TARGET_MAP}" >&2
+    exit 1
+fi
+if [[ -n "${MAP}" && -n "${TARGET_MAP}" && "${MAP}" != "${TARGET_MAP}" ]]; then
+    echo "--map and --target-map must match when both are supplied." >&2
+    exit 1
+fi
+if [[ -n "${RUN_ID}" && ! "${RUN_ID}" =~ ^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$ ]]; then
+    echo "Invalid run id: ${RUN_ID}" >&2
+    exit 1
+fi
+EFFECTIVE_TARGET_MAP="${TARGET_MAP:-${MAP}}"
+
+binding_count=0
+for binding_value in "${RUN_ID}" "${TARGET_MAP}" "${WINDOW_MANIFEST}" "${COPIED_LOG}" "${EVIDENCE_DIR}"; do
+    if [[ -n "${binding_value}" ]]; then
+        binding_count=$((binding_count + 1))
+    fi
+done
+binding_complete=0
+if [[ "${binding_count}" -eq 5 ]]; then
+    binding_complete=1
+elif [[ "${binding_count}" -eq 4 && -n "${MAP}" && -z "${TARGET_MAP}" ]]; then
+    binding_complete=1
+fi
+if [[ "${binding_count}" -ne 0 && "${binding_complete}" -ne 1 ]]; then
+    echo "Evidence binding requires --run-id, --target-map or matching --map, --window-manifest, --copied-log, and --evidence-dir together." >&2
+    exit 2
+fi
+if [[ "${binding_complete}" -eq 1 ]]; then
+    case "${EVIDENCE_DIR}" in
+        */live-validation-logs/"${RUN_ID}")
+            ;;
+        *)
+            echo "--evidence-dir must end with live-validation-logs/${RUN_ID}." >&2
+            exit 1
+            ;;
+    esac
+    if [[ "${COPIED_LOG}" != "${EVIDENCE_DIR%/}/Obelisk.log" ]]; then
+        echo "--copied-log must equal --evidence-dir/Obelisk.log." >&2
+        exit 1
+    fi
+    if [[ "${WINDOW_MANIFEST}" != "${EVIDENCE_DIR%/}/window-manifest.env" ]]; then
+        echo "--window-manifest must equal --evidence-dir/window-manifest.env." >&2
+        exit 1
+    fi
 fi
 [[ "${MODE}" == "stable" || "${MODE}" == "observer-window" ]] || {
     echo "--mode must be stable or observer-window." >&2
@@ -450,6 +528,15 @@ if [[ "${OFFLINE_ONLY}" == "1" ]]; then
     if [[ -n "${ENV_FILE}" ]]; then
         reject_protected_live_path "Env file" "${ENV_FILE}"
     fi
+    if [[ -n "${WINDOW_MANIFEST}" ]]; then
+        reject_protected_live_path "Window manifest" "${WINDOW_MANIFEST}"
+    fi
+    if [[ -n "${COPIED_LOG}" ]]; then
+        reject_protected_live_path "Copied log" "${COPIED_LOG}"
+    fi
+    if [[ -n "${EVIDENCE_DIR}" ]]; then
+        reject_protected_live_path "Evidence directory" "${EVIDENCE_DIR}"
+    fi
     if [[ -n "${MAP}" ]]; then
         echo "--offline-only rejects --map because it would inspect live process posture." >&2
         exit 1
@@ -537,7 +624,7 @@ fi
 if [[ "${JSON_OUTPUT}" == "1" ]]; then
     export OBELISK_PREFLIGHT_MODE="${MODE}"
     export OBELISK_PREFLIGHT_INSTANCE="${INSTANCE}"
-    export OBELISK_PREFLIGHT_MAP="${MAP}"
+    export OBELISK_PREFLIGHT_MAP="${EFFECTIVE_TARGET_MAP}"
     export OBELISK_PREFLIGHT_BINARY="${SERVER_BINARY}"
     export OBELISK_PREFLIGHT_BINARY_SHA="${actual_sha}"
     export OBELISK_PREFLIGHT_ROOT="${OBELISK_ROOT}"
@@ -545,12 +632,17 @@ if [[ "${JSON_OUTPUT}" == "1" ]]; then
     export OBELISK_PREFLIGHT_WRAPPER_SHA="${wrapper_sha}"
     export OBELISK_PREFLIGHT_ENV="${ENV_FILE}"
     export OBELISK_PREFLIGHT_ENV_SHA="${env_sha}"
+    export OBELISK_PREFLIGHT_RUN_ID="${RUN_ID}"
+    export OBELISK_PREFLIGHT_WINDOW_MANIFEST="${WINDOW_MANIFEST}"
+    export OBELISK_PREFLIGHT_COPIED_LOG="${COPIED_LOG}"
+    export OBELISK_PREFLIGHT_EVIDENCE_DIR="${EVIDENCE_DIR}"
     export OBELISK_PREFLIGHT_MARKER_DIR="${MARKER_DIR}"
     export OBELISK_PREFLIGHT_OFFLINE_ONLY="${OFFLINE_ONLY}"
     export OBELISK_PREFLIGHT_ALLOW_STOPPED="${ALLOW_STOPPED}"
     python3 - <<'PY'
 import json
 import os
+from datetime import datetime, timezone
 
 def optional_file(path: str, sha256: str) -> dict | None:
     if not path:
@@ -561,8 +653,16 @@ payload = {
     "schema": "obelisk.player-principal-lifecycle-preflight.v1",
     "ready": True,
     "mode": os.environ["OBELISK_PREFLIGHT_MODE"],
+    "run_id": os.environ["OBELISK_PREFLIGHT_RUN_ID"] or None,
     "instance": os.environ["OBELISK_PREFLIGHT_INSTANCE"],
     "map": os.environ["OBELISK_PREFLIGHT_MAP"] or None,
+    "target": {
+        "instance": os.environ["OBELISK_PREFLIGHT_INSTANCE"],
+        "map": os.environ["OBELISK_PREFLIGHT_MAP"] or None,
+    },
+    "window_manifest_path": os.environ["OBELISK_PREFLIGHT_WINDOW_MANIFEST"] or None,
+    "copied_log_path": os.environ["OBELISK_PREFLIGHT_COPIED_LOG"] or None,
+    "copied_evidence_dir": os.environ["OBELISK_PREFLIGHT_EVIDENCE_DIR"] or None,
     "server_binary": {
         "path": os.environ["OBELISK_PREFLIGHT_BINARY"],
         "sha256": os.environ["OBELISK_PREFLIGHT_BINARY_SHA"],
@@ -579,6 +679,7 @@ payload = {
     "marker_dir": os.environ["OBELISK_PREFLIGHT_MARKER_DIR"],
     "offline_only": os.environ["OBELISK_PREFLIGHT_OFFLINE_ONLY"] == "1",
     "allow_stopped": os.environ["OBELISK_PREFLIGHT_ALLOW_STOPPED"] == "1",
+    "checked_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     "posture_check": "accepted",
     "non_claim": "preflight only; not runtime approval and not permission to touch servers",
 }
