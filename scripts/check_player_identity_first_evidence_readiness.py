@@ -2201,6 +2201,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         downstream_blockers.append("principal_invalidation_semantics_unresolved")
     if lifecycle_ready and principal_invalidation_ready and not approved_runtime_evidence_ready:
         downstream_blockers.append("approved_runtime_evidence_missing")
+    if lifecycle_ready and principal_invalidation_ready and approved_runtime_evidence_ready:
+        downstream_blockers.append("identity_public_contract_gate_missing")
     if not public_contract_gap_diagnosis.get("ready"):
         downstream_blockers.append("identity_public_contract_gap_report_invalid")
     if inventory_ready:

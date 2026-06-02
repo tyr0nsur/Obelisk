@@ -45,11 +45,7 @@ REQUIRED_PLANNING_ONLY_CHECKS = {
     "command_chat_response_public_readiness",
     "commands_replies_public_readiness",
 }
-ALLOWED_CRITICAL_PATH_BLOCKERS = {
-    "approved_runtime_evidence_missing",
-    "identity_public_contract_gate",
-    "identity_public_contract_gate_missing",
-}
+CURRENT_CRITICAL_PATH_BLOCKER = "approved_runtime_evidence_missing"
 FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "promotion_ready",
     "public_sdk_ready",
@@ -377,7 +373,7 @@ def build_critical_path_phase() -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         parse_error = f"stdout_json_decode_error: {exc}"
 
-    current_blocker = "approved_runtime_evidence_missing"
+    current_blocker = CURRENT_CRITICAL_PATH_BLOCKER
     if report is not None:
         current_blocker = (
             report.get("primary_blocker")
@@ -413,8 +409,10 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_schema_mismatch")
     if phase.get("source_checker_parse_error") is not None:
         blockers.append("critical_path_identity_readiness_output_invalid")
-    if phase.get("current_blocker") not in ALLOWED_CRITICAL_PATH_BLOCKERS:
+    if phase.get("current_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
+    if phase.get("current_blocker") in {"identity_public_contract_gate", "identity_public_contract_gate_missing"}:
+        blockers.append("critical_path_runtime_evidence_blocker_must_remain_current")
     for key in (
         "permissions_admin_unlocked",
         "command_response_unlocked",

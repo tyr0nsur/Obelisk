@@ -131,10 +131,21 @@ This file is an active routing table only. Durable evidence belongs in
   file itself and does not reopen temp-path provenance. Route gate remains planning-only
   and still blocks at `approved_runtime_evidence_missing`; SDK completion remains
   fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
-- Deferred audited guardrail: structure build-policy offline intake should validate
-  manifest-level `obelisk.structure_census.v1` surface status/list placement/support tier
-  and public-contract posture so a manifest-only promotion overclaim cannot pass the
-  consume-only structure checker.
+- 2026-06-02 Structure/P0/ResourceHandle guardrail hardening: structure build-policy
+  offline intake now validates manifest-level `obelisk.structure_census.v1` posture
+  against promoted/planning list placement, `status=planning`, `support_tier=blocked`, and
+  empty public/ABI contract posture. Player-identity first-evidence now keeps
+  `identity_public_contract_gate_missing` as a top-level blocker after approved runtime
+  evidence, so accepted runtime evidence cannot make the checker `ready=true` before
+  public contract review. The command/permission route gate rejects child-reported
+  identity contract gates as premature current-route blockers and stays pinned to
+  `approved_runtime_evidence_missing` in the current route. ResourceHandle readiness now
+  scans decisions text for positive public ResourceHandle/object lookup/post-callback
+  claims. These remain offline guardrails only; no runtime, public SDK, Structure SDK,
+  ResourceHandle, identity, or v1 completion readiness is promoted.
+- Deferred audited guardrail: inventory copied-signal stability should scan top-level and
+  adjacent `docs/public_sdk_surfaces.json` text for positive Inventory/Items SDK side-lane
+  claims, not only the `obelisk.inventory_item_copied_signals.v1` surface row.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

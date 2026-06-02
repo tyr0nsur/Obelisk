@@ -71,6 +71,27 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
         self.assertIn("public_resource_handle_ready_not_false", report["blockers"])
         self.assertIn("required_public_contract_not_empty", report["blockers"])
 
+    def test_rejects_positive_resource_handle_claim_in_decisions_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["release_claim"] = (
+                "ResourceHandle ready for public SDK lookup and post-callback object correlation."
+            )
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("decisions_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
     def test_rejects_public_sdk_surface_promotion_or_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

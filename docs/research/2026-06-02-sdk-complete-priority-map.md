@@ -327,3 +327,58 @@ Remaining focused offline finding:
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Structure SDK, release readiness, or a stable SDK claim.
+
+## Structure, P0 Route, And ResourceHandle Text Guardrails
+
+The next supervised round closed three additional offline overclaim paths:
+
+- `scripts/check_structure_build_policy_offline_intake.py` now validates the
+  manifest-level `obelisk.structure_census.v1` surface posture, not only the nested
+  structure build-policy report. It rejects placement in `promoted_surfaces`, absence from
+  `planning_surfaces`, status/support-tier drift away from `planning`/`blocked`, and
+  non-empty public contract, public ABI, or ABI contract posture.
+- `scripts/check_player_identity_first_evidence_readiness.py` now adds
+  `identity_public_contract_gate_missing` as a top-level blocker after approved runtime
+  principal lifecycle evidence is accepted. Approved runtime evidence can clear
+  `approved_runtime_evidence_missing`, but it cannot make the first-evidence checker
+  `ready=true` before reviewed public contract work.
+- `scripts/check_command_permission_route_gate.py` now rejects child-reported
+  `identity_public_contract_gate` or `identity_public_contract_gate_missing` as the
+  current route blocker. The current route remains pinned to
+  `approved_runtime_evidence_missing` until the route gate is explicitly updated with
+  reviewed public-contract evidence.
+- `scripts/check_object_identity_resource_handle_public_contract_readiness.py` now scans
+  decisions-manifest text for positive ResourceHandle/object identity/object lookup or
+  post-callback correlation claims, closing a gap where only the public SDK surface row
+  and public events were text-scanned.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_command_permission_route_gate scripts.test_check_structure_build_policy_offline_intake`
+  passed with 70 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+  passed with 9 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_structure_build_policy_offline_intake.py --json`
+  passed as planning-only Structure build-policy intake with public SDK/runtime/enforcement
+  readiness false.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+  passed as planning-only with ResourceHandle/object identity still blocked.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+Remaining focused offline finding:
+
+- `scripts/check_inventory_item_copied_signals_stability.py` should scan top-level and
+  adjacent `docs/public_sdk_surfaces.json` text for positive Inventory/Items SDK
+  side-lane claims. Current scanning catches forbidden public claim terms inside the
+  inventory copied-signal surface row and readiness booleans across the manifest, but a
+  crafted top-level text such as an inventory SDK release note can still overstate the
+  no-core side lane.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Structure SDK, ResourceHandle, Inventory SDK, release readiness, or a
+stable SDK claim.

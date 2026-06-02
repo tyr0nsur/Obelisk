@@ -271,9 +271,26 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
 
     def manifest_payload(self, readiness: Path, sha256: str) -> dict[str, Any]:
         return {
+            "promoted_surfaces": [
+                "obelisk.lifecycle_config_logging.v1",
+                "obelisk.descriptors.v1",
+                "obelisk.process_local_timers.v1",
+            ],
+            "planning_surfaces": [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+                "obelisk.structure_census.v1",
+                "obelisk.mission_transfer_dino_tribe.v1",
+            ],
             "surfaces": [
                 {
                     "id": "obelisk.structure_census.v1",
+                    "category": "structure observer and build policy",
+                    "status": "planning",
+                    "support_tier": "blocked",
+                    "public_contract": [],
                     "evidence": {
                         "offline_readiness_reports": [
                             {
@@ -355,6 +372,72 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertEqual(payload["non_claim_matrix"]["enforcement"], "not_claimed")
         self.assertEqual(payload["non_claim_matrix"]["runtime_hooks"], "not_claimed")
         self.assertEqual(payload["blockers"], [])
+
+    def test_manifest_surface_posture_overclaims_fail_closed(self) -> None:
+        cases = [
+            (
+                "promoted_surfaces",
+                lambda payload: payload["promoted_surfaces"].append("obelisk.structure_census.v1"),
+                "structure_surface_in_promoted_surfaces",
+            ),
+            (
+                "planning_surfaces",
+                lambda payload: payload["planning_surfaces"].remove("obelisk.structure_census.v1"),
+                "structure_surface_missing_from_planning_surfaces",
+            ),
+            (
+                "status",
+                lambda payload: payload["surfaces"][0].__setitem__("status", "promoted"),
+                "surface_status_mismatch",
+            ),
+            (
+                "support_tier",
+                lambda payload: payload["surfaces"][0].__setitem__("support_tier", "release-supported foundation"),
+                "surface_support_tier_mismatch",
+            ),
+            (
+                "public_contract",
+                lambda payload: payload["surfaces"][0].__setitem__(
+                    "public_contract", ["ObeliskApi.RegisterStructureCensusCallback"]
+                ),
+                "surface_public_contract_not_empty",
+            ),
+            (
+                "public_abi",
+                lambda payload: payload["surfaces"][0].__setitem__("public_abi", "RegisterStructureCensusCallback"),
+                "surface_public_abi_not_false",
+            ),
+            (
+                "abi_contract",
+                lambda payload: payload["surfaces"][0].__setitem__(
+                    "abi_contract", ["append_only_abi"]
+                ),
+                "surface_abi_contract_not_empty",
+            ),
+        ]
+        for key, mutate, blocker in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    readiness_payload = self.readiness_payload()
+                    readiness = root / "readiness.json"
+                    readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+                    manifest_payload = self.manifest_payload(
+                        readiness,
+                        hashlib.sha256(readiness.read_bytes()).hexdigest(),
+                    )
+                    mutate(manifest_payload)
+                    manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
+                    result = self.run_checker("--manifest", str(manifest), "--json", check=False)
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertFalse(payload["ready"])
+                self.assertIn(blocker, {item["reason"] for item in payload["blockers"]})
+                self.assertFalse(payload["promotion_ready"])
+                self.assertFalse(payload["public_sdk_ready"])
+                self.assertFalse(payload["runtime_ready"])
+                self.assertFalse(payload["enforcement_ready"])
 
     def test_manifest_target_status_totals_flags_and_non_claim_drift_fail_closed(self) -> None:
         cases = [

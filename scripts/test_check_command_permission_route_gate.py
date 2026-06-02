@@ -144,7 +144,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 any("player_identity_public_contract_gap" in blocker for blocker in report["blockers"])
             )
 
-    def test_critical_path_phase_accepts_identity_runtime_and_contract_blockers(self) -> None:
+    def test_critical_path_phase_accepts_only_current_runtime_evidence_blocker(self) -> None:
         phase = {
             "current_surface": "obelisk.player_identity.v1",
             "current_blocker": "approved_runtime_evidence_missing",
@@ -161,10 +161,14 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
 
         phase["current_blocker"] = "identity_public_contract_gate_missing"
-        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
+        self.assertIn("critical_path_runtime_evidence_blocker_must_remain_current", blockers)
 
         phase["current_blocker"] = "identity_public_contract_gate"
-        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
+        self.assertIn("critical_path_runtime_evidence_blocker_must_remain_current", blockers)
 
     def test_critical_path_phase_rejects_unlocked_commands_or_unknown_blocker(self) -> None:
         phase = {

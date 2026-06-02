@@ -171,6 +171,20 @@ def walk_surface_text_claims(value: Any, blockers: list[str], trail: str) -> Non
                 blockers.append(f"surface_positive_resource_handle_claim:{trail}[clause:{clause_index}]")
 
 
+def walk_decisions_text_claims(value: Any, blockers: list[str], trail: str) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            walk_decisions_text_claims(child, blockers, f"{trail}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            walk_decisions_text_claims(child, blockers, f"{trail}[{index}]")
+    elif isinstance(value, str):
+        for clause_index, clause in enumerate(re.split(r"[.;\n]+", value)):
+            normalized = clause.strip()
+            if normalized and positive_surface_text_claim(normalized):
+                blockers.append(f"decisions_positive_resource_handle_claim:{trail}[clause:{clause_index}]")
+
+
 def surface_entry(surfaces: Any, blockers: list[str]) -> dict[str, Any] | None:
     entries = surfaces.get("surfaces") if isinstance(surfaces, dict) else None
     if not isinstance(entries, list):
@@ -214,6 +228,7 @@ def validate_decisions(decisions: Any, blockers: list[str]) -> None:
         missing = [claim for claim in REQUIRED_NON_CLAIMS if claim not in non_claims]
         if missing:
             blockers.append("required_non_claims_missing")
+    walk_decisions_text_claims(decisions, blockers, "$.decisions")
 
 
 def validate_surface(surfaces: Any, blockers: list[str]) -> None:

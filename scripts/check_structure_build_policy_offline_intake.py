@@ -21,6 +21,8 @@ READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 SURFACE_ID = "obelisk.structure_census.v1"
 TARGET_SET = "structure-build-policy-offline-intake"
+EXPECTED_SURFACE_STATUS = "planning"
+EXPECTED_SURFACE_SUPPORT_TIER = "blocked"
 EXPECTED_STATUS = "planning-layout-second-source-accepted"
 EXPECTED_READINESS_ENVELOPE = {
     "evidence_scope": "second_source_layout_evidence_only",
@@ -440,6 +442,65 @@ def find_report_entry(surface: dict[str, Any], blockers: list[dict[str, Any]]) -
         add(blockers, "offline_readiness_report_match_count_mismatch", expected=1, value=len(matches))
         return None
     return matches[0]
+
+
+def manifest_string_list(manifest: dict[str, Any], key: str) -> set[str]:
+    value = manifest.get(key)
+    if not isinstance(value, list):
+        return set()
+    return {item for item in value if isinstance(item, str)}
+
+
+def is_non_empty_posture(value: Any) -> bool:
+    if value is None or value is False:
+        return False
+    if isinstance(value, (list, dict, str, tuple, set)):
+        return bool(value)
+    return value is True
+
+
+def validate_surface_manifest_posture(
+    manifest: dict[str, Any],
+    surface: dict[str, Any] | None,
+    blockers: list[dict[str, Any]],
+) -> None:
+    promoted_surfaces = manifest_string_list(manifest, "promoted_surfaces")
+    planning_surfaces = manifest_string_list(manifest, "planning_surfaces")
+
+    if SURFACE_ID in promoted_surfaces:
+        add(blockers, "structure_surface_in_promoted_surfaces", surface=SURFACE_ID)
+    if SURFACE_ID not in planning_surfaces:
+        add(blockers, "structure_surface_missing_from_planning_surfaces", surface=SURFACE_ID)
+
+    if surface is None:
+        return
+
+    if surface.get("status") != EXPECTED_SURFACE_STATUS:
+        add(
+            blockers,
+            "surface_status_mismatch",
+            surface=SURFACE_ID,
+            expected=EXPECTED_SURFACE_STATUS,
+            value=surface.get("status"),
+        )
+    if surface.get("support_tier") != EXPECTED_SURFACE_SUPPORT_TIER:
+        add(
+            blockers,
+            "surface_support_tier_mismatch",
+            surface=SURFACE_ID,
+            expected=EXPECTED_SURFACE_SUPPORT_TIER,
+            value=surface.get("support_tier"),
+        )
+
+    public_contract = surface.get("public_contract")
+    if is_non_empty_posture(public_contract):
+        add(blockers, "surface_public_contract_not_empty", surface=SURFACE_ID, value=public_contract)
+    public_abi = surface.get("public_abi")
+    if is_non_empty_posture(public_abi):
+        add(blockers, "surface_public_abi_not_false", surface=SURFACE_ID, value=public_abi)
+    abi_contract = surface.get("abi_contract")
+    if is_non_empty_posture(abi_contract):
+        add(blockers, "surface_abi_contract_not_empty", surface=SURFACE_ID, value=abi_contract)
 
 
 def missing_tokens(text: str, tokens: tuple[str, ...]) -> list[str]:
@@ -1150,6 +1211,7 @@ def main() -> int:
 
     if manifest is not None:
         surface = find_surface(manifest, blockers)
+        validate_surface_manifest_posture(manifest, surface, blockers)
     if surface is not None:
         entry = find_report_entry(surface, blockers)
         validate_candidate_manifest(surface, blockers)
