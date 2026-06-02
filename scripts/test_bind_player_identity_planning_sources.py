@@ -32,6 +32,14 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def align_lifecycle_to_first_evidence(lifecycle: dict, first_evidence: dict) -> dict:
+    lifecycle = json.loads(json.dumps(lifecycle))
+    lifecycle["artifact_identity"]["source_artifact_ids"] = first_evidence["artifact_identity"][
+        "source_artifact_ids"
+    ]
+    return lifecycle
+
+
 class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
     def run_tool(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
@@ -86,7 +94,7 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
             principal_path = root / "principal.json"
             output_dir = root / "bound"
             write_json(first_path, first_evidence)
-            write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+            write_json(lifecycle_path, align_lifecycle_to_first_evidence(accepted_lifecycle_anchor_manifest(), first_evidence))
             write_json(principal_path, principal_policy_manifest())
 
             result = self.run_tool(
@@ -159,6 +167,7 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
             principal_path = root / "principal.json"
             output_dir = root / "bound"
             lifecycle = accepted_lifecycle_anchor_manifest()
+            lifecycle = align_lifecycle_to_first_evidence(lifecycle, players_identity_first_evidence_manifest())
             lifecycle["server_operations_authorized"] = True
             lifecycle["principal_policy"]["note"] = "runtime ready and commands enabled"
             write_json(first_path, players_identity_first_evidence_manifest())
@@ -194,7 +203,7 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
             principal_path = root / "principal.json"
             output_dir = root / "bound"
             write_json(first_path, first_evidence)
-            write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+            write_json(lifecycle_path, align_lifecycle_to_first_evidence(accepted_lifecycle_anchor_manifest(), first_evidence))
             write_json(principal_path, principal_policy_manifest())
 
             result = self.run_tool(
@@ -222,7 +231,13 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
             lifecycle_path = root / "lifecycle.json"
             principal_path = root / "principal.json"
             write_json(first_path, players_identity_first_evidence_manifest())
-            write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+            write_json(
+                lifecycle_path,
+                align_lifecycle_to_first_evidence(
+                    accepted_lifecycle_anchor_manifest(),
+                    players_identity_first_evidence_manifest(),
+                ),
+            )
             write_json(principal_path, principal_policy_manifest())
 
             result = self.run_tool(
@@ -241,6 +256,105 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("must not write under protected server root", result.stderr)
+
+    def test_rejects_stale_lifecycle_source_artifact_ids_before_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first_path = root / "first-evidence.json"
+            lifecycle_path = root / "lifecycle.json"
+            principal_path = root / "principal.json"
+            output_dir = root / "bound"
+            write_json(first_path, players_identity_first_evidence_manifest())
+            write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+            write_json(principal_path, principal_policy_manifest())
+
+            result = self.run_tool(
+                [
+                    "--first-evidence",
+                    str(first_path),
+                    "--lifecycle-anchor-candidates",
+                    str(lifecycle_path),
+                    "--principal-invalidation-policy",
+                    str(principal_path),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("failed prebind provenance", result.stderr)
+        self.assertIn("lifecycle_anchor_source_artifact_ids_mismatch", result.stderr)
+        self.assertFalse(output_dir.exists())
+
+    def test_rejects_principal_anchor_mismatch_before_binding(self) -> None:
+        first_evidence = players_identity_first_evidence_manifest()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first_path = root / "first-evidence.json"
+            lifecycle_path = root / "lifecycle.json"
+            principal_path = root / "principal.json"
+            output_dir = root / "bound"
+            principal = principal_policy_manifest()
+            principal["lifecycle_layout_source"]["start_anchor"] = "ShooterGameMode.CheckJoinInProgress"
+            write_json(first_path, first_evidence)
+            write_json(lifecycle_path, align_lifecycle_to_first_evidence(accepted_lifecycle_anchor_manifest(), first_evidence))
+            write_json(principal_path, principal)
+
+            result = self.run_tool(
+                [
+                    "--first-evidence",
+                    str(first_path),
+                    "--lifecycle-anchor-candidates",
+                    str(lifecycle_path),
+                    "--principal-invalidation-policy",
+                    str(principal_path),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_start_anchor_not_accepted_by_lifecycle", result.stderr)
+        self.assertFalse(output_dir.exists())
+
+    def test_rejects_principal_lifecycle_source_binding_mismatch_before_binding(self) -> None:
+        first_evidence = players_identity_first_evidence_manifest()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first_path = root / "first-evidence.json"
+            lifecycle_path = root / "lifecycle.json"
+            principal_path = root / "principal.json"
+            output_dir = root / "bound"
+            principal = principal_policy_manifest()
+            principal["lifecycle_layout_source"]["source_binding"] = {
+                "lifecycle_manifest_schema": "obelisk.players-identity-lifecycle-anchor-candidates.v1",
+                "artifact_identity_source_artifact_ids": ["artifact_sha256:" + "b" * 64],
+                "accepted_start_targets": ["ShooterGameMode.HandleNewPlayer"],
+                "accepted_end_targets": ["ShooterGameMode.OnLogout"],
+            }
+            write_json(first_path, first_evidence)
+            write_json(lifecycle_path, align_lifecycle_to_first_evidence(accepted_lifecycle_anchor_manifest(), first_evidence))
+            write_json(principal_path, principal)
+
+            result = self.run_tool(
+                [
+                    "--first-evidence",
+                    str(first_path),
+                    "--lifecycle-anchor-candidates",
+                    str(lifecycle_path),
+                    "--principal-invalidation-policy",
+                    str(principal_path),
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("principal_lifecycle_source_binding_mismatch", result.stderr)
+        self.assertFalse(output_dir.exists())
 
 
 if __name__ == "__main__":

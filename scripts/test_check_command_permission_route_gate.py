@@ -168,8 +168,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
             principal_path = root / "players-identity-principal-invalidation-policy.json"
             bound_dir = root / "bound"
+            lifecycle = accepted_lifecycle_anchor_manifest()
+            lifecycle["artifact_identity"]["source_artifact_ids"] = first_evidence["artifact_identity"][
+                "source_artifact_ids"
+            ]
             first_evidence_path.write_text(json.dumps(first_evidence), encoding="utf-8")
-            lifecycle_path.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            lifecycle_path.write_text(json.dumps(lifecycle), encoding="utf-8")
             principal_path.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
             binder = subprocess.run(
                 [

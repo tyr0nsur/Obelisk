@@ -1033,6 +1033,45 @@ P0 progress `0/4`. This round does not approve runtime work, public identity, pu
 permissions/admin, command response, commands/replies, release readiness, or a stable SDK
 claim.
 
+## Permissions Structured Evidence And Bound-Route Prebind Closure
+
+The next supervised guardrail round extended the structured evidence pattern and tightened
+the explicit bound identity route:
+
+- Promoted `obelisk.permissions_admin.v1` rows in
+  `scripts/check_public_sdk_v1_completion.py` now require structured evidence instead of
+  accepting surface-specific placeholder ABI/SDK files plus the required prose terms.
+  Required evidence includes a repo-relative
+  `obelisk.permissions-admin-query-failclosed-contract-check.v1` consume report,
+  a repo-relative `obelisk.permissions-admin-public-readiness-check.v1` planning report,
+  and an executed ABI/SDK test report. These reports are prerequisites only: the current
+  permissions/admin artifacts still keep `promotion_ready=false`, `public_abi_ready=false`,
+  `public_sdk_ready=false`, and `runtime_ready=false`.
+- `scripts/bind_player_identity_planning_sources.py` now validates prebind provenance
+  before writing bound outputs. Lifecycle `artifact_identity.source_artifact_ids` must
+  already match the selected first-evidence source, principal `start_anchor`/`end_anchor`
+  must match accepted lifecycle targets, and an existing principal
+  `lifecycle_layout_source.source_binding` must match the lifecycle source. The binder no
+  longer silently normalizes stale standalone lifecycle/principal manifests into bound
+  route evidence.
+- The historical standalone lifecycle/principal bundle under
+  `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
+  remains consume-only planning evidence, but the stricter bound wrapper now rejects it
+  with `lifecycle_anchor_source_artifact_ids_mismatch` when paired with the generated
+  first-evidence source. A future bound-route run must regenerate or align the planning
+  manifests to the first-evidence source before it may advance to
+  `approved_runtime_evidence_missing`.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_bind_player_identity_planning_sources scripts.test_check_command_permission_route_gate_bound_identity_sources`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate_bound_identity_sources.py --lifecycle-anchor-candidates-manifest /servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/players-identity-lifecycle-anchor-candidates.json --principal-invalidation-policy-manifest /servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/players-identity-principal-invalidation-policy.json --json`
+
+The last command is expected to fail closed on stale prebind provenance. This round does
+not approve runtime work, public identity, public permissions/admin, command response,
+commands/replies, release readiness, or a stable SDK claim.
+
 ## Command Response Readiness Provenance Binding
 
 The next P0-focused supervised round closed the deferred synthetic readiness provenance

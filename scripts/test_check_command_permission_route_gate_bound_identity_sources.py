@@ -32,6 +32,17 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def align_lifecycle_to_snapshot_root(lifecycle: dict, snapshot_root: Path) -> dict:
+    lifecycle = json.loads(json.dumps(lifecycle))
+    first_evidence = CHECKER.build_redacted_ufunction_signatures.build_players_identity_first_evidence(
+        snapshot_root=snapshot_root
+    )
+    lifecycle["artifact_identity"]["source_artifact_ids"] = first_evidence["artifact_identity"][
+        "source_artifact_ids"
+    ]
+    return lifecycle
+
+
 class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase):
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
@@ -97,7 +108,13 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                 root = Path(temp_dir)
                 lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
                 principal_path = root / "players-identity-principal-invalidation-policy.json"
-                write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+                write_json(
+                    lifecycle_path,
+                    align_lifecycle_to_snapshot_root(
+                        accepted_lifecycle_anchor_manifest(),
+                        CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
+                    ),
+                )
                 write_json(principal_path, principal_policy_manifest())
 
                 def fake_run_route_gate(*_args: object, **_kwargs: object) -> tuple[int, dict, str, None]:
@@ -113,7 +130,13 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             root = Path(temp_dir)
             lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
             principal_path = root / "players-identity-principal-invalidation-policy.json"
-            write_json(lifecycle_path, accepted_lifecycle_anchor_manifest())
+            write_json(
+                lifecycle_path,
+                align_lifecycle_to_snapshot_root(
+                    accepted_lifecycle_anchor_manifest(),
+                    CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
+                ),
+            )
             write_json(principal_path, principal_policy_manifest())
 
             result = self.run_checker(
@@ -230,6 +253,10 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
             lifecycle_path = root / "players-identity-lifecycle-anchor-candidates.json"
             principal_path = root / "players-identity-principal-invalidation-policy.json"
             lifecycle = accepted_lifecycle_anchor_manifest()
+            lifecycle = align_lifecycle_to_snapshot_root(
+                lifecycle,
+                CHECKER.build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
+            )
             lifecycle["public_sdk_ready"] = True
             write_json(lifecycle_path, lifecycle)
             write_json(principal_path, principal_policy_manifest())

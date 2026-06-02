@@ -350,6 +350,9 @@ priorities, and do not use history files as the active source of truth.
   principal lifecycle evidence, reported as `approved_runtime_evidence_missing`.
   `scripts/bind_player_identity_planning_sources.py` is the offline binder for that
   transition: it validates first-evidence, lifecycle-anchor, and principal-policy JSON,
+  now rejects stale prebind provenance before writing outputs when lifecycle
+  `artifact_identity.source_artifact_ids`, principal lifecycle source binding, or
+  principal start/end anchors do not match the selected first-evidence/lifecycle source,
   emits bound lifecycle/principal planning artifacts plus a non-claim report, and rejects
   protected output paths and symlinks. Bound outputs are planning provenance only; they do
   not approve runtime evidence, public identity, public SDK readiness, or v1 completion.
@@ -360,6 +363,11 @@ priorities, and do not use history files as the active source of truth.
   `scripts/check_command_permission_route_gate_bound_identity_sources.py` is the
   checker-style wrapper for that explicit route: it uses transient bound artifacts under a
   non-protected temp root and still authorizes no runtime/server work or SDK readiness.
+  The historical `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
+  lifecycle/principal bundle remains standalone consume-only planning evidence but now
+  fails the stricter wrapper as not source-bound to generated first evidence; regenerate or
+  align source-bound manifests before expecting the wrapper to advance to
+  `approved_runtime_evidence_missing`.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

@@ -270,8 +270,12 @@ This file is an active routing table only. Durable evidence belongs in
   now emits bound lifecycle-anchor and principal-policy planning artifacts from validated
   first-evidence, lifecycle, and principal JSON inputs. The tool writes only to a checked
   offline output directory, rejects protected output paths and symlinks, emits a
-  non-claim report, and validates aggregate planning provenance. The default repo route
-  remains blocked on `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit
+  non-claim report, and validates aggregate planning provenance. A later hardening
+  requires lifecycle `artifact_identity.source_artifact_ids`, principal
+  `lifecycle_layout_source.source_binding`, and principal start/end anchors to match the
+  first-evidence/lifecycle source before binding; stale standalone manifests now fail
+  before outputs are written. The default repo route remains blocked on
+  `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit source-aligned
   bound lifecycle/principal planning artifacts are supplied to the route gate via
   `--lifecycle-anchor-candidates-manifest` and
   `--principal-invalidation-policy-manifest`; with those explicit bound inputs, the route
@@ -286,11 +290,17 @@ This file is an active routing table only. Durable evidence belongs in
   the route gate with explicit bound inputs. A valid wrapper report may show only
   `approved_runtime_evidence_missing`; it still authorizes no runtime/server work and no
   public SDK/ABI/v1 readiness.
-- Latest bound-identity/default-route/SDK rerun: the default
+- Latest bound-identity/default-route/SDK rerun: the historical
+  `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
+  lifecycle/principal manifests are still valid standalone consume-only planning artifacts,
+  but the stricter wrapper rejects them as not source-bound to the generated first
+  evidence (`lifecycle_anchor_source_artifact_ids_mismatch`). The default
   `scripts/check_command_permission_route_gate.py --json` route remains planning-only and
-  blocks at `lifecycle_anchor_first_evidence_provenance_unbound` when explicit bound
-  lifecycle/principal manifests are not supplied. The explicit wrapper may advance only to
-  `approved_runtime_evidence_missing` with all public/runtime/promotion/v1 flags false.
+  blocks at `lifecycle_anchor_first_evidence_provenance_unbound` when explicit source-bound
+  lifecycle/principal manifests are not supplied. A wrapper run with source-aligned
+  synthetic test fixtures may advance only to `approved_runtime_evidence_missing` with all
+  public/runtime/promotion/v1 flags false; the historical standalone bundle must not be
+  treated as bound-route evidence until regenerated/aligned.
   `scripts/check_public_sdk_v1_completion.py --json` still fails closed with
   `stable_claim_allowed=false`, complete-SDK `0/12`, and P0 `0/4`. This is offline
   routing evidence only: no runtime/server work, public identity, permissions/admin,
@@ -341,12 +351,14 @@ This file is an active routing table only. Durable evidence belongs in
   route gate, validates required public-contract decision manifests even for non-default
   `--contract-decisions-dir`, and requires promoted `obelisk.player_identity.v1` evidence
   to include structured approved-runtime, public-contract-readiness, and executed ABI/SDK
-  test evidence instead of relying on placeholder paths plus prose terms. This does not
-  promote player identity or v1 completion; default SDK completion still fails closed with
+  test evidence, and promoted `obelisk.permissions_admin.v1` evidence to include structured
+  query fail-closed, public-readiness, and executed ABI/SDK test evidence, instead of
+  relying on placeholder paths plus prose terms. This does not promote player identity,
+  permissions/admin, or v1 completion; default SDK completion still fails closed with
   `stable_claim_allowed=false`, complete-SDK `0/12`, and P0 `0/4`.
 - Deferred SDK-completion audit risk: extend the same structured promotion-evidence
-  binding beyond player identity before any future permissions/admin, command response,
-  or commands/replies promotion accounting can trust synthetic promoted evidence.
+  binding to command response and commands/replies before future promotion accounting can
+  trust synthetic promoted evidence.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -432,13 +444,14 @@ This file is an active routing table only. Durable evidence belongs in
 
 ## Priority Next Steps
 
-- P0: first run `scripts/check_command_permission_route_gate_bound_identity_sources.py`
-  with explicit lifecycle-anchor/principal-policy planning manifests and confirm the
-  wrapper route blocker is only `approved_runtime_evidence_missing`. Do not treat the
-  default-route `lifecycle_anchor_first_evidence_provenance_unbound` blocker as
-  runtime-evidence work. After the runtime principal lifecycle evidence blocker is
-  cleared by future scoped evidence, review the identity contract before
-  permissions/admin, command response, or commands/replies ABI.
+- P0: produce or regenerate lifecycle-anchor/principal-policy planning manifests whose
+  source artifact IDs and principal lifecycle source binding match the current
+  first-evidence source, then run `scripts/check_command_permission_route_gate_bound_identity_sources.py`
+  and confirm the wrapper route blocker is only `approved_runtime_evidence_missing`. Do
+  not treat the default-route `lifecycle_anchor_first_evidence_provenance_unbound` blocker
+  as runtime-evidence work. After the runtime principal lifecycle evidence blocker is
+  cleared by future scoped evidence, review the identity contract before permissions/admin,
+  command response, or commands/replies ABI.
 - Offline: keep tightening guardrails around permissions/admin query-only provenance,
   command/principal contracts, command route drift, inventory copied-signal hygiene, and
   structure build-policy snapshot envelopes.

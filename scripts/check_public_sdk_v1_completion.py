@@ -1896,14 +1896,98 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
     return missing
 
 
+def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> list[str]:
+    missing: list[str] = []
+    executed = evidence.get("executed_test_report")
+    if not isinstance(executed, dict):
+        return ["executed_test_report:missing"]
+    abi_tests = executed.get("abi_tests")
+    sdk_tests = executed.get("sdk_consumer_tests")
+    if executed.get("schema") != "obelisk.promoted-surface-test-execution.v1":
+        missing.append("executed_test_report:schema_invalid")
+    if executed.get("surface_id") != surface_id:
+        missing.append("executed_test_report:surface_id_invalid")
+    if not isinstance(abi_tests, list) or not abi_tests:
+        missing.append("executed_test_report:abi_tests_missing")
+    if not isinstance(sdk_tests, list) or not sdk_tests:
+        missing.append("executed_test_report:sdk_consumer_tests_missing")
+    for key, tests in (("abi_tests", abi_tests), ("sdk_consumer_tests", sdk_tests)):
+        if not isinstance(tests, list):
+            continue
+        for index, item in enumerate(tests):
+            if not isinstance(item, dict):
+                missing.append(f"executed_test_report:{key}[{index}]:not_object")
+                continue
+            if item.get("status") != "passed":
+                missing.append(f"executed_test_report:{key}[{index}]:status_not_passed")
+            if not isinstance(item.get("command"), str) or not item["command"].strip():
+                missing.append(f"executed_test_report:{key}[{index}]:command_missing")
+            path = item.get("path")
+            if not isinstance(path, str) or not evidence_path_exists(path, allow_generic_dirs=False):
+                missing.append(f"executed_test_report:{key}[{index}]:path_invalid")
+    return missing
+
+
+def permissions_admin_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    query_report, query_error = load_repo_relative_json_evidence(evidence.get("query_failclosed_report"))
+    if query_error is not None:
+        missing.append(f"query_failclosed_report:{query_error}")
+    elif not (
+        query_report.get("schema") == "obelisk.permissions-admin-query-failclosed-contract-check.v1"
+        and query_report.get("input_schema") == "obelisk.permissions-admin-query-failclosed-contract.v1"
+        and query_report.get("mode") == "consume"
+        and query_report.get("ready") is True
+        and query_report.get("valid") is True
+        and query_report.get("candidate_only") is True
+        and query_report.get("pre_abi") is True
+        and query_report.get("public_header_allowed") is False
+        and query_report.get("public_cache_abi_allowed") is False
+        and query_report.get("promotion_ready") is False
+        and query_report.get("public_sdk_ready") is False
+        and query_report.get("runtime_ready") is False
+        and query_report.get("blockers") == []
+    ):
+        missing.append("query_failclosed_report:fields_invalid")
+
+    readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
+    if readiness_error is not None:
+        missing.append(f"public_readiness_report:{readiness_error}")
+    elif not (
+        readiness_report.get("schema") == "obelisk.permissions-admin-public-readiness-check.v1"
+        and readiness_report.get("surface") == "obelisk.permissions_admin.v1"
+        and readiness_report.get("valid") is True
+        and readiness_report.get("accepted_for_planning") is True
+        and readiness_report.get("planning_only") is True
+        and readiness_report.get("promotion_ready") is False
+        and readiness_report.get("public_header_allowed") is False
+        and readiness_report.get("public_abi_ready") is False
+        and readiness_report.get("public_sdk_ready") is False
+        and readiness_report.get("runtime_ready") is False
+        and readiness_report.get("dependency") == "obelisk.player_identity.v1"
+        and readiness_report.get("query_failclosed_artifact_schema")
+        == "obelisk.permissions-admin-query-failclosed-contract.v1"
+        and readiness_report.get("blockers") == []
+    ):
+        missing.append("public_readiness_report:fields_invalid")
+
+    missing.extend(executed_test_report_missing(evidence, "obelisk.permissions_admin.v1"))
+    return missing
+
+
 def surface_missing_structured_promotion_evidence(surface: dict[str, Any]) -> list[str]:
     surface_id = surface.get("id")
-    if surface_id != "obelisk.player_identity.v1" or surface.get("status") != "promoted":
+    if surface.get("status") != "promoted":
         return []
     evidence = surface.get("evidence")
     if not isinstance(evidence, dict):
         return ["evidence:missing"]
-    return player_identity_structured_promotion_evidence_missing(evidence)
+    if surface_id == "obelisk.player_identity.v1":
+        return player_identity_structured_promotion_evidence_missing(evidence)
+    if surface_id == "obelisk.permissions_admin.v1":
+        return permissions_admin_structured_promotion_evidence_missing(evidence)
+    return []
+
 
 
 def unresolved_promoted_surface_dependencies(
@@ -3088,7 +3172,7 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "Action: add the required terms to the manifest evidence or keep the surface non-promoted.",
         ],
         "promoted_surface_structured_evidence_missing": [
-            "Promoted player identity lacks structured runtime, contract-readiness, or executed-test evidence.",
+            "Promoted dependency-chain surfaces lack structured runtime, readiness, or executed-test evidence.",
             "Action: bind promotion accounting to checker reports and passed ABI/SDK test execution, or keep the surface non-promoted.",
         ],
         "promoted_surface_dependency_unresolved": [

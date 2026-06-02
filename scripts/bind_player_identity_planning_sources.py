@@ -130,6 +130,82 @@ def validation_reasons(blockers: list[dict[str, Any]]) -> list[str]:
     return [str(blocker.get("reason")) for blocker in blockers]
 
 
+def expected_lifecycle_source_binding(
+    lifecycle: dict[str, Any],
+    first_evidence: dict[str, Any],
+) -> dict[str, Any]:
+    artifact = lifecycle.get("artifact_identity")
+    acceptance = lifecycle.get("lifecycle_acceptance")
+    source_ids = first_evidence_readiness.first_evidence_source_artifact_ids(first_evidence)
+    return {
+        "lifecycle_manifest_schema": lifecycle.get("schema"),
+        "artifact_identity_source_artifact_ids": list(
+            artifact.get("source_artifact_ids", []) if isinstance(artifact, dict) else []
+        )
+        if isinstance(artifact, dict)
+        else list(source_ids),
+        "accepted_start_targets": list(acceptance.get("accepted_start_targets", []))
+        if isinstance(acceptance, dict)
+        else [],
+        "accepted_end_targets": list(acceptance.get("accepted_end_targets", []))
+        if isinstance(acceptance, dict)
+        else [],
+    }
+
+
+def validate_prebind_provenance(
+    *,
+    first_evidence: dict[str, Any],
+    lifecycle: dict[str, Any],
+    principal: dict[str, Any],
+) -> None:
+    source_ids = first_evidence_readiness.first_evidence_source_artifact_ids(first_evidence)
+    if not source_ids:
+        raise SystemExit("first-evidence artifact_identity.source_artifact_ids is empty")
+    lifecycle_artifact = lifecycle.get("artifact_identity")
+    lifecycle_source_ids = (
+        lifecycle_artifact.get("source_artifact_ids") if isinstance(lifecycle_artifact, dict) else None
+    )
+    if list(lifecycle_source_ids or []) != list(source_ids):
+        raise SystemExit(
+            "player identity planning source binding failed prebind provenance: "
+            + json.dumps(
+                {
+                    "lifecycle_anchor_candidates": [
+                        "lifecycle_anchor_source_artifact_ids_mismatch"
+                    ]
+                },
+                sort_keys=True,
+            )
+        )
+
+    acceptance = lifecycle.get("lifecycle_acceptance")
+    accepted_start_targets = (
+        acceptance.get("accepted_start_targets") if isinstance(acceptance, dict) else []
+    )
+    accepted_end_targets = acceptance.get("accepted_end_targets") if isinstance(acceptance, dict) else []
+    source = principal.get("lifecycle_layout_source")
+    if not isinstance(source, dict):
+        raise SystemExit(
+            "player identity planning source binding failed prebind provenance: "
+            + json.dumps({"principal_invalidation_policy": ["lifecycle_layout_source_missing"]}, sort_keys=True)
+        )
+    principal_errors: list[str] = []
+    if source.get("start_anchor") not in accepted_start_targets:
+        principal_errors.append("principal_start_anchor_not_accepted_by_lifecycle")
+    if source.get("end_anchor") not in accepted_end_targets:
+        principal_errors.append("principal_end_anchor_not_accepted_by_lifecycle")
+    expected_binding = expected_lifecycle_source_binding(lifecycle, first_evidence)
+    existing_binding = source.get("source_binding")
+    if existing_binding is not None and existing_binding != expected_binding:
+        principal_errors.append("principal_lifecycle_source_binding_mismatch")
+    if principal_errors:
+        raise SystemExit(
+            "player identity planning source binding failed prebind provenance: "
+            + json.dumps({"principal_invalidation_policy": principal_errors}, sort_keys=True)
+        )
+
+
 def validate_inputs(
     *,
     first_evidence: dict[str, Any],
@@ -151,6 +227,7 @@ def validate_inputs(
     failed = {key: values for key, values in blockers.items() if values}
     if failed:
         raise SystemExit("player identity planning source binding failed validation: " + json.dumps(failed, sort_keys=True))
+    validate_prebind_provenance(first_evidence=first_evidence, lifecycle=lifecycle, principal=principal)
 
 
 def bind_lifecycle_to_first_evidence(
@@ -192,12 +269,7 @@ def bind_principal_to_lifecycle(principal: dict[str, Any], lifecycle: dict[str, 
     acceptance = lifecycle.get("lifecycle_acceptance")
     if not isinstance(artifact, dict) or not isinstance(acceptance, dict):
         raise SystemExit("bound lifecycle manifest is missing artifact_identity or lifecycle_acceptance")
-    source["source_binding"] = {
-        "lifecycle_manifest_schema": lifecycle.get("schema"),
-        "artifact_identity_source_artifact_ids": list(artifact.get("source_artifact_ids", [])),
-        "accepted_start_targets": list(acceptance.get("accepted_start_targets", [])),
-        "accepted_end_targets": list(acceptance.get("accepted_end_targets", [])),
-    }
+    source["source_binding"] = expected_lifecycle_source_binding(lifecycle, {"artifact_identity": artifact})
     return bound
 
 

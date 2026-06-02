@@ -4742,6 +4742,165 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
         )
 
+    def test_permissions_admin_required_terms_do_not_replace_structured_promotion_evidence(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PermissionsAdminPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="permissions_admin_promotion",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            identity_abi_test = core_path / "PlayerIdentityPromotionTests.cpp"
+            identity_sdk_test = sdk_path / "player_identity_promotion_plugin.c"
+            permissions_abi_test = core_path / "PermissionsAdminPromotionTests.cpp"
+            permissions_sdk_test = sdk_path / "permissions_admin_promotion_plugin.c"
+            identity_runtime_report = core_path / "player_identity_approved_runtime_report.json"
+            identity_contract_report = core_path / "player_identity_public_contract_readiness_report.json"
+            for path in (identity_abi_test, identity_sdk_test, permissions_abi_test, permissions_sdk_test):
+                path.write_text("// synthetic promotion evidence fixture\n", encoding="utf-8")
+            identity_runtime_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            identity_contract_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                        "surface": "obelisk.player_identity.v1",
+                        "accepted_for_contract_review": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "public_header_allowed": False,
+                        "approved_runtime_evidence": {
+                            "approved_runtime_evidence_present": True,
+                            "runtime_evidence_ready": True,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            manifest, release_statement = complete_excluded_manifest()
+            promoted_ids = {"obelisk.player_identity.v1", "obelisk.permissions_admin.v1"}
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.RegisterPlayerIdentityCallback"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(identity_abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(identity_sdk_test.relative_to(REPO_ROOT))],
+                        "approved_runtime_evidence_report": str(identity_runtime_report.relative_to(REPO_ROOT)),
+                        "public_contract_readiness_report": str(identity_contract_report.relative_to(REPO_ROOT)),
+                        "executed_test_report": {
+                            "schema": "obelisk.promoted-surface-test-execution.v1",
+                            "surface_id": "obelisk.player_identity.v1",
+                            "abi_tests": [
+                                {
+                                    "path": str(identity_abi_test.relative_to(REPO_ROOT)),
+                                    "command": "python3 -m unittest player_identity_abi",
+                                    "status": "passed",
+                                }
+                            ],
+                            "sdk_consumer_tests": [
+                                {
+                                    "path": str(identity_sdk_test.relative_to(REPO_ROOT)),
+                                    "command": "cmake --build player_identity_sdk_consumer",
+                                    "status": "passed",
+                                }
+                            ],
+                        },
+                        "terms": [
+                            "obelisk.core-dump-evidence-pack.v1",
+                            "obelisk.reflection-inventory-pack.v1",
+                            "ServerListPlayers",
+                            "ServerKickPlayer",
+                            "approved runtime principal lifecycle evidence",
+                            "accepted login/logout lifecycle ordering and principal invalidation semantics",
+                            "principal privacy, invalidation, and cross-instance semantics",
+                            "append-only POD C ABI design with capability gates, owner-scoped cleanup, and SDK consumer tests",
+                        ],
+                    }
+                if surface["id"] == "obelisk.permissions_admin.v1":
+                    surface["status"] = "promoted"
+                    surface["public_contract"] = ["ObeliskApi.CheckPermissionWithCopiedPrincipal"]
+                    surface["evidence"] = {
+                        "surface_id": "obelisk.permissions_admin.v1",
+                        "promotion_status": "promoted",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(permissions_abi_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(permissions_sdk_test.relative_to(REPO_ROOT))],
+                        "terms": [
+                            "query-only fail-closed permission checks over copied principals",
+                            "stale principal, scope mismatch, missing generation, missing owner token, unknown authority source, and missing policy provenance fail closed",
+                            "allow decisions carry policy_source_id, policy_source_generation, authority_kind, authority_generation, and policy_epoch provenance",
+                            "promoted copied principal semantics",
+                        ],
+                    }
+            for surface_id in promoted_ids:
+                if surface_id not in manifest["promoted_surfaces"]:
+                    manifest["promoted_surfaces"].append(surface_id)
+            manifest["post_v1_or_excluded_surfaces"] = [
+                surface_id
+                for surface_id in manifest["post_v1_or_excluded_surfaces"]
+                if surface_id not in promoted_ids
+            ]
+            release_statement = "\n".join(
+                (
+                    f"{surface_id}: promoted - reviewed ABI and SDK evidence."
+                    if surface_id in promoted_ids
+                    else line
+                )
+                for line in release_statement.splitlines()
+                for surface_id in [line.split(":", 1)[0]]
+            ) + "\n"
+            manifest_path = core_path / "public_sdk_surfaces.json"
+            statement_path = core_path / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("promoted_surface_evidence_missing", payload["blockers"])
+        self.assertNotIn("promoted_surface_required_evidence_terms_missing", payload["blockers"])
+        self.assertIn("promoted_surface_structured_evidence_missing", payload["blockers"])
+        self.assertEqual(
+            payload["promoted_surfaces_missing_structured_evidence"],
+            {
+                "obelisk.permissions_admin.v1": [
+                    "executed_test_report:missing",
+                    "public_readiness_report:missing",
+                    "query_failclosed_report:missing",
+                ]
+            },
+        )
+
     def test_promoted_command_response_requires_semantic_evidence_terms(self) -> None:
         with (
             tempfile.TemporaryDirectory(
