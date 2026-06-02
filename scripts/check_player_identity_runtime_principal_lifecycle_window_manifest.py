@@ -540,6 +540,16 @@ def validate_sidecar_file(
     run_id = fields.get("run_id")
     if run_id and run_id not in status.resolved.parts:
         add(blockers, f"{path_key}_run_id_mismatch", path_key, run_id=run_id, resolved=str(status.resolved))
+    if status.approved_offline_workspace:
+        expected_dir = manifest_path.expanduser().resolve().parent
+        if status.resolved.parent != expected_dir:
+            add(
+                blockers,
+                f"{path_key}_not_beside_window_manifest",
+                path_key,
+                expected_dir=str(expected_dir),
+                resolved=str(status.resolved),
+            )
     if not sha_text:
         add(blockers, f"{sha_key}_missing", sha_key)
     elif SHA256_RE.fullmatch(sha_text) is None:

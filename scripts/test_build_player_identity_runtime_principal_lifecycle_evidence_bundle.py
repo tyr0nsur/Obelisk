@@ -516,9 +516,13 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(report["approved_runtime_manifest_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
         self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_ready"])
+        self.assertEqual(report["public_capability_bits_now"], [])
+        self.assertEqual(report["public_callback_abi_now"], [])
         self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
         self.assertEqual(
             [artifact["present"] for artifact in report["next_required_artifacts"]],
@@ -555,6 +559,45 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["ready"])
         self.assertEqual(report["inputs"]["approved_runtime_manifest_check"]["exit_code"], 0)
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checker_ready"])
+
+    def test_preflight_rejects_window_manifest_sidecar_outside_copied_log_dir(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            fields = dict(
+                line.split("=", 1)
+                for line in window_manifest.read_text(encoding="utf-8").splitlines()
+                if "=" in line
+            )
+            original = Path(fields["preflight_pre_path"])
+            alternate = (
+                copied_log.parent.parent
+                / "alternate-sidecars"
+                / RUN_ID
+                / "preflight-pre.json"
+            )
+            alternate.parent.mkdir(parents=True, exist_ok=True)
+            alternate.write_bytes(original.read_bytes())
+            fields["preflight_pre_path"] = str(alternate)
+            fields["preflight_pre_sha256"] = hashlib.sha256(alternate.read_bytes()).hexdigest()
+            window_manifest.write_text(
+                "\n".join(f"{key}={value}" for key, value in fields.items()) + "\n",
+                encoding="utf-8",
+            )
+
+            preflight = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(preflight.returncode, 1)
+        report = json.loads(preflight.stdout)
+        self.assertFalse(report["ready"])
+        self.assertIn("window_manifest_check_failed", report["blockers"])
+        self.assertIn(
+            "preflight_pre_path_not_beside_window_manifest",
+            report["inputs"]["window_manifest_check"]["blockers"],
+        )
 
     def test_preflight_rejects_invalid_present_approved_manifest(self) -> None:
         with self.temp_offline_workspace() as temp:
@@ -743,6 +786,46 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(state["exit_code"], 1)
         self.assertTrue(state["checker_ready"])
         self.assertFalse(state["ready"])
+        self.assertIn("approved_runtime_manifest_check_failed", [blocker["reason"] for blocker in blockers])
+
+    def test_approved_runtime_manifest_check_rejects_public_overclaim_fields(self) -> None:
+        original = bundle_builder.run_json_check
+        blockers: list[dict] = []
+
+        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+            return (
+                0,
+                {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "ready": True,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_header_allowed": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": True,
+                    "v1_completion_ready": False,
+                    "runtime_ready": False,
+                    "public_capability_bits_now": ["OBELISK_PUBLIC_IDENTITY"],
+                    "public_callback_abi_now": [],
+                    "blockers": [],
+                    "next_blocker": "identity_public_contract_gate_missing",
+                },
+                "",
+            )
+
+        try:
+            bundle_builder.run_json_check = fake_run_json_check
+            state = bundle_builder.approved_runtime_manifest_check_state(
+                {"exists": True, "path": Path("approved-runtime-principal-lifecycle-evidence.json")},
+                blockers,
+            )
+        finally:
+            bundle_builder.run_json_check = original
+
+        self.assertTrue(state["checked"])
+        self.assertFalse(state["ready"])
+        self.assertTrue(state["checker_ready"])
         self.assertIn("approved_runtime_manifest_check_failed", [blocker["reason"] for blocker in blockers])
 
     def test_request_pack_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:
@@ -1430,6 +1513,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
 
         self.assertIn("overclaims public_sdk_ready", str(raised.exception))
+
+    def test_rejects_readiness_reports_that_overclaim_public_abi_lists(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_consume_only_check_report(
+                {
+                    "ready": True,
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_header_allowed": False,
+                    "public_sdk_ready": False,
+                    "public_abi_ready": False,
+                    "v1_completion_ready": False,
+                    "runtime_ready": False,
+                    "public_capability_bits_now": [],
+                    "public_callback_abi_now": ["ObeliskRegisterPlayerIdentityCallback"],
+                    "blockers": [],
+                    "next_blocker": "identity_public_contract_gate_missing",
+                },
+                "consume approved runtime principal lifecycle evidence check",
+            )
+
+        self.assertIn("overclaims public_callback_abi_now", str(raised.exception))
 
     def test_rejects_negative_readiness_report_with_wrong_blocker(self) -> None:
         with self.assertRaises(SystemExit) as raised:

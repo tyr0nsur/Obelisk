@@ -453,8 +453,30 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
-        self.assertEqual(report["remaining_blockers"], [])
-        self.assertEqual(report["next_blocker"], "approved_runtime_observer_log_summary_and_manifest_missing")
+
+    def test_rejects_sidecar_in_other_approved_directory_even_with_matching_sha(self) -> None:
+        def move_request_pack(exact_dir: Path, fields: dict[str, str]) -> None:
+            original = Path(fields["request_pack_path"])
+            if not original.is_absolute():
+                original = exact_dir / original
+            alternate = exact_dir.parent / "alternate-sidecars" / fields["run_id"] / "window-request.json"
+            alternate.parent.mkdir(parents=True, exist_ok=True)
+            alternate.write_bytes(original.read_bytes())
+            fields["request_pack_path"] = str(alternate)
+            fields["request_pack_sha256"] = hashlib.sha256(alternate.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=move_request_pack,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        self.assertIn("request_pack_path_not_beside_window_manifest", report["blockers"])
+        self.assertEqual(report["remaining_blockers"], ["window_manifest_not_accepted"])
+        self.assertEqual(report["next_blocker"], "window_manifest_not_accepted")
 
     def test_rejects_operator_approval_receipt_completion_metadata_drift(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:

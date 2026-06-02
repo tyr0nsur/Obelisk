@@ -1107,6 +1107,19 @@ priorities, and do not use history files as the active source of truth.
   missing `Obelisk.log`, `window-manifest.env`, completed
   `operator-approval-receipt.json`, and approved evidence manifest. No runtime/server
   operation was performed.
+- 2026-06-02 lifecycle preflight/route visibility hardening pass: after compaction, lead
+  attempted fresh sub-agent verification, but the multi-agent tool reported agent thread
+  limit reached, so integration continued locally. Integrated offline-only changes bind
+  lifecycle window sidecars to the exact directory beside copied `window-manifest.env`,
+  reject request/preflight/approved-manifest reports that overclaim public header, public
+  ABI, v1 completion, or public capability/callback ABI lists, and expose
+  `route_gate_current_blockers` in SDK report sections plus human P0 route-gate output.
+  Validation: 144 request/manifest/bundle tests OK, 178 SDK completion tests OK,
+  route gate JSON valid/planning-only, and SDK JSON failed closed as expected with
+  `approved_runtime_evidence_missing`, SDK 0/12, P0 0/4, `stable_claim_allowed=false`.
+  Pending live-ops hardening: add prepared-request freshness provenance
+  (`prepared_at_utc`) so operator approval receipts cannot replay stale request packs.
+  No runtime/server operation was performed.
 
 ## Agent Coordination
 

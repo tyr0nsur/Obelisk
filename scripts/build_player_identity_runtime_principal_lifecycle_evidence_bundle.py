@@ -111,8 +111,18 @@ def require_expected_failure(result: subprocess.CompletedProcess[str], label: st
 
 
 def require_false_readiness_flags(payload: dict[str, Any], label: str) -> None:
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
-        if payload.get(key) is not False:
+    for key in (
+        "promotion_ready",
+        "public_header_allowed",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "v1_completion_ready",
+        "runtime_ready",
+    ):
+        if payload.get(key, False) is not False:
+            raise SystemExit(f"{label} overclaims {key}")
+    for key in ("public_capability_bits_now", "public_callback_abi_now"):
+        if payload.get(key, []) != []:
             raise SystemExit(f"{label} overclaims {key}")
 
 
@@ -355,8 +365,13 @@ def approved_runtime_manifest_check_state(
             and payload.get("approved_runtime_evidence_present") is True
             and payload.get("runtime_evidence_ready") is True
             and payload.get("promotion_ready") is False
+            and payload.get("public_header_allowed", False) is False
             and payload.get("public_sdk_ready") is False
+            and payload.get("public_abi_ready", False) is False
+            and payload.get("v1_completion_ready", False) is False
             and payload.get("runtime_ready") is False
+            and payload.get("public_capability_bits_now", []) == []
+            and payload.get("public_callback_abi_now", []) == []
         )
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")
@@ -587,9 +602,13 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
         "approved_runtime_evidence_ready": bool(approved_bundle_check["ready"]),
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "public_abi_ready": False,
         "runtime_ready": False,
         "v1_completion_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "next_blocker": (
             "identity_public_contract_gate_missing"
             if approved_bundle_check["ready"]

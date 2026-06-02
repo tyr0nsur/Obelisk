@@ -795,6 +795,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(progress["route_gate_non_counting_blockers"], [])
         self.assertEqual(progress["route_gate_non_counting_surfaces"], [])
         self.assertEqual(progress["p0_manifest_promoted_non_counting"], [])
+        sections = payload["v1_sdk_report_sections"]
+        self.assertEqual(
+            sections["runtime_required_blockers"]["route_gate_current_blockers"],
+            ["identity_public_contract_gate_missing"],
+        )
+        self.assertEqual(
+            sections["next_v1_work"]["route_gate_current_blockers"],
+            ["identity_public_contract_gate_missing"],
+        )
         self.assertEqual(
             payload["v1_sdk_report_sections"]["next_v1_work"]["recommended_next_action"],
             (
@@ -1071,6 +1080,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["release_statement_missing_blocker_outcomes"],
         )
         self.assertIn("bookkeeping alone never approves", sections["release_statement_bookkeeping"]["non_claim"])
+        self.assertEqual(
+            sections["runtime_required_blockers"]["route_gate_current_blockers"],
+            ["approved_runtime_evidence_missing"],
+        )
+        self.assertEqual(
+            sections["next_v1_work"]["route_gate_current_blockers"],
+            ["approved_runtime_evidence_missing"],
+        )
         self.assertEqual(
             sections["promoted_demand_gaps"]["minimum_promoted_demand_family_gaps"],
             payload["minimum_promoted_demand_family_gaps"],
@@ -1569,6 +1586,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.player_identity.v1", result.stdout)
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
         self.assertIn("obelisk.chat_message.v1", result.stdout)
+        self.assertIn("P0 route gate: approved_runtime_evidence_missing", result.stdout)
+        self.assertIn("approved_runtime_principal_lifecycle_evidence", result.stdout)
+        self.assertIn("reviewed_identity_public_contract", result.stdout)
+        self.assertIn("Request-pack and preflight readiness are non-counting preparation", result.stdout)
+        self.assertIn("do not satisfy approved runtime principal lifecycle evidence", result.stdout)
         self.assertIn("Use --json for the full machine-readable report.", result.stdout)
 
     def test_completion_gate_rejects_route_gate_public_or_runtime_claims(self) -> None:

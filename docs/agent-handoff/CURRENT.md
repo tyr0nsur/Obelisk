@@ -207,11 +207,13 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest delegated rounds used handoff/workflow/live-ops/continuous-learning and
+- Latest delegated/local rounds used handoff/workflow/live-ops/continuous-learning and
   read-only reversing skills. Integrated: approved runtime evidence is contract-review
-  input only; nested private-candidate drift and forbidden identity exposure are guarded;
-  SDK/P0 rows now expose non-counting reasons for `identity_public_contract_gate_missing`,
-  scoped P0 excluded/post-v1 outcomes, and manifest-promoted-but-non-counting rows.
-  Stale 20260601 lifecycle artifacts are formally insufficient. Default route/SDK remain
-  fail-closed: `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  input only; private-candidate drift/forbidden identity exposure are guarded; SDK/P0
+  reports expose non-counting rows and current route blockers; lifecycle request preflight
+  rejects public ABI/header/list overclaims; window sidecars must sit beside the copied
+  `window-manifest.env`. Fresh sub-agent verification was attempted but blocked by agent
+  thread limit; lead integrated locally. Pending: bind request-pack freshness with
+  `prepared_at_utc`. Default route/SDK remain fail-closed:
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`. No runtime/server op.

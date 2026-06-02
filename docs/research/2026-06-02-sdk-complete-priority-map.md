@@ -2305,3 +2305,43 @@ Validation remained offline-only. `scripts.test_check_public_sdk_v1_completion` 
 passed. No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 Discord, GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
+
+## Lifecycle Preflight Boundary Follow-Up
+
+A follow-up lead-owned pass integrated the remaining offline boundary checks from the
+live-ops/reversing/SDK audits. A fresh sub-agent verifier was attempted after compaction,
+but the multi-agent tool reported the agent thread limit was reached, so this pass was
+implemented and validated locally.
+
+Integrated offline changes:
+
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now requires
+  request/approval/preflight sidecars to live beside the copied `window-manifest.env`;
+  sidecars elsewhere in the approved offline workspace fail even if their run id and SHA
+  match.
+- `build_player_identity_runtime_principal_lifecycle_evidence_bundle.py` now rejects
+  consume/preflight/approved-manifest reports that overclaim public header, public ABI,
+  v1 completion, or public capability/callback ABI lists. Preflight reports explicitly
+  publish those fields as closed/empty.
+- `check_public_sdk_v1_completion.py` now exposes `route_gate_current_blockers` in
+  `runtime_required_blockers` and `next_v1_work`, and the human report names the active
+  P0 route gate. For `approved_runtime_evidence_missing`, it states that request-pack and
+  preflight readiness are non-counting preparation.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle scripts.test_check_player_principal_lifecycle_window_request scripts.test_prepare_player_principal_lifecycle_window_request`
+  passed 144 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 178 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected, with SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+
+Pending follow-up: bind request-pack freshness with `prepared_at_utc` so a completed
+operator approval receipt cannot be replayed against stale pre-window preparation.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.

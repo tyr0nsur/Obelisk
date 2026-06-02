@@ -3858,6 +3858,10 @@ def categorized_v1_report_sections(
         },
         "runtime_required_blockers": {
             "blocker_codes": sorted(set(runtime_blocker_codes)),
+            "route_gate_current_blockers": blocker_outcome_summary.get(
+                "route_gate_current_blockers",
+                [],
+            ),
             "dependency_chain_remaining": blocker_outcome_summary.get(
                 "dependency_chain_remaining",
                 [],
@@ -3933,6 +3937,10 @@ def categorized_v1_report_sections(
         },
         "next_v1_work": {
             "critical_path": list(dependency_chain_remaining),
+            "route_gate_current_blockers": blocker_outcome_summary.get(
+                "route_gate_current_blockers",
+                [],
+            ),
             "release_statement_bookkeeping_required": sorted(set(release_statement_missing_blockers)),
             "manifest_promoted_but_non_counting": blocker_outcome_summary.get(
                 "manifest_promoted_but_non_counting",
@@ -5131,6 +5139,20 @@ def print_human_report(report: dict[str, Any]) -> None:
             f"{outcome_summary.get('release_statement_outcome_missing_count', 0)} need release-statement outcomes; "
             f"{outcome_summary.get('dependency_chain_remaining_count', 0)} dependency-chain blockers remain."
         )
+    route_gate = report.get("command_permission_route_gate")
+    if isinstance(route_gate, dict):
+        current_blocker = route_gate.get("current_blocker")
+        blocked_until = route_gate.get("route_lock_blocked_until")
+        if current_blocker:
+            print(
+                "P0 route gate: "
+                f"{current_blocker}; blocked until {format_human_list(blocked_until)}."
+            )
+            if current_blocker == "approved_runtime_evidence_missing":
+                print(
+                    "Request-pack and preflight readiness are non-counting preparation; "
+                    "they do not satisfy approved runtime principal lifecycle evidence."
+                )
     print("Blockers:")
     for blocker in report["blockers"]:
         print(f"- {blocker}")
