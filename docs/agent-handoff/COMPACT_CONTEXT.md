@@ -355,6 +355,9 @@ priorities, and do not use history files as the active source of truth.
   stays blocked on `lifecycle_anchor_first_evidence_provenance_unbound`, while a route run
   with explicit bound lifecycle/principal inputs may report only
   `approved_runtime_evidence_missing` as the next blocker.
+  `scripts/check_command_permission_route_gate_bound_identity_sources.py` is the
+  checker-style wrapper for that explicit route: it uses transient bound artifacts under a
+  non-protected temp root and still authorizes no runtime/server work or SDK readiness.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

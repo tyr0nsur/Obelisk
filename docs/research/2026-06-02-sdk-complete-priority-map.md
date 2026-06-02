@@ -761,6 +761,11 @@ The follow-up identity round added an offline binder for the aggregate provenanc
   repo route remains blocked on `lifecycle_anchor_first_evidence_provenance_unbound` until
   bound artifacts are supplied; with explicit bound artifacts, route aggregation may
   advance only to `approved_runtime_evidence_missing`.
+- `scripts/check_command_permission_route_gate_bound_identity_sources.py` composes that
+  explicit route without leaving durable artifacts: it builds transient first-evidence,
+  binds supplied lifecycle/principal planning manifests in a private non-protected temp
+  root, forces child temp writes under that temp root, and requires the route gate to
+  remain valid/planning-only with current blocker `approved_runtime_evidence_missing`.
 - The route-gate passthrough round found that real first-evidence can carry multiple
   complete `artifact_sha256`/`capture_id`/`evidence_pack_id` source triples. The lifecycle
   checker now accepts multiple complete triples while still rejecting incomplete or

@@ -271,6 +271,13 @@ This file is an active routing table only. Durable evidence belongs in
   lifecycle/principal input. Bound outputs do not provide approved runtime evidence,
   public identity, permissions/admin, command response, commands/replies, release
   readiness, or v1 completion.
+- `scripts/check_command_permission_route_gate_bound_identity_sources.py` is the explicit
+  offline wrapper for the bound route transition. It builds transient first-evidence from
+  sanitized snapshots, binds supplied lifecycle/principal planning manifests in a private
+  temp directory, forces child temp writes under that non-protected temp root, and runs
+  the route gate with explicit bound inputs. A valid wrapper report may show only
+  `approved_runtime_evidence_missing`; it still authorizes no runtime/server work and no
+  public SDK/ABI/v1 readiness.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -354,11 +361,11 @@ This file is an active routing table only. Durable evidence belongs in
 
 ## Priority Next Steps
 
-- P0: first supply or produce bound lifecycle-anchor/principal-policy planning artifacts
-  for the route gate; then, once the route reports `approved_runtime_evidence_missing`,
-  request approved copied runtime principal lifecycle evidence from a copied, redacted
-  observer log; then review the public identity contract before any permissions/admin,
-  command response, or commands/replies ABI.
+- P0: run `scripts/check_command_permission_route_gate_bound_identity_sources.py` with
+  explicit lifecycle-anchor/principal-policy planning manifests; then, once that wrapper
+  reports `approved_runtime_evidence_missing`, request approved copied runtime principal
+  lifecycle evidence from a copied, redacted observer log; then review the public identity
+  contract before any permissions/admin, command response, or commands/replies ABI.
 - Offline: keep tightening guardrails around permissions/admin query-only provenance,
   command/principal contracts, command route drift, inventory copied-signal hygiene, and
   structure build-policy snapshot envelopes.
