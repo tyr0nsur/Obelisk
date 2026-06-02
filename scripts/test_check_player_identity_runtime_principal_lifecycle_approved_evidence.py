@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -726,6 +727,73 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
+
+    def test_operational_window_artifact_does_not_hash_protected_path(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_protected_sidecar")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected_root = root / "server"
+            offline_root = root / "workspace-offline"
+            protected_root.mkdir()
+            offline_root.mkdir()
+            artifact_path = protected_root / RUN_ID / "window-manifest.json"
+            artifact = {"path": str(artifact_path), "sha256": "a" * 64}
+            blockers: list[dict] = []
+
+            with mock.patch.object(checker, "SERVER_ROOT", protected_root), mock.patch.object(
+                checker,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (offline_root,),
+            ), mock.patch.object(checker, "sha256_file", side_effect=AssertionError("sha256_file should not run")):
+                checker.validate_operational_window_artifact(
+                    artifact,
+                    "$.operational_window.manifest",
+                    blockers,
+                    run_id=RUN_ID,
+                    expected_name="window-manifest.json",
+                )
+
+        self.assertIn(
+            "operational_window_artifact_path_not_copied_or_offline",
+            [blocker["reason"] for blocker in blockers],
+        )
+        self.assertNotIn(
+            "operational_window_artifact_file_missing",
+            [blocker["reason"] for blocker in blockers],
+        )
+
+    def test_operational_window_artifact_does_not_hash_symlinked_path(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_symlink_sidecar")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected_root = root / "server"
+            offline_root = root / "workspace-offline"
+            protected_target = protected_root / RUN_ID
+            approved_link = offline_root / RUN_ID
+            protected_target.mkdir(parents=True)
+            offline_root.mkdir()
+            approved_link.symlink_to(protected_target)
+            artifact_path = approved_link / "window-manifest.json"
+            artifact = {"path": str(artifact_path), "sha256": "a" * 64}
+            blockers: list[dict] = []
+
+            with mock.patch.object(checker, "SERVER_ROOT", protected_root), mock.patch.object(
+                checker,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (offline_root,),
+            ), mock.patch.object(checker, "sha256_file", side_effect=AssertionError("sha256_file should not run")):
+                checker.validate_operational_window_artifact(
+                    artifact,
+                    "$.operational_window.manifest",
+                    blockers,
+                    run_id=RUN_ID,
+                    expected_name="window-manifest.json",
+                )
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("operational_window_artifact_path_symlink_component", reasons)
+        self.assertIn("operational_window_artifact_path_not_copied_or_offline", reasons)
+        self.assertNotIn("operational_window_artifact_file_missing", reasons)
 
     def test_rejects_expired_request_pack_when_markdown_drift_is_also_present(self) -> None:
         payload = manifest()

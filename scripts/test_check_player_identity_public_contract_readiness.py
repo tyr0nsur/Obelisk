@@ -23,6 +23,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import manifest as approved_manifest
+from test_check_player_identity_identifier_redaction_evidence import evidence as redaction_manifest
 import check_player_identity_public_contract_readiness as checker
 
 
@@ -30,13 +31,25 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
     def normalize_runtime_manifest_paths(self, runtime: dict) -> dict:
         return copy.deepcopy(runtime)
 
-    def run_checker(self, decisions: dict, runtime: dict, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        decisions: dict,
+        runtime: dict,
+        *args: str,
+        redaction: dict | None = None,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             decisions_path = root / "decisions.json"
             runtime_path = root / "approved-runtime.json"
+            redaction_args = []
             decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
             runtime_path.write_text(json.dumps(self.normalize_runtime_manifest_paths(runtime)), encoding="utf-8")
+            if redaction is not None:
+                redaction_path = root / "identifier-redaction.json"
+                redaction_path.write_text(json.dumps(redaction), encoding="utf-8")
+                redaction_args = ["--identifier-redaction-evidence", str(redaction_path)]
             result = subprocess.run(
                 [
                     sys.executable,
@@ -45,6 +58,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     str(decisions_path),
                     "--approved-runtime-evidence",
                     str(runtime_path),
+                    *redaction_args,
                     "--json",
                     *args,
                 ],
@@ -83,6 +97,43 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate")
         self.assertNotEqual(report["next_blocker"], "public_readiness")
         self.assertEqual(report["blockers"], [])
+        self.assertFalse(report["identifier_redaction_evidence"]["provided"])
+        self.assertFalse(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
+
+    def test_accepts_identifier_redaction_evidence_for_contract_review_only(self) -> None:
+        result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction_manifest())
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["accepted_for_contract_review"])
+        self.assertEqual(
+            report["resolved_inputs"],
+            ["runtime.lifecycle_evidence", "privacy.identifier_redaction"],
+        )
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
+        self.assertTrue(report["identifier_redaction_evidence"]["provided"])
+        self.assertTrue(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
+        self.assertFalse(report["identifier_redaction_evidence"]["promotion_ready"])
+        self.assertFalse(report["identifier_redaction_evidence"]["public_sdk_ready"])
+        self.assertFalse(report["identifier_redaction_evidence"]["runtime_ready"])
+        self.assertFalse(report["identifier_redaction_evidence"]["public_header_allowed"])
+
+    def test_rejects_identifier_redaction_evidence_that_overclaims_or_fails_validation(self) -> None:
+        redaction = redaction_manifest()
+        redaction["public_sdk_ready"] = True
+        redaction["sample_logs"][0]["message"] = "free form sanitized log"
+
+        result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
+        self.assertIn("identifier_redaction_evidence_public_sdk_ready_not_false", report["blockers"])
+        self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
 
     def test_accepts_candidate_only_pod_abi_shape(self) -> None:
         decisions = self.decisions()

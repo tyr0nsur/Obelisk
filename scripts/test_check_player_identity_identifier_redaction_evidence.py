@@ -148,6 +148,37 @@ class PlayerIdentityIdentifierRedactionEvidenceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sample_logs_contain_raw_identifier_material", report["blockers"])
+        self.assertIn("sample_log_keys_unexpected", report["blockers"])
+
+    def test_rejects_free_form_sample_log_text_without_raw_identifier_pattern(self) -> None:
+        payload = evidence()
+        payload["sample_logs"][0]["message"] = "joined with sanitized identity"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sample_log_keys_unexpected", report["blockers"])
+
+    def test_rejects_unknown_sample_log_redaction_reason_flag(self) -> None:
+        payload = evidence()
+        payload["sample_logs"][0]["redaction_reason_flags"] = ["display_label_observed"]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sample_log_redaction_reason_flags_unknown", report["blockers"])
+
+    def test_rejects_unknown_sample_log_event(self) -> None:
+        payload = evidence()
+        payload["sample_logs"][0]["event"] = "player_lookup"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sample_log_event_not_allowed", report["blockers"])
 
     def test_rejects_missing_required_identifier_class_coverage(self) -> None:
         payload = evidence()

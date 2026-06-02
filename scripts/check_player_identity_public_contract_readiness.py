@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence
+import check_player_identity_identifier_redaction_evidence as identifier_redaction
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -468,6 +469,11 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Approved runtime principal lifecycle evidence manifest.",
     )
+    parser.add_argument(
+        "--identifier-redaction-evidence",
+        type=Path,
+        help="Optional sanitized identifier-redaction evidence manifest for contract-review intake only.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     parser.add_argument(
         "--public-header",
@@ -592,6 +598,69 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
         if key in report and report.get(key) is not False:
             add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
     return report
+
+
+def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    if path is None:
+        return {
+            "provided": False,
+            "ready": False,
+            "accepted_for_contract_review": False,
+            "resolved_inputs": [],
+            "remaining_blockers": [REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT],
+        }
+    try:
+        payload = identifier_redaction.load_evidence(path)
+    except (OSError, SystemExit) as exc:
+        add(blockers, "identifier_redaction_evidence_unreadable", "$.identifier_redaction_evidence", error=str(exc))
+        return {
+            "provided": True,
+            "ready": False,
+            "accepted_for_contract_review": False,
+            "resolved_inputs": [],
+            "remaining_blockers": [REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT],
+        }
+
+    validation_blockers = identifier_redaction.validate_evidence(payload)
+    report = identifier_redaction.build_report(payload, validation_blockers)
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+        if payload.get(key) is not False or report.get(key) is not False:
+            add(blockers, f"identifier_redaction_evidence_{key}_not_false", f"$.identifier_redaction_evidence.{key}")
+    if validation_blockers:
+        add(
+            blockers,
+            "identifier_redaction_evidence_not_accepted",
+            "$.identifier_redaction_evidence",
+            reasons=[blocker["reason"] for blocker in validation_blockers],
+        )
+    else:
+        if report.get("accepted_for_contract_review") is not True:
+            add(
+                blockers,
+                "identifier_redaction_evidence_contract_review_not_accepted",
+                "$.identifier_redaction_evidence.accepted_for_contract_review",
+            )
+        if report.get("resolved_inputs") != [REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT]:
+            add(
+                blockers,
+                "identifier_redaction_evidence_resolved_inputs_mismatch",
+                "$.identifier_redaction_evidence.resolved_inputs",
+                value=report.get("resolved_inputs"),
+            )
+        if report.get("next_blocker") != NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE:
+            add(
+                blockers,
+                "identifier_redaction_evidence_next_blocker_mismatch",
+                "$.identifier_redaction_evidence.next_blocker",
+                value=report.get("next_blocker"),
+            )
+    return {
+        "provided": True,
+        "ready": report.get("ready") is True,
+        "accepted_for_contract_review": report.get("accepted_for_contract_review") is True,
+        "resolved_inputs": report.get("resolved_inputs") if isinstance(report.get("resolved_inputs"), list) else [],
+        "remaining_blockers": report.get("remaining_blockers") if isinstance(report.get("remaining_blockers"), list) else [],
+    }
 
 
 def string_list(value: Any) -> list[str] | None:
@@ -1252,6 +1321,7 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
 def build_report(
     decisions: dict[str, Any],
     runtime_report: dict[str, Any],
+    redaction_report: dict[str, Any],
     private_candidate_contract: dict[str, Any],
     public_header_report: dict[str, Any],
     blockers: list[dict[str, Any]],
@@ -1275,13 +1345,18 @@ def build_report(
         if not blocker["reason"].endswith("_blocked_until_player_identity_public_contract_promotion")
     ]
     accepted_for_contract_review = not evidence_blockers
+    resolved_inputs = []
+    if accepted_for_contract_review:
+        resolved_inputs.append(REQUIRED_RESOLVED_INPUT)
+        if redaction_report.get("accepted_for_contract_review") is True:
+            resolved_inputs.append(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
     return {
         "schema": REPORT_SCHEMA,
         "surface": decisions.get("surface"),
         "mode": check_mode,
         "ready": accepted_for_contract_review and check_mode == "consume",
         "accepted_for_contract_review": accepted_for_contract_review,
-        "resolved_inputs": [REQUIRED_RESOLVED_INPUT] if accepted_for_contract_review else [],
+        "resolved_inputs": resolved_inputs,
         "promotion_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
@@ -1328,8 +1403,17 @@ def build_report(
             "public_sdk_ready": False,
             "runtime_ready": False,
         },
+        "identifier_redaction_evidence": {
+            "provided": redaction_report.get("provided") is True,
+            "accepted_for_contract_review": redaction_report.get("accepted_for_contract_review") is True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+        },
         "non_claims": [
             "approved runtime evidence intake does not add public header symbols, capability bits, callbacks, lookup, mutation, return override, or v1 SDK readiness",
+            "identifier-redaction evidence intake does not resolve the full privacy blocker, add public header symbols, or make player identity promotion-ready",
         ],
     }
 
@@ -1344,7 +1428,16 @@ def main() -> int:
     private_candidate_contract = load_private_candidate_contract(decisions, args.private_candidate_contract, blockers)
     public_header_report = validate_public_header(decisions, args.public_header, blockers)
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
-    report = build_report(decisions, runtime_report, private_candidate_contract, public_header_report, blockers, check_mode)
+    redaction_report = identifier_redaction_report(args.identifier_redaction_evidence, blockers)
+    report = build_report(
+        decisions,
+        runtime_report,
+        redaction_report,
+        private_candidate_contract,
+        public_header_report,
+        blockers,
+        check_mode,
+    )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif blockers:

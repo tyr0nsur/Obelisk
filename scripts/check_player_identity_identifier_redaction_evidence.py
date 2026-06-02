@@ -34,6 +34,26 @@ REQUIRED_FIELD_CLASSES = {
     "raw chat text used as identity",
     "controller/playerstate object references",
 }
+ALLOWED_SAMPLE_LOG_KEYS = {
+    "event",
+    "principal_present",
+    "redaction_reason_flags",
+}
+ALLOWED_SAMPLE_LOG_EVENTS = {
+    "session_start",
+    "session_start_rejected",
+    "session_end",
+}
+ALLOWED_REDACTION_REASON_FLAGS = {
+    "platform_account_id_redacted",
+    "player_name_redacted",
+    "tribe_identifier_redacted",
+    "network_address_redacted",
+    "raw_chat_text_redacted",
+    "controller_playerstate_reference_redacted",
+    "opaque_principal_present",
+    "no_raw_identity_material",
+}
 FORBIDDEN_RAW_KEYS = {
     "account_id",
     "address",
@@ -101,6 +121,37 @@ def contains_raw_identifier(value: Any) -> list[str]:
         for nested in value:
             matches.extend(contains_raw_identifier(nested))
     return sorted(set(matches))
+
+
+def validate_sample_logs(sample_logs: Any, blockers: list[dict[str, Any]]) -> None:
+    raw_matches = contains_raw_identifier(sample_logs)
+    if raw_matches:
+        add(blockers, "sample_logs_contain_raw_identifier_material", "$.sample_logs", matches=raw_matches)
+    if sample_logs is None:
+        return
+    if not isinstance(sample_logs, list):
+        add(blockers, "sample_logs_not_list", "$.sample_logs")
+        return
+    for index, entry in enumerate(sample_logs):
+        label = f"$.sample_logs[{index}]"
+        if not isinstance(entry, dict):
+            add(blockers, "sample_log_not_object", label)
+            continue
+        unexpected_keys = sorted(set(entry) - ALLOWED_SAMPLE_LOG_KEYS)
+        if unexpected_keys:
+            add(blockers, "sample_log_keys_unexpected", label, unexpected=unexpected_keys)
+        event = entry.get("event")
+        if not isinstance(event, str) or event not in ALLOWED_SAMPLE_LOG_EVENTS:
+            add(blockers, "sample_log_event_not_allowed", f"{label}.event", value=event)
+        if entry.get("principal_present") not in {True, False}:
+            add(blockers, "sample_log_principal_present_not_bool", f"{label}.principal_present")
+        flags = entry.get("redaction_reason_flags")
+        if not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags):
+            add(blockers, "sample_log_redaction_reason_flags_not_string_list", f"{label}.redaction_reason_flags")
+            continue
+        unknown_flags = sorted(set(flags) - ALLOWED_REDACTION_REASON_FLAGS)
+        if unknown_flags:
+            add(blockers, "sample_log_redaction_reason_flags_unknown", f"{label}.redaction_reason_flags", unknown=unknown_flags)
 
 
 def validate_field(field: Any, index: int, blockers: list[dict[str, Any]]) -> str | None:
@@ -174,9 +225,7 @@ def validate_evidence(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if policy.get("raw_identity_logging_allowed") is not False:
             add(blockers, "policy_raw_identity_logging_allowed_not_false", "$.policy.raw_identity_logging_allowed")
 
-    raw_matches = contains_raw_identifier(payload.get("sample_logs", []))
-    if raw_matches:
-        add(blockers, "sample_logs_contain_raw_identifier_material", "$.sample_logs", matches=raw_matches)
+    validate_sample_logs(payload.get("sample_logs", []), blockers)
     return blockers
 
 

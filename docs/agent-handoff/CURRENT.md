@@ -156,11 +156,11 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
-  primary offline gap remains `privacy.identifier_redaction`; next offline work is an
-  identity-specific identifier-redaction policy/checker over sanitized snapshots only.
-  A new manifest checker exists for offline identifier-redaction evidence, but it is not
-  sufficient promotion evidence; its decision-manifest intake is contract-review only and
-  `privacy.identifier_redaction` remains unresolved.
+  primary offline gap remains `privacy.identifier_redaction`. The redaction checker now
+  enforces strict sanitized sample-log keys/events/reason flags, and public-contract
+  readiness can consume optional identifier-redaction evidence as contract-review input
+  only. It may add `privacy.identifier_redaction` to `resolved_inputs`, but the blocker
+  remains unresolved for promotion/public SDK/runtime/public-header readiness.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.
@@ -215,6 +215,6 @@ This file is an active routing table only. Durable evidence belongs in
   request packs reject expired windows, Markdown sidecars replay-check, approved runtime
   manifests preflight-check, and stale route-lock guidance points to runtime evidence plus identity contract. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, complete-SDK `0/12`, P0 `0/4`.
-- Latest guardrail round pinned downstream operator Markdown drift, requires approved
-  manifest checker `ready` plus exit zero, blocks rejected route gates from P0 credit, and
-  found broad UE4/dump rediscovery lower value than request/contract gates.
+- Latest delegated guardrail round integrated privacy log-schema hardening, optional
+  redaction-evidence intake, and approved-evidence sidecar path short-circuiting before
+  hashing protected/symlinked/non-approved paths. SDK remains fail-closed at `0/12`.

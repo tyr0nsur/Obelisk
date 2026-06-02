@@ -539,6 +539,7 @@ def validate_operational_window_artifact(
         add(blockers, "operational_window_artifact_path_missing", f"{label}.path")
         return
     symlink_component = symlink_component_for_path_text(path_text)
+    path_safe_for_hash = True
     if symlink_component is not None:
         add(
             blockers,
@@ -546,15 +547,25 @@ def validate_operational_window_artifact(
             f"{label}.path",
             symlink=str(symlink_component),
         )
-    if not source_path_is_copied_or_offline(path_text):
+        path_safe_for_hash = False
+    status = protected_paths.protected_path_status(
+        Path(path_text).expanduser(),
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected:
         add(blockers, "operational_window_artifact_path_not_copied_or_offline", f"{label}.path")
-    elif not source_path_is_approved_offline_workspace(path_text):
+        path_safe_for_hash = False
+    elif not status.approved_offline_workspace:
         add(blockers, "operational_window_artifact_path_not_approved_offline_workspace", f"{label}.path")
+        path_safe_for_hash = False
     path = Path(path_text).expanduser()
     if run_id and run_id not in path.parts:
         add(blockers, "operational_window_artifact_run_id_mismatch", f"{label}.path", run_id=run_id)
     if expected_name is not None and path.name != expected_name:
         add(blockers, "operational_window_artifact_filename_mismatch", f"{label}.path", expected=expected_name)
+    if not path_safe_for_hash:
+        return
     try:
         actual_sha256 = sha256_file(path)
     except FileNotFoundError:

@@ -930,6 +930,16 @@ priorities, and do not use history files as the active source of truth.
   preflight to see checker `ready` plus exit zero, and blocked rejected route-gate reports
   from giving P0 route credit in SDK accounting. Broad offline UE4/dump rediscovery was
   explicitly lower value for the current blocker.
+- Follow-up delegated guardrail pass integrated the active useful findings from four
+  read-only agents: stricter identifier-redaction `sample_logs` schema
+  (`event`, `principal_present`, allowlisted `redaction_reason_flags` only), optional
+  public-contract readiness consumption of identifier-redaction evidence as
+  contract-review input only, and approved-runtime-evidence operational sidecar
+  short-circuiting before `sha256_file()` on protected, symlinked, or non-approved paths.
+  Runtime/ABI and SDK wording audits found no higher-value blocker than the current
+  request/contract gates; route/SDK remain fail-closed with
+  `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, complete SDK `0/12`,
+  and P0 `0/4`.
 
 ## Agent Coordination
 

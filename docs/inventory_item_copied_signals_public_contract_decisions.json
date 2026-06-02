@@ -148,7 +148,7 @@
   "v1_completion_contract": {
     "claim_effect": "does_not_complete_v1_sdk",
     "required_before_stable_sdk_claim": [
-      "Promote this copied-signal surface to stable SDK wording, explicitly exclude it from v1, or keep the release statement scoped so it cannot imply Inventory SDK or Items SDK coverage.",
+      "Promote this copied-signal surface to non-experimental copied-signal wording, explicitly exclude it from v1, or keep the release statement scoped so it cannot imply Inventory SDK or Items SDK coverage.",
       "Promote obelisk.inventory_items_mutation.v1 separately before claiming inventory/item mutation, lookup, grants, removal, kits, rewards, engrams, or return override."
     ]
   },
