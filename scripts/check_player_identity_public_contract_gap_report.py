@@ -19,6 +19,7 @@ import check_player_identity_identifier_redaction_evidence as redaction_checker
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
 import check_player_identity_public_abi_preflight_candidate as public_abi_preflight_candidate
 import check_player_identity_private_pod_layout_candidate as private_pod_layout_candidate
+import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_runtime_evidence
 
 
 SCHEMA = "obelisk.player-identity-public-contract-gap-report.v1"
@@ -44,6 +45,14 @@ DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE = Path(
 )
 DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT = Path(
     "docs/research/player-identity-planning-sources/player-identity-owner-token-sdk-consumer-contract.json"
+)
+APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT = "runtime.lifecycle_evidence"
+APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER = "identity_public_contract_gate_missing"
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_CHECKER = "scripts/check_player_identity_public_contract_readiness.py"
+REQUIRED_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM = (
+    "A valid approved runtime evidence manifest can resolve only the runtime lifecycle "
+    "evidence input for contract review; it does not promote public player identity or open ABI."
 )
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
@@ -303,6 +312,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_IDENTIFIER_REDACTION_EVIDENCE,
         help="Sanitized identifier-redaction evidence manifest consumed as contract-review input only.",
+    )
+    parser.add_argument(
+        "--approved-runtime-evidence",
+        type=Path,
+        help=(
+            "Optional approved runtime principal lifecycle evidence manifest consumed as "
+            "contract-review input only; never promotion or public SDK evidence."
+        ),
     )
     parser.add_argument(
         "--principal-invalidation-policy",
@@ -745,6 +762,41 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             "$.forbidden_public_contract",
             missing=missing_required(decisions.get("forbidden_public_contract"), REQUIRED_FORBIDDEN_PUBLIC_CONTRACT),
         )
+    approved_runtime_intake = decisions.get("approved_runtime_evidence_intake")
+    if not isinstance(approved_runtime_intake, dict):
+        add(blockers, "decisions_approved_runtime_evidence_intake_missing", "$.approved_runtime_evidence_intake")
+    else:
+        if approved_runtime_intake.get("id") != REQUIRED_APPROVED_RUNTIME_EVIDENCE_INTAKE_ID:
+            add(blockers, "decisions_approved_runtime_evidence_intake_id_mismatch", "$.approved_runtime_evidence_intake.id")
+        if approved_runtime_intake.get("status") != "external_manifest_required":
+            add(blockers, "decisions_approved_runtime_evidence_intake_status_mismatch", "$.approved_runtime_evidence_intake.status")
+        if approved_runtime_intake.get("resolved_input") != APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT:
+            add(
+                blockers,
+                "decisions_approved_runtime_evidence_intake_resolved_input_mismatch",
+                "$.approved_runtime_evidence_intake.resolved_input",
+            )
+        if approved_runtime_intake.get("required_checker") != REQUIRED_APPROVED_RUNTIME_EVIDENCE_CHECKER:
+            add(
+                blockers,
+                "decisions_approved_runtime_evidence_intake_checker_mismatch",
+                "$.approved_runtime_evidence_intake.required_checker",
+            )
+        if approved_runtime_intake.get("non_claim") != REQUIRED_APPROVED_RUNTIME_EVIDENCE_NON_CLAIM:
+            add(
+                blockers,
+                "decisions_approved_runtime_evidence_intake_non_claim_mismatch",
+                "$.approved_runtime_evidence_intake.non_claim",
+            )
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+            if approved_runtime_intake.get(key) is not False:
+                add(
+                    blockers,
+                    "readiness_flag_not_false",
+                    f"$.approved_runtime_evidence_intake.{key}",
+                    input="approved_runtime_evidence_intake",
+                    value=approved_runtime_intake.get(key),
+                )
     redaction_intake = decisions.get("identifier_redaction_evidence_intake")
     if not isinstance(redaction_intake, dict):
         add(blockers, "decisions_identifier_redaction_evidence_intake_missing", "$.identifier_redaction_evidence_intake")
@@ -934,9 +986,32 @@ def validate_surfaces(surfaces: dict[str, Any], blockers: list[dict[str, Any]]) 
 
 def has_negative_context(value: str, match_start: int) -> bool:
     normalized = value.replace("_", " ")
-    prefix = normalized[max(0, match_start - 32) : match_start]
-    whole = normalized
-    return bool(NEGATIVE_CONTEXT_RE.search(prefix) or NEGATIVE_CONTEXT_RE.search(whole))
+    clause_start = max(
+        normalized.rfind(";", 0, match_start),
+        normalized.rfind(".", 0, match_start),
+    )
+    clause_end_candidates = [
+        index
+        for index in (
+            normalized.find(";", match_start),
+            normalized.find(".", match_start),
+        )
+        if index != -1
+    ]
+    clause_end = min(clause_end_candidates) if clause_end_candidates else len(normalized)
+    prefix = normalized[clause_start + 1 : match_start]
+    suffix = normalized[match_start:clause_end]
+    if re.search(r"(?:^|\b)non[-_ ]*$", prefix, re.IGNORECASE):
+        return True
+    if NEGATIVE_CONTEXT_RE.search(prefix):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:forbidden|unavailable|blocked|redacted)\b|\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
+            suffix,
+            re.IGNORECASE,
+        )
+    )
 
 
 def candidate_exposures(candidate: dict[str, Any]) -> list[dict[str, str]]:
@@ -1108,10 +1183,116 @@ def validate_principal_invalidation_policy(path: Path, blockers: list[dict[str, 
     }
 
 
-def validate_private_pod_layout_candidate(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    if path is None:
+        return {
+            "provided": False,
+            "accepted_for_contract_review": False,
+            "resolved_input": None,
+            "next_blocker": None,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "blockers": ["approved_runtime_evidence_not_provided"],
+        }
+    try:
+        payload = approved_runtime_evidence.load_json(path)
+    except (OSError, json.JSONDecodeError, SystemExit) as exc:
+        add(
+            blockers,
+            "approved_runtime_evidence_unreadable_or_rejected",
+            "--approved-runtime-evidence",
+            path=str(path),
+            error=str(exc),
+        )
+        return {
+            "path": str(path),
+            "provided": True,
+            "accepted_for_contract_review": False,
+            "resolved_input": None,
+            "next_blocker": None,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "blockers": ["approved_runtime_evidence_unreadable_or_rejected"],
+        }
+
+    validation = approved_runtime_evidence.validate_manifest(payload, check_mode="consume")
+    report = approved_runtime_evidence.build_report(payload, validation, check_mode="consume")
+    accepted = not validation.blockers
+    if not accepted:
+        add(
+            blockers,
+            "approved_runtime_evidence_not_accepted",
+            "--approved-runtime-evidence",
+            path=str(path),
+            evidence_blockers=report.get("blockers", []),
+        )
+    if report.get("next_blocker") != APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER:
+        add(
+            blockers,
+            "approved_runtime_evidence_next_blocker_mismatch",
+            "--approved-runtime-evidence.next_blocker",
+            value=report.get("next_blocker"),
+        )
+        accepted = False
+    if report.get("approved_runtime_evidence_present") is not True:
+        add(
+            blockers,
+            "approved_runtime_evidence_presence_missing",
+            "--approved-runtime-evidence.approved_runtime_evidence_present",
+            value=report.get("approved_runtime_evidence_present"),
+        )
+        accepted = False
+    if report.get("runtime_evidence_ready") is not True:
+        add(
+            blockers,
+            "approved_runtime_evidence_ready_missing",
+            "--approved-runtime-evidence.runtime_evidence_ready",
+            value=report.get("runtime_evidence_ready"),
+        )
+        accepted = False
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
+        if report.get(key) is not False:
+            add(
+                blockers,
+                "approved_runtime_evidence_readiness_flag_not_false",
+                f"--approved-runtime-evidence.{key}",
+                value=report.get(key),
+            )
+            accepted = False
+    return {
+        "path": str(path),
+        "provided": True,
+        "accepted_for_contract_review": accepted,
+        "resolved_input": APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT if accepted else None,
+        "next_blocker": report.get("next_blocker"),
+        "approved_runtime_evidence_present": report.get("approved_runtime_evidence_present") is True,
+        "runtime_evidence_ready": report.get("runtime_evidence_ready") is True,
+        "ready_scope": report.get("ready_scope"),
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "blockers": report.get("blockers", []),
+        "non_claim": (
+            "approved runtime evidence is a contract-review input only; it does not "
+            "promote player identity, open public ABI, unlock downstream surfaces, or "
+            "count toward v1 completion"
+        ),
+    }
+
+
+def validate_private_pod_layout_candidate(
+    path: Path,
+    private_contract_path: Path,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
     try:
         payload = private_pod_layout_candidate.load_json(path)
-        private_contract = private_pod_layout_candidate.load_json(DEFAULT_PRIVATE_CONTRACT)
+        private_contract = private_pod_layout_candidate.load_json(private_contract_path)
     except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
         add(
             blockers,
@@ -1175,6 +1356,7 @@ def validate_private_pod_layout_candidate(path: Path, blockers: list[dict[str, A
 def validate_public_abi_preflight_candidate(
     path: Path,
     private_pod_layout_path: Path,
+    private_contract_path: Path,
     public_header_path: Path,
     blockers: list[dict[str, Any]],
     identifier_redaction_evidence: dict[str, Any],
@@ -1183,7 +1365,7 @@ def validate_public_abi_preflight_candidate(
     try:
         payload = public_abi_preflight_candidate.load_json(path)
         private_payload = private_pod_layout_candidate.load_json(private_pod_layout_path)
-        private_contract = private_pod_layout_candidate.load_json(private_pod_layout_candidate.DEFAULT_PRIVATE_CONTRACT)
+        private_contract = private_pod_layout_candidate.load_json(private_contract_path)
         private_blockers = private_pod_layout_candidate.validate_manifest(private_payload, private_contract)
         private_report = private_pod_layout_candidate.build_report(private_payload, private_blockers)
     except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
@@ -1356,6 +1538,7 @@ def build_report(
     surface: dict[str, Any],
     header_scan: dict[str, Any],
     candidate: dict[str, Any],
+    approved_runtime_evidence_report: dict[str, Any],
     identifier_redaction_evidence: dict[str, Any],
     principal_invalidation_policy_report: dict[str, Any],
     private_pod_layout_report: dict[str, Any],
@@ -1370,17 +1553,21 @@ def build_report(
         else PRIMARY_OFFLINE_GAP
     )
     resolved_inputs = []
+    runtime_evidence_accepted = approved_runtime_evidence_report.get("accepted_for_contract_review") is True
+    if runtime_evidence_accepted:
+        resolved_inputs.append(APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT)
     if redaction_accepted:
         resolved_inputs.append(PRIMARY_OFFLINE_GAP)
     if principal_policy_accepted:
         resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
     remaining_contract_gate_inputs = [
-        "runtime.lifecycle_evidence",
         "lifetime.principal_scope",
         "lifetime.invalidation_events",
         "lifetime.reconnect_duplicate_stale_policy",
         "abi.public_pod_contract",
     ]
+    if not runtime_evidence_accepted:
+        remaining_contract_gate_inputs.insert(0, APPROVED_RUNTIME_EVIDENCE_RESOLVED_INPUT)
     if not redaction_accepted:
         remaining_contract_gate_inputs.insert(1, PRIMARY_OFFLINE_GAP)
     private_layout_accepted = private_pod_layout_report.get("accepted_for_contract_review_input") is True
@@ -1433,7 +1620,14 @@ def build_report(
         "sdk_consumer_contract": public_abi_preflight_report.get("sdk_consumer_contract", {}),
         "owner_token_sdk_consumer_contract": owner_token_sdk_consumer_report,
         "next_offline_actions": next_offline_actions,
-        "runtime_evidence_missing": True,
+        "runtime_evidence_missing": not runtime_evidence_accepted,
+        "current_blocker": APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER if runtime_evidence_accepted else "approved_runtime_evidence_missing",
+        "next_blocker": APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER,
+        "blocked_until": (
+            ["reviewed_identity_public_contract"]
+            if runtime_evidence_accepted
+            else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
+        ),
         "inputs": {
             "decisions": str(args.decisions),
             "surfaces": str(args.surfaces),
@@ -1444,6 +1638,7 @@ def build_report(
             "private_pod_layout_candidate": str(args.private_pod_layout_candidate),
             "public_abi_preflight_candidate": str(args.public_abi_preflight_candidate),
             "owner_token_sdk_consumer_contract": str(args.owner_token_sdk_consumer_contract),
+            "approved_runtime_evidence": str(args.approved_runtime_evidence) if args.approved_runtime_evidence else None,
         },
         "decisions": {
             "schema": decisions.get("schema"),
@@ -1470,12 +1665,14 @@ def build_report(
             "public_header_allowed": False,
         },
         "identifier_redaction_evidence": identifier_redaction_evidence,
+        "approved_runtime_evidence": approved_runtime_evidence_report,
         "principal_invalidation_policy": principal_invalidation_policy_report,
         "private_pod_layout_candidate": private_pod_layout_report,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
         "non_claims": [
             "offline gap report does not require approved runtime evidence",
+            "approved runtime evidence is contract-review input only and does not make player identity promotion-ready",
             "identifier-redaction evidence is contract-review input only and does not resolve the full privacy blocker",
             "principal invalidation policy is candidate-only review input and does not resolve the full lifetime/generation/scope blocker",
             "private POD layout candidate is contract-review input only and does not resolve the public ABI layout or SDK consumer gates",
@@ -1496,12 +1693,18 @@ def main() -> int:
     surface = validate_surfaces(surfaces, blockers) if surfaces else {}
     if candidate:
         validate_private_candidate(candidate, blockers)
+    approved_runtime_evidence_report = validate_approved_runtime_evidence(args.approved_runtime_evidence, blockers)
     identifier_redaction_evidence = validate_identifier_redaction_evidence(args.identifier_redaction_evidence, blockers)
     principal_invalidation_policy_report = validate_principal_invalidation_policy(args.principal_invalidation_policy, blockers)
-    private_pod_layout_report = validate_private_pod_layout_candidate(args.private_pod_layout_candidate, blockers)
+    private_pod_layout_report = validate_private_pod_layout_candidate(
+        args.private_pod_layout_candidate,
+        args.private_candidate_contract,
+        blockers,
+    )
     public_abi_preflight_report = validate_public_abi_preflight_candidate(
         args.public_abi_preflight_candidate,
         args.private_pod_layout_candidate,
+        args.private_candidate_contract,
         args.public_header,
         blockers,
         identifier_redaction_evidence,
@@ -1523,6 +1726,7 @@ def main() -> int:
         surface,
         header_scan,
         candidate,
+        approved_runtime_evidence_report,
         identifier_redaction_evidence,
         principal_invalidation_policy_report,
         private_pod_layout_report,

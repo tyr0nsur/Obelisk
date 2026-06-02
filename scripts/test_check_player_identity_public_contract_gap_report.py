@@ -6,14 +6,15 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_public_contract_gap_report.py"
 DECISIONS = REPO_ROOT / "docs" / "player_identity_public_contract_decisions.json"
@@ -24,6 +25,8 @@ PRINCIPAL_INVALIDATION_POLICY = REPO_ROOT / "docs" / "research" / "player-identi
 PRIVATE_POD_LAYOUT_CANDIDATE = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources" / "player-identity-private-pod-layout-candidate.json"
 PUBLIC_ABI_PREFLIGHT_CANDIDATE = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources" / "player-identity-public-abi-preflight-candidate.json"
 HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+
+from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import manifest as approved_manifest  # noqa: E402
 
 SPEC = importlib.util.spec_from_file_location("player_identity_gap_report_checker", SCRIPT)
 assert SPEC is not None
@@ -66,6 +69,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         principal_invalidation_policy: dict | None = None,
         private_pod_layout_candidate: dict | None = None,
         public_abi_preflight_candidate: dict | None = None,
+        approved_runtime_evidence: dict | None = None,
         header_text: str | None = None,
         owner_token_sdk_consumer_contract_path: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
@@ -78,6 +82,7 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             principal_policy_path = root / "principal-invalidation-policy.json"
             private_pod_layout_path = root / "private-pod-layout-candidate.json"
             public_abi_preflight_path = root / "public-abi-preflight-candidate.json"
+            approved_runtime_path = root / "approved-runtime-evidence.json"
             header_path = root / "ObeliskApi.h"
 
             decisions_path.write_text(json.dumps(decisions if decisions is not None else self.load_decisions()), encoding="utf-8")
@@ -115,6 +120,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            approved_runtime_args = []
+            if approved_runtime_evidence is not None:
+                approved_runtime_path.write_text(json.dumps(approved_runtime_evidence), encoding="utf-8")
+                approved_runtime_args = ["--approved-runtime-evidence", str(approved_runtime_path)]
             header_path.write_text(header_text if header_text is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
             owner_token_contract_args = []
             if owner_token_sdk_consumer_contract_path is not None:
@@ -141,12 +150,14 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                     str(private_pod_layout_path),
                     "--public-abi-preflight-candidate",
                     str(public_abi_preflight_path),
+                    *approved_runtime_args,
                     *owner_token_contract_args,
                     "--public-header",
                     str(header_path),
                     "--json",
                 ],
                 cwd=REPO_ROOT,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -324,6 +335,50 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertEqual(report["public_header_scan"]["detected_player_identity_tokens"], [])
         self.assertEqual(report["blockers"], [])
 
+    def test_consumes_approved_runtime_evidence_as_contract_review_input_only(self) -> None:
+        result = self.run_checker(approved_runtime_evidence=approved_manifest())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["guardrail_passed"])
+        self.assertFalse(report["accepted_for_contract_review"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["public_header_allowed"])
+        self.assertFalse(report["runtime_evidence_missing"])
+        self.assertEqual(report["current_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertEqual(report["blocked_until"], ["reviewed_identity_public_contract"])
+        self.assertIn("runtime.lifecycle_evidence", report["contract_review_inputs_resolved"])
+        self.assertNotIn("runtime.lifecycle_evidence", report["remaining_contract_gate_inputs"])
+        runtime_report = report["approved_runtime_evidence"]
+        self.assertTrue(runtime_report["provided"])
+        self.assertTrue(runtime_report["accepted_for_contract_review"])
+        self.assertEqual(runtime_report["resolved_input"], "runtime.lifecycle_evidence")
+        self.assertEqual(runtime_report["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertFalse(runtime_report["promotion_ready"])
+        self.assertFalse(runtime_report["public_sdk_ready"])
+        self.assertFalse(runtime_report["runtime_ready"])
+        self.assertFalse(runtime_report["public_header_allowed"])
+
+    def test_rejects_invalid_approved_runtime_evidence_without_routing(self) -> None:
+        runtime = approved_manifest()
+        runtime["public_sdk_ready"] = True
+
+        result = self.run_checker(approved_runtime_evidence=runtime)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved_runtime_evidence_not_accepted", report["blockers"])
+        self.assertIn("approved_runtime_evidence_presence_missing", report["blockers"])
+        self.assertIn("approved_runtime_evidence_ready_missing", report["blockers"])
+        self.assertTrue(report["runtime_evidence_missing"])
+        self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn("runtime.lifecycle_evidence", report["remaining_contract_gate_inputs"])
+        self.assertNotIn("runtime.lifecycle_evidence", report["contract_review_inputs_resolved"])
+        self.assertFalse(report["approved_runtime_evidence"]["accepted_for_contract_review"])
+
     def test_rejects_missing_owner_token_sdk_consumer_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             missing_contract = Path(tempdir) / "missing-owner-token-sdk-consumer.json"
@@ -383,6 +438,32 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("decisions_identifier_redaction_evidence_intake_missing", report["blockers"])
+
+    def test_rejects_missing_or_weakened_approved_runtime_evidence_intake(self) -> None:
+        decisions = self.load_decisions()
+        decisions["approved_runtime_evidence_intake"]["id"] = "runtime_evidence"
+        decisions["approved_runtime_evidence_intake"]["status"] = "accepted"
+        decisions["approved_runtime_evidence_intake"]["resolved_input"] = "public.identity"
+        decisions["approved_runtime_evidence_intake"]["required_checker"] = "scripts/other.py"
+        decisions["approved_runtime_evidence_intake"]["non_claim"] = "promotes player identity"
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_approved_runtime_evidence_intake_id_mismatch", report["blockers"])
+        self.assertIn("decisions_approved_runtime_evidence_intake_status_mismatch", report["blockers"])
+        self.assertIn("decisions_approved_runtime_evidence_intake_resolved_input_mismatch", report["blockers"])
+        self.assertIn("decisions_approved_runtime_evidence_intake_checker_mismatch", report["blockers"])
+        self.assertIn("decisions_approved_runtime_evidence_intake_non_claim_mismatch", report["blockers"])
+
+        decisions = self.load_decisions()
+        decisions.pop("approved_runtime_evidence_intake")
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("decisions_approved_runtime_evidence_intake_missing", report["blockers"])
 
     def test_rejects_missing_or_weakened_public_abi_preflight_intake(self) -> None:
         decisions = self.load_decisions()
@@ -773,6 +854,44 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "return_override",
             },
         )
+
+    def test_custom_private_candidate_contract_drift_reaches_nested_layout_and_preflight_checks(self) -> None:
+        candidate = self.load_private_candidate()
+        candidate["candidate_event_payload_fields_or_equivalent"].append("custom_contract_drift_probe")
+
+        result = self.run_checker(candidate=candidate)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_pod_layout_candidate_not_accepted", report["blockers"])
+        self.assertIn("public_abi_preflight_candidate_not_accepted", report["blockers"])
+        self.assertIn(
+            "event_layout_private_contract_fields_mismatch",
+            report["private_pod_layout_candidate"]["blockers"],
+        )
+        self.assertIn(
+            "private_pod_layout_candidate_not_accepted",
+            report["public_abi_promotion_preflight"]["blockers"],
+        )
+
+    def test_rejects_positive_identity_exposure_before_later_unrelated_negative_clause(self) -> None:
+        candidate = self.load_private_candidate()
+        candidate["candidate_event_payload_fields_or_equivalent"].extend(
+            [
+                "SteamID copied into candidate payload; no lookup API is exposed",
+                "PlayerDataID copied into candidate payload; no lookup API is exposed",
+            ]
+        )
+
+        result = self.run_checker(candidate=candidate)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_candidate_forbidden_public_identity_exposure", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "private_candidate_forbidden_public_identity_exposure")
+        terms = {item["term"] for item in detail["exposures"]}
+        self.assertIn("steam_id", terms)
+        self.assertIn("player_data_id", terms)
 
     def test_rejects_private_candidate_missing_stale_handle_fail_closed_rule(self) -> None:
         candidate = self.load_private_candidate()

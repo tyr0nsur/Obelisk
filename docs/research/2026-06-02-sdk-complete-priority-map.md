@@ -2211,16 +2211,52 @@ Integrated offline changes:
 - Handoff/compact context now records delegated scopes, required/used skills, integrated
   findings, and pending findings so compaction does not erase coordination state.
 
-Deferred explorer recommendations:
+These public-contract gap-report items were later integrated in the same supervised
+goal: optional approved runtime evidence can now be consumed as contract-review input
+only, custom private-candidate drift reaches nested layout/preflight checks, and
+forbidden identity exposure scanning is clause-local. Validation remained offline-only.
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
+Discord, GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
 
-- `check_player_identity_public_contract_gap_report.py` could optionally consume approved
-  runtime evidence so its post-evidence report can set `runtime_evidence_missing=false`,
-  resolve only `runtime.lifecycle_evidence`, keep all readiness flags false, and retain
-  `identity_public_contract_gate_missing`.
-- The gap checker still validates private POD/preflight against default private-contract
-  inputs and could be tightened to honor supplied `--private-candidate-contract` drift.
-- The private-candidate forbidden exposure scan could be tightened so positive
-  identity-like terms are not hidden by a later unrelated negative clause.
+## Public Contract Gap Report Runtime-Input Hardening
+
+A delegated follow-up round split scope across gap-report design, private-candidate drift
+tests, SDK/P0 accounting audit, and offline reversing priority. Required/used skills were
+`obelisk-agent-handoff`, `obelisk-github-research-workflow`, `obelisk-live-ops`,
+`obelisk-continuous-learning`, and read-only reversing/tooling skills for the reversing
+audit.
+
+Integrated offline changes:
+
+- `check_player_identity_public_contract_gap_report.py` now has optional
+  `--approved-runtime-evidence`. Accepted evidence resolves only
+  `runtime.lifecycle_evidence`, sets `runtime_evidence_missing=false`, reports
+  `current_blocker=identity_public_contract_gate_missing`, keeps
+  `blocked_until=[reviewed_identity_public_contract]`, and leaves promotion/public
+  SDK/runtime/header readiness false.
+- The same checker validates `approved_runtime_evidence_intake` id/status/resolved input,
+  checker path, non-claim text, and false readiness flags in the public-contract decision
+  manifest.
+- Nested private POD layout and public ABI preflight validation now use the supplied
+  `--private-candidate-contract` instead of silently reloading the default contract.
+- Private-candidate forbidden exposure scanning is clause-local: negative non-claims such
+  as `does not expose player names` remain allowed, but positive `SteamID` or
+  `PlayerDataID` exposure followed by an unrelated `no lookup` clause fails.
+- `check_player_identity_first_evidence_readiness.py` was updated to call the widened
+  gap-report helpers while preserving the default pre-runtime `approved_runtime_evidence_missing`
+  route.
+
+Auditor findings:
+
+- Reverse-engineering/offline dump audit found no useful broad FName/GObjects/core/admin
+  or lifecycle-layout task left for this P0 blocker. Existing copied player-principal
+  lifecycle artifacts cannot clear `approved_runtime_evidence_missing` because the
+  canonical route shape is missing approved window/request/receipt evidence.
+- SDK/P0 auditor recommended the next accounting hardening: add mixed P0 non-counting
+  visibility for combinations of `identity_public_contract_gate_missing`, scoped P0
+  excluded/post-v1 release-statement records, and manifest-promoted-but-non-counting P0
+  rows. That remains pending.
 
 Validation remained offline-only. No runtime/server operation, marker/env change,
 ReflectionScanner, ptrace/gcore, Discord, GitHub publication, public ABI/header opening,

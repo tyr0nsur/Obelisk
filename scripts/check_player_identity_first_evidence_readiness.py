@@ -1614,13 +1614,19 @@ def player_identity_public_contract_gap_diagnosis(
         principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
         report_blockers,
     )
+    approved_runtime_evidence_gap_report = public_contract_gap_report.validate_approved_runtime_evidence(
+        None,
+        report_blockers,
+    )
     private_pod_layout_report = public_contract_gap_report.validate_private_pod_layout_candidate(
         public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
+        private_candidate_contract,
         report_blockers,
     )
     public_abi_preflight_report = public_contract_gap_report.validate_public_abi_preflight_candidate(
         public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
         public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
+        private_candidate_contract,
         public_header,
         report_blockers,
         redaction_diagnosis,
@@ -1643,6 +1649,7 @@ def player_identity_public_contract_gap_diagnosis(
         private_pod_layout_candidate=public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_abi_preflight_candidate=public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
         owner_token_sdk_consumer_contract=public_contract_gap_report.DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
+        approved_runtime_evidence=None,
         public_header=public_header,
     )
     report = public_contract_gap_report.build_report(
@@ -1652,6 +1659,7 @@ def player_identity_public_contract_gap_diagnosis(
         surface,
         header_scan,
         candidate_payload,
+        approved_runtime_evidence_gap_report,
         redaction_diagnosis,
         principal_policy_gap_report,
         private_pod_layout_report,

@@ -208,10 +208,10 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest delegated round used `obelisk-agent-handoff`,
-  `obelisk-github-research-workflow`, `obelisk-live-ops`, and
-  `obelisk-continuous-learning`: public-contract readiness now reports
-  `public_contract_allowed=false` and post-evidence blocker
-  `identity_public_contract_gate_missing`; SDK completion accepts that locked state as
-  non-counting; approved-evidence tests cover receipt payload/sidecar/log/request drift.
-  Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`, SDK `0/12`,
-  P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+  `obelisk-github-research-workflow`, `obelisk-live-ops`,
+  `obelisk-continuous-learning`, and read-only reversing skills. Integrated:
+  public-contract gap report optionally consumes approved runtime evidence as
+  contract-review input only, honors supplied private-candidate drift in nested checks,
+  and tightens forbidden identity exposure scanning. Pending: mixed P0 non-counting SDK
+  visibility. Default route/SDK remain fail-closed: `approved_runtime_evidence_missing`,
+  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.

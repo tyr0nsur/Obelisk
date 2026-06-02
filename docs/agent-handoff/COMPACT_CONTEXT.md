@@ -1082,6 +1082,16 @@ priorities, and do not use history files as the active source of truth.
   artifact drift. Remaining explorer recommendations: gap report could optionally consume
   approved runtime evidence and custom private-candidate inputs, plus tighten forbidden
   exposure scanning. No runtime/server operation was performed.
+- 2026-06-02 delegated gap-report/reversing priority pass integrated those deferred
+  gap-report items: optional `--approved-runtime-evidence` is contract-review input only,
+  accepted evidence resolves only `runtime.lifecycle_evidence` and routes to
+  `identity_public_contract_gate_missing`; supplied `--private-candidate-contract` now
+  reaches nested private POD/preflight checks; forbidden identity exposure scanning is
+  clause-local so positive `SteamID`/`PlayerDataID` text is rejected even if a later clause
+  says `no lookup`. Reversing audit found no higher-value broad dump/core task; existing
+  artifacts cannot clear `approved_runtime_evidence_missing`. Pending SDK auditor item:
+  mixed P0 non-counting visibility fields/tests. No runtime/server operation was
+  performed.
 
 ## Agent Coordination
 
