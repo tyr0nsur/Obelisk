@@ -50,10 +50,25 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
                 return f"/offline/{basename}"
             return str(root / "base-snapshots" / basename)
 
+        source_root = str(root) if root is not None else "/offline"
         return {
             "schema": "obelisk.reflection-snapshot-readiness.v1",
             "evidence_scope": "second_source_layout_evidence_only",
             "gate_mode": "planning_layout_intake",
+            "source_root": source_root,
+            "producer": {
+                "script": "scripts/compare_reflection_snapshots.py",
+                "argv": [
+                    "scripts/compare_reflection_snapshots.py",
+                    "--base-root",
+                    source_root,
+                    "--target-set",
+                    "command-chat-response-route-planning",
+                    "--readiness-report",
+                    "--json",
+                ],
+                "output_name": "command-chat-response-route-planning-readiness.json",
+            },
             "modules": [
                 {
                     "block_reasons": {},
@@ -336,7 +351,32 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             )
         readiness_path = root / "command-chat-response-route-planning-readiness.json"
         decisions_path = root / "command_chat_response_public_contract_decisions.json"
-        readiness_path.write_text(json.dumps(readiness if readiness is not None else self.make_readiness(root)), encoding="utf-8")
+        effective_readiness = deepcopy(readiness) if readiness is not None else self.make_readiness(root)
+        if effective_readiness.get("source_root") in (None, "/offline"):
+            effective_readiness["source_root"] = str(root)
+        effective_readiness.setdefault(
+            "producer",
+            {
+                "script": "scripts/compare_reflection_snapshots.py",
+                "argv": [
+                    "scripts/compare_reflection_snapshots.py",
+                    "--base-root",
+                    effective_readiness["source_root"],
+                    "--target-set",
+                    "command-chat-response-route-planning",
+                    "--readiness-report",
+                    "--json",
+                ],
+                "output_name": "command-chat-response-route-planning-readiness.json",
+            },
+        )
+        producer = effective_readiness.get("producer")
+        if isinstance(producer, dict) and isinstance(producer.get("argv"), list):
+            producer["argv"] = [
+                effective_readiness["source_root"] if item == "/offline" else item
+                for item in producer["argv"]
+            ]
+        readiness_path.write_text(json.dumps(effective_readiness), encoding="utf-8")
         decisions_path.write_text(json.dumps(decisions if decisions is not None else self.make_decisions()), encoding="utf-8")
         if temp_header:
             public_header_path = root / "ObeliskApi.h"
@@ -370,6 +410,59 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
+
+    def test_rejects_readiness_without_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir))
+            readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+            readiness.pop("source_root")
+            readiness.pop("producer")
+            readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("readiness_provenance_missing", report["blockers"])
+        self.assertIn("readiness_producer_missing", report["blockers"])
+
+    def test_rejects_readiness_source_root_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            stale_root = root / "stale-root"
+            stale_root.mkdir()
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+            readiness["source_root"] = str(stale_root)
+            readiness["producer"]["argv"] = [
+                str(stale_root) if item == str(root) else item
+                for item in readiness["producer"]["argv"]
+            ]
+            readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+            result = self.run_checker(
+                "--readiness",
+                str(readiness_path),
+                "--decisions",
+                str(decisions_path),
+                "--public-header",
+                str(public_header_path),
+                "--json",
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("readiness_source_root_mismatch", report["blockers"])
 
     def test_rejects_readiness_not_bound_to_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

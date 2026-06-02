@@ -1963,3 +1963,43 @@ not approved runtime evidence. The default route remains
 `lifecycle_anchor_first_evidence_provenance_unbound`; an explicit bound no-runtime route
 may only reach `approved_runtime_evidence_missing`; accepted runtime evidence may only
 advance to `identity_public_contract_gate_missing`.
+
+## Command Response Readiness Provenance Guardrail
+
+The next delegated follow-up closed the non-default synthetic command-response readiness
+gap and added a P0 request-pack aggregate regression:
+
+- `scripts/check_command_chat_response_public_readiness.py` now requires non-default
+  readiness JSON to carry `source_root` matching the selected root and a producer block
+  naming `scripts/compare_reflection_snapshots.py`, the
+  `command-chat-response-route-planning` target set, `--readiness-report`, `--json`, and
+  the canonical output name.
+- `scripts/validate_offline_artifact_gate.py` requires that same provenance when
+  validating command-response route readiness inside offline artifact manifests.
+- `scripts/test_check_player_identity_first_evidence_readiness.py` now has a
+  build-report-level regression proving that valid player-principal lifecycle
+  request-pack/env inputs, with lifecycle/principal planning aligned but no approved
+  runtime evidence, still leave top-level `approved_runtime_evidence_missing` and all
+  public/runtime/promotion flags false.
+- Runtime approved-evidence fixtures were aligned with preflight timeline binding so
+  accepted runtime-evidence tests continue to prove only the runtime-evidence blocker,
+  not public identity or SDK readiness.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_chat_response_public_readiness scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_validate_offline_artifact_gate.ValidateOfflineArtifactGateTests.test_accepts_command_chat_response_route_planning_manifest_for_consume_mode scripts.test_validate_offline_artifact_gate.ValidateOfflineArtifactGateTests.test_blocks_command_chat_response_route_planning_manifest_in_promote_mode scripts.test_validate_offline_artifact_gate.ValidateOfflineArtifactGateTests.test_command_chat_response_route_manifest_fails_closed_on_overclaims_and_bad_layout`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+
+Deferred finding: `check_commands_replies_public_readiness.py` strongly revalidates child
+command-response report source artifacts, but the child report file itself may still be a
+copy outside the response root if its contents rebuild identically. A future guardrail
+should choose a canonical report path that does not break route-gate temp composition.
+
+This round does not authorize runtime/server work, `/servidor/ark` writes, marker/env
+changes, Discord, GitHub publication, release refs, public identity, permissions/admin
+ABI, command response/replies readiness, ResourceHandle, or stable/complete SDK wording.
+Default route and SDK accounting remain fail-closed with
+`lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
+complete-SDK progress `0/12`, and P0 progress `0/4`.

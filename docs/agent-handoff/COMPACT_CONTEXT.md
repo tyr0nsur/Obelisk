@@ -897,6 +897,14 @@ priorities, and do not use history files as the active source of truth.
   P0 chain position 1, and a reviewed artifact hash. This is accounting-only and does
   not promote identity, permissions/admin, public ABI, runtime readiness, or SDK
   completion.
+- Follow-up command-response provenance guardrail now requires non-default
+  command-response readiness JSON to bind `source_root` plus
+  `scripts/compare_reflection_snapshots.py` producer argv for
+  `command-chat-response-route-planning`; default legacy offline readiness remains
+  planning-only until regenerated. P0 identity build-report regression now proves valid
+  player-principal request packs do not satisfy approved runtime evidence. Remaining
+  command/replies hardening risk: a copied child response-path report outside the response
+  root can still be accepted if its source artifacts rebuild identically.
 
 ## Agent Coordination
 

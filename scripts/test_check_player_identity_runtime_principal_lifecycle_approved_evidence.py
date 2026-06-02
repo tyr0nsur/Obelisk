@@ -130,6 +130,7 @@ def preflight_payload(
     copied_log_path: Path,
     env_file: Path | None = None,
     env_sha256: str | None = None,
+    checked_at_utc: str = "2026-06-01T12:00:00Z",
 ) -> str:
     payload = {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
@@ -155,7 +156,7 @@ def preflight_payload(
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": True,
-        "checked_at_utc": "2026-06-01T12:00:00Z",
+        "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
     }
@@ -236,6 +237,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
             copied_log_path=copied_log,
             env_file=observer_env_path,
             env_sha256=observer_env["sha256"],
+            checked_at_utc=approved_window["start_utc"],
         ),
     )
     preflight_post = write_sidecar(
@@ -247,6 +249,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
             map_name="TheIsland",
             window_manifest_path=manifest_path,
             copied_log_path=copied_log,
+            checked_at_utc="2026-06-01T12:10:00Z",
         ),
     )
     manifest = write_sidecar(

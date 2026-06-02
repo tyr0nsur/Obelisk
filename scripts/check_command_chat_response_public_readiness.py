@@ -24,6 +24,7 @@ DEFAULT_DECISIONS = REPO_ROOT / "docs" / "command_chat_response_public_contract_
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
 DEFAULT_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
+EXPECTED_READINESS_PRODUCER_SCRIPT = "scripts/compare_reflection_snapshots.py"
 
 REPORT_SCHEMA = "obelisk.command-chat-response-public-readiness-check.v1"
 READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
@@ -597,12 +598,87 @@ def validate_target_detail_path(
         add(blockers, "target_detail_path_not_regular_file", f"{label}.path", target=target, value=str(observed))
 
 
-def validate_readiness(payload: dict[str, Any], blockers: list[dict[str, Any]], *, root: Path) -> None:
+def validate_readiness_provenance(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    root: Path,
+    required: bool,
+) -> None:
+    source_root = payload.get("source_root")
+    if not isinstance(source_root, str) or not source_root:
+        if required:
+            add(blockers, "readiness_provenance_missing", "$.readiness.source_root")
+    else:
+        observed_root = safe_resolve_input_path(Path(source_root), "readiness_source_root", blockers)
+        expected_root = safe_resolve_input_path(root, "root", blockers)
+        if observed_root is not None and expected_root is not None and observed_root != expected_root:
+            add(
+                blockers,
+                "readiness_source_root_mismatch",
+                "$.readiness.source_root",
+                expected=str(expected_root),
+                value=str(observed_root),
+            )
+
+    producer = payload.get("producer")
+    if not isinstance(producer, dict):
+        if required:
+            add(blockers, "readiness_producer_missing", "$.readiness.producer")
+        return
+    if producer.get("script") != EXPECTED_READINESS_PRODUCER_SCRIPT:
+        add(
+            blockers,
+            "readiness_producer_script_mismatch",
+            "$.readiness.producer.script",
+            expected=EXPECTED_READINESS_PRODUCER_SCRIPT,
+            value=producer.get("script"),
+        )
+    if producer.get("output_name") != DEFAULT_READINESS_NAME:
+        add(
+            blockers,
+            "readiness_producer_output_name_mismatch",
+            "$.readiness.producer.output_name",
+            expected=DEFAULT_READINESS_NAME,
+            value=producer.get("output_name"),
+        )
+    argv = producer.get("argv")
+    if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
+        add(blockers, "readiness_producer_argv_missing", "$.readiness.producer.argv")
+        return
+    if EXPECTED_READINESS_PRODUCER_SCRIPT not in argv:
+        add(blockers, "readiness_producer_argv_script_missing", "$.readiness.producer.argv")
+    if "--target-set" not in argv:
+        add(blockers, "readiness_producer_argv_target_set_missing", "$.readiness.producer.argv")
+    else:
+        target_set_index = argv.index("--target-set") + 1
+        if target_set_index >= len(argv) or argv[target_set_index] != TARGET_SET:
+            add(
+                blockers,
+                "readiness_producer_argv_target_set_mismatch",
+                "$.readiness.producer.argv",
+                expected=TARGET_SET,
+                value=argv[target_set_index] if target_set_index < len(argv) else None,
+            )
+    if "--readiness-report" not in argv:
+        add(blockers, "readiness_producer_argv_readiness_report_missing", "$.readiness.producer.argv")
+    if "--json" not in argv:
+        add(blockers, "readiness_producer_argv_json_missing", "$.readiness.producer.argv")
+
+
+def validate_readiness(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    root: Path,
+    require_provenance: bool,
+) -> None:
     require_equal(payload, "schema", READINESS_SCHEMA, "$.readiness", blockers)
     require_equal(payload, "evidence_scope", "second_source_layout_evidence_only", "$.readiness", blockers)
     require_equal(payload, "gate_mode", "planning_layout_intake", "$.readiness", blockers)
     require_equal(payload, "second_source_status", "compared", "$.readiness", blockers)
     require_equal(payload, "strict_identity_indices", False, "$.readiness", blockers)
+    validate_readiness_provenance(payload, blockers, root=root, required=require_provenance)
     if string_set(payload.get("target_sets")) != {TARGET_SET}:
         add(blockers, "target_sets_mismatch", "$.readiness.target_sets", expected=[TARGET_SET], value=payload.get("target_sets"))
     if string_set(payload.get("target_filters")) != TARGETS:
@@ -1047,7 +1123,17 @@ def build_report(
     decisions = safe_load_json(decisions_path, "decisions", blockers)
     surfaces = safe_load_json(surfaces_path, "surfaces", blockers)
     if readiness is not None:
-        validate_readiness(readiness, blockers, root=resolved_root or root)
+        validation_root = resolved_root or root
+        try:
+            require_provenance = validation_root.resolve() != DEFAULT_ROOT.resolve()
+        except OSError:
+            require_provenance = True
+        validate_readiness(
+            readiness,
+            blockers,
+            root=validation_root,
+            require_provenance=require_provenance,
+        )
     if decisions is not None:
         validate_decisions(decisions, blockers, public_header_path)
     if surfaces is not None:

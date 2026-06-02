@@ -1365,6 +1365,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                server_binary_path=prepare_window_request.EXPECTED_SERVER_BINARY_PATH,
                 restart_expectation="restart",
                 final_posture="stable",
                 user_policy="no_regular_users",
@@ -1402,6 +1403,119 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             ],
         )
 
+    def test_build_report_keeps_request_pack_from_satisfying_runtime_evidence(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.lower_level_accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lifecycle_manifest = root / "lifecycle-candidates.json"
+            principal_manifest = root / "principal-policy.json"
+            request_path = root / "window-request.json"
+            env_path = root / "observer-window.env"
+            lifecycle_payload = lifecycle_manifest_bound_to_first_evidence()
+            lifecycle_manifest.write_text(json.dumps(lifecycle_payload), encoding="utf-8")
+            principal_manifest.write_text(
+                json.dumps(principal_policy_bound_to_lifecycle(lifecycle_payload)),
+                encoding="utf-8",
+            )
+            start = datetime.now(timezone.utc) + timedelta(hours=1)
+            end = start + timedelta(minutes=10)
+            run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            request_args = SimpleNamespace(
+                instance="arkserver2",
+                map_name="TheIsland",
+                run_id=run_id,
+                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                server_binary_path=prepare_window_request.EXPECTED_SERVER_BINARY_PATH,
+                restart_expectation="restart",
+                final_posture="stable",
+                user_policy="no_regular_users",
+                notice_path="not_applicable",
+                rollback_owner="operator",
+                output_dir=root,
+                json=True,
+            )
+            request_path.write_text(
+                json.dumps(prepare_window_request.request_payload(request_args)),
+                encoding="utf-8",
+            )
+            env_path.write_text(
+                "\n".join(prepare_window_request.env_lines(request_args)) + "\n",
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                artifact_root=Path("/tmp/player-identity-artifacts"),
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=Path("/tmp/player-identity-second-source"),
+                lifecycle_anchor_candidates_manifest=lifecycle_manifest,
+                principal_invalidation_policy_manifest=principal_manifest,
+                runtime_principal_lifecycle_evidence_manifest=None,
+                approved_runtime_principal_lifecycle_evidence_manifest=None,
+                player_principal_lifecycle_window_request=request_path,
+                player_principal_lifecycle_window_env=env_path,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False},
+                ),
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+            ):
+                payload = checker.build_report(args)
+
+        window_request = payload["first_evidence"]["player_principal_lifecycle_window_request"]
+        self.assertFalse(payload["ready"])
+        self.assertFalse(payload["accepted_for_internal_planning"])
+        self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(payload["blockers"], ["approved_runtime_evidence_missing"])
+        self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
+        self.assertTrue(window_request["request_pack_ready"])
+        self.assertFalse(window_request["bundle_inputs_ready"])
+        self.assertFalse(window_request["request_pack_is_runtime_evidence"])
+        self.assertTrue(window_request["operator_current_turn_runtime_window_approval_required"])
+        self.assertFalse(window_request["approved_runtime_evidence_present"])
+        self.assertFalse(window_request["runtime_evidence_ready"])
+        self.assertFalse(window_request["promotion_ready"])
+        self.assertFalse(window_request["public_sdk_ready"])
+        self.assertFalse(window_request["runtime_ready"])
+        self.assertEqual(window_request["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertEqual(window_request["next_blocker"], "operator_current_turn_runtime_window_approval_required")
+
     def test_window_request_pack_diagnosis_preserves_env_parse_blockers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             request_path = Path(tmp) / "window-request.json"
@@ -1417,6 +1531,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
+                server_binary_path=prepare_window_request.EXPECTED_SERVER_BINARY_PATH,
                 restart_expectation="restart",
                 final_posture="stable",
                 user_policy="no_regular_users",

@@ -4599,6 +4599,7 @@ def validate_command_chat_response_route_planning_manifest(
                 readiness_payload,
                 readiness_blockers,
                 root=readiness_path.parent,
+                require_provenance=True,
             )
             blockers.extend(
                 {
