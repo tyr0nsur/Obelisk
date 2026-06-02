@@ -524,6 +524,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
     if report is not None:
         primary_blocker = report.get("primary_blocker")
         next_blocker = report.get("next_blocker")
+    source_blockers = report.get("blockers") if report is not None else None
     current_blocker = primary_blocker or next_blocker
 
     blocker_route = ALLOWED_IDENTITY_LOCK_BLOCKERS.get(str(current_blocker), {})
@@ -546,6 +547,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
         "source_checker_accepted_for_internal_planning": (
             report.get("accepted_for_internal_planning") if report is not None else None
         ),
+        "source_checker_blockers": source_blockers,
         "planning_only": True,
         "promotion_ready": report.get("promotion_ready") is True if report is not None else None,
         "public_sdk_ready": report.get("public_sdk_ready") is True if report is not None else None,
@@ -572,6 +574,12 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
     if phase.get("source_checker_primary_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_readiness_blocker_missing")
+    source_blockers = phase.get("source_checker_blockers")
+    primary_blocker = phase.get("source_checker_primary_blocker")
+    if not isinstance(source_blockers, list):
+        blockers.append("critical_path_identity_readiness_blockers_missing")
+    elif primary_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS and primary_blocker not in source_blockers:
+        blockers.append("critical_path_identity_readiness_primary_blocker_not_in_blockers")
     if phase.get("current_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
     if phase.get("current_blocker") in {"identity_public_contract_gate", "identity_public_contract_gate_missing"}:
@@ -667,7 +675,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         ],
         "critical_path_phase": critical_path_phase,
         "route_lock": {
-            "locked": not validate_critical_path_phase(critical_path_phase),
+            "locked": not blockers,
             "blocked_until": [
                 ALLOWED_IDENTITY_LOCK_BLOCKERS.get(
                     str(critical_path_phase.get("current_blocker")),

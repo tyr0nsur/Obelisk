@@ -808,10 +808,32 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
     route_lock = payload.get("route_lock") if isinstance(payload.get("route_lock"), dict) else {}
     current_blocker = critical_path_phase.get("current_blocker")
     source_checker_primary_blocker = critical_path_phase.get("source_checker_primary_blocker")
+    source_checker_next_blocker = critical_path_phase.get("source_checker_next_blocker")
+    source_checker_status = critical_path_phase.get("source_checker_status")
+    source_checker_ready = critical_path_phase.get("source_checker_ready")
+    source_checker_internal_planning = critical_path_phase.get("source_checker_accepted_for_internal_planning")
+    route_blockers = payload.get("blockers", [])
     if current_blocker != "lifecycle_anchor_first_evidence_provenance_unbound":
         blockers.append("command_permission_route_gate_default_blocker_mismatch")
     if source_checker_primary_blocker != "lifecycle_anchor_first_evidence_provenance_unbound":
         blockers.append("command_permission_route_gate_default_source_blocker_mismatch")
+    if source_checker_next_blocker is not None:
+        blockers.append("command_permission_route_gate_default_source_next_blocker_unexpected")
+    if source_checker_status != "blocked":
+        blockers.append("command_permission_route_gate_source_status_unexpected")
+    if source_checker_ready is not False:
+        blockers.append("command_permission_route_gate_source_ready_overclaim")
+    if source_checker_internal_planning is not False:
+        blockers.append("command_permission_route_gate_source_internal_planning_overclaim")
+    if route_blockers:
+        blockers.append("command_permission_route_gate_blockers_not_empty")
+    if route_lock.get("locked") is not True:
+        blockers.append("command_permission_route_gate_lock_unexpected")
+    if route_lock.get("blocked_until") != [
+        "bound_lifecycle_anchor_and_principal_policy_sources",
+        "reviewed_identity_public_contract",
+    ]:
+        blockers.append("command_permission_route_gate_default_lock_blocked_until_unexpected")
     if public_or_runtime_claims:
         blockers.append("command_permission_route_gate_public_or_runtime_claims")
     return (
@@ -829,9 +851,14 @@ def run_command_permission_route_gate(path: Path) -> tuple[dict[str, Any], list[
             "public_header_allowed": payload.get("public_header_allowed"),
             "current_blocker": current_blocker,
             "source_checker_primary_blocker": source_checker_primary_blocker,
+            "source_checker_next_blocker": source_checker_next_blocker,
+            "source_checker_status": source_checker_status,
+            "source_checker_ready": source_checker_ready,
+            "source_checker_accepted_for_internal_planning": source_checker_internal_planning,
             "route_lock_blocked_until": route_lock.get("blocked_until"),
+            "route_lock_locked": route_lock.get("locked"),
             "public_or_runtime_claims": public_or_runtime_claims,
-            "blockers": payload.get("blockers", []),
+            "blockers": route_blockers,
             "stderr": result.stderr.strip(),
             "non_claim": "planning-only route guard; not v1 completion evidence",
         },

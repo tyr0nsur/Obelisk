@@ -309,10 +309,15 @@ This file is an active routing table only. Durable evidence belongs in
   resolved artifact paths, and reject launch-posture env keys such as `LD_PRELOAD`,
   `LD_LIBRARY_PATH`, `OBELISK_ROOT`, and Obelisk plugin/config/log roots in observer
   preflight env. This remains offline consume-side validation only.
-- Deferred read-only audit risks for the next offline guardrail round: route/SDK checks
-  should bind child primary blockers to child blocker lists and route locks; command
-  response/commands-replies should reject fake public-header paths and bind response
-  reports to canonical decisions; permissions/admin should reject symlinked JSON inputs.
+- Follow-up route/SDK provenance guardrails now bind the identity child
+  `primary_blocker` to the child blocker list, make `route_lock.locked` reflect all route
+  blockers, and require the bound wrapper and SDK completion wrapper to reject route-gate
+  reports with stale source checker readiness/status/internal-planning fields, non-empty
+  route blockers, route-lock drift, or stale default `source_checker_next_blocker`.
+  This remains planning-only validation and does not advance the default or bound route.
+- Deferred read-only audit risks for the next offline guardrail round: command response
+  and commands/replies should reject fake public-header paths and bind response reports to
+  canonical decisions; permissions/admin should reject symlinked JSON inputs.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

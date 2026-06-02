@@ -300,18 +300,42 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append("route_gate_report_missing")
     else:
         phase = route_report.get("critical_path_phase")
+        route_lock = route_report.get("route_lock")
         current_blocker = phase.get("current_blocker") if isinstance(phase, dict) else None
+        source_checker_primary_blocker = phase.get("source_checker_primary_blocker") if isinstance(phase, dict) else None
+        source_checker_status = phase.get("source_checker_status") if isinstance(phase, dict) else None
+        source_checker_ready = phase.get("source_checker_ready") if isinstance(phase, dict) else None
+        source_checker_internal_planning = (
+            phase.get("source_checker_accepted_for_internal_planning") if isinstance(phase, dict) else None
+        )
         if route_report.get("schema") != ROUTE_GATE_SCHEMA:
             blockers.append("route_gate_schema_mismatch")
         if route_report.get("valid") is not True or route_report.get("accepted_for_planning") is not True:
             blockers.append("route_gate_not_accepted_for_planning")
         if route_report.get("planning_only") is not True:
             blockers.append("route_gate_not_planning_only")
+        if route_report.get("blockers"):
+            blockers.append("route_gate_blockers_not_empty")
         for key in ("promotion_ready", "public_sdk_ready", "public_abi_ready", "runtime_ready", "public_header_allowed"):
             if route_report.get(key) is not False:
                 blockers.append(f"route_gate_{key}_overclaim")
         if current_blocker != "approved_runtime_evidence_missing":
             blockers.append("route_gate_bound_identity_blocker_unexpected")
+        if source_checker_primary_blocker != "approved_runtime_evidence_missing":
+            blockers.append("route_gate_bound_identity_primary_blocker_unexpected")
+        if source_checker_status != "blocked":
+            blockers.append("route_gate_identity_readiness_status_unexpected")
+        if source_checker_ready is not False:
+            blockers.append("route_gate_identity_readiness_ready_flag_overclaim")
+        if source_checker_internal_planning is not False:
+            blockers.append("route_gate_identity_readiness_internal_planning_overclaim")
+        if not isinstance(route_lock, dict) or route_lock.get("locked") is not True:
+            blockers.append("route_gate_lock_unexpected")
+        if not isinstance(route_lock, dict) or route_lock.get("blocked_until") != [
+            "approved_runtime_principal_lifecycle_evidence",
+            "reviewed_identity_public_contract",
+        ]:
+            blockers.append("route_gate_lock_blocked_until_unexpected")
 
     critical_path_phase = (
         route_report.get("critical_path_phase")

@@ -672,6 +672,44 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Route And SDK Provenance Lock Hardening
+
+The next supervised P0 guardrail round closed the route/SDK shallow-trust findings from
+read-only audit:
+
+- `check_command_permission_route_gate.py` now preserves the identity child checker's
+  `blockers` list in `critical_path_phase.source_checker_blockers` and requires the
+  allowed `source_checker_primary_blocker` to be present in that list. Identity child
+  blockers are expected while identity remains blocked; the primary blocker must be
+  provenance-backed rather than invented by the route gate.
+- The route gate's `route_lock.locked` now reflects all aggregate route blockers, not only
+  the isolated critical-path phase, so identity-mode drift cannot still publish a locked
+  route posture.
+- `check_command_permission_route_gate_bound_identity_sources.py` now rejects valid-looking
+  route reports with non-empty route blockers, bound-route primary blocker drift,
+  source-checker ready/status/internal-planning overclaims, or route-lock `locked` /
+  `blocked_until` drift.
+- `check_public_sdk_v1_completion.py` now rejects default route reports with non-empty
+  route blockers, route-lock drift, stale `source_checker_next_blocker`, or source-checker
+  ready/status/internal-planning overclaims even if the route report says `valid=true`.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate_bound_identity_sources`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+
+Deferred read-only audit findings for the next offline guardrail round:
+
+- Command response and commands/replies readiness should reject fake public-header paths
+  and bind embedded response-path reports to canonical decision manifests.
+- Permissions/admin public readiness should reject symlinked JSON artifacts and protected
+  decisions/surfaces inputs.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Structured Player-Principal Preflight Sidecars
 
 The next supervised round closed the deferred structured-preflight sidecar gap on the

@@ -124,6 +124,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "source_checker_status": "blocked",
                 "source_checker_ready": False,
                 "source_checker_accepted_for_internal_planning": False,
+                "source_checker_blockers": [
+                    "lifecycle_anchor_first_evidence_provenance_unbound",
+                    "accepted_lifecycle_anchors_missing",
+                ],
                 "planning_only": True,
                 "promotion_ready": False,
                 "public_sdk_ready": False,
@@ -221,6 +225,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(phase["runtime_ready"])
         self.assertFalse(phase["source_checker_ready"])
         self.assertFalse(phase["source_checker_accepted_for_internal_planning"])
+        self.assertIn("approved_runtime_evidence_missing", phase["source_checker_blockers"])
         self.assertEqual(
             ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
             report["route_lock"]["blocked_until"],
@@ -301,6 +306,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_status": "blocked",
             "source_checker_ready": False,
             "source_checker_accepted_for_internal_planning": False,
+            "source_checker_blockers": ["approved_runtime_evidence_missing"],
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -313,6 +319,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         phase["current_blocker"] = "lifecycle_anchor_first_evidence_provenance_unbound"
         phase["source_checker_primary_blocker"] = "lifecycle_anchor_first_evidence_provenance_unbound"
+        phase["source_checker_blockers"] = ["lifecycle_anchor_first_evidence_provenance_unbound"]
         self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
 
         phase["source_checker_primary_blocker"] = "approved_runtime_evidence_missing"
@@ -337,6 +344,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_status": "blocked",
             "source_checker_ready": False,
             "source_checker_accepted_for_internal_planning": False,
+            "source_checker_blockers": ["unexpected"],
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": True,
@@ -349,6 +357,34 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
         self.assertIn("critical_path_commands_replies_unlocked_must_stay_false", blockers)
 
+    def test_critical_path_phase_requires_primary_blocker_in_child_blockers(self) -> None:
+        phase = {
+            "current_surface": "obelisk.player_identity.v1",
+            "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+            "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+            "source_checker_parse_error": None,
+            "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+            "source_checker_blockers": [],
+            "source_checker_exit_code": 1,
+            "source_checker_status": "blocked",
+            "source_checker_ready": False,
+            "source_checker_accepted_for_internal_planning": False,
+            "permissions_admin_unlocked": False,
+            "command_response_unlocked": False,
+            "commands_replies_unlocked": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+        }
+
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+
+        self.assertIn("critical_path_identity_readiness_primary_blocker_not_in_blockers", blockers)
+        phase.pop("source_checker_blockers")
+        blockers = ROUTE_GATE.validate_critical_path_phase(phase)
+        self.assertIn("critical_path_identity_readiness_blockers_missing", blockers)
+
     def test_critical_path_phase_rejects_unparsable_or_schema_drifted_identity_readiness(self) -> None:
         phase = {
             "current_surface": "obelisk.player_identity.v1",
@@ -360,6 +396,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "source_checker_status": "blocked",
             "source_checker_ready": False,
             "source_checker_accepted_for_internal_planning": False,
+            "source_checker_blockers": ["approved_runtime_evidence_missing"],
             "permissions_admin_unlocked": False,
             "command_response_unlocked": False,
             "commands_replies_unlocked": False,
@@ -417,6 +454,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     {
                         "schema": "obelisk.player-identity-first-evidence-readiness.v1",
                         "primary_blocker": "approved_runtime_evidence_missing",
+                        "blockers": ["approved_runtime_evidence_missing"],
                         "status": "blocked",
                         "ready": False,
                         "accepted_for_internal_planning": False,
@@ -469,6 +507,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     {
                         "schema": "obelisk.player-identity-first-evidence-readiness.v1",
                         "primary_blocker": "approved_runtime_evidence_missing",
+                        "blockers": ["approved_runtime_evidence_missing"],
                         "status": "blocked",
                         "ready": False,
                         "accepted_for_internal_planning": False,
@@ -502,6 +541,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     {
                         "schema": "obelisk.player-identity-first-evidence-readiness.v1",
                         "primary_blocker": "approved_runtime_evidence_missing",
+                        "blockers": ["approved_runtime_evidence_missing"],
                         "status": "ready",
                         "ready": True,
                         "accepted_for_internal_planning": True,

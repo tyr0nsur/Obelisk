@@ -90,6 +90,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
 
+    def write_fake_route_gate(self, path: Path, **overrides: object) -> Path:
+        payload = {
+            "schema": "obelisk.command-permission-route-gate-check.v1",
+            "valid": True,
+            "accepted_for_planning": True,
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "critical_path_phase": {
+                "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+                "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+                "source_checker_next_blocker": None,
+                "source_checker_status": "blocked",
+                "source_checker_ready": False,
+                "source_checker_accepted_for_internal_planning": False,
+            },
+            "route_lock": {
+                "locked": True,
+                "blocked_until": [
+                    "bound_lifecycle_anchor_and_principal_policy_sources",
+                    "reviewed_identity_public_contract",
+                ],
+            },
+            "checks": [],
+            "blockers": [],
+        }
+        for key, value in overrides.items():
+            if key == "critical_path_phase" and isinstance(value, dict):
+                payload["critical_path_phase"].update(value)
+            elif key == "route_lock" and isinstance(value, dict):
+                payload["route_lock"].update(value)
+            else:
+                payload[key] = value
+        path.write_text(
+            f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
+            encoding="utf-8",
+        )
+        return path
+
     def test_inventory_copied_signals_contract_decision_manifest_is_required(self) -> None:
         import importlib.util
 
@@ -555,6 +597,92 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
         self.assertIn("command_permission_route_gate_schema_mismatch", payload["blockers"])
+
+    def test_completion_gate_rejects_route_gate_nonempty_blockers_even_when_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                blockers=["critical_path_identity_readiness_ready_flag_overclaim"],
+            )
+
+            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_blockers_not_empty", payload["blockers"])
+
+    def test_completion_gate_rejects_route_gate_unlocked_route_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                route_lock={"locked": False},
+            )
+
+            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_lock_unexpected", payload["blockers"])
+
+    def test_completion_gate_rejects_route_gate_wrong_default_blocked_until(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                route_lock={"blocked_until": ["reviewed_identity_public_contract"]},
+            )
+
+            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_default_lock_blocked_until_unexpected", payload["blockers"])
+
+    def test_completion_gate_rejects_route_gate_source_checker_ready_overclaim(self) -> None:
+        cases = (
+            (
+                {"source_checker_ready": True},
+                "command_permission_route_gate_source_ready_overclaim",
+            ),
+            (
+                {"source_checker_status": "ready"},
+                "command_permission_route_gate_source_status_unexpected",
+            ),
+            (
+                {"source_checker_accepted_for_internal_planning": True},
+                "command_permission_route_gate_source_internal_planning_overclaim",
+            ),
+        )
+        for phase_overrides, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    route_gate_path = self.write_fake_route_gate(
+                        Path(temp_dir) / "fake_route_gate.py",
+                        critical_path_phase=phase_overrides,
+                    )
+
+                    result = self.run_checker(
+                        "--command-permission-route-gate",
+                        str(route_gate_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+
+    def test_completion_gate_rejects_route_gate_stale_source_checker_next_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(
+                Path(temp_dir) / "fake_route_gate.py",
+                critical_path_phase={"source_checker_next_blocker": "identity_public_contract_gate_missing"},
+            )
+
+            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_default_source_next_blocker_unexpected", payload["blockers"])
 
     def test_completion_gate_rejects_default_route_gate_runtime_blocker_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
