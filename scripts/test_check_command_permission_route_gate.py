@@ -818,8 +818,44 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
                 self.assertEqual(["claim:positive_text_claim"], claims)
 
+    def test_collect_public_or_runtime_claims_rejects_public_sdk_v1_text_and_keys(self) -> None:
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(
+            {
+                "notes": [
+                    "public SDK is ready",
+                    "public header is allowed",
+                    "v1 completion is ready",
+                    "stable claim is ready",
+                ],
+                "stable_claim_allowed": True,
+                "v1_completion_ready": True,
+                "publicSdkReady": True,
+                "publicHeaderReady": "ready",
+            }
+        )
+
+        self.assertIn("notes[0]:positive_text_claim", claims)
+        self.assertIn("notes[1]:positive_text_claim", claims)
+        self.assertIn("notes[2]:positive_text_claim", claims)
+        self.assertIn("notes[3]:positive_text_claim", claims)
+        self.assertIn("stable_claim_allowed", claims)
+        self.assertIn("v1_completion_ready", claims)
+        self.assertIn("publicSdkReady", claims)
+        self.assertIn("publicHeaderReady", claims)
+
     def test_collect_public_or_runtime_claims_accepts_negated_runtime_ready_text(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):
+            with self.subTest(text=text):
+                claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
+                self.assertEqual([], claims)
+
+    def test_collect_public_or_runtime_claims_accepts_negated_public_sdk_v1_text(self) -> None:
+        for text in (
+            "public SDK remains blocked",
+            "public header is not allowed",
+            "v1 completion remains blocked",
+            "stable claim is not allowed",
+        ):
             with self.subTest(text=text):
                 claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
                 self.assertEqual([], claims)

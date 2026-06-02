@@ -25,11 +25,12 @@ After the 2026-06-02 compaction/reorganization, the lead reran the canonical off
 checks from the current worktree:
 
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with `lifecycle_anchor_first_evidence_provenance_unbound` as
-  the default-route critical-path blocker. Only explicit bound lifecycle/principal
-  planning artifacts may advance the no-runtime-evidence route to
-  `approved_runtime_evidence_missing`; after accepted approved runtime evidence, the next
-  allowed locked blocker is `identity_public_contract_gate_missing`.
+  originally passed as planning-only with
+  `lifecycle_anchor_first_evidence_provenance_unbound` as the default-route critical-path
+  blocker. That historical blocker is now closed by repo-local source-bound planning
+  artifacts; the current default-route blocker is `approved_runtime_evidence_missing`.
+  After accepted approved runtime evidence, the next allowed locked blocker is
+  `identity_public_contract_gate_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   intentionally failed closed with `stable_claim_allowed=false`,
   complete-SDK progress `0/12`, and P0 progress `0/4`.
@@ -87,14 +88,12 @@ evidence, and module side lanes are not substitutes for promotion of this chain.
 ## Identity Blocker
 
 Player identity is first. If the current offline identity packs continue to pass, the
-immediate default-route blocker is `lifecycle_anchor_first_evidence_provenance_unbound`.
-The next offline step is source-bound lifecycle-anchor/principal-policy planning artifacts,
-preferably through `scripts/check_command_permission_route_gate_bound_identity_sources.py`.
-A successful no-runtime-evidence bound-wrapper run may advance only to
-`approved_runtime_evidence_missing`; after accepted approved runtime evidence, the allowed
-locked route blocker is `identity_public_contract_gate_missing`. Do not spend more rounds
-on broad offline rediscovery unless the binary/hash changes, the accepted packs fail, or a
-focused checker contradicts the current evidence.
+immediate default-route blocker is `approved_runtime_evidence_missing`. Request-pack,
+preflight, and planning-layout readiness are not approved runtime principal lifecycle
+evidence and do not authorize runtime. After accepted approved runtime evidence, the
+allowed locked route blocker is `identity_public_contract_gate_missing`. Do not spend more
+rounds on broad offline rediscovery unless the binary/hash changes, the accepted packs
+fail, or a focused checker contradicts the current evidence.
 
 ## Post-P0 Target Map
 
@@ -2080,3 +2079,28 @@ commands/replies, promotion, release readiness, or stable/complete SDK wording. 
 next offline public-contract lane is an identity-specific `privacy.identifier_redaction`
 policy/checker over sanitized snapshots only; more broad FName/GObjects/core/static
 rediscovery is not useful for the current blocker.
+
+## Identifier-Redaction And Route-Claim Guardrails
+
+A follow-up delegated round split audit across identity/privacy, route/SDK accounting,
+docs, and request-hardening tests. Integrated offline changes:
+
+- Added `scripts/check_player_identity_identifier_redaction_evidence.py`, a standalone
+  sanitized-manifest checker for `privacy.identifier_redaction` evidence. A passing report
+  is contract-review evidence only: it keeps promotion, public SDK, runtime readiness, and
+  public header readiness false and does not promote `obelisk.player_identity.v1`.
+- Expanded `scripts/check_command_permission_route_gate.py` claim scanning so child
+  reports that claim public SDK readiness, public-header readiness, v1 completion, or
+  stable-claim allowance are rejected by the standalone route gate instead of only by the
+  top-level SDK completion wrapper.
+- Hardened player-principal request packs as pre-window-only artifacts: generation and
+  checking now reject approved windows that have already started, not only windows whose
+  end time has expired.
+
+Validation added focused unit coverage for identifier-redaction evidence, route-gate
+public SDK/v1/stable-claim overclaim scanning, and already-started approved-window
+rejection. No runtime/server work, `/servidor/ark` writes, marker/env edits, Discord,
+public ABI/header readiness, promotion, release readiness, or complete/stable SDK claim
+was authorized. The route remains locked/planning-only at
+`approved_runtime_evidence_missing`; complete-SDK progress remains non-counting until
+approved runtime principal lifecycle evidence and reviewed identity public contract exist.

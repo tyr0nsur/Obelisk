@@ -30,7 +30,7 @@ owner; the short checker is an operator/reviewer-facing entry point.
 
 ## Required Checker Artifact
 
-The future checker must fail closed unless the copied manifest proves all of these facts
+The checker must fail closed unless the copied manifest proves all of these facts
 for one approved window:
 
 - exact `run_id` / window id and exact target instance/map match the approval
@@ -58,5 +58,6 @@ summary. The exact checker should require explicit fields such as
 that any alternate observer, scanner, native-exec, ptrace, debug-control, callback escape,
 or malformed/symlink marker summary blocks acceptance.
 
-Until the long checker and the short entry-point test pass in the integration gate, the
-future runtime window request remains blocked at the manifest/checker contract stage.
+The manifest/checker contract-stage gap is closed by the short entry point and alias
+tests. Future runtime windows remain blocked by current-turn operator approval and
+approved runtime-evidence authorization, not by a missing checker artifact.

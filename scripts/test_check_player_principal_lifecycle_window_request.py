@@ -209,6 +209,32 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["operator_request_verified"])
         self.assertIn("operator_request_unreadable", report["blockers"])
 
+    def test_rejects_already_started_approved_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            start = (datetime.now(timezone.utc) - timedelta(seconds=60)).replace(microsecond=0)
+            end = (datetime.now(timezone.utc) + timedelta(minutes=5)).replace(microsecond=0)
+            request["run_id"] = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            request["approved_window"]["start_utc"] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+            request["approved_window"]["end_utc"] = end.strftime("%Y-%m-%dT%H:%M:%SZ")
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            markdown_path = output_dir / "operator-approval-request.md"
+            markdown_path.write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved_window_already_started", report["blockers"])
+
     def test_rejects_post_run_verification_command_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"

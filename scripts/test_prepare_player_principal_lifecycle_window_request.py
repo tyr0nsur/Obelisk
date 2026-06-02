@@ -209,6 +209,19 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must be in the future", result.stderr)
 
+    def test_rejects_already_started_approved_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = base_args(Path(tmp) / "request")
+            start = (datetime.now(timezone.utc) - timedelta(seconds=60)).replace(microsecond=0)
+            end = (datetime.now(timezone.utc) + timedelta(minutes=5)).replace(microsecond=0)
+            args[args.index("--run-id") + 1] = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            args[args.index("--approved-window-start-utc") + 1] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+            args[args.index("--approved-window-end-utc") + 1] = end.strftime("%Y-%m-%dT%H:%M:%SZ")
+            result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--approved-window-start-utc must be in the future", result.stderr)
+
     def test_rejects_run_id_window_start_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             args = base_args(Path(tmp) / "request")

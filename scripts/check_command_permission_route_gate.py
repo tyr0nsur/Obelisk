@@ -63,6 +63,7 @@ ALLOWED_IDENTITY_LOCK_BLOCKERS = {
 FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "promotion_ready",
     "public_sdk_ready",
+    "public_sdk",
     "public_abi_ready",
     "public_abi_allowed",
     "public_reply_abi_ready",
@@ -70,6 +71,7 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "runtime_ready",
     "send_chat_ready",
     "public_header_allowed",
+    "public_header_ready",
     "public_readiness_ready",
     "public_bridge_abi_allowed",
     "public_command_router_allowed",
@@ -93,6 +95,8 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "runtime_readiness_allowed",
     "public_response_path_allowed",
     "v1_completion_evidence",
+    "v1_completion_ready",
+    "stable_claim_allowed",
 }
 
 
@@ -115,7 +119,8 @@ POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"\b(?:"
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
     r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
-    r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime"
+    r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
+    r"public[_ -]?(?:sdk|header)|v1[_ -]?completion|stable[_ -]?claim"
     r")\b(?:\s+(?:is|are))?\s+"
     r"\b(?:public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
     re.IGNORECASE,

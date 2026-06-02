@@ -151,12 +151,15 @@ This file is an active routing table only. Durable evidence belongs in
   `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, reviewed server
   binary path/SHA, exact env/marker and forbidden-marker boundaries, pre/post evidence paths, structured preflight/window
   binding, post-run verification commands, canonical rollback delta, and no runtime/server
-  authorization.
+  authorization. Request packs are pre-window only: already-started or expired approved
+  windows fail closed.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
   primary offline gap remains `privacy.identifier_redaction`; next offline work is an
   identity-specific identifier-redaction policy/checker over sanitized snapshots only.
+  A new manifest checker exists for offline identifier-redaction evidence, but it is not
+  wired as sufficient promotion evidence and does not open public headers/SDK.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.

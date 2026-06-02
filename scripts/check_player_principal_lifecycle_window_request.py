@@ -524,6 +524,8 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "approved_window_end_utc_invalid", "approved_window.end_utc")
         if start_dt is not None and end_dt is not None and not start_dt < end_dt:
             add(blockers, "approved_window_order_invalid", "approved_window")
+        if start_dt is not None and start_dt <= datetime.now(timezone.utc):
+            add(blockers, "approved_window_already_started", "approved_window.start_utc", value=start)
         if (
             start_dt is not None
             and end_dt is not None

@@ -918,6 +918,12 @@ priorities, and do not use history files as the active source of truth.
   guidance no longer asks for already-closed bound lifecycle provenance. This does not
   authorize runtime/server work. The next offline public-contract lane is an
   identity-specific `privacy.identifier_redaction` policy/checker over sanitized snapshots.
+- Follow-up guardrail pass added a standalone offline identifier-redaction evidence
+  checker for sanitized player-identity manifests, expanded the route-gate claim scanner
+  to reject broad public SDK/public header/v1 completion/stable-claim overclaims, and
+  made request-pack preparation/checking reject already-started approved windows. This is
+  still offline-only: no runtime/server operation, public header, public ABI, promotion,
+  SDK completion, or release claim is authorized.
 
 ## Agent Coordination
 
