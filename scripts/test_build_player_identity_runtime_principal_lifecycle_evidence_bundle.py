@@ -769,6 +769,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             state = bundle_builder.request_pack_check_state(
                 {"exists": True, "path": Path("player-principal-lifecycle-window-request.json")},
                 {"exists": True, "path": Path("player-principal-lifecycle-observer.env")},
+                {"exists": True, "path": Path("operator-approval-receipt.json")},
                 blockers,
             )
         finally:
@@ -781,6 +782,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertIn("request_pack_check_failed", [blocker["reason"] for blocker in blockers])
         self.assertTrue(observed_commands)
         self.assertIn("--post-window-replay", observed_commands[0])
+        self.assertIn("--operator-approval-receipt", observed_commands[0])
+        self.assertIn("operator-approval-receipt.json", [str(part) for part in observed_commands[0]])
 
     def test_request_pack_check_accepts_post_window_replay_expired_only(self) -> None:
         original = bundle_builder.run_json_check
@@ -806,6 +809,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             state = bundle_builder.request_pack_check_state(
                 {"exists": True, "path": Path("player-principal-lifecycle-window-request.json")},
                 {"exists": True, "path": Path("player-principal-lifecycle-observer.env")},
+                {"exists": True, "path": Path("operator-approval-receipt.json")},
                 blockers,
             )
         finally:
@@ -841,6 +845,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             state = bundle_builder.request_pack_check_state(
                 {"exists": True, "path": Path("player-principal-lifecycle-window-request.json")},
                 {"exists": True, "path": Path("player-principal-lifecycle-observer.env")},
+                {"exists": True, "path": Path("operator-approval-receipt.json")},
                 blockers,
             )
         finally:
@@ -1219,6 +1224,12 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 {
                     "exists": True,
                     "path": Path("/servidor/ark/obelisk/protected-observer-window.env"),
+                    "approved_offline_workspace": False,
+                    "protected": True,
+                },
+                {
+                    "exists": True,
+                    "path": Path("/servidor/ark/obelisk/protected-operator-approval-receipt.json"),
                     "approved_offline_workspace": False,
                     "protected": True,
                 },

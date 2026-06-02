@@ -424,6 +424,15 @@ namespace
         bool ReleaseItemReturn = false;
     };
 
+    struct PlayerPrincipalUnloadFenceState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        int Calls = 0;
+        bool Entered = false;
+        bool Release = false;
+    };
+
     void GameplayPolicyShutdownCrossFamilyFenceCallback(
         const ObeliskGameplayPolicyEvent* event,
         void* userData)
@@ -498,6 +507,22 @@ namespace
         state->ItemReturnEntered = true;
         state->Cv.notify_all();
         state->Cv.wait(lock, [state]() { return state->ReleaseItemReturn; });
+    }
+
+    void DirectPlayerPrincipalUnloadFenceCallback(
+        const Obelisk::Core::PlayerPrincipalEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                "direct player-principal unload fence callback received unexpected event kind");
+        Require(event.Action == Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+                "direct player-principal unload fence callback received unexpected action");
+        auto* state = static_cast<PlayerPrincipalUnloadFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->Calls;
+        state->Entered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->Release; });
     }
 
     void FakeChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
@@ -4618,6 +4643,108 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllWaitsForDirectPlayerPrincipalDispatchBeforeClose()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_direct_player_principal_unload_fence");
+        ConfigureEnvironment(root);
+
+        std::atomic<bool> closeObserved{false};
+        FakePlugin plugin{
+            .filename = "direct_player_principal_unload_fence.so",
+            .pluginId = "direct_player_principal_unload_fence",
+            .closeObserved = &closeObserved,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "direct player-principal unload fence plugin was not initialized");
+
+        PlayerPrincipalUnloadFenceState state;
+        const uint64_t registrationId =
+            Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Register(
+                plugin.owner,
+                Obelisk::Core::PlayerPrincipalEventSubscription{
+                    DirectPlayerPrincipalUnloadFenceCallback,
+                    &state,
+                });
+        Require(registrationId != 0, "direct player-principal unload fence registration returned zero");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "direct player-principal unload fence callback was not registered");
+
+        const std::vector<Obelisk::Core::PlayerPrincipalBoolValue> bools{
+            {
+                .Field = Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin,
+                .Value = true,
+            },
+            {
+                .Field = Obelisk::Core::PlayerPrincipalBoolField::ReturnValue,
+                .Value = true,
+            },
+        };
+        const Obelisk::Core::PlayerPrincipalEventView event{
+            .Kind = Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+            .Action = Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+            .EventSequence = 1,
+            .ServerProcessEpoch = 1,
+            .Bools = bools,
+        };
+
+        std::atomic<size_t> dispatches{0};
+        std::atomic<bool> unloadReturned{false};
+
+        std::thread dispatchThread([&]() {
+            dispatches.store(
+                Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Dispatch(event),
+                std::memory_order_release);
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(state.Mutex);
+            Require(state.Cv.wait_for(lock, std::chrono::seconds(2), [&state]() {
+                        return state.Entered;
+                    }),
+                    "direct player-principal unload fence callback did not enter");
+        }
+
+        std::thread unloadThread([&]() {
+            manager.UnloadAll();
+            unloadReturned.store(true, std::memory_order_release);
+        });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        Require(!closeObserved.load(std::memory_order_acquire),
+                "plugin was closed while direct player-principal callback was in flight");
+        Require(!unloadReturned.load(std::memory_order_acquire),
+                "UnloadAll returned while direct player-principal callback was in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(state.Mutex);
+            state.Release = true;
+        }
+        state.Cv.notify_all();
+
+        dispatchThread.join();
+        unloadThread.join();
+
+        Require(dispatches.load(std::memory_order_acquire) == 1,
+                "direct player-principal unload fence dispatch did not complete exactly one callback");
+        Require(state.Calls == 1, "direct player-principal unload fence callback call count mismatch");
+        Require(closeObserved.load(std::memory_order_acquire),
+                "plugin was not closed after direct player-principal callback completed");
+        Require(plugin.closeCalls == 1, "direct player-principal unload fence plugin was not closed once");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "direct player-principal unload fence callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestDescribeResourceKind()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_describe_resource_kind");
@@ -6684,6 +6811,7 @@ int main()
     TestUnloadAllWaitsForCrossFamilyGameplayPolicyDispatchBeforeClose();
     TestUnloadAllWaitsForInventoryAndItemReturnGameplayPolicyDispatchBeforeClose();
     TestUnloadAllWaitsForDirectInventoryAndItemReturnDispatchBeforeClose();
+    TestUnloadAllWaitsForDirectPlayerPrincipalDispatchBeforeClose();
     TestDescribeResourceKind();
     TestDescribeGameplayPolicyEventKind();
     TestGameplayPolicyCallbackCleansOnInitFailure();

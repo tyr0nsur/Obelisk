@@ -203,14 +203,10 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest no-runtime delegated hardening rounds bound request-pack sidecars to canonical
-  siblings, stopped protected sidecar reads, rejected unsafe/duplicate window-manifest
-  keys, required explicit no-public-header/no-v1/no-capability/no-callback fields,
-  forced stable-only lifecycle request posture, required completed operator approval
-  receipts for post-window replay, added exact JSON sidecar commands to the operator
-  request markdown, labeled ambiguous `ready=true` reports with narrow `ready_scope`,
-  and made SDK completion reject bundle-builder-ready scopes plus require promoted
-  permissions/admin evidence before command response/replies. UE4 audit rejected further
-  offline broad rediscovery; next side-lane candidate is PluginManager unload fencing for
-  direct player-principal dispatch. Validated focused tests plus route/SDK gates; blocker
-  remains `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, no runtime/server op.
+- Latest no-runtime delegated hardening rounds bound request/window sidecars, stopped
+  protected sidecar reads, required receipt-bound post-window replay, labeled narrow
+  `ready_scope`, rejected planning/candidate/ready-scope reports as promoted SDK
+  sub-evidence, and added PluginManager unload fencing for direct player-principal
+  dispatch. Validated bundle/window tests, SDK completion tests, PluginManagerTests,
+  route/SDK gates, and `git diff --check`; blocker remains
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, no runtime/server op.

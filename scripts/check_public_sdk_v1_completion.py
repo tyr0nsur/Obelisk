@@ -2202,6 +2202,25 @@ def evidence_has_forbidden_ready_scope(value: Any) -> bool:
     return False
 
 
+def report_is_limited_to_non_promotional_readiness(report: Any) -> bool:
+    if not isinstance(report, dict):
+        return False
+    if report.get("planning_only") is True:
+        return True
+    if report.get("accepted_for_planning") is True:
+        return True
+    if report.get("candidate_only") is True:
+        return True
+    if report.get("pre_abi") is True:
+        return True
+    ready_scope = report.get("ready_scope")
+    return isinstance(ready_scope, str) and ready_scope in {
+        RUNTIME_EVIDENCE_READY_SCOPE,
+        PUBLIC_CONTRACT_REVIEW_READY_SCOPE,
+        BUNDLE_BUILDER_INPUTS_READY_SCOPE,
+    }
+
+
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     if surface.get("status") != "promoted":
         return False
@@ -2986,13 +3005,12 @@ def permissions_admin_structured_promotion_evidence_missing(
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
-    missing.extend(
-        player_identity_promotion_certificate_missing(
-            evidence,
-            manifest_path,
-            public_header_path,
-        )
+    dependency_missing = player_identity_promotion_certificate_missing(
+        evidence,
+        manifest_path,
+        public_header_path,
     )
+    missing.extend(dependency_missing)
 
     query_report, query_error = load_repo_relative_json_evidence(evidence.get("query_failclosed_report"))
     if query_error is not None:
@@ -3013,6 +3031,8 @@ def permissions_admin_structured_promotion_evidence_missing(
         and query_report.get("blockers") == []
     ):
         missing.append("query_failclosed_report:fields_invalid")
+    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(query_report):
+        missing.append("query_failclosed_report:not_promoted_evidence")
 
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
@@ -3034,6 +3054,8 @@ def permissions_admin_structured_promotion_evidence_missing(
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
+    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
+        missing.append("public_readiness_report:not_promoted_evidence")
 
     missing.extend(
         executed_test_report_missing(
@@ -3090,6 +3112,8 @@ def command_response_structured_promotion_evidence_missing(
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
+    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
+        missing.append("public_readiness_report:not_promoted_evidence")
     else:
         missing.extend(
             command_response_public_readiness_source_artifacts_missing(
@@ -3117,6 +3141,20 @@ def commands_replies_structured_promotion_evidence_missing(
     public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
+    command_response_evidence = evidence.get("command_response_promotion_evidence")
+    if not isinstance(command_response_evidence, dict):
+        command_response_evidence = {
+            "public_readiness_report": evidence.get("command_response_public_readiness_report"),
+            "executed_test_report": evidence.get("command_response_executed_test_report"),
+        }
+    dependency_missing = command_response_structured_promotion_evidence_missing(
+        command_response_evidence,
+        manifest_path,
+        public_header_path,
+    )
+    for reason in dependency_missing:
+        missing.append(f"command_response_{reason}")
+
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
         missing.append(f"public_readiness_report:{readiness_error}")
@@ -3144,6 +3182,8 @@ def commands_replies_structured_promotion_evidence_missing(
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
+    elif not dependency_missing and report_is_limited_to_non_promotional_readiness(readiness_report):
+        missing.append("public_readiness_report:not_promoted_evidence")
     else:
         missing.extend(
             commands_replies_public_readiness_source_artifacts_missing(
@@ -3153,20 +3193,6 @@ def commands_replies_structured_promotion_evidence_missing(
                 public_header_path,
             )
         )
-
-    command_response_evidence = evidence.get("command_response_promotion_evidence")
-    if not isinstance(command_response_evidence, dict):
-        command_response_evidence = {
-            "public_readiness_report": evidence.get("command_response_public_readiness_report"),
-            "executed_test_report": evidence.get("command_response_executed_test_report"),
-        }
-    dependency_missing = command_response_structured_promotion_evidence_missing(
-        command_response_evidence,
-        manifest_path,
-        public_header_path,
-    )
-    for reason in dependency_missing:
-        missing.append(f"command_response_{reason}")
 
     missing.extend(
         executed_test_report_missing(

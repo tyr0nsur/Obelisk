@@ -222,6 +222,7 @@ def run_json_check(command: list[str]) -> tuple[int, dict[str, Any] | None, str]
 def request_pack_check_state(
     request_pack: dict[str, Any],
     observer_env: dict[str, Any],
+    operator_approval_receipt: dict[str, Any],
     blockers: list[dict[str, Any]],
 ) -> dict[str, Any]:
     state: dict[str, Any] = {
@@ -235,18 +236,19 @@ def request_pack_check_state(
         return state
     if not unprotected_existing_file_state(request_pack) or not unprotected_existing_file_state(observer_env):
         return state
+    command = [
+        sys.executable,
+        str(WINDOW_REQUEST_CHECKER),
+        "--json",
+        str(request_pack["path"]),
+        "--env-file",
+        str(observer_env["path"]),
+        "--post-window-replay",
+    ]
+    if unprotected_existing_file_state(operator_approval_receipt):
+        command.extend(["--operator-approval-receipt", str(operator_approval_receipt["path"])])
     state["checked"] = True
-    exit_code, payload, stderr = run_json_check(
-        [
-            sys.executable,
-            str(WINDOW_REQUEST_CHECKER),
-            "--json",
-            str(request_pack["path"]),
-            "--env-file",
-            str(observer_env["path"]),
-            "--post-window-replay",
-        ]
-    )
+    exit_code, payload, stderr = run_json_check(command)
     state["exit_code"] = exit_code
     state["stderr"] = stderr
     if isinstance(payload, dict):
@@ -549,7 +551,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "operator_approval_receipt",
         blockers,
     )
-    request_check = request_pack_check_state(request_pack, observer_env, blockers)
+    request_check = request_pack_check_state(request_pack, observer_env, operator_approval_receipt, blockers)
     window_check = window_manifest_check_state(window_manifest, blockers)
 
     bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
