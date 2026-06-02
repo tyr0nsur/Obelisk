@@ -265,6 +265,7 @@ FORBIDDEN_READY_DOMAINS = {
     "v1",
 }
 READY_TERMS = {
+    "accepted",
     "complete",
     "completion",
     "done",
@@ -274,6 +275,20 @@ READY_TERMS = {
     "ready",
     "released",
 }
+FORBIDDEN_STRING_DOMAINS = {
+    "public sdk": "public_sdk",
+    "structure sdk": "structure_sdk",
+    "structure events": "public_structure_events_sdk",
+    "structureevents": "public_structure_events_sdk",
+    "structureevents sdk": "public_structure_events_sdk",
+    "public abi": "public_abi",
+    "promotion gate": "promotion_gate",
+}
+POSITIVE_STRING_CLAIM_RE = re.compile(
+    r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"\bpublic[-_\s]+ready\b|\bready\b)",
+    re.IGNORECASE,
+)
 NEGATED_TRUE_KEY_PREFIXES = (
     "must_block_",
     "must_remain_",
@@ -518,6 +533,14 @@ def compact_key_text(value: str) -> str:
     return "".join(token for token in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if token)
 
 
+def is_negative_statement(text: str) -> bool:
+    return text.strip().casefold().startswith(("does not", "do not", "no ", "not "))
+
+
+def has_false_ready_literal(text: str) -> bool:
+    return re.search(r"\bready\s*[:=]\s*false\b", text, re.IGNORECASE) is not None
+
+
 def raw_sanitization_reasons(value: Any, *, key: str | None = None, path: str = "") -> list[str]:
     reasons: list[str] = []
     if key in FORBIDDEN_SNAPSHOT_KEYS:
@@ -730,6 +753,7 @@ def validate_snapshot_shape(target_filter: str, snapshot_path: Path, blockers: l
     scan_for_forbidden_runtime_inputs(snapshot, blockers, f"$.snapshot[{target_filter}]")
     scan_for_forbidden_true_ready(snapshot, blockers, f"$.snapshot[{target_filter}]")
     scan_for_forbidden_true_claims(snapshot, blockers, f"$.snapshot[{target_filter}]")
+    scan_for_forbidden_string_claims(snapshot, blockers, f"$.snapshot[{target_filter}]")
     validate_snapshot_envelope(snapshot, blockers, str(snapshot_path))
     if snapshot.get("schema") != SNAPSHOT_SCHEMA:
         add(blockers, "snapshot_schema_mismatch", path=str(snapshot_path), expected=SNAPSHOT_SCHEMA, value=snapshot.get("schema"))
@@ -1113,6 +1137,42 @@ def scan_for_forbidden_true_claims(payload: Any, blockers: list[dict[str, Any]],
             scan_for_forbidden_true_claims(value, blockers, f"{path}[{index}]")
 
 
+def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | None:
+    text = value.casefold().strip()
+    if is_negative_statement(text) or has_false_ready_literal(text):
+        return None
+    normalized = normalized_key(key)
+    value_tokens = key_tokens(value)
+    key_path_tokens = key_tokens(key) | key_tokens(path)
+    value_public_ready = "public" in value_tokens and "ready" in value_tokens
+    if normalized == "status" and (value_public_ready or text in {"promoted", "public-ready", "public_ready"}):
+        return "status"
+    if normalized.endswith("_status"):
+        domain_tokens = key_path_tokens & FORBIDDEN_READY_DOMAINS
+        if domain_tokens and value_tokens & {"accepted", "promoted", "ready", "released"}:
+            return "_".join(sorted(domain_tokens))
+    if POSITIVE_STRING_CLAIM_RE.search(text) is None:
+        return None
+    for phrase, surface in FORBIDDEN_STRING_DOMAINS.items():
+        if phrase in text:
+            return surface
+    return None
+
+
+def scan_for_forbidden_string_claims(payload: Any, blockers: list[dict[str, Any]], path: str) -> None:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            child_path = f"{path}.{key}"
+            if isinstance(value, str):
+                surface = forbidden_string_claim_surface(str(key), child_path, value)
+                if surface is not None:
+                    add(blockers, "forbidden_string_claim", path=child_path, key=key, surface=surface)
+            scan_for_forbidden_string_claims(value, blockers, child_path)
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload):
+            scan_for_forbidden_string_claims(value, blockers, f"{path}[{index}]")
+
+
 def normalized_key(key: object) -> str:
     separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
     return separated.casefold().replace("-", "_").replace(" ", "_")
@@ -1232,10 +1292,12 @@ def main() -> int:
         scan_for_forbidden_runtime_inputs(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_ready(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_claims(readiness, blockers, "$.readiness")
+        scan_for_forbidden_string_claims(readiness, blockers, "$.readiness")
     if manifest is not None:
         scan_for_forbidden_runtime_inputs(manifest, blockers, "$.manifest")
         scan_for_forbidden_true_ready(manifest, blockers, "$.manifest")
         scan_for_forbidden_true_claims(manifest, blockers, "$.manifest")
+        scan_for_forbidden_string_claims(manifest, blockers, "$.manifest")
 
     report = build_report(blockers, readiness_path=readiness_path, readiness_sha256=readiness_sha256)
     print(json.dumps(report, indent=2, sort_keys=True))

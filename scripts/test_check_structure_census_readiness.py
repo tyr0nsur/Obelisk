@@ -343,10 +343,20 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
             manifest = self.copy_pack(root)
             readiness = self.write_second_source_readiness(Path(temp_dir) / "second-source.json")
             payload = json.loads(readiness.read_text(encoding="utf-8"))
+            payload["sdk_ready"] = True
+            payload["ready_for_promotion"] = True
+            payload["public_abi_ready"] = True
+            payload["structure_events_ready"] = True
+            payload["public_sdk_gate"] = {"ready": True}
             payload["public_structure_sdk_ready"] = True
             payload["build_policy_ready"] = True
             payload["enforcement_ready"] = True
             payload["v1_complete"] = True
+            payload["status"] = "public-ready"
+            payload["sdk_status"] = "ready"
+            payload["promotion_status"] = "promoted"
+            payload["public_sdk_status"] = "accepted"
+            payload["negative_note"] = "does not promote Structure SDK readiness"
             payload["notes"] = "runtime hooks ready"
             readiness.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -366,6 +376,49 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
         self.assertIn("second_source_readiness_surface_overclaim", reasons)
         self.assertEqual(report["second_source_readiness"]["status"], "blocked")
         self.assertEqual(report["target_readiness"]["second_source"]["status"], "missing")
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["promotion_ready"])
+
+    def test_policy_alias_and_string_overclaims_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "pack"
+            manifest = self.copy_pack(root)
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload["sdk_ready"] = True
+            payload["ready_for_promotion"] = True
+            payload["public_abi_ready"] = True
+            payload["structure_events_ready"] = True
+            payload["public_sdk_gate"] = {"ready": True}
+            payload["status_aliases"] = {
+                "status": "public-ready",
+                "sdk_status": "ready",
+                "promotion_status": "promoted",
+                "public_sdk_status": "accepted",
+                "negative_note": "no public SDK ready claim",
+                "boundary": "public_sdk_ready=false",
+                "notes": "Structure SDK ready",
+            }
+            manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+            result = self.run_checker("--root", str(root), "--manifest", str(manifest), check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        blockers = [
+            blocker
+            for blocker in report["blockers"]
+            if blocker["reason"] == "structure_census_policy_surface_overclaim"
+        ]
+        paths = {blocker["path"] for blocker in blockers}
+        surfaces = {blocker["surface"] for blocker in blockers}
+        self.assertTrue(any(path.endswith(".sdk_ready") for path in paths))
+        self.assertTrue(any(path.endswith(".ready_for_promotion") for path in paths))
+        self.assertTrue(any(path.endswith(".public_abi_ready") for path in paths))
+        self.assertTrue(any(path.endswith(".structure_events_ready") for path in paths))
+        self.assertTrue(any(path.endswith(".public_sdk_gate.ready") for path in paths))
+        self.assertIn("public_structure_sdk", surfaces)
+        self.assertIn("status", surfaces)
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["promotion_ready"])

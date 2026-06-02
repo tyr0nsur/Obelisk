@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -20,6 +21,12 @@ DEFAULT_CONTRACT_DECISIONS_DIR = REPO_ROOT / "docs"
 DEFAULT_COMMAND_PERMISSION_ROUTE_GATE = REPO_ROOT / "scripts" / "check_command_permission_route_gate.py"
 DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY = (
     REPO_ROOT / "scripts" / "check_inventory_item_copied_signals_stability.py"
+)
+DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS = (
+    REPO_ROOT / "scripts" / "check_object_identity_resource_handle_public_contract_readiness.py"
+)
+OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME = (
+    "object_identity_resource_handle_public_contract_decisions.json"
 )
 CANONICAL_MANIFEST_RELEASE_CLAIM = "no-v1-stable-release-claim-post-rc-surface-inventory"
 CANONICAL_SURFACE_IDS = {
@@ -168,6 +175,27 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "v1_completion_evidence",
     "v1_completion_ready",
     "stable_claim_allowed",
+)
+ROUTE_GATE_OVERRIDE_TEST_ENV = "OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS"
+OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS = (
+    "promotion_ready",
+    "public_sdk_ready",
+    "runtime_ready",
+    "public_resource_handle_ready",
+    "post_callback_resource_handle_ready",
+)
+OBJECT_IDENTITY_RESOURCE_HANDLE_FORBIDDEN_READY_KEYS = (
+    *OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS,
+    "object_identity_ready",
+    "object_lookup_ready",
+    "public_abi_ready",
+    "public_contract_allowed",
+    "public_header_allowed",
+    "public_object_identity_ready",
+    "public_object_lookup_ready",
+    "release_ready",
+    "resource_handle_ready",
+    "v1_completion_ready",
 )
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"\b(?:"
@@ -757,6 +785,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--object-identity-resource-handle-readiness",
+        type=Path,
+        default=DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS,
+        help=(
+            "Offline guardrail that keeps ResourceHandle/object identity lookup "
+            "post-v1 and non-promotional."
+        ),
+    )
+    parser.add_argument(
         "--validate-release-statement-scope",
         action="store_true",
         help=(
@@ -773,6 +810,21 @@ def run_command_permission_route_gate(
     public_header_path: Path,
 ) -> tuple[dict[str, Any], list[str]]:
     blockers: list[str] = []
+    resolved_default = DEFAULT_COMMAND_PERMISSION_ROUTE_GATE.resolve()
+    try:
+        resolved_path = path.resolve()
+    except OSError:
+        resolved_path = path
+    if resolved_path != resolved_default and os.environ.get(ROUTE_GATE_OVERRIDE_TEST_ENV) != "1":
+        return (
+            {
+                "path": str(path),
+                "expected_path": str(DEFAULT_COMMAND_PERMISSION_ROUTE_GATE),
+                "override_allowed": False,
+                "non_claim": "SDK completion uses the canonical route gate; arbitrary route-gate overrides are test-only",
+            },
+            ["command_permission_route_gate_override_not_allowed"],
+        )
     result = subprocess.run(
         [
             sys.executable,
@@ -1006,6 +1058,144 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
             "blockers": payload.get("blockers", []),
             "stderr": result.stderr.strip(),
             "non_claim": "copied-signal stability guard; not Inventory SDK, Items SDK, or v1 completion evidence",
+        },
+        blockers,
+    )
+
+
+def object_identity_resource_handle_public_or_runtime_claims(payload: dict[str, Any]) -> list[str]:
+    claims: list[str] = []
+
+    def normalized_key(key: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+        return separated.casefold().replace("-", "_").replace(" ", "_")
+
+    def is_positive_claim_value(value: Any) -> bool:
+        if value is True:
+            return True
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return value != 0
+        if isinstance(value, str):
+            return normalized_key(value) in {
+                "allowed",
+                "available",
+                "enabled",
+                "live",
+                "operational",
+                "promoted",
+                "public",
+                "ready",
+                "supported",
+                "true",
+                "unlocked",
+                "yes",
+            }
+        return False
+
+    forbidden_keys = {normalized_key(key) for key in OBJECT_IDENTITY_RESOURCE_HANDLE_FORBIDDEN_READY_KEYS}
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                item_path = f"{path}.{key}" if path else str(key)
+                if normalized_key(key) in forbidden_keys and is_positive_claim_value(item):
+                    claims.append(item_path)
+                visit(item, item_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+
+    visit(payload, "")
+    return sorted(set(claims))
+
+
+def run_object_identity_resource_handle_readiness(
+    path: Path,
+    public_sdk_surfaces_path: Path,
+    public_header_path: Path,
+    contract_decisions_dir: Path,
+) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    decisions_path = contract_decisions_dir / OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(path),
+            "--decisions",
+            str(decisions_path),
+            "--surfaces",
+            str(public_sdk_surfaces_path),
+            "--public-header",
+            str(public_header_path),
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return (
+            {
+                "path": str(path),
+                "decisions": str(decisions_path),
+                "exit_code": result.returncode,
+                "parse_error": f"stdout_json_decode_error: {exc}",
+                "stderr": result.stderr.strip(),
+            },
+            ["object_identity_resource_handle_readiness_output_invalid"],
+        )
+    if not isinstance(payload, dict):
+        return (
+            {
+                "path": str(path),
+                "decisions": str(decisions_path),
+                "exit_code": result.returncode,
+                "parse_error": "stdout_json_not_object",
+                "stderr": result.stderr.strip(),
+            },
+            ["object_identity_resource_handle_readiness_output_invalid"],
+        )
+
+    public_or_runtime_claims = object_identity_resource_handle_public_or_runtime_claims(payload)
+    if payload.get("schema") != "obelisk.object-identity-resource-handle-public-contract-readiness-check.v1":
+        blockers.append("object_identity_resource_handle_readiness_schema_mismatch")
+    if result.returncode != 0 or payload.get("valid") is not True:
+        blockers.append("object_identity_resource_handle_readiness_invalid")
+    if payload.get("accepted_for_planning") is not True or payload.get("planning_only") is not True:
+        blockers.append("object_identity_resource_handle_readiness_not_planning_only")
+    for key in OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS:
+        if payload.get(key) is not False:
+            blockers.append(f"object_identity_resource_handle_{key}_not_false")
+    readiness_blockers = payload.get("blockers", [])
+    if readiness_blockers:
+        blockers.append("object_identity_resource_handle_readiness_blockers_not_empty")
+    if public_or_runtime_claims:
+        blockers.append("object_identity_resource_handle_public_or_runtime_claims")
+
+    return (
+        {
+            "path": str(path),
+            "decisions": str(decisions_path),
+            "exit_code": result.returncode,
+            "schema": payload.get("schema"),
+            "valid": payload.get("valid"),
+            "accepted_for_planning": payload.get("accepted_for_planning"),
+            "planning_only": payload.get("planning_only"),
+            "promotion_ready": payload.get("promotion_ready"),
+            "public_sdk_ready": payload.get("public_sdk_ready"),
+            "runtime_ready": payload.get("runtime_ready"),
+            "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
+            "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
+            "public_or_runtime_claims": public_or_runtime_claims,
+            "blockers": readiness_blockers,
+            "stderr": result.stderr.strip(),
+            "non_claim": (
+                "ResourceHandle/object-identity readiness guard; not public SDK, "
+                "runtime, promotion, or v1 completion evidence"
+            ),
         },
         blockers,
     )
@@ -2034,9 +2224,13 @@ def commands_replies_structured_promotion_evidence_missing(evidence: dict[str, A
     ):
         missing.append("public_readiness_report:fields_invalid")
 
-    dependency_missing = command_response_structured_promotion_evidence_missing(
-        {"public_readiness_report": evidence.get("command_response_public_readiness_report")}
-    )
+    command_response_evidence = evidence.get("command_response_promotion_evidence")
+    if not isinstance(command_response_evidence, dict):
+        command_response_evidence = {
+            "public_readiness_report": evidence.get("command_response_public_readiness_report"),
+            "executed_test_report": evidence.get("command_response_executed_test_report"),
+        }
+    dependency_missing = command_response_structured_promotion_evidence_missing(command_response_evidence)
     for reason in dependency_missing:
         missing.append(f"command_response_{reason}")
 
@@ -2499,6 +2693,7 @@ def build_report(
     contract_decisions_dir: Path = DEFAULT_CONTRACT_DECISIONS_DIR,
     command_permission_route_gate_path: Path = DEFAULT_COMMAND_PERMISSION_ROUTE_GATE,
     inventory_copied_signals_stability_path: Path = DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY,
+    object_identity_resource_handle_readiness_path: Path = DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS,
 ) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     command_permission_route_gate, route_gate_blockers = run_command_permission_route_gate(
@@ -2511,6 +2706,15 @@ def build_report(
         run_inventory_copied_signals_stability(inventory_copied_signals_stability_path)
     )
     blockers.extend(inventory_stability_blockers)
+    object_identity_resource_handle_readiness, resource_handle_readiness_blockers = (
+        run_object_identity_resource_handle_readiness(
+            object_identity_resource_handle_readiness_path,
+            manifest_path,
+            public_header_path,
+            contract_decisions_dir,
+        )
+    )
+    blockers.extend(resource_handle_readiness_blockers)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
     blockers.extend(release_statement_blockers)
     blocked_contract_header_symbols, contract_symbol_blockers = blocked_contract_public_header_symbol_drift(
@@ -2532,6 +2736,7 @@ def build_report(
             "contract_decisions_dir": str(contract_decisions_dir),
             "command_permission_route_gate": command_permission_route_gate,
             "inventory_copied_signals_stability": inventory_copied_signals_stability,
+            "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
             "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
             "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
             "blockers": blockers,
@@ -2992,6 +3197,7 @@ def build_report(
         "contract_decisions_dir": str(contract_decisions_dir),
         "command_permission_route_gate": command_permission_route_gate,
         "inventory_copied_signals_stability": inventory_copied_signals_stability,
+        "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
         "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
         "release_claim": manifest.get("release_claim"),
@@ -3318,6 +3524,10 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "The command/permission route gate reported a public, runtime, or v1-completion claim.",
             "Action: keep the route gate planning-only; identity, permissions, command response, and replies need separate promotion evidence.",
         ],
+        "command_permission_route_gate_override_not_allowed": [
+            "SDK completion was asked to use a non-canonical command/permission route gate.",
+            "Action: use scripts/check_command_permission_route_gate.py for release/accounting checks; route-gate overrides are test-only.",
+        ],
         "inventory_copied_signals_stability_output_invalid": [
             "The inventory/item copied-signal stability checker did not emit valid JSON.",
             "Action: fix scripts/check_inventory_item_copied_signals_stability.py before relying on copied inventory signals in release accounting.",
@@ -3333,6 +3543,50 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "inventory_copied_signals_v1_completion_ready_not_false": [
             "Inventory copied-signal stability attempted to mark v1 completion readiness.",
             "Action: copied inventory signals cannot count toward complete/full/production SDK progress.",
+        ],
+        "object_identity_resource_handle_readiness_output_invalid": [
+            "The ResourceHandle/object-identity public-contract readiness checker did not emit valid JSON.",
+            "Action: fix scripts/check_object_identity_resource_handle_public_contract_readiness.py before relying on ResourceHandle/object-identity accounting.",
+        ],
+        "object_identity_resource_handle_readiness_schema_mismatch": [
+            "The ResourceHandle/object-identity readiness checker emitted an unexpected schema.",
+            "Action: keep the dedicated checker on obelisk.object-identity-resource-handle-public-contract-readiness-check.v1.",
+        ],
+        "object_identity_resource_handle_readiness_invalid": [
+            "The ResourceHandle/object-identity readiness checker failed.",
+            "Action: keep ResourceHandle, object identity, object lookup, and post-callback object correlation blocked from public SDK accounting.",
+        ],
+        "object_identity_resource_handle_readiness_not_planning_only": [
+            "The ResourceHandle/object-identity readiness checker stopped reporting planning-only status.",
+            "Action: this guardrail must remain planning-only until a separate promotion gate exists.",
+        ],
+        "object_identity_resource_handle_readiness_blockers_not_empty": [
+            "The ResourceHandle/object-identity readiness checker reported blockers.",
+            "Action: resolve the dedicated checker blockers before any SDK completion claim.",
+        ],
+        "object_identity_resource_handle_public_or_runtime_claims": [
+            "The ResourceHandle/object-identity readiness checker reported a public, runtime, or promotion claim.",
+            "Action: keep ResourceHandle/object identity post-v1; copied events and category-only resource_kind metadata do not imply lookup or identity.",
+        ],
+        "object_identity_resource_handle_promotion_ready_not_false": [
+            "ResourceHandle/object identity attempted to mark promotion readiness.",
+            "Action: promotion readiness must remain false until a reviewed public ResourceHandle/object-identity gate exists.",
+        ],
+        "object_identity_resource_handle_public_sdk_ready_not_false": [
+            "ResourceHandle/object identity attempted to mark public SDK readiness.",
+            "Action: keep ResourceHandle/object identity out of public SDK readiness accounting.",
+        ],
+        "object_identity_resource_handle_runtime_ready_not_false": [
+            "ResourceHandle/object identity attempted to mark runtime readiness.",
+            "Action: runtime readiness for ResourceHandle/object identity needs separate promotion evidence.",
+        ],
+        "object_identity_resource_handle_public_resource_handle_ready_not_false": [
+            "ResourceHandle readiness was reported as true.",
+            "Action: no public ResourceHandle ABI is part of the v1 SDK completion claim.",
+        ],
+        "object_identity_resource_handle_post_callback_resource_handle_ready_not_false": [
+            "Post-callback ResourceHandle readiness was reported as true.",
+            "Action: no post-callback object correlation or handle API is part of the v1 SDK completion claim.",
         ],
         "schema_mismatch": [
             "The manifest schema is not obelisk.public-sdk-surfaces.v1.",
@@ -3432,6 +3686,7 @@ def main() -> int:
         args.contract_decisions_dir,
         args.command_permission_route_gate,
         args.inventory_copied_signals_stability,
+        args.object_identity_resource_handle_readiness,
     )
     if args.validate_release_statement_scope:
         report = add_scoped_release_statement_result(report)

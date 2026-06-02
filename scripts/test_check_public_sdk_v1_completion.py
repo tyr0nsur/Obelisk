@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -77,11 +78,20 @@ def complete_excluded_manifest() -> tuple[dict, str]:
 
 
 class PublicSdkV1CompletionCheckTests(unittest.TestCase):
-    def run_checker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        *args: str,
+        check: bool = True,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        run_env = os.environ.copy()
+        if env is not None:
+            run_env.update(env)
         result = subprocess.run(
             ["python3", str(SCRIPT), *args],
             cwd=REPO_ROOT,
             check=False,
+            env=run_env,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -89,6 +99,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         if check and result.returncode != 0:
             self.fail(f"checker failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
+
+    def route_gate_override_env(self) -> dict[str, str]:
+        return {"OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS": "1"}
 
     def write_fake_route_gate(self, path: Path, **overrides: object) -> Path:
         payload = {
@@ -126,6 +139,26 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 payload["route_lock"].update(value)
             else:
                 payload[key] = value
+        path.write_text(
+            f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def write_fake_resource_handle_checker(self, path: Path, **overrides: object) -> Path:
+        payload = {
+            "schema": "obelisk.object-identity-resource-handle-public-contract-readiness-check.v1",
+            "valid": True,
+            "accepted_for_planning": True,
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_resource_handle_ready": False,
+            "post_callback_resource_handle_ready": False,
+            "blockers": [],
+        }
+        payload.update(overrides)
         path.write_text(
             f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
             encoding="utf-8",
@@ -309,6 +342,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--command-permission-route-gate",
                 str(route_gate_path),
                 "--json",
+                env=self.route_gate_override_env(),
                 check=False,
             )
 
@@ -316,6 +350,22 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("command_permission_route_gate_invalid", payload["blockers"])
         self.assertNotIn("command_permission_route_gate_blockers_not_empty", payload["blockers"])
         self.assertTrue(payload["command_permission_route_gate"]["valid"])
+
+    def test_completion_gate_rejects_non_default_route_gate_without_test_override(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            route_gate_path = self.write_fake_route_gate(Path(temp_dir) / "fake_route_gate.py")
+
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("command_permission_route_gate_override_not_allowed", payload["blockers"])
+        self.assertFalse(payload["command_permission_route_gate"]["override_allowed"])
 
     def test_current_manifest_fails_closed_for_v1_completion(self) -> None:
         result = self.run_checker("--json", check=False)
@@ -346,6 +396,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertFalse(inventory_stability["public_sdk_ready"])
         self.assertFalse(inventory_stability["v1_completion_ready"])
         self.assertNotIn("inventory_copied_signals_stability_invalid", payload["blockers"])
+        resource_handle_readiness = payload["object_identity_resource_handle_readiness"]
+        self.assertEqual(
+            resource_handle_readiness["schema"],
+            "obelisk.object-identity-resource-handle-public-contract-readiness-check.v1",
+        )
+        self.assertTrue(resource_handle_readiness["valid"])
+        self.assertTrue(resource_handle_readiness["accepted_for_planning"])
+        self.assertTrue(resource_handle_readiness["planning_only"])
+        self.assertFalse(resource_handle_readiness["promotion_ready"])
+        self.assertFalse(resource_handle_readiness["public_sdk_ready"])
+        self.assertFalse(resource_handle_readiness["runtime_ready"])
+        self.assertFalse(resource_handle_readiness["public_resource_handle_ready"])
+        self.assertFalse(resource_handle_readiness["post_callback_resource_handle_ready"])
+        self.assertEqual(resource_handle_readiness["public_or_runtime_claims"], [])
+        self.assertEqual(resource_handle_readiness["blockers"], [])
+        self.assertNotIn("object_identity_resource_handle_readiness_invalid", payload["blockers"])
+        self.assertNotIn("object_identity_resource_handle_public_or_runtime_claims", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
         self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
         self.assertEqual(
@@ -518,6 +585,106 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(payload["inventory_copied_signals_stability"]["exit_code"], 2)
 
+    def test_resource_handle_readiness_checker_is_required(self) -> None:
+        result = self.run_checker(
+            "--object-identity-resource-handle-readiness",
+            "/tmp/obelisk-missing-resource-handle-readiness-checker.py",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("object_identity_resource_handle_readiness_output_invalid", payload["blockers"])
+        self.assertEqual(
+            payload["object_identity_resource_handle_readiness"]["path"],
+            "/tmp/obelisk-missing-resource-handle-readiness-checker.py",
+        )
+        self.assertEqual(payload["object_identity_resource_handle_readiness"]["exit_code"], 2)
+
+    def test_completion_gate_rejects_resource_handle_public_runtime_promotion_overclaims(self) -> None:
+        cases = (
+            ("promotion_ready", True, "object_identity_resource_handle_promotion_ready_not_false"),
+            ("public_sdk_ready", True, "object_identity_resource_handle_public_sdk_ready_not_false"),
+            ("runtime_ready", True, "object_identity_resource_handle_runtime_ready_not_false"),
+            (
+                "public_resource_handle_ready",
+                True,
+                "object_identity_resource_handle_public_resource_handle_ready_not_false",
+            ),
+            (
+                "post_callback_resource_handle_ready",
+                True,
+                "object_identity_resource_handle_post_callback_resource_handle_ready_not_false",
+            ),
+            ("public_abi_ready", True, "object_identity_resource_handle_public_or_runtime_claims"),
+            ("public_header_allowed", "ready", "object_identity_resource_handle_public_or_runtime_claims"),
+        )
+        for key, value, expected in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_resource_handle_checker(
+                        Path(temp_dir) / "fake_resource_handle_checker.py",
+                        **{key: value},
+                    )
+
+                    result = self.run_checker(
+                        "--object-identity-resource-handle-readiness",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertIn("object_identity_resource_handle_public_or_runtime_claims", payload["blockers"])
+                self.assertIn(key, payload["object_identity_resource_handle_readiness"]["public_or_runtime_claims"])
+                self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_resource_handle_checker_invalid_or_blocking_report(self) -> None:
+        cases = (
+            (
+                {"schema": "wrong-schema"},
+                "object_identity_resource_handle_readiness_schema_mismatch",
+            ),
+            (
+                {"valid": False},
+                "object_identity_resource_handle_readiness_invalid",
+            ),
+            (
+                {"accepted_for_planning": False},
+                "object_identity_resource_handle_readiness_not_planning_only",
+            ),
+            (
+                {"planning_only": False},
+                "object_identity_resource_handle_readiness_not_planning_only",
+            ),
+            (
+                {"blockers": ["surface_status_not_post_v1"]},
+                "object_identity_resource_handle_readiness_blockers_not_empty",
+            ),
+        )
+        for overrides, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_resource_handle_checker(
+                        Path(temp_dir) / "fake_resource_handle_checker.py",
+                        **overrides,
+                    )
+
+                    result = self.run_checker(
+                        "--object-identity-resource-handle-readiness",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertFalse(payload["stable_claim_allowed"])
+
     def test_missing_p0_dependency_chain_blocker_reports_specific_mismatch(self) -> None:
         manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
         p0_chain = [
@@ -636,6 +803,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--command-permission-route-gate",
                 str(route_gate_path),
                 "--json",
+                env=self.route_gate_override_env(),
                 check=False,
             )
 
@@ -685,6 +853,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--command-permission-route-gate",
                 str(route_gate_path),
                 "--json",
+                env=self.route_gate_override_env(),
                 check=False,
             )
 
@@ -699,7 +868,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 blockers=["critical_path_identity_readiness_ready_flag_overclaim"],
             )
 
-            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -712,7 +887,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 route_lock={"locked": False},
             )
 
-            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -725,7 +906,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 route_lock={"blocked_until": ["reviewed_identity_public_contract"]},
             )
 
-            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -758,6 +945,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "--command-permission-route-gate",
                         str(route_gate_path),
                         "--json",
+                        env=self.route_gate_override_env(),
                         check=False,
                     )
 
@@ -772,7 +960,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 critical_path_phase={"source_checker_next_blocker": "identity_public_contract_gate_missing"},
             )
 
-            result = self.run_checker("--command-permission-route-gate", str(route_gate_path), "--json", check=False)
+            result = self.run_checker(
+                "--command-permission-route-gate",
+                str(route_gate_path),
+                "--json",
+                env=self.route_gate_override_env(),
+                check=False,
+            )
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
@@ -810,6 +1004,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--command-permission-route-gate",
                 str(route_gate_path),
                 "--json",
+                env=self.route_gate_override_env(),
                 check=False,
             )
 
@@ -933,6 +1128,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "--command-permission-route-gate",
                 str(route_gate_path),
                 "--json",
+                env=self.route_gate_override_env(),
                 check=False,
             )
 
@@ -1799,7 +1995,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         scoped_payload = json.loads(scoped_result.stdout)
         self.assertFalse(scoped_payload["ready"])
-        self.assertTrue(scoped_payload["scoped_release_statement"]["ready"])
+        self.assertFalse(scoped_payload["scoped_release_statement"]["ready"])
         self.assertFalse(scoped_payload["scoped_release_statement"]["stable_v1_sdk_claim_allowed"])
         self.assertIn(
             "complete_sdk_claim_requires_promoted_demand_families",
@@ -1809,7 +2005,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "p0_dependency_chain_outcomes_scoped_non_complete_only",
             scoped_payload["scoped_release_statement"]["allowed_remaining_blockers"],
         )
-        self.assertEqual(scoped_payload["scoped_release_statement"]["blocking_report_blockers"], [])
+        self.assertEqual(
+            scoped_payload["scoped_release_statement"]["blocking_report_blockers"],
+            [
+                "object_identity_resource_handle_readiness_blockers_not_empty",
+                "object_identity_resource_handle_readiness_invalid",
+                "object_identity_resource_handle_readiness_not_planning_only",
+            ],
+        )
 
     def test_minimum_promoted_demand_family_rejects_unreviewed_synthetic_equivalent(self) -> None:
         import importlib.util
@@ -5164,6 +5367,139 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "executed_test_report:missing",
             ],
         )
+
+    def test_commands_replies_accepts_complete_structured_command_response_dependency_evidence(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="CommandsRepliesPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="commands_replies_promotion",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            response_abi = core_path / "CommandChatResponsePromotionTests.cpp"
+            response_sdk = sdk_path / "command_chat_response_promotion_plugin.c"
+            replies_abi = core_path / "CommandsRepliesPromotionTests.cpp"
+            replies_sdk = sdk_path / "commands_replies_promotion_plugin.c"
+            for path in (response_abi, response_sdk, replies_abi, replies_sdk):
+                path.write_text("// synthetic executed promotion fixture\n", encoding="utf-8")
+            response_report = core_path / "command_response_public_readiness.json"
+            response_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "target_set": "command-chat-response-route-planning",
+                        "readiness_status": "compared",
+                        "decisions_status": "blocked",
+                        "surfaces_status": "planning",
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            replies_report = core_path / "commands_replies_public_readiness.json"
+            replies_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.commands-replies-public-readiness-check.v1",
+                        "surface": "obelisk.commands_replies.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "public_command_router_allowed": False,
+                        "public_reply_or_send_chat_abi_allowed": False,
+                        "public_response_path_allowed": False,
+                        "decisions_status": "blocked",
+                        "commands_replies_surface_status": "planning",
+                        "dependency_chain": [
+                            "obelisk.player_identity.v1",
+                            "obelisk.permissions_admin.v1",
+                            "obelisk.command_chat_response_path.v1",
+                        ],
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_executed = {
+                "schema": "obelisk.promoted-surface-test-execution.v1",
+                "surface_id": "obelisk.command_chat_response_path.v1",
+                "abi_tests": [
+                    {
+                        "path": str(response_abi.relative_to(REPO_ROOT)),
+                        "command": "python3 -m unittest command_response_abi",
+                        "status": "passed",
+                    }
+                ],
+                "sdk_consumer_tests": [
+                    {
+                        "path": str(response_sdk.relative_to(REPO_ROOT)),
+                        "command": "cmake --build command_response_sdk_consumer",
+                        "status": "passed",
+                    }
+                ],
+            }
+            replies_executed = {
+                "schema": "obelisk.promoted-surface-test-execution.v1",
+                "surface_id": "obelisk.commands_replies.v1",
+                "abi_tests": [
+                    {
+                        "path": str(replies_abi.relative_to(REPO_ROOT)),
+                        "command": "python3 -m unittest commands_replies_abi",
+                        "status": "passed",
+                    }
+                ],
+                "sdk_consumer_tests": [
+                    {
+                        "path": str(replies_sdk.relative_to(REPO_ROOT)),
+                        "command": "cmake --build commands_replies_sdk_consumer",
+                        "status": "passed",
+                    }
+                ],
+            }
+
+            missing = module.surface_missing_structured_promotion_evidence(
+                {
+                    "id": "obelisk.commands_replies.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        "public_readiness_report": str(replies_report.relative_to(REPO_ROOT)),
+                        "command_response_promotion_evidence": {
+                            "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
+                            "executed_test_report": response_executed,
+                        },
+                        "executed_test_report": replies_executed,
+                    },
+                }
+            )
+
+        self.assertEqual(missing, [])
 
     def test_dependency_chain_accounting_keeps_invalid_promoted_identity_visible(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

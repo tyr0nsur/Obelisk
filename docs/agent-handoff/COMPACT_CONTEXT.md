@@ -376,8 +376,15 @@ priorities, and do not use history files as the active source of truth.
   and executed ABI/SDK tests. Inventory copied-signal and ResourceHandle readiness
   scanners now reject additional generic readiness aliases (`v1_sdk_ready`,
   `release_ready`, `public_abi_ready`, and related ResourceHandle metadata booleans).
-  Deferred next guardrails: wire ResourceHandle readiness into SDK completion accounting,
-  and close Structure alias/string overclaim gaps.
+  Later follow-up wires ResourceHandle/object-identity readiness into SDK completion
+  accounting, closes Structure census/build-policy alias/string overclaim gaps, rejects
+  non-canonical command/permission route-gate overrides by default, and fixes
+  commands/replies nested command-response structured evidence so future legitimate
+  evidence can include the command-response executed-test report. Deferred next
+  guardrails: replace inline executed promotion test reports with runner-emitted
+  repo-relative JSON carrying current HEAD/argv/exit/output provenance, and add an
+  offline ABI regression test for GameplayPolicyEvent multi-dispatcher partial
+  registration rollback.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

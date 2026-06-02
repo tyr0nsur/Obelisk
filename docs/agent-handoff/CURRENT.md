@@ -264,11 +264,19 @@ This file is an active routing table only. Durable evidence belongs in
   prose terms are present. Inventory copied-signal stability also rejects
   `v1_sdk_ready`, `release_ready`, and `public_abi_ready` aliases in
   `docs/public_gameplay_events.json`, and ResourceHandle readiness rejects generic
-  readiness booleans in decisions and the ResourceHandle surface row. Remaining deferred
-  guardrails: wire ResourceHandle readiness into SDK completion accounting, and close the
-  Structure alias/string gaps found by read-only audit. This is offline guardrail work
-  only; command response, commands/replies, Inventory/Items SDK, ResourceHandle, runtime,
-  release readiness, and v1 completion remain unpromoted.
+  readiness booleans in decisions and the ResourceHandle surface row. A later follow-up
+  wires the ResourceHandle/object-identity readiness checker into SDK completion
+  accounting, closes Structure alias/string overclaim gaps in census/build-policy
+  checkers, rejects non-canonical command/permission route-gate overrides unless the
+  explicit test-only env flag is set, and lets commands/replies structured evidence carry
+  a complete nested command-response promotion-evidence object instead of permanently
+  failing on a missing nested executed-test report. Remaining deferred guardrail:
+  executed promotion test reports are still inline manifest objects; future accounting
+  should require repo-relative runner-emitted JSON with current HEAD/argv/exit/output
+  provenance. ABI audit also recommends an offline test for GameplayPolicyEvent
+  multi-dispatcher partial registration rollback. This is offline guardrail work only;
+  command response, commands/replies, Inventory/Items SDK, Structure SDK, ResourceHandle,
+  runtime, release readiness, and v1 completion remain unpromoted.
 - 2026-06-02 P0 identity aggregate provenance closure: player-identity first-evidence now
   rejects standalone lifecycle-anchor/principal-policy planning artifacts unless they are
   bound to the first-evidence source artifact identity and the principal policy binds back

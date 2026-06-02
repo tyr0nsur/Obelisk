@@ -121,6 +121,41 @@ STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS = {
     "v1_completion",
     "v1_ready",
 }
+STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS = {
+    "abi",
+    "build",
+    "buildpolicy",
+    "callback",
+    "completion",
+    "event",
+    "events",
+    "promotion",
+    "promote",
+    "promoted",
+    "public",
+    "sdk",
+    "structure",
+    "structureevents",
+    "structuresdk",
+    "v1",
+}
+STRUCTURE_CENSUS_READY_TERMS = {
+    "accepted",
+    "complete",
+    "completion",
+    "done",
+    "promoted",
+    "promotion",
+    "readiness",
+    "ready",
+    "released",
+}
+STRUCTURE_CENSUS_NEGATED_TRUE_KEY_PREFIXES = (
+    "must_block_",
+    "must_remain_",
+    "no_",
+    "not_",
+)
 STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "build placement": "build_placement_policy",
     "build policy": "build_policy",
@@ -150,6 +185,22 @@ STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES = {
     "v1 done": "v1_completion",
     "v1 ready": "v1_completion",
 }
+STRUCTURE_CENSUS_FORBIDDEN_STRING_DOMAINS = {
+    "public sdk": "public_structure_sdk",
+    "public structure sdk": "public_structure_sdk",
+    "structure sdk": "public_structure_sdk",
+    "structure events": "public_structureevents_sdk",
+    "structureevents": "public_structureevents_sdk",
+    "structureevents sdk": "public_structureevents_sdk",
+    "public abi": "public_abi",
+    "public sdk gate": "public_structure_sdk",
+    "promotion gate": "promotion_gate",
+}
+STRUCTURE_CENSUS_POSITIVE_STRING_RE = re.compile(
+    r"(?:\baccepted\b|\bpromoted\b|\breleased\b|\bcomplete\b|\bdone\b|"
+    r"\bpublic[-_\s]+ready\b|\bready\b)",
+    re.IGNORECASE,
+)
 STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE = re.compile(
     r"(?:\bready\b|\breadiness\b|\ballowed\b|\benabled\b|\bpromoted\b|"
     r"\bpublic\s+sdk\b|\bv1\s+(?:complete|completion|done|ready)\b|"
@@ -160,7 +211,75 @@ STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE = re.compile(
 
 def is_negative_boundary_statement(text: str) -> bool:
     stripped = text.strip()
-    return stripped.startswith(("does not", "do not", "not "))
+    return stripped.startswith(("does not", "do not", "no ", "not "))
+
+
+def normalized_key(key: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return separated.casefold().replace("-", "_").replace(" ", "_")
+
+
+def key_tokens(value: object) -> set[str]:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", str(value))
+    return {token for token in re.split(r"[^A-Za-z0-9]+", spaced.casefold()) if token}
+
+
+def compact_key_text(value: object) -> str:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", str(value))
+    return "".join(token for token in re.split(r"[^A-Za-z0-9]+", spaced.casefold()) if token)
+
+
+def has_forbidden_ready_true_claim(key: str, path: str) -> bool:
+    normalized = normalized_key(key)
+    if normalized.startswith(STRUCTURE_CENSUS_NEGATED_TRUE_KEY_PREFIXES):
+        return False
+    if normalized == "layout_ready":
+        return False
+    if normalized in STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS:
+        return True
+
+    key_token_set = key_tokens(key)
+    path_token_set = key_tokens(path)
+    compact_key = compact_key_text(key)
+    compact_path = compact_key_text(path)
+    domain_in_key = bool(key_token_set & STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS) or any(
+        domain in compact_key for domain in STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS if len(domain) > 3
+    )
+    domain_in_path = bool(path_token_set & STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS) or any(
+        domain in compact_path for domain in STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS if len(domain) > 3
+    )
+    readiness_in_key = bool(key_token_set & STRUCTURE_CENSUS_READY_TERMS)
+    if readiness_in_key and (domain_in_key or domain_in_path):
+        return True
+    if "ready" in key_token_set and domain_in_path:
+        return True
+    return False
+
+
+def has_false_ready_literal(text: str) -> bool:
+    return re.search(r"\bready\s*[:=]\s*false\b", text, re.IGNORECASE) is not None
+
+
+def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | None:
+    text = value.casefold().strip()
+    if is_negative_boundary_statement(text) or has_false_ready_literal(text):
+        return None
+    normalized = normalized_key(key)
+    value_tokens = key_tokens(value)
+    key_path_tokens = key_tokens(key) | key_tokens(path)
+    value_public_ready = "public" in value_tokens and "ready" in value_tokens
+    if normalized == "status" and (value_public_ready or text in {"promoted", "public-ready", "public_ready"}):
+        return "status"
+    if normalized.endswith("_status"):
+        domain_tokens = key_path_tokens & STRUCTURE_CENSUS_FORBIDDEN_READY_DOMAINS
+        if domain_tokens and value_tokens & {"accepted", "promoted", "ready", "released"}:
+            return "_".join(sorted(domain_tokens))
+    if STRUCTURE_CENSUS_POSITIVE_STRING_RE.search(text) is None:
+        return None
+    for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_STRING_DOMAINS.items():
+        if phrase in text:
+            return surface
+    return None
 
 
 FORBIDDEN_COPIED_RE = re.compile(
@@ -536,7 +655,7 @@ def validate_second_source_no_core_surface_claims(
     for trail, value in iter_policy_values(readiness):
         if value is True:
             key = trail.rsplit(".", 1)[-1]
-            if key in STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS:
+            if has_forbidden_ready_true_claim(key, trail):
                 append_blocker(
                     blockers,
                     "second_source_readiness_surface_overclaim",
@@ -548,6 +667,14 @@ def validate_second_source_no_core_surface_claims(
         text = value.casefold()
         if is_negative_boundary_statement(text):
             continue
+        surface = forbidden_string_claim_surface(trail.rsplit(".", 1)[-1], trail, value)
+        if surface is not None:
+            append_blocker(
+                blockers,
+                "second_source_readiness_surface_overclaim",
+                surface=surface,
+                path=trail,
+            )
         if STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE.search(text) is None:
             continue
         for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES.items():
@@ -692,13 +819,16 @@ def validate_no_core_surface_claims(policy: dict[str, Any], blockers: list[dict[
     for trail, value in iter_policy_values(policy):
         if value is True:
             key = trail.rsplit(".", 1)[-1]
-            if key in STRUCTURE_CENSUS_FORBIDDEN_TRUE_KEYS:
+            if has_forbidden_ready_true_claim(key, trail):
                 append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=key, path=trail)
         if not isinstance(value, str):
             continue
         text = value.casefold()
-        if any(trail.startswith(prefix) for prefix in STRUCTURE_CENSUS_ALLOWED_BOUNDARY_PREFIXES) and is_negative_boundary_statement(text):
+        if is_negative_boundary_statement(text):
             continue
+        surface = forbidden_string_claim_surface(trail.rsplit(".", 1)[-1], trail, value)
+        if surface is not None:
+            append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=surface, path=trail)
         for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES.items():
             if phrase in text:
                 append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=surface, path=trail)

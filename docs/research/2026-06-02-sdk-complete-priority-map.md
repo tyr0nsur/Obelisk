@@ -718,6 +718,56 @@ This round remains offline guardrail work only. It does not promote command resp
 commands/replies, Inventory/Items SDKs, ResourceHandle, Structure SDK, runtime readiness,
 release readiness, or a stable SDK claim.
 
+## ResourceHandle Accounting, Structure Alias Closure, And Route-Gate Override Lock
+
+The next supervised round closed the two deferred side-lane guardrails and one P0
+direct-invocation bypass:
+
+- `scripts/check_public_sdk_v1_completion.py` now runs
+  `scripts/check_object_identity_resource_handle_public_contract_readiness.py` as part of
+  SDK completion accounting, records the ResourceHandle/object-identity report, and fails
+  closed if that checker emits invalid JSON, blockers, non-planning posture, public/runtime
+  promotion flags, or ResourceHandle/object-identity overclaims.
+- Structure census and build-policy offline-intake checkers now reject generic readiness
+  aliases such as `sdk_ready`, `ready_for_promotion`, `public_abi_ready`,
+  `structure_events_ready`, nested `public_sdk_gate.ready=true`, and status/string aliases
+  such as `public-ready`, `sdk_status=ready`, `promotion_status=promoted`,
+  `public_sdk_status=accepted`, or `Structure SDK ready`. Existing planning-only
+  artifacts and negated non-claims remain accepted.
+- SDK completion now rejects non-canonical `--command-permission-route-gate` paths unless
+  `OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS=1` is set. This keeps direct
+  checker invocations from replacing the real P0 child route with a self-consistent fake
+  gate. Test fixtures still use the override explicitly when validating child-field
+  rejection behavior.
+- Commands/replies structured promotion evidence now accepts a complete nested
+  `command_response_promotion_evidence` object, so future legitimate evidence can include
+  command-response readiness plus its executed ABI/SDK test report. Without that object,
+  the fallback remains fail-closed.
+
+Deferred risks from this round:
+
+- Inline `executed_test_report` objects still self-attest `status=passed` and existing
+  file paths. Future promotion accounting should require repo-relative runner-emitted JSON
+  artifacts carrying current HEAD, argv, exit code, and output/hash provenance.
+- Public ABI tests should add a regression for `GameplayPolicyEvent` multi-dispatcher
+  partial registration rollback, forcing a later dispatcher registration to fail/throw
+  after an earlier family registered and asserting all family subscription counts return
+  to zero.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_structure_census_readiness scripts.test_check_structure_build_policy_offline_intake`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+
+The final SDK completion command still fails closed with `stable_claim_allowed=false`,
+complete-SDK progress `0/12`, and P0 progress `0/4`. This round does not approve runtime
+work, public identity, permissions/admin, command response, commands/replies,
+Inventory/Items SDKs, Structure SDK, ResourceHandle, release readiness, or a stable SDK
+claim.
+
 ## Player Identity Public Contract And Bound Planning Input Hardening
 
 The next supervised P0 identity guardrail round closed two offline input-provenance and
