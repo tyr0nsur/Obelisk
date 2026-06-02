@@ -25,6 +25,7 @@ assert SPEC is not None and SPEC.loader is not None
 REQUEST_CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = REQUEST_CHECKER
 SPEC.loader.exec_module(REQUEST_CHECKER)
+from prepare_player_principal_lifecycle_window_request import operator_approval_receipt_payload  # noqa: E402
 
 
 def prepare_args(output_dir: Path) -> list[str]:
@@ -70,6 +71,25 @@ def prepare_pack(output_dir: Path) -> None:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+
+
+def write_completed_receipt(output_dir: Path, receipt_path: Path | None = None) -> Path:
+    request_path = output_dir / "window-request.json"
+    env_path = output_dir / "observer-window.env"
+    operator_request_path = output_dir / "operator-approval-request.md"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    receipt = operator_approval_receipt_payload(
+        request,
+        request_json_path=request_path,
+        request_md_path=operator_request_path,
+        env_path=env_path,
+        operator_approved=True,
+        operator_reference="operator",
+        approved_at_utc="2026-06-01T00:00:00Z",
+    )
+    path = receipt_path or (output_dir / "operator-approval-receipt.json")
+    path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+    return path
 
 
 class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
@@ -120,6 +140,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["v1_completion_ready"])
         self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
         self.assertTrue(report["operator_request_verified"])
+        self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertIn("does not authorize server operations", report["non_claims"][1])
         brief = request["operator_live_ops_brief"]
@@ -297,13 +318,18 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            result = self.run_checker(output_dir, extra_args=["--post-window-replay"])
+            receipt_path = write_completed_receipt(output_dir)
+            result = self.run_checker(
+                output_dir,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
             report = json.loads(result.stdout)
 
         self.assertEqual(result.returncode, 0)
         self.assertTrue(report["ready"])
         self.assertTrue(report["post_window_replay"])
         self.assertTrue(report["post_window_replay_expiry_tolerated"])
+        self.assertTrue(report["operator_approval_receipt_verified"])
         self.assertEqual([], report["blockers"])
 
     def test_post_window_replay_rejects_expired_window_plus_markdown_drift(self) -> None:
@@ -332,7 +358,12 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
                 ).replace("dispatch limit=0", "dispatch limit=1"),
                 encoding="utf-8",
             )
-            result = self.run_checker(output_dir, check=False, extra_args=["--post-window-replay"])
+            receipt_path = write_completed_receipt(output_dir)
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
             report = json.loads(result.stdout)
 
         self.assertNotEqual(result.returncode, 0)
@@ -340,6 +371,51 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["post_window_replay_expiry_tolerated"])
         self.assertIn("approved_window_expired", report["blockers"])
         self.assertIn("operator_request_markdown_mismatch", report["blockers"])
+
+    def test_post_window_replay_requires_completed_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            result = self.run_checker(output_dir, check=False, extra_args=["--post-window-replay"])
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_required_for_post_window_replay", report["blockers"])
+
+    def test_rejects_receipt_replay_across_request_pack_bindings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            other_dir = Path(tmp) / "other-request"
+            other_dir.mkdir()
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["bound_request_pack"]["run_id"] = "20260101T000000Z-player-principal-lifecycle"
+            receipt["bound_request_pack"]["final_posture"] = "stopped"
+            receipt["bound_artifacts"]["observer_window_env"]["sha256"] = "0" * 64
+            receipt["bound_artifacts"]["operator_approval_request_md"]["sha256"] = "0" * 64
+            receipt["request_pack_digest"]["sha256"] = "0" * 64
+            replayed_receipt_path = other_dir / "operator-approval-receipt.json"
+            replayed_receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--operator-approval-receipt", str(replayed_receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        for reason in (
+            "operator_approval_receipt_not_sibling_of_request_json",
+            "operator_approval_receipt_run_id_mismatch",
+            "operator_approval_receipt_final_posture_mismatch",
+            "operator_approval_receipt_observer_window_env_artifact_mismatch",
+            "operator_approval_receipt_operator_approval_request_md_artifact_mismatch",
+            "operator_approval_receipt_digest_mismatch",
+        ):
+            self.assertIn(reason, report["blockers"])
 
     def test_rejects_missing_operator_request_markdown_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

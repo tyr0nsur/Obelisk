@@ -206,9 +206,11 @@ This file is an active routing table only. Durable evidence belongs in
 - Latest no-runtime delegated hardening rounds bound request-pack sidecars to canonical
   siblings, stopped protected sidecar reads, rejected unsafe/duplicate window-manifest
   keys, required explicit no-public-header/no-v1/no-capability/no-callback fields,
-  forced lifecycle request packs to stable final posture only, labeled ambiguous
-  `ready=true` reports with narrow `ready_scope`, and made command response SDK
-  completion depend on promoted permissions/admin evidence. UE4 audit rejected further
-  offline broad rediscovery for this blocker. Validated 448 focused tests plus route/SDK
-  gates; blocker remains `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, no
-  runtime/server op.
+  forced stable-only lifecycle request posture, required completed operator approval
+  receipts for post-window replay, added exact JSON sidecar commands to the operator
+  request markdown, labeled ambiguous `ready=true` reports with narrow `ready_scope`,
+  and made SDK completion reject bundle-builder-ready scopes plus require promoted
+  permissions/admin evidence before command response/replies. UE4 audit rejected further
+  offline broad rediscovery; next side-lane candidate is PluginManager unload fencing for
+  direct player-principal dispatch. Validated focused tests plus route/SDK gates; blocker
+  remains `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, no runtime/server op.

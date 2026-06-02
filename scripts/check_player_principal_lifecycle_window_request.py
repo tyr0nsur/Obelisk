@@ -24,6 +24,7 @@ import protected_paths
 from player_principal_commit_validation import is_reviewed_obelisk_commit
 from snapshot_evidence_pack import first_symlink_component, reject_symlink_component
 from prepare_player_principal_lifecycle_window_request import (
+    APPROVAL_RECEIPT_SCHEMA,
     APPROVAL_TEXT,
     EXPECTED_BINARY_SHA256,
     EXPECTED_SERVER_BINARY_PATH,
@@ -35,10 +36,12 @@ from prepare_player_principal_lifecycle_window_request import (
     SCHEMA,
     UTC_RE,
     WINDOW_MARKERS,
+    bound_artifact,
     env_lines,
     markdown_request,
     post_window_replay_contract,
     post_run_verification_commands,
+    request_pack_digest,
     run_id_for_window_start,
 )
 
@@ -142,8 +145,82 @@ EXPECTED_REPLAY_CONTRACT_SIDECAR_KEYS = frozenset(
     )
 )
 EXPECTED_REPLAY_CONTRACT_CHECK_KEYS = frozenset(("window_manifest_replay",))
-ALLOWED_RESTART_EXPECTATIONS = frozenset(("none", "start", "restart", "stop-after-window"))
-ALLOWED_FINAL_POSTURES = frozenset(("stable", "stopped"))
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_TOP_LEVEL_KEYS = frozenset(
+    (
+        "schema",
+        "status",
+        "receipt_completed",
+        "operator_current_turn_approval_recorded",
+        "approval_scope",
+        "bound_request_pack",
+        "bound_artifacts",
+        "request_pack_digest",
+        "operator_completion",
+        "non_authorization_flags",
+        "non_claims",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCOPE_KEYS = frozenset(
+    (
+        "scope_type",
+        "standing_approval",
+        "reusable",
+        "future_windows_authorized",
+        "scope_expansion_authorized",
+        "unbound_artifacts_authorized",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS = frozenset(
+    (
+        "run_id",
+        "target",
+        "approved_window",
+        "obelisk_commit",
+        "ark_binary_sha256",
+        "server_binary_path",
+        "restart_expectation",
+        "final_posture",
+        "user_policy",
+        "notice_path",
+        "copied_evidence_dir",
+        "copied_log_path",
+        "window_manifest_path",
+        "rollback",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_ARTIFACTS_KEYS = frozenset(
+    ("window_request_json", "observer_window_env", "operator_approval_request_md")
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_ARTIFACT_KEYS = frozenset(("path", "sha256", "size_bytes"))
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_COMPLETION_KEYS = frozenset(
+    ("approval_recorded_at_utc", "approved_by_role", "approval_source", "attestation")
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS = frozenset(
+    (
+        "request_pack_acceptance_authorizes_runtime",
+        "generated_template_authorizes_runtime",
+        "server_operations_authorized_by_template",
+        "runtime_work_authorized_by_template",
+        "discord_authorized",
+        "github_publication_authorized",
+        "publication_authorized",
+        "promotion_ready",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "v1_completion_ready",
+        "secrets_included",
+        "player_private_data_included",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS = [
+    "generated receipt template only; does not record operator approval",
+    "completed receipt binds one current-turn request pack only",
+    "receipt does not authorize future windows, standing approval, Discord, GitHub publication, public SDK readiness, runtime readiness, or v1 completion",
+    "receipt does not promote public player identity, permissions/admin, command response, lookup, mutation, return override, or ResourceHandle",
+]
+ALLOWED_RESTART_EXPECTATIONS = frozenset(("none", "start", "restart"))
+ALLOWED_FINAL_POSTURES = frozenset(("stable",))
 ALLOWED_USER_POLICIES = frozenset(("no_regular_users", "operator_approved_beta_users"))
 FORBIDDEN_VALUE_RE = re.compile(
     r"(?:steam|eos|unique[_-]?net|player[_-]?(?:id|name|data)|\bip(?:v4|v6)?\b|tribe[_-]?id|"
@@ -198,6 +275,11 @@ def parse_args() -> argparse.Namespace:
         "--operator-request",
         type=Path,
         help="operator-approval-request.md from the same request pack; defaults to the sibling file.",
+    )
+    parser.add_argument(
+        "--operator-approval-receipt",
+        type=Path,
+        help="Completed operator-approval-receipt.json from the same request pack; required for post-window replay.",
     )
     parser.add_argument(
         "--post-window-replay",
@@ -326,6 +408,36 @@ def validate_request_pack_sidecar_paths(
                 expected_dir=str(request_dir),
                 actual_dir=str(sidecar.parent),
             )
+
+
+def validate_operator_approval_receipt_path(
+    *,
+    request_json_path: Path,
+    receipt_path: Path,
+    blockers: list[dict[str, Any]],
+) -> None:
+    if receipt_path.name != "operator-approval-receipt.json":
+        add(
+            blockers,
+            "operator_approval_receipt_filename_mismatch",
+            "operator_approval_receipt",
+            expected="operator-approval-receipt.json",
+            actual=receipt_path.name,
+        )
+    try:
+        request_dir = request_json_path.expanduser().resolve(strict=True).parent
+        resolved_receipt = receipt_path.expanduser().resolve(strict=True)
+    except OSError as exc:
+        add(blockers, "operator_approval_receipt_path_unresolved", "operator_approval_receipt", path=str(receipt_path), error=str(exc))
+        return
+    if resolved_receipt.parent != request_dir:
+        add(
+            blockers,
+            "operator_approval_receipt_not_sibling_of_request_json",
+            "operator_approval_receipt",
+            expected_dir=str(request_dir),
+            actual_dir=str(resolved_receipt.parent),
+        )
 
 
 def require_keys(
@@ -772,7 +884,216 @@ def validate_operator_request_markdown(
     return True
 
 
-def build_report(validation: Validation, *, operator_request_verified: bool = False) -> dict[str, Any]:
+def expected_bound_request_pack(payload: dict[str, Any]) -> dict[str, Any] | None:
+    try:
+        return {
+            "run_id": payload["run_id"],
+            "target": payload["target"],
+            "approved_window": payload["approved_window"],
+            "obelisk_commit": payload["obelisk_commit"],
+            "ark_binary_sha256": payload["ark_binary_sha256"],
+            "server_binary_path": payload["server_binary_path"],
+            "restart_expectation": payload["restart_expectation"],
+            "final_posture": payload["final_posture"],
+            "user_policy": payload["user_policy"],
+            "notice_path": payload["notice_path"],
+            "copied_evidence_dir": payload["copied_evidence_dir"],
+            "copied_log_path": payload["copied_log_path"],
+            "window_manifest_path": payload["window_manifest_path"],
+            "rollback": payload["rollback"],
+        }
+    except (KeyError, TypeError):
+        return None
+
+
+def validate_operator_approval_receipt(
+    *,
+    payload: dict[str, Any],
+    request_json_path: Path,
+    env_file_path: Path,
+    operator_request_path: Path,
+    receipt_path: Path,
+    blockers: list[dict[str, Any]],
+) -> bool:
+    try:
+        reject_symlink_component(receipt_path, "operator_approval_receipt")
+        resolved = protected_paths.reject_protected_input_path(
+            receipt_path,
+            "operator_approval_receipt",
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        receipt = json.loads(resolved.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        add(blockers, "operator_approval_receipt_json_invalid", "operator_approval_receipt", error=str(exc))
+        return False
+    except (OSError, ValueError) as exc:
+        add(blockers, "operator_approval_receipt_unreadable", "operator_approval_receipt", path=str(receipt_path), error=str(exc))
+        return False
+    if not isinstance(receipt, dict):
+        add(blockers, "operator_approval_receipt_not_object", "operator_approval_receipt")
+        return False
+
+    require_keys(
+        receipt,
+        required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_TOP_LEVEL_KEYS,
+        label="operator_approval_receipt",
+        blockers=blockers,
+    )
+    if receipt.get("schema") != APPROVAL_RECEIPT_SCHEMA:
+        add(blockers, "operator_approval_receipt_schema_mismatch", "operator_approval_receipt")
+    if receipt.get("status") != "completed_operator_receipt":
+        add(blockers, "operator_approval_receipt_status_not_completed", "operator_approval_receipt")
+    if receipt.get("receipt_completed") is not True:
+        add(blockers, "operator_approval_receipt_receipt_completed_not_true", "operator_approval_receipt")
+    if receipt.get("operator_current_turn_approval_recorded") is not True:
+        add(blockers, "operator_approval_receipt_current_turn_approval_not_recorded", "operator_approval_receipt")
+
+    if receipt.get("non_claims") != EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS:
+        add(blockers, "operator_approval_receipt_non_claims_mismatch", "operator_approval_receipt")
+
+    scope = require_keys(
+        receipt.get("approval_scope"),
+        required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCOPE_KEYS,
+        label="operator_approval_receipt_scope",
+        blockers=blockers,
+    ) or {}
+    if scope.get("scope_type") != "exact_bound_player_principal_lifecycle_window_only":
+        add(blockers, "operator_approval_receipt_scope_type_mismatch", "operator_approval_receipt")
+    for key in (
+        "standing_approval",
+        "reusable",
+        "future_windows_authorized",
+        "scope_expansion_authorized",
+        "unbound_artifacts_authorized",
+    ):
+        if scope.get(key) is not False:
+            add(blockers, f"operator_approval_receipt_scope_{key}_not_false", "operator_approval_receipt")
+
+    completion = require_keys(
+        receipt.get("operator_completion"),
+        required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_COMPLETION_KEYS,
+        label="operator_approval_receipt_completion",
+        blockers=blockers,
+    ) or {}
+    if not isinstance(completion.get("approval_recorded_at_utc"), str) or parse_utc(completion.get("approval_recorded_at_utc")) is None:
+        add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt")
+    if not isinstance(completion.get("approved_by_role"), str) or not completion.get("approved_by_role", "").strip():
+        add(blockers, "operator_approval_receipt_approved_by_role_invalid", "operator_approval_receipt")
+    if completion.get("approval_source") != "current_turn_operator_message":
+        add(blockers, "operator_approval_receipt_approval_source_mismatch", "operator_approval_receipt")
+    if completion.get("attestation") != "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY":
+        add(blockers, "operator_approval_receipt_attestation_mismatch", "operator_approval_receipt")
+
+    bound_request = require_keys(
+        receipt.get("bound_request_pack"),
+        required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS,
+        label="operator_approval_receipt_bound_request_pack",
+        blockers=blockers,
+    ) or {}
+    if isinstance(bound_request.get("target"), dict):
+        require_keys(
+            bound_request["target"],
+            required=EXPECTED_TARGET_KEYS,
+            label="operator_approval_receipt_bound_request_pack_target",
+            blockers=blockers,
+        )
+    if isinstance(bound_request.get("approved_window"), dict):
+        require_keys(
+            bound_request["approved_window"],
+            required=EXPECTED_WINDOW_KEYS,
+            label="operator_approval_receipt_bound_request_pack_window",
+            blockers=blockers,
+        )
+    if isinstance(bound_request.get("rollback"), dict):
+        require_keys(
+            bound_request["rollback"],
+            required=EXPECTED_ROLLBACK_KEYS,
+            label="operator_approval_receipt_bound_request_pack_rollback",
+            blockers=blockers,
+        )
+    expected_bound = expected_bound_request_pack(payload)
+    if expected_bound is not None and bound_request != expected_bound:
+        for key, expected_value in expected_bound.items():
+            if bound_request.get(key) != expected_value:
+                add(
+                    blockers,
+                    f"operator_approval_receipt_{key}_mismatch",
+                    "operator_approval_receipt",
+                    expected=expected_value,
+                    actual=bound_request.get(key),
+                )
+
+    bound_artifacts = require_keys(
+        receipt.get("bound_artifacts"),
+        required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_ARTIFACTS_KEYS,
+        label="operator_approval_receipt_bound_artifacts",
+        blockers=blockers,
+    ) or {}
+    try:
+        expected_artifacts = {
+            "window_request_json": bound_artifact(request_json_path),
+            "observer_window_env": bound_artifact(env_file_path),
+            "operator_approval_request_md": bound_artifact(operator_request_path),
+        }
+    except OSError as exc:
+        add(blockers, "operator_approval_receipt_bound_artifact_unreadable", "operator_approval_receipt", error=str(exc))
+        expected_artifacts = {}
+    for key, expected in expected_artifacts.items():
+        actual = bound_artifacts.get(key)
+        if isinstance(actual, dict):
+            require_keys(
+                actual,
+                required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_ARTIFACT_KEYS,
+                label=f"operator_approval_receipt_bound_artifacts_{key}",
+                blockers=blockers,
+            )
+        if actual != expected:
+            add(
+                blockers,
+                f"operator_approval_receipt_{key}_artifact_mismatch",
+                "operator_approval_receipt",
+                expected=expected,
+                actual=actual,
+            )
+
+    try:
+        expected_digest = request_pack_digest(
+            request_json_path=request_json_path,
+            request_md_path=operator_request_path,
+            env_path=env_file_path,
+        )
+    except OSError as exc:
+        add(blockers, "operator_approval_receipt_digest_unreadable", "operator_approval_receipt", error=str(exc))
+    else:
+        if receipt.get("request_pack_digest") != expected_digest:
+            add(
+                blockers,
+                "operator_approval_receipt_digest_mismatch",
+                "operator_approval_receipt",
+                expected=expected_digest,
+                actual=receipt.get("request_pack_digest"),
+            )
+
+    flags = require_keys(
+        receipt.get("non_authorization_flags"),
+        required=EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS,
+        label="operator_approval_receipt_non_authorization_flags",
+        blockers=blockers,
+    ) or {}
+    for key in EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS:
+        if flags.get(key) is not False:
+            add(blockers, f"operator_approval_receipt_{key}_not_false", "operator_approval_receipt")
+
+    return not any(blocker.get("label") == "operator_approval_receipt" for blocker in blockers)
+
+
+def build_report(
+    validation: Validation,
+    *,
+    operator_request_verified: bool = False,
+    operator_approval_receipt_verified: bool = False,
+) -> dict[str, Any]:
     accepted = not validation.blockers
     payload = validation.payload or {}
     return {
@@ -792,6 +1113,7 @@ def build_report(validation: Validation, *, operator_request_verified: bool = Fa
         "blocker_details": validation.blockers,
         "next_blocker": "operator_current_turn_runtime_window_approval_required" if accepted else "request_pack_not_accepted",
         "operator_request_verified": operator_request_verified,
+        "operator_approval_receipt_verified": operator_approval_receipt_verified,
         "target": payload.get("target"),
         "run_id": payload.get("run_id"),
         "approval_required": APPROVAL_TEXT,
@@ -822,6 +1144,18 @@ def main() -> int:
         operator_request_path=operator_request_path,
         blockers=blockers,
     )
+    if args.operator_approval_receipt is not None:
+        validate_operator_approval_receipt_path(
+            request_json_path=args.request_json,
+            receipt_path=args.operator_approval_receipt,
+            blockers=blockers,
+        )
+    elif args.post_window_replay:
+        add(
+            blockers,
+            "operator_approval_receipt_required_for_post_window_replay",
+            "operator_approval_receipt",
+        )
     payload = read_json(args.request_json)
     env = read_env(args.env_file, blockers)
     operator_request_markdown = read_text_sidecar(operator_request_path, "operator_request", blockers)
@@ -835,10 +1169,24 @@ def main() -> int:
     )
     if any(blocker.get("label") == "operator_request" for blocker in validation.blockers):
         operator_request_verified = False
+    operator_approval_receipt_verified = False
+    if args.operator_approval_receipt is not None:
+        operator_approval_receipt_verified = validate_operator_approval_receipt(
+            payload=payload,
+            request_json_path=args.request_json,
+            env_file_path=args.env_file,
+            operator_request_path=operator_request_path,
+            receipt_path=args.operator_approval_receipt,
+            blockers=validation.blockers,
+        )
     post_window_replay_expiry_tolerated = False
     if args.post_window_replay:
         post_window_replay_expiry_tolerated = tolerate_post_window_expiry_only(validation.blockers)
-    report = build_report(validation, operator_request_verified=operator_request_verified)
+    report = build_report(
+        validation,
+        operator_request_verified=operator_request_verified,
+        operator_approval_receipt_verified=operator_approval_receipt_verified,
+    )
     report["post_window_replay"] = bool(args.post_window_replay)
     report["post_window_replay_expiry_tolerated"] = post_window_replay_expiry_tolerated
     if args.json:

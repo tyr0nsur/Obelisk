@@ -271,6 +271,10 @@ COMMAND_PERMISSION_ROUTE_GATE_NEGATED_CLAIM_RE = re.compile(
     re.IGNORECASE,
 )
 STRICT_PROMOTION_EVIDENCE_SURFACE_IDS = CANONICAL_V1_COMPLETION_BLOCKERS | CANONICAL_EXPERIMENTAL_SURFACE_IDS
+RUNTIME_EVIDENCE_READY_SCOPE = "runtime_evidence_only"
+PUBLIC_CONTRACT_REVIEW_READY_SCOPE = "contract_review_input_only"
+BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
+PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {BUNDLE_BUILDER_INPUTS_READY_SCOPE}
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
         "obelisk.core-dump-evidence-pack.v1",
@@ -2187,6 +2191,17 @@ def evidence_has_non_promotional_schema_marker(
     return False
 
 
+def evidence_has_forbidden_ready_scope(value: Any) -> bool:
+    if isinstance(value, dict):
+        ready_scope = value.get("ready_scope")
+        if isinstance(ready_scope, str) and ready_scope in PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES:
+            return True
+        return any(evidence_has_forbidden_ready_scope(item) for item in value.values())
+    if isinstance(value, list):
+        return any(evidence_has_forbidden_ready_scope(item) for item in value)
+    return False
+
+
 def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
     if surface.get("status") != "promoted":
         return False
@@ -2195,6 +2210,8 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         return False
     surface_id = surface.get("id")
     if not isinstance(surface_id, str):
+        return False
+    if evidence_has_forbidden_ready_scope(evidence):
         return False
     if surface_id == "obelisk.mission_transfer_dino_tribe.v1":
         leaf_units = surface.get("leaf_decision_units")
@@ -2212,6 +2229,8 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
             if not isinstance(leaf_evidence, dict):
                 leaf_evidence = per_leaf_evidence.get(leaf_id)
             if not isinstance(leaf_evidence, dict):
+                return False
+            if evidence_has_forbidden_ready_scope(leaf_evidence):
                 return False
             if leaf_evidence.get("promotion_status") != "promoted":
                 return False
@@ -2806,6 +2825,7 @@ def player_identity_structured_promotion_evidence_missing(
     elif not (
         runtime_report.get("schema")
         == "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+        and runtime_report.get("ready_scope") == RUNTIME_EVIDENCE_READY_SCOPE
         and runtime_report.get("approved_runtime_evidence_present") is True
         and runtime_report.get("runtime_evidence_ready") is True
         and runtime_report.get("promotion_ready") is False
@@ -2817,6 +2837,7 @@ def player_identity_structured_promotion_evidence_missing(
     elif replayed_runtime_report is not None:
         for key in (
             "schema",
+            "ready_scope",
             "approved_runtime_evidence_present",
             "runtime_evidence_ready",
             "promotion_ready",
@@ -2840,6 +2861,7 @@ def player_identity_structured_promotion_evidence_missing(
         private_pod_layout_candidate = private_pod_layout_candidate if isinstance(private_pod_layout_candidate, dict) else {}
         if not (
             contract_report.get("schema") == "obelisk.player-identity-public-contract-readiness-check.v1"
+            and contract_report.get("ready_scope") == PUBLIC_CONTRACT_REVIEW_READY_SCOPE
             and contract_report.get("surface") == "obelisk.player_identity.v1"
             and contract_report.get("accepted_for_contract_review") is True
             and contract_report.get("promotion_ready") is False

@@ -343,6 +343,53 @@ def post_run_verification_commands(payload: dict[str, Any]) -> list[list[str]]:
     ]
 
 
+def evidence_sidecar_command_lines(payload: dict[str, Any]) -> list[str]:
+    target = payload["target"]
+    evidence_dir = Path(payload["copied_evidence_dir"])
+    common_binding = [
+        "--run-id",
+        payload["run_id"],
+        "--window-manifest",
+        str(evidence_dir / "window-manifest.env"),
+        "--copied-log",
+        str(evidence_dir / "Obelisk.log"),
+        "--evidence-dir",
+        str(evidence_dir),
+    ]
+    preflight_pre = [
+        "scripts/check_player_principal_lifecycle_preflight.sh",
+        "--instance",
+        target["instance"],
+        "--target-map",
+        target["map"],
+        "--mode",
+        "observer-window",
+        "--env-file",
+        str(evidence_dir / "observer-window.env"),
+        "--expected-binary-sha256",
+        payload["ark_binary_sha256"],
+        *common_binding,
+        "--json",
+    ]
+    preflight_post = [
+        "scripts/check_player_principal_lifecycle_preflight.sh",
+        "--instance",
+        target["instance"],
+        "--map",
+        target["map"],
+        "--mode",
+        "stable",
+        "--expected-binary-sha256",
+        payload["ark_binary_sha256"],
+        *common_binding,
+        "--json",
+    ]
+    return [
+        " ".join(preflight_pre) + f" > {evidence_dir / 'preflight-pre.json'}",
+        " ".join(preflight_post) + f" > {evidence_dir / 'preflight-post.json'}",
+    ]
+
+
 def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
     target = payload["target"]
     window = payload["approved_window"]
@@ -378,6 +425,12 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         "",
         "```text",
         *[" ".join(command) for command in post_run_verification_commands(payload)],
+        "```",
+        "",
+        "Required evidence sidecar commands:",
+        "",
+        "```text",
+        *evidence_sidecar_command_lines(payload),
         "```",
         "",
         "Post-window replay contract:",

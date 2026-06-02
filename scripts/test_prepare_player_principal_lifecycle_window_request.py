@@ -195,6 +195,27 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("preflight_pre_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
         self.assertIn("operator_approval_receipt_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
         self.assertIn("completed operator-approval-receipt.json", markdown)
+        self.assertIn("Required evidence sidecar commands:", markdown)
+        self.assertIn(
+            "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --target-map TheIsland "
+            "--mode observer-window --env-file "
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/observer-window.env "
+            f"--expected-binary-sha256 {SHA} --run-id {request['run_id']} "
+            f"--window-manifest /servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/window-manifest.env "
+            f"--copied-log /servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/Obelisk.log "
+            f"--evidence-dir /servidor/ark/workspace-offline/live-validation-logs/{request['run_id']} --json > "
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/preflight-pre.json",
+            markdown,
+        )
+        self.assertIn(
+            "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --map TheIsland "
+            f"--mode stable --expected-binary-sha256 {SHA} --run-id {request['run_id']} "
+            f"--window-manifest /servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/window-manifest.env "
+            f"--copied-log /servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/Obelisk.log "
+            f"--evidence-dir /servidor/ark/workspace-offline/live-validation-logs/{request['run_id']} --json > "
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/preflight-post.json",
+            markdown,
+        )
         self.assertIn("--post-window-replay", markdown)
         self.assertIn(
             "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --map TheIsland "

@@ -23,6 +23,7 @@ from check_public_sdk_v1_completion import (
     permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
+    surface_has_promotion_evidence,
 )
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
     manifest as approved_runtime_principal_lifecycle_manifest,
@@ -244,6 +245,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 json.dumps(
                     {
                         "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "ready_scope": "runtime_evidence_only",
                         "approved_runtime_evidence_present": True,
                         "runtime_evidence_ready": True,
                         "promotion_ready": False,
@@ -279,6 +281,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             json.dumps(
                 {
                     "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "ready_scope": "runtime_evidence_only",
                     "approved_runtime_evidence_present": True,
                     "runtime_evidence_ready": True,
                     "promotion_ready": False,
@@ -293,6 +296,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             json.dumps(
                 {
                     "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                    "ready_scope": "contract_review_input_only",
                     "surface": "obelisk.player_identity.v1",
                     "accepted_for_contract_review": True,
                     "promotion_ready": False,
@@ -4804,6 +4808,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 json.dumps(
                     {
                         "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "ready_scope": "runtime_evidence_only",
                         "approved_runtime_evidence_present": True,
                         "runtime_evidence_ready": True,
                         "promotion_ready": False,
@@ -4818,6 +4823,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 json.dumps(
                     {
                         "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                        "ready_scope": "contract_review_input_only",
                         "surface": "obelisk.player_identity.v1",
                         "accepted_for_contract_review": True,
                         "promotion_ready": False,
@@ -4845,6 +4851,63 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "executed_test_report": executed_report_path,
                 }
             )
+
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
+
+    def test_bundle_builder_ready_scope_does_not_count_as_promotion_evidence(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="PlayerIdentityPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="player_identity_promotion",
+            ) as sdk_dir,
+        ):
+            core_test = Path(core_dir) / "PlayerIdentityPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "player_identity_promotion_plugin.c"
+            core_test.write_text("// promoted player identity ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted player identity SDK placeholder\n", encoding="utf-8")
+
+            promoted = surface_has_promotion_evidence(
+                {
+                    "id": "obelisk.player_identity.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        "surface_id": "obelisk.player_identity.v1",
+                        "promotion_status": "promoted",
+                        "ready_scope": "bundle_builder_inputs_only",
+                        "public_sdk_ready": True,
+                        "abi_tests": [str(core_test.relative_to(REPO_ROOT))],
+                        "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                    },
+                }
+            )
+
+        self.assertFalse(promoted)
+
+    def test_player_identity_structured_promotion_requires_runtime_evidence_ready_scope(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            runtime_path = REPO_ROOT / artifacts["approved_runtime_evidence_report"]
+            runtime_report = json.loads(runtime_path.read_text(encoding="utf-8"))
+            runtime_report["ready_scope"] = "bundle_builder_inputs_only"
+            runtime_path.write_text(json.dumps(runtime_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("approved_runtime_evidence_report:fields_invalid", missing)
+
+    def test_player_identity_structured_promotion_requires_contract_review_ready_scope(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            contract_path = REPO_ROOT / artifacts["public_contract_readiness_report"]
+            contract_report = json.loads(contract_path.read_text(encoding="utf-8"))
+            contract_report["ready_scope"] = "bundle_builder_inputs_only"
+            contract_path.write_text(json.dumps(contract_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
 
         self.assertIn("public_contract_readiness_report:fields_invalid", missing)
 
