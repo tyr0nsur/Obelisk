@@ -381,6 +381,78 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             env=env,
         )
 
+    def test_preflight_does_not_read_unapproved_window_manifest(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-unapproved-manifest-") as temp:
+            evidence_dir = Path(temp) / "live-validation-logs" / RUN_ID
+            evidence_dir.mkdir(parents=True)
+            (evidence_dir / "window-manifest.env").write_text(
+                "request_pack_path=unsafe-request.json\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(
+                    bundle_builder,
+                    "read_manifest_fields",
+                    side_effect=AssertionError("unsafe window manifest must not be parsed"),
+                ),
+                mock.patch.object(
+                    bundle_builder,
+                    "run_json_check",
+                    side_effect=AssertionError("unsafe window manifest must not be checked"),
+                ),
+            ):
+                report = bundle_builder.classify_preflight_evidence_dir(evidence_dir)
+
+        self.assertFalse(report["ready"])
+        self.assertIn("window_manifest_not_approved_offline_workspace", report["blockers"])
+        self.assertFalse(report["inputs"]["window_manifest"]["approved_offline_workspace"])
+        self.assertFalse(report["inputs"]["window_manifest_check"]["checked"])
+
+    def test_preflight_does_not_read_protected_window_manifest(self) -> None:
+        original_status = bundle_builder.protected_paths.protected_path_status
+
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-protected-manifest-") as temp:
+            evidence_dir = Path(temp) / "live-validation-logs" / RUN_ID
+            evidence_dir.mkdir(parents=True)
+            manifest = evidence_dir / "window-manifest.env"
+            manifest.write_text(
+                "request_pack_path=unsafe-request.json\n",
+                encoding="utf-8",
+            )
+
+            def fake_status(path: Path, **kwargs: object) -> object:
+                expanded = Path(path).expanduser()
+                if expanded == manifest:
+                    return bundle_builder.protected_paths.ProtectedPathStatus(
+                        expanded=expanded,
+                        resolved=expanded,
+                        direct_under_protected_root=True,
+                        resolved_under_protected_root=False,
+                        approved_offline_workspace=False,
+                    )
+                return original_status(path, **kwargs)
+
+            with (
+                mock.patch.object(bundle_builder.protected_paths, "protected_path_status", side_effect=fake_status),
+                mock.patch.object(
+                    bundle_builder,
+                    "read_manifest_fields",
+                    side_effect=AssertionError("protected window manifest must not be parsed"),
+                ),
+                mock.patch.object(
+                    bundle_builder,
+                    "run_json_check",
+                    side_effect=AssertionError("protected window manifest must not be checked"),
+                ),
+            ):
+                report = bundle_builder.classify_preflight_evidence_dir(evidence_dir)
+
+        self.assertFalse(report["ready"])
+        self.assertIn("window_manifest_under_protected_server_root", report["blockers"])
+        self.assertTrue(report["inputs"]["window_manifest"]["protected"])
+        self.assertFalse(report["inputs"]["window_manifest_check"]["checked"])
+
     def test_preflight_rejects_malformed_request_pack_sidecars_without_building(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

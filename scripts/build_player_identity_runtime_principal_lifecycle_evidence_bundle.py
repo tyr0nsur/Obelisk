@@ -194,6 +194,14 @@ def file_state(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[s
     return state
 
 
+def offline_readable_file_state(state: dict[str, Any]) -> bool:
+    return (
+        state.get("exists") is True
+        and state.get("approved_offline_workspace") is not False
+        and state.get("protected") is not True
+    )
+
+
 def run_json_check(command: list[str]) -> tuple[int, dict[str, Any] | None, str]:
     result = subprocess.run(command, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     payload: dict[str, Any] | None = None
@@ -265,6 +273,8 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
         "stderr": "",
     }
     if not window_manifest["exists"]:
+        return state
+    if not offline_readable_file_state(window_manifest):
         return state
     state["checked"] = True
     exit_code, payload, stderr = run_json_check(
@@ -463,10 +473,11 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     window_manifest = file_state(resolved / "window-manifest.env", "window_manifest", blockers)
     manifest_fields: dict[str, str] = {}
     window_manifest_path = Path(window_manifest["path"])
-    if window_manifest["exists"]:
+    window_manifest_readable = offline_readable_file_state(window_manifest)
+    if window_manifest_readable:
         manifest_fields = read_manifest_fields(window_manifest_path, blockers)
     def sidecar_path(key: str, fallback: Path) -> Path:
-        if window_manifest["exists"]:
+        if window_manifest_readable:
             return path_from_manifest(manifest_fields, window_manifest_path, key, fallback, blockers)
         return fallback
 

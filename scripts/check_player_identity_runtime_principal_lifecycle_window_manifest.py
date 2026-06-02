@@ -287,6 +287,12 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
     blockers.append(blocker)
 
 
+def add_once(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -> None:
+    if any(blocker.get("reason") == reason and blocker.get("label") == label for blocker in blockers):
+        return
+    add(blockers, reason, label, **extra)
+
+
 def load_manifest(path: Path) -> dict[str, str]:
     reject_symlink_component(path, "manifest")
     path = protected_paths.reject_protected_input_path(
@@ -362,6 +368,31 @@ def is_test_fixture_workspace_path(path: Path) -> bool:
             continue
         return bool(relative.parts and relative.parts[0].startswith("obelisk-test-player-principal-"))
     return False
+
+
+def content_readable_status(status: Any) -> bool:
+    return not status.protected and status.approved_offline_workspace and status.resolved.is_file()
+
+
+def add_unreadable_sidecar_status(
+    blockers: list[dict[str, Any]],
+    status: Any,
+    *,
+    label: str,
+    protected_reason: str,
+    unapproved_reason: str,
+    missing_reason: str,
+) -> bool:
+    if status.protected:
+        add_once(blockers, protected_reason, label, resolved=str(status.resolved))
+        return False
+    if not status.approved_offline_workspace:
+        add_once(blockers, unapproved_reason, label, resolved=str(status.resolved))
+        return False
+    if not status.resolved.is_file():
+        add_once(blockers, missing_reason, label, resolved=str(status.resolved))
+        return False
+    return True
 
 
 def validate_target(fields: dict[str, str], blockers: list[dict[str, Any]]) -> Target:
@@ -455,19 +486,19 @@ def validate_copied_log_path(fields: dict[str, str], manifest_path: Path, blocke
     expected_sha256 = fields.get("copied_log_sha256")
     if expected_sha256 == "0" * 64:
         add(blockers, "copied_log_sha256_placeholder", "copied_log_sha256")
-    if not copied_log_path.is_file():
-        add(blockers, "copied_log_file_missing", "copied_log_path", resolved=str(status.resolved))
-    elif expected_sha256 and SHA256_RE.fullmatch(expected_sha256):
-        actual_sha256 = hashlib.sha256(copied_log_path.read_bytes()).hexdigest()
-        if actual_sha256 != expected_sha256:
-            add(
-                blockers,
-                "copied_log_sha256_mismatch",
-                "copied_log_sha256",
-                expected=expected_sha256,
-                actual=actual_sha256,
-            )
     if status.approved_offline_workspace:
+        if not status.resolved.is_file():
+            add(blockers, "copied_log_file_missing", "copied_log_path", resolved=str(status.resolved))
+        elif expected_sha256 and SHA256_RE.fullmatch(expected_sha256):
+            actual_sha256 = hashlib.sha256(status.resolved.read_bytes()).hexdigest()
+            if actual_sha256 != expected_sha256:
+                add(
+                    blockers,
+                    "copied_log_sha256_mismatch",
+                    "copied_log_sha256",
+                    expected=expected_sha256,
+                    actual=actual_sha256,
+                )
         return "approved_offline_workspace"
     add(
         blockers,
@@ -515,6 +546,8 @@ def validate_sidecar_file(
         add(blockers, f"{sha_key}_invalid", sha_key)
     elif sha_text == "0" * 64:
         add(blockers, f"{sha_key}_placeholder", sha_key)
+    if not status.approved_offline_workspace:
+        return "unprotected_offline"
     if not status.resolved.is_file():
         add(blockers, f"{path_key}_file_missing", path_key, resolved=str(status.resolved))
     elif sha_text and SHA256_RE.fullmatch(sha_text):
@@ -551,6 +584,10 @@ def bound_artifact_from_file(path: Path) -> dict[str, Any]:
         "sha256": hashlib.sha256(data).hexdigest(),
         "size_bytes": len(data),
     }
+
+
+def bound_artifact_from_status(status: Any) -> dict[str, Any]:
+    return bound_artifact_from_file(status.resolved)
 
 
 def add_unexpected_receipt_keys(
@@ -695,7 +732,14 @@ def validate_operator_approval_receipt(
         protected_root=SERVER_ROOT,
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
-    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
+    if not add_unreadable_sidecar_status(
+        blockers,
+        status,
+        label="operator_approval_receipt_path",
+        protected_reason="operator_approval_receipt_path_under_protected_server_root",
+        unapproved_reason="operator_approval_receipt_path_not_under_approved_offline_workspace",
+        missing_reason="operator_approval_receipt_path_file_missing",
+    ):
         return
     try:
         payload = json.loads(status.resolved.read_text(encoding="utf-8"))
@@ -773,13 +817,22 @@ def validate_operator_approval_receipt(
             protected_root=SERVER_ROOT,
             approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
         )
-        if request_status.resolved.is_file():
+        if content_readable_status(request_status):
             try:
                 loaded_request = json.loads(request_status.resolved.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 loaded_request = None
             if isinstance(loaded_request, dict):
                 request_payload = loaded_request
+        else:
+            add_unreadable_sidecar_status(
+                blockers,
+                request_status,
+                label="request_pack_path",
+                protected_reason="operator_approval_receipt_request_pack_under_protected_server_root",
+                unapproved_reason="operator_approval_receipt_request_pack_not_under_approved_offline_workspace",
+                missing_reason="operator_approval_receipt_request_pack_file_missing",
+            )
     if bound_request.get("run_id") != fields.get("run_id"):
         add(blockers, "operator_approval_receipt_run_id_mismatch", "operator_approval_receipt_path")
     if bound_request.get("obelisk_commit") != fields.get("obelisk_commit"):
@@ -848,18 +901,50 @@ def validate_operator_approval_receipt(
             approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
         )
         operator_request = request_status.resolved.parent / "operator-approval-request.md"
-        if operator_request.is_file():
-            expected_operator_request = bound_artifact_from_file(operator_request)
+        if content_readable_status(request_status):
+            operator_request_status = protected_paths.protected_path_status(
+                operator_request,
+                protected_root=SERVER_ROOT,
+                approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+            )
+            if add_unreadable_sidecar_status(
+                blockers,
+                operator_request_status,
+                label="operator_approval_receipt_path",
+                protected_reason="operator_approval_request_sidecar_under_protected_server_root",
+                unapproved_reason="operator_approval_request_sidecar_not_under_approved_offline_workspace",
+                missing_reason="operator_approval_request_sidecar_missing",
+            ):
+                expected_operator_request = bound_artifact_from_status(operator_request_status)
         else:
-            add(blockers, "operator_approval_request_sidecar_missing", "operator_approval_receipt_path", expected=str(operator_request))
+            add_unreadable_sidecar_status(
+                blockers,
+                request_status,
+                label="request_pack_path",
+                protected_reason="operator_approval_receipt_request_pack_under_protected_server_root",
+                unapproved_reason="operator_approval_receipt_request_pack_not_under_approved_offline_workspace",
+                missing_reason="operator_approval_receipt_request_pack_file_missing",
+            )
     if env_path_text:
         env_status = protected_paths.protected_path_status(
             manifest_relative_path(env_path_text, manifest_path),
             protected_root=SERVER_ROOT,
             approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
         )
-    expected_request = bound_artifact_from_file(request_status.resolved) if request_status and request_status.resolved.is_file() else None
-    expected_env = bound_artifact_from_file(env_status.resolved) if env_status and env_status.resolved.is_file() else None
+    expected_request = None
+    if request_status and content_readable_status(request_status):
+        expected_request = bound_artifact_from_status(request_status)
+    expected_env = None
+    if env_status:
+        if add_unreadable_sidecar_status(
+            blockers,
+            env_status,
+            label="observer_env_path",
+            protected_reason="operator_approval_receipt_observer_env_under_protected_server_root",
+            unapproved_reason="operator_approval_receipt_observer_env_not_under_approved_offline_workspace",
+            missing_reason="operator_approval_receipt_observer_env_file_missing",
+        ):
+            expected_env = bound_artifact_from_status(env_status)
     for key, expected in (
         ("window_request_json", expected_request),
         ("observer_window_env", expected_env),
@@ -871,7 +956,13 @@ def validate_operator_approval_receipt(
         if actual != expected:
             add(blockers, f"operator_approval_receipt_{key}_artifact_mismatch", "operator_approval_receipt_path", expected=expected, actual=actual)
 
-    if request_status and env_status and expected_operator_request is not None:
+    if (
+        request_status
+        and env_status
+        and content_readable_status(request_status)
+        and content_readable_status(env_status)
+        and expected_operator_request is not None
+    ):
         expected_digest = request_pack_digest(
             request_json_path=request_status.resolved,
             env_path=env_status.resolved,
@@ -928,7 +1019,14 @@ def validate_preflight_content(
         protected_root=SERVER_ROOT,
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
-    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
+    if not add_unreadable_sidecar_status(
+        blockers,
+        status,
+        label=path_key,
+        protected_reason=f"{path_key}_under_protected_server_root",
+        unapproved_reason=f"{path_key}_not_under_approved_offline_workspace",
+        missing_reason=f"{path_key}_file_missing",
+    ):
         return
     try:
         payload = json.loads(status.resolved.read_text(encoding="utf-8"))
@@ -1260,7 +1358,14 @@ def validate_request_pack(
         protected_root=SERVER_ROOT,
         approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
     )
-    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
+    if not add_unreadable_sidecar_status(
+        blockers,
+        status,
+        label="request_pack_path",
+        protected_reason="request_pack_path_under_protected_server_root",
+        unapproved_reason="request_pack_path_not_under_approved_offline_workspace",
+        missing_reason="request_pack_path_file_missing",
+    ):
         return
     try:
         payload = json.loads(status.resolved.read_text(encoding="utf-8"))
@@ -1355,6 +1460,20 @@ def validate_request_pack(
     if not observer_env_text:
         return
     observer_env_path = manifest_relative_path(observer_env_text, manifest_path)
+    observer_env_status = protected_paths.protected_path_status(
+        observer_env_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if not add_unreadable_sidecar_status(
+        blockers,
+        observer_env_status,
+        label="observer_env_path",
+        protected_reason="request_pack_observer_env_under_protected_server_root",
+        unapproved_reason="request_pack_observer_env_not_under_approved_offline_workspace",
+        missing_reason="request_pack_observer_env_file_missing",
+    ):
+        return
     result = subprocess.run(
         [
             sys.executable,
@@ -1362,7 +1481,7 @@ def validate_request_pack(
             "--json",
             str(status.resolved),
             "--env-file",
-            str(observer_env_path),
+            str(observer_env_status.resolved),
         ],
         check=False,
         text=True,

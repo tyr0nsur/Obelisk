@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -1036,6 +1037,219 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertEqual(report["copied_log"]["path_status"], "unprotected_offline")
         self.assertFalse(report["ready"])
 
+    def test_validate_copied_log_path_does_not_hash_unapproved_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            log_path.parent.mkdir(parents=True)
+            log_path.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            manifest_path = root / "window-manifest.env"
+            fields = {
+                "run_id": RUN_ID,
+                "copied_log_path": str(log_path),
+                "copied_log_sha256": GOOD_SHA,
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root / "approved",)
+                with (
+                    mock.patch.object(Path, "is_file", side_effect=AssertionError("unsafe copied-log stat")),
+                    mock.patch.object(Path, "read_bytes", side_effect=AssertionError("unsafe hash read")),
+                ):
+                    status = CHECKER.validate_copied_log_path(fields, manifest_path, blockers)
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        self.assertEqual(status, "unprotected_offline")
+        self.assertIn("copied_log_path_not_under_approved_offline_workspace", [item["reason"] for item in blockers])
+
+    def test_validate_sidecar_file_does_not_hash_unapproved_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sidecar = root / "window-request.json"
+            sidecar.write_text("{}", encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "request_pack_path": str(sidecar),
+                "request_pack_sha256": hashlib.sha256(b"{}").hexdigest(),
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root / "approved",)
+                with (
+                    mock.patch.object(Path, "is_file", side_effect=AssertionError("unsafe sidecar stat")),
+                    mock.patch.object(Path, "read_bytes", side_effect=AssertionError("unsafe sidecar hash")),
+                ):
+                    status = CHECKER.validate_sidecar_file(
+                        fields,
+                        root / "window-manifest.env",
+                        blockers,
+                        path_key="request_pack_path",
+                        sha_key="request_pack_sha256",
+                    )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        self.assertEqual(status, "unprotected_offline")
+        self.assertIn("request_pack_path_not_under_approved_offline_workspace", [item["reason"] for item in blockers])
+
+    def test_validate_request_pack_does_not_subprocess_unapproved_observer_env(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved = root / "approved"
+            approved.mkdir()
+            manifest_path = approved / "window-manifest.env"
+            request_pack = approved / "window-request.json"
+            observer_env = root / "observer-window.env"
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            payload = {
+                "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                "run_id": RUN_ID,
+                "target": {"instance": "arkserver2", "map": "TheIsland"},
+                "approved_window": {
+                    "start_utc": "2026-06-01T12:00:00Z",
+                    "end_utc": "2026-06-01T12:10:00Z",
+                },
+                "window_manifest_path": str(manifest_path),
+            }
+            request_pack.write_text(json.dumps(payload), encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "target": "arkserver2/TheIsland",
+                "approved_window_start_utc": "2026-06-01T12:00:00Z",
+                "approved_window_end_utc": "2026-06-01T12:10:00Z",
+                "request_pack_path": str(request_pack),
+                "observer_env_path": str(observer_env),
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            request_pack_resolved = request_pack.resolve()
+
+            def guarded_is_file(path: Path) -> bool:
+                if path == request_pack_resolved:
+                    return True
+                raise AssertionError(f"unsafe observer-env stat: {path}")
+
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (approved,)
+                with (
+                    mock.patch.object(Path, "is_file", guarded_is_file),
+                    mock.patch.object(CHECKER.subprocess, "run", side_effect=AssertionError("unsafe subprocess")),
+                ):
+                    CHECKER.validate_request_pack(fields, manifest_path, blockers, post_window_replay=True)
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        self.assertIn("request_pack_observer_env_not_under_approved_offline_workspace", [item["reason"] for item in blockers])
+
+    def test_operator_receipt_does_not_digest_or_read_unapproved_bound_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved = root / "approved"
+            approved.mkdir()
+            manifest_path = approved / "window-manifest.env"
+            receipt_path = approved / "operator-approval-receipt.json"
+            request_pack = root / "window-request.json"
+            observer_env = root / "observer-window.env"
+            request_pack.write_text("{}", encoding="utf-8")
+            observer_env.write_text("OBELISK_INSTANCE_ID=arkserver2\n", encoding="utf-8")
+            receipt = {
+                "schema": CHECKER.APPROVAL_RECEIPT_SCHEMA,
+                "status": "completed_operator_receipt",
+                "receipt_completed": True,
+                "operator_current_turn_approval_recorded": True,
+                "approval_scope": {
+                    "scope_type": "exact_bound_player_principal_lifecycle_window_only",
+                    "standing_approval": False,
+                    "reusable": False,
+                    "future_windows_authorized": False,
+                    "scope_expansion_authorized": False,
+                    "unbound_artifacts_authorized": False,
+                },
+                "bound_request_pack": {
+                    "run_id": RUN_ID,
+                    "target": {"instance": "arkserver2", "map": "TheIsland"},
+                    "approved_window": {
+                        "start_utc": "2026-06-01T12:00:00Z",
+                        "end_utc": "2026-06-01T12:10:00Z",
+                    },
+                    "obelisk_commit": TEST_COMMIT,
+                    "ark_binary_sha256": CHECKER.EXPECTED_BINARY_SHA256,
+                    "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
+                    "window_manifest_path": str(manifest_path),
+                },
+                "bound_artifacts": {},
+                "request_pack_digest": "not-evaluated",
+                "operator_completion": {
+                    "approval_recorded_at_utc": "2026-06-01T12:00:00Z",
+                    "approved_by_role": "operator",
+                    "approval_source": "current_turn_operator_message",
+                    "attestation": "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY",
+                },
+                "non_authorization_flags": {},
+                "non_claims": CHECKER.EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS,
+            }
+            receipt_text = json.dumps(receipt, sort_keys=True)
+            receipt_path.write_text(receipt_text, encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "obelisk_commit": TEST_COMMIT,
+                "target": "arkserver2/TheIsland",
+                "approved_window_start_utc": "2026-06-01T12:00:00Z",
+                "approved_window_end_utc": "2026-06-01T12:10:00Z",
+                "request_pack_path": str(request_pack),
+                "observer_env_path": str(observer_env),
+                "operator_approval_receipt_path": str(receipt_path),
+            }
+            blockers: list[dict[str, object]] = []
+            receipt_resolved = receipt_path.resolve()
+
+            def guarded_is_file(path: Path) -> bool:
+                if path == receipt_resolved:
+                    return True
+                raise AssertionError(f"unsafe receipt-bound artifact stat: {path}")
+
+            def guarded_read_text(path: Path, *args: object, **kwargs: object) -> str:
+                if path == receipt_resolved:
+                    return receipt_text
+                raise AssertionError(f"unsafe receipt-bound artifact read: {path}")
+
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (approved,)
+                with (
+                    mock.patch.object(Path, "is_file", guarded_is_file),
+                    mock.patch.object(Path, "read_text", guarded_read_text),
+                    mock.patch.object(Path, "read_bytes", side_effect=AssertionError("unsafe receipt-bound hash")),
+                    mock.patch.object(CHECKER, "request_pack_digest", side_effect=AssertionError("unsafe digest")),
+                ):
+                    CHECKER.validate_operator_approval_receipt(
+                        fields,
+                        manifest_path,
+                        CHECKER.Target(instance="arkserver2", map_name="TheIsland"),
+                        blockers,
+                    )
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("operator_approval_receipt_request_pack_not_under_approved_offline_workspace", reasons)
+        self.assertIn("operator_approval_receipt_observer_env_not_under_approved_offline_workspace", reasons)
+
     def test_rejects_copied_log_path_under_live_server_root(self) -> None:
         result = self.run_checker(
             manifest_lines(copied_log_path="/servidor/ark/Obelisk.log"),
@@ -1071,7 +1285,12 @@ class WindowManifestCheckerTests(unittest.TestCase):
             try:
                 CHECKER.SERVER_ROOT = protected
                 CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (approved,)
-                CHECKER.validate_request_pack(fields, manifest_path, blockers)
+                with (
+                    mock.patch.object(Path, "is_file", side_effect=AssertionError("unsafe protected stat")),
+                    mock.patch.object(Path, "read_text", side_effect=AssertionError("unsafe protected read")),
+                    mock.patch.object(CHECKER.subprocess, "run", side_effect=AssertionError("unsafe subprocess")),
+                ):
+                    CHECKER.validate_request_pack(fields, manifest_path, blockers)
             finally:
                 CHECKER.SERVER_ROOT = original_server_root
                 CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
@@ -1082,7 +1301,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertNotIn("request_pack_schema_mismatch", reasons)
 
     def test_rejects_missing_copied_log_and_placeholder_sha(self) -> None:
-        result = self.run_checker(
+        result = self.run_checker_in_approved_workspace(
             manifest_lines(copied_log_sha256="0" * 64),
             check=False,
             create_copied_log=False,
@@ -1095,7 +1314,7 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertFalse(report["ready"])
 
     def test_rejects_copied_log_sha_mismatch(self) -> None:
-        result = self.run_checker(
+        result = self.run_checker_in_approved_workspace(
             manifest_lines(copied_log_sha256=GOOD_SHA),
             check=False,
             copied_log_text="different copied log\n",

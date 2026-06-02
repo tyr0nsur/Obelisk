@@ -211,6 +211,10 @@ This file is an active routing table only. Durable evidence belongs in
   now require exact canonical shape/non-claims and reject positive authorization/readiness
   text. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
   `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`; no runtime/server op.
-- Pending delegated safety finding to preserve after compaction: reject protected or
-  unapproved request/env/operator sidecars before reading, hashing, subprocess replay, or
-  digest binding in lifecycle window/bundle evidence paths.
+- Latest delegated sidecar-safety round closed the lifecycle window/bundle read-before-
+  reject gap: protected or unapproved request/env/operator sidecars, copied logs, receipt
+  artifacts, replay subprocesses, digest binding, and bundle `window-manifest.env` parsing
+  are rejected before content reads/hashes/check execution. Next useful no-runtime SDK
+  action: define a candidate-only player identity owner-token lifecycle plus SDK-consumer
+  promotion contract for `abi.layout`, `sdk.consumer`, `lifecycle.owner_cleanup`, and
+  downstream separation, preserving no public symbols/capability bits/callback ABI/runtime/SDK/v1 credit.
