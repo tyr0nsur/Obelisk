@@ -346,6 +346,11 @@ priorities, and do not use history files as the active source of truth.
   `lifecycle_anchor_first_evidence_provenance_unbound`; only after lifecycle/principal
   source binding is produced should the route advance back to approved copied runtime
   principal lifecycle evidence, reported as `approved_runtime_evidence_missing`.
+  `scripts/bind_player_identity_planning_sources.py` is the offline binder for that
+  transition: it validates first-evidence, lifecycle-anchor, and principal-policy JSON,
+  emits bound lifecycle/principal planning artifacts plus a non-claim report, and rejects
+  protected output paths and symlinks. Bound outputs are planning provenance only; they do
+  not approve runtime evidence, public identity, public SDK readiness, or v1 completion.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

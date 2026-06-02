@@ -1173,6 +1173,69 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("lifecycle_anchor_source_artifact_identity_mismatch", provenance["blockers"])
         self.assertIn("principal_policy_lifecycle_source_binding_missing", provenance["blockers"])
 
+    def test_blocks_self_consistent_stale_lifecycle_source_before_runtime_blocker(self) -> None:
+        first_evidence = players_identity_first_evidence_manifest()
+        lifecycle = lifecycle_manifest_bound_to_first_evidence(first_evidence)
+        lifecycle["artifact_identity"]["source_artifact_ids"] = [
+            f"artifact_sha256:{'f' * 64}",
+            "capture_id:stale-capture",
+            "evidence_pack_id:stale-pack",
+        ]
+        principal = principal_policy_bound_to_lifecycle(lifecycle)
+        lifecycle_validation = checker.lifecycle_anchor_candidates.validate_manifest_details(lifecycle)
+        lifecycle_diagnosis = checker.lifecycle_anchor_candidates.build_report(
+            lifecycle,
+            lifecycle_validation,
+            promote=False,
+        )
+        lifecycle_diagnosis["artifact_identity_source_artifact_ids"] = lifecycle["artifact_identity"]["source_artifact_ids"]
+        principal_diagnosis = {
+            "policy_consume_ready": True,
+            "lifecycle_source_binding": principal["lifecycle_layout_source"]["source_binding"],
+        }
+
+        blockers = checker.planning_provenance_blockers(
+            first_evidence_payload=first_evidence,
+            lifecycle_candidate_diagnosis=lifecycle_diagnosis,
+            principal_policy_diagnosis=principal_diagnosis,
+        )
+
+        self.assertIn("lifecycle_anchor_first_evidence_provenance_unbound", blockers)
+        self.assertIn("lifecycle_anchor_source_artifact_identity_mismatch", blockers)
+        self.assertNotIn("principal_policy_lifecycle_source_artifact_identity_mismatch", blockers)
+        self.assertNotIn("approved_runtime_evidence_missing", blockers)
+
+    def test_blocks_principal_lifecycle_source_binding_mismatch_before_runtime_blocker(self) -> None:
+        first_evidence = players_identity_first_evidence_manifest()
+        lifecycle = lifecycle_manifest_bound_to_first_evidence(first_evidence)
+        principal = principal_policy_bound_to_lifecycle(lifecycle)
+        principal["lifecycle_layout_source"]["source_binding"]["artifact_identity_source_artifact_ids"] = [
+            f"artifact_sha256:{'e' * 64}",
+            "capture_id:wrong-capture",
+            "evidence_pack_id:wrong-pack",
+        ]
+        lifecycle_validation = checker.lifecycle_anchor_candidates.validate_manifest_details(lifecycle)
+        lifecycle_diagnosis = checker.lifecycle_anchor_candidates.build_report(
+            lifecycle,
+            lifecycle_validation,
+            promote=False,
+        )
+        lifecycle_diagnosis["artifact_identity_source_artifact_ids"] = lifecycle["artifact_identity"]["source_artifact_ids"]
+        principal_diagnosis = {
+            "policy_consume_ready": True,
+            "lifecycle_source_binding": principal["lifecycle_layout_source"]["source_binding"],
+        }
+
+        blockers = checker.planning_provenance_blockers(
+            first_evidence_payload=first_evidence,
+            lifecycle_candidate_diagnosis=lifecycle_diagnosis,
+            principal_policy_diagnosis=principal_diagnosis,
+        )
+
+        self.assertIn("lifecycle_anchor_first_evidence_provenance_unbound", blockers)
+        self.assertIn("principal_policy_lifecycle_source_artifact_identity_mismatch", blockers)
+        self.assertNotIn("approved_runtime_evidence_missing", blockers)
+
     def test_approved_runtime_evidence_routes_to_identity_public_contract_gate(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
 

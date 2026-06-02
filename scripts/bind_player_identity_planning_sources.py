@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""Bind player-identity planning artifacts to first-evidence provenance."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import artifact_identity
+import check_player_identity_first_evidence_readiness as first_evidence_readiness
+import check_player_identity_lifecycle_anchor_candidates as lifecycle_anchor_candidates
+import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
+import validate_offline_artifact_gate as offline_artifact_gate
+from protected_paths import reject_protected_input_path, reject_protected_output_path, reject_symlink_component
+
+
+REPORT_SCHEMA = "obelisk.player-identity-planning-source-binding-report.v1"
+LIFECYCLE_OUTPUT_NAME = "players-identity-lifecycle-anchor-candidates.json"
+PRINCIPAL_OUTPUT_NAME = "players-identity-principal-invalidation-policy.json"
+REPORT_OUTPUT_NAME = "player-identity-planning-source-binding-report.json"
+NON_CLAIMS = [
+    "no runtime or server operation was performed",
+    "no ARK process was started, stopped, restarted, attached, or observed",
+    "no public player identity is promoted",
+    "no permissions/admin, command response, or commands/replies surface is promoted",
+    "no public SDK, public ABI, release, or v1 completion readiness is claimed",
+    "no Discord or GitHub publication is authorized",
+]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--first-evidence", type=Path, required=True, help="players-identity first-evidence JSON.")
+    parser.add_argument(
+        "--lifecycle-anchor-candidates",
+        type=Path,
+        required=True,
+        help="Consume-only lifecycle-anchor candidates JSON to bind.",
+    )
+    parser.add_argument(
+        "--principal-invalidation-policy",
+        type=Path,
+        required=True,
+        help="Consume-only principal invalidation policy JSON to bind.",
+    )
+    parser.add_argument("--output-dir", type=Path, required=True, help="Directory for bound planning artifacts.")
+    parser.add_argument("--json", action="store_true", help="Emit the binding report JSON to stdout.")
+    return parser.parse_args()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_json(path: Path, label: str) -> tuple[dict[str, Any], Path]:
+    reject_symlink_component(path, label)
+    resolved = reject_protected_input_path(path, label)
+    try:
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{resolved}: invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{resolved}: top-level JSON must be an object")
+    return payload, resolved
+
+
+def prepare_output_dir(path: Path) -> Path:
+    reject_symlink_component(path, "output-dir")
+    resolved = reject_protected_output_path(path, "output-dir")
+    resolved.mkdir(parents=True, exist_ok=True)
+    reject_symlink_component(resolved, "output-dir")
+    if not resolved.is_dir():
+        raise SystemExit(f"output-dir is not a directory: {resolved}")
+    return resolved
+
+
+def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    reject_symlink_component(path.parent, f"{path.name} parent")
+    if path.exists() or path.is_symlink():
+        reject_symlink_component(path, path.name)
+        if path.is_symlink():
+            raise SystemExit(f"{path.name} must not be a symlink: {path}")
+    reject_protected_output_path(path, path.name)
+    encoded = artifact_identity.canonical_json_bytes(payload) + b"\n"
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, path)
+    except Exception:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def first_evidence_snapshot_by_target(first_evidence: dict[str, Any]) -> dict[str, dict[str, str]]:
+    generated_from = first_evidence.get("generated_from")
+    snapshots = (
+        generated_from.get("input_snapshots")
+        if isinstance(generated_from, dict) and isinstance(generated_from.get("input_snapshots"), list)
+        else []
+    )
+    result: dict[str, dict[str, str]] = {}
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        target = snapshot.get("target")
+        snapshot_id = snapshot.get("id")
+        snapshot_sha256 = snapshot.get("sha256")
+        if isinstance(target, str) and isinstance(snapshot_id, str) and isinstance(snapshot_sha256, str):
+            result[target] = {"id": snapshot_id, "sha256": snapshot_sha256}
+    return result
+
+
+def validation_reasons(blockers: list[dict[str, Any]]) -> list[str]:
+    return [str(blocker.get("reason")) for blocker in blockers]
+
+
+def validate_inputs(
+    *,
+    first_evidence: dict[str, Any],
+    lifecycle: dict[str, Any],
+    principal: dict[str, Any],
+) -> None:
+    first_blockers = offline_artifact_gate.validate_players_identity_first_evidence_manifest(
+        first_evidence,
+        label="first-evidence",
+        mode="consume",
+    )
+    lifecycle_blockers = lifecycle_anchor_candidates.validate_manifest(lifecycle, promote=False)
+    principal_blockers = principal_invalidation_policy.validate_manifest(principal, check_mode="consume").blockers
+    blockers = {
+        "first_evidence": validation_reasons(first_blockers),
+        "lifecycle_anchor_candidates": validation_reasons(lifecycle_blockers),
+        "principal_invalidation_policy": validation_reasons(principal_blockers),
+    }
+    failed = {key: values for key, values in blockers.items() if values}
+    if failed:
+        raise SystemExit("player identity planning source binding failed validation: " + json.dumps(failed, sort_keys=True))
+
+
+def bind_lifecycle_to_first_evidence(
+    lifecycle: dict[str, Any],
+    first_evidence: dict[str, Any],
+) -> dict[str, Any]:
+    bound = copy.deepcopy(lifecycle)
+    source_ids = first_evidence_readiness.first_evidence_source_artifact_ids(first_evidence)
+    if not source_ids:
+        raise SystemExit("first-evidence artifact_identity.source_artifact_ids is empty")
+    artifact = bound.get("artifact_identity")
+    if not isinstance(artifact, dict):
+        raise SystemExit("lifecycle-anchor candidates artifact_identity missing")
+    artifact["source_artifact_ids"] = list(source_ids)
+
+    snapshots_by_target = first_evidence_snapshot_by_target(first_evidence)
+    anchors = bound.get("candidate_anchors")
+    if not isinstance(anchors, list):
+        raise SystemExit("lifecycle-anchor candidates candidate_anchors missing")
+    for anchor in anchors:
+        if not isinstance(anchor, dict) or anchor.get("accepted") is not True:
+            continue
+        target = anchor.get("target")
+        evidence = anchor.get("evidence")
+        snapshot = snapshots_by_target.get(target) if isinstance(target, str) else None
+        if snapshot is None or not isinstance(evidence, dict):
+            continue
+        evidence["source_snapshot"] = snapshot["id"]
+        evidence["source_snapshot_sha256"] = snapshot["sha256"]
+    return bound
+
+
+def bind_principal_to_lifecycle(principal: dict[str, Any], lifecycle: dict[str, Any]) -> dict[str, Any]:
+    bound = copy.deepcopy(principal)
+    source = bound.get("lifecycle_layout_source")
+    if not isinstance(source, dict):
+        raise SystemExit("principal invalidation policy lifecycle_layout_source missing")
+    artifact = lifecycle.get("artifact_identity")
+    acceptance = lifecycle.get("lifecycle_acceptance")
+    if not isinstance(artifact, dict) or not isinstance(acceptance, dict):
+        raise SystemExit("bound lifecycle manifest is missing artifact_identity or lifecycle_acceptance")
+    source["source_binding"] = {
+        "lifecycle_manifest_schema": lifecycle.get("schema"),
+        "artifact_identity_source_artifact_ids": list(artifact.get("source_artifact_ids", [])),
+        "accepted_start_targets": list(acceptance.get("accepted_start_targets", [])),
+        "accepted_end_targets": list(acceptance.get("accepted_end_targets", [])),
+    }
+    return bound
+
+
+def source_record(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "resolved_path": str(path.resolve()),
+        "sha256": sha256_file(path),
+        "schema": payload.get("schema"),
+    }
+
+
+def build_report(
+    *,
+    first_path: Path,
+    lifecycle_path: Path,
+    principal_path: Path,
+    first_evidence: dict[str, Any],
+    lifecycle_output: Path,
+    principal_output: Path,
+    bound_lifecycle: dict[str, Any],
+    bound_principal: dict[str, Any],
+) -> dict[str, Any]:
+    lifecycle_diagnosis = first_evidence_readiness.lifecycle_anchor_candidate_manifest_diagnosis(lifecycle_output)
+    principal_diagnosis = first_evidence_readiness.principal_invalidation_policy_diagnosis(principal_output)
+    blockers = first_evidence_readiness.planning_provenance_blockers(
+        first_evidence_payload=first_evidence,
+        lifecycle_candidate_diagnosis=lifecycle_diagnosis,
+        principal_policy_diagnosis=principal_diagnosis,
+    )
+    return {
+        "schema": REPORT_SCHEMA,
+        "ready": not blockers,
+        "planning_only": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "runtime_ready": False,
+        "v1_completion_ready": False,
+        "blockers": blockers,
+        "sources": {
+            "first_evidence": source_record(first_path, first_evidence),
+            "lifecycle_anchor_candidates": source_record(lifecycle_path, bound_lifecycle),
+            "principal_invalidation_policy": source_record(principal_path, bound_principal),
+        },
+        "outputs": {
+            "lifecycle_anchor_candidates": {
+                "path": str(lifecycle_output),
+                "sha256": sha256_file(lifecycle_output),
+                "schema": bound_lifecycle.get("schema"),
+            },
+            "principal_invalidation_policy": {
+                "path": str(principal_output),
+                "sha256": sha256_file(principal_output),
+                "schema": bound_principal.get("schema"),
+            },
+        },
+        "planning_provenance": {
+            "ready": not blockers,
+            "blockers": blockers,
+            "lifecycle_anchor_candidates": lifecycle_diagnosis,
+            "principal_invalidation_policy": principal_diagnosis,
+        },
+        "non_claims": NON_CLAIMS,
+    }
+
+
+def main() -> int:
+    args = parse_args()
+    first_evidence, first_path = load_json(args.first_evidence, "first-evidence")
+    lifecycle, lifecycle_path = load_json(args.lifecycle_anchor_candidates, "lifecycle-anchor-candidates")
+    principal, principal_path = load_json(args.principal_invalidation_policy, "principal-invalidation-policy")
+    validate_inputs(first_evidence=first_evidence, lifecycle=lifecycle, principal=principal)
+
+    output_dir = prepare_output_dir(args.output_dir)
+    lifecycle_output = output_dir / LIFECYCLE_OUTPUT_NAME
+    principal_output = output_dir / PRINCIPAL_OUTPUT_NAME
+    report_output = output_dir / REPORT_OUTPUT_NAME
+
+    bound_lifecycle = bind_lifecycle_to_first_evidence(lifecycle, first_evidence)
+    lifecycle_bound_blockers = lifecycle_anchor_candidates.validate_manifest(bound_lifecycle, promote=False)
+    if lifecycle_bound_blockers:
+        raise SystemExit(
+            "bound lifecycle-anchor candidates failed validation: "
+            + json.dumps(validation_reasons(lifecycle_bound_blockers), sort_keys=True)
+        )
+
+    bound_principal = bind_principal_to_lifecycle(principal, bound_lifecycle)
+    principal_bound_blockers = principal_invalidation_policy.validate_manifest(
+        bound_principal,
+        check_mode="consume",
+    ).blockers
+    if principal_bound_blockers:
+        raise SystemExit(
+            "bound principal invalidation policy failed validation: "
+            + json.dumps(validation_reasons(principal_bound_blockers), sort_keys=True)
+        )
+
+    atomic_write_json(lifecycle_output, bound_lifecycle)
+    atomic_write_json(principal_output, bound_principal)
+    report = build_report(
+        first_path=first_path,
+        lifecycle_path=lifecycle_path,
+        principal_path=principal_path,
+        first_evidence=first_evidence,
+        lifecycle_output=lifecycle_output,
+        principal_output=principal_output,
+        bound_lifecycle=bound_lifecycle,
+        bound_principal=bound_principal,
+    )
+    atomic_write_json(report_output, report)
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report["ready"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

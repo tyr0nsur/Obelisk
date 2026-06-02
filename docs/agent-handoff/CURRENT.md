@@ -258,6 +258,14 @@ This file is an active routing table only. Durable evidence belongs in
   This is offline guardrail work only and does not approve runtime capture, public
   identity, permissions/admin, command response, commands/replies, release readiness, or
   v1 completion.
+- 2026-06-02 P0 identity planning-source binder: `scripts/bind_player_identity_planning_sources.py`
+  now emits bound lifecycle-anchor and principal-policy planning artifacts from validated
+  first-evidence, lifecycle, and principal JSON inputs. The tool writes only to a checked
+  offline output directory, rejects protected output paths and symlinks, emits a
+  non-claim report, and validates that aggregate planning provenance is ready. Using the
+  bound outputs can move the identity route back to `approved_runtime_evidence_missing`;
+  it still does not provide approved runtime evidence, public identity, permissions/admin,
+  command response, commands/replies, release readiness, or v1 completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

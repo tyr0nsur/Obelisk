@@ -732,6 +732,40 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Player Identity Planning Source Binder
+
+The follow-up identity round added an offline binder for the aggregate provenance gate:
+
+- `scripts/bind_player_identity_planning_sources.py` consumes validated
+  `obelisk.players-identity-first-evidence.v1`,
+  `obelisk.players-identity-lifecycle-anchor-candidates.v1`, and
+  `obelisk.players-identity-principal-invalidation-policy.v1` JSON inputs.
+- The tool writes bound copies of the lifecycle-anchor and principal-policy planning
+  artifacts, plus `player-identity-planning-source-binding-report.json`, to a validated
+  output directory. It rejects protected output paths and symlink components, uses atomic
+  canonical JSON writes, and records source/output SHA256s.
+- The lifecycle output is rebound to first-evidence
+  `artifact_identity.source_artifact_ids` and accepted anchor snapshot hashes. The
+  principal output gains `lifecycle_layout_source.source_binding` for lifecycle schema,
+  lifecycle source ids, accepted start targets, and accepted end targets.
+- The binder verifies the outputs through
+  `check_player_identity_first_evidence_readiness.planning_provenance_blockers(...)`.
+  A successful report means aggregate planning provenance is aligned only; it does not
+  provide approved runtime principal lifecycle evidence.
+- Focused tests cover the real CLI output path, route aggregation moving from
+  `lifecycle_anchor_first_evidence_provenance_unbound` to
+  `approved_runtime_evidence_missing`, invalid first-evidence rejection, protected output
+  rejection, self-consistent stale lifecycle source rejection, and principal source
+  binding mismatch rejection.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_bind_player_identity_planning_sources scripts.test_check_player_identity_first_evidence_readiness`
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Command Response Readiness Provenance Binding
 
 The next P0-focused supervised round closed the deferred synthetic readiness provenance
