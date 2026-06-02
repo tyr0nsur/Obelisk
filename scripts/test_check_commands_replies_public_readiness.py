@@ -238,6 +238,40 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_rejects_response_path_report_with_nonexistent_source_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            response_report = json.loads(report_path.read_text(encoding="utf-8"))
+            response_report["readiness_path"] = str(root / "missing-readiness.json")
+            response_report["decisions_path"] = str(root / "missing-decisions.json")
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            result = self.run_checker("--response-path-report", str(report_path), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_source_artifact_missing_or_unreadable", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_response_path_report_whose_summary_disagrees_with_rebuilt_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            response_report = json.loads(report_path.read_text(encoding="utf-8"))
+            response_report["surfaces_status"] = "post-v1"
+            response_report["target_filters"] = list(reversed(response_report["target_filters"]))
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            result = self.run_checker("--response-path-report", str(report_path), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_source_artifact_identity_mismatch", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_rejects_missing_response_path_report(self) -> None:
         result = self.run_checker("--json", check=False)
         report = json.loads(result.stdout)

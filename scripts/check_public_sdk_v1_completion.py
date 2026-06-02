@@ -370,6 +370,16 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"(?:is|are|remains?|stays?)\s+"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",
+    r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+v1(?:\.0)?\s+"
+    r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
+    r"(?:is|are)?\s*generally\s+available)\b",
+    r"\bv1(?:\.0)?\s+(?:sdk|api|support)\s+"
+    r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
+    r"(?:is|are)?\s*generally\s+available)\b",
+    r"\b(?:complete|full|production[- ]?ready|production|stable)\s+"
+    r"(?:sdk|api|support)\s+"
+    r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
+    r"(?:is|are)?\s*generally\s+available)\b",
     r"\b(?:this|statement|release)\s+"
     r"(?:is|declares?|approves?|allows?|authorizes?)\s+"
     r"(?:a\s+)?v1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim))?\b",

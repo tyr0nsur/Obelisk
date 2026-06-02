@@ -1165,6 +1165,35 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             payload["scoped_release_statement"]["blocking_report_blockers"],
         )
 
+    def test_scoped_release_statement_scope_rejects_active_release_verbs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            statement_path.write_text(
+                SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
+                + "Obelisk SDK v1 ships today.\n"
+                + "The complete SDK ships today.\n"
+                + "The stable SDK launches today.\n"
+                + "Obelisk SDK v1 is generally available.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                "--release-statement",
+                str(statement_path),
+                "--validate-release-statement-scope",
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(payload["scoped_release_statement"]["ready"])
+        self.assertIn(
+            "release_statement_forbidden_broad_claims",
+            payload["scoped_release_statement"]["blocking_report_blockers"],
+        )
+        self.assertGreaterEqual(len(payload["release_statement_forbidden_broad_claims"]), 4)
+
     def test_scoped_release_statement_scope_rejects_unrelated_negator_complete_sdk_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"

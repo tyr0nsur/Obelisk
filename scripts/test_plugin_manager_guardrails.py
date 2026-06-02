@@ -22,6 +22,15 @@ COPIED_DISPATCHER_CLEANUP_EXCEPTIONS = {
 }
 
 COPIED_DISPATCHER_PUBLIC_ABI_TOKENS = {
+    "MissionCopiedBoolEventDispatcher": (
+        "MissionCopiedBool",
+        "MISSION_COPIED_BOOL",
+        "ObeliskMission",
+        "MissionEvent",
+        "OBELISK_API_CAPABILITY_MISSION",
+        "RegisterMission",
+        "UnregisterMission",
+    ),
     "PlayerPrincipalEventDispatcher": (
         "PlayerPrincipal",
         "PLAYER_PRINCIPAL",
@@ -666,10 +675,26 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         )
         cleaned_dispatchers = cleaned_dispatcher_classes(cleanup_body)
 
-        for dispatcher, blocked_tokens in COPIED_DISPATCHER_PUBLIC_ABI_TOKENS.items():
-            if dispatcher in cleaned_dispatchers:
-                continue
+        missing_exception_token_sets = sorted(
+            set(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS) - set(COPIED_DISPATCHER_PUBLIC_ABI_TOKENS)
+        )
+        self.assertEqual(
+            missing_exception_token_sets,
+            [],
+            "Every internal/test-only copied dispatcher cleanup exception must name the "
+            "public ABI and PluginManager wiring tokens that stay blocked while owner "
+            "cleanup is absent.",
+        )
+
+        for dispatcher in sorted(COPIED_DISPATCHER_CLEANUP_EXCEPTIONS):
+            blocked_tokens = COPIED_DISPATCHER_PUBLIC_ABI_TOKENS[dispatcher]
             with self.subTest(dispatcher=dispatcher):
+                self.assertNotIn(
+                    dispatcher,
+                    cleaned_dispatchers,
+                    "Dispatcher should be removed from cleanup exceptions once PluginManager "
+                    "owner cleanup covers it.",
+                )
                 self.assertIn(
                     dispatcher,
                     COPIED_DISPATCHER_CLEANUP_EXCEPTIONS,
@@ -687,13 +712,13 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                         self.assertNotIn(
                             token,
                             api_header,
-                            "Player identity/principal public ABI must stay absent until the "
+                            "Internal/test-only dispatcher public ABI must stay absent until the "
                             "dispatcher is covered by PluginManager owner cleanup.",
                         )
                         self.assertNotIn(
                             token,
                             plugin_manager_text,
-                            "Player identity/principal PluginManager wiring must stay absent "
+                            "Internal/test-only dispatcher PluginManager wiring must stay absent "
                             "until dispatcher owner cleanup is explicit.",
                         )
 

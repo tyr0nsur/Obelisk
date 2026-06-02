@@ -426,3 +426,49 @@ Validation:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Mission/Transfer/Dino/Tribe/Buff SDKs, Inventory SDK, release readiness,
 or a stable SDK claim.
+
+## Provenance, Dispatcher Exception, Descriptor, And Release Verb Guardrails
+
+The next supervised round closed four additional offline guardrail gaps:
+
+- `scripts/check_commands_replies_public_readiness.py` now treats embedded
+  `check_command_chat_response_public_readiness.py` source paths as verifiable report
+  provenance. It rejects missing/unreadable source artifacts, re-runs the child response
+  path checker from those artifacts, and rejects child summary fields that drift from the
+  rebuilt report. A plausible JSON report with nonexistent paths is no longer accepted.
+- `scripts/test_plugin_manager_guardrails.py` now requires every
+  `COPIED_DISPATCHER_CLEANUP_EXCEPTIONS` entry to declare blocked public ABI and
+  PluginManager wiring tokens. `MissionCopiedBoolEventDispatcher` remains an
+  internal/test-only cleanup exception, but Mission public ABI or PluginManager wiring
+  tokens now fail while owner cleanup is absent.
+- `scripts/check_object_identity_resource_handle_public_contract_readiness.py` now scans
+  promoted descriptor metadata surfaces, including `obelisk.descriptors.v1`, for forbidden
+  ResourceHandle/object identity/object lookup public-contract terms and positive
+  evidence claims. Public descriptor helpers remain category-only metadata and cannot
+  imply ResourceHandle lookup or post-callback object correlation.
+- `scripts/check_public_sdk_v1_completion.py` now rejects active release verbs in scoped
+  release statements, including `Obelisk SDK v1 ships today`, `complete SDK ships`,
+  `stable SDK launches`, and `Obelisk SDK v1 is generally available`.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_commands_replies_public_readiness`
+  passed with 28 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_plugin_manager_guardrails.py`
+  passed with 24 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+  passed with 10 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed with 108 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+  passed as planning-only with ResourceHandle/object identity still blocked.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Mission SDK, ResourceHandle, object lookup, release readiness, or a
+stable SDK claim.

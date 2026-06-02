@@ -374,6 +374,41 @@ def load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[st
     return payload
 
 
+def resolve_source_artifact_path(path: Path, label: str, blockers: list[dict[str, Any]]) -> Path | None:
+    try:
+        reject_symlink_component(path, label)
+        resolved = reject_protected_input_path(path, label)
+        if not resolved.is_file():
+            add(
+                blockers,
+                "response_path_report_source_artifact_missing_or_unreadable",
+                f"$.response_path_report.{label}",
+                path=str(path),
+            )
+            return None
+        with resolved.open("r", encoding="utf-8"):
+            pass
+    except SystemExit as exc:
+        add(
+            blockers,
+            "response_path_report_source_artifact_missing_or_unreadable",
+            f"$.response_path_report.{label}",
+            path=str(path),
+            detail=str(exc),
+        )
+        return None
+    except OSError as exc:
+        add(
+            blockers,
+            "response_path_report_source_artifact_missing_or_unreadable",
+            f"$.response_path_report.{label}",
+            path=str(path),
+            detail=str(exc),
+        )
+        return None
+    return resolved
+
+
 def strings(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -881,6 +916,12 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                 "$.response_path_report",
                 artifacts=unverifiable_source_artifacts,
             )
+        resolved_source_artifacts: dict[str, Path] = {}
+        if not missing_source_artifacts and not unverifiable_source_artifacts:
+            for key in RESPONSE_PATH_SOURCE_ARTIFACT_KEYS:
+                resolved = resolve_source_artifact_path(Path(payload[key]), key, blockers)
+                if resolved is not None:
+                    resolved_source_artifacts[key] = resolved
         if payload.get("valid") is not True or payload.get("accepted_for_planning") is not True:
             add(blockers, "response_path_report_not_accepted_for_planning", "$.response_path_report")
         if payload.get("planning_only") is not True:
@@ -959,6 +1000,46 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                     f"$.response_path_report.{key}",
                     value=payload.get(key),
                 )
+        if len(resolved_source_artifacts) == len(RESPONSE_PATH_SOURCE_ARTIFACT_KEYS):
+            rebuilt = response_path_readiness.build_report(
+                resolved_source_artifacts["readiness_path"],
+                resolved_source_artifacts["decisions_path"],
+                resolved_source_artifacts["public_header_path"],
+                resolved_source_artifacts["surfaces_path"],
+            )
+            if rebuilt.get("valid") is not True or rebuilt.get("accepted_for_planning") is not True:
+                add(
+                    blockers,
+                    "response_path_report_source_artifact_revalidation_failed",
+                    "$.response_path_report",
+                    rebuilt_blockers=rebuilt.get("blockers"),
+                )
+            for key in (
+                "valid",
+                "accepted_for_planning",
+                "planning_only",
+                "surface",
+                "target_set",
+                "target_filters",
+                "readiness_status",
+                "decisions_status",
+                "surfaces_status",
+                "public_readiness_ready",
+                "public_header_allowed",
+                "promotion_ready",
+                "public_sdk_ready",
+                "public_abi_ready",
+                "runtime_ready",
+                "blockers",
+            ):
+                if payload.get(key) != rebuilt.get(key):
+                    add(
+                        blockers,
+                        "response_path_report_source_artifact_identity_mismatch",
+                        f"$.response_path_report.{key}",
+                        expected=rebuilt.get(key),
+                        value=payload.get(key),
+                    )
     else:
         add(blockers, "response_path_report_schema_mismatch", "$.response_path_report.schema", value=schema)
     collect_overclaims(payload, blockers, "$.response_path_report")

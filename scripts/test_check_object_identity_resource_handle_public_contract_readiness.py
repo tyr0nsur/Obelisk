@@ -136,6 +136,38 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             report["blockers"],
         )
 
+    def test_rejects_promoted_descriptor_surface_resource_handle_contract_and_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.descriptors.v1":
+                    surface["public_contract"].append("ObeliskResourceHandle")
+                    surface["evidence"]["claim"] = (
+                        "Descriptor metadata now includes public ResourceHandle lookup API readiness."
+                    )
+                    break
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("promoted_descriptor_surface_forbidden_public_contract:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+        self.assertTrue(
+            any(
+                blocker.startswith("surface_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+
     def test_rejects_public_header_resource_handle_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

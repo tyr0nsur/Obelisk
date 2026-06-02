@@ -153,6 +153,18 @@ This file is an active routing table only. Durable evidence belongs in
   `primary_blocker` after approved runtime evidence. SDK completion release-statement
   scanning now rejects broad wording such as `Obelisk SDK v1 is ready` and production-ready
   variants. These changes keep route gate planning-only and SDK completion fail-closed.
+- 2026-06-02 provenance/dispatcher/descriptor/release guardrails: commands/replies
+  public readiness now revalidates embedded command response-path source artifacts and
+  rejects missing/unreadable or summary-drifted child reports. PluginManager static
+  guardrails now require every internal/test-only copied dispatcher cleanup exception,
+  including `MissionCopiedBoolEventDispatcher`, to carry blocked public ABI and
+  PluginManager wiring tokens while owner cleanup is absent. ResourceHandle readiness now
+  scans promoted descriptor metadata surfaces such as `obelisk.descriptors.v1` for
+  forbidden ResourceHandle/object lookup public contracts and positive evidence claims.
+  SDK completion release-statement scanning now rejects active broad release verbs such
+  as `ships`, `launches`, `goes live`, and `generally available` for SDK v1/complete or
+  stable SDK wording. These are offline guardrails only; route gate remains planning-only
+  and SDK completion remains fail-closed.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

@@ -90,6 +90,22 @@ SURFACE_POSITIVE_CLAIM_RE = re.compile(
     r"promoted|supported|lookup[_ -]?api|handle[_ -]?api)",
     re.IGNORECASE,
 )
+DESCRIPTOR_SURFACE_IDS = frozenset(
+    (
+        "obelisk.descriptors.v1",
+        "obelisk.resource_kind_descriptors.v1",
+        "obelisk.gameplay_policy_event_descriptors.v1",
+    )
+)
+DESCRIPTOR_FORBIDDEN_PUBLIC_CONTRACT_RE = re.compile(
+    r"(?:"
+    r"\bObelisk(?:ResourceHandle|ObjectIdentity|ObjectLookup)[A-Za-z0-9_]*\b|"
+    r"\bOBELISK_API_CAPABILITY_(?:RESOURCE_HANDLE|OBJECT_IDENTITY|OBJECT_LOOKUP)\b|"
+    r"\b(?:resourcehandle|resource[_ -]?handle|object[_ -]?identity|object[_ -]?lookup|"
+    r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity))\b"
+    r")",
+    re.IGNORECASE,
+)
 SURFACE_NEGATED_CLAIM_RE = re.compile(
     r"(?:\bno\b|\bnot\b|must[_ -]?not|cannot|blocked|excluded|post[_ -]?v1|"
     r"without|not[_ -]?included|does[_ -]?not|do[_ -]?not)",
@@ -257,6 +273,32 @@ def validate_surface(surfaces: Any, blockers: list[str]) -> None:
     walk_surface_text_claims(entry, blockers, f"$.surfaces[{SURFACE_ID}]")
 
 
+def validate_promoted_descriptor_surfaces(surfaces: Any, blockers: list[str]) -> None:
+    entries = surfaces.get("surfaces") if isinstance(surfaces, dict) else None
+    if not isinstance(entries, list):
+        return
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        surface_id = entry.get("id")
+        is_descriptor_surface = surface_id in DESCRIPTOR_SURFACE_IDS or (
+            entry.get("status") == "promoted"
+            and entry.get("category") == "metadata"
+            and "descriptor" in str(entry.get("public_name", "")).casefold()
+        )
+        if not is_descriptor_surface:
+            continue
+        for key in ("public_contract", "capabilities", "public_name"):
+            value = entry.get(key)
+            for item_index, item in enumerate(value if isinstance(value, list) else [value]):
+                if isinstance(item, str) and DESCRIPTOR_FORBIDDEN_PUBLIC_CONTRACT_RE.search(item):
+                    blockers.append(
+                        "promoted_descriptor_surface_forbidden_public_contract:"
+                        f"$.surfaces[{index}].{key}[{item_index}]"
+                    )
+        walk_surface_text_claims(entry.get("evidence", {}), blockers, f"$.surfaces[{index}].evidence")
+
+
 def validate_public_events(events: Any, blockers: list[str]) -> None:
     text = json.dumps(events, sort_keys=True)
     for term in FORBIDDEN_PUBLIC_EVENT_TERMS:
@@ -315,6 +357,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 
     validate_decisions(decisions, blockers)
     validate_surface(surfaces, blockers)
+    validate_promoted_descriptor_surfaces(surfaces, blockers)
     validate_public_events(events, blockers)
     validate_header(args.public_header, blockers)
     valid = not blockers
