@@ -27,7 +27,9 @@ checks from the current worktree:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
   passed as planning-only with `lifecycle_anchor_first_evidence_provenance_unbound` as
   the default-route critical-path blocker. Only explicit bound lifecycle/principal
-  planning artifacts may advance the route to `approved_runtime_evidence_missing`.
+  planning artifacts may advance the no-runtime-evidence route to
+  `approved_runtime_evidence_missing`; after accepted approved runtime evidence, the next
+  allowed locked blocker is `identity_public_contract_gate_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   intentionally failed closed with `stable_claim_allowed=false`,
   complete-SDK progress `0/12`, and P0 progress `0/4`.
@@ -88,10 +90,11 @@ Player identity is first. If the current offline identity packs continue to pass
 immediate default-route blocker is `lifecycle_anchor_first_evidence_provenance_unbound`.
 The next offline step is source-bound lifecycle-anchor/principal-policy planning artifacts,
 preferably through `scripts/check_command_permission_route_gate_bound_identity_sources.py`.
-A successful bound-wrapper run may advance only to `approved_runtime_evidence_missing`;
-that is the separate runtime principal lifecycle evidence blocker. Do not spend more
-rounds on broad offline rediscovery unless the binary/hash changes, the accepted packs
-fail, or a focused checker contradicts the current evidence.
+A successful no-runtime-evidence bound-wrapper run may advance only to
+`approved_runtime_evidence_missing`; after accepted approved runtime evidence, the allowed
+locked route blocker is `identity_public_contract_gate_missing`. Do not spend more rounds
+on broad offline rediscovery unless the binary/hash changes, the accepted packs fail, or a
+focused checker contradicts the current evidence.
 
 ## Post-P0 Target Map
 
@@ -350,11 +353,10 @@ The next supervised round closed three additional offline overclaim paths:
   principal lifecycle evidence is accepted. Approved runtime evidence can clear
   `approved_runtime_evidence_missing`, but it cannot make the first-evidence checker
   `ready=true` before reviewed public contract work.
-- `scripts/check_command_permission_route_gate.py` now rejects child-reported
-  `identity_public_contract_gate` or `identity_public_contract_gate_missing` as the
-  current route blocker. The current route remains pinned to
-  `approved_runtime_evidence_missing` until the route gate is explicitly updated with
-  reviewed public-contract evidence.
+- Superseded by `bf5f055`: `scripts/check_command_permission_route_gate.py` now accepts
+  `identity_public_contract_gate_missing` as a locked planning blocker after approved
+  runtime evidence, while keeping downstream readiness/unlock flags false. It still
+  rejects bare `identity_public_contract_gate` as not a route-lock blocker.
 - `scripts/check_object_identity_resource_handle_public_contract_readiness.py` now scans
   decisions-manifest text for positive ResourceHandle/object identity/object lookup or
   post-callback correlation claims, closing a gap where only the public SDK surface row
@@ -705,6 +707,40 @@ approved runtime evidence is later accepted, the next allowed route blocker is o
 This round still does not approve runtime work, public identity, public permissions/admin,
 command response, commands/replies, public header symbols, release readiness, or a stable
 SDK claim.
+
+## Route Lock And Identity Evidence Shape Hardening
+
+The next supervised P0 round tightened the post-evidence route lock and the identity
+structured-evidence shape:
+
+- Four read-only sub-agent scopes were lead-delegated and closed: route/accounting,
+  permissions/admin dependency evidence, side-lane SDK accounting, and handoff/research
+  continuity.
+- `scripts/check_command_permission_route_gate.py` now computes
+  `route_lock.blocked_until` without duplicate entries. The post-approved-runtime-evidence
+  blocker `identity_public_contract_gate_missing` reports only
+  `[reviewed_identity_public_contract]`; no-runtime-evidence bound planning still reports
+  `[approved_runtime_principal_lifecycle_evidence, reviewed_identity_public_contract]`.
+- `scripts/check_command_permission_route_gate_bound_identity_sources.py` accepts the
+  deduped post-evidence route-lock shape and still requires locked/planning-only posture.
+- `scripts/check_public_sdk_v1_completion.py` now rejects player-identity contract
+  structured evidence unless the public-contract readiness report preserves the full
+  blocker set from the producer, has `blockers=[]`, and reports
+  `resolved_inputs=[runtime.lifecycle_evidence]`. A report truncated to only
+  `privacy.identifier_redaction`, or one with checker blockers, is not promotion evidence.
+- P0 accounting has direct regression coverage that
+  `identity_public_contract_gate_missing` does not count toward complete SDK progress.
+
+Deferred side-lane finding: `check_mission_transfer_dino_tribe_v1_outcome_accounting.py`
+is stricter than top-level SDK release-statement matching because it requires explicit
+mission, transfer, dino-policy, tribe-policy, and buff-status leaf outcomes. The next
+side-lane guardrail should wire that checker into `check_public_sdk_v1_completion.py`
+similarly to inventory copied signals and ResourceHandle/object identity, so umbrella
+wording cannot satisfy top-level bookkeeping without leaf evidence.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command response, commands/replies, Mission/Transfer/Dino/Tribe SDKs, public header
+symbols, release readiness, or a stable SDK claim.
 
 ## Approved Evidence Operational-Window Projection Binding
 

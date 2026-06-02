@@ -112,13 +112,14 @@ priorities, and do not use history files as the active source of truth.
   offline planning/consume-only work.
   If the current offline identity packs still pass, the default route is blocked first at
   `lifecycle_anchor_first_evidence_provenance_unbound`. Only an explicit bound-wrapper
-  route run may advance the blocker to `approved_runtime_evidence_missing`; that is
-  missing runtime principal lifecycle evidence, not readiness or promotion.
+  no-runtime-evidence route run may advance the blocker to
+  `approved_runtime_evidence_missing`; with accepted approved runtime evidence, the route
+  may advance only to `identity_public_contract_gate_missing`, still locked/planning-only.
   The accepted lifecycle-anchor snapshot binding gap is closed in the current builder and
   bound-wrapper route: `ShooterGameMode.HandleNewPlayer` and
   `ShooterGameMode.OnLogout` source hashes are checked against the actual
-  `--snapshot-root` files before an explicit bound route may advance to
-  `approved_runtime_evidence_missing`.
+  `--snapshot-root` files before an explicit no-runtime-evidence bound route may advance
+  to `approved_runtime_evidence_missing`.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -374,16 +375,18 @@ priorities, and do not use history files as the active source of truth.
   not approve runtime evidence, public identity, public SDK readiness, or v1 completion.
   Route-gate passthrough for these bound artifacts is explicit: the repo-default route
   stays blocked on `lifecycle_anchor_first_evidence_provenance_unbound`, while a route run
-  with explicit bound lifecycle/principal inputs may report only
-  `approved_runtime_evidence_missing` as the next blocker.
+  with explicit bound lifecycle/principal inputs and no approved runtime evidence may
+  report `approved_runtime_evidence_missing` as the next blocker. With accepted approved
+  runtime evidence, the allowed locked blocker is `identity_public_contract_gate_missing`.
   `scripts/check_command_permission_route_gate_bound_identity_sources.py` is the
   checker-style wrapper for that explicit route: it uses transient bound artifacts under a
   non-protected temp root and still authorizes no runtime/server work or SDK readiness.
   The historical `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
   lifecycle/principal bundle remains standalone consume-only planning evidence but now
   fails the stricter wrapper as not source-bound to generated first evidence; regenerate or
-  align source-bound manifests before expecting the wrapper to advance to
-  `approved_runtime_evidence_missing`.
+  align source-bound manifests before expecting the no-runtime-evidence wrapper to advance
+  to `approved_runtime_evidence_missing`, or the post-evidence route to advance to
+  `identity_public_contract_gate_missing`.
   Later SDK-completion hardening also applies structured promotion-evidence requirements
   to command response and commands/replies: generic ABI/SDK paths plus prose terms no
   longer let those P0 rows count toward complete SDK accounting. Command response needs
@@ -754,8 +757,8 @@ priorities, and do not use history files as the active source of truth.
     `planning_provenance.next_action` for
     `lifecycle_anchor_first_evidence_provenance_unbound`: regenerate or select
     lifecycle/principal planning manifests bound to current first-evidence, then verify
-    with the bound identity route wrapper. Expected next blocker after correct alignment
-    is `approved_runtime_evidence_missing`.
+    with the bound identity route wrapper. Expected no-approved-runtime-evidence next
+    blocker after correct alignment is `approved_runtime_evidence_missing`.
   - Public chat and gameplay-policy registration rollback now inerts released callback
     state before rollback. If rollback unregister fails, the orphan cannot invoke plugin
     code and owner cleanup still removes it. Test-only hooks cover both paths.
@@ -859,6 +862,25 @@ priorities, and do not use history files as the active source of truth.
   - This round does not authorize runtime/server operations, marker/env edits, Discord,
     publication, public identity, permissions/admin, command response, commands/replies,
     public header symbols, or stable SDK claims.
+- Delegated route-lock/evidence-hardening round on 2026-06-02 closed the next P0
+  accounting ambiguity:
+  - Four read-only sub-agent scopes were lead-delegated and closed: route/accounting,
+    permissions/admin dependency evidence, side-lane SDK accounting, and handoff
+    continuity.
+  - Route locks now dedupe the post-approved-runtime-evidence state:
+    `identity_public_contract_gate_missing` emits
+    `blocked_until=[reviewed_identity_public_contract]`, while
+    `approved_runtime_evidence_missing` still emits
+    `blocked_until=[approved_runtime_principal_lifecycle_evidence,
+    reviewed_identity_public_contract]`.
+  - Player-identity structured contract evidence in
+    `check_public_sdk_v1_completion.py` must now preserve the full producer blocker set,
+    `blockers=[]`, and `resolved_inputs=[runtime.lifecycle_evidence]`; truncated or
+    checker-blocked reports remain invalid.
+  - P0 SDK accounting explicitly keeps `identity_public_contract_gate_missing`
+    non-counting. Deferred side-lane finding: top-level SDK completion should run
+    `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` so umbrella wording
+    cannot bypass explicit mission/transfer/dino/tribe/buff leaf outcomes.
 
 ## Agent Coordination
 

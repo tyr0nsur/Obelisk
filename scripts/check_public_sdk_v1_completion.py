@@ -29,6 +29,14 @@ DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS = (
 OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME = (
     "object_identity_resource_handle_public_contract_decisions.json"
 )
+PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
+    "runtime.lifecycle_evidence",
+    "privacy.identifier_redaction",
+    "lifetime.generation_scope_invalidation",
+    "abi.public_pod_contract",
+    "lifecycle.owner_cleanup",
+    "separation.downstream_surfaces",
+}
 CANONICAL_MANIFEST_RELEASE_CLAIM = "no-v1-stable-release-claim-post-rc-surface-inventory"
 CANONICAL_SURFACE_IDS = {
     "obelisk.arkapi_compatibility.v1",
@@ -2264,7 +2272,10 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
             and contract_report.get("runtime_ready") is False
             and contract_report.get("public_header_allowed") is False
             and contract_report.get("next_blocker") == "identity_public_contract_gate"
-            and "privacy.identifier_redaction" in contract_report.get("remaining_blockers", [])
+            and set(contract_report.get("remaining_blockers", []))
+            == PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS
+            and contract_report.get("blockers") == []
+            and contract_report.get("resolved_inputs") == ["runtime.lifecycle_evidence"]
             and approved_runtime.get("approved_runtime_evidence_present") is True
             and approved_runtime.get("runtime_evidence_ready") is True
         ):

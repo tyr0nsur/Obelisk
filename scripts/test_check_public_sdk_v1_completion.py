@@ -188,6 +188,40 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def route_gate_override_env(self) -> dict[str, str]:
         return {"OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS": "1"}
 
+    def identity_structured_missing_for_contract_report(self, contract_payload: dict[str, object]) -> list[str]:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            root = Path(core_dir)
+            runtime_report = root / "player_identity_approved_runtime_report.json"
+            contract_report = root / "player_identity_public_contract_readiness_report.json"
+            executed_report = root / "player_identity_executed_tests.json"
+            runtime_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            contract_report.write_text(json.dumps(contract_payload), encoding="utf-8")
+            executed_report_path = write_executed_test_artifact(
+                executed_report,
+                "obelisk.player_identity.v1",
+                argv=["python3", "-m", "unittest", "player_identity_promotion"],
+            )
+            return player_identity_structured_promotion_evidence_missing(
+                {
+                    "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
+                    "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
+                    "executed_test_report": executed_report_path,
+                }
+            )
+
     def write_fake_route_gate(self, path: Path, **overrides: object) -> Path:
         payload = {
             "schema": "obelisk.command-permission-route-gate-check.v1",
@@ -3966,6 +4000,59 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
 
+    def test_identity_structured_contract_report_must_keep_full_blocker_set(self) -> None:
+        missing = self.identity_structured_missing_for_contract_report(
+            {
+                "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                "surface": "obelisk.player_identity.v1",
+                "accepted_for_contract_review": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "next_blocker": "identity_public_contract_gate",
+                "blockers": [],
+                "resolved_inputs": ["runtime.lifecycle_evidence"],
+                "remaining_blockers": ["privacy.identifier_redaction"],
+                "approved_runtime_evidence": {
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                },
+            }
+        )
+
+        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+
+    def test_identity_structured_contract_report_must_have_no_checker_blockers(self) -> None:
+        missing = self.identity_structured_missing_for_contract_report(
+            {
+                "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                "surface": "obelisk.player_identity.v1",
+                "accepted_for_contract_review": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "next_blocker": "identity_public_contract_gate",
+                "blockers": ["public_header_allowed_not_false"],
+                "resolved_inputs": ["runtime.lifecycle_evidence"],
+                "remaining_blockers": [
+                    "runtime.lifecycle_evidence",
+                    "privacy.identifier_redaction",
+                    "lifetime.generation_scope_invalidation",
+                    "abi.public_pod_contract",
+                    "lifecycle.owner_cleanup",
+                    "separation.downstream_surfaces",
+                ],
+                "approved_runtime_evidence": {
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                },
+            }
+        )
+
+        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+
     def test_candidate_only_player_identity_preflight_test_does_not_promote_completion_blocker(self) -> None:
         manifest, _ = complete_excluded_manifest()
         for surface in manifest["surfaces"]:
@@ -5195,6 +5282,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "runtime_ready": False,
                         "public_header_allowed": False,
                         "next_blocker": "identity_public_contract_gate",
+                        "blockers": [],
+                        "resolved_inputs": ["runtime.lifecycle_evidence"],
                         "remaining_blockers": [
                             "runtime.lifecycle_evidence",
                             "privacy.identifier_redaction",
@@ -5545,6 +5634,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 for blocker in (
                     "lifecycle_anchor_first_evidence_provenance_unbound",
                     "approved_runtime_evidence_missing",
+                    "identity_public_contract_gate_missing",
                 )
             ]
             unlocked_row = row_for_route_gate(

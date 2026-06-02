@@ -94,6 +94,15 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "public_response_path_allowed",
     "v1_completion_evidence",
 }
+
+
+def route_lock_blocked_until(current_blocker: Any) -> list[str]:
+    blocker_route = ALLOWED_IDENTITY_LOCK_BLOCKERS.get(str(current_blocker), {})
+    required = blocker_route.get("blocked_until", "allowed_identity_lock_blocker")
+    blocked_until = [required]
+    if required != "reviewed_identity_public_contract":
+        blocked_until.append("reviewed_identity_public_contract")
+    return blocked_until
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = {
     "authority_claim_source",
     "principal_source",
@@ -711,13 +720,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "critical_path_phase": critical_path_phase,
         "route_lock": {
             "locked": not blockers,
-            "blocked_until": [
-                ALLOWED_IDENTITY_LOCK_BLOCKERS.get(
-                    str(critical_path_phase.get("current_blocker")),
-                    {},
-                ).get("blocked_until", "allowed_identity_lock_blocker"),
-                "reviewed_identity_public_contract",
-            ],
+            "blocked_until": route_lock_blocked_until(critical_path_phase.get("current_blocker")),
             "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
         },
         "checks": [

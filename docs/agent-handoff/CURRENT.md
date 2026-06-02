@@ -25,11 +25,12 @@ This file is an active routing table only. Durable evidence belongs in
 - Current identity status: `scripts/build_player_identity_planning_source_manifests.py`
   can produce source-aligned planning manifests for the bound identity route. It now
   proves accepted lifecycle anchor `source_snapshot_sha256` values against the current
-  `--snapshot-root` files before a bound proof may advance only to
-  `approved_runtime_evidence_missing`; after accepted approved runtime evidence, the route
-  may report only `identity_public_contract_gate_missing`. The default route remains
-  blocked first at `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit
-  aligned manifests are supplied.
+  `--snapshot-root` files before a no-approved-runtime-evidence bound proof may report
+  `approved_runtime_evidence_missing`. After accepted approved runtime evidence, the only
+  allowed route blocker is `identity_public_contract_gate_missing`, still
+  locked/planning-only. The default route remains blocked first at
+  `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit aligned manifests
+  are supplied.
 
 ## Hard Overrides
 
@@ -99,6 +100,10 @@ This file is an active routing table only. Durable evidence belongs in
   validation may accept `identity_public_contract_gate_missing` only as locked,
   planning-only state with identity, permissions/admin, command response, commands/replies,
   public SDK, public header, and runtime readiness still false.
+  Route-lock expectation: `approved_runtime_evidence_missing` keeps
+  `blocked_until=[approved_runtime_principal_lifecycle_evidence,
+  reviewed_identity_public_contract]`; `identity_public_contract_gate_missing` keeps
+  `blocked_until=[reviewed_identity_public_contract]`.
 - Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md` remains the safe
   offline pack route. It requires a non-protected complete
@@ -137,8 +142,11 @@ This file is an active routing table only. Durable evidence belongs in
 
 - P0 identity: use `scripts/build_player_identity_planning_source_manifests.py` when a
   bound route proof is needed, then run
-  `scripts/check_command_permission_route_gate_bound_identity_sources.py` and confirm the
-  wrapper blocker is only `approved_runtime_evidence_missing`. The previous offline
+  `scripts/check_command_permission_route_gate_bound_identity_sources.py`. For a
+  no-runtime-evidence bound proof, confirm the wrapper blocker is
+  `approved_runtime_evidence_missing`. If accepted approved runtime evidence is supplied
+  to the route, confirm `identity_public_contract_gate_missing` and keep all
+  unlock/readiness flags false. The previous offline
   provenance gap for accepted lifecycle-anchor snapshot hashes is closed in the builder
   and bound wrapper; stale standalone manifests still fail closed unless regenerated or
   explicitly aligned to the current `--snapshot-root`.
@@ -158,6 +166,10 @@ This file is an active routing table only. Durable evidence belongs in
   cleanup under an in-flight callback during `UnloadAll` is now covered.
 - Side lanes: keep guardrails fail-closed for inventory copied-signal hygiene,
   ResourceHandle overclaims, Mission copied-bool planning, and Structure planning slices.
+  Next high-value side-lane guardrail: wire
+  `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` into top-level SDK
+  completion so umbrella release-statement wording cannot bypass explicit mission,
+  transfer, dino-policy, tribe-policy, and buff-status leaf outcomes.
 
 ## Agent Protocol
 
@@ -174,31 +186,9 @@ This file is an active routing table only. Durable evidence belongs in
 - Lead handles delegation directly when the user asks for agents. Keep the scoped
   delegation fact in handoff/research notes before finishing so compaction does not erase
   which work was delegated and which findings remain pending.
-- Latest delegated round used four lead-scoped read-only agents: offline identity
-  provenance, SDK-route overclaim audit, UE4 snapshot fixture provenance, and handoff
-  continuity. Integrated result: snapshot-root hash binding is enforced before bound
-  identity route advancement; no public SDK/runtime/permissions overclaim path was found.
-- Latest runtime-evidence preparation round used four lead-scoped read-only agents:
-  live-ops brief completeness, runtime observer safety, approved-evidence provenance, and
-  handoff continuity. Integrated result: request packs now include a validated
-  operator-live-ops brief, forbid the inventory-action observer marker, bind request-pack
-  commit/binary fields to the window manifest, and preserve canonical rollback delta.
-- Latest preflight-provenance round used four lead-scoped read-only agents: preflight
-  JSON schema/binding, window manifest/evidence replay, live-ops safety, and handoff
-  continuity. Integrated result: `check_player_principal_lifecycle_preflight.sh --json`
-  can bind `run_id`, target map, copied log, evidence dir, window manifest path, and
-  `checked_at_utc`; the window-manifest checker now rejects stale or swapped preflight
-  sidecars even when their outer manifest SHA is refreshed. Request-pack binding remains
-  indirect through manifest sidecar validation and request-check replay, not a preflight
-  JSON field.
-- Latest operational-window projection round used four lead-scoped read-only agents:
-  approved-manifest projection audit, replay attack-path audit, live-ops authorization
-  safety, and handoff continuity. Integrated result: approved runtime evidence now
-  preserves and replays window approval text, approved/capture/rollback timestamps,
-  `notice_sent`, `log_budget=10`, and fixed window non-claims inside
-  `operational_window`; every allowed `operational_window` key is covered by replay.
-  This remains consume-only evidence and does not authorize runtime/server work or public
-  SDK readiness.
+- Recent delegated rounds before the current route work are summarized in
+  `COMPACT_CONTEXT.md`: snapshot-root binding, runtime-evidence request/brief hardening,
+  preflight sidecar replay, and operational-window projection.
 - Latest identity-public-contract route round used four lead-scoped read-only agents:
   public-contract gap/readiness, route composition, privacy/redaction, and
   handoff/research continuity. Integrated result: route and bound-route validation now
@@ -207,3 +197,12 @@ This file is an active routing table only. Durable evidence belongs in
   `next_blocker=identity_public_contract_gate` plus unresolved
   `privacy.identifier_redaction`, and no permissions/admin, command, runtime, public
   header, or stable SDK readiness is unlocked.
+- Latest route-lock/evidence-hardening round used four lead-scoped read-only agents:
+  route/accounting, permissions/admin dependency evidence, side-lane SDK accounting, and
+  handoff continuity. Integrated result: route locks now dedupe
+  `blocked_until=[reviewed_identity_public_contract]` for
+  `identity_public_contract_gate_missing`; SDK completion requires identity contract
+  structured evidence to carry the full blocker set, `blockers=[]`, and
+  `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
+  `identity_public_contract_gate_missing` non-counting. Deferred finding:
+  Mission/Transfer/Dino/Tribe leaf accounting should be wired into top-level completion.

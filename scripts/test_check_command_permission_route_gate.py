@@ -338,6 +338,26 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         blockers = ROUTE_GATE.validate_critical_path_phase(phase)
         self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)
 
+    def test_route_lock_blocked_until_deduplicates_public_contract_gate(self) -> None:
+        self.assertEqual(
+            [
+                "bound_lifecycle_anchor_and_principal_policy_sources",
+                "reviewed_identity_public_contract",
+            ],
+            ROUTE_GATE.route_lock_blocked_until("lifecycle_anchor_first_evidence_provenance_unbound"),
+        )
+        self.assertEqual(
+            [
+                "approved_runtime_principal_lifecycle_evidence",
+                "reviewed_identity_public_contract",
+            ],
+            ROUTE_GATE.route_lock_blocked_until("approved_runtime_evidence_missing"),
+        )
+        self.assertEqual(
+            ["reviewed_identity_public_contract"],
+            ROUTE_GATE.route_lock_blocked_until("identity_public_contract_gate_missing"),
+        )
+
     def test_critical_path_phase_rejects_unlocked_commands_or_unknown_blocker(self) -> None:
         phase = {
             "current_surface": "obelisk.player_identity.v1",

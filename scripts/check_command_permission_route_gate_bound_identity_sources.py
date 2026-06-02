@@ -341,7 +341,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         if not isinstance(route_lock, dict) or route_lock.get("locked") is not True:
             blockers.append("route_gate_lock_unexpected")
         expected_blocked_until = (
-            ["reviewed_identity_public_contract", "reviewed_identity_public_contract"]
+            ["reviewed_identity_public_contract"]
             if current_blocker == "identity_public_contract_gate_missing"
             else ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"]
         )

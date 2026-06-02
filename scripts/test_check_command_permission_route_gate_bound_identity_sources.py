@@ -204,7 +204,6 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         phase["source_checker_primary_blocker"] = "identity_public_contract_gate_missing"
         route_report["route_lock"]["blocked_until"] = [
             "reviewed_identity_public_contract",
-            "reviewed_identity_public_contract",
         ]
 
         report = self.run_with_fake_route_report(route_report)
