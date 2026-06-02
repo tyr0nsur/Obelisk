@@ -164,12 +164,16 @@ This file is an active routing table only. Durable evidence belongs in
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.
-- Side lanes: keep guardrails fail-closed for inventory copied-signal hygiene,
-  ResourceHandle overclaims, Mission copied-bool planning, and Structure planning slices.
-  Next high-value side-lane guardrail: wire
-  `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` into top-level SDK
-  completion so umbrella release-statement wording cannot bypass explicit mission,
-  transfer, dino-policy, tribe-policy, and buff-status leaf outcomes.
+- Side lanes: mission/transfer/dino/tribe/buff leaf accounting is now enforced by
+  top-level SDK completion via
+  `check_mission_transfer_dino_tribe_v1_outcome_accounting.py`; umbrella release
+  wording cannot bypass explicit mission, transfer, dino-policy, tribe-policy, and
+  buff-status outcomes. This is accounting-only and does not promote
+  Mission/Transfer/Dino/Tribe/Buff SDKs, runtime, ABI, public callbacks,
+  ResourceHandle, or v1 completion.
+- Next P0 guardrail: permissions/admin structured promotion must require a matching
+  player-identity promotion certificate with the expected surface, chain position, and
+  artifact hash before any permissions/admin public/readiness claim can count.
 
 ## Agent Protocol
 
@@ -204,5 +208,10 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
-  `identity_public_contract_gate_missing` non-counting. Deferred finding:
-  Mission/Transfer/Dino/Tribe leaf accounting should be wired into top-level completion.
+  `identity_public_contract_gate_missing` non-counting.
+- Latest mission-leaf accounting follow-up used four lead-scoped read-only agents:
+  mission accounting integration, release-statement accounting risk,
+  permissions/admin dependency risk, and handoff continuity. Integrated result:
+  SDK completion now runs the mission-transfer-dino-tribe outcome checker, rejects
+  umbrella wording without explicit leaf outcomes, and preserves fail-closed status:
+  `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.

@@ -878,9 +878,17 @@ priorities, and do not use history files as the active source of truth.
     `blockers=[]`, and `resolved_inputs=[runtime.lifecycle_evidence]`; truncated or
     checker-blocked reports remain invalid.
   - P0 SDK accounting explicitly keeps `identity_public_contract_gate_missing`
-    non-counting. Deferred side-lane finding: top-level SDK completion should run
-    `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` so umbrella wording
-    cannot bypass explicit mission/transfer/dino/tribe/buff leaf outcomes.
+    non-counting.
+- Follow-up mission-leaf accounting integration closed the deferred side-lane finding:
+  top-level SDK completion now runs
+  `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` so umbrella wording
+  cannot bypass explicit mission/transfer/dino/tribe/buff leaf outcomes. This is
+  accounting-only; SDK completion remains fail-closed with
+  `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+- Deferred P0 guardrail from the same delegated round: permissions/admin structured
+  promotion should require a matching player-identity promotion certificate with the
+  expected surface, chain position, and artifact hash before permissions/admin
+  public/readiness evidence can count.
 
 ## Agent Coordination
 

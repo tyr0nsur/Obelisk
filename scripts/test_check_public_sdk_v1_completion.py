@@ -18,7 +18,10 @@ SCRIPT_DIR = REPO_ROOT / "scripts"
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from check_public_sdk_v1_completion import player_identity_structured_promotion_evidence_missing
+from check_public_sdk_v1_completion import (
+    player_identity_structured_promotion_evidence_missing,
+    release_statement_satisfies_exclusion_contract,
+)
 
 SCRIPT = REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"
 PUBLIC_SDK_SURFACES = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
@@ -130,6 +133,11 @@ def complete_excluded_manifest() -> tuple[dict, str]:
         if surface["id"] in manifest["v1_sdk_completion_blockers"]:
             surface["status"] = "excluded"
             surface["public_contract"] = []
+            if surface["id"] == "obelisk.mission_transfer_dino_tribe.v1":
+                for leaf in surface.get("leaf_decision_units", []):
+                    if isinstance(leaf, dict):
+                        leaf["status"] = "excluded"
+                        leaf["public_contract"] = []
             if not isinstance(surface.get("v1_decision_contract"), dict):
                 exclusions = surface.get("exclusions") if isinstance(surface.get("exclusions"), list) else []
                 audit_units = surface.get("audit_units") if isinstance(surface.get("audit_units"), list) else []
@@ -158,6 +166,11 @@ def complete_excluded_manifest() -> tuple[dict, str]:
                     marker = "the v1 release statement states that "
                     if isinstance(requirement, str) and requirement.lower().startswith(marker):
                         detail_parts.append(requirement[len(marker) :])
+            if surface["id"] == "obelisk.mission_transfer_dino_tribe.v1":
+                detail_parts.append(
+                    "mission excluded; transfer excluded; dino_policy excluded; "
+                    "tribe_policy excluded; buff_status excluded"
+                )
             release_lines.append(f"{surface['id']}: excluded - {'; '.join(detail_parts)}")
     return manifest, "\n".join(release_lines) + "\n"
 
@@ -282,6 +295,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
             encoding="utf-8",
         )
+        return path
+
+    def write_fake_mission_accounting_checker(self, path: Path, payload: dict[str, object] | str) -> Path:
+        if isinstance(payload, str):
+            path.write_text(f"print({json.dumps(payload)})\n", encoding="utf-8")
+        else:
+            path.write_text(f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n", encoding="utf-8")
         return path
 
     def test_inventory_copied_signals_contract_decision_manifest_is_required(self) -> None:
@@ -532,6 +552,24 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(resource_handle_readiness["blockers"], [])
         self.assertNotIn("object_identity_resource_handle_readiness_invalid", payload["blockers"])
         self.assertNotIn("object_identity_resource_handle_public_or_runtime_claims", payload["blockers"])
+        mission_accounting = payload["mission_transfer_dino_tribe_outcome_accounting"]
+        self.assertEqual(
+            mission_accounting["schema"],
+            "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+        )
+        self.assertEqual(mission_accounting["surface"], "obelisk.mission_transfer_dino_tribe.v1")
+        self.assertTrue(mission_accounting["ready"])
+        self.assertEqual(mission_accounting["accounting_route"], "candidate_only")
+        self.assertTrue(mission_accounting["candidate_only"])
+        self.assertFalse(mission_accounting["v1_accounted"])
+        self.assertFalse(mission_accounting["promotion_ready"])
+        self.assertFalse(mission_accounting["public_sdk_ready"])
+        self.assertFalse(mission_accounting["runtime_ready"])
+        self.assertEqual(
+            set(mission_accounting["missing_leaf_families"]),
+            {"mission", "transfer", "dino_policy", "tribe_policy", "buff_status"},
+        )
+        self.assertNotIn("mission_transfer_dino_tribe_outcome_accounting_invalid", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
         self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
         self.assertEqual(
@@ -720,6 +758,109 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "/tmp/obelisk-missing-resource-handle-readiness-checker.py",
         )
         self.assertEqual(payload["object_identity_resource_handle_readiness"]["exit_code"], 2)
+
+    def test_mission_transfer_dino_tribe_accounting_checker_is_required(self) -> None:
+        result = self.run_checker(
+            "--mission-transfer-dino-tribe-outcome-accounting",
+            "/tmp/obelisk-missing-mission-transfer-dino-tribe-checker.py",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_transfer_dino_tribe_outcome_accounting_output_invalid", payload["blockers"])
+        self.assertEqual(
+            payload["mission_transfer_dino_tribe_outcome_accounting"]["path"],
+            "/tmp/obelisk-missing-mission-transfer-dino-tribe-checker.py",
+        )
+        self.assertEqual(payload["mission_transfer_dino_tribe_outcome_accounting"]["exit_code"], 2)
+
+    def test_completion_gate_rejects_mission_accounting_public_runtime_overclaims(self) -> None:
+        base = {
+            "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+            "surface": "obelisk.mission_transfer_dino_tribe.v1",
+            "ready": True,
+            "accounting_route": "candidate_only",
+            "candidate_only": True,
+            "v1_accounted": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "missing_leaf_families": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "blockers": [],
+        }
+        cases = (
+            ("promotion_ready", "mission_transfer_dino_tribe_promotion_ready_not_false"),
+            ("public_sdk_ready", "mission_transfer_dino_tribe_public_sdk_ready_not_false"),
+            ("runtime_ready", "mission_transfer_dino_tribe_runtime_ready_not_false"),
+        )
+        for key, expected in cases:
+            with self.subTest(key=key):
+                payload = dict(base)
+                payload[key] = True
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_mission_accounting_checker(
+                        Path(temp_dir) / "fake_mission_accounting.py",
+                        payload,
+                    )
+                    result = self.run_checker(
+                        "--mission-transfer-dino-tribe-outcome-accounting",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                report = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, report["blockers"])
+                self.assertFalse(report["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_mission_accounting_invalid_or_incomplete_report(self) -> None:
+        base = {
+            "schema": "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1",
+            "surface": "obelisk.mission_transfer_dino_tribe.v1",
+            "ready": True,
+            "accounting_route": "candidate_only",
+            "candidate_only": True,
+            "v1_accounted": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "required_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "observed_leaves": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "missing_leaf_families": ["mission", "transfer", "dino_policy", "tribe_policy", "buff_status"],
+            "blockers": [],
+        }
+        cases = (
+            ("not json", "mission_transfer_dino_tribe_outcome_accounting_output_invalid"),
+            ({**base, "schema": "wrong-schema"}, "mission_transfer_dino_tribe_outcome_accounting_schema_mismatch"),
+            ({**base, "surface": "wrong-surface"}, "mission_transfer_dino_tribe_outcome_accounting_surface_mismatch"),
+            ({**base, "ready": False}, "mission_transfer_dino_tribe_outcome_accounting_invalid"),
+            ({**base, "blockers": ["release_statement_leaf_exclusions_missing"]}, "mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty"),
+            ({**base, "observed_leaves": ["mission"]}, "mission_transfer_dino_tribe_observed_leaves_mismatch"),
+            ({**base, "candidate_only": False}, "mission_transfer_dino_tribe_candidate_only_accounting_mismatch"),
+        )
+        for fake_payload, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_mission_accounting_checker(
+                        Path(temp_dir) / "fake_mission_accounting.py",
+                        fake_payload,
+                    )
+                    result = self.run_checker(
+                        "--mission-transfer-dino-tribe-outcome-accounting",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                report = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, report["blockers"])
+                self.assertFalse(report["stable_claim_allowed"])
 
     def test_completion_gate_rejects_resource_handle_public_runtime_promotion_overclaims(self) -> None:
         cases = (
@@ -3276,6 +3417,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "obelisk.mission_transfer_dino_tribe.v1",
             payload["release_statement_missing_exclusion_contracts"],
         )
+
+    def test_release_statement_umbrella_mission_exclusion_requires_leaf_outcomes(self) -> None:
+        manifest, release_statement = complete_excluded_manifest()
+        release_statement = release_statement.replace(
+            "; mission excluded; transfer excluded; dino_policy excluded; tribe_policy excluded; buff_status excluded",
+            "",
+        )
+        surface = next(
+            surface
+            for surface in manifest["surfaces"]
+            if surface["id"] == "obelisk.mission_transfer_dino_tribe.v1"
+        )
+        for leaf in surface["leaf_decision_units"]:
+            leaf["status"] = "planning"
+
+        self.assertFalse(release_statement_satisfies_exclusion_contract(release_statement, surface))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            statement_path.write_text(release_statement, encoding="utf-8")
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(statement_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("mission_transfer_dino_tribe_outcome_accounting_invalid", payload["blockers"])
+        self.assertIn("mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty", payload["blockers"])
+        self.assertIn("release_statement_missing_exclusion_contract", payload["blockers"])
+        self.assertIn(
+            "release_statement_leaf_exclusions_missing",
+            payload["mission_transfer_dino_tribe_outcome_accounting"]["blockers"],
+        )
+        self.assertFalse(payload["mission_transfer_dino_tribe_outcome_accounting"]["v1_accounted"])
 
     def test_release_statement_rejects_duplicate_or_mixed_surface_records(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

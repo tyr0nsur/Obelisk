@@ -26,9 +26,19 @@ DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY = (
 DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS = (
     REPO_ROOT / "scripts" / "check_object_identity_resource_handle_public_contract_readiness.py"
 )
+DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING = (
+    REPO_ROOT / "scripts" / "check_mission_transfer_dino_tribe_v1_outcome_accounting.py"
+)
 OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME = (
     "object_identity_resource_handle_public_contract_decisions.json"
 )
+MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES = {
+    "mission",
+    "transfer",
+    "dino_policy",
+    "tribe_policy",
+    "buff_status",
+}
 PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
@@ -842,6 +852,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--mission-transfer-dino-tribe-outcome-accounting",
+        type=Path,
+        default=DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING,
+        help=(
+            "Offline guardrail that keeps Mission/Transfer/Dino/Tribe/Buff v1 "
+            "umbrella accounting tied to explicit leaf outcomes."
+        ),
+    )
+    parser.add_argument(
         "--validate-release-statement-scope",
         action="store_true",
         help=(
@@ -1247,6 +1266,131 @@ def run_object_identity_resource_handle_readiness(
         },
         blockers,
     )
+
+
+def run_mission_transfer_dino_tribe_outcome_accounting(
+    path: Path,
+    manifest_path: Path,
+    release_statement_path: Path | None,
+) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    argv = [sys.executable, str(path), "--manifest", str(manifest_path), "--json"]
+    if release_statement_path is not None:
+        argv.extend(["--release-statement", str(release_statement_path)])
+    result = subprocess.run(
+        argv,
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": f"stdout_json_decode_error: {exc}",
+                "stderr": result.stderr.strip(),
+            },
+            ["mission_transfer_dino_tribe_outcome_accounting_output_invalid"],
+        )
+    if not isinstance(payload, dict):
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": "stdout_json_not_object",
+                "stderr": result.stderr.strip(),
+            },
+            ["mission_transfer_dino_tribe_outcome_accounting_output_invalid"],
+        )
+
+    accounting_route = payload.get("accounting_route")
+    if payload.get("schema") != "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1":
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_schema_mismatch")
+    if result.returncode != 0 or payload.get("ready") is not True:
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_invalid")
+    if payload.get("surface") != "obelisk.mission_transfer_dino_tribe.v1":
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_surface_mismatch")
+    if set(payload.get("required_leaves", [])) != MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES:
+        blockers.append("mission_transfer_dino_tribe_required_leaves_mismatch")
+    if set(payload.get("observed_leaves", [])) != MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES:
+        blockers.append("mission_transfer_dino_tribe_observed_leaves_mismatch")
+    report_blockers = payload.get("blockers", [])
+    if report_blockers:
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_blockers_not_empty")
+    if accounting_route == "candidate_only":
+        if payload.get("candidate_only") is not True or payload.get("v1_accounted") is not False:
+            blockers.append("mission_transfer_dino_tribe_candidate_only_accounting_mismatch")
+    elif accounting_route == "release_statement_umbrella_excluded":
+        release_statement = payload.get("release_statement") if isinstance(payload.get("release_statement"), dict) else {}
+        leaf_exclusions = release_statement.get("leaf_exclusions")
+        leaf_exclusions = leaf_exclusions if isinstance(leaf_exclusions, dict) else {}
+        missing_leaf_exclusions = sorted(
+            leaf_id
+            for leaf_id in MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES
+            if leaf_exclusions.get(leaf_id) is not True
+        )
+        if payload.get("v1_accounted") is not True or missing_leaf_exclusions:
+            blockers.append("mission_transfer_dino_tribe_release_statement_leaf_exclusions_incomplete")
+    elif accounting_route == "per_leaf_promoted":
+        if not (
+            payload.get("promotion_ready") is True
+            and payload.get("public_sdk_ready") is True
+            and payload.get("runtime_ready") is True
+            and payload.get("v1_accounted") is True
+        ):
+            blockers.append("mission_transfer_dino_tribe_promoted_leaf_accounting_mismatch")
+    else:
+        blockers.append("mission_transfer_dino_tribe_outcome_accounting_route_unexpected")
+    if accounting_route != "per_leaf_promoted":
+        for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+            if payload.get(key) is not False:
+                blockers.append(f"mission_transfer_dino_tribe_{key}_not_false")
+
+    return (
+        {
+            "path": str(path),
+            "exit_code": result.returncode,
+            "schema": payload.get("schema"),
+            "surface": payload.get("surface"),
+            "ready": payload.get("ready"),
+            "accounting_route": accounting_route,
+            "candidate_only": payload.get("candidate_only"),
+            "v1_accounted": payload.get("v1_accounted"),
+            "promotion_ready": payload.get("promotion_ready"),
+            "public_sdk_ready": payload.get("public_sdk_ready"),
+            "runtime_ready": payload.get("runtime_ready"),
+            "required_leaves": payload.get("required_leaves"),
+            "observed_leaves": payload.get("observed_leaves"),
+            "missing_leaf_families": payload.get("missing_leaf_families"),
+            "release_statement": payload.get("release_statement"),
+            "blockers": report_blockers,
+            "stderr": result.stderr.strip(),
+            "non_claim": (
+                "Mission/Transfer/Dino/Tribe/Buff accounting guard; not public SDK, "
+                "runtime, promotion, or v1 completion evidence"
+            ),
+        },
+        blockers,
+    )
+
+
+def mission_transfer_dino_tribe_release_statement_path(path: Path | None) -> Path | None:
+    if path is None:
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return path
+    if not any(
+        line.strip().startswith("obelisk.mission_transfer_dino_tribe.v1:")
+        for line in text.splitlines()
+    ):
+        return None
+    return path
 
 
 def load_manifest(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
@@ -1722,6 +1866,16 @@ def release_statement_satisfies_exclusion_contract(text: str, surface: dict[str,
     if release_statement_has_surface_claim_contradiction(text, surface):
         return False
     required_text = [item for item in (required_release_statement_text(item) for item in required) if item]
+    if surface_id == "obelisk.mission_transfer_dino_tribe.v1":
+        leaf_terms = {
+            "mission": ("mission excluded", "mission post-v1", "mission post v1"),
+            "transfer": ("transfer excluded", "transfer post-v1", "transfer post v1"),
+            "dino_policy": ("dino_policy excluded", "dino policy excluded", "dino_policy post-v1", "dino policy post-v1"),
+            "tribe_policy": ("tribe_policy excluded", "tribe policy excluded", "tribe_policy post-v1", "tribe policy post-v1"),
+            "buff_status": ("buff_status excluded", "buff/status excluded", "buff status excluded", "buff_status post-v1", "buff/status post-v1"),
+        }
+        if not all(any(term in lowered for term in terms) for terms in leaf_terms.values()):
+            return False
     return all(item.lower() in lowered for item in required_text)
 
 
@@ -2882,6 +3036,7 @@ def build_report(
     command_permission_route_gate_path: Path = DEFAULT_COMMAND_PERMISSION_ROUTE_GATE,
     inventory_copied_signals_stability_path: Path = DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY,
     object_identity_resource_handle_readiness_path: Path = DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS,
+    mission_transfer_dino_tribe_outcome_accounting_path: Path = DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING,
 ) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     command_permission_route_gate, route_gate_blockers = run_command_permission_route_gate(
@@ -2903,6 +3058,14 @@ def build_report(
         )
     )
     blockers.extend(resource_handle_readiness_blockers)
+    mission_transfer_dino_tribe_outcome_accounting, mission_transfer_blockers = (
+        run_mission_transfer_dino_tribe_outcome_accounting(
+            mission_transfer_dino_tribe_outcome_accounting_path,
+            manifest_path,
+            mission_transfer_dino_tribe_release_statement_path(release_statement_path),
+        )
+    )
+    blockers.extend(mission_transfer_blockers)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
     blockers.extend(release_statement_blockers)
     blocked_contract_header_symbols, contract_symbol_blockers = blocked_contract_public_header_symbol_drift(
@@ -2925,6 +3088,7 @@ def build_report(
             "command_permission_route_gate": command_permission_route_gate,
             "inventory_copied_signals_stability": inventory_copied_signals_stability,
             "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
+            "mission_transfer_dino_tribe_outcome_accounting": mission_transfer_dino_tribe_outcome_accounting,
             "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
             "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
             "blockers": blockers,
@@ -3398,6 +3562,7 @@ def build_report(
         "command_permission_route_gate": command_permission_route_gate,
         "inventory_copied_signals_stability": inventory_copied_signals_stability,
         "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
+        "mission_transfer_dino_tribe_outcome_accounting": mission_transfer_dino_tribe_outcome_accounting,
         "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
         "release_claim": manifest.get("release_claim"),
@@ -3894,6 +4059,7 @@ def main() -> int:
         args.command_permission_route_gate,
         args.inventory_copied_signals_stability,
         args.object_identity_resource_handle_readiness,
+        args.mission_transfer_dino_tribe_outcome_accounting,
     )
     if args.validate_release_statement_scope:
         report = add_scoped_release_statement_result(report)

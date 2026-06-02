@@ -1867,3 +1867,37 @@ report before accepting planning alignment.
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
+
+## Mission Leaf Accounting Integration
+
+The next delegated follow-up closed the mission/transfer/dino/tribe/buff accounting
+gap found during route-lock hardening:
+
+- `scripts/check_public_sdk_v1_completion.py` now runs
+  `scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py` and embeds its
+  compact report under `mission_transfer_dino_tribe_outcome_accounting`.
+- Default repo accounting stays `candidate_only`, `v1_accounted=false`, and
+  `promotion_ready=false`, `public_sdk_ready=false`, `runtime_ready=false`.
+- Mission umbrella release-statement wording no longer satisfies the exclusion contract
+  unless it names explicit mission, transfer, dino-policy, tribe-policy, and buff-status
+  outcomes.
+- The integration rejects invalid checker output, schema/surface drift, missing required
+  leaves, unexpected accounting routes, child blockers, and public/runtime/promotion
+  overclaims unless the leaf route is explicitly promoted.
+- Deferred P0 guardrail: permissions/admin structured promotion should require a matching
+  player-identity promotion certificate with the expected surface, chain position, and
+  artifact hash before permissions/admin public/readiness evidence can count.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_mission_transfer_dino_tribe_v1_outcome_accounting`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_public_sdk_guardrails scripts.test_agent_handoff_guardrails`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+
+The default SDK completion check still fails closed with `stable_claim_allowed=false`,
+complete-SDK progress `0/12`, and P0 progress `0/4`. This round does not approve runtime
+work, public identity, public permissions/admin, command response, commands/replies,
+Mission/Transfer/Dino/Tribe/Buff SDKs, ResourceHandle, release readiness, or a stable
+SDK claim.
