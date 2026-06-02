@@ -336,12 +336,15 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
     report_schema = report.get("schema") if report is not None else None
     expected_schema = EXPECTED_ROUTE_CHECK_SCHEMAS.get(name)
     schema_valid = report_schema == expected_schema
+    report_blockers = report.get("blockers", []) if report is not None else []
+    blockers_empty = isinstance(report_blockers, list) and not report_blockers
 
     check_valid = (
         result.returncode == 0
         and report is not None
         and schema_valid
         and report.get("valid") is True
+        and blockers_empty
         and (
             name not in REQUIRED_PLANNING_ONLY_CHECKS
             or (
@@ -363,7 +366,7 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         "planning_only": report.get("planning_only") if report is not None else None,
         "accepted_for_planning": report.get("accepted_for_planning") if report is not None else None,
         "public_or_runtime_claims": public_or_runtime_claims,
-        "blockers": report.get("blockers", []) if report is not None else [],
+        "blockers": report_blockers,
         "parse_error": parse_error,
         "stderr": result.stderr.strip(),
         "report_payload": report,
@@ -499,6 +502,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         if check["public_or_runtime_claims"]:
             joined = ", ".join(check["public_or_runtime_claims"])
             blockers.append(f"{check['name']}: unexpected public/runtime claim: {joined}")
+        if check["blockers"]:
+            blockers.append(f"{check['name']}: child blockers not empty")
         if check["name"] in REQUIRED_PLANNING_ONLY_CHECKS:
             if check["planning_only"] is not True:
                 blockers.append(f"{check['name']}: planning_only must stay true")

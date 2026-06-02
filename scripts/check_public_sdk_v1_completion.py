@@ -1554,10 +1554,28 @@ def surface_has_promotion_evidence(surface: dict[str, Any]) -> bool:
         leaf_units = surface.get("leaf_decision_units")
         if not isinstance(leaf_units, list) or not leaf_units:
             return False
-        observed = {leaf.get("id"): leaf.get("status") for leaf in leaf_units if isinstance(leaf, dict)}
+        leaves = {leaf.get("id"): leaf for leaf in leaf_units if isinstance(leaf, dict)}
+        observed = {leaf_id: leaf.get("status") for leaf_id, leaf in leaves.items()}
         required = {"mission", "transfer", "dino_policy", "tribe_policy", "buff_status"}
         if set(observed) != required or any(observed.get(leaf_id) != "promoted" for leaf_id in required):
             return False
+        per_leaf_evidence = surface.get("promotion_evidence_by_leaf")
+        per_leaf_evidence = per_leaf_evidence if isinstance(per_leaf_evidence, dict) else {}
+        for leaf_id in required:
+            leaf_evidence = leaves[leaf_id].get("evidence")
+            if not isinstance(leaf_evidence, dict):
+                leaf_evidence = per_leaf_evidence.get(leaf_id)
+            if not isinstance(leaf_evidence, dict):
+                return False
+            if leaf_evidence.get("promotion_status") != "promoted":
+                return False
+            for flag in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+                if leaf_evidence.get(flag) is not True:
+                    return False
+            for key in ("abi_tests", "sdk_consumer_tests", "second_source_evidence"):
+                value = leaf_evidence.get(key)
+                if not isinstance(value, list) or not value:
+                    return False
     allow_generic_dirs = surface_id not in STRICT_PROMOTION_EVIDENCE_SURFACE_IDS
     if not allow_generic_dirs:
         if evidence.get("surface_id") != surface_id:

@@ -197,6 +197,20 @@ This file is an active routing table only. Durable evidence belongs in
   first-evidence child exit/status/ready/internal-planning fields. Gap/query child reports
   now emit explicit `valid`. These remain offline guardrails only; no public SDK/runtime
   readiness or v1 completion is promoted.
+- 2026-06-02 post-compaction route/umbrella evidence hardening: SDK completion now also
+  requires the umbrella `obelisk.mission_transfer_dino_tribe.v1` row to carry per-leaf
+  promoted evidence for all five leaf decision units, not only top-level umbrella
+  evidence. The command/permission route gate now rejects any child check that reports
+  non-empty `blockers` even when that child also says `valid=true`, and surfaces that
+  condition as `child blockers not empty`. These are offline fail-closed guardrails only;
+  no runtime, public SDK, command route, Mission/Transfer/Dino/Tribe, or v1 completion
+  readiness is promoted.
+- Deferred read-only audit risks from the same subagent round: structure second-source
+  readiness should reject additional ready aliases and positive readiness strings;
+  inventory/item copied-signal hygiene should scan `docs/public_gameplay_events.json`
+  readiness claims; ResourceHandle/object-identity readiness should scan structured
+  metadata in `docs/public_sdk_surfaces.json` and decisions, not only strings and gameplay
+  events. Treat these as next offline guardrail targets, not current readiness evidence.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

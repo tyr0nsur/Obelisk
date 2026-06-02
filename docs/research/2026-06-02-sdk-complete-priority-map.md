@@ -640,3 +640,26 @@ Validation:
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a
 stable SDK claim.
+
+## Post-Compaction Route And Umbrella Evidence Guardrails
+
+The resumed lead round closed two more offline fail-closed gaps while preserving the same
+P0 blocker and SDK-completion accounting:
+
+- `scripts/check_public_sdk_v1_completion.py` now requires the
+  `obelisk.mission_transfer_dino_tribe.v1` umbrella row to carry promoted evidence for
+  each leaf decision unit (`mission`, `transfer`, `dino_policy`, `tribe_policy`, and
+  `buff_status`). Top-level umbrella evidence plus promoted leaf statuses is no longer
+  enough to satisfy `promotion_evidence_satisfied`.
+- `scripts/check_command_permission_route_gate.py` now treats non-empty `blockers` in a
+  child report as a hard route failure even when the child also reports `valid=true`.
+  Aggregated reports surface this as `child blockers not empty` so dependency blockers
+  cannot be masked by a contradictory child `valid` field.
+- Deferred read-only audit findings remain open for future guardrail rounds:
+  structure second-source readiness alias/string overclaims, inventory/item copied-signal
+  readiness claims in `docs/public_gameplay_events.json`, and structured ResourceHandle/
+  object-identity metadata claims in surfaces or decision JSON.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.

@@ -344,6 +344,34 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertFalse(result["valid"])
 
+    def test_route_check_rejects_child_blockers_even_when_valid_true(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+            return subprocess.CompletedProcess(
+                args=args[0],
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "blockers": ["masked_dependency_provenance_gap"],
+                    }
+                ),
+                stderr="",
+            )
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("command_chat_response_public_readiness", ["fake-check", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertEqual(["masked_dependency_provenance_gap"], result["blockers"])
+
     def test_route_check_rejects_schema_drift_even_when_otherwise_valid(self) -> None:
         original = ROUTE_GATE.run_check
 
