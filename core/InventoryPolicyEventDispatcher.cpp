@@ -128,10 +128,11 @@ namespace Obelisk::Core
             }
         }
 
-        void DestroySubscriptionsForOwnerCleanup(
-            const std::vector<InventoryPolicyEventSubscription>& subscriptions)
+        std::vector<InventoryPolicyEventSubscription> DestroySubscriptionsForOwnerCleanup(
+            const std::vector<InventoryPolicyEventSubscription>& subscriptions,
+            std::exception_ptr& firstFailure)
         {
-            std::exception_ptr firstFailure;
+            std::vector<InventoryPolicyEventSubscription> failed;
             for (const InventoryPolicyEventSubscription& subscription : subscriptions)
             {
                 try
@@ -142,11 +143,11 @@ namespace Obelisk::Core
                 {
                     if (!firstFailure)
                         firstFailure = std::current_exception();
+                    failed.push_back(subscription);
                 }
             }
 
-            if (firstFailure)
-                std::rethrow_exception(firstFailure);
+            return failed;
         }
 
         bool IsInsideAnyGameplayCallback()
@@ -264,7 +265,7 @@ namespace Obelisk::Core
             if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
             {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
-                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+                removed = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
             }
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
@@ -344,7 +345,7 @@ namespace Obelisk::Core
             if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
             {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
-                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+                removed = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
             }
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
@@ -377,11 +378,15 @@ namespace Obelisk::Core
 
         std::vector<InventoryPolicyEventSubscription> removed;
         std::exception_ptr deferredFailure;
+        std::vector<InventoryPolicyEventSubscription> deferredFailures;
+        size_t retainedCount = 0;
         size_t before = 0;
         size_t after = 0;
         try
         {
             std::unique_lock<std::mutex> lock(m_Mutex);
+            removed = TakeFailedOwnerDestroySubscriptions(owner);
+            retainedCount = removed.size();
             before = m_Registrations.size();
             const size_t matchingCount = static_cast<size_t>(
                 std::count_if(m_Registrations.begin(),
@@ -389,7 +394,7 @@ namespace Obelisk::Core
                               [owner](const Registration& item) {
                                   return item.Owner == owner;
                               }));
-            if (matchingCount == 0)
+            if (matchingCount == 0 && retainedCount == 0)
             {
                 if (!IsInsideAnyGameplayCallback() &&
                     !IsInsideDispatcherCleanup() &&
@@ -399,7 +404,7 @@ namespace Obelisk::Core
                 }
                 return 0;
             }
-            removed.reserve(matchingCount);
+            removed.reserve(retainedCount + matchingCount);
             if (m_DispatchDepth > 0)
                 m_PendingDestroy.reserve(m_PendingDestroy.size() + matchingCount);
             auto keepEnd = std::remove_if(m_Registrations.begin(),
@@ -421,11 +426,17 @@ namespace Obelisk::Core
                 if (m_NextCleanupBatchId == 0)
                     m_NextCleanupBatchId = 1;
             }
-            if (QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId))
+            std::vector<InventoryPolicyEventSubscription> currentRemoved(
+                removed.begin() + static_cast<std::ptrdiff_t>(retainedCount),
+                removed.end());
+            const bool queuedForDeferredDestroy = m_DispatchDepth > 0 && !currentRemoved.empty();
+            if (QueueOrDestroyRemovedSubscriptions(currentRemoved, lock, cleanupBatchId))
             {
                 m_DispatchCv.wait(lock, [this]() { return IsDispatchCleanupComplete(); });
-                deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId);
+                deferredFailures = TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure);
             }
+            if (queuedForDeferredDestroy)
+                removed.erase(removed.begin() + static_cast<std::ptrdiff_t>(retainedCount), removed.end());
             else if (!IsInsideAnyGameplayCallback() &&
                      !IsInsideDispatcherCleanup() &&
                      !IsDispatchCleanupComplete())
@@ -443,10 +454,19 @@ namespace Obelisk::Core
                 OBELISK_ERROR("Inventory policy event owner cleanup failed with an unknown exception.");
             throw;
         }
-        DestroySubscriptionsForOwnerCleanup(removed);
+        std::exception_ptr cleanupFailure;
+        std::vector<InventoryPolicyEventSubscription> failed =
+            DestroySubscriptionsForOwnerCleanup(removed, cleanupFailure);
         if (deferredFailure)
-            std::rethrow_exception(deferredFailure);
-        return before - after;
+        {
+            cleanupFailure = cleanupFailure ? cleanupFailure : deferredFailure;
+            failed.insert(failed.end(), deferredFailures.begin(), deferredFailures.end());
+        }
+        if (!failed.empty())
+            RetainFailedOwnerDestroySubscriptions(owner, failed);
+        if (cleanupFailure)
+            std::rethrow_exception(cleanupFailure);
+        return retainedCount + (before - after);
     }
 
     bool InventoryPolicyEventDispatcher::QueueOrDestroyRemovedSubscriptions(
@@ -468,23 +488,56 @@ namespace Obelisk::Core
         return false;
     }
 
-    std::exception_ptr InventoryPolicyEventDispatcher::TakeDeferredDestroyFailure(uint64_t cleanupBatchId)
+    std::vector<InventoryPolicyEventSubscription> InventoryPolicyEventDispatcher::TakeFailedOwnerDestroySubscriptions(void* owner)
     {
-        if (cleanupBatchId == 0)
-            return nullptr;
+        std::vector<InventoryPolicyEventSubscription> subscriptions;
+        auto keepEnd = std::remove_if(
+            m_FailedOwnerDestroy.begin(),
+            m_FailedOwnerDestroy.end(),
+            [owner, &subscriptions](const FailedOwnerDestroy& item) {
+                if (item.Owner != owner)
+                    return false;
+                subscriptions.push_back(item.Subscription);
+                return true;
+            });
+        m_FailedOwnerDestroy.erase(keepEnd, m_FailedOwnerDestroy.end());
+        return subscriptions;
+    }
 
-        const auto failureIt = std::find_if(
+    void InventoryPolicyEventDispatcher::RetainFailedOwnerDestroySubscriptions(
+        void* owner,
+        const std::vector<InventoryPolicyEventSubscription>& subscriptions)
+    {
+        if (!owner || subscriptions.empty())
+            return;
+
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        m_FailedOwnerDestroy.reserve(m_FailedOwnerDestroy.size() + subscriptions.size());
+        for (const InventoryPolicyEventSubscription& subscription : subscriptions)
+            m_FailedOwnerDestroy.push_back({owner, subscription});
+    }
+
+    std::vector<InventoryPolicyEventSubscription> InventoryPolicyEventDispatcher::TakeDeferredDestroyFailures(
+        uint64_t cleanupBatchId,
+        std::exception_ptr& firstFailure)
+    {
+        std::vector<InventoryPolicyEventSubscription> failedSubscriptions;
+        if (cleanupBatchId == 0)
+            return failedSubscriptions;
+
+        auto keepEnd = std::remove_if(
             m_DeferredDestroyFailures.begin(),
             m_DeferredDestroyFailures.end(),
-            [cleanupBatchId](const DeferredDestroyFailure& failure) {
-                return failure.CleanupBatchId == cleanupBatchId;
+            [cleanupBatchId, &firstFailure, &failedSubscriptions](const DeferredDestroyFailure& failure) {
+                if (failure.CleanupBatchId != cleanupBatchId)
+                    return false;
+                if (!firstFailure)
+                    firstFailure = failure.Failure;
+                failedSubscriptions.push_back(failure.Subscription);
+                return true;
             });
-        if (failureIt == m_DeferredDestroyFailures.end())
-            return nullptr;
-
-        std::exception_ptr failure = failureIt->Failure;
-        m_DeferredDestroyFailures.erase(failureIt);
-        return failure;
+        m_DeferredDestroyFailures.erase(keepEnd, m_DeferredDestroyFailures.end());
+        return failedSubscriptions;
     }
 
     bool InventoryPolicyEventDispatcher::IsDispatchCleanupComplete() const
@@ -528,7 +581,7 @@ namespace Obelisk::Core
                             return failure.CleanupBatchId == item.CleanupBatchId;
                         });
                     if (!alreadyCaptured)
-                        failures.push_back({item.CleanupBatchId, std::current_exception()});
+                        failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()});
                 }
                 catch (...)
                 {

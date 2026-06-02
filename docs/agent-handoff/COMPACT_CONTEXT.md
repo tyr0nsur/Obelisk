@@ -1161,6 +1161,12 @@ priorities, and do not use history files as the active source of truth.
   gate tests OK, route JSON locked at `approved_runtime_evidence_missing`, and SDK JSON
   failed closed with SDK 0/12, P0 0/4, `stable_claim_allowed=false`. No runtime/server
   operation was performed.
+- 2026-06-02 supervised runtime/ABI round: copied-event `DestroyUserData` owner-cleanup
+  failures are retry-stable for Chat, Structure, InventoryPolicy, ItemReturn, and
+  PlayerPrincipal dispatchers. Failed destroy subscriptions are retained outside the
+  dispatchable callback set and reattempted by `UnregisterCallbacksForOwner(owner)` before
+  `PluginManager` can `dlclose`; `ObeliskPlugin_Shutdown()` is not repeated on retry.
+  Validation: dispatcher tests plus `PluginManagerTests`; no runtime/server operation.
 - 2026-06-02 supervised 4-agent offline P0-prep round: lead integrated window-manifest
   preflight hardening. Accepted `preflight-pre.json`/`preflight-post.json` sidecars must
   now report `offline_only=false` and `allow_stopped=false`; bundle preflight fallback
@@ -1168,11 +1174,12 @@ priorities, and do not use history files as the active source of truth.
   `sidecars/<run-id>/*.txt` paths. SDK/P0 audit found no accounting drift for request
   packs, planning manifests, route acceptance, or PluginManager hardening. Reversing audit
   kept broad FName/GObjects/core rediscovery rejected and validated Mission copied-bool
-  side-lane as internal/non-public. Runtime/ABI audit found a pending follow-up:
-  copied-event `DestroyUserData` cleanup failures can be erased before successful retry,
-  allowing a later `dlclose`; next runtime round should make dispatcher destroy cleanup
-  retry-stable. Validation stayed offline-only and route/SDK remained fail-closed. No
-  runtime/server operation was performed.
+  side-lane as internal/non-public. Runtime/ABI audit found the copied-event
+  `DestroyUserData` retry gap that was resolved in the following runtime round.
+  Structure aggregate/census planning remains excluded/non-counting, and Transfer
+  `bAccept` remains a useful bool-layout fixture rather than a promoted module route.
+  Validation stayed offline-only and route/SDK remained fail-closed. No runtime/server
+  operation was performed.
 
 ## Agent Coordination
 

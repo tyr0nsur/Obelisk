@@ -94,7 +94,14 @@ namespace Obelisk::Core
         struct DeferredDestroyFailure
         {
             uint64_t CleanupBatchId = 0;
+            StructureEventSubscription Subscription;
             std::exception_ptr Failure;
+        };
+
+        struct FailedOwnerDestroy
+        {
+            void* Owner = nullptr;
+            StructureEventSubscription Subscription;
         };
 
         uint64_t AllocateRegistrationId();
@@ -105,7 +112,13 @@ namespace Obelisk::Core
             std::unique_lock<std::mutex>& lock,
             uint64_t cleanupBatchId = 0);
         bool IsDispatchCleanupComplete() const;
-        std::exception_ptr TakeDeferredDestroyFailure(uint64_t cleanupBatchId);
+        std::vector<StructureEventSubscription> TakeFailedOwnerDestroySubscriptions(void* owner);
+        void RetainFailedOwnerDestroySubscriptions(
+            void* owner,
+            const std::vector<StructureEventSubscription>& subscriptions);
+        std::vector<StructureEventSubscription> TakeDeferredDestroyFailures(
+            uint64_t cleanupBatchId,
+            std::exception_ptr& firstFailure);
         void FinishDispatch();
 
         mutable std::mutex m_Mutex;
@@ -117,6 +130,7 @@ namespace Obelisk::Core
         std::atomic<size_t> m_SubscriptionCount{0};
         std::vector<PendingDestroy> m_PendingDestroy;
         std::vector<DeferredDestroyFailure> m_DeferredDestroyFailures;
+        std::vector<FailedOwnerDestroy> m_FailedOwnerDestroy;
         size_t m_PendingDestroyInProgress = 0;
         uint64_t m_NextCleanupBatchId = 1;
     };

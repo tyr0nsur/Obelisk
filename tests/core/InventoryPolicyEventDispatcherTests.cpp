@@ -755,6 +755,64 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0,
                 "owner cleanup failure left inventory policy callbacks registered");
     }
+
+    struct RetryDestroyFailureState
+    {
+        int FailingCalls = 0;
+        int CountingCalls = 0;
+        bool FailNext = true;
+    };
+
+    void FailsOnceDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->FailingCalls;
+        if (state->FailNext)
+        {
+            state->FailNext = false;
+            throw std::runtime_error("expected one-shot inventory policy destroy failure");
+        }
+    }
+
+    void CountRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->CountingCalls;
+    }
+
+    void TestOwnerCleanupRetriesFailedDestroyUserData()
+    {
+        Obelisk::Core::InventoryPolicyEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "failing retry inventory policy registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountRetryDestroyUserData}) != 0,
+                "counting retry inventory policy registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid one-shot inventory policy DestroyUserData failure");
+        Require(state.FailingCalls == 1, "first cleanup did not call failing inventory policy destroy once");
+        Require(state.CountingCalls == 1, "first cleanup did not attempt successful inventory policy destroy");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1, "retry cleanup did not report pending failed inventory policy destroy");
+        Require(state.FailingCalls == 2, "retry cleanup did not retry failed inventory policy DestroyUserData");
+        Require(state.CountingCalls == 1, "retry cleanup repeated successful inventory policy DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed inventory policy cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left inventory policy callbacks dispatchable");
+    }
 }
 
 int main()
@@ -775,6 +833,7 @@ int main()
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestExceptionsDoNotStopDispatch();
     TestOwnerCleanupPropagatesDestroyUserDataFailure();
+    TestOwnerCleanupRetriesFailedDestroyUserData();
 
     std::cout << "InventoryPolicyEventDispatcherTests passed\n";
     return 0;

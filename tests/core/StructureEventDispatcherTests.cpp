@@ -782,6 +782,63 @@ namespace
         Require(dispatcher.SubscriptionCount() == 0, "owner cleanup failure left structure callbacks registered");
     }
 
+    struct RetryDestroyFailureState
+    {
+        int FailingCalls = 0;
+        int CountingCalls = 0;
+        bool FailNext = true;
+    };
+
+    void FailsOnceDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->FailingCalls;
+        if (state->FailNext)
+        {
+            state->FailNext = false;
+            throw std::runtime_error("expected one-shot structure destroy failure");
+        }
+    }
+
+    void CountRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->CountingCalls;
+    }
+
+    void TestOwnerCleanupRetriesFailedDestroyUserData()
+    {
+        Obelisk::Core::StructureEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "failing retry structure registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountRetryDestroyUserData}) != 0,
+                "counting retry structure registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid one-shot structure DestroyUserData failure");
+        Require(state.FailingCalls == 1, "first cleanup did not call failing structure destroy once");
+        Require(state.CountingCalls == 1, "first cleanup did not attempt successful structure destroy");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1, "retry cleanup did not report pending failed structure destroy");
+        Require(state.FailingCalls == 2, "retry cleanup did not retry failed structure DestroyUserData");
+        Require(state.CountingCalls == 1, "retry cleanup repeated successful structure DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0, "completed structure cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left structure callbacks dispatchable");
+    }
+
     void TestExceptionsDoNotStopDispatch()
     {
         Obelisk::Core::StructureEventDispatcher dispatcher;
@@ -815,6 +872,7 @@ int main()
     TestOwnerCleanupWaitsForDeferredDestroyAfterInFlightDispatch();
     TestOwnerCleanup();
     TestOwnerCleanupPropagatesDestroyUserDataFailure();
+    TestOwnerCleanupRetriesFailedDestroyUserData();
     TestExceptionsDoNotStopDispatch();
 
     std::cout << "StructureEventDispatcherTests passed\n";

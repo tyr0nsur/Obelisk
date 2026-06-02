@@ -137,6 +137,11 @@ Validation rules:
 - Dispatcher owner-cleanup failures must propagate to `PluginManager`. Returning `0` from
   `UnregisterCallbacksForOwner(owner)` means no callbacks were removed, not cleanup
   failure; swallowed exceptions can let `PluginManager` incorrectly proceed to `dlclose`.
+- Deferred `DestroyUserData` cleanup failures in copied-event dispatchers are
+  plugin-owned cleanup failures. They must remain visible to
+  `UnregisterCallbacksForOwner(owner)`, propagate to `PluginManager`, block `dlclose`,
+  preserve retry state outside the dispatchable callback set, and not repeat plugin
+  shutdown during retry.
 - Retained retry paths must not call `ObeliskPlugin_Shutdown()` again. Shutdown is a
   one-time transition; retries are for cleanup and library close only.
 - Shutdown exports must be idempotent, stop external ingress before releasing state, and

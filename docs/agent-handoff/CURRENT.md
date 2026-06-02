@@ -169,10 +169,12 @@ This file is an active routing table only. Durable evidence belongs in
   contract-review-only intake; it cannot promote identity, unlock public SDK/runtime/header
   readiness, or satisfy the complete SDK claim.
 - Runtime/ABI hardening: cleanup failure skips `dlclose`, retains the plugin for retry,
-  and does not repeat plugin shutdown. Gameplay-policy rollback-failure orphan coverage
-  covers structure, inventory, and item-return paths; owner-token process-local core timer
-  explicit unregister remains distinct from gameplay/module timer, shared scheduler state,
-  UE identity, persistent handles, and repeating timer cleanup under in-flight `UnloadAll`.
+  and does not repeat plugin shutdown. Copied-event `DestroyUserData` owner-cleanup
+  failures are now retry-stable across chat, structure, inventory policy, item return, and
+  player-principal dispatchers. owner-token process-local core timer explicit unregister
+  remains distinct from gameplay/module timer, shared scheduler state, UE identity, and
+  persistent handles; see
+  `docs/research/2026-06-02-copied-event-destroy-userdata-retry-stability.md`.
 - Side lanes: Mission copied-bool exact bool-tail evidence is `bool_field_size=1`,
   `bool_byte_offset=0`, `byte_mask=0x01`, `field_mask=0xff`, and `native_bool=false`;
   consume mode accepts and promote mode blocks. Mission/Transfer/Dino/Tribe/Buff leaf
@@ -207,11 +209,9 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest supervised round used four read-only subagents plus lead integration. Integrated
-  offline window-manifest hardening: accepted preflight sidecars must record
-  `offline_only=false` and `allow_stopped=false`, and bundle preflight fallbacks now use
-  sibling JSON sidecars beside copied evidence. SDK/P0 accounting still has no drift;
-  Mission side-lane checks remain internal/non-public. Pending runtime/ABI follow-up:
-  copied-event `DestroyUserData` cleanup failures should be retry-stable before `dlclose`.
-  Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`,
-  P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+- Latest supervised rounds used four read-only subagents plus lead integration. Integrated
+  offline window-manifest hardening and runtime/ABI retry-stable copied-event
+  `DestroyUserData` cleanup. SDK/P0 accounting still has no drift; Mission side-lane
+  checks remain internal/non-public. Default route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`. No runtime/server op.

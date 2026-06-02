@@ -762,7 +762,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
     def test_deferred_event_dispatcher_owner_cleanup_uses_batch_id(self) -> None:
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):
             text = source.read_text(encoding="utf-8")
-            if "TakeDeferredDestroyFailure" not in text:
+            if "TakeDeferredDestroyFailure" not in text and "TakeDeferredDestroyFailures" not in text:
                 continue
             body = extract_function_body(
                 text,
@@ -772,9 +772,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 self.assertIn("std::exception_ptr deferredFailure", body)
                 self.assertIn("uint64_t cleanupBatchId = 0", body)
                 self.assertIn("cleanupBatchId = m_NextCleanupBatchId++", body)
-                self.assertIn("QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId)", body)
-                self.assertIn("deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)", body)
-                self.assertIn("std::rethrow_exception(deferredFailure)", body)
+                self.assertRegex(
+                    body,
+                    r"QueueOrDestroyRemovedSubscriptions\((?:removed|currentRemoved), lock, cleanupBatchId\)",
+                )
+                self.assertTrue(
+                    "deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)" in body or
+                    "TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure)" in body,
+                    "owner cleanup must retrieve deferred cleanup failures",
+                )
+                self.assertTrue(
+                    "std::rethrow_exception(deferredFailure)" in body or
+                    "std::rethrow_exception(cleanupFailure)" in body,
+                    "owner cleanup must rethrow retained/deferred cleanup failures",
+                )
 
     def test_deferred_event_dispatcher_granular_cleanup_failures_are_visible(self) -> None:
         signatures = (
@@ -783,7 +794,7 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         )
         for source in CORE_DIR.glob("*EventDispatcher.cpp"):
             text = source.read_text(encoding="utf-8")
-            if "TakeDeferredDestroyFailure" not in text:
+            if "TakeDeferredDestroyFailure" not in text and "TakeDeferredDestroyFailures" not in text:
                 continue
             for signature in signatures:
                 try:
@@ -795,7 +806,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                 with self.subTest(source=source.name, signature=signature):
                     self.assertIn("uint64_t cleanupBatchId = 0", body)
                     self.assertIn("QueueOrDestroyRemovedSubscriptions(removed, lock, cleanupBatchId)", body)
-                    self.assertIn("deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)", body)
+                    self.assertTrue(
+                        "deferredFailure = TakeDeferredDestroyFailure(cleanupBatchId)" in body or
+                        "TakeDeferredDestroyFailures(cleanupBatchId, deferredFailure)" in body,
+                        "granular cleanup must retrieve deferred cleanup failures",
+                    )
                     self.assertIn("std::rethrow_exception(deferredFailure)", body)
 
     def test_deferred_event_dispatcher_finish_dispatch_does_not_throw_before_notify(self) -> None:
@@ -806,7 +821,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
             body = extract_function_body(text, r"void \w+EventDispatcher::FinishDispatch\(\)")
             with self.subTest(source=source.name):
                 self.assertIn("try\n                {\n                    const bool alreadyCaptured", body)
-                self.assertIn("failures.push_back({item.CleanupBatchId, std::current_exception()})", body)
+                self.assertTrue(
+                    "failures.push_back({item.CleanupBatchId, std::current_exception()})" in body or
+                    "failures.push_back({item.CleanupBatchId, item.Subscription, std::current_exception()})" in body,
+                    "deferred cleanup failures must be captured before notify",
+                )
                 self.assertIn("try\n            {\n                m_DeferredDestroyFailures.insert", body)
                 self.assertLess(body.index("m_PendingDestroyInProgress -= pending.size()"),
                                 body.index("m_DispatchCv.notify_all()"))

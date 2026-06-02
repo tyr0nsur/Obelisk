@@ -76,6 +76,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 `docs/agent-handoff/CURRENT.md` for the active assignment):
 
 - [2026-05-30-v1-core-capability-map.md](2026-05-30-v1-core-capability-map.md)
+- [2026-06-02-copied-event-destroy-userdata-retry-stability.md](2026-06-02-copied-event-destroy-userdata-retry-stability.md)
 - [2026-05-30-aseapi-reference-scan.md](2026-05-30-aseapi-reference-scan.md)
 - [2026-05-30-nextgenplugins-reference-inventory.md](2026-05-30-nextgenplugins-reference-inventory.md)
 - [2026-05-31-plugin-hub-experimental-chat-audit-template.md](2026-05-31-plugin-hub-experimental-chat-audit-template.md)

@@ -689,6 +689,63 @@ namespace
         Require(state.Calls == 2, "owner cleanup did not attempt all item return DestroyUserData callbacks");
         Require(dispatcher.SubscriptionCount() == 0, "owner cleanup failure left item return callbacks registered");
     }
+
+    struct RetryDestroyFailureState
+    {
+        int FailingCalls = 0;
+        int CountingCalls = 0;
+        bool FailNext = true;
+    };
+
+    void FailsOnceDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->FailingCalls;
+        if (state->FailNext)
+        {
+            state->FailNext = false;
+            throw std::runtime_error("expected one-shot item return destroy failure");
+        }
+    }
+
+    void CountRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->CountingCalls;
+    }
+
+    void TestOwnerCleanupRetriesFailedDestroyUserData()
+    {
+        Obelisk::Core::ItemReturnEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "failing retry item return registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountRetryDestroyUserData}) != 0,
+                "counting retry item return registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid one-shot item return DestroyUserData failure");
+        Require(state.FailingCalls == 1, "first cleanup did not call failing item return destroy once");
+        Require(state.CountingCalls == 1, "first cleanup did not attempt successful item return destroy");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1, "retry cleanup did not report pending failed item return destroy");
+        Require(state.FailingCalls == 2, "retry cleanup did not retry failed item return DestroyUserData");
+        Require(state.CountingCalls == 1, "retry cleanup repeated successful item return DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0, "completed item return cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left item return callbacks dispatchable");
+    }
 }
 
 int main()
@@ -709,6 +766,7 @@ int main()
         TestOwnerCleanupWithoutDispatchDestroysImmediatelyAndSuppressesCallbacks();
         TestCallbackExceptionDoesNotStopDispatch();
         TestOwnerCleanupPropagatesDestroyUserDataFailure();
+        TestOwnerCleanupRetriesFailedDestroyUserData();
     }
     catch (const std::exception& e)
     {

@@ -112,6 +112,7 @@ namespace
         bool throwInInitAfterCallbacks = false;
         bool throwOnShutdown = false;
         bool throwOnClose = false;
+        bool failDestroyUserDataOnce = false;
         bool captureApi = false;
         bool mutateApiInInit = false;
         std::atomic<bool>* closeObserved = nullptr;
@@ -120,6 +121,7 @@ namespace
         int initCalls = 0;
         int shutdownCalls = 0;
         int closeCalls = 0;
+        int destroyUserDataCalls = 0;
         std::string initConfigDir;
         std::string initConfigPath;
         std::string initInstanceId;
@@ -238,6 +240,17 @@ namespace
 
     void FakeStructureCallback(const Obelisk::Core::StructureEventView&, void*)
     {
+    }
+
+    void FakeDestroyUserData(void* userData)
+    {
+        auto* plugin = static_cast<FakePlugin*>(userData);
+        ++plugin->destroyUserDataCalls;
+        if (plugin->failDestroyUserDataOnce)
+        {
+            plugin->failDestroyUserDataOnce = false;
+            throw std::runtime_error("injected one-shot DestroyUserData failure");
+        }
     }
 
     void FakeGameplayPolicyEventCallback(const ObeliskGameplayPolicyEvent* event, void* userData)
@@ -837,7 +850,10 @@ namespace
                     "fake plugin requested chat callback without dispatcher");
             const uint64_t registrationId = g_CurrentFakePlugin->chatDispatcher->Register(
                 g_CurrentFakePlugin->owner,
-                Obelisk::Core::ChatMessageSubscription{FakeChatCallback, g_CurrentFakePlugin});
+                Obelisk::Core::ChatMessageSubscription{
+                    FakeChatCallback,
+                    g_CurrentFakePlugin,
+                    FakeDestroyUserData});
             Require(registrationId != 0, "fake chat callback registration failed");
         }
 
@@ -845,7 +861,10 @@ namespace
         {
             const uint64_t registrationId = Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
                 g_CurrentFakePlugin->owner,
-                Obelisk::Core::InventoryPolicyEventSubscription{FakeInventoryPolicyCallback, g_CurrentFakePlugin});
+                Obelisk::Core::InventoryPolicyEventSubscription{
+                    FakeInventoryPolicyCallback,
+                    g_CurrentFakePlugin,
+                    FakeDestroyUserData});
             Require(registrationId != 0, "fake inventory policy callback registration failed");
         }
 
@@ -853,7 +872,10 @@ namespace
         {
             const uint64_t registrationId = Obelisk::Core::ItemReturnEventDispatcher::Get().Register(
                 g_CurrentFakePlugin->owner,
-                Obelisk::Core::ItemReturnEventSubscription{FakeItemReturnCallback, g_CurrentFakePlugin});
+                Obelisk::Core::ItemReturnEventSubscription{
+                    FakeItemReturnCallback,
+                    g_CurrentFakePlugin,
+                    FakeDestroyUserData});
             Require(registrationId != 0, "fake item-return callback registration failed");
         }
 
@@ -861,7 +883,10 @@ namespace
         {
             const uint64_t registrationId = Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Register(
                 g_CurrentFakePlugin->owner,
-                Obelisk::Core::PlayerPrincipalEventSubscription{FakePlayerPrincipalCallback, g_CurrentFakePlugin});
+                Obelisk::Core::PlayerPrincipalEventSubscription{
+                    FakePlayerPrincipalCallback,
+                    g_CurrentFakePlugin,
+                    FakeDestroyUserData});
             Require(registrationId != 0, "fake player-principal callback registration failed");
         }
 
@@ -869,7 +894,10 @@ namespace
         {
             const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
                 g_CurrentFakePlugin->owner,
-                Obelisk::Core::StructureEventSubscription{FakeStructureCallback, g_CurrentFakePlugin});
+                Obelisk::Core::StructureEventSubscription{
+                    FakeStructureCallback,
+                    g_CurrentFakePlugin,
+                    FakeDestroyUserData});
             Require(registrationId != 0, "fake structure callback registration failed");
         }
 
@@ -6556,6 +6584,72 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_destroy_userdata_retry");
+        ConfigureEnvironment(root);
+        fs::create_directories(root / "state" / "instances" / "arkserver");
+
+        FakePlugin plugin{
+            .filename = "destroy_userdata_retry.so",
+            .registerChatCallback = true,
+            .registerInventoryPolicyCallback = true,
+            .registerItemReturnCallback = true,
+            .registerPlayerPrincipalCallback = true,
+            .registerStructureCallback = true,
+            .failDestroyUserDataOnce = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "destroy-userdata retry plugin was not initialized");
+        Require(chatDispatcher.SubscriptionCount() == 1,
+                "destroy-userdata retry plugin chat callback was not registered");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 1,
+                "destroy-userdata retry plugin inventory callback was not registered");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 1,
+                "destroy-userdata retry plugin item-return callback was not registered");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 1,
+                "destroy-userdata retry plugin player-principal callback was not registered");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 1,
+                "destroy-userdata retry plugin structure callback was not registered");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "destroy-userdata retry plugin shutdown was not called");
+        Require(plugin.closeCalls == 0,
+                "destroy-userdata retry plugin was closed despite failed DestroyUserData cleanup");
+        Require(plugin.destroyUserDataCalls == 5,
+                "first unload did not attempt all copied-event DestroyUserData callbacks");
+
+        manager.UnloadAll();
+
+        Require(plugin.shutdownCalls == 1, "destroy-userdata retry plugin shutdown repeated during retry");
+        Require(plugin.destroyUserDataCalls == 6,
+                "second unload did not retry the retained failed DestroyUserData callback before close");
+        Require(plugin.closeCalls == 1, "destroy-userdata retry plugin was not closed after cleanup retry");
+        Require(plugin.chatSubscriptionsAtClose == 0,
+                "destroy-userdata retry chat callback was still registered at close");
+        Require(plugin.inventoryPolicySubscriptionsAtClose == 0,
+                "destroy-userdata retry inventory callback was still registered at close");
+        Require(plugin.itemReturnSubscriptionsAtClose == 0,
+                "destroy-userdata retry item-return callback was still registered at close");
+        Require(plugin.playerPrincipalSubscriptionsAtClose == 0,
+                "destroy-userdata retry player-principal callback was still registered at close");
+        Require(plugin.structureSubscriptionsAtClose == 0,
+                "destroy-userdata retry structure callback was still registered at close");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_init_cleanup_fail");
@@ -6895,6 +6989,7 @@ int main()
     TestUnloadAllPreservesPreviouslyRetainedPluginWhenLaterRetentionFails();
     TestUnloadAllCleansAfterShutdownException();
     TestUnloadAllRetainsPluginWhenCallbackCleanupFails();
+    TestUnloadAllRetriesCopiedEventDestroyUserDataBeforeClose();
     TestInitFailureRetainsPluginWhenCallbackCleanupFailsAndRetries();
     TestInitFailureDoesNotCloseWhenCleanupFailsAndRetentionTrackingFails();
     TestDuplicatePluginIdRejectsSecondPlugin();

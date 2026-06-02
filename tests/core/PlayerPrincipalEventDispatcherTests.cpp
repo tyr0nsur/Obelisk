@@ -946,6 +946,64 @@ namespace
                 "owner cleanup failure left player principal callbacks registered");
     }
 
+    struct RetryDestroyFailureState
+    {
+        int FailingCalls = 0;
+        int CountingCalls = 0;
+        bool FailNext = true;
+    };
+
+    void FailsOnceDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->FailingCalls;
+        if (state->FailNext)
+        {
+            state->FailNext = false;
+            throw std::runtime_error("expected one-shot player principal destroy failure");
+        }
+    }
+
+    void CountRetryDestroyUserData(void* userData)
+    {
+        auto* state = static_cast<RetryDestroyFailureState*>(userData);
+        ++state->CountingCalls;
+    }
+
+    void TestOwnerCleanupRetriesFailedDestroyUserData()
+    {
+        PlayerPrincipalEventDispatcher dispatcher;
+        int owner = 0;
+        RetryDestroyFailureState state;
+
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, FailsOnceDestroyUserData}) != 0,
+                "failing retry player principal registration failed");
+        Require(dispatcher.Register(&owner, {NoopCallback, &state, CountRetryDestroyUserData}) != 0,
+                "counting retry player principal registration failed");
+
+        bool threw = false;
+        try
+        {
+            (void)dispatcher.UnregisterCallbacksForOwner(&owner);
+        }
+        catch (const std::runtime_error&)
+        {
+            threw = true;
+        }
+
+        Require(threw, "owner cleanup hid one-shot player principal DestroyUserData failure");
+        Require(state.FailingCalls == 1, "first cleanup did not call failing player principal destroy once");
+        Require(state.CountingCalls == 1, "first cleanup did not attempt successful player principal destroy");
+
+        const size_t retryRemoved = dispatcher.UnregisterCallbacksForOwner(&owner);
+        Require(retryRemoved == 1, "retry cleanup did not report pending failed player principal destroy");
+        Require(state.FailingCalls == 2, "retry cleanup did not retry failed player principal DestroyUserData");
+        Require(state.CountingCalls == 1, "retry cleanup repeated successful player principal DestroyUserData");
+        Require(dispatcher.UnregisterCallbacksForOwner(&owner) == 0,
+                "completed player principal cleanup was not idempotent");
+        Require(dispatcher.SubscriptionCount() == 0, "retry cleanup left player principal callbacks dispatchable");
+    }
+
     void TestUnregisterIsIdempotent()
     {
         PlayerPrincipalEventDispatcher dispatcher;
@@ -985,6 +1043,7 @@ int main()
         TestOwnerCleanupRemovesOnlyMatchingOwner();
         TestCallbackExceptionsAreContained();
         TestOwnerCleanupPropagatesDestroyUserDataFailure();
+        TestOwnerCleanupRetriesFailedDestroyUserData();
         TestUnregisterIsIdempotent();
     }
     catch (const std::exception& e)
