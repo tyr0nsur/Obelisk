@@ -127,9 +127,10 @@ This file is an active routing table only. Durable evidence belongs in
   and `item-return-only-policy-slice`, keep `inventory-action-compact-intake` excluded,
   and reject positive raw identity/action-param claims such as `ItemId`, `ItemID1`,
   `InventoryComp`, `anActor`, and raw params.
-- Structure census, Mission/Transfer/Dino/Tribe, ResourceHandle, economy/storage/operator
-  ingress, and gameplay tick surfaces remain planning, post-v1, or blocked unless a
-  future route explicitly promotes them with evidence.
+- Structure census, Structure build-policy, Mission/Transfer/Dino/Tribe,
+  ResourceHandle, economy/storage/operator ingress, and gameplay tick surfaces remain
+  planning, post-v1, or blocked unless a future route explicitly promotes them with
+  evidence.
 
 ## Priority Next Steps
 
@@ -191,9 +192,6 @@ This file is an active routing table only. Durable evidence belongs in
 - Lead handles delegation directly when the user asks for agents. Keep the scoped
   delegation fact in handoff/research notes before finishing so compaction does not erase
   which work was delegated and which findings remain pending.
-- Recent delegated rounds before the current route work are summarized in
-  `COMPACT_CONTEXT.md`: snapshot-root binding, runtime-evidence request/brief hardening,
-  preflight sidecar replay, and operational-window projection.
 - Latest identity-public-contract route round used four lead-scoped read-only agents:
   public-contract gap/readiness, route composition, privacy/redaction, and
   handoff/research continuity. Integrated result: route and bound-route validation now
@@ -214,7 +212,9 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated guardrail round integrated first-evidence sidecar replay, redaction
-  non-routing, SDK scoped outcome accounting, and player-identity runtime manifest
-  hash-binding for structured promotion intake. Next side-lane: central structure checks.
-  SDK remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
+- Latest delegated SDK accounting round integrated central Structure census and
+  Structure build-policy reports in `check_public_sdk_v1_completion.py`. Canonical SDK
+  completion now exposes Structure evidence and fails closed on the build-policy child
+  blockers; census remains candidate-ready/non-promotional. Pending SDK guardrail:
+  active `--manifest`/header binding for executed-test artifacts. SDK remains
+  fail-closed at `0/12`, P0 `0/4`; no runtime/server op.

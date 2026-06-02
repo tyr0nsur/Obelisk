@@ -952,8 +952,17 @@ priorities, and do not use history files as the active source of truth.
   identifier-redaction evidence as non-routing contract-review input only, release
   statement accounting for alternate allowed scoped outcomes, and hash-bound replay of the
   raw approved runtime-principal manifest before player-identity structured promotion
-  evidence can count. A side-lane finding remains pending: central SDK completion should
-  run/report structure census and structure build-policy checkers like inventory/mission.
+  evidence can count.
+- Follow-up delegated SDK accounting pass integrated the pending Structure side-lane:
+  `check_public_sdk_v1_completion.py` now accepts Structure census/build-policy checker
+  overrides, runs both child reports, includes them in canonical JSON, adds blocker
+  guidance, and tests missing checkers/overclaim/fail-closed cases. Current canonical SDK
+  completion exposes `structure_census_readiness` as `ready=true,status=candidate_ready`
+  and fails closed on `structure_build_policy_offline_intake_invalid` plus
+  `structure_build_policy_offline_intake_blockers_not_empty`. This is central accounting
+  evidence only; no Structure SDK/runtime/enforcement/v1 completion readiness is claimed.
+  Deferred SDK guardrail from read-only audit: executed-test artifacts still need active
+  `--manifest`/`--public-header` path+hash binding instead of default-only bindings.
 
 ## Agent Coordination
 

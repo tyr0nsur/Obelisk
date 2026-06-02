@@ -31,6 +31,10 @@ DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS = (
 DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING = (
     REPO_ROOT / "scripts" / "check_mission_transfer_dino_tribe_v1_outcome_accounting.py"
 )
+DEFAULT_STRUCTURE_CENSUS_READINESS = REPO_ROOT / "scripts" / "check_structure_census_readiness.py"
+DEFAULT_STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE = (
+    REPO_ROOT / "scripts" / "check_structure_build_policy_offline_intake.py"
+)
 DEFAULT_COMMAND_RESPONSE_PUBLIC_CONTRACT_DECISIONS = (
     REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
 )
@@ -891,6 +895,18 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--structure-census-readiness",
+        type=Path,
+        default=DEFAULT_STRUCTURE_CENSUS_READINESS,
+        help="Offline guardrail that keeps structure census candidate-only and non-promotional.",
+    )
+    parser.add_argument(
+        "--structure-build-policy-offline-intake",
+        type=Path,
+        default=DEFAULT_STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE,
+        help="Offline guardrail that keeps structure build-policy intake planning-only and non-promotional.",
+    )
+    parser.add_argument(
         "--validate-release-statement-scope",
         action="store_true",
         help=(
@@ -1405,6 +1421,156 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
                 "Mission/Transfer/Dino/Tribe/Buff accounting guard; not public SDK, "
                 "runtime, promotion, or v1 completion evidence"
             ),
+        },
+        blockers,
+    )
+
+
+def run_structure_census_readiness(path: Path) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    result = subprocess.run(
+        [sys.executable, str(path), "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": f"stdout_json_decode_error: {exc}",
+                "stderr": result.stderr.strip(),
+            },
+            ["structure_census_readiness_output_invalid"],
+        )
+    if not isinstance(payload, dict):
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": "stdout_json_not_object",
+                "stderr": result.stderr.strip(),
+            },
+            ["structure_census_readiness_output_invalid"],
+        )
+
+    report_blockers = payload.get("blockers", [])
+    if payload.get("schema") != "obelisk.structure-census-readiness-check.v1":
+        blockers.append("structure_census_readiness_schema_mismatch")
+    if result.returncode != 0 or payload.get("ready") is not True:
+        blockers.append("structure_census_readiness_invalid")
+    if payload.get("accepted_for_internal_planning") is not True or payload.get("offline_only") is not True:
+        blockers.append("structure_census_readiness_not_offline_planning")
+    if report_blockers:
+        blockers.append("structure_census_readiness_blockers_not_empty")
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
+        if payload.get(key) is not False:
+            blockers.append(f"structure_census_{key}_not_false")
+    accounting = payload.get("candidate_only_accounting") if isinstance(payload.get("candidate_only_accounting"), dict) else {}
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "build_policy_ready", "public_structure_sdk_ready", "structure_identity_ready"):
+        if accounting.get(key) is not False:
+            blockers.append(f"structure_census_accounting_{key}_not_false")
+
+    return (
+        {
+            "path": str(path),
+            "exit_code": result.returncode,
+            "schema": payload.get("schema"),
+            "ready": payload.get("ready"),
+            "status": payload.get("status"),
+            "outcome": payload.get("outcome"),
+            "accounting_mode": payload.get("accounting_mode"),
+            "accepted_for_internal_planning": payload.get("accepted_for_internal_planning"),
+            "offline_only": payload.get("offline_only"),
+            "promotion_ready": payload.get("promotion_ready"),
+            "public_sdk_ready": payload.get("public_sdk_ready"),
+            "runtime_ready": payload.get("runtime_ready"),
+            "enforcement_ready": payload.get("enforcement_ready"),
+            "second_source_status": (
+                payload.get("second_source_readiness", {}).get("status")
+                if isinstance(payload.get("second_source_readiness"), dict)
+                else None
+            ),
+            "missing_public_gates": accounting.get("missing_public_gates"),
+            "blockers": report_blockers,
+            "stderr": result.stderr.strip(),
+            "non_claim": "Structure census readiness guard; not Structure SDK, runtime, enforcement, or v1 completion evidence",
+        },
+        blockers,
+    )
+
+
+def run_structure_build_policy_offline_intake(path: Path) -> tuple[dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    result = subprocess.run(
+        [sys.executable, str(path), "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": f"stdout_json_decode_error: {exc}",
+                "stderr": result.stderr.strip(),
+            },
+            ["structure_build_policy_offline_intake_output_invalid"],
+        )
+    if not isinstance(payload, dict):
+        return (
+            {
+                "path": str(path),
+                "exit_code": result.returncode,
+                "parse_error": "stdout_json_not_object",
+                "stderr": result.stderr.strip(),
+            },
+            ["structure_build_policy_offline_intake_output_invalid"],
+        )
+
+    report_blockers = payload.get("blockers", [])
+    if payload.get("schema") != "obelisk.structure-build-policy-offline-intake-check.v1":
+        blockers.append("structure_build_policy_offline_intake_schema_mismatch")
+    if result.returncode != 0 or payload.get("ready") is not True:
+        blockers.append("structure_build_policy_offline_intake_invalid")
+    if payload.get("planning_only") is not True:
+        blockers.append("structure_build_policy_offline_intake_not_planning_only")
+    if report_blockers:
+        blockers.append("structure_build_policy_offline_intake_blockers_not_empty")
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
+        if payload.get(key) is not False:
+            blockers.append(f"structure_build_policy_{key}_not_false")
+    readiness_flags = payload.get("readiness_flags") if isinstance(payload.get("readiness_flags"), dict) else {}
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
+        if readiness_flags.get(key) is not False:
+            blockers.append(f"structure_build_policy_readiness_flags_{key}_not_false")
+
+    return (
+        {
+            "path": str(path),
+            "exit_code": result.returncode,
+            "schema": payload.get("schema"),
+            "ready": payload.get("ready"),
+            "status": payload.get("status"),
+            "accepted_for_offline_planning": payload.get("accepted_for_offline_planning"),
+            "planning_only": payload.get("planning_only"),
+            "promotion_ready": payload.get("promotion_ready"),
+            "public_sdk_ready": payload.get("public_sdk_ready"),
+            "runtime_ready": payload.get("runtime_ready"),
+            "enforcement_ready": payload.get("enforcement_ready"),
+            "expected_status": payload.get("expected_status"),
+            "target_set": payload.get("target_set"),
+            "blockers": [blocker.get("reason") if isinstance(blocker, dict) else blocker for blocker in report_blockers],
+            "stderr": result.stderr.strip(),
+            "non_claim": "Structure build-policy offline intake guard; not Structure SDK, runtime, enforcement, or v1 completion evidence",
         },
         blockers,
     )
@@ -3337,6 +3503,8 @@ def build_report(
     inventory_copied_signals_stability_path: Path = DEFAULT_INVENTORY_COPIED_SIGNALS_STABILITY,
     object_identity_resource_handle_readiness_path: Path = DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS,
     mission_transfer_dino_tribe_outcome_accounting_path: Path = DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING,
+    structure_census_readiness_path: Path = DEFAULT_STRUCTURE_CENSUS_READINESS,
+    structure_build_policy_offline_intake_path: Path = DEFAULT_STRUCTURE_BUILD_POLICY_OFFLINE_INTAKE,
 ) -> dict[str, Any]:
     manifest, blockers = load_manifest(manifest_path)
     command_permission_route_gate, route_gate_blockers = run_command_permission_route_gate(
@@ -3366,6 +3534,14 @@ def build_report(
         )
     )
     blockers.extend(mission_transfer_blockers)
+    structure_census_readiness, structure_census_blockers = run_structure_census_readiness(
+        structure_census_readiness_path
+    )
+    blockers.extend(structure_census_blockers)
+    structure_build_policy_offline_intake, structure_build_policy_blockers = (
+        run_structure_build_policy_offline_intake(structure_build_policy_offline_intake_path)
+    )
+    blockers.extend(structure_build_policy_blockers)
     release_statement_text, release_statement_blockers = load_release_statement(release_statement_path)
     blockers.extend(release_statement_blockers)
     blocked_contract_header_symbols, contract_symbol_blockers = blocked_contract_public_header_symbol_drift(
@@ -3389,6 +3565,8 @@ def build_report(
             "inventory_copied_signals_stability": inventory_copied_signals_stability,
             "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
             "mission_transfer_dino_tribe_outcome_accounting": mission_transfer_dino_tribe_outcome_accounting,
+            "structure_census_readiness": structure_census_readiness,
+            "structure_build_policy_offline_intake": structure_build_policy_offline_intake,
             "blocked_public_contract_header_symbols": blocked_contract_header_symbols,
             "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
             "blockers": blockers,
@@ -3863,6 +4041,8 @@ def build_report(
         "inventory_copied_signals_stability": inventory_copied_signals_stability,
         "object_identity_resource_handle_readiness": object_identity_resource_handle_readiness,
         "mission_transfer_dino_tribe_outcome_accounting": mission_transfer_dino_tribe_outcome_accounting,
+        "structure_census_readiness": structure_census_readiness,
+        "structure_build_policy_offline_intake": structure_build_policy_offline_intake,
         "missing_required_public_contract_decision_manifests": missing_required_contract_decisions,
         "sdk_version": manifest.get("sdk_version"),
         "release_claim": manifest.get("release_claim"),
@@ -4260,6 +4440,86 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
             "Post-callback ResourceHandle readiness was reported as true.",
             "Action: no post-callback object correlation or handle API is part of the v1 SDK completion claim.",
         ],
+        "structure_census_readiness_output_invalid": [
+            "The Structure census readiness checker did not emit valid JSON.",
+            "Action: fix scripts/check_structure_census_readiness.py before relying on Structure census accounting.",
+        ],
+        "structure_census_readiness_schema_mismatch": [
+            "The Structure census readiness checker emitted an unexpected schema.",
+            "Action: keep the dedicated checker on obelisk.structure-census-readiness-check.v1.",
+        ],
+        "structure_census_readiness_invalid": [
+            "The Structure census readiness checker failed.",
+            "Action: keep Structure census candidate-only until second-source/readiness evidence remains accepted and non-promotional.",
+        ],
+        "structure_census_readiness_not_offline_planning": [
+            "The Structure census readiness checker stopped reporting offline internal-planning status.",
+            "Action: Structure census accounting must not become a public SDK, runtime, promotion, or enforcement gate here.",
+        ],
+        "structure_census_readiness_blockers_not_empty": [
+            "The Structure census readiness checker reported blockers.",
+            "Action: resolve the dedicated checker blockers before any SDK completion claim.",
+        ],
+        "structure_census_promotion_ready_not_false": [
+            "Structure census attempted to mark promotion readiness.",
+            "Action: promotion readiness must remain false until a reviewed public Structure SDK gate exists.",
+        ],
+        "structure_census_public_sdk_ready_not_false": [
+            "Structure census attempted to mark public SDK readiness.",
+            "Action: keep Structure census out of public SDK readiness accounting.",
+        ],
+        "structure_census_runtime_ready_not_false": [
+            "Structure census attempted to mark runtime readiness.",
+            "Action: runtime readiness for Structure APIs needs separate promotion evidence.",
+        ],
+        "structure_census_enforcement_ready_not_false": [
+            "Structure census attempted to mark enforcement readiness.",
+            "Action: enforcement/build-policy readiness is a separate Structure side-lane and cannot be inferred from census.",
+        ],
+        "structure_census_accounting_public_structure_sdk_ready_not_false": [
+            "Structure census candidate-only accounting attempted to mark public Structure SDK readiness.",
+            "Action: candidate-only accounting must keep public Structure SDK readiness false.",
+        ],
+        "structure_build_policy_offline_intake_output_invalid": [
+            "The Structure build-policy offline intake checker did not emit valid JSON.",
+            "Action: fix scripts/check_structure_build_policy_offline_intake.py before relying on build-policy accounting.",
+        ],
+        "structure_build_policy_offline_intake_schema_mismatch": [
+            "The Structure build-policy offline intake checker emitted an unexpected schema.",
+            "Action: keep the dedicated checker on obelisk.structure-build-policy-offline-intake-check.v1.",
+        ],
+        "structure_build_policy_offline_intake_invalid": [
+            "The Structure build-policy offline intake checker failed.",
+            "Action: keep build-policy intake planning-only and resolve its blockers before any SDK completion claim.",
+        ],
+        "structure_build_policy_offline_intake_not_planning_only": [
+            "The Structure build-policy offline intake checker stopped reporting planning-only status.",
+            "Action: this guardrail cannot authorize public SDK, runtime, promotion, or enforcement readiness.",
+        ],
+        "structure_build_policy_offline_intake_blockers_not_empty": [
+            "The Structure build-policy offline intake checker reported blockers.",
+            "Action: resolve dedicated build-policy blockers before relying on Structure build-policy accounting.",
+        ],
+        "structure_build_policy_promotion_ready_not_false": [
+            "Structure build-policy intake attempted to mark promotion readiness.",
+            "Action: promotion readiness needs a separate reviewed public gate.",
+        ],
+        "structure_build_policy_public_sdk_ready_not_false": [
+            "Structure build-policy intake attempted to mark public SDK readiness.",
+            "Action: keep build-policy intake out of public SDK readiness accounting.",
+        ],
+        "structure_build_policy_runtime_ready_not_false": [
+            "Structure build-policy intake attempted to mark runtime readiness.",
+            "Action: runtime readiness needs separate approved evidence.",
+        ],
+        "structure_build_policy_enforcement_ready_not_false": [
+            "Structure build-policy intake attempted to mark enforcement readiness.",
+            "Action: enforcement readiness must stay false until a reviewed enforcement gate exists.",
+        ],
+        "structure_build_policy_readiness_flags_public_sdk_ready_not_false": [
+            "Structure build-policy readiness_flags attempted to mark public SDK readiness.",
+            "Action: nested readiness flags must remain false in offline intake accounting.",
+        ],
         "schema_mismatch": [
             "The manifest schema is not obelisk.public-sdk-surfaces.v1.",
         ],
@@ -4360,6 +4620,8 @@ def main() -> int:
         args.inventory_copied_signals_stability,
         args.object_identity_resource_handle_readiness,
         args.mission_transfer_dino_tribe_outcome_accounting,
+        args.structure_census_readiness,
+        args.structure_build_policy_offline_intake,
     )
     if args.validate_release_statement_scope:
         report = add_scoped_release_statement_result(report)

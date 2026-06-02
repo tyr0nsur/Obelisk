@@ -475,6 +475,73 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             path.write_text(f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n", encoding="utf-8")
         return path
 
+    def write_fake_structure_census_checker(self, path: Path, **overrides: object) -> Path:
+        accounting = {
+            "mode": "candidate-only",
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "build_policy_ready": False,
+            "public_structure_sdk_ready": False,
+            "structure_identity_ready": False,
+            "missing_public_gates": ["public-abi", "runtime-evidence"],
+        }
+        if isinstance(overrides.get("candidate_only_accounting"), dict):
+            accounting.update(overrides.pop("candidate_only_accounting"))  # type: ignore[arg-type]
+        payload = {
+            "schema": "obelisk.structure-census-readiness-check.v1",
+            "ready": True,
+            "status": "candidate_ready",
+            "outcome": "candidate-only",
+            "accounting_mode": "candidate-only",
+            "accepted_for_internal_planning": True,
+            "offline_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "enforcement_ready": False,
+            "candidate_only_accounting": accounting,
+            "target_readiness": {"status": "second-source-accepted"},
+            "blockers": [],
+        }
+        payload.update(overrides)
+        path.write_text(
+            f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
+            encoding="utf-8",
+        )
+        return path
+
+    def write_fake_structure_build_policy_checker(self, path: Path, **overrides: object) -> Path:
+        readiness_flags = {
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "enforcement_ready": False,
+        }
+        if isinstance(overrides.get("readiness_flags"), dict):
+            readiness_flags.update(overrides.pop("readiness_flags"))  # type: ignore[arg-type]
+        payload = {
+            "schema": "obelisk.structure-build-policy-offline-intake-check.v1",
+            "target_set": "structure_build_policy",
+            "status": "accepted_for_offline_planning",
+            "ready": True,
+            "accepted_for_offline_planning": True,
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "enforcement_ready": False,
+            "readiness_flags": readiness_flags,
+            "expected_status": "candidate",
+            "blockers": [],
+        }
+        payload.update(overrides)
+        path.write_text(
+            f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
+            encoding="utf-8",
+        )
+        return path
+
     def test_inventory_copied_signals_contract_decision_manifest_is_required(self) -> None:
         import importlib.util
 
@@ -741,6 +808,34 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             {"mission", "transfer", "dino_policy", "tribe_policy", "buff_status"},
         )
         self.assertNotIn("mission_transfer_dino_tribe_outcome_accounting_invalid", payload["blockers"])
+        structure_census = payload["structure_census_readiness"]
+        self.assertEqual(structure_census["schema"], "obelisk.structure-census-readiness-check.v1")
+        self.assertTrue(structure_census["ready"])
+        self.assertEqual(structure_census["status"], "candidate_ready")
+        self.assertEqual(structure_census["accounting_mode"], "candidate-only")
+        self.assertTrue(structure_census["accepted_for_internal_planning"])
+        self.assertTrue(structure_census["offline_only"])
+        self.assertFalse(structure_census["promotion_ready"])
+        self.assertFalse(structure_census["public_sdk_ready"])
+        self.assertFalse(structure_census["runtime_ready"])
+        self.assertFalse(structure_census["enforcement_ready"])
+        self.assertEqual(structure_census["second_source_status"], "accepted")
+        self.assertNotIn("structure_census_readiness_invalid", payload["blockers"])
+        structure_build_policy = payload["structure_build_policy_offline_intake"]
+        self.assertEqual(
+            structure_build_policy["schema"],
+            "obelisk.structure-build-policy-offline-intake-check.v1",
+        )
+        self.assertFalse(structure_build_policy["ready"])
+        self.assertEqual(structure_build_policy["status"], "blocked")
+        self.assertTrue(structure_build_policy["planning_only"])
+        self.assertFalse(structure_build_policy["promotion_ready"])
+        self.assertFalse(structure_build_policy["public_sdk_ready"])
+        self.assertFalse(structure_build_policy["runtime_ready"])
+        self.assertFalse(structure_build_policy["enforcement_ready"])
+        self.assertIn("forbidden_string_claim", structure_build_policy["blockers"])
+        self.assertIn("structure_build_policy_offline_intake_invalid", payload["blockers"])
+        self.assertIn("structure_build_policy_offline_intake_blockers_not_empty", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
         self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(
@@ -943,6 +1038,158 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "/tmp/obelisk-missing-mission-transfer-dino-tribe-checker.py",
         )
         self.assertEqual(payload["mission_transfer_dino_tribe_outcome_accounting"]["exit_code"], 2)
+
+    def test_structure_census_readiness_checker_is_required(self) -> None:
+        result = self.run_checker(
+            "--structure-census-readiness",
+            "/tmp/obelisk-missing-structure-census-readiness-checker.py",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("structure_census_readiness_output_invalid", payload["blockers"])
+        self.assertEqual(
+            payload["structure_census_readiness"]["path"],
+            "/tmp/obelisk-missing-structure-census-readiness-checker.py",
+        )
+        self.assertEqual(payload["structure_census_readiness"]["exit_code"], 2)
+
+    def test_structure_build_policy_offline_intake_checker_is_required(self) -> None:
+        result = self.run_checker(
+            "--structure-build-policy-offline-intake",
+            "/tmp/obelisk-missing-structure-build-policy-offline-intake-checker.py",
+            "--json",
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("structure_build_policy_offline_intake_output_invalid", payload["blockers"])
+        self.assertEqual(
+            payload["structure_build_policy_offline_intake"]["path"],
+            "/tmp/obelisk-missing-structure-build-policy-offline-intake-checker.py",
+        )
+        self.assertEqual(payload["structure_build_policy_offline_intake"]["exit_code"], 2)
+
+    def test_completion_gate_rejects_structure_census_public_runtime_overclaims(self) -> None:
+        cases = (
+            ("promotion_ready", True, "structure_census_promotion_ready_not_false"),
+            ("public_sdk_ready", True, "structure_census_public_sdk_ready_not_false"),
+            ("runtime_ready", True, "structure_census_runtime_ready_not_false"),
+            ("enforcement_ready", True, "structure_census_enforcement_ready_not_false"),
+            (
+                "candidate_only_accounting",
+                {"public_structure_sdk_ready": True},
+                "structure_census_accounting_public_structure_sdk_ready_not_false",
+            ),
+        )
+        for key, value, expected in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_structure_census_checker(
+                        Path(temp_dir) / "fake_structure_census.py",
+                        **{key: value},
+                    )
+                    result = self.run_checker(
+                        "--structure-census-readiness",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_structure_census_invalid_or_blocking_report(self) -> None:
+        cases = (
+            ({"schema": "wrong-schema"}, "structure_census_readiness_schema_mismatch"),
+            ({"ready": False}, "structure_census_readiness_invalid"),
+            ({"accepted_for_internal_planning": False}, "structure_census_readiness_not_offline_planning"),
+            ({"offline_only": False}, "structure_census_readiness_not_offline_planning"),
+            ({"blockers": ["structure_public_gate_missing"]}, "structure_census_readiness_blockers_not_empty"),
+        )
+        for overrides, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_structure_census_checker(
+                        Path(temp_dir) / "fake_structure_census.py",
+                        **overrides,
+                    )
+                    result = self.run_checker(
+                        "--structure-census-readiness",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_structure_build_policy_public_runtime_overclaims(self) -> None:
+        cases = (
+            ("promotion_ready", True, "structure_build_policy_promotion_ready_not_false"),
+            ("public_sdk_ready", True, "structure_build_policy_public_sdk_ready_not_false"),
+            ("runtime_ready", True, "structure_build_policy_runtime_ready_not_false"),
+            ("enforcement_ready", True, "structure_build_policy_enforcement_ready_not_false"),
+            (
+                "readiness_flags",
+                {"public_sdk_ready": True},
+                "structure_build_policy_readiness_flags_public_sdk_ready_not_false",
+            ),
+        )
+        for key, value, expected in cases:
+            with self.subTest(key=key):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_structure_build_policy_checker(
+                        Path(temp_dir) / "fake_structure_build_policy.py",
+                        **{key: value},
+                    )
+                    result = self.run_checker(
+                        "--structure-build-policy-offline-intake",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_structure_build_policy_invalid_or_blocking_report(self) -> None:
+        cases = (
+            ({"schema": "wrong-schema"}, "structure_build_policy_offline_intake_schema_mismatch"),
+            ({"ready": False}, "structure_build_policy_offline_intake_invalid"),
+            ({"planning_only": False}, "structure_build_policy_offline_intake_not_planning_only"),
+            (
+                {"blockers": ["forbidden_string_claim"]},
+                "structure_build_policy_offline_intake_blockers_not_empty",
+            ),
+        )
+        for overrides, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_structure_build_policy_checker(
+                        Path(temp_dir) / "fake_structure_build_policy.py",
+                        **overrides,
+                    )
+                    result = self.run_checker(
+                        "--structure-build-policy-offline-intake",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertFalse(payload["stable_claim_allowed"])
 
     def test_completion_gate_rejects_mission_accounting_public_runtime_overclaims(self) -> None:
         base = {
@@ -2135,12 +2382,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn(surface_id, payload["promoted_blockers_without_evidence"])
 
     def test_scoped_release_statement_template_passes_statement_scope_only(self) -> None:
-        result = self.run_checker(
-            "--release-statement",
-            str(SCOPED_RELEASE_STATEMENT_TEMPLATE),
-            "--validate-release-statement-scope",
-            "--json",
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
+            result = self.run_checker(
+                "--release-statement",
+                str(SCOPED_RELEASE_STATEMENT_TEMPLATE),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
+                "--validate-release-statement-scope",
+                "--json",
+            )
         payload = json.loads(result.stdout)
 
         self.assertFalse(payload["ready"])
@@ -2224,6 +2477,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_scoped_release_statement_allows_alternate_non_complete_outcome_when_contract_allows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
             statement = SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8").replace(
                 "obelisk.inventory_items_mutation.v1: post-v1 -",
                 "obelisk.inventory_items_mutation.v1: excluded -",
@@ -2233,6 +2489,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             result = self.run_checker(
                 "--release-statement",
                 str(statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
                 "--validate-release-statement-scope",
                 "--json",
             )
@@ -2525,6 +2783,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
     def test_scoped_release_statement_scope_allows_negated_v1_stable_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
             statement_path.write_text(
                 SCOPED_RELEASE_STATEMENT_TEMPLATE.read_text(encoding="utf-8")
                 + "v1 stable remains blocked until the full gate passes.\n",
@@ -2534,6 +2795,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             result = self.run_checker(
                 "--release-statement",
                 str(statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
                 "--validate-release-statement-scope",
                 "--json",
                 check=False,
@@ -2550,6 +2813,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
             release_statement_path = Path(temp_dir) / "RELEASE_STATEMENT.md"
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                Path(temp_dir) / "fake_structure_build_policy.py"
+            )
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             release_statement_path.write_text(release_statement, encoding="utf-8")
             result = self.run_checker(
@@ -2565,6 +2831,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 str(manifest_path),
                 "--release-statement",
                 str(release_statement_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
                 "--validate-release-statement-scope",
                 "--json",
                 check=False,
