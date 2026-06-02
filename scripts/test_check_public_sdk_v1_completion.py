@@ -296,13 +296,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             json.dumps(
                 {
                     "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                    "ready": True,
                     "ready_scope": "contract_review_input_only",
                     "surface": "obelisk.player_identity.v1",
                     "accepted_for_contract_review": True,
                     "promotion_ready": False,
                     "public_sdk_ready": False,
                     "runtime_ready": False,
+                    "public_contract_allowed": False,
                     "public_header_allowed": False,
+                    "public_header_symbols_now": [],
+                    "public_capability_bits_now": [],
+                    "public_callback_abi_now": [],
                     "next_blocker": "identity_public_contract_gate",
                     "blockers": [],
                     "resolved_inputs": ["runtime.lifecycle_evidence"],
@@ -5194,6 +5199,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
             {
                 **base_evidence,
+                "ready_scope": "operator_approval_receipt_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "preflight_only",
+            },
+            {
+                **base_evidence,
+                "ready_scope": "window_manifest_only",
+            },
+            {
+                **base_evidence,
                 "sidecars": [
                     {
                         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
@@ -5215,7 +5232,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "schema": "obelisk.operator-approval-receipt.v1",
                         "server_operations_authorized_by_template": False,
                     },
+                    {
+                        "schema": "obelisk.operator-receipt.v1",
+                        "source_kind": "operator_receipt",
+                    },
+                    {
+                        "schema": "obelisk.live-ops-sidecar.v1",
+                        "evidence_kind": "live_ops_sidecar",
+                    },
                 ],
+            },
+            {
+                **base_evidence,
+                "source_kind": "live-ops",
+            },
+            {
+                **base_evidence,
+                "evidence_kind": "live-validation-sidecar",
             },
         )
         for evidence in cases:
@@ -5272,6 +5305,21 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             missing = player_identity_structured_promotion_evidence_missing(artifacts)
 
         self.assertIn("approved_runtime_evidence_manifest:sha256_mismatch", missing)
+
+    def test_identity_structured_contract_report_rejects_public_surface_openings(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
+            artifacts = self.write_player_identity_structured_promotion_artifacts(Path(core_dir))
+            contract_path = REPO_ROOT / artifacts["public_contract_readiness_report"]
+            contract_report = json.loads(contract_path.read_text(encoding="utf-8"))
+            contract_report["public_contract_allowed"] = True
+            contract_report["public_header_symbols_now"] = ["ObeliskPlayerPrincipalEvent"]
+            contract_report["public_capability_bits_now"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+            contract_report["public_callback_abi_now"] = ["ObeliskPlayerPrincipalCallback"]
+            contract_path.write_text(json.dumps(contract_report, sort_keys=True), encoding="utf-8")
+
+            missing = player_identity_structured_promotion_evidence_missing(artifacts)
+
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
 
     def test_identity_structured_contract_report_with_redaction_input_still_does_not_count_for_promotion(self) -> None:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
@@ -6594,12 +6642,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 json.dumps(
                     {
                         "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                        "ready": True,
+                        "ready_scope": "contract_review_input_only",
                         "surface": "obelisk.player_identity.v1",
                         "accepted_for_contract_review": True,
                         "promotion_ready": False,
                         "public_sdk_ready": False,
                         "runtime_ready": False,
+                        "public_contract_allowed": False,
                         "public_header_allowed": False,
+                        "public_header_symbols_now": [],
+                        "public_capability_bits_now": [],
+                        "public_callback_abi_now": [],
                         "next_blocker": "identity_public_contract_gate",
                         "blockers": [],
                         "resolved_inputs": ["runtime.lifecycle_evidence"],

@@ -344,6 +344,9 @@ PLAYER_IDENTITY_REQUEST_PACK_NON_EVIDENCE_TERMS = (
     "window manifests",
     "observer env files",
     "operator approval receipts",
+    "operator receipts",
+    "live-validation sidecars",
+    "live-ops sidecars",
     "do not satisfy approved runtime principal lifecycle evidence",
     "public identity promotion",
     "public ABI/SDK readiness",
@@ -403,6 +406,10 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "item_return_event",
     "live_validation",
     "live-validation",
+    "live_ops",
+    "live-ops",
+    "live_ops_sidecar",
+    "live-ops-sidecar",
     "package_shape",
     "planning",
     "plugin_hub",
@@ -417,6 +424,8 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "request-pack",
     "operator_approval_receipt",
     "operator-approval-receipt",
+    "operator_receipt",
+    "operator-receipt",
     "window_manifest",
     "window-manifest",
     "static_candidate",
@@ -455,7 +464,8 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
     r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
-    r"operator[-_ ]?approval[-_ ]?receipts?|window[-_ ]?manifests?|live[-_ ]?validation|"
+    r"operator[-_ ]?(?:approval[-_ ]?)?receipts?|window[-_ ]?manifests?|"
+    r"live[-_ ]?(?:validation|ops)(?:[-_ ]?sidecars?)?|"
     r"copied[-_ ]?data|(?:chat[-_ ]?message|gameplay[-_ ]?policy[-_ ]?event|event|chat)[-_ ]?seeds?|"
     r"static[-_ ]?(?:orientation|candidate|target|discovery)|native[-_ ]?ufunction[-_ ]?registration[-_ ]?static[-_ ]?discovery|"
     r"admin[-_ ]?thunks?|orientation|preflight|readiness|"
@@ -2982,13 +2992,18 @@ def player_identity_structured_promotion_evidence_missing(
         private_pod_layout_candidate = private_pod_layout_candidate if isinstance(private_pod_layout_candidate, dict) else {}
         if not (
             contract_report.get("schema") == "obelisk.player-identity-public-contract-readiness-check.v1"
+            and contract_report.get("ready") is True
             and contract_report.get("ready_scope") == PUBLIC_CONTRACT_REVIEW_READY_SCOPE
             and contract_report.get("surface") == "obelisk.player_identity.v1"
             and contract_report.get("accepted_for_contract_review") is True
             and contract_report.get("promotion_ready") is False
             and contract_report.get("public_sdk_ready") is False
             and contract_report.get("runtime_ready") is False
+            and contract_report.get("public_contract_allowed") is False
             and contract_report.get("public_header_allowed") is False
+            and contract_report.get("public_header_symbols_now") == []
+            and contract_report.get("public_capability_bits_now") == []
+            and contract_report.get("public_callback_abi_now") == []
             and contract_report.get("next_blocker") == "identity_public_contract_gate"
             and set(contract_report.get("remaining_blockers", []))
             == PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS

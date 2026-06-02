@@ -2372,6 +2372,66 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## P0 Certificate And Sidecar Non-Evidence Hardening
+
+A supervised four-agent offline round audited player-identity public-contract intake,
+permissions/admin dependency accounting, SDK publication guardrails, and a bounded
+identity-readiness worker patch. No runtime/server operation or protected workspace write
+was authorized.
+
+Integrated hardening:
+
+- `check_permissions_admin_public_readiness.py` now requires a repo-relative hash-bound
+  `obelisk.player-identity-promotion-certificate.v1` before a promoted-looking
+  `obelisk.player_identity.v1` surface can satisfy permissions/admin dependency checks.
+  The certificate must bind surface `obelisk.player_identity.v1`, P0 chain position 1,
+  `required_by_surface=obelisk.permissions_admin.v1`, required-by position 2, and an
+  evidence object. Missing or stale certificates keep permissions/admin non-counting.
+- `check_public_sdk_v1_completion.py` now rejects identity public-contract readiness
+  reports that omit `ready=true`, set `public_contract_allowed`, or list public identity
+  header symbols, capability bits, or callback ABI while still claiming contract-review
+  intake. Contract-review reports remain non-promotional.
+- SDK accounting and `docs/public_sdk_surfaces.json` now name `operator receipts`,
+  `live-validation sidecars`, and `live-ops sidecars` alongside request packs, preflight,
+  window manifests, observer env files, and operator approval receipts as operational
+  preparation only. These artifacts do not satisfy approved runtime principal lifecycle
+  evidence, public identity promotion, public ABI/SDK readiness, runtime readiness, or
+  v1 SDK completion.
+- `check_player_identity_public_contract_readiness.py` rejects approved-runtime reports
+  whose `resolved_inputs` try to include request/preflight/window/operator/sidecar/live-op
+  inputs. The report also carries the non-promotion denial text.
+
+Validated offline:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness`
+  passed 51 tests.
+- Focused SDK completion regressions for live-ops sidecars and identity contract public
+  opening rejection passed 3 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 181 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_public_sdk_guardrails scripts.test_research_doc_guardrails scripts.test_agent_handoff_guardrails`
+  passed 224 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `current_route_blocker=approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, and P0 `0/4`.
+
+Deferred findings for future offline work:
+
+- Public identity header scanners should reject alternate public names such as player
+  session/lifecycle/callback/register/capability/event symbols while identity remains
+  blocked.
+- `check_player_identity_public_contract_gap_report.py` should mirror the readiness
+  checker’s non-promotional `resolved_inputs` guard and make `next_blocker` less
+  ambiguous while approved runtime evidence is still missing.
+- The full player-identity public-contract readiness test suite currently has known
+  fixture failures around `operational_window_manifest_check_failed` and
+  `operational_window_manifest_replay_mismatch`; focused new tests pass.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
 ## Live-Ops Sidecar Authorization Non-Claim Hardening
 
 A supervised four-agent round split preflight sidecars, window-manifest consumption,

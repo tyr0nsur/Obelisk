@@ -138,6 +138,27 @@ REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
     "ABI layout and SDK consumer tests passing",
     "public docs state exact non-claims and downstream dependency order",
 }
+FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS = (
+    "request_pack",
+    "request-pack",
+    "preflight",
+    "window_manifest",
+    "window-manifest",
+    "operator_receipt",
+    "operator-receipt",
+    "operator_approval_receipt",
+    "operator-approval-receipt",
+    "sidecar",
+    "observer_env",
+    "observer-env",
+    "live_ops",
+    "live-ops",
+)
+NON_PROMOTIONAL_EVIDENCE_DENIAL = (
+    "Request packs, preflight/window manifests, operator receipts, and live-ops sidecars are "
+    "planning or operational-preparation artifacts only; they do not resolve runtime lifecycle "
+    "evidence, public identity promotion, public ABI/SDK readiness, runtime readiness, or v1 completion."
+)
 REQUIRED_NON_CLAIMS = {
     "This manifest does not add public header symbols.",
     "This manifest does not promote obelisk.player_identity.v1.",
@@ -651,6 +672,38 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                 "approved_runtime_evidence_runtime_ready_missing",
                 "$.approved_runtime_evidence.runtime_evidence_ready",
             )
+        resolved_inputs = report.get("resolved_inputs")
+        if resolved_inputs is not None:
+            if not isinstance(resolved_inputs, list) or not all(
+                isinstance(item, str) for item in resolved_inputs
+            ):
+                add(
+                    blockers,
+                    "approved_runtime_evidence_resolved_inputs_not_string_list",
+                    "$.approved_runtime_evidence.resolved_inputs",
+                    value=resolved_inputs,
+                )
+            else:
+                forbidden_inputs = sorted(
+                    item
+                    for item in resolved_inputs
+                    if any(token in item.lower() for token in FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS)
+                )
+                if forbidden_inputs:
+                    add(
+                        blockers,
+                        "approved_runtime_evidence_non_promotional_inputs_claimed",
+                        "$.approved_runtime_evidence.resolved_inputs",
+                        forbidden=forbidden_inputs,
+                    )
+                unexpected_inputs = sorted(set(resolved_inputs) - {REQUIRED_RESOLVED_INPUT})
+                if unexpected_inputs:
+                    add(
+                        blockers,
+                        "approved_runtime_evidence_resolved_inputs_unexpected",
+                        "$.approved_runtime_evidence.resolved_inputs",
+                        unexpected=unexpected_inputs,
+                    )
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if key in report and report.get(key) is not False:
             add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
@@ -1924,6 +1977,7 @@ def build_report(
         "owner_token_sdk_consumer_contract": owner_token_sdk_consumer_report,
         "non_claims": [
             "approved runtime evidence intake does not add public header symbols, capability bits, callbacks, lookup, mutation, return override, or v1 SDK readiness",
+            NON_PROMOTIONAL_EVIDENCE_DENIAL,
             "identifier-redaction evidence intake does not resolve the full privacy blocker, add public header symbols, or make player identity promotion-ready",
             "principal invalidation policy intake is candidate-only and does not resolve the full lifetime/generation/scope blocker or prove runtime lifecycle ordering",
             "public ABI preflight candidate intake is candidate-only and does not resolve public ABI layout, SDK consumer tests, lifecycle cleanup, or v1 completion",

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -31,6 +32,7 @@ IDENTITY_SURFACE = "obelisk.player_identity.v1"
 COMMAND_RESPONSE_SURFACE = "obelisk.command_chat_response_path.v1"
 COMMANDS_REPLIES_SURFACE = "obelisk.commands_replies.v1"
 REQUIRED_P0_CHAIN = [IDENTITY_SURFACE, SURFACE, COMMAND_RESPONSE_SURFACE, COMMANDS_REPLIES_SURFACE]
+PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = "obelisk.player-identity-promotion-certificate.v1"
 
 REQUIRED_DECISION_IDS = frozenset(
     (
@@ -145,6 +147,7 @@ REQUIRED_DEPENDENCY_BEHAVIOR = frozenset(
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
+        "permissions/admin structured promotion evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in the ordered P0 dependency chain, bound by reviewed evidence artifact hash",
         "promoted player identity must define copied principal semantics for principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle before permissions/admin can count as promoted",
         "promoted player identity must include owner-token cleanup on init failure, plugin unload, and owner-scoped unregister before permissions/admin can count as promoted",
         "permissions/admin cannot infer copied principal semantics from surface status text, runtime evidence text, command text, operator config, or plugin input",
@@ -1000,6 +1003,62 @@ def string_set(value: Any) -> set[str]:
     return set(value)
 
 
+def sha256_file(path: Path) -> str | None:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def repo_relative_path(raw_path: Any) -> Path | None:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None
+    path = Path(raw_path)
+    if path.is_absolute() or ".." in path.parts:
+        return None
+    return path
+
+
+def player_identity_has_promotion_certificate(identity: dict[str, Any]) -> bool:
+    evidence = identity.get("evidence")
+    binding = evidence.get("player_identity_promotion_certificate") if isinstance(evidence, dict) else None
+    if not isinstance(binding, dict):
+        return False
+    relative = repo_relative_path(binding.get("path"))
+    if relative is None:
+        return False
+    path = REPO_ROOT / relative
+    if path.suffix.lower() != ".json" or not path.is_file():
+        return False
+    expected_sha256 = binding.get("sha256")
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256):
+        return False
+    actual_sha256 = sha256_file(path)
+    if actual_sha256 != expected_sha256.lower():
+        return False
+    try:
+        certificate = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(certificate, dict):
+        return False
+    if not isinstance(certificate.get("evidence"), dict):
+        return False
+    return (
+        certificate.get("schema") == PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA
+        and certificate.get("surface_id") == IDENTITY_SURFACE
+        and certificate.get("promotion_status") == "promoted"
+        and certificate.get("v1_dependency_chain") == REQUIRED_P0_CHAIN
+        and certificate.get("v1_dependency_chain_position") == 1
+        and certificate.get("required_by_surface") == SURFACE
+        and certificate.get("required_by_v1_dependency_chain_position") == 2
+    )
+
+
 def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bool:
     """Require identity's public contract, not just its consume-mode runtime evidence."""
 
@@ -1029,6 +1088,8 @@ def player_identity_has_promoted_public_contract(identity: dict[str, Any]) -> bo
     if not REQUIRED_IDENTITY_PUBLIC_FIELDS.issubset(public_fields):
         return False
     if not evidence_tests and not evidence_sdk_consumer_tests:
+        return False
+    if not player_identity_has_promotion_certificate(identity):
         return False
     if not isinstance(decision_contract, dict):
         return False

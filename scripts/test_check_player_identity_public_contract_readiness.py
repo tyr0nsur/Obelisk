@@ -134,6 +134,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertNotEqual(report["next_blocker"], "public_readiness")
         self.assertEqual(report["blockers"], [])
+        self.assertIn(checker.NON_PROMOTIONAL_EVIDENCE_DENIAL, report["non_claims"])
         self.assertFalse(report["identifier_redaction_evidence"]["provided"])
         self.assertFalse(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
         self.assertTrue(report["principal_invalidation_policy"]["provided"])
@@ -1057,6 +1058,69 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "approved_runtime_evidence_promotion_ready_not_false",
                 "approved_runtime_evidence_runtime_ready_not_false",
                 "approved_runtime_evidence_public_header_allowed_not_false",
+            ],
+        )
+
+    def test_approved_runtime_report_rejects_non_promotional_resolved_inputs(self) -> None:
+        def accepted_validation(_payload, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return mock.Mock(blockers=[])
+
+        def non_promotional_inputs_report(_payload, _validation, *, check_mode: str):
+            self.assertEqual(check_mode, "consume")
+            return {
+                "next_blocker": "identity_public_contract_gate_missing",
+                "approved_runtime_evidence_present": True,
+                "runtime_evidence_ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "resolved_inputs": [
+                    "runtime.lifecycle_evidence",
+                    "operational.window_manifest",
+                    "operator_approval_receipt",
+                    "preflight_readiness",
+                    "live_ops_sidecar",
+                    "abi.public_pod_contract.public_abi_preflight_candidate",
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with (
+                mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}),
+                mock.patch.object(
+                    checker.approved_evidence,
+                    "validate_manifest",
+                    side_effect=accepted_validation,
+                ),
+                mock.patch.object(
+                    checker.approved_evidence,
+                    "build_report",
+                    side_effect=non_promotional_inputs_report,
+                ),
+            ):
+                checker.approved_runtime_report(runtime_path, blockers)
+
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("approved_runtime_evidence_non_promotional_inputs_claimed", reasons)
+        self.assertIn("approved_runtime_evidence_resolved_inputs_unexpected", reasons)
+        non_promotional_detail = next(
+            blocker
+            for blocker in blockers
+            if blocker["reason"] == "approved_runtime_evidence_non_promotional_inputs_claimed"
+        )
+        self.assertEqual(
+            non_promotional_detail["forbidden"],
+            [
+                "abi.public_pod_contract.public_abi_preflight_candidate",
+                "live_ops_sidecar",
+                "operational.window_manifest",
+                "operator_approval_receipt",
+                "preflight_readiness",
             ],
         )
 
