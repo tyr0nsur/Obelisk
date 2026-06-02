@@ -121,7 +121,9 @@ priorities, and do not use history files as the active source of truth.
   Operator approval receipt handling is provenance-only: request preparation writes only
   `operator-approval-receipt.template.json`; post-window replay requires a completed
   `operator-approval-receipt.json`, exact current-turn completion metadata, bound-request
-  parity, and request replay that tolerates only `approved_window_expired`.
+  parity, `approval_recorded_at_utc > prepared_at_utc` and `< approved_window.start_utc`,
+  and request replay that tolerates only `approved_window_expired`. Completed receipts are
+  accepted only in `--post-window-replay`; templates never count as replay evidence.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied
@@ -1117,8 +1119,9 @@ priorities, and do not use history files as the active source of truth.
   Validation: 144 request/manifest/bundle tests OK, 178 SDK completion tests OK,
   route gate JSON valid/planning-only, and SDK JSON failed closed as expected with
   `approved_runtime_evidence_missing`, SDK 0/12, P0 0/4, `stable_claim_allowed=false`.
-  Pending live-ops hardening: add prepared-request freshness provenance
-  (`prepared_at_utc`) so operator approval receipts cannot replay stale request packs.
+  Closed live-ops hardening: prepared-request freshness provenance (`prepared_at_utc`) is
+  bound into request/receipt replay so operator approval receipts cannot replay stale
+  request packs.
   No runtime/server operation was performed.
 - 2026-06-02 request-pack freshness hardening pass: lead attempted a new 4-agent round
   with gpt-5.5/high, but the multi-agent tool again reported agent thread limit reached.

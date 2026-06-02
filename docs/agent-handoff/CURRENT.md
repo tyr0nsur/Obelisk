@@ -38,10 +38,10 @@ This file is an active routing table only. Durable evidence belongs in
   scoped run; it is not approval to change markers/env, start/restart/stop a server, run
   ReflectionScanner, ptrace/gcore, broad ProcessEvent tracing, runtime observers, or write
   under protected live paths.
-- Request-pack, preflight, `planning_layout_gate.ready=true`, planning acceptance, or
-  route acceptance are not runtime approval and do not authorize public SDK readiness,
-  runtime readiness, release readiness, command router, reply/send-chat ABI, marker/env
-  changes, runtime capture, Discord, or v1 completion.
+- Request-pack/preflight/window-manifest/operator-receipt/sidecar readiness, planning
+  acceptance, or route acceptance are operational preparation only; they do not authorize
+  runtime work, public identity readiness, public ABI readiness, public SDK readiness, release readiness, command router,
+  reply/send-chat ABI, marker/env changes, runtime capture, Discord, or v1 completion.
 - The lead retains server-safety decisions.
 - no Discord for internal rounds or agent status. Public modder-facing milestones and
   beta-test notices require explicit current-turn approval, the guarded helper, embed
@@ -155,12 +155,12 @@ This file is an active routing table only. Durable evidence belongs in
   work only: request-pack acceptance keeps `server_operations_authorized=false`,
   `runtime_work_authorized=false`, public/runtime/promotion/v1 readiness false, and
   `next_blocker=operator_current_turn_runtime_window_approval_required`. Preserve checked
-  `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, digest-bound
-  completed `operator-approval-receipt.json` for post-window replay, reviewed server
-  binary path/SHA, exact env/marker and forbidden-marker boundaries, pre/post evidence
-  paths, structured preflight/window binding, post-run verification commands, canonical
-  rollback delta, and no runtime/server authorization. Request packs are pre-window only:
-  already-started or expired approved windows fail closed.
+  `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, completed
+  `operator-approval-receipt.json` only for post-window replay, reviewed server binary
+  path/SHA, exact env/marker boundaries, sibling JSON `preflight-pre.json`/
+  `preflight-post.json` with false auth/readiness flags, post-run checks, rollback delta,
+  and no runtime/server authorization. Request packs are pre-window only: already-started
+  or expired approved windows fail closed; receipt templates never count.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
@@ -211,10 +211,9 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing` non-counting.
 - Latest supervised rounds integrated route-gate summaries, retry-stable copied-event
   cleanup, live-ops sidecar non-claims, P0 certificate/accounting hardening, player
-  identity header/gap-report guardrails, secondary-report overclaim scanning, and default
-  SDK route-boundary hardening. Secondary reports now reject public/runtime/completion
-  overclaims; Mission leaf promotion evidence now requires strict schema/path/leaf-token
-  checks and `per_leaf_promoted` summaries need manifest-verified leaf evidence. Bound
+  identity header/gap-report guardrails, secondary-report overclaim scanning, default SDK
+  route-boundary hardening, request receipt-template rejection, approved-evidence sidecar
+  replay validation, approved-bundle SDK non-evidence markers, and Mission report checks. Bound
   identity planning accepts only `approved_runtime_evidence_missing` without explicit runtime evidence; public-contract `next_blocker` uses `identity_public_contract_gate_missing`.
   Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`,
   P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.

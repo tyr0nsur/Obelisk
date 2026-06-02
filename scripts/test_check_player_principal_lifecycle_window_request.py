@@ -227,6 +227,38 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
 
+    def test_rejects_operator_live_ops_brief_template_receipt_requirement(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["evidence_capture"][
+                "operator_approval_receipt_required"
+            ] = "generated_template"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_receipt_required_not_completed_receipt", report["blockers"])
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_operator_live_ops_brief_runtime_authorization_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["non_authorization"] = "brief says runtime work authorized"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_non_authorization_mismatch", report["blockers"])
+        self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
     def test_rejects_request_pack_missing_prepared_at_utc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -449,6 +481,49 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["operator_approval_receipt_verified"])
         self.assertIn("operator_approval_receipt_required_for_post_window_replay", report["blockers"])
 
+    def test_post_window_replay_rejects_generated_receipt_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = output_dir / "operator-approval-receipt.json"
+            receipt_path.write_text(
+                (output_dir / "operator-approval-receipt.template.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_generated_template_not_completed_receipt", report["blockers"])
+        self.assertIn("operator_approval_receipt_status_not_completed", report["blockers"])
+
+    def test_rejects_operator_approval_receipt_runtime_readiness_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            receipt_path = write_completed_receipt(output_dir)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["operator_completion"]["approved_by_role"] = "operator runtime ready"
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn(
+            "operator_approval_receipt_forbidden_public_capability_or_readiness_claim",
+            report["blockers"],
+        )
+
     def test_rejects_completed_receipt_without_post_window_replay(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"
@@ -576,6 +651,12 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("approved_window_already_started", report["blockers"])
         self.assertNotIn("approved_window_expired", report["blockers"])
+        details = {
+            item["reason"]: item
+            for item in report["blocker_details"]
+            if item["reason"] == "approved_window_already_started"
+        }
+        self.assertEqual("already_started", details["approved_window_already_started"]["stale_condition"])
 
     def test_rejects_post_run_verification_command_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -656,6 +737,12 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("approved_window_expired", report["blockers"])
+        details = {
+            item["reason"]: item
+            for item in report["blocker_details"]
+            if item["reason"] == "approved_window_expired"
+        }
+        self.assertEqual("expired", details["approved_window_expired"]["stale_condition"])
 
     def test_rejects_approved_window_duration_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

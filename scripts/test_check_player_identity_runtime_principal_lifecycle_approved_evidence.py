@@ -159,7 +159,7 @@ def preflight_payload(
         "env_file": None if env_file is None else {"path": str(env_file), "sha256": env_sha256},
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
-        "allow_stopped": True,
+        "allow_stopped": False,
         "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
@@ -806,6 +806,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 "request_pack",
                 lambda payload: payload["operational_window"]["request_pack"],
                 lambda path: path.read_text(encoding="utf-8").replace('"map": "TheIsland"', '"map": "Ragnarok"'),
+                "operational_window_request_pack_target_mismatch",
             ),
             (
                 "observer_env",
@@ -814,6 +815,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                     "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0\n",
                     "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=1\n",
                 ),
+                "operational_window_observer_env_value_mismatch",
             ),
             (
                 "preflight_pre",
@@ -822,6 +824,7 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                     '"mode": "observer-window"',
                     '"mode": "stable"',
                 ),
+                "operational_window_preflight_mode_mismatch",
             ),
             (
                 "preflight_post",
@@ -830,9 +833,10 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                     '"mode": "stable"',
                     '"mode": "observer-window"',
                 ),
+                "operational_window_preflight_mode_mismatch",
             ),
         )
-        for name, artifact_for_payload, mutate in cases:
+        for name, artifact_for_payload, mutate, expected_blocker in cases:
             with self.subTest(sidecar=name):
                 payload = manifest()
                 artifact = artifact_for_payload(payload)
@@ -842,10 +846,51 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 report = json.loads(result.stdout)
 
                 self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_blocker, report["blockers"])
                 self.assertIn("operational_window_manifest_check_failed", report["blockers"])
                 self.assertIn("operational_window_manifest_replay_mismatch", report["blockers"])
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_request_pack_with_partial_replay_provenance(self) -> None:
+        payload = manifest()
+        request_artifact = payload["operational_window"]["request_pack"]
+        request_path = Path(request_artifact["path"])
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        request.pop("post_window_replay_contract")
+        self.rewrite_sidecar_and_refresh_identity(
+            payload,
+            request_artifact,
+            json.dumps(request, sort_keys=True) + "\n",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_request_pack_post_window_replay_contract_missing", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_sidecar_public_sdk_or_runtime_readiness_overclaim(self) -> None:
+        payload = manifest()
+        request_artifact = payload["operational_window"]["request_pack"]
+        request_path = Path(request_artifact["path"])
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        request["public_sdk_ready"] = True
+        self.rewrite_sidecar_and_refresh_identity(
+            payload,
+            request_artifact,
+            json.dumps(request, sort_keys=True) + "\n",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_sidecar_readiness_flag_overclaim", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_rejects_operator_receipt_verified_flag_not_true(self) -> None:
         payload = manifest()

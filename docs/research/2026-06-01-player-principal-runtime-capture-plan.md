@@ -89,6 +89,12 @@ Before any marker/env activation, prepare and check the request pack offline. Th
 generated request must include `prepared_at_utc`; completed receipts are valid only when
 `approval_recorded_at_utc` is after `prepared_at_utc` and before the approved window
 start.
+Preparation output is not replay evidence by itself. Post-window replay expects sibling
+copies beside the copied log under
+`/servidor/ark/workspace-offline/live-validation-logs/<run-id>/`: `window-request.json`,
+`observer-window.env`, `operator-approval-request.md`, completed
+`operator-approval-receipt.json`, `preflight-pre.json`, `preflight-post.json`,
+`window-manifest.env`, and `Obelisk.log`.
 
 ```bash
 python3 scripts/prepare_player_principal_lifecycle_window_request.py \
@@ -111,14 +117,19 @@ python3 scripts/check_player_principal_lifecycle_window_request.py \
   --json
 ```
 
-Then run the read-only stable preflight for the same target:
+Then write the structured read-only stable preflight sidecar for the same target:
 
 ```bash
 scripts/check_player_principal_lifecycle_preflight.sh \
   --instance <instance-id> \
   --map <map> \
   --mode stable \
-  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+  --run-id <run-id> \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+  --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id> \
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --json > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/preflight-post.json
 ```
 
 Request packs for this lane must not use `final_posture=stopped` or
@@ -128,7 +139,7 @@ live install paths; that mode is for offline copies and rejects live server path
 design.
 
 For the observer-window marker posture, the preflight must also receive a secret-free
-effective env snapshot:
+effective env snapshot and write the pre-window sidecar:
 
 ```bash
 scripts/check_player_principal_lifecycle_preflight.sh \
@@ -140,8 +151,13 @@ scripts/check_player_principal_lifecycle_preflight.sh \
   --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
   --evidence-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id> \
-  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520
+  --expected-binary-sha256 7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520 \
+  --json > /servidor/ark/workspace-offline/live-validation-logs/<run-id>/preflight-pre.json
 ```
+
+Accepted preflight JSON must keep `offline_only=false`, `allow_stopped=false`, all
+server/runtime/public SDK/promotion readiness flags false, and no positive authorization
+or readiness text.
 
 The env snapshot must contain the exact player-principal lifecycle window posture:
 `OBELISK_INSTANCE_ID=<instance-id>`, `OBELISK_ENABLE_PROCESS_EVENT_HOOK=1`,
@@ -382,7 +398,10 @@ fields, rollback fields, and notice/user-policy fields for the approved window. 
 the manifest before building an evidence bundle; stale or extra keys must fail closed. The
 emitted template is not acceptance-ready evidence by itself: the checker must run only
 after copying the log under the matching `<run-id>` evidence directory and verifying the
-reviewed sidecar fields.
+canonical sibling sidecars. Generated `operator-approval-receipt.template.json` never
+counts as replay evidence; post-window replay requires completed
+`operator-approval-receipt.json` with `approval_recorded_at_utc` after
+`prepared_at_utc` and before approved window start.
 
 If users are involved, the manifest may record only a notice path label and a sanitized
 notice digest. It must not record endpoints, webhooks, tokens, message URLs, player
@@ -406,9 +425,10 @@ python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundl
   --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
 ```
 
-The bundle helper runs analyzer -> approved manifest builder -> approved-evidence checker
--> offline consume gate, rejects direct server log paths through the underlying analyzer,
-and reports only the `player_principal_lifecycle` module.
+The bundle helper runs window-manifest post-window replay -> analyzer -> approved
+manifest builder -> approved-evidence checker -> offline consume/promote/public/runtime
+gates, rejects direct server log paths through the underlying analyzer, and reports only
+the `player_principal_lifecycle` module.
 
 Manual equivalent analyzer command:
 

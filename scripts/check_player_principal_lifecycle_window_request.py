@@ -238,9 +238,9 @@ FORBIDDEN_VALUE_RE = re.compile(
 POSITIVE_CAPABILITY_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity)|"
     r"player[_ -]?identity[_ -]?(?:promotion|ready|readiness)|"
-    r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
+    r"(?:sdk|runtime|runtime[_ -]?work|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
     r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
-    r"(?:ready|readiness|enabled|allowed|supported|promoted|delivered)|"
+    r"(?:ready|readiness|enabled|allowed|authorized|supported|promoted|delivered)|"
     r"command[_ -]?(?:reply|response|routing|support)|"
     r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
     re.IGNORECASE,
@@ -418,6 +418,14 @@ def validate_operator_approval_receipt_path(
     receipt_path: Path,
     blockers: list[dict[str, Any]],
 ) -> None:
+    if receipt_path.name == "operator-approval-receipt.template.json":
+        add(
+            blockers,
+            "operator_approval_receipt_template_path_not_completed_receipt",
+            "operator_approval_receipt",
+            expected="operator-approval-receipt.json",
+            actual=receipt_path.name,
+        )
     if receipt_path.name != "operator-approval-receipt.json":
         add(
             blockers,
@@ -732,8 +740,33 @@ def validate_operator_live_ops_brief(payload: dict[str, Any], env: list[str], bl
     require_keys(brief.get("server_binary"), required=EXPECTED_SERVER_BINARY_KEYS, label="operator_live_ops_brief_server_binary", blockers=blockers)
     require_keys(brief.get("marker_changes"), required=EXPECTED_MARKER_CHANGE_KEYS, label="operator_live_ops_brief_marker_changes", blockers=blockers)
     require_keys(brief.get("start_restart_stop_window"), required=EXPECTED_WINDOW_BRIEF_KEYS, label="operator_live_ops_brief_window", blockers=blockers)
-    require_keys(brief.get("evidence_capture"), required=EXPECTED_EVIDENCE_CAPTURE_KEYS, label="operator_live_ops_brief_evidence_capture", blockers=blockers)
+    evidence_capture = require_keys(brief.get("evidence_capture"), required=EXPECTED_EVIDENCE_CAPTURE_KEYS, label="operator_live_ops_brief_evidence_capture", blockers=blockers)
     require_keys(brief.get("post_run_stable_posture"), required=EXPECTED_POST_RUN_KEYS, label="operator_live_ops_brief_post_run_stable_posture", blockers=blockers)
+    if isinstance(evidence_capture, dict):
+        if evidence_capture.get("operator_approval_receipt_required") != "completed_operator_receipt":
+            add(
+                blockers,
+                "operator_live_ops_brief_receipt_required_not_completed_receipt",
+                "operator_live_ops_brief.evidence_capture.operator_approval_receipt_required",
+                expected="completed_operator_receipt",
+                actual=evidence_capture.get("operator_approval_receipt_required"),
+            )
+        receipt_path = evidence_capture.get("operator_approval_receipt_path")
+        if isinstance(receipt_path, str) and receipt_path.endswith(".template.json"):
+            add(
+                blockers,
+                "operator_live_ops_brief_receipt_path_points_to_template",
+                "operator_live_ops_brief.evidence_capture.operator_approval_receipt_path",
+                value=receipt_path,
+            )
+    if brief.get("non_authorization") != "brief only; request-pack acceptance does not authorize operations":
+        add(
+            blockers,
+            "operator_live_ops_brief_non_authorization_mismatch",
+            "operator_live_ops_brief.non_authorization",
+            expected="brief only; request-pack acceptance does not authorize operations",
+            actual=brief.get("non_authorization"),
+        )
     expected = expected_operator_live_ops_brief(payload, env)
     if expected is not None and brief != expected:
         add(blockers, "operator_live_ops_brief_mismatch", "operator_live_ops_brief", expected=expected, actual=brief)
@@ -788,7 +821,13 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
             add(blockers, "prepared_at_utc_not_before_approved_window", "prepared_at_utc")
         now = datetime.now(timezone.utc)
         if start_dt is not None and start_dt <= now and (end_dt is None or end_dt > now):
-            add(blockers, "approved_window_already_started", "approved_window.start_utc", value=start)
+            add(
+                blockers,
+                "approved_window_already_started",
+                "approved_window.start_utc",
+                value=start,
+                stale_condition="already_started",
+            )
         if (
             start_dt is not None
             and end_dt is not None
@@ -802,7 +841,13 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
                 max_seconds=MAX_APPROVED_WINDOW_SECONDS,
             )
         if end_dt is not None and end_dt <= now:
-            add(blockers, "approved_window_expired", "approved_window.end_utc", value=end)
+            add(
+                blockers,
+                "approved_window_expired",
+                "approved_window.end_utc",
+                value=end,
+                stale_condition="expired",
+            )
     rollback = require_keys(payload.get("rollback"), required=EXPECTED_ROLLBACK_KEYS, label="rollback", blockers=blockers)
     if rollback:
         if not isinstance(rollback.get("owner"), str) or not re.fullmatch(r"[A-Za-z0-9_.@ -]+", rollback["owner"]):
@@ -955,6 +1000,12 @@ def validate_operator_approval_receipt(
     )
     if receipt.get("schema") != APPROVAL_RECEIPT_SCHEMA:
         add(blockers, "operator_approval_receipt_schema_mismatch", "operator_approval_receipt")
+    if receipt.get("status") == "generated_template":
+        add(
+            blockers,
+            "operator_approval_receipt_generated_template_not_completed_receipt",
+            "operator_approval_receipt",
+        )
     if receipt.get("status") != "completed_operator_receipt":
         add(blockers, "operator_approval_receipt_status_not_completed", "operator_approval_receipt")
     if receipt.get("receipt_completed") is not True:
@@ -1020,6 +1071,16 @@ def validate_operator_approval_receipt(
         add(blockers, "operator_approval_receipt_approval_source_mismatch", "operator_approval_receipt")
     if completion.get("attestation") != "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY":
         add(blockers, "operator_approval_receipt_attestation_mismatch", "operator_approval_receipt")
+    forbidden_receipt_claim = find_forbidden_claim(receipt)
+    if forbidden_receipt_claim is not None:
+        value, trail = forbidden_receipt_claim
+        add(
+            blockers,
+            "operator_approval_receipt_forbidden_public_capability_or_readiness_claim",
+            "operator_approval_receipt",
+            trail=trail,
+            value=value,
+        )
 
     bound_request = require_keys(
         receipt.get("bound_request_pack"),

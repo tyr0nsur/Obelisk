@@ -251,6 +251,27 @@ NEGATIVE_EVIDENCE_RE = re.compile(
     r"runtime[_ -]?ready\s*[:=]\s*false)\b",
     re.IGNORECASE,
 )
+NON_PROMOTIONAL_SCHEMA_KEYS = {"schema", "artifact_schema", "evidence_schema", "report_schema"}
+NON_PROMOTIONAL_SCHEMA_TOKENS = {
+    "candidate",
+    "consume",
+    "planning",
+    "preflight",
+    "readiness",
+    "request",
+    "window",
+    "sidecar",
+}
+NON_PROMOTIONAL_PATH_MARKERS = (
+    "candidate",
+    "consume",
+    "planning",
+    "preflight",
+    "readiness",
+    "request",
+    "window",
+    "sidecar",
+)
 FORBIDDEN_CLAIM_PATTERNS = (
     r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+(?:SDK|API)\b",
     r"\bidentity\b",
@@ -504,6 +525,58 @@ def resolve_evidence_path(raw_path: str, manifest_dir: Path) -> Path:
     return manifest_dir / path
 
 
+def relative_promoted_evidence_path(raw_path: str) -> Path | None:
+    path = Path(raw_path)
+    if path.is_absolute() or not raw_path.strip():
+        return None
+    if any(part in {"", ".", ".."} for part in path.parts):
+        return None
+    return path
+
+
+def evidence_path_has_non_promotional_marker(raw_path: str) -> bool:
+    relative = relative_promoted_evidence_path(raw_path)
+    if relative is None:
+        return True
+    parts = [part.lower().replace("-", "_") for part in relative.parts]
+    for part in parts:
+        tokens = {token for token in part.split("_") if token}
+        for marker in NON_PROMOTIONAL_PATH_MARKERS:
+            if marker in tokens or part.startswith(f"{marker}_") or part.endswith(f"_{marker}"):
+                return True
+    return False
+
+
+def evidence_path_is_specific_to_leaf(raw_path: str, leaf_id: str, evidence_key: str) -> bool:
+    relative = relative_promoted_evidence_path(raw_path)
+    if relative is None:
+        return False
+    lowered = relative.name.lower()
+    leaf_tokens = [token for token in leaf_id.replace("-", "_").split("_") if token]
+    key_tokens = [token for token in evidence_key.replace("-", "_").split("_") if token]
+    return all(token.lower() in lowered for token in leaf_tokens + key_tokens)
+
+
+def evidence_has_non_promotional_schema_marker(value: Any, *, parent_key: str | None = None) -> bool:
+    normalized_key = parent_key.lower().replace("-", "_") if isinstance(parent_key, str) else None
+    if normalized_key in NON_PROMOTIONAL_SCHEMA_KEYS:
+        try:
+            text = json.dumps(value, sort_keys=True)
+        except TypeError:
+            text = str(value)
+        schema_tokens = {token for token in re.split(r"[^a-z0-9]+", text.lower()) if token}
+        if schema_tokens & NON_PROMOTIONAL_SCHEMA_TOKENS:
+            return True
+    if isinstance(value, dict):
+        return any(
+            evidence_has_non_promotional_schema_marker(child, parent_key=key if isinstance(key, str) else None)
+            for key, child in value.items()
+        )
+    if isinstance(value, list):
+        return any(evidence_has_non_promotional_schema_marker(child, parent_key=parent_key) for child in value)
+    return False
+
+
 def validate_promoted_leaf_gate_report(
     entry: Any,
     *,
@@ -520,6 +593,36 @@ def validate_promoted_leaf_gate_report(
     expected_sha = entry.get("sha256")
     if not isinstance(raw_path, str) or not raw_path:
         add(blockers, "promoted_leaf_evidence_path_missing", f"{label}.path", leaf=leaf_id, evidence_key=evidence_key)
+        return
+    if relative_promoted_evidence_path(raw_path) is None:
+        add(
+            blockers,
+            "promoted_leaf_evidence_path_not_repo_relative",
+            f"{label}.path",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            path=raw_path,
+        )
+        return
+    if evidence_path_has_non_promotional_marker(raw_path):
+        add(
+            blockers,
+            "promoted_leaf_evidence_path_non_promotional",
+            f"{label}.path",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            path=raw_path,
+        )
+        return
+    if not evidence_path_is_specific_to_leaf(raw_path, leaf_id, evidence_key):
+        add(
+            blockers,
+            "promoted_leaf_evidence_path_not_leaf_specific",
+            f"{label}.path",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+            path=raw_path,
+        )
         return
     if not isinstance(expected_sha, str) or SHA256_RE.fullmatch(expected_sha) is None:
         add(
@@ -594,6 +697,14 @@ def validate_promoted_leaf_gate_report(
             )
     if not isinstance(report.get("schema"), str) or not report["schema"].startswith("obelisk."):
         add(blockers, "promoted_leaf_gate_report_unverified", f"{label}.schema", leaf=leaf_id, evidence_key=evidence_key)
+    if evidence_has_non_promotional_schema_marker(report):
+        add(
+            blockers,
+            "promoted_leaf_gate_report_non_promotional_schema",
+            f"{label}.schema",
+            leaf=leaf_id,
+            evidence_key=evidence_key,
+        )
     artifact_identity = report.get("artifact_identity")
     if not isinstance(artifact_identity, dict) or not isinstance(artifact_identity.get("sha256"), str):
         add(

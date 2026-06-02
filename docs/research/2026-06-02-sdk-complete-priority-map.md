@@ -234,15 +234,12 @@ Validation:
   and P0 progress `0/4`.
 - `git diff --check` passed.
 
-Remaining focused offline finding:
+Closed focused offline finding:
 
-- `scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py` should
-  replay or strongly compare the operational `window-manifest.env` and request/env/preflight
-  sidecars instead of trusting embedded operational-window metadata plus hashes alone.
-  The replay must tolerate expiry-only request-window blockers for already-captured
-  approved evidence only after confirming capture timestamps are inside the approved
-  window; target/window/env/preflight drift should fail with a top-level blocker such as
-  `operational_window_manifest_check_failed`.
+- The approved-evidence replay gap was closed by the next supervised round: the checker
+  now replays `window-manifest.env` and request/env/preflight sidecars, tolerates only the
+  documented expired-window replay case for already-captured evidence, and fails
+  target/window/env/preflight drift.
 
 This round still does not approve runtime work, public permissions/admin ABI, public
 identity, command replies, ResourceHandle, release readiness, or a stable SDK claim.
@@ -821,9 +818,9 @@ Read-only findings preserved:
   posture checkers rather than only by the observer translation unit. This is acceptable
   for the operational path, but future defense-in-depth could duplicate selected
   exclusivity checks in runtime if a wrapper bypass becomes realistic.
-- Preflight sidecars are still not fully bound to run id, target map, copied log path,
-  window manifest path, and request pack path. The next offline guardrail should extend
-  preflight JSON output and window-manifest validation before any runtime request is made.
+- Preflight sidecar binding was later closed: accepted JSON is bound to run id, target map,
+  copied log, evidence dir, window manifest path, and checked timestamp; request-pack
+  binding remains indirect through manifest sidecar validation and request replay.
 - No current-turn runtime/server approval exists. These request packs remain planning
   artifacts and their next blocker is operator current-turn runtime window approval.
 
@@ -2549,14 +2546,12 @@ Integrated changes:
   the accepted-runtime-evidence transition can only reach
   `identity_public_contract_gate_missing` while P0 unlock flags stay false.
 
-Delegated findings kept for the next offline hardening pass:
+Delegated findings closed or kept for the next offline hardening pass:
 
-- Live-ops request/preflight sidecars should add explicit false flags for
-  `server_operations_authorized`, `runtime_work_authorized`, `runtime_ready`,
-  `public_sdk_ready`, and related promotion claims, and window-manifest validation should
-  reject positive claims in consumed preflight sidecars.
-- Request-pack markdown should make copied sidecar commands carry an exact
-  current-turn-approval-required projection before execution.
+- Closed in this round: live-ops request/preflight sidecars now carry explicit false
+  authorization/readiness flags and consumed preflight sidecars reject positive runtime,
+  server, public SDK, or promotion claims. Request-pack Markdown sidecar commands now carry
+  the current-turn-approval-required projection before execution.
 - `MissionCopiedBoolEventDispatcher` remains internal/test-only and must not be promoted
   without `PluginManager` owner cleanup and retry-stable `DestroyUserData` coverage.
   Current plugin-facing dispatcher families remain covered by existing cleanup retry
@@ -2839,13 +2834,64 @@ Validation stayed offline-only:
 
 Deferred work:
 
-- The standalone Mission/Transfer/Dino/Tribe accounting checker can still be tightened to
-  reject non-promotional report schemas/target sets and deny-marker paths inside future
-  `{path, sha256}` per-leaf report bindings.
+- The standalone Mission/Transfer/Dino/Tribe accounting checker can still be aligned with
+  the SDK gate's stricter directory rules for ABI/SDK consumer evidence after this round's
+  repo-relative, leaf-specific, non-promotional schema/path checks.
 - The next offline P0-prep task is an end-to-end audit of player-principal lifecycle
   request, preflight, post-window replay, bundle, and approved-evidence contracts. It
   should improve reviewability for an operator-approved future window without asserting
   runtime authorization or SDK readiness.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.
+
+## Request Receipt And Mission Accounting Hardening
+
+This supervised round kept the same no-runtime boundary and delegated four scoped agents:
+request-pack checker hardening, approved-evidence bundle/replay audit, SDK/P0 gate audit,
+and research/handoff stale-guidance audit. The lead integrated the request-pack checker,
+SDK promotion marker, standalone Mission accounting, and documentation deltas.
+
+Implemented changes:
+
+- `check_player_principal_lifecycle_window_request.py` now rejects generated
+  `operator-approval-receipt.template.json` as completed receipt evidence, requires the
+  live-ops brief to point at completed receipt semantics, scans completed receipts for
+  runtime/public SDK readiness or authorization claims, and records stale-window details
+  for already-started versus expired windows without changing blocker names.
+- `check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now performs
+  direct offline sidecar provenance validation for the request pack, observer env,
+  completed operator approval receipt, and preflight JSON sidecars. Partial replay
+  contracts, env drift, preflight binding drift, receipt digest/status drift, and sidecar
+  public/runtime readiness overclaims fail before any runtime/public SDK readiness claim.
+- `check_public_sdk_v1_completion.py` now treats `approved-bundle`,
+  `approved_bundle`, and approved-runtime-bundle markers as non-promotional path/schema
+  evidence. Approved bundles stay operational replay evidence, not generic promotion
+  evidence for SDK completion.
+- `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` now rejects future
+  per-leaf promoted report bindings with absolute paths, non-repo-relative paths,
+  candidate/planning/preflight/readiness/request/window/sidecar path markers,
+  non-leaf-specific artifact basenames, or non-promotional report schemas.
+- Documentation guidance was corrected: replay needs sibling request/env/approval/preflight
+  sidecars beside copied evidence, generated receipt templates never count as replay
+  evidence, completed receipts are accepted only in post-window replay, and the bundle
+  helper sequence is window-manifest replay -> analyzer -> approved manifest builder ->
+  approved-evidence checker -> consume/promote/public/runtime gates.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_principal_lifecycle_window_request`
+  passed 40 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+  passed 54 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
+  passed 40 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_mission_transfer_dino_tribe_v1_outcome_accounting`
+  passed 16 tests.
+- Focused SDK completion sidecar/approved-bundle marker test passed.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 189 tests.
 
 No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
 GitHub publication, public ABI/header opening, promotion, release readiness, or

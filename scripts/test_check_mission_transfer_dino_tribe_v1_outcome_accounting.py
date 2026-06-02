@@ -63,7 +63,7 @@ def write_promoted_leaf_report(root: Path, leaf_id: str, evidence_kind: str) -> 
             "binary_sha256": hashlib.sha256(f"{leaf_id}:binary".encode("utf-8")).hexdigest(),
         }
     path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
-    return {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    return {"path": str(path.relative_to(REPO_ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
 class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
@@ -290,7 +290,9 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertIn("leaf_public_contract_forbidden_claim", report["blockers"])
 
     def test_future_per_leaf_promoted_route_requires_real_evidence(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
+        evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
+        evidence_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
             evidence_root = Path(temp_dir)
             manifest = load_manifest()
             gameplay = surface(manifest)
@@ -349,8 +351,79 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertNotEqual(report["accounting_route"], "per_leaf_promoted")
         self.assertIn("promoted_leaf_gate_report_unverified", report["blockers"])
 
+    def test_future_per_leaf_promoted_route_rejects_absolute_evidence_paths(self) -> None:
+        evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
+        evidence_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
+            evidence_root = Path(temp_dir)
+            report = write_promoted_leaf_report(evidence_root, "mission", "abi_tests")
+            manifest = load_manifest()
+            gameplay = surface(manifest)
+            gameplay["status"] = "promoted"
+            for leaf in gameplay["leaf_decision_units"]:
+                leaf["status"] = "promoted"
+                leaf["public_contract"] = [f"Copied {leaf['id']} policy event"]
+                leaf["evidence"] = {
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "promotion_ready": True,
+                    "runtime_ready": True,
+                    "abi_tests": [copy.deepcopy(report)],
+                    "sdk_consumer_tests": [copy.deepcopy(report)],
+                    "second_source_evidence": [copy.deepcopy(report)],
+                }
+            gameplay["leaf_decision_units"][0]["evidence"]["abi_tests"][0]["path"] = str(evidence_root / "mission-abi_tests.json")
+
+            result = self.run_checker(manifest=manifest, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_leaf_evidence_path_not_repo_relative", payload["blockers"])
+
+    def test_future_per_leaf_promoted_route_rejects_non_leaf_specific_or_planning_schema_reports(self) -> None:
+        evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
+        evidence_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
+            evidence_root = Path(temp_dir)
+            manifest = load_manifest()
+            gameplay = surface(manifest)
+            gameplay["status"] = "promoted"
+            for leaf in gameplay["leaf_decision_units"]:
+                leaf["status"] = "promoted"
+                leaf["public_contract"] = [f"Copied {leaf['id']} policy event"]
+                leaf["evidence"] = {
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "promotion_ready": True,
+                    "runtime_ready": True,
+                    "abi_tests": [write_promoted_leaf_report(evidence_root, leaf["id"], "abi_tests")],
+                    "sdk_consumer_tests": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "sdk_consumer_tests")
+                    ],
+                    "second_source_evidence": [
+                        write_promoted_leaf_report(evidence_root, leaf["id"], "second_source_evidence")
+                    ],
+                }
+            generic = write_promoted_leaf_report(evidence_root, "mission", "abi_tests")
+            generic_path = evidence_root / "mission-abi_tests.json"
+            generic_report = json.loads(generic_path.read_text(encoding="utf-8"))
+            generic_report["schema"] = "obelisk.mission-planning-readiness.v1"
+            generic_path.write_text(json.dumps(generic_report, sort_keys=True), encoding="utf-8")
+            generic["sha256"] = hashlib.sha256(generic_path.read_bytes()).hexdigest()
+            gameplay["leaf_decision_units"][0]["evidence"]["abi_tests"] = [generic]
+            gameplay["leaf_decision_units"][1]["evidence"]["abi_tests"] = [copy.deepcopy(generic)]
+
+            result = self.run_checker(manifest=manifest, check=False)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("promoted_leaf_gate_report_non_promotional_schema", payload["blockers"])
+        self.assertIn("promoted_leaf_evidence_path_not_leaf_specific", payload["blockers"])
+
     def test_future_per_leaf_promoted_route_rejects_missing_or_candidate_evidence(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
+        evidence_parent = REPO_ROOT / "local" / "mission-transfer-dino-tribe-test-evidence"
+        evidence_parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=evidence_parent) as temp_dir:
             evidence_root = Path(temp_dir)
             manifest = load_manifest()
             gameplay = surface(manifest)

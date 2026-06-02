@@ -61,6 +61,54 @@ WINDOW_CHECK_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-wind
 EXPECTED_COPIED_LOG_PARENT = "live-validation-logs"
 EXPECTED_COPIED_LOG_PATH_STATUS = "approved_offline_workspace"
 EXPECTED_APPROVAL = "current-turn operator-approved runtime window, not standing approval"
+EXPECTED_REQUEST_SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
+EXPECTED_REQUEST_STATUS = "candidate_only_request_pack"
+EXPECTED_SERVER_BINARY_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
+EXPECTED_REQUEST_ROLLBACK_DELTA = "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins"
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCHEMA = "obelisk.player-principal-lifecycle-operator-approval-receipt.v1"
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS = [
+    "generated receipt template only; does not record operator approval",
+    "completed receipt binds one current-turn request pack only",
+    "receipt does not authorize future windows, standing approval, Discord, GitHub publication, public SDK readiness, runtime readiness, or v1 completion",
+    "receipt does not promote public player identity, permissions/admin, command response, lookup, mutation, return override, or ResourceHandle",
+]
+EXPECTED_OBSERVER_ENV_KEYS = (
+    "OBELISK_INSTANCE_ID",
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK",
+    "OBELISK_DISABLE_PLUGINS",
+    "OBELISK_WRAPPER_PROFILE",
+    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT",
+    "OBELISK_PE_TRACE_LIMIT",
+)
+REQUIRED_OBSERVER_ENV_VALUES = {
+    "OBELISK_ENABLE_PROCESS_EVENT_HOOK": "1",
+    "OBELISK_DISABLE_PLUGINS": "1",
+    "OBELISK_WRAPPER_PROFILE": "observer-debug",
+    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER": "1",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256": EXPECTED_BINARY_SHA256,
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT": "10",
+    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT": "0",
+    "OBELISK_PE_TRACE_LIMIT": "0",
+}
+FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
+    (
+        "runtime_work_authorized",
+        "server_operations_authorized",
+        "runtime_ready",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "public_header_allowed",
+        "promotion_ready",
+        "v1_completion_ready",
+        "server_operations_authorized_by_template",
+        "runtime_work_authorized_by_template",
+        "generated_template_authorizes_runtime",
+        "request_pack_acceptance_authorizes_runtime",
+    )
+)
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 ALLOWED_SOURCE_KEYS = frozenset(("path", "sha256", "line_count"))
@@ -649,6 +697,353 @@ def resolved_artifact_path(artifact: Any) -> str | None:
     return None if status is None else str(status.resolved)
 
 
+def artifact_status_for_read(
+    artifact: Any,
+    label: str,
+    blockers: list[dict[str, Any]],
+) -> protected_paths.ProtectedPathStatus | None:
+    if not isinstance(artifact, dict):
+        add(blockers, "operational_window_artifact_missing", label)
+        return None
+    status = approved_artifact_status(artifact)
+    if status is None:
+        return None
+    return status
+
+
+def load_json_artifact(artifact: Any, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
+    status = artifact_status_for_read(artifact, label, blockers)
+    if status is None:
+        return None
+    try:
+        payload = json.loads(status.resolved.read_text(encoding="utf-8"))
+    except OSError as exc:
+        add(blockers, "operational_window_json_artifact_unreadable", label, error=str(exc))
+        return None
+    except json.JSONDecodeError as exc:
+        add(blockers, "operational_window_json_artifact_invalid", label, error=str(exc))
+        return None
+    if not isinstance(payload, dict):
+        add(blockers, "operational_window_json_artifact_not_object", label)
+        return None
+    return payload
+
+
+def load_text_artifact(artifact: Any, label: str, blockers: list[dict[str, Any]]) -> str | None:
+    status = artifact_status_for_read(artifact, label, blockers)
+    if status is None:
+        return None
+    try:
+        return status.resolved.read_text(encoding="utf-8")
+    except OSError as exc:
+        add(blockers, "operational_window_text_artifact_unreadable", label, error=str(exc))
+        return None
+
+
+def request_pack_digest(
+    *,
+    request_json_path: Path,
+    request_md_path: Path,
+    env_path: Path,
+) -> dict[str, str]:
+    domain = b"obelisk.player-principal-lifecycle.request-pack.v1"
+    material = b"\0".join(
+        (
+            domain,
+            b"window-request.json",
+            request_json_path.read_bytes(),
+            b"observer-window.env",
+            env_path.read_bytes(),
+            b"operator-approval-request.md",
+            request_md_path.read_bytes(),
+        )
+    )
+    return {
+        "algorithm": "sha256",
+        "domain": domain.decode("ascii"),
+        "sha256": hashlib.sha256(material).hexdigest(),
+    }
+
+
+def validate_no_sidecar_overclaims(value: Any, label: str, blockers: list[dict[str, Any]], trail: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if key in FORBIDDEN_POSITIVE_FLAG_KEYS and child is not False:
+                add(
+                    blockers,
+                    "operational_window_sidecar_readiness_flag_overclaim",
+                    label,
+                    key_path=child_trail,
+                    actual=child,
+                )
+            if key in ("public_capability_bits_now", "public_callback_abi_now") and child != []:
+                add(
+                    blockers,
+                    "operational_window_sidecar_public_surface_overclaim",
+                    label,
+                    key_path=child_trail,
+                    actual=child,
+                )
+            validate_no_sidecar_overclaims(child, label, blockers, child_trail)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            validate_no_sidecar_overclaims(child, label, blockers, f"{trail}[{index}]")
+    elif isinstance(value, str) and ".non_claims[" not in trail and contains_unnegated_positive_capability_claim(value):
+        add(
+            blockers,
+            "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
+            label,
+            key_path=trail,
+            value=value,
+        )
+
+
+def parse_observer_env(text: str, label: str, blockers: list[dict[str, Any]]) -> dict[str, str]:
+    env: dict[str, str] = {}
+    for line_number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line:
+            continue
+        if "=" not in line:
+            add(blockers, "operational_window_observer_env_line_invalid", label, line=line_number)
+            continue
+        key, value = line.split("=", 1)
+        if key in env:
+            add(blockers, "operational_window_observer_env_key_duplicate", label, line=line_number, key=key)
+            continue
+        env[key] = value
+    return env
+
+
+def validate_observer_env_binding(
+    window: dict[str, Any],
+    request_payload: dict[str, Any] | None,
+    blockers: list[dict[str, Any]],
+) -> None:
+    label = "$.operational_window.observer_env.path"
+    text = load_text_artifact(window.get("observer_env"), label, blockers)
+    if text is None:
+        return
+    env = parse_observer_env(text, label, blockers)
+    target = window.get("target") if isinstance(window.get("target"), dict) else {}
+    expected = {
+        "OBELISK_INSTANCE_ID": target.get("instance"),
+        **REQUIRED_OBSERVER_ENV_VALUES,
+    }
+    observed_order = [line.split("=", 1)[0] for line in text.splitlines() if line.strip() and "=" in line]
+    if tuple(observed_order) != EXPECTED_OBSERVER_ENV_KEYS:
+        add(
+            blockers,
+            "operational_window_observer_env_key_order_or_set_mismatch",
+            label,
+            expected=list(EXPECTED_OBSERVER_ENV_KEYS),
+            actual=observed_order,
+        )
+    for key, expected_value in expected.items():
+        if env.get(key) != expected_value:
+            add(
+                blockers,
+                "operational_window_observer_env_value_mismatch",
+                label,
+                key=key,
+                expected=expected_value,
+                actual=env.get(key),
+            )
+    if request_payload is not None and request_payload.get("observer_env_file") != "observer-window.env":
+        add(
+            blockers,
+            "operational_window_request_observer_env_file_mismatch",
+            "$.operational_window.request_pack.path",
+            expected="observer-window.env",
+            actual=request_payload.get("observer_env_file"),
+        )
+
+
+def validate_request_pack_binding(window: dict[str, Any], blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
+    label = "$.operational_window.request_pack.path"
+    payload = load_json_artifact(window.get("request_pack"), label, blockers)
+    if payload is None:
+        return None
+    validate_no_sidecar_overclaims(payload, label, blockers)
+    if payload.get("schema") != EXPECTED_REQUEST_SCHEMA:
+        add(blockers, "operational_window_request_pack_schema_mismatch", label)
+    if payload.get("status") != EXPECTED_REQUEST_STATUS:
+        add(blockers, "operational_window_request_pack_status_mismatch", label)
+    if payload.get("approval_required") != EXPECTED_APPROVAL:
+        add(blockers, "operational_window_request_pack_approval_required_mismatch", label)
+    expected_values = {
+        "run_id": window.get("run_id"),
+        "obelisk_commit": window.get("obelisk_commit"),
+        "target": window.get("target"),
+        "approved_window": window.get("approved_window"),
+        "ark_binary_sha256": EXPECTED_BINARY_SHA256,
+        "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
+        "final_posture": "stable",
+    }
+    for key, expected in expected_values.items():
+        if payload.get(key) != expected:
+            add(
+                blockers,
+                f"operational_window_request_pack_{key}_mismatch",
+                label,
+                expected=expected,
+                actual=payload.get(key),
+            )
+    if payload.get("restart_expectation") not in {"none", "start", "restart"}:
+        add(blockers, "operational_window_request_pack_restart_expectation_invalid", label)
+    if payload.get("user_policy") != window.get("user_policy"):
+        add(
+            blockers,
+            "operational_window_request_pack_user_policy_mismatch",
+            label,
+            expected=window.get("user_policy"),
+            actual=payload.get("user_policy"),
+        )
+    expected_paths = {
+        "copied_log_path": resolved_artifact_path(window.get("copied_log")),
+        "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+    }
+    copied_log_path = expected_paths["copied_log_path"]
+    if copied_log_path is not None:
+        expected_paths["copied_evidence_dir"] = str(Path(copied_log_path).parent)
+    for key, expected in expected_paths.items():
+        if expected is not None and payload.get(key) != expected:
+            add(
+                blockers,
+                f"operational_window_request_pack_{key}_mismatch",
+                label,
+                expected=expected,
+                actual=payload.get(key),
+            )
+    rollback = payload.get("rollback")
+    if not isinstance(rollback, dict) or rollback.get("delta") != EXPECTED_REQUEST_ROLLBACK_DELTA:
+        add(
+            blockers,
+            "operational_window_request_pack_rollback_delta_mismatch",
+            label,
+            expected=EXPECTED_REQUEST_ROLLBACK_DELTA,
+        )
+    contract = payload.get("post_window_replay_contract")
+    sidecars = contract.get("sidecars") if isinstance(contract, dict) else None
+    if not isinstance(sidecars, dict):
+        add(blockers, "operational_window_request_pack_post_window_replay_contract_missing", label)
+    else:
+        expected_sidecars = {
+            "request_pack_path": resolved_artifact_path(window.get("request_pack")),
+            "observer_env_path": resolved_artifact_path(window.get("observer_env")),
+            "operator_approval_receipt_path": resolved_artifact_path(window.get("operator_approval_receipt")),
+            "preflight_pre_path": resolved_artifact_path(window.get("preflight", {}).get("pre") if isinstance(window.get("preflight"), dict) else None),
+            "preflight_post_path": resolved_artifact_path(window.get("preflight", {}).get("post") if isinstance(window.get("preflight"), dict) else None),
+            "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+        }
+        for key, expected in expected_sidecars.items():
+            if expected is not None and sidecars.get(key) != expected:
+                add(
+                    blockers,
+                    f"operational_window_request_pack_replay_contract_{key}_mismatch",
+                    label,
+                    expected=expected,
+                    actual=sidecars.get(key),
+                )
+    return payload
+
+
+def validate_preflight_payload(
+    payload: dict[str, Any],
+    *,
+    label: str,
+    window: dict[str, Any],
+    expected_mode: str,
+    require_env_file: bool,
+    blockers: list[dict[str, Any]],
+) -> None:
+    validate_no_sidecar_overclaims(payload, label, blockers)
+    if payload.get("schema") != "obelisk.player-principal-lifecycle-preflight.v1":
+        add(blockers, "operational_window_preflight_schema_mismatch", label)
+    if payload.get("ready") is not True:
+        add(blockers, "operational_window_preflight_ready_not_true", label)
+    if payload.get("mode") != expected_mode:
+        add(blockers, "operational_window_preflight_mode_mismatch", label, expected=expected_mode, actual=payload.get("mode"))
+    target = window.get("target") if isinstance(window.get("target"), dict) else {}
+    expected_values = {
+        "run_id": window.get("run_id"),
+        "instance": target.get("instance"),
+        "map": target.get("map"),
+        "target": target,
+        "window_manifest_path": resolved_artifact_path(window.get("manifest")),
+        "copied_log_path": resolved_artifact_path(window.get("copied_log")),
+    }
+    copied_log_path = expected_values["copied_log_path"]
+    if copied_log_path is not None:
+        expected_values["copied_evidence_dir"] = str(Path(copied_log_path).parent)
+    for key, expected in expected_values.items():
+        if expected is not None and payload.get(key) != expected:
+            add(
+                blockers,
+                f"operational_window_preflight_{key}_mismatch",
+                label,
+                expected=expected,
+                actual=payload.get(key),
+            )
+    server_binary = payload.get("server_binary")
+    if not isinstance(server_binary, dict):
+        add(blockers, "operational_window_preflight_server_binary_missing", label)
+    else:
+        if server_binary.get("path") != EXPECTED_SERVER_BINARY_PATH:
+            add(blockers, "operational_window_preflight_server_binary_path_mismatch", label)
+        if server_binary.get("sha256") != EXPECTED_BINARY_SHA256:
+            add(blockers, "operational_window_preflight_server_binary_sha256_mismatch", label)
+    env_file = payload.get("env_file")
+    if require_env_file:
+        observer_env = window.get("observer_env") if isinstance(window.get("observer_env"), dict) else {}
+        expected_env_file = {
+            "path": resolved_artifact_path(observer_env),
+            "sha256": observer_env.get("sha256"),
+        }
+        if env_file != expected_env_file:
+            add(
+                blockers,
+                "operational_window_preflight_env_file_mismatch",
+                label,
+                expected=expected_env_file,
+                actual=env_file,
+            )
+    elif env_file is not None:
+        add(blockers, "operational_window_preflight_post_env_file_not_none", label, actual=env_file)
+    checked_at_utc = payload.get("checked_at_utc")
+    if not isinstance(checked_at_utc, str) or UTC_TIMESTAMP_RE.fullmatch(checked_at_utc) is None:
+        add(blockers, "operational_window_preflight_checked_at_utc_invalid", label)
+    if payload.get("posture_check") != "accepted":
+        add(blockers, "operational_window_preflight_posture_check_mismatch", label)
+
+
+def validate_preflight_bindings(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    preflight = window.get("preflight")
+    if not isinstance(preflight, dict):
+        return
+    pre_payload = load_json_artifact(preflight.get("pre"), "$.operational_window.preflight.pre.path", blockers)
+    post_payload = load_json_artifact(preflight.get("post"), "$.operational_window.preflight.post.path", blockers)
+    if pre_payload is not None:
+        validate_preflight_payload(
+            pre_payload,
+            label="$.operational_window.preflight.pre.path",
+            window=window,
+            expected_mode="observer-window",
+            require_env_file=True,
+            blockers=blockers,
+        )
+    if post_payload is not None:
+        validate_preflight_payload(
+            post_payload,
+            label="$.operational_window.preflight.post.path",
+            window=window,
+            expected_mode="stable",
+            require_env_file=False,
+            blockers=blockers,
+        )
+
+
 def operator_request_sidecar_artifact(window: dict[str, Any]) -> dict[str, Any] | None:
     request_status = approved_artifact_status(window.get("request_pack"))
     if request_status is None:
@@ -717,6 +1112,68 @@ def validate_operator_approval_receipt_binding(
     payload = load_operator_approval_receipt_payload(window, blockers)
     if payload is None:
         return
+    validate_no_sidecar_overclaims(payload, "$.operational_window.operator_approval_receipt.path", blockers)
+
+    if payload.get("schema") != EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCHEMA:
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_schema_mismatch",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+    if payload.get("status") != "completed_operator_receipt":
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_status_not_completed",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+    for key in ("receipt_completed", "operator_current_turn_approval_recorded"):
+        if payload.get(key) is not True:
+            add(
+                blockers,
+                f"operational_window_operator_approval_receipt_{key}_not_true",
+                "$.operational_window.operator_approval_receipt.path",
+            )
+    if payload.get("non_claims") != EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS:
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_non_claims_mismatch",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+
+    completion = payload.get("operator_completion")
+    if not isinstance(completion, dict):
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_completion_missing",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+        completion = {}
+    if not isinstance(completion.get("approval_recorded_at_utc"), str) or UTC_TIMESTAMP_RE.fullmatch(
+        completion.get("approval_recorded_at_utc", "")
+    ) is None:
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_approved_at_utc_invalid",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+    if not isinstance(completion.get("approved_by_role"), str) or not completion.get("approved_by_role", "").strip():
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_approved_by_role_invalid",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+    if completion.get("approval_source") != "current_turn_operator_message":
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_approval_source_mismatch",
+            "$.operational_window.operator_approval_receipt.path",
+        )
+    if completion.get("attestation") != "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY":
+        add(
+            blockers,
+            "operational_window_operator_approval_receipt_attestation_mismatch",
+            "$.operational_window.operator_approval_receipt.path",
+        )
 
     scope = payload.get("approval_scope")
     if not isinstance(scope, dict):
@@ -802,6 +1259,33 @@ def validate_operator_approval_receipt_binding(
                 expected=expected,
                 actual=bound_artifacts.get(key),
             )
+
+    request_status = approved_artifact_status(window.get("request_pack"))
+    observer_env_status = approved_artifact_status(window.get("observer_env"))
+    operator_request = operator_request_sidecar_artifact(window)
+    if request_status is not None and observer_env_status is not None and operator_request is not None:
+        try:
+            expected_digest = request_pack_digest(
+                request_json_path=request_status.resolved,
+                request_md_path=Path(operator_request["path"]),
+                env_path=observer_env_status.resolved,
+            )
+        except OSError as exc:
+            add(
+                blockers,
+                "operational_window_operator_approval_receipt_digest_unreadable",
+                "$.operational_window.operator_approval_receipt.path",
+                error=str(exc),
+            )
+        else:
+            if payload.get("request_pack_digest") != expected_digest:
+                add(
+                    blockers,
+                    "operational_window_operator_approval_receipt_digest_mismatch",
+                    "$.operational_window.operator_approval_receipt.path",
+                    expected=expected_digest,
+                    actual=payload.get("request_pack_digest"),
+                )
 
 
 def replay_operational_window_manifest(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -1331,6 +1815,8 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         run_id=run_id,
         expected_name="operator-approval-receipt.json",
     )
+    request_payload = validate_request_pack_binding(window, blockers)
+    validate_observer_env_binding(window, request_payload, blockers)
     validate_operator_approval_receipt_binding(window, blockers)
     preflight = window.get("preflight")
     if not isinstance(preflight, dict):
@@ -1358,6 +1844,7 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
             run_id=run_id,
             expected_name="preflight-post.json",
         )
+        validate_preflight_bindings(window, blockers)
 
     posture = window.get("posture")
     if not isinstance(posture, dict):

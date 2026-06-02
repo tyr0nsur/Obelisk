@@ -404,6 +404,10 @@ PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
     re.IGNORECASE,
 )
 STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
+    "approved_bundle",
+    "approved-bundle",
+    "approved_runtime_bundle",
+    "approved-runtime-bundle",
     "candidate",
     "admin_thunk",
     "admin_thunks",
@@ -474,7 +478,7 @@ STRICT_PROMOTION_EVIDENCE_SCHEMA_KEYS = {
     "terms",
 }
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(
-    r"(?:candidate|planning|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
+    r"(?:candidate|planning|approved[-_ ]?(?:runtime[-_ ]?)?bundle|plugin[-_ ]?hub|package[-_ ]?shape|core[-_ ]?first|"
     r"players?[-_ ]?identity[-_ ]?principal[-_ ]?invalidation[-_ ]?policy|"
     r"principal[-_ ]?invalidation[-_ ]?policy|"
     r"player[-_ ]?principal[-_ ]?lifecycle[-_ ]?window[-_ ]?request|"
