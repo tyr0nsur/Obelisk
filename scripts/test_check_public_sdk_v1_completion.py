@@ -19,10 +19,12 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from check_public_sdk_v1_completion import (
+    SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER,
     blocker_guidance,
     permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
+    secondary_report_completion_claims_without_blocker,
     surface_has_promotion_evidence,
 )
 from test_check_player_identity_runtime_principal_lifecycle_approved_evidence import (
@@ -498,6 +500,29 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         return path
 
+    def write_fake_inventory_copied_signals_checker(self, path: Path, **overrides: object) -> Path:
+        summary = {
+            "allowed_signal_count": 5,
+            "resource_kind_contract": "category-only metadata",
+            "public_sdk_ready": False,
+            "v1_completion_ready": False,
+        }
+        if isinstance(overrides.get("summary"), dict):
+            summary.update(overrides.pop("summary"))  # type: ignore[arg-type]
+        payload = {
+            "schema": "obelisk.inventory-item-copied-signals-stability-check.v1",
+            "ready": True,
+            "surface": "obelisk.inventory_item_copied_signals.v1",
+            "summary": summary,
+            "blockers": [],
+        }
+        payload.update(overrides)
+        path.write_text(
+            f"print({json.dumps(json.dumps(payload, sort_keys=True))})\n",
+            encoding="utf-8",
+        )
+        return path
+
     def write_fake_mission_accounting_checker(self, path: Path, payload: dict[str, object] | str) -> Path:
         if isinstance(payload, str):
             path.write_text(f"print({json.dumps(payload)})\n", encoding="utf-8")
@@ -571,6 +596,57 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             encoding="utf-8",
         )
         return path
+
+    def test_secondary_report_scanner_rejects_completion_claims_without_blocker(self) -> None:
+        for key in (
+            "public_abi_ready",
+            "v1_completion_ready",
+            "stable_claim_allowed",
+            "public_sdk_ready",
+            "promotion_ready",
+            "runtime_ready",
+        ):
+            with self.subTest(key=key):
+                payload = {
+                    "schema": "obelisk.secondary-report.v1",
+                    "blockers": [],
+                    "nested": [{"claim": {key: True}}],
+                }
+
+                claims = secondary_report_completion_claims_without_blocker(payload)
+
+                self.assertEqual(claims, [f"nested[0].claim.{key}"])
+
+    def test_secondary_report_scanner_allows_positive_claim_when_report_has_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": ["public_sdk_gate_missing"],
+            "nested": {"stable_claim_allowed": True},
+        }
+
+        self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
+
+    def test_completion_gate_rejects_secondary_stable_claim_without_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_resource_handle_checker(
+                Path(temp_dir) / "fake_resource_handle.py",
+                nested={"stable_claim_allowed": True},
+            )
+            result = self.run_checker(
+                "--object-identity-resource-handle-readiness",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER, payload["blockers"])
+        self.assertEqual(
+            payload["object_identity_resource_handle_readiness"]["completion_claims_without_blocker"],
+            ["nested.stable_claim_allowed"],
+        )
+        self.assertFalse(payload["stable_claim_allowed"])
 
     def test_inventory_copied_signals_contract_decision_manifest_is_required(self) -> None:
         import importlib.util
@@ -758,7 +834,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("command_permission_route_gate_blockers_not_empty", payload["blockers"])
         self.assertTrue(payload["command_permission_route_gate"]["valid"])
 
-    def test_completion_gate_identity_public_contract_blocker_remains_non_counting(self) -> None:
+    def test_completion_gate_rejects_identity_public_contract_blocker_without_runtime_input(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             route_gate_path = self.write_fake_route_gate(
                 Path(temp_dir) / "fake_route_gate.py",
@@ -788,7 +864,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         progress = payload["v1_sdk_progress"]
 
         self.assertEqual(result.returncode, 1)
-        self.assertTrue(route_gate["completion_gate_accepted"])
+        self.assertFalse(route_gate["completion_gate_accepted"])
+        self.assertIn("command_permission_route_gate_default_blocker_mismatch", payload["blockers"])
+        self.assertIn("command_permission_route_gate_default_source_blocker_mismatch", payload["blockers"])
+        self.assertIn(
+            "command_permission_route_gate_default_lock_blocked_until_unexpected",
+            payload["blockers"],
+        )
         self.assertEqual(route_gate["current_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(route_gate["source_checker_primary_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(route_gate["route_lock_blocked_until"], ["reviewed_identity_public_contract"])
@@ -1154,6 +1236,34 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertEqual(payload["inventory_copied_signals_stability"]["exit_code"], 2)
 
+    def test_completion_gate_rejects_inventory_copied_signal_overclaims(self) -> None:
+        cases = (
+            ({"summary": {"public_sdk_ready": True}}, "inventory_copied_signals_public_sdk_ready_not_false"),
+            ({"summary": {"v1_completion_ready": True}}, "inventory_copied_signals_v1_completion_ready_not_false"),
+            ({"summary": {"public_abi_ready": True}}, "inventory_copied_signals_public_or_runtime_claims"),
+            ({"summary": {"stable_claim_allowed": True}}, "inventory_copied_signals_public_or_runtime_claims"),
+            ({"stable_claim_allowed": True}, "inventory_copied_signals_public_or_runtime_claims"),
+            ({"blockers": ["copied_signal_boundary_failed"]}, "inventory_copied_signals_stability_blockers_not_empty"),
+        )
+        for overrides, expected in cases:
+            with self.subTest(expected=expected):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    checker_path = self.write_fake_inventory_copied_signals_checker(
+                        Path(temp_dir) / "fake_inventory_copied_signals.py",
+                        **overrides,
+                    )
+                    result = self.run_checker(
+                        "--inventory-copied-signals-stability",
+                        str(checker_path),
+                        "--json",
+                        check=False,
+                    )
+
+                payload = json.loads(result.stdout)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected, payload["blockers"])
+                self.assertFalse(payload["stable_claim_allowed"])
+
     def test_resource_handle_readiness_checker_is_required(self) -> None:
         result = self.run_checker(
             "--object-identity-resource-handle-readiness",
@@ -1228,10 +1338,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ("public_sdk_ready", True, "structure_census_public_sdk_ready_not_false"),
             ("runtime_ready", True, "structure_census_runtime_ready_not_false"),
             ("enforcement_ready", True, "structure_census_enforcement_ready_not_false"),
+            ("public_abi_ready", True, "structure_census_public_or_runtime_claims"),
+            ("v1_completion_ready", True, "structure_census_public_or_runtime_claims"),
+            ("stable_claim_allowed", True, "structure_census_public_or_runtime_claims"),
             (
                 "candidate_only_accounting",
                 {"public_structure_sdk_ready": True},
                 "structure_census_accounting_public_structure_sdk_ready_not_false",
+            ),
+            (
+                "candidate_only_accounting",
+                {"public_abi_ready": True},
+                "structure_census_public_or_runtime_claims",
+            ),
+            (
+                "second_source_readiness",
+                {"stable_claim_allowed": True},
+                "structure_census_public_or_runtime_claims",
             ),
         )
         for key, value, expected in cases:
@@ -1286,10 +1409,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ("public_sdk_ready", True, "structure_build_policy_public_sdk_ready_not_false"),
             ("runtime_ready", True, "structure_build_policy_runtime_ready_not_false"),
             ("enforcement_ready", True, "structure_build_policy_enforcement_ready_not_false"),
+            ("public_abi_ready", True, "structure_build_policy_public_or_runtime_claims"),
+            ("v1_completion_ready", True, "structure_build_policy_public_or_runtime_claims"),
+            ("stable_claim_allowed", True, "structure_build_policy_public_or_runtime_claims"),
             (
                 "readiness_flags",
                 {"public_sdk_ready": True},
                 "structure_build_policy_readiness_flags_public_sdk_ready_not_false",
+            ),
+            (
+                "readiness_flags",
+                {"v1_completion_ready": True},
+                "structure_build_policy_public_or_runtime_claims",
+            ),
+            (
+                "summary",
+                {"stable_claim_allowed": True},
+                "structure_build_policy_public_or_runtime_claims",
             ),
         )
         for key, value, expected in cases:
@@ -1360,11 +1496,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ("promotion_ready", "mission_transfer_dino_tribe_promotion_ready_not_false"),
             ("public_sdk_ready", "mission_transfer_dino_tribe_public_sdk_ready_not_false"),
             ("runtime_ready", "mission_transfer_dino_tribe_runtime_ready_not_false"),
+            ("public_abi_ready", "mission_transfer_dino_tribe_public_or_runtime_claims"),
+            ("v1_completion_ready", "mission_transfer_dino_tribe_public_or_runtime_claims"),
+            ("stable_claim_allowed", "mission_transfer_dino_tribe_public_or_runtime_claims"),
+            ("summary", "mission_transfer_dino_tribe_public_or_runtime_claims"),
         )
         for key, expected in cases:
             with self.subTest(key=key):
                 payload = dict(base)
-                payload[key] = True
+                payload[key] = {"stable_claim_allowed": True} if key == "summary" else True
                 with tempfile.TemporaryDirectory() as temp_dir:
                     checker_path = self.write_fake_mission_accounting_checker(
                         Path(temp_dir) / "fake_mission_accounting.py",
@@ -2035,6 +2175,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "API is production ready",
                             "planning-only report says stable SDK is ready",
                             "stable SDK remains blocked",
+                            {
+                                "non_claims": [
+                                    "public SDK readiness remains blocked",
+                                    "v1 completion ready is not satisfied",
+                                ]
+                            },
                         ],
                     }
                 ],
@@ -2072,6 +2218,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[11]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[12]:positive_text_claim", claims)
         self.assertNotIn("checks[0].notes[13]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[14].non_claims[0]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[14].non_claims[1]:positive_text_claim", claims)
         self.assertIn("complete_sdk_ready", claims)
         self.assertIn("full_api_supported", claims)
         self.assertIn("production_support_ready", claims)

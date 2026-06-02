@@ -2733,3 +2733,61 @@ reported a possible cleanup-failure path where a mapped plugin could be stranded
 No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
+
+## Secondary Report Overclaims And Default Route Runtime Boundary
+
+The next supervised SDK/P0 guardrail round split secondary-report overclaim auditing,
+Mission leaf-evidence review, route/P0 accounting drift, and one worker slot. The worker
+slot was still running after compaction and was closed by the lead without integrating
+unreported findings. The lead integrated only offline SDK-completion guardrails.
+
+Implemented changes:
+
+- `check_public_sdk_v1_completion.py` now applies a shared recursive scanner to secondary
+  reports and rejects positive `public_abi_ready`, `v1_completion_ready`,
+  `stable_claim_allowed`, `public_sdk_ready`, `promotion_ready`, or `runtime_ready`
+  aliases when the secondary report has no blockers.
+- Inventory copied-signal stability now fails the SDK completion gate if the checker
+  reports its own blockers, or if top-level/nested public/runtime/completion claims appear.
+- Mission/Transfer/Dino/Tribe accounting, Structure census readiness, Structure
+  build-policy offline intake, ResourceHandle/object-identity readiness, and the route
+  gate wrapper now surface secondary completion overclaims in their machine-readable
+  sections and block the aggregate completion gate.
+- The route-gate text scanner now treats nested `non_claim` and `non_claims` paths as
+  negative context, preventing explanatory non-claim prose from becoming a false positive
+  while still rejecting structured positive readiness keys.
+- The default SDK completion integration now accepts only
+  `approved_runtime_evidence_missing` from the canonical route gate. A default route report
+  at `identity_public_contract_gate_missing` without an explicit approved runtime evidence
+  input fails with route-gate default blocker/source/lock blockers instead of being
+  treated as an accepted non-counting state.
+
+Validation stayed offline-only:
+
+- Focused secondary-report and route-boundary tests passed 7 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+  passed 185 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_public_sdk_guardrails scripts.test_research_doc_guardrails scripts.test_agent_handoff_guardrails`
+  passed 224 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`, and no
+  secondary public/runtime claim blockers in the current canonical reports.
+
+Deferred read-only audit findings for future offline guardrail rounds:
+
+- Mission leaf promotion evidence should reuse the strict schema/path/non-promotional
+  marker checks that top-level promotion evidence already uses. Current leaf checks still
+  need explicit rejection coverage for nonexistent paths, live-ops/operator receipt
+  schemas, and `per_leaf_promoted` summaries without validated per-leaf evidence.
+- The bound identity route wrapper should eventually mirror the default SDK integration:
+  `identity_public_contract_gate_missing` should require an explicit approved runtime
+  evidence input rather than lifecycle/principal planning manifests alone.
+- The identity public-contract structured evidence checker still has a legacy
+  `identity_public_contract_gate` alias to align with canonical
+  `identity_public_contract_gate_missing` wording.
+
+No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore, Discord,
+GitHub publication, public ABI/header opening, promotion, release readiness, or
+stable/complete SDK claim was authorized.

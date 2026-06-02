@@ -232,6 +232,14 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "v1_completion_ready",
     "stable_claim_allowed",
 )
+SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
+    "public_abi_ready",
+    "v1_completion_ready",
+    "stable_claim_allowed",
+    "public_sdk_ready",
+    "promotion_ready",
+    "runtime_ready",
+)
 BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r"^(?:"
     r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
@@ -242,6 +250,9 @@ BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r")$"
 )
 ROUTE_GATE_OVERRIDE_TEST_ENV = "OBELISK_SDK_COMPLETION_ALLOW_ROUTE_GATE_OVERRIDE_FOR_TESTS"
+SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER = (
+    "secondary_report_completion_claim_without_blocker"
+)
 OBJECT_IDENTITY_RESOURCE_HANDLE_REQUIRED_FALSE_KEYS = (
     "promotion_ready",
     "public_sdk_ready",
@@ -1061,6 +1072,7 @@ def run_command_permission_route_gate(
             ["command_permission_route_gate_output_invalid"],
         )
     public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
+    completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
     if payload.get("schema") != "obelisk.command-permission-route-gate-check.v1":
         blockers.append("command_permission_route_gate_schema_mismatch")
     if result.returncode != 0 or payload.get("valid") is not True:
@@ -1082,9 +1094,6 @@ def run_command_permission_route_gate(
     expected_lock_by_blocker = {
         "approved_runtime_evidence_missing": [
             "approved_runtime_principal_lifecycle_evidence",
-            "reviewed_identity_public_contract",
-        ],
-        "identity_public_contract_gate_missing": [
             "reviewed_identity_public_contract",
         ],
     }
@@ -1109,6 +1118,8 @@ def run_command_permission_route_gate(
         blockers.append("command_permission_route_gate_default_lock_blocked_until_unexpected")
     if public_or_runtime_claims:
         blockers.append("command_permission_route_gate_public_or_runtime_claims")
+    if completion_claims_without_blocker:
+        blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
     return (
         {
             "path": str(path),
@@ -1131,6 +1142,7 @@ def run_command_permission_route_gate(
             "route_lock_blocked_until": route_lock.get("blocked_until"),
             "route_lock_locked": route_lock.get("locked"),
             "public_or_runtime_claims": public_or_runtime_claims,
+            "completion_claims_without_blocker": completion_claims_without_blocker,
             "blockers": route_blockers,
             "completion_gate_accepted": not blockers,
             "completion_gate_blockers": blockers[:],
@@ -1198,6 +1210,13 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
             return False
         return True
 
+    def text_claim_path_is_negative_context(path: str) -> bool:
+        return any(
+            normalized_key(part.split("[", 1)[0]) in PROMOTION_EVIDENCE_NEGATIVE_CONTEXT_KEYS
+            for part in path.split(".")
+            if part
+        )
+
     def visit(value: Any, path: str) -> None:
         if isinstance(value, dict):
             for key, item in value.items():
@@ -1216,11 +1235,72 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
         elif isinstance(value, list):
             for index, item in enumerate(value):
                 visit(item, f"{path}[{index}]")
-        elif isinstance(value, str) and positive_text_claim(value):
+        elif (
+            isinstance(value, str)
+            and not text_claim_path_is_negative_context(path)
+            and positive_text_claim(value)
+        ):
             claims.append(f"{path}:positive_text_claim")
 
     visit(payload, "")
     return sorted(set(claims))
+
+
+def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) -> list[str]:
+    report_blockers = payload.get("blockers", [])
+    if isinstance(report_blockers, list) and report_blockers:
+        return []
+
+    claims: list[str] = []
+    forbidden_keys = {
+        normalized_completion_claim_key(key)
+        for key in SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS
+    }
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                item_path = f"{path}.{key}" if path else str(key)
+                if (
+                    normalized_completion_claim_key(key) in forbidden_keys
+                    and is_positive_completion_claim_value(item)
+                ):
+                    claims.append(item_path)
+                visit(item, item_path)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                visit(item, f"{path}[{index}]")
+
+    visit(payload, "")
+    return sorted(set(claims))
+
+
+def normalized_completion_claim_key(key: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return separated.casefold().replace("-", "_").replace(" ", "_")
+
+
+def is_positive_completion_claim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        return normalized_completion_claim_key(value) in {
+            "allowed",
+            "available",
+            "enabled",
+            "live",
+            "operational",
+            "promoted",
+            "public",
+            "ready",
+            "supported",
+            "true",
+            "unlocked",
+            "yes",
+        }
+    return False
 
 
 def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], list[str]]:
@@ -1255,6 +1335,8 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
             ["inventory_copied_signals_stability_output_invalid"],
         )
 
+    public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
+    completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
     if result.returncode != 0 or payload.get("ready") is not True:
         blockers.append("inventory_copied_signals_stability_invalid")
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
@@ -1262,6 +1344,13 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
         blockers.append("inventory_copied_signals_public_sdk_ready_not_false")
     if summary.get("v1_completion_ready") is not False:
         blockers.append("inventory_copied_signals_v1_completion_ready_not_false")
+    report_blockers = payload.get("blockers", [])
+    if report_blockers:
+        blockers.append("inventory_copied_signals_stability_blockers_not_empty")
+    if public_or_runtime_claims:
+        blockers.append("inventory_copied_signals_public_or_runtime_claims")
+    if completion_claims_without_blocker:
+        blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
     return (
         {
@@ -1274,7 +1363,9 @@ def run_inventory_copied_signals_stability(path: Path) -> tuple[dict[str, Any], 
             "resource_kind_contract": summary.get("resource_kind_contract"),
             "public_sdk_ready": summary.get("public_sdk_ready"),
             "v1_completion_ready": summary.get("v1_completion_ready"),
-            "blockers": payload.get("blockers", []),
+            "public_or_runtime_claims": public_or_runtime_claims,
+            "completion_claims_without_blocker": completion_claims_without_blocker,
+            "blockers": report_blockers,
             "stderr": result.stderr.strip(),
             "non_claim": "copied-signal stability guard; not Inventory SDK, Items SDK, or v1 completion evidence",
         },
@@ -1379,6 +1470,7 @@ def run_object_identity_resource_handle_readiness(
         )
 
     public_or_runtime_claims = object_identity_resource_handle_public_or_runtime_claims(payload)
+    completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
     if payload.get("schema") != "obelisk.object-identity-resource-handle-public-contract-readiness-check.v1":
         blockers.append("object_identity_resource_handle_readiness_schema_mismatch")
     if result.returncode != 0 or payload.get("valid") is not True:
@@ -1393,6 +1485,8 @@ def run_object_identity_resource_handle_readiness(
         blockers.append("object_identity_resource_handle_readiness_blockers_not_empty")
     if public_or_runtime_claims:
         blockers.append("object_identity_resource_handle_public_or_runtime_claims")
+    if completion_claims_without_blocker:
+        blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
     return (
         {
@@ -1409,6 +1503,7 @@ def run_object_identity_resource_handle_readiness(
             "public_resource_handle_ready": payload.get("public_resource_handle_ready"),
             "post_callback_resource_handle_ready": payload.get("post_callback_resource_handle_ready"),
             "public_or_runtime_claims": public_or_runtime_claims,
+            "completion_claims_without_blocker": completion_claims_without_blocker,
             "blockers": readiness_blockers,
             "stderr": result.stderr.strip(),
             "non_claim": (
@@ -1460,6 +1555,8 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
         )
 
     accounting_route = payload.get("accounting_route")
+    public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
+    completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
     if payload.get("schema") != "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check.v1":
         blockers.append("mission_transfer_dino_tribe_outcome_accounting_schema_mismatch")
     if result.returncode != 0 or payload.get("ready") is not True:
@@ -1501,6 +1598,10 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
         for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
             if payload.get(key) is not False:
                 blockers.append(f"mission_transfer_dino_tribe_{key}_not_false")
+        if public_or_runtime_claims:
+            blockers.append("mission_transfer_dino_tribe_public_or_runtime_claims")
+    if completion_claims_without_blocker:
+        blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
     return (
         {
@@ -1515,6 +1616,8 @@ def run_mission_transfer_dino_tribe_outcome_accounting(
             "promotion_ready": payload.get("promotion_ready"),
             "public_sdk_ready": payload.get("public_sdk_ready"),
             "runtime_ready": payload.get("runtime_ready"),
+            "public_or_runtime_claims": public_or_runtime_claims,
+            "completion_claims_without_blocker": completion_claims_without_blocker,
             "required_leaves": payload.get("required_leaves"),
             "observed_leaves": payload.get("observed_leaves"),
             "missing_leaf_families": payload.get("missing_leaf_families"),
@@ -1563,6 +1666,8 @@ def run_structure_census_readiness(path: Path) -> tuple[dict[str, Any], list[str
         )
 
     report_blockers = payload.get("blockers", [])
+    public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
+    completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
     if payload.get("schema") != "obelisk.structure-census-readiness-check.v1":
         blockers.append("structure_census_readiness_schema_mismatch")
     if result.returncode != 0 or payload.get("ready") is not True:
@@ -1578,6 +1683,10 @@ def run_structure_census_readiness(path: Path) -> tuple[dict[str, Any], list[str
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "build_policy_ready", "public_structure_sdk_ready", "structure_identity_ready"):
         if accounting.get(key) is not False:
             blockers.append(f"structure_census_accounting_{key}_not_false")
+    if public_or_runtime_claims:
+        blockers.append("structure_census_public_or_runtime_claims")
+    if completion_claims_without_blocker:
+        blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
     return (
         {
@@ -1594,6 +1703,8 @@ def run_structure_census_readiness(path: Path) -> tuple[dict[str, Any], list[str
             "public_sdk_ready": payload.get("public_sdk_ready"),
             "runtime_ready": payload.get("runtime_ready"),
             "enforcement_ready": payload.get("enforcement_ready"),
+            "public_or_runtime_claims": public_or_runtime_claims,
+            "completion_claims_without_blocker": completion_claims_without_blocker,
             "second_source_status": (
                 payload.get("second_source_readiness", {}).get("status")
                 if isinstance(payload.get("second_source_readiness"), dict)
@@ -1641,6 +1752,8 @@ def run_structure_build_policy_offline_intake(path: Path) -> tuple[dict[str, Any
         )
 
     report_blockers = payload.get("blockers", [])
+    public_or_runtime_claims = command_permission_route_gate_public_or_runtime_claims(payload)
+    completion_claims_without_blocker = secondary_report_completion_claims_without_blocker(payload)
     if payload.get("schema") != "obelisk.structure-build-policy-offline-intake-check.v1":
         blockers.append("structure_build_policy_offline_intake_schema_mismatch")
     if result.returncode != 0 or payload.get("ready") is not True:
@@ -1656,6 +1769,10 @@ def run_structure_build_policy_offline_intake(path: Path) -> tuple[dict[str, Any
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "enforcement_ready"):
         if readiness_flags.get(key) is not False:
             blockers.append(f"structure_build_policy_readiness_flags_{key}_not_false")
+    if public_or_runtime_claims:
+        blockers.append("structure_build_policy_public_or_runtime_claims")
+    if completion_claims_without_blocker:
+        blockers.append(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER)
 
     return (
         {
@@ -1670,6 +1787,8 @@ def run_structure_build_policy_offline_intake(path: Path) -> tuple[dict[str, Any
             "public_sdk_ready": payload.get("public_sdk_ready"),
             "runtime_ready": payload.get("runtime_ready"),
             "enforcement_ready": payload.get("enforcement_ready"),
+            "public_or_runtime_claims": public_or_runtime_claims,
+            "completion_claims_without_blocker": completion_claims_without_blocker,
             "expected_status": payload.get("expected_status"),
             "target_set": payload.get("target_set"),
             "blockers": [blocker.get("reason") if isinstance(blocker, dict) else blocker for blocker in report_blockers],
@@ -5068,6 +5187,10 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "object_identity_resource_handle_post_callback_resource_handle_ready_not_false": [
             "Post-callback ResourceHandle readiness was reported as true.",
             "Action: no post-callback object correlation or handle API is part of the v1 SDK completion claim.",
+        ],
+        SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER: [
+            "A secondary offline report emitted a positive public/runtime/completion readiness claim without its own blockers.",
+            "Action: keep secondary reports non-promotional, or include a blocker that prevents the claim from being counted.",
         ],
         "structure_census_readiness_output_invalid": [
             "The Structure census readiness checker did not emit valid JSON.",

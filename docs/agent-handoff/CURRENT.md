@@ -210,10 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest supervised rounds integrated route-gate summaries, retry-stable copied-event
-  cleanup, live-ops sidecar non-claims, P0 certificate/accounting hardening, and player
-  identity header/gap-report guardrails. Identity header scanners now reject public
-  player session/lifecycle/login/logout/connect/disconnect/join/leave/event aliases while
-  blocked; gap-report approved-runtime intake rejects non-promotional `resolved_inputs`,
-  public ABI, and v1-completion overclaims; sidecar `ready_scope` aliases stay
-  non-evidence. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
-  SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
+  cleanup, live-ops sidecar non-claims, P0 certificate/accounting hardening, player
+  identity header/gap-report guardrails, secondary-report overclaim scanning, and default
+  SDK route-boundary hardening. Inventory, Mission/Transfer/Dino/Tribe, Structure census,
+  Structure build-policy, ResourceHandle/object-identity, and route-gate secondary reports
+  now reject public/runtime/completion readiness overclaims; default SDK completion accepts
+  only `approved_runtime_evidence_missing` unless approved runtime evidence is explicit.
+  Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`,
+  P0 `0/4`, `stable_claim_allowed=false`. No runtime/server op.
