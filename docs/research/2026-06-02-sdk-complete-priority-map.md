@@ -25,8 +25,9 @@ After the 2026-06-02 compaction/reorganization, the lead reran the canonical off
 checks from the current worktree:
 
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with `approved_runtime_evidence_missing` as the current
-  critical-path blocker.
+  passed as planning-only with `lifecycle_anchor_first_evidence_provenance_unbound` as
+  the default-route critical-path blocker. Only explicit bound lifecycle/principal
+  planning artifacts may advance the route to `approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   intentionally failed closed with `stable_claim_allowed=false`,
   complete-SDK progress `0/12`, and P0 progress `0/4`.
@@ -134,7 +135,8 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_permissions_admin_public_readiness scripts.test_check_command_chat_response_public_readiness scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
   passed with 98 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with `approved_runtime_evidence_missing`.
+  passed as planning-only on the default route with
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, P0 `0/4`, and complete SDK
   `0/12`.
@@ -181,7 +183,8 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate scripts.test_check_permissions_admin_query_failclosed_contract scripts.test_check_permissions_admin_public_readiness scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
   passed with 147 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+  passed as planning-only on the default route with current blocker
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
   and P0 progress `0/4`.
@@ -220,7 +223,8 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
   passed with 8 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+  passed as planning-only on the default route with current blocker
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
   passed as planning-only with ResourceHandle/object identity still blocked.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
@@ -275,7 +279,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_copied_bool_readiness.py --json`
   passed as consume-only Mission evidence with public SDK/runtime/v1 completion false.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with `approved_runtime_evidence_missing`.
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
   and P0 progress `0/4`.
@@ -315,7 +319,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_chat_response_public_readiness scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
   passed with 64 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
   and P0 progress `0/4`.
@@ -363,7 +367,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
   passed with 9 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_structure_build_policy_offline_intake.py --json`
   passed as planning-only Structure build-policy intake with public SDK/runtime/enforcement
   readiness false.
@@ -421,7 +425,7 @@ Validation:
   passed as candidate-only Mission/Transfer/Dino/Tribe/Buff accounting with public
   SDK/runtime/v1 accounting false.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
   and P0 progress `0/4`.
@@ -465,7 +469,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
   passed with 108 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing`.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
   passed as planning-only with ResourceHandle/object identity still blocked.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
@@ -515,7 +519,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
   passed with 109 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing`, and
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing`, and
   its child argv now shows shared `--surfaces`/`--public-header` on permissions/admin,
   command response, and commands/replies checks.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_dino_scalar_readiness.py --json`
@@ -565,7 +569,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
   passed with 110 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing` and
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing` and
   preserved source-checker blocker provenance.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
   still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
@@ -632,7 +636,7 @@ Validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
   passed with 111 tests.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
-  passed as planning-only with current blocker `approved_runtime_evidence_missing` and
+  passed as planning-only in that historical route context with blocker `approved_runtime_evidence_missing` and
   explicit valid child reports.
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json`
   passed as candidate-only accounting with all five leaves still planning.
@@ -769,7 +773,7 @@ The follow-up identity round added an offline binder for the aggregate provenanc
   explicit route without leaving durable artifacts: it builds transient first-evidence,
   binds supplied lifecycle/principal planning manifests in a private non-protected temp
   root, forces child temp writes under that temp root, and requires the route gate to
-  remain valid/planning-only with current blocker `approved_runtime_evidence_missing`.
+  remain valid/planning-only with explicit-wrapper blocker `approved_runtime_evidence_missing`.
 - The route-gate passthrough round found that real first-evidence can carry multiple
   complete `artifact_sha256`/`capture_id`/`evidence_pack_id` source triples. The lifecycle
   checker now accepts multiple complete triples while still rejecting incomplete or
@@ -818,6 +822,39 @@ full structured JSON emitted by `check_player_principal_lifecycle_preflight.sh -
 The text path now binds the reviewed binary SHA, but a future guardrail round should
 consider requiring structured JSON sidecars with wrapper/env/marker posture fields before
 approved evidence promotion.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
+## Approved Runtime Evidence Review Provenance Guardrails
+
+The next supervised round tightened the consume-side checker and test fixtures for the
+future approved player-principal lifecycle evidence path:
+
+- `check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now requires
+  `approval.reviewed_by` and `approval.review_note` to be present, strings, and non-blank.
+  It rejects identity/UE-internal approval review text with the same strict posture as the
+  approved-manifest builder, including negated phrases such as `does not expose Steam IDs`.
+- The approved-evidence readiness scanner now normalizes whitespace and splits negation
+  scope on comma and conjunction boundaries such as `and`, `but`, `while`, `however`, and
+  `then`, so `does not promote identity and public SDK ready` and tabbed `public SDK ready`
+  variants fail closed instead of inheriting an unrelated negative clause.
+- `check_player_identity_runtime_principal_lifecycle_window_manifest.py` now compares the
+  request-pack JSON's `copied_log_path`, `copied_evidence_dir`, and
+  `window_manifest_path` against the copied log and current `window-manifest.env` being
+  checked, so a structurally valid stale request pack cannot describe a different
+  approved-workspace evidence path.
+- Builder and bundle tests now use future run ids, current request-pack shape, reviewed
+  binary SHA preflight text, and test-workspace replay flags so producer-shaped manifests
+  are exercised against the stricter consumer.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_approved_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle`
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,

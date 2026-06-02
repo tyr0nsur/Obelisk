@@ -30,14 +30,15 @@ from prepare_player_principal_lifecycle_window_request import (
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+WINDOW_START = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microsecond=0)
+RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 OTHER_TEST_COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
 
 
 def future_window() -> dict[str, str]:
-    start = datetime.now(timezone.utc) + timedelta(hours=1)
+    start = WINDOW_START
     actual_start = start + timedelta(minutes=1)
     actual_end = start + timedelta(minutes=9)
     end = start + timedelta(minutes=10)
@@ -161,11 +162,11 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
-            "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+            f"player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2 binary_sha256={SHA}\n",
         )
         preflight_post_sha256 = write_sidecar(
             preflight_post,
-            "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+            f"player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2 binary_sha256={SHA}\n",
         )
         manifest.write_text(
             "\n".join(
@@ -435,7 +436,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
             self.assertEqual(
                 identity["capture_id"],
-                "20260601T120000Z-player-principal-lifecycle",
+                RUN_ID,
             )
             self.assertTrue(report["operational_window"]["manifest_ready"])
             self.assertEqual(report["operational_window"]["obelisk_commit"], TEST_COMMIT)
@@ -490,9 +491,17 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             result = self.run_bundle(copied_log, output_dir)
             self.assertEqual(result.returncode, 0, result.stderr)
 
-            diagnosis = first_evidence_checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
-                output_dir / "approved-runtime-principal-lifecycle-evidence.json"
-            )
+            old_env = os.environ.get("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES")
+            os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
+            try:
+                diagnosis = first_evidence_checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    output_dir / "approved-runtime-principal-lifecycle-evidence.json"
+                )
+            finally:
+                if old_env is None:
+                    os.environ.pop("OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES", None)
+                else:
+                    os.environ["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = old_env
             if not (
                 first_evidence_checker.APPROVED_CANDIDATE_ROOT_FALLBACK.is_dir()
                 and first_evidence_checker.APPROVED_LIFECYCLE_ANCHOR_CANDIDATES_FALLBACK.is_file()
@@ -511,6 +520,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
             )
 
         self.assertTrue(diagnosis["ready"])

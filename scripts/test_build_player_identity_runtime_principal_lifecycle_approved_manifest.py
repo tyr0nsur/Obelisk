@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -19,7 +20,9 @@ CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approv
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 WINDOW_CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_window_manifest.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-RUN_ID = "20260601T120000Z-player-principal-lifecycle"
+WINDOW_START = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microsecond=0)
+WINDOW_END = WINDOW_START + timedelta(minutes=10)
+RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
@@ -100,13 +103,61 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     "schema": "obelisk.player-principal-lifecycle-window-request.v1",
                     "run_id": RUN_ID,
                     "status": "candidate_only_request_pack",
+                    "approval_required": "current-turn operator-approved runtime window, not standing approval",
+                    "ark_binary_sha256": SHA,
                     "obelisk_commit": summary["evidence"]["obelisk_commit"],
                     "target": {"instance": "arkserver2", "map": "TheIsland"},
                     "approved_window": {
-                        "start_utc": "2026-06-01T12:00:00Z",
-                        "end_utc": "2026-06-01T12:10:00Z",
+                        "start_utc": WINDOW_START.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "end_utc": WINDOW_END.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
+                    "restart_expectation": "restart",
+                    "final_posture": "stable",
+                    "user_policy": "no_regular_users",
+                    "notice_path": "not_applicable",
+                    "copied_evidence_dir": str(Path(source["path"]).parent),
+                    "copied_log_path": source["path"],
+                    "window_manifest_path": str(manifest_path),
                     "observer_env_file": "observer-window.env",
+                    "marker_set": [
+                        "enable-process-event-hook",
+                        "disable-plugins",
+                        "allow-observer-debug-window",
+                        "allow-experimental-observers",
+                        "enable-player-principal-lifecycle-observer",
+                    ],
+                    "forbidden_markers": [
+                        "allow-ptrace",
+                        "enable-debug-control",
+                        "enable-reflection-scanner",
+                        "enable-native-exec-probes",
+                        "allow-global-process-event-callbacks",
+                        "allow-filtered-process-event-callbacks",
+                        "allow-call-process-event",
+                        "allow-process-event-blocking",
+                        "request-static-fname-probe",
+                        "enable-chat-events",
+                        "enable-chat-reflection",
+                        "enable-chat-route-observer",
+                        "enable-inventory-reflection",
+                        "enable-structure-reflection",
+                        "enable-item-return-events",
+                    ],
+                    "rollback": {
+                        "owner": "operator",
+                        "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+                    },
+                    "non_claims": [
+                        "does not authorize server operations",
+                        "does not authorize marker/env changes",
+                        "does not authorize starts, restarts, or stops",
+                        "does not authorize Discord/community notices",
+                        "does not promote public player identity",
+                        "does not claim stable principal identity",
+                        "does not promote permissions/admin",
+                        "does not promote command/chat response or commands/replies",
+                        "does not authorize lookup, persistence, mutation, return override, plugin delivery, runtime readiness, public SDK readiness, or v1 SDK completion",
+                    ],
                 },
                 sort_keys=True,
             )
@@ -116,21 +167,26 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             observer_env,
             "\n".join(
                 [
+                    "OBELISK_INSTANCE_ID=arkserver2",
+                    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
+                    "OBELISK_DISABLE_PLUGINS=1",
                     "OBELISK_WRAPPER_PROFILE=observer-debug",
                     "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
-                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+                    f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={SHA}",
                     "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
+                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
+                    "OBELISK_PE_TRACE_LIMIT=0",
                 ]
             )
             + "\n",
         )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
-            "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+            f"player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2 binary_sha256={SHA}\n",
         )
         preflight_post_sha256 = write_sidecar(
             preflight_post,
-            "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+            f"player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2 binary_sha256={SHA}\n",
         )
         manifest_path.write_text(
             "\n".join(
@@ -139,10 +195,10 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     f"obelisk_commit={summary['evidence']['obelisk_commit']}",
                     "target=arkserver2/TheIsland",
                     "approval=current-turn operator-approved runtime window, not standing approval",
-                    "approved_window_start_utc=2026-06-01T12:00:00Z",
-                    "approved_window_end_utc=2026-06-01T12:10:00Z",
-                    "actual_capture_start_utc=2026-06-01T12:01:00Z",
-                    "actual_capture_end_utc=2026-06-01T12:09:00Z",
+                    f"approved_window_start_utc={WINDOW_START.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                    f"approved_window_end_utc={WINDOW_END.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                    f"actual_capture_start_utc={(WINDOW_START + timedelta(minutes=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                    f"actual_capture_end_utc={(WINDOW_START + timedelta(minutes=9)).strftime('%Y-%m-%dT%H:%M:%SZ')}",
                     f"copied_log_path={source['path']}",
                     f"copied_log_sha256={source['sha256']}",
                     f"request_pack_path={request_pack}",
@@ -157,8 +213,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     "post_posture=stable",
                     "pre_check=passed",
                     "post_check=passed",
-                    "rollback_start_utc=2026-06-01T12:09:00Z",
-                    "rollback_end_utc=2026-06-01T12:10:00Z",
+                    f"rollback_start_utc={(WINDOW_START + timedelta(minutes=9)).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                    f"rollback_end_utc={WINDOW_END.strftime('%Y-%m-%dT%H:%M:%SZ')}",
                     "rollback_completed=true",
                     "rollback_delta=removed_observer_env_and_markers_preserved_disable_plugins",
                     "observer_env_survived=false",
@@ -209,6 +265,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         reviewed_by: str = "runtime-reviewer",
         review_note: str = "consume-only lifecycle evidence reviewed",
     ) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         return subprocess.run(
             [
                 sys.executable,
@@ -228,15 +286,19 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
         )
 
     def run_checker(self, manifest: Path, *extra_args: str) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env["OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES"] = "1"
         return subprocess.run(
             [sys.executable, str(CHECKER), str(manifest), "--json", *extra_args],
             check=False,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
         )
 
     def test_builds_manifest_that_passes_existing_consume_checker(self) -> None:

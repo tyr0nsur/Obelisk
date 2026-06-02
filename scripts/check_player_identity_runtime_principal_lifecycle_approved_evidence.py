@@ -274,6 +274,10 @@ NEGATED_CAPABILITY_BOUNDARY_RE = re.compile(
     r"\b(?:without|blocked|forbidden|reject(?:ed|s)?|fail[-_ ]closed)\b",
     re.IGNORECASE,
 )
+NEGATION_SCOPE_SPLIT_RE = re.compile(
+    r"[,.;\n]|\s+\b(?:and|but|then|however|unless|while)\b\s+",
+    re.IGNORECASE,
+)
 ALLOWED_FORBIDDEN_KEY_PATHS = (
     "$.schema",
     "$.privacy_boundary.copied_opaque_principal_only",
@@ -1226,6 +1230,12 @@ def validate_approval(approval: Any, blockers: list[dict[str, Any]]) -> None:
         add(blockers, "approval_keys_unexpected", "$.approval", unexpected=sorted(unexpected_keys))
     if approval.get("runtime_evidence_reviewed") is not True:
         add(blockers, "approval_runtime_evidence_reviewed_not_true", "$.approval.runtime_evidence_reviewed")
+    for key in ("reviewed_by", "review_note"):
+        value = approval.get(key)
+        if not isinstance(value, str) or not value.strip():
+            add(blockers, f"approval_{key}_missing_or_empty", f"$.approval.{key}")
+        elif FORBIDDEN_KEY_RE.search(value):
+            add(blockers, f"approval_{key}_forbidden_identity_or_ue_text", f"$.approval.{key}")
     for key in (
         "runtime_work_authorized_by_this_manifest",
         "server_operations_authorized_by_this_manifest",
@@ -1301,6 +1311,7 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
                 return found
     elif (
         isinstance(value, str)
+        and value not in REQUIRED_NON_CLAIMS
         and contains_unnegated_positive_capability_claim(value)
     ):
         return value, trail
@@ -1308,14 +1319,15 @@ def find_positive_capability_claim(value: Any, trail: str = "$") -> tuple[str, s
 
 
 def contains_unnegated_positive_capability_claim(value: str) -> bool:
-    for match in POSITIVE_CAPABILITY_CLAIM_RE.finditer(value):
-        if not positive_capability_claim_is_negated(value, match.start()):
+    normalized = re.sub(r"\s+", " ", value)
+    for match in POSITIVE_CAPABILITY_CLAIM_RE.finditer(normalized):
+        if not positive_capability_claim_is_negated(normalized, match.start()):
             return True
     return False
 
 
 def positive_capability_claim_is_negated(value: str, claim_start: int) -> bool:
-    preceding_clause = re.split(r"[.;\n]", value[:claim_start])[-1]
+    preceding_clause = NEGATION_SCOPE_SPLIT_RE.split(value[:claim_start])[-1]
     return bool(
         NEGATED_CAPABILITY_ACTION_RE.search(preceding_clause)
         or NEGATED_CAPABILITY_BOUNDARY_RE.search(preceding_clause)

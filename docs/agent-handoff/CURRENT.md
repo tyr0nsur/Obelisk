@@ -143,11 +143,12 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing` as a top-level blocker after approved runtime
   evidence, so accepted runtime evidence cannot make the checker `ready=true` before
   public contract review. The command/permission route gate rejects child-reported
-  identity contract gates as premature current-route blockers and stays pinned to
-  `approved_runtime_evidence_missing` in the current route. ResourceHandle readiness now
-  scans decisions text for positive public ResourceHandle/object lookup/post-callback
-  claims. These remain offline guardrails only; no runtime, public SDK, Structure SDK,
-  ResourceHandle, identity, or v1 completion readiness is promoted.
+  identity contract gates as premature current-route blockers; the default current route
+  remains pinned to `lifecycle_anchor_first_evidence_provenance_unbound`, and only the
+  explicit bound route may advance to `approved_runtime_evidence_missing`. ResourceHandle
+  readiness now scans decisions text for positive public ResourceHandle/object
+  lookup/post-callback claims. These remain offline guardrails only; no runtime, public
+  SDK, Structure SDK, ResourceHandle, identity, or v1 completion readiness is promoted.
 - 2026-06-02 Inventory/Mission/release wording hardening: inventory copied-signal
   stability now scans all `docs/public_sdk_surfaces.json` string text for positive
   Inventory/Items SDK side-lane claims while preserving negated non-claims. Mission/
@@ -294,6 +295,13 @@ This file is an active routing table only. Durable evidence belongs in
   `stable_claim_allowed=false`, complete-SDK `0/12`, and P0 `0/4`. This is offline
   routing evidence only: no runtime/server work, public identity, permissions/admin,
   command response, commands/replies, release readiness, or completion claim is promoted.
+- Approved runtime principal lifecycle evidence guardrails now require producer-shaped
+  `approval.reviewed_by` and `approval.review_note`, reject blank or identity/UE-internal
+  approval review text even when phrased as a negative claim, normalize whitespace before
+  public/runtime readiness claim scanning, and reject request-pack JSON whose copied log,
+  copied evidence dir, or `window-manifest.env` path drifts from the current manifest
+  being checked. This is consume-side offline validation only and does not approve runtime
+  capture, public identity, route promotion, or v1 completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->
@@ -323,8 +331,10 @@ This file is an active routing table only. Durable evidence belongs in
   completed admin snapshot, second-source layout, or lifecycle layout routes.
 - Current recipe:
   `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`.
-- If the identity offline packs remain accepted, identity is blocked on an approved
-  runtime principal lifecycle window rather than more offline rediscovery.
+- If the identity offline packs remain accepted, the default route is blocked first on
+  source-bound lifecycle/principal planning provenance. Only the explicit bound-wrapper
+  route may advance to the approved runtime principal lifecycle evidence blocker; neither
+  path calls for broad offline rediscovery.
 - The old `20260601T120000Z-player-principal-lifecycle` request-pack is expired and should
   report `approved_window_expired`, `request_pack_ready=false`, and `bundle_inputs_ready=false`.
   It is not runtime evidence. Missing runtime artifacts remain copied `Obelisk.log`,

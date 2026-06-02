@@ -498,6 +498,45 @@ def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers:
         add(blockers, "request_pack_schema_mismatch", "request_pack_path")
     if payload.get("run_id") != fields.get("run_id"):
         add(blockers, "request_pack_run_id_mismatch", "request_pack_path")
+    copied_log_text = fields.get("copied_log_path")
+    if copied_log_text:
+        copied_log_status = protected_paths.protected_path_status(
+            manifest_relative_path(copied_log_text, manifest_path),
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        expected_log_path = str(copied_log_status.resolved)
+        expected_evidence_dir = str(copied_log_status.resolved.parent)
+        if payload.get("copied_log_path") != expected_log_path:
+            add(
+                blockers,
+                "request_pack_copied_log_path_manifest_mismatch",
+                "request_pack_path",
+                expected=expected_log_path,
+                actual=payload.get("copied_log_path"),
+            )
+        if payload.get("copied_evidence_dir") != expected_evidence_dir:
+            add(
+                blockers,
+                "request_pack_copied_evidence_dir_manifest_mismatch",
+                "request_pack_path",
+                expected=expected_evidence_dir,
+                actual=payload.get("copied_evidence_dir"),
+            )
+    manifest_status = protected_paths.protected_path_status(
+        manifest_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    expected_manifest_path = str(manifest_status.resolved)
+    if payload.get("window_manifest_path") != expected_manifest_path:
+        add(
+            blockers,
+            "request_pack_window_manifest_path_manifest_mismatch",
+            "request_pack_path",
+            expected=expected_manifest_path,
+            actual=payload.get("window_manifest_path"),
+        )
     target = payload.get("target")
     if isinstance(target, dict):
         instance = fields.get("instance") or fields.get("instance_id")

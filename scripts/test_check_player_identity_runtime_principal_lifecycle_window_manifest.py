@@ -466,6 +466,52 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
                 self.assertIn(expected_reason, [item["reason"] for item in blockers])
 
+    def test_validate_request_pack_rejects_manifest_path_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_dir = root / "approved" / "live-validation-logs" / RUN_ID
+            manifest_dir.mkdir(parents=True)
+            copied_log = manifest_dir / "Obelisk.log"
+            copied_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            manifest_path = manifest_dir / "window-manifest.env"
+            request_pack = manifest_dir / "window-request.json"
+            payload = {
+                "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+                "run_id": RUN_ID,
+                "target": {"instance": "arkserver2", "map": "TheIsland"},
+                "approved_window": {
+                    "start_utc": "2026-06-01T12:00:00Z",
+                    "end_utc": "2026-06-01T12:10:00Z",
+                },
+                "copied_evidence_dir": str(manifest_dir / "stale"),
+                "copied_log_path": str(manifest_dir / "stale" / "Obelisk.log"),
+                "window_manifest_path": str(manifest_dir / "stale" / "window-manifest.env"),
+            }
+            request_pack.write_text(json.dumps(payload), encoding="utf-8")
+            fields = {
+                "run_id": RUN_ID,
+                "target": "arkserver2/TheIsland",
+                "approved_window_start_utc": "2026-06-01T12:00:00Z",
+                "approved_window_end_utc": "2026-06-01T12:10:00Z",
+                "copied_log_path": str(copied_log),
+                "request_pack_path": str(request_pack),
+            }
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (root / "approved",)
+                CHECKER.validate_request_pack(fields, manifest_path, blockers)
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("request_pack_copied_log_path_manifest_mismatch", reasons)
+        self.assertIn("request_pack_copied_evidence_dir_manifest_mismatch", reasons)
+        self.assertIn("request_pack_window_manifest_path_manifest_mismatch", reasons)
+
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)
         lines.append("users_policy=no_regular_users")

@@ -205,11 +205,11 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     )
     preflight_pre = write_sidecar(
         preflight_pre_path,
-        "player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2\n",
+        f"player_principal_lifecycle_preflight=ok mode=observer-window instance=arkserver2 binary_sha256={SHA}\n",
     )
     preflight_post = write_sidecar(
         preflight_post_path,
-        "player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2\n",
+        f"player_principal_lifecycle_preflight=ok mode=stable instance=arkserver2 binary_sha256={SHA}\n",
     )
     manifest = write_sidecar(
         manifest_path,
@@ -306,6 +306,8 @@ def manifest() -> dict:
         "runtime_ready": False,
         "approval": {
             "runtime_evidence_reviewed": True,
+            "reviewed_by": "runtime-reviewer",
+            "review_note": "consume-only lifecycle evidence reviewed",
             "runtime_work_authorized_by_this_manifest": False,
             "server_operations_authorized_by_this_manifest": False,
             "publication_authorized_by_this_manifest": False,
@@ -425,6 +427,8 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
         "runtime_ready": False,
         "approval": {
             "runtime_evidence_reviewed": True,
+            "reviewed_by": "runtime-reviewer",
+            "review_note": "consume-only lifecycle evidence reviewed",
             "runtime_work_authorized_by_this_manifest": False,
             "server_operations_authorized_by_this_manifest": False,
             "publication_authorized_by_this_manifest": False,
@@ -948,6 +952,11 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         for claim in (
             ("non_claims", "not blocking public SDK ready"),
             ("review_note", "does not promote identity; public SDK ready"),
+            ("review_note", "does not promote identity and public SDK ready"),
+            ("non_claims", "does not authorize commands but runtime ready"),
+            ("non_claims", "does not authorize commands while public SDK ready"),
+            ("review_note", "does not promote identity however public\tSDK\tready"),
+            ("review_note", "does not promote identity then runtime   ready"),
         ):
             with self.subTest(claim=claim):
                 payload = manifest()
@@ -962,6 +971,43 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("forbidden_public_capability_or_readiness_claim", report["blockers"])
+
+    def test_rejects_missing_or_empty_review_provenance(self) -> None:
+        for key, value in (
+            ("reviewed_by", None),
+            ("review_note", None),
+            ("reviewed_by", "   "),
+            ("review_note", ""),
+        ):
+            with self.subTest(key=key, value=value):
+                payload = manifest()
+                if value is None:
+                    payload["approval"].pop(key)
+                else:
+                    payload["approval"][key] = value
+                payload.pop("output_artifact_identity")
+                add_output_artifact_identity(payload)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"approval_{key}_missing_or_empty", report["blockers"])
+
+    def test_rejects_identity_or_ue_terms_in_review_provenance_even_when_negated(self) -> None:
+        for key, value in (
+            ("review_note", "does not expose Steam IDs"),
+            ("reviewed_by", "raw_params reviewer"),
+        ):
+            with self.subTest(key=key):
+                payload = manifest()
+                payload["approval"][key] = value
+                payload.pop("output_artifact_identity")
+                add_output_artifact_identity(payload)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"approval_{key}_forbidden_identity_or_ue_text", report["blockers"])
 
     def test_rejects_live_server_source_paths_in_wrapped_summary(self) -> None:
         payload = manifest()
