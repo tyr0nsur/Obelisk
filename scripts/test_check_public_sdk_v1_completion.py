@@ -19,6 +19,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from check_public_sdk_v1_completion import (
+    permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
 )
@@ -234,6 +235,148 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "executed_test_report": executed_report_path,
                 }
             )
+
+    def write_player_identity_structured_promotion_artifacts(self, root: Path) -> dict[str, str]:
+        runtime_report = root / "player_identity_approved_runtime_report.json"
+        contract_report = root / "player_identity_public_contract_readiness_report.json"
+        executed_report = root / "player_identity_executed_tests.json"
+        runtime_report.write_text(
+            json.dumps(
+                {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                    "approved_runtime_evidence_present": True,
+                    "runtime_evidence_ready": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "next_blocker": "identity_public_contract_gate_missing",
+                }
+            ),
+            encoding="utf-8",
+        )
+        contract_report.write_text(
+            json.dumps(
+                {
+                    "schema": "obelisk.player-identity-public-contract-readiness-check.v1",
+                    "surface": "obelisk.player_identity.v1",
+                    "accepted_for_contract_review": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "public_header_allowed": False,
+                    "next_blocker": "identity_public_contract_gate",
+                    "blockers": [],
+                    "resolved_inputs": ["runtime.lifecycle_evidence"],
+                    "remaining_blockers": [
+                        "runtime.lifecycle_evidence",
+                        "privacy.identifier_redaction",
+                        "lifetime.generation_scope_invalidation",
+                        "abi.public_pod_contract",
+                        "lifecycle.owner_cleanup",
+                        "separation.downstream_surfaces",
+                    ],
+                    "approved_runtime_evidence": {
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        executed_report_path = write_executed_test_artifact(
+            executed_report,
+            "obelisk.player_identity.v1",
+            argv=["python3", "-m", "unittest", "player_identity_promotion"],
+        )
+        return {
+            "approved_runtime_evidence_report": str(runtime_report.relative_to(REPO_ROOT)),
+            "public_contract_readiness_report": str(contract_report.relative_to(REPO_ROOT)),
+            "executed_test_report": executed_report_path,
+        }
+
+    def write_player_identity_promotion_certificate(
+        self,
+        path: Path,
+        identity_artifacts: dict[str, str],
+        **overrides: object,
+    ) -> dict[str, str]:
+        payload: dict[str, object] = {
+            "schema": "obelisk.player-identity-promotion-certificate.v1",
+            "surface_id": "obelisk.player_identity.v1",
+            "promotion_status": "promoted",
+            "v1_dependency_chain": [
+                "obelisk.player_identity.v1",
+                "obelisk.permissions_admin.v1",
+                "obelisk.command_chat_response_path.v1",
+                "obelisk.commands_replies.v1",
+            ],
+            "v1_dependency_chain_position": 1,
+            "required_by_surface": "obelisk.permissions_admin.v1",
+            "required_by_v1_dependency_chain_position": 2,
+            "evidence": identity_artifacts,
+        }
+        payload.update(overrides)
+        path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        relative = str(path.relative_to(REPO_ROOT))
+        return {
+            "path": relative,
+            "sha256": sha256_file(REPO_ROOT / relative),
+        }
+
+    def write_permissions_admin_structured_promotion_artifacts(self, root: Path) -> dict[str, str]:
+        query_report = root / "permissions_admin_query_failclosed_report.json"
+        readiness_report = root / "permissions_admin_public_readiness_report.json"
+        executed_report = root / "permissions_admin_executed_tests.json"
+        query_report.write_text(
+            json.dumps(
+                {
+                    "schema": "obelisk.permissions-admin-query-failclosed-contract-check.v1",
+                    "input_schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
+                    "mode": "consume",
+                    "ready": True,
+                    "valid": True,
+                    "candidate_only": True,
+                    "pre_abi": True,
+                    "public_header_allowed": False,
+                    "public_cache_abi_allowed": False,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "blockers": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        readiness_report.write_text(
+            json.dumps(
+                {
+                    "schema": "obelisk.permissions-admin-public-readiness-check.v1",
+                    "surface": "obelisk.permissions_admin.v1",
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_header_allowed": False,
+                    "public_abi_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "dependency": "obelisk.player_identity.v1",
+                    "query_failclosed_artifact_schema": "obelisk.permissions-admin-query-failclosed-contract.v1",
+                    "blockers": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        executed_report_path = write_executed_test_artifact(
+            executed_report,
+            "obelisk.permissions_admin.v1",
+            argv=["python3", "-m", "unittest", "permissions_admin_promotion"],
+        )
+        return {
+            "query_failclosed_report": str(query_report.relative_to(REPO_ROOT)),
+            "public_readiness_report": str(readiness_report.relative_to(REPO_ROOT)),
+            "executed_test_report": executed_report_path,
+        }
 
     def write_fake_route_gate(self, path: Path, **overrides: object) -> Path:
         payload = {
@@ -5569,6 +5712,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             {
                 "obelisk.permissions_admin.v1": [
                     "executed_test_report:missing",
+                    "player_identity_promotion_certificate:missing",
                     "public_readiness_report:missing",
                     "query_failclosed_report:missing",
                 ]
@@ -5987,6 +6131,60 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertEqual(missing, [])
+
+    def test_permissions_admin_structured_promotion_requires_identity_promotion_certificate(self) -> None:
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="PermissionsAdminCertificate",
+        ) as core_dir:
+            evidence = self.write_permissions_admin_structured_promotion_artifacts(Path(core_dir))
+
+            missing = permissions_admin_structured_promotion_evidence_missing(evidence)
+
+        self.assertEqual(
+            missing,
+            ["player_identity_promotion_certificate:missing"],
+        )
+
+    def test_permissions_admin_structured_promotion_rejects_identity_certificate_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="PermissionsAdminCertificate",
+        ) as core_dir:
+            root = Path(core_dir)
+            identity_artifacts = self.write_player_identity_structured_promotion_artifacts(root)
+            permissions_evidence = self.write_permissions_admin_structured_promotion_artifacts(root)
+            certificate_path = root / "player_identity_promotion_certificate.json"
+            certificate = self.write_player_identity_promotion_certificate(
+                certificate_path,
+                identity_artifacts,
+            )
+            permissions_evidence["player_identity_promotion_certificate"] = certificate
+            valid_missing = permissions_admin_structured_promotion_evidence_missing(permissions_evidence)
+
+            bad_surface_certificate = self.write_player_identity_promotion_certificate(
+                certificate_path,
+                identity_artifacts,
+                required_by_surface="obelisk.command_chat_response_path.v1",
+            )
+            permissions_evidence["player_identity_promotion_certificate"] = bad_surface_certificate
+            bad_surface_missing = permissions_admin_structured_promotion_evidence_missing(permissions_evidence)
+
+            payload = json.loads(certificate_path.read_text(encoding="utf-8"))
+            payload["required_by_surface"] = "obelisk.permissions_admin.v1"
+            certificate_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+            permissions_evidence["player_identity_promotion_certificate"] = {
+                "path": str(certificate_path.relative_to(REPO_ROOT)),
+                "sha256": "f" * 64,
+            }
+            bad_hash_missing = permissions_admin_structured_promotion_evidence_missing(permissions_evidence)
+
+        self.assertEqual(valid_missing, [])
+        self.assertIn("player_identity_promotion_certificate:fields_invalid", bad_surface_missing)
+        self.assertIn(
+            "player_identity_promotion_certificate:sha256_mismatch",
+            bad_hash_missing,
+        )
 
     def test_p0_executed_test_artifact_missing_canonical_provenance_is_rejected(self) -> None:
         import importlib.util

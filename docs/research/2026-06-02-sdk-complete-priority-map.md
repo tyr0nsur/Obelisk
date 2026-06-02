@@ -1884,10 +1884,6 @@ gap found during route-lock hardening:
 - The integration rejects invalid checker output, schema/surface drift, missing required
   leaves, unexpected accounting routes, child blockers, and public/runtime/promotion
   overclaims unless the leaf route is explicitly promoted.
-- Deferred P0 guardrail: permissions/admin structured promotion should require a matching
-  player-identity promotion certificate with the expected surface, chain position, and
-  artifact hash before permissions/admin public/readiness evidence can count.
-
 Validation:
 
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
@@ -1901,3 +1897,32 @@ complete-SDK progress `0/12`, and P0 progress `0/4`. This round does not approve
 work, public identity, public permissions/admin, command response, commands/replies,
 Mission/Transfer/Dino/Tribe/Buff SDKs, ResourceHandle, release readiness, or a stable
 SDK claim.
+
+## Permissions/Admin Identity Promotion Certificate Guardrail
+
+The next delegated follow-up closed the permissions/admin dependency-evidence gap from
+the mission-leaf accounting round:
+
+- `scripts/check_public_sdk_v1_completion.py` now requires promoted
+  `obelisk.permissions_admin.v1` structured evidence to include a matching
+  player-identity promotion certificate.
+- The certificate must identify `obelisk.player_identity.v1`, the expected P0 chain
+  position before permissions/admin, and a reviewed artifact hash.
+- Missing certificate, wrong surface, wrong chain position, artifact-hash drift, or
+  invalid nested player-identity structured evidence keeps permissions/admin structured
+  promotion evidence unsatisfied and non-counting.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_agent_handoff_guardrails`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `git diff --check`
+
+This is accounting-only. It does not authorize runtime/server work, marker/env changes,
+Discord, public identity, public permissions/admin ABI, command response,
+commands/replies, ResourceHandle, release readiness, or stable/complete SDK wording.
+Default route and SDK accounting remain fail-closed with
+`lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
+complete-SDK progress `0/12`, and P0 progress `0/4`.

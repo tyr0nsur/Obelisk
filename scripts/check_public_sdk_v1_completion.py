@@ -39,6 +39,9 @@ MISSION_TRANSFER_DINO_TRIBE_REQUIRED_LEAVES = {
     "tribe_policy",
     "buff_status",
 }
+PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = (
+    "obelisk.player-identity-promotion-certificate.v1"
+)
 PLAYER_IDENTITY_PUBLIC_CONTRACT_REQUIRED_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
@@ -2439,8 +2442,77 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
     return missing
 
 
+def load_hash_bound_json_artifact_binding(
+    binding: Any,
+    reason_prefix: str,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    if not isinstance(binding, dict):
+        return None, [f"{reason_prefix}:missing"]
+    raw_path = binding.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None, [f"{reason_prefix}:path_missing"]
+    relative = repo_relative_evidence_path(raw_path)
+    if relative is None:
+        return None, [f"{reason_prefix}:path_not_repo_relative"]
+    path = REPO_ROOT / relative
+    if not path.is_file():
+        return None, [f"{reason_prefix}:path_not_file"]
+    if path.suffix.lower() != ".json":
+        return None, [f"{reason_prefix}:path_not_json"]
+    expected_sha256 = binding.get("sha256")
+    if not isinstance(expected_sha256, str) or not expected_sha256.strip():
+        return None, [f"{reason_prefix}:sha256_missing"]
+    if SHA256_RE.fullmatch(expected_sha256.strip()) is None:
+        return None, [f"{reason_prefix}:sha256_invalid"]
+    actual_sha256 = sha256_file(path)
+    if actual_sha256 is None:
+        return None, [f"{reason_prefix}:sha256_unavailable"]
+    if actual_sha256 != expected_sha256.lower():
+        return None, [f"{reason_prefix}:sha256_mismatch"]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, [f"{reason_prefix}:json_unreadable"]
+    if not isinstance(payload, dict):
+        return None, [f"{reason_prefix}:json_not_object"]
+    return payload, []
+
+
+def player_identity_promotion_certificate_missing(evidence: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    certificate, certificate_errors = load_hash_bound_json_artifact_binding(
+        evidence.get("player_identity_promotion_certificate"),
+        "player_identity_promotion_certificate",
+    )
+    if certificate_errors:
+        return certificate_errors
+
+    assert certificate is not None
+    if not (
+        certificate.get("schema") == PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA
+        and certificate.get("surface_id") == "obelisk.player_identity.v1"
+        and certificate.get("promotion_status") == "promoted"
+        and certificate.get("v1_dependency_chain") == list(CANONICAL_V1_DEPENDENCY_SEQUENCE)
+        and certificate.get("v1_dependency_chain_position") == 1
+        and certificate.get("required_by_surface") == "obelisk.permissions_admin.v1"
+        and certificate.get("required_by_v1_dependency_chain_position") == 2
+    ):
+        missing.append("player_identity_promotion_certificate:fields_invalid")
+
+    identity_evidence = certificate.get("evidence")
+    if not isinstance(identity_evidence, dict):
+        missing.append("player_identity_promotion_certificate:evidence_missing")
+    else:
+        dependency_missing = player_identity_structured_promotion_evidence_missing(identity_evidence)
+        for reason in dependency_missing:
+            missing.append(f"player_identity_{reason}")
+    return missing
+
+
 def permissions_admin_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
     missing: list[str] = []
+    missing.extend(player_identity_promotion_certificate_missing(evidence))
+
     query_report, query_error = load_repo_relative_json_evidence(evidence.get("query_failclosed_report"))
     if query_error is not None:
         missing.append(f"query_failclosed_report:{query_error}")

@@ -54,6 +54,7 @@
         "approved runtime principal lifecycle evidence alone cannot enable permissions/admin",
         "promoted player identity must include approved runtime principal lifecycle evidence, not only promoted status text",
         "promoted player identity must include a public identity/principal contract with capability, ABI, lifecycle cleanup, and SDK consumer coverage",
+        "permissions/admin structured promotion evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in the ordered P0 dependency chain, bound by reviewed evidence artifact hash",
         "promoted player identity must define copied principal semantics for principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle before permissions/admin can count as promoted",
         "promoted player identity must include owner-token cleanup on init failure, plugin unload, and owner-scoped unregister before permissions/admin can count as promoted",
         "permissions/admin cannot infer copied principal semantics from surface status text, runtime evidence text, command text, operator config, or plugin input",

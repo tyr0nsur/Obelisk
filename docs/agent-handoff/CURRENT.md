@@ -171,9 +171,10 @@ This file is an active routing table only. Durable evidence belongs in
   buff-status outcomes. This is accounting-only and does not promote
   Mission/Transfer/Dino/Tribe/Buff SDKs, runtime, ABI, public callbacks,
   ResourceHandle, or v1 completion.
-- Next P0 guardrail: permissions/admin structured promotion must require a matching
-  player-identity promotion certificate with the expected surface, chain position, and
-  artifact hash before any permissions/admin public/readiness claim can count.
+- P0 guardrail: permissions/admin structured promotion now requires a matching
+  player-identity promotion certificate for `obelisk.player_identity.v1`, chain position
+  1, and a reviewed artifact hash before permissions/admin structured evidence can
+  count. Missing, mismatched, or stale certificates keep permissions/admin non-counting.
 
 ## Agent Protocol
 
@@ -209,9 +210,9 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest mission-leaf accounting follow-up used four lead-scoped read-only agents:
-  mission accounting integration, release-statement accounting risk,
-  permissions/admin dependency risk, and handoff continuity. Integrated result:
-  SDK completion now runs the mission-transfer-dino-tribe outcome checker, rejects
-  umbrella wording without explicit leaf outcomes, and preserves fail-closed status:
-  `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+- Latest delegated guardrail rounds closed mission-leaf umbrella accounting and the
+  permissions/admin identity-certificate dependency gap. SDK completion now runs the
+  mission-transfer-dino-tribe outcome checker and rejects permissions/admin structured
+  evidence without a hash-bound player-identity promotion certificate. Default route and
+  SDK accounting remain unchanged: `stable_claim_allowed=false`, complete-SDK progress
+  `0/12`, and P0 progress `0/4`.

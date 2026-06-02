@@ -135,6 +135,7 @@
     "Commands/replies also depend on obelisk.command_chat_response_path.v1; while that command/chat response path is unpromoted, no reply, send-chat, broadcast/notices, moderation, or public CallProcessEvent path may be documented as promoted.",
     "Promoted command/chat response and commands/replies evidence must name promoted identity/principal and permissions prerequisites plus copied response/command ABI, owner-scoped lifecycle, privacy/redaction, abuse/rate-limit, audit, and command lifecycle boundaries before those rows can support v1 release-claim accounting.",
     "Static thunk orientation, passive ChatMessageEvent parsing, candidate vtable slots, raw ProcessEvent callbacks, and legacy CallProcessEvent debug access are not public response-path or command/reply promotion evidence.",
+    "Promoted permissions/admin structured evidence must include a matching player-identity promotion certificate for obelisk.player_identity.v1, first in v1_required_dependency_chain, bound by reviewed evidence artifact hash, before permissions/admin can count toward complete-SDK accounting.",
     "Installed-SDK foundation examples before identity/principal are limited to lifecycle/config/logging, descriptors, and process-local timers; they are package-shape/contributor-readiness examples only. Plugin Hub seed/package publication remains post-SDK-complete, and neither these examples nor passive chat routing are enough for v1 completion; passive chat parsing and plugin-local routing remain promoted-experimental-only.",
     "Plugin Hub seed docs and installed examples must not be used as v1 completion evidence.",
     "Plugin Hub remains post-SDK-complete planning: no seed/package publication, intake prioritization, production module availability, or support-tier activation may be inferred from v0.1 RC surfaces, installed SDK package shape, foundation examples, or promoted-experimental copied-data seeds.",
@@ -1080,6 +1081,7 @@
         ],
         "promotion_requires": [
           "promoted copied player identity/principal semantics, including principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle",
+          "matching player-identity promotion certificate for obelisk.player_identity.v1, first in v1_required_dependency_chain, bound by reviewed evidence artifact hash and proving promoted copied identity/principal semantics with approved runtime principal lifecycle evidence, public contract/capability/ABI/lifecycle cleanup, SDK consumer coverage, principal_handle, principal_generation, principal_scope_flags, invalidation, and owner-token lifecycle",
           "query-only fail-closed permission checks over copied principals",
           "permission queries include principal_generation and principal_scope_flags or are formally callback-local only",
           "stale principal, scope mismatch, missing generation, missing owner token, zero owner token, unknown owner token, unloading owner token, unknown authority source, and missing policy provenance fail closed",

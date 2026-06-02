@@ -885,10 +885,12 @@ priorities, and do not use history files as the active source of truth.
   cannot bypass explicit mission/transfer/dino/tribe/buff leaf outcomes. This is
   accounting-only; SDK completion remains fail-closed with
   `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
-- Deferred P0 guardrail from the same delegated round: permissions/admin structured
-  promotion should require a matching player-identity promotion certificate with the
-  expected surface, chain position, and artifact hash before permissions/admin
-  public/readiness evidence can count.
+- Follow-up permissions/admin certificate guardrail closed the deferred P0
+  dependency-evidence gap: permissions/admin structured promotion evidence now needs a
+  matching player-identity promotion certificate bound to `obelisk.player_identity.v1`,
+  P0 chain position 1, and a reviewed artifact hash. This is accounting-only and does
+  not promote identity, permissions/admin, public ABI, runtime readiness, or SDK
+  completion.
 
 ## Agent Coordination
 
