@@ -97,6 +97,25 @@ REQUIRED_NON_CLAIMS = {
     "does not expose UE pointers, raw params, FName/GObjects indices, ResourceHandle, mutation, or return overrides",
     "accepted layout anchors are non-public and do not prove principal invalidation semantics",
 }
+REQUIRED_TOP_LEVEL_KEYS = frozenset(
+    (
+        "schema",
+        "artifact_status",
+        "readiness_classification",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "input_target_set",
+        "snapshot_root",
+        "artifact_identity",
+        "candidate_anchors",
+        "lifecycle_acceptance",
+        "principal_policy",
+        "promotion_gate",
+        "safety_summary",
+        "non_claims",
+    )
+)
 IDENTITY_FIELD_TOKENS = (
     "playerid",
     "steamid",
@@ -115,6 +134,28 @@ FORBIDDEN_COORDINATE_KEYS = {
     "uobject_address",
     "function_address",
 }
+FORBIDDEN_POSITIVE_CLAIM_RE = re.compile(
+    r"\b("
+    r"runtime[_ -]?ready|"
+    r"runtime\s+readiness|"
+    r"runtime\s+approved|"
+    r"server[_ -]?operations?[_ -]?authorized|"
+    r"server\s+operations?\s+authorized|"
+    r"commands?\s+(?:enabled|ready|authorized)|"
+    r"command[_ -]?router\s+(?:enabled|ready|authorized)|"
+    r"public[_ -]?sdk\s+(?:ready|enabled)|"
+    r"public\s+identity\s+(?:ready|enabled|authorized)"
+    r")\b",
+    re.IGNORECASE,
+)
+NEGATIVE_CONTEXT_TOKENS = (
+    "blocker",
+    "excluded",
+    "forbidden",
+    "negative",
+    "non_claim",
+    "safety",
+)
 
 
 @dataclass
@@ -163,6 +204,27 @@ def has_forbidden_coordinate(value: Any, trail: str = "$") -> tuple[str, str] | 
             found = has_forbidden_coordinate(child, f"{trail}[{index}]")
             if found:
                 return found
+    return None
+
+
+def has_forbidden_positive_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
+    if any(token in trail.casefold() for token in NEGATIVE_CONTEXT_TOKENS):
+        return None
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            if FORBIDDEN_POSITIVE_CLAIM_RE.search(str(key)) and child not in (False, None):
+                return str(key), child_trail
+            found = has_forbidden_positive_claim(child, child_trail)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            found = has_forbidden_positive_claim(child, f"{trail}[{index}]")
+            if found:
+                return found
+    elif isinstance(value, str) and FORBIDDEN_POSITIVE_CLAIM_RE.search(value):
+        return value, trail
     return None
 
 
@@ -413,6 +475,13 @@ def validate_manifest_details(payload: dict[str, Any], *, promote: bool = False)
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
         return ManifestValidation(blockers, accepted_by_role)
+    keys = set(payload)
+    missing_keys = REQUIRED_TOP_LEVEL_KEYS - keys
+    unexpected_keys = keys - REQUIRED_TOP_LEVEL_KEYS
+    if missing_keys:
+        add(blockers, "top_level_fields_missing_required", "$", missing=sorted(missing_keys))
+    if unexpected_keys:
+        add(blockers, "top_level_fields_unexpected", "$", unexpected=sorted(unexpected_keys))
     if payload.get("artifact_status") != "candidate_only":
         add(blockers, "status_not_candidate_only", "$.artifact_status")
     if payload.get("readiness_classification") != "planning_only":
@@ -488,6 +557,10 @@ def validate_manifest_details(payload: dict[str, Any], *, promote: bool = False)
     if forbidden is not None:
         key, trail = forbidden
         add(blockers, "path_or_coordinate_leakage", trail, field=key)
+    claim = has_forbidden_positive_claim(payload)
+    if claim is not None:
+        value, trail = claim
+        add(blockers, "forbidden_runtime_or_public_claim", trail, value=value)
     if promote:
         accepted_targets = sorted(target for targets in accepted_by_role.values() for target in targets)
         if accepted_targets:

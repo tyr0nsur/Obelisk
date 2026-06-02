@@ -325,6 +325,24 @@ This file is an active routing table only. Durable evidence belongs in
   checks. This remains offline planning-only validation and does not promote public
   permissions/admin, command response, commands/replies, runtime readiness, or v1
   completion.
+- Follow-up player-identity public-contract and bound-planning guardrails now load
+  player-identity public-contract decisions and private candidate contracts through
+  protected/symlink-safe JSON guards, require the public contract checker to scan the
+  canonical `include/obelisk/ObeliskApi.h`, and reject approved-runtime reports that try
+  to overclaim `public_header_allowed`. Lifecycle-anchor planning manifests now reject
+  unexpected top-level fields and positive runtime/server/command/public-SDK claims;
+  principal-invalidation policy now rejects extra `lifecycle_layout_source` fields and no
+  longer exempts that source from positive command/permission claim scanning. The binder
+  therefore fails before writing bound outputs if planning inputs carry runtime/server
+  authorization claims. This remains offline planning-only validation and does not
+  authorize runtime/server work or promote public identity.
+- Deferred SDK-completion audit risk: non-default SDK completion invocations still need
+  tighter evidence binding before any future promotion accounting can trust synthetic
+  promoted evidence. Audit found that placeholder promoted-surface evidence can satisfy
+  some term checks without proving approved runtime evidence, public-contract readiness,
+  or executed ABI/SDK tests, and that SDK completion does not forward non-default
+  manifest/header inputs into the route gate. Treat this as the next offline guardrail
+  target, not current readiness evidence.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

@@ -16,13 +16,18 @@ from pathlib import Path
 from typing import Any
 
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence
+from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent
 DECISION_SCHEMA = "obelisk.player-identity-public-contract-decisions.v1"
 PRIVATE_CANDIDATE_SCHEMA = "obelisk.player-identity-private-candidate-contract.v1"
 REPORT_SCHEMA = "obelisk.player-identity-public-contract-readiness-check.v1"
 SURFACE = "obelisk.player_identity.v1"
 DEFAULT_PRIVATE_CANDIDATE_CONTRACT = Path("docs/research/2026-06-01-player-identity-private-candidate-contract.json")
+DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
+DEFAULT_PUBLIC_HEADER_DECL = "include/obelisk/ObeliskApi.h"
 REQUIRED_INTAKE_ID = "approved_runtime_principal_lifecycle_evidence"
 REQUIRED_RESOLVED_INPUT = "runtime.lifecycle_evidence"
 NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
@@ -510,6 +515,35 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
     return payload
 
 
+def safe_load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any] | None:
+    try:
+        reject_symlink_component(path, label)
+        resolved = reject_protected_input_path(path, label)
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", f"$.{label}", path=str(path), error=str(exc))
+        return None
+    except OSError as exc:
+        add(blockers, f"{label}_unreadable", f"$.{label}", path=str(path), error=str(exc))
+        return None
+    except json.JSONDecodeError as exc:
+        add(blockers, f"{label}_invalid_json", f"$.{label}", path=str(path), error=str(exc))
+        return None
+    if not isinstance(payload, dict):
+        add(blockers, f"{label}_not_object", f"$.{label}", path=str(path))
+        return None
+    return payload
+
+
+def safe_resolve_input_path(path: Path, label: str, blockers: list[dict[str, Any]]) -> Path | None:
+    try:
+        reject_symlink_component(path, label)
+        return reject_protected_input_path(path, label)
+    except SystemExit as exc:
+        add(blockers, f"{label}_path_rejected", f"$.{label}", path=str(path), error=str(exc))
+        return None
+
+
 def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     try:
         payload = approved_evidence.load_json(path)
@@ -551,7 +585,7 @@ def approved_runtime_report(path: Path, blockers: list[dict[str, Any]]) -> dict[
                 "approved_runtime_evidence_runtime_ready_missing",
                 "$.approved_runtime_evidence.runtime_evidence_ready",
             )
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if key in report and report.get(key) is not False:
             add(blockers, f"approved_runtime_evidence_{key}_not_false", f"$.approved_runtime_evidence.{key}")
     return report
@@ -678,8 +712,29 @@ def public_header_identity_tokens(path: Path) -> list[dict[str, Any]]:
 
 
 def validate_public_header(decisions: dict[str, Any], path: Path, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+    resolved = safe_resolve_input_path(path, "public_header", blockers)
+    if resolved is None:
+        return {"path": str(path), "readable": False, "detected_player_identity_tokens": []}
+    if resolved != DEFAULT_PUBLIC_HEADER.resolve():
+        add(
+            blockers,
+            "public_header_path_mismatch",
+            "$.public_header",
+            expected=str(DEFAULT_PUBLIC_HEADER),
+            path=str(path),
+            resolved=str(resolved),
+        )
+    declared = decisions.get("public_header")
+    if declared == DEFAULT_PUBLIC_HEADER_DECL and DEFAULT_PUBLIC_HEADER.resolve() != resolved:
+        add(
+            blockers,
+            "decisions_public_header_not_scanned_header",
+            "$.public_header",
+            declared=str(DEFAULT_PUBLIC_HEADER),
+            scanned=str(path),
+        )
     try:
-        detected = public_header_identity_tokens(path)
+        detected = public_header_identity_tokens(resolved)
     except OSError as exc:
         add(blockers, "public_header_unreadable", "$.public_header", path=str(path), error=str(exc))
         return {"path": str(path), "readable": False, "detected_player_identity_tokens": []}
@@ -861,10 +916,8 @@ def load_private_candidate_contract(decisions: dict[str, Any], path: Path, block
             expected=str(DEFAULT_PRIVATE_CANDIDATE_CONTRACT),
             observed=expected,
         )
-    try:
-        payload = load_json(path, "private candidate contract")
-    except (OSError, SystemExit) as exc:
-        add(blockers, "private_candidate_contract_unreadable", "$.private_candidate_contract", path=str(path), error=str(exc))
+    payload = safe_load_json(path, "private_candidate_contract", blockers)
+    if payload is None:
         return {}
     validate_private_candidate_contract(payload, blockers)
     return payload
@@ -1266,8 +1319,9 @@ def main() -> int:
     args = parse_args()
     check_mode = mode(args)
     blockers: list[dict[str, Any]] = []
-    decisions = load_json(args.decisions, "decisions")
-    validate_decisions(decisions, blockers)
+    decisions = safe_load_json(args.decisions, "decisions", blockers) or {}
+    if decisions:
+        validate_decisions(decisions, blockers)
     private_candidate_contract = load_private_candidate_contract(decisions, args.private_candidate_contract, blockers)
     public_header_report = validate_public_header(decisions, args.public_header, blockers)
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)

@@ -672,6 +672,49 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Player Identity Public Contract And Bound Planning Input Hardening
+
+The next supervised P0 identity guardrail round closed two offline input-provenance and
+overclaim gaps before the approved runtime evidence blocker can feed public contract
+review:
+
+- `scripts/check_player_identity_public_contract_readiness.py` now loads player identity
+  public-contract decisions and private candidate contracts through symlink/protected-path
+  safe JSON guards, emits structured blockers for rejected JSON inputs, and requires the
+  scanned public header to resolve to canonical `include/obelisk/ObeliskApi.h`.
+- The public-contract checker now rejects approved runtime evidence reports that try to
+  carry `public_header_allowed=true`, matching the existing promotion/public-SDK/runtime
+  overclaim guards.
+- `scripts/check_player_identity_lifecycle_anchor_candidates.py` now rejects unexpected
+  top-level fields and positive runtime/server/command/public-SDK text claims in
+  lifecycle-anchor planning artifacts.
+- `scripts/check_player_identity_principal_invalidation_policy.py` now rejects unexpected
+  `lifecycle_layout_source` fields and no longer exempts that source from positive
+  command/permission claim scanning.
+- `scripts/bind_player_identity_planning_sources.py` therefore fails validation before
+  writing bound lifecycle/principal outputs when a planning input tries to preserve
+  runtime/server authorization claims.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_public_contract_readiness`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_lifecycle_anchor_candidates scripts.test_check_player_identity_principal_invalidation_policy scripts.test_bind_player_identity_planning_sources`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_identity_public_contract_readiness scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_command_permission_route_gate scripts.test_check_command_permission_route_gate_bound_identity_sources scripts.test_check_public_sdk_v1_completion`
+
+Deferred read-only audit findings for the next offline guardrail round:
+
+- SDK completion promotion evidence should be bound to approved runtime/public-contract
+  evidence and executed ABI/SDK tests rather than placeholder term-bearing files.
+- SDK completion should either forward non-default manifest/header inputs into the route
+  gate or reject non-default route-relevant inputs while route consistency is unproven.
+- Approved runtime principal lifecycle evidence still needs stronger external capture and
+  builder provenance binding before any future runtime evidence can be treated as more
+  than consume-side review input.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Route And SDK Provenance Lock Hardening
 
 The next supervised P0 guardrail round closed the route/SDK shallow-trust findings from

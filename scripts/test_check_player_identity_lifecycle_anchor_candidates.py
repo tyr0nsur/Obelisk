@@ -271,6 +271,27 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertFalse(payload["public_sdk_ready"])
         self.assertFalse(payload["runtime_ready"])
 
+    def test_rejects_unexpected_top_level_runtime_authorization_claim(self) -> None:
+        payload = manifest()
+        payload["server_operations_authorized"] = True
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("top_level_fields_unexpected", report["blockers"])
+        self.assertIn("forbidden_runtime_or_public_claim", report["blockers"])
+
+    def test_rejects_positive_runtime_and_command_text_claim(self) -> None:
+        payload = manifest()
+        payload["principal_policy"]["note"] = "runtime ready and commands enabled"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("forbidden_runtime_or_public_claim", report["blockers"])
+
     def test_accepts_multiple_complete_source_artifact_id_triples(self) -> None:
         payload = manifest()
         payload["artifact_identity"]["source_artifact_ids"] = [

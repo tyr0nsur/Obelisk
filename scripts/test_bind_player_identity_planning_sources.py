@@ -151,6 +151,40 @@ class BindPlayerIdentityPlanningSourcesTests(unittest.TestCase):
         self.assertEqual(["approved_runtime_evidence_missing"], route_report["blockers"])
         self.assertNotIn("lifecycle_anchor_first_evidence_provenance_unbound", route_report["blockers"])
 
+    def test_rejects_lifecycle_source_with_runtime_authorization_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first_path = root / "first-evidence.json"
+            lifecycle_path = root / "lifecycle.json"
+            principal_path = root / "principal.json"
+            output_dir = root / "bound"
+            lifecycle = accepted_lifecycle_anchor_manifest()
+            lifecycle["server_operations_authorized"] = True
+            lifecycle["principal_policy"]["note"] = "runtime ready and commands enabled"
+            write_json(first_path, players_identity_first_evidence_manifest())
+            write_json(lifecycle_path, lifecycle)
+            write_json(principal_path, principal_policy_manifest())
+
+            result = self.run_tool(
+                [
+                    "--first-evidence",
+                    str(first_path),
+                    "--lifecycle-anchor-candidates",
+                    str(lifecycle_path),
+                    "--principal-invalidation-policy",
+                    str(principal_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("lifecycle_anchor_candidates", result.stderr)
+        self.assertIn("top_level_fields_unexpected", result.stderr)
+        self.assertIn("forbidden_runtime_or_public_claim", result.stderr)
+
     def test_rejects_invalid_first_evidence_before_writing_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

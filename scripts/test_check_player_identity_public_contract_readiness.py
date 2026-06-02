@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -48,6 +49,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     *args,
                 ],
                 check=False,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -180,6 +182,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--json",
                 ],
                 check=False,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -309,16 +312,100 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            detected = checker.public_header_identity_tokens(header)
+
+        self.assertEqual(detected, [])
+
+    def test_rejects_fake_public_header_path_even_without_identity_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            header = Path(tmp) / "ObeliskApi.h"
+            header.write_text("/* no player identity ABI */\n", encoding="utf-8")
             result = self.run_checker(
                 self.decisions(),
                 approved_manifest(),
                 "--public-header",
                 str(header),
+                check=False,
             )
 
         report = json.loads(result.stdout)
-        self.assertEqual(report["blockers"], [])
-        self.assertEqual(report["public_header_scan"]["detected_player_identity_tokens"], [])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_header_path_mismatch", report["blockers"])
+        self.assertIn("decisions_public_header_not_scanned_header", report["blockers"])
+
+    def test_rejects_public_header_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "ObeliskApi.h"
+            target.write_text("/* no player identity ABI */\n", encoding="utf-8")
+            link = root / "ObeliskApi-link.h"
+            link.symlink_to(target)
+            result = self.run_checker(
+                self.decisions(),
+                approved_manifest(),
+                "--public-header",
+                str(link),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_header_path_rejected", report["blockers"])
+
+    def test_rejects_decisions_symlink_component_with_json_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions_path = root / "decisions.json"
+            runtime_path = root / "approved-runtime.json"
+            decisions_path.write_text(json.dumps(self.decisions()), encoding="utf-8")
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            link = root / "decisions-link.json"
+            link.symlink_to(decisions_path)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--decisions",
+                    str(link),
+                    "--approved-runtime-evidence",
+                    str(runtime_path),
+                    "--json",
+                ],
+                check=False,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "")
+        report = json.loads(result.stdout)
+        self.assertIn("decisions_path_rejected", report["blockers"])
+
+    def test_rejects_private_candidate_contract_symlink_component(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "private-candidate.json"
+            target.write_text(
+                (REPO_ROOT / "docs/research/2026-06-01-player-identity-private-candidate-contract.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            link = root / "private-candidate-link.json"
+            link.symlink_to(target)
+            result = self.run_checker(
+                self.decisions(),
+                approved_manifest(),
+                "--private-candidate-contract",
+                str(link),
+                check=False,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_candidate_contract_path_rejected", report["blockers"])
 
     def test_rejects_candidate_public_promotion_or_runtime_claims(self) -> None:
         decisions = self.decisions()
@@ -535,7 +622,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.object(checker.approved_evidence, "build_report", side_effect=wrong_next_blocker):
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
+                checker.approved_evidence,
+                "build_report",
+                side_effect=wrong_next_blocker,
+            ):
                 checker.approved_runtime_report(runtime_path, blockers)
 
         self.assertEqual(
@@ -555,12 +646,40 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.object(checker.approved_evidence, "build_report", side_effect=overclaiming_report):
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
+                checker.approved_evidence,
+                "build_report",
+                side_effect=overclaiming_report,
+            ):
                 checker.approved_runtime_report(runtime_path, blockers)
 
         self.assertEqual(
             [blocker["reason"] for blocker in blockers],
             ["approved_runtime_evidence_public_sdk_ready_not_false"],
+        )
+
+    def test_approved_runtime_report_must_not_overclaim_public_header_allowed(self) -> None:
+        original_build_report = checker.approved_evidence.build_report
+
+        def overclaiming_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["public_header_allowed"] = True
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
+                checker.approved_evidence,
+                "build_report",
+                side_effect=overclaiming_report,
+            ):
+                checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertEqual(
+            [blocker["reason"] for blocker in blockers],
+            ["approved_runtime_evidence_public_header_allowed_not_false"],
         )
 
     def test_approved_runtime_report_accumulates_route_and_public_overclaims(self) -> None:
@@ -571,13 +690,14 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             report["next_blocker"] = "runtime_ready"
             report["promotion_ready"] = True
             report["runtime_ready"] = True
+            report["public_header_allowed"] = True
             return report
 
         with tempfile.TemporaryDirectory() as tmp:
             runtime_path = Path(tmp) / "approved-runtime.json"
             runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
             blockers: list[dict] = []
-            with mock.patch.object(
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
                 checker.approved_evidence,
                 "build_report",
                 side_effect=mismatched_and_overclaiming_report,
@@ -590,6 +710,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "approved_runtime_evidence_next_blocker_mismatch",
                 "approved_runtime_evidence_promotion_ready_not_false",
                 "approved_runtime_evidence_runtime_ready_not_false",
+                "approved_runtime_evidence_public_header_allowed_not_false",
             ],
         )
 
@@ -611,6 +732,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--json",
                 ],
                 check=False,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

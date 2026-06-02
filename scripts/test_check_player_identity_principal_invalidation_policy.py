@@ -478,6 +478,18 @@ class PlayerIdentityPrincipalInvalidationPolicyTests(unittest.TestCase):
         self.assertIn("top_level_fields_unexpected", report["blockers"])
         self.assertIn("forbidden_public_capability_claim", report["blockers"])
 
+    def test_rejects_extra_lifecycle_layout_source_runtime_claim(self) -> None:
+        payload = manifest()
+        payload["lifecycle_layout_source"]["server_operations_authorized"] = True
+        payload["lifecycle_layout_source"]["note"] = "runtime ready and commands enabled"
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("lifecycle_layout_source_fields_unexpected", report["blockers"])
+        self.assertIn("forbidden_public_capability_claim", report["blockers"])
+
     def test_rejects_manifest_under_protected_server_root_before_reading(self) -> None:
         result = subprocess.run(
             [

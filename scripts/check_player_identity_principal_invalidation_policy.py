@@ -91,6 +91,16 @@ REQUIRED_NON_CLAIMS = frozenset(
         "promote, public SDK readiness, and runtime readiness require separately approved runtime evidence",
     )
 )
+ALLOWED_LIFECYCLE_LAYOUT_SOURCE_KEYS = frozenset(
+    (
+        "status",
+        "accepted_layout_only",
+        "start_anchor",
+        "end_anchor",
+        "principal_invalidation_evidence",
+        "source_binding",
+    )
+)
 REQUIRED_EXCLUSIONS = frozenset(
     (
         "real_player_ids",
@@ -197,7 +207,6 @@ NEGATIVE_CONTEXT_TOKENS = (
 )
 PERMITTED_POSITIVE_TRAIL_TOKENS = (
     "invalidation_cases",
-    "lifecycle_layout_source",
 )
 
 
@@ -567,6 +576,14 @@ def validate_lifecycle_layout_source(source: Any, blockers: list[dict[str, Any]]
     if not isinstance(source, dict):
         add(blockers, "lifecycle_layout_source_missing", "$.lifecycle_layout_source")
         return
+    unexpected_keys = set(source) - ALLOWED_LIFECYCLE_LAYOUT_SOURCE_KEYS
+    if unexpected_keys:
+        add(
+            blockers,
+            "lifecycle_layout_source_fields_unexpected",
+            "$.lifecycle_layout_source",
+            unexpected=sorted(unexpected_keys),
+        )
     if source.get("status") != "candidate_layout_consumable":
         add(blockers, "lifecycle_layout_source_status_not_candidate", "$.lifecycle_layout_source.status")
     if source.get("accepted_layout_only") is not True:
