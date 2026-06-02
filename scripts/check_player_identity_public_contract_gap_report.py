@@ -44,6 +44,14 @@ DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE = Path(
 )
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_INTAKE_ID = "public_abi_preflight_candidate"
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT = "abi.public_pod_contract.public_abi_preflight_candidate"
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_CHECKER = "scripts/check_player_identity_public_abi_preflight_candidate.py"
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM = (
+    "A valid public ABI preflight candidate is offline routing evidence only; it does not resolve the public "
+    "POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote "
+    "player identity, or count toward v1 completion."
+)
 REQUIRED_PROMOTION_BLOCKERS = {
     "runtime.lifecycle_evidence",
     "privacy.identifier_redaction",
@@ -727,6 +735,54 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
         for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed", "principal_invalidation_ready"):
             if principal_policy_intake.get(key) is not False:
                 add(blockers, "readiness_flag_not_false", f"$.principal_invalidation_policy_evidence_intake.{key}", input="principal_invalidation_policy_evidence_intake", value=principal_policy_intake.get(key))
+    public_abi_preflight_intake = decisions.get("public_abi_preflight_candidate_intake")
+    if not isinstance(public_abi_preflight_intake, dict):
+        add(blockers, "decisions_public_abi_preflight_candidate_intake_missing", "$.public_abi_preflight_candidate_intake")
+    else:
+        if public_abi_preflight_intake.get("id") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_INTAKE_ID:
+            add(blockers, "decisions_public_abi_preflight_candidate_intake_id_mismatch", "$.public_abi_preflight_candidate_intake.id")
+        if public_abi_preflight_intake.get("status") != "repo_candidate_preflight_required":
+            add(blockers, "decisions_public_abi_preflight_candidate_intake_status_mismatch", "$.public_abi_preflight_candidate_intake.status")
+        if public_abi_preflight_intake.get("resolved_input") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT:
+            add(
+                blockers,
+                "decisions_public_abi_preflight_candidate_intake_resolved_input_mismatch",
+                "$.public_abi_preflight_candidate_intake.resolved_input",
+            )
+        if public_abi_preflight_intake.get("required_checker") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_CHECKER:
+            add(
+                blockers,
+                "decisions_public_abi_preflight_candidate_intake_checker_mismatch",
+                "$.public_abi_preflight_candidate_intake.required_checker",
+            )
+        if public_abi_preflight_intake.get("default_manifest") != str(DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE):
+            add(
+                blockers,
+                "decisions_public_abi_preflight_candidate_intake_default_manifest_mismatch",
+                "$.public_abi_preflight_candidate_intake.default_manifest",
+            )
+        if public_abi_preflight_intake.get("non_claim") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM:
+            add(
+                blockers,
+                "decisions_public_abi_preflight_candidate_intake_non_claim_mismatch",
+                "$.public_abi_preflight_candidate_intake.non_claim",
+            )
+        for key in (
+            "promotion_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "public_header_allowed",
+            "public_abi_ready",
+            "v1_completion_evidence",
+        ):
+            if public_abi_preflight_intake.get(key) is not False:
+                add(
+                    blockers,
+                    "readiness_flag_not_false",
+                    f"$.public_abi_preflight_candidate_intake.{key}",
+                    input="public_abi_preflight_candidate_intake",
+                    value=public_abi_preflight_intake.get(key),
+                )
     not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
     if not isinstance(not_sufficient, dict):
         add(blockers, "decisions_approved_runtime_evidence_not_sufficient_missing", "$.approved_runtime_evidence_not_sufficient")
@@ -1079,6 +1135,8 @@ def validate_public_abi_preflight_candidate(
     private_pod_layout_path: Path,
     public_header_path: Path,
     blockers: list[dict[str, Any]],
+    identifier_redaction_evidence: dict[str, Any],
+    principal_invalidation_policy_report: dict[str, Any],
 ) -> dict[str, Any]:
     try:
         payload = public_abi_preflight_candidate.load_json(path)
@@ -1120,11 +1178,29 @@ def validate_public_abi_preflight_candidate(
         )
     header_scan = public_abi_preflight_candidate.scan_public_header(public_header_path, candidate_blockers)
     public_abi_preflight_candidate.validate_manifest(payload, private_payload, candidate_blockers)
+    redaction_report = {
+        "accepted_for_contract_review": identifier_redaction_evidence.get("accepted_for_contract_review") is True,
+        "blockers": identifier_redaction_evidence.get("blockers", []),
+    }
+    principal_report = {
+        "ready": principal_invalidation_policy_report.get("accepted_for_policy_review") is True,
+        "candidate_only": principal_invalidation_policy_report.get("candidate_only") is True,
+        "blockers": principal_invalidation_policy_report.get("blockers", []),
+    }
+    public_abi_preflight_candidate.validate_claimed_contract_review_inputs(
+        payload,
+        candidate_blockers,
+        redaction_report=redaction_report,
+        principal_report=principal_report,
+        private_layout_report=private_report,
+    )
     report = public_abi_preflight_candidate.build_report(
         payload,
         candidate_blockers,
         header_scan=header_scan,
         private_layout_report=private_report,
+        redaction_report=redaction_report,
+        principal_report=principal_report,
     )
     if candidate_blockers:
         add(
@@ -1287,6 +1363,8 @@ def main() -> int:
         args.private_pod_layout_candidate,
         args.public_header,
         blockers,
+        identifier_redaction_evidence,
+        principal_invalidation_policy_report,
     )
     header_scan = scan_public_header(args.public_header, blockers)
 

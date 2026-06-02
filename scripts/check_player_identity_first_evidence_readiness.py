@@ -1623,6 +1623,8 @@ def player_identity_public_contract_gap_diagnosis(
         public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_header,
         report_blockers,
+        redaction_diagnosis,
+        principal_policy_gap_report,
     )
     header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
     args = argparse.Namespace(

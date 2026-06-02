@@ -16,6 +16,8 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_player_identity_private_pod_layout_candidate as private_layout
+import check_player_identity_identifier_redaction_evidence as identifier_redaction
+import check_player_identity_principal_invalidation_policy as principal_invalidation
 
 
 SCHEMA = "obelisk.player-identity-public-abi-preflight-candidate.v1"
@@ -23,6 +25,10 @@ REPORT_SCHEMA = "obelisk.player-identity-public-abi-preflight-candidate-check.v1
 SURFACE = "obelisk.player_identity.v1"
 DEFAULT_MANIFEST = Path("docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json")
 DEFAULT_PRIVATE_LAYOUT = Path("docs/research/player-identity-planning-sources/player-identity-private-pod-layout-candidate.json")
+DEFAULT_IDENTIFIER_REDACTION = Path("docs/research/2026-06-02-player-identity-identifier-redaction-evidence.json")
+DEFAULT_PRINCIPAL_INVALIDATION = Path(
+    "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json"
+)
 DEFAULT_PUBLIC_HEADER = Path("include/obelisk/ObeliskApi.h")
 REQUIRED_ACCEPTED_INPUTS = {
     "privacy.identifier_redaction",
@@ -86,6 +92,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", nargs="?", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--private-pod-layout-candidate", type=Path, default=DEFAULT_PRIVATE_LAYOUT)
+    parser.add_argument("--identifier-redaction-evidence", type=Path, default=DEFAULT_IDENTIFIER_REDACTION)
+    parser.add_argument("--principal-invalidation-policy", type=Path, default=DEFAULT_PRINCIPAL_INVALIDATION)
     parser.add_argument("--public-header", type=Path, default=DEFAULT_PUBLIC_HEADER)
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
@@ -266,12 +274,53 @@ def validate_manifest(payload: dict[str, Any], private_payload: dict[str, Any], 
         add(blockers, "descriptor_fields_private_layout_mismatch", "$.descriptor.fields")
 
 
+def validate_claimed_contract_review_inputs(
+    payload: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    *,
+    redaction_report: dict[str, Any],
+    principal_report: dict[str, Any],
+    private_layout_report: dict[str, Any],
+) -> None:
+    accepted = payload.get("contract_review_inputs_accepted")
+    if not isinstance(accepted, dict):
+        return
+    checks = (
+        (
+            "privacy.identifier_redaction",
+            redaction_report.get("accepted_for_contract_review") is True,
+            redaction_report.get("blockers", []),
+        ),
+        (
+            "lifetime.generation_scope_invalidation.candidate_policy",
+            principal_report.get("ready") is True,
+            principal_report.get("blockers", []),
+        ),
+        (
+            "abi.public_pod_contract.private_layout_candidate",
+            private_layout_report.get("accepted_for_contract_review") is True,
+            private_layout_report.get("blockers", []),
+        ),
+    )
+    for key, accepted_now, input_blockers in checks:
+        if accepted.get(key) is True and not accepted_now:
+            add(
+                blockers,
+                "claimed_contract_review_input_not_accepted",
+                f"$.contract_review_inputs_accepted.{key}",
+                input=key,
+                input_blockers=input_blockers,
+            )
+
+
 def build_report(
     payload: dict[str, Any],
     blockers: list[dict[str, Any]],
     *,
     header_scan: dict[str, Any],
     private_layout_report: dict[str, Any],
+    redaction_report: dict[str, Any],
+    principal_report: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema": REPORT_SCHEMA,
@@ -300,6 +349,15 @@ def build_report(
             "accepted_for_contract_review": private_layout_report.get("accepted_for_contract_review") is True,
             "blockers": private_layout_report.get("blockers", []),
         },
+        "identifier_redaction_evidence": {
+            "accepted_for_contract_review": redaction_report.get("accepted_for_contract_review") is True,
+            "blockers": redaction_report.get("blockers", []),
+        },
+        "principal_invalidation_policy": {
+            "ready": principal_report.get("ready") is True,
+            "candidate_only": principal_report.get("candidate_only") is True,
+            "blockers": principal_report.get("blockers", []),
+        },
         "public_header_scan": header_scan,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,
@@ -325,10 +383,63 @@ def main() -> int:
         add(blockers, "private_pod_layout_candidate_unreadable", "--private-pod-layout-candidate", error=str(exc))
     else:
         if private_blockers:
-            add(blockers, "private_pod_layout_candidate_not_accepted", "--private-pod-layout-candidate", blockers=private_report["blockers"])
+            add(
+                blockers,
+                "private_pod_layout_candidate_not_accepted",
+                "--private-pod-layout-candidate",
+                input_blockers=private_report["blockers"],
+            )
+    try:
+        redaction_payload = identifier_redaction.load_evidence(args.identifier_redaction_evidence)
+        redaction_blockers = identifier_redaction.validate_evidence(redaction_payload)
+        redaction_report = identifier_redaction.build_report(redaction_payload, redaction_blockers)
+    except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        redaction_report = {"accepted_for_contract_review": False, "blockers": ["identifier_redaction_evidence_unreadable"]}
+        add(blockers, "identifier_redaction_evidence_unreadable", "--identifier-redaction-evidence", error=str(exc))
+    else:
+        if redaction_blockers:
+            add(
+                blockers,
+                "identifier_redaction_evidence_not_accepted",
+                "--identifier-redaction-evidence",
+                input_blockers=redaction_report["blockers"],
+            )
+    try:
+        principal_payload = principal_invalidation.load_json(args.principal_invalidation_policy)
+        principal_validation = principal_invalidation.validate_manifest(principal_payload, check_mode="consume")
+        principal_report = principal_invalidation.build_report(
+            principal_payload,
+            principal_validation,
+            check_mode="consume",
+        )
+    except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        principal_report = {"ready": False, "candidate_only": False, "blockers": ["principal_invalidation_policy_unreadable"]}
+        add(blockers, "principal_invalidation_policy_unreadable", "--principal-invalidation-policy", error=str(exc))
+    else:
+        if principal_validation.blockers:
+            add(
+                blockers,
+                "principal_invalidation_policy_not_accepted",
+                "--principal-invalidation-policy",
+                input_blockers=principal_report["blockers"],
+            )
     header_scan = scan_public_header(args.public_header, blockers)
     validate_manifest(payload, private_payload, blockers)
-    report = build_report(payload, blockers, header_scan=header_scan, private_layout_report=private_report)
+    validate_claimed_contract_review_inputs(
+        payload,
+        blockers,
+        redaction_report=redaction_report,
+        principal_report=principal_report,
+        private_layout_report=private_report,
+    )
+    report = build_report(
+        payload,
+        blockers,
+        header_scan=header_scan,
+        private_layout_report=private_report,
+        redaction_report=redaction_report,
+        principal_report=principal_report,
+    )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

@@ -15,13 +15,28 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "check_player_identity_public_abi_preflight_candidate.py"
 MANIFEST = REPO_ROOT / "docs" / "research" / "player-identity-planning-sources" / "player-identity-public-abi-preflight-candidate.json"
+IDENTIFIER_REDACTION = REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json"
+PRINCIPAL_INVALIDATION = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
+    / "players-identity-principal-invalidation-policy.json"
+)
 
 
 class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
     def manifest(self) -> dict:
         return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
-    def run_checker(self, payload: dict | None = None, *, public_header_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        payload: dict | None = None,
+        *,
+        public_header_text: str | None = None,
+        identifier_redaction_payload: dict | None = None,
+        principal_invalidation_payload: dict | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             path = root / "public-abi-preflight.json"
@@ -31,6 +46,14 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
                 header = root / "ObeliskApi.h"
                 header.write_text(public_header_text, encoding="utf-8")
                 command.extend(["--public-header", str(header)])
+            if identifier_redaction_payload is not None:
+                evidence = root / "identifier-redaction.json"
+                evidence.write_text(json.dumps(identifier_redaction_payload), encoding="utf-8")
+                command.extend(["--identifier-redaction-evidence", str(evidence)])
+            if principal_invalidation_payload is not None:
+                policy = root / "principal-invalidation.json"
+                policy.write_text(json.dumps(principal_invalidation_payload), encoding="utf-8")
+                command.extend(["--principal-invalidation-policy", str(policy)])
             return subprocess.run(
                 command,
                 cwd=REPO_ROOT,
@@ -125,6 +148,32 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("event_payload_private_layout_mismatch", report["blockers"])
         self.assertIn("descriptor_fields_private_layout_mismatch", report["blockers"])
+
+    def test_rejects_claimed_redaction_input_when_redaction_checker_blocks(self) -> None:
+        redaction = json.loads(IDENTIFIER_REDACTION.read_text(encoding="utf-8"))
+        redaction["sanitized"] = False
+
+        result = self.run_checker(identifier_redaction_payload=redaction)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
+        self.assertIn("claimed_contract_review_input_not_accepted", report["blockers"])
+        self.assertFalse(report["identifier_redaction_evidence"]["accepted_for_contract_review"])
+        self.assertIn("sanitized_not_true", report["identifier_redaction_evidence"]["blockers"])
+
+    def test_rejects_claimed_principal_input_when_policy_checker_blocks(self) -> None:
+        principal = json.loads(PRINCIPAL_INVALIDATION.read_text(encoding="utf-8"))
+        principal["promotion_ready"] = True
+
+        result = self.run_checker(principal_invalidation_payload=principal)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("principal_invalidation_policy_not_accepted", report["blockers"])
+        self.assertIn("claimed_contract_review_input_not_accepted", report["blockers"])
+        self.assertFalse(report["principal_invalidation_policy"]["ready"])
+        self.assertIn("promotion_ready_not_false", report["principal_invalidation_policy"]["blockers"])
 
 
 if __name__ == "__main__":

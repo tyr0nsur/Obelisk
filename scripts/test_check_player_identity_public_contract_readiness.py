@@ -22,6 +22,13 @@ HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
 REPO_REDACTION_EVIDENCE = (
     REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json"
 )
+PUBLIC_ABI_PREFLIGHT_CANDIDATE = (
+    REPO_ROOT
+    / "docs"
+    / "research"
+    / "player-identity-planning-sources"
+    / "player-identity-public-abi-preflight-candidate.json"
+)
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -40,6 +47,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         runtime: dict,
         *args: str,
         redaction: dict | None = None,
+        public_abi_preflight_candidate: dict | None = None,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmp:
@@ -47,12 +55,20 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             decisions_path = root / "decisions.json"
             runtime_path = root / "approved-runtime.json"
             redaction_args = []
+            public_abi_preflight_args = []
             decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
             runtime_path.write_text(json.dumps(self.normalize_runtime_manifest_paths(runtime)), encoding="utf-8")
             if redaction is not None:
                 redaction_path = root / "identifier-redaction.json"
                 redaction_path.write_text(json.dumps(redaction), encoding="utf-8")
                 redaction_args = ["--identifier-redaction-evidence", str(redaction_path)]
+            if public_abi_preflight_candidate is not None:
+                public_abi_preflight_path = root / "public-abi-preflight.json"
+                public_abi_preflight_path.write_text(json.dumps(public_abi_preflight_candidate), encoding="utf-8")
+                public_abi_preflight_args = [
+                    "--public-abi-preflight-candidate",
+                    str(public_abi_preflight_path),
+                ]
             result = subprocess.run(
                 [
                     sys.executable,
@@ -62,6 +78,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                     "--approved-runtime-evidence",
                     str(runtime_path),
                     *redaction_args,
+                    *public_abi_preflight_args,
                     "--json",
                     *args,
                 ],
@@ -78,6 +95,9 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
     def decisions(self) -> dict:
         return json.loads(DECISIONS.read_text(encoding="utf-8"))
 
+    def public_abi_preflight_candidate(self) -> dict:
+        return json.loads(PUBLIC_ABI_PREFLIGHT_CANDIDATE.read_text(encoding="utf-8"))
+
     def test_accepts_runtime_evidence_for_contract_review_only(self) -> None:
         result = self.run_checker(self.decisions(), approved_manifest())
         report = json.loads(result.stdout)
@@ -89,6 +109,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             [
                 "runtime.lifecycle_evidence",
                 "lifetime.generation_scope_invalidation.candidate_policy",
+                "abi.public_pod_contract.public_abi_preflight_candidate",
             ],
         )
         self.assertFalse(report["promotion_ready"])
@@ -120,6 +141,21 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             "lifetime.generation_scope_invalidation.candidate_policy",
         )
         self.assertFalse(report["principal_invalidation_policy"]["principal_invalidation_ready"])
+        abi_preflight = report["public_abi_preflight_candidate"]
+        self.assertTrue(abi_preflight["provided"])
+        self.assertEqual(abi_preflight["status"], "blocked")
+        self.assertTrue(abi_preflight["candidate_only"])
+        self.assertTrue(abi_preflight["accepted_for_candidate_review"])
+        self.assertFalse(abi_preflight["accepted_for_contract_review"])
+        self.assertFalse(abi_preflight["promotion_ready"])
+        self.assertFalse(abi_preflight["public_sdk_ready"])
+        self.assertFalse(abi_preflight["runtime_ready"])
+        self.assertFalse(abi_preflight["public_header_allowed"])
+        self.assertFalse(abi_preflight["public_abi_ready"])
+        self.assertFalse(abi_preflight["v1_completion_evidence"])
+        self.assertEqual(abi_preflight["public_header_symbols_now"], [])
+        self.assertEqual(abi_preflight["public_capability_bits_now"], [])
+        self.assertEqual(abi_preflight["public_callback_abi_now"], [])
 
     def test_accepts_identifier_redaction_evidence_for_contract_review_only(self) -> None:
         result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction_manifest())
@@ -133,6 +169,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
                 "runtime.lifecycle_evidence",
                 "privacy.identifier_redaction",
                 "lifetime.generation_scope_invalidation.candidate_policy",
+                "abi.public_pod_contract.public_abi_preflight_candidate",
             ],
         )
         self.assertFalse(report["promotion_ready"])
@@ -795,6 +832,50 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("identifier_redaction_evidence_intake_missing", report["blockers"])
+
+    def test_rejects_missing_or_weakened_public_abi_preflight_intake(self) -> None:
+        decisions = self.decisions()
+        decisions["public_abi_preflight_candidate_intake"]["required_checker"] = "scripts/other.py"
+        decisions["public_abi_preflight_candidate_intake"]["default_manifest"] = "docs/research/other.json"
+        decisions["public_abi_preflight_candidate_intake"]["non_claim"] = "promotes public ABI"
+        decisions["public_abi_preflight_candidate_intake"]["public_abi_ready"] = True
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_abi_preflight_candidate_intake_checker_mismatch", report["blockers"])
+        self.assertIn("public_abi_preflight_candidate_intake_default_manifest_mismatch", report["blockers"])
+        self.assertIn("public_abi_preflight_candidate_intake_non_claim_mismatch", report["blockers"])
+        self.assertIn("public_abi_preflight_candidate_intake_public_abi_ready_not_false", report["blockers"])
+
+        decisions = self.decisions()
+        decisions.pop("public_abi_preflight_candidate_intake")
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_abi_preflight_candidate_intake_missing", report["blockers"])
+
+    def test_rejects_public_abi_preflight_candidate_overclaim(self) -> None:
+        preflight = self.public_abi_preflight_candidate()
+        preflight["public_abi_ready"] = True
+        preflight["v1_completion_evidence"] = True
+        preflight["public_header_symbols_now"] = ["ObeliskPlayerPrincipalEvent"]
+
+        result = self.run_checker(
+            self.decisions(),
+            approved_manifest(),
+            public_abi_preflight_candidate=preflight,
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_abi_preflight_candidate_not_accepted", report["blockers"])
+        self.assertIn("public_abi_ready_not_false", report["public_abi_preflight_candidate"]["blockers"])
+        self.assertIn("v1_completion_evidence_not_false", report["public_abi_preflight_candidate"]["blockers"])
+        self.assertIn("public_header_symbols_now_not_empty", report["public_abi_preflight_candidate"]["blockers"])
 
     def test_approved_runtime_report_must_route_to_identity_public_contract_gate(self) -> None:
         original_build_report = checker.approved_evidence.build_report

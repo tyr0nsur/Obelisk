@@ -18,6 +18,7 @@ from typing import Any
 import check_player_identity_runtime_principal_lifecycle_approved_evidence as approved_evidence
 import check_player_identity_identifier_redaction_evidence as identifier_redaction
 import check_player_identity_principal_invalidation_policy as principal_invalidation_policy
+import check_player_identity_public_abi_preflight_candidate as public_abi_preflight_candidate
 from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_component
 
 
@@ -39,6 +40,17 @@ PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT = "lifetime.generation_scope_invalida
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
 DEFAULT_PRINCIPAL_INVALIDATION_POLICY = Path(
     "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json"
+)
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_INTAKE_ID = "public_abi_preflight_candidate"
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT = "abi.public_pod_contract.public_abi_preflight_candidate"
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_CHECKER = "scripts/check_player_identity_public_abi_preflight_candidate.py"
+DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE = Path(
+    "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json"
+)
+REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM = (
+    "A valid public ABI preflight candidate is offline routing evidence only; it does not resolve the public "
+    "POD ABI, add header symbols, add capability bits, expose callbacks, satisfy SDK consumer tests, promote "
+    "player identity, or count toward v1 completion."
 )
 NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE = "identity_public_contract_gate"
 REQUIRED_DECISION_GATE_CURRENT_DECISION = (
@@ -516,6 +528,12 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_PRIVATE_CANDIDATE_CONTRACT,
         help="Private candidate-only player identity contract artifact.",
     )
+    parser.add_argument(
+        "--public-abi-preflight-candidate",
+        type=Path,
+        default=DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
+        help="Candidate-only public ABI preflight routing artifact; never promotion evidence.",
+    )
     parser.add_argument("--promote", action="store_true", help="Fail closed for promotion checks.")
     parser.add_argument("--public-readiness", action="store_true", help="Fail closed for public SDK readiness checks.")
     parser.add_argument("--runtime-readiness", action="store_true", help="Fail closed for runtime readiness checks.")
@@ -751,6 +769,176 @@ def principal_invalidation_policy_report(path: Path | None, blockers: list[dict[
         "public_header_allowed": False,
         "principal_invalidation_ready": False,
         "blockers": report.get("blockers", []),
+    }
+
+
+def public_abi_preflight_candidate_report(
+    path: Path | None,
+    public_header_path: Path,
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if path is None:
+        add(blockers, "public_abi_preflight_candidate_missing", "$.public_abi_preflight_candidate")
+        return {
+            "provided": False,
+            "status": "blocked",
+            "candidate_only": True,
+            "accepted_for_candidate_review": False,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "blockers": ["public_abi_preflight_candidate_missing"],
+        }
+    try:
+        payload = public_abi_preflight_candidate.load_json(path)
+        private_payload = public_abi_preflight_candidate.private_layout.load_json(
+            public_abi_preflight_candidate.DEFAULT_PRIVATE_LAYOUT
+        )
+        private_contract = public_abi_preflight_candidate.private_layout.load_json(
+            public_abi_preflight_candidate.private_layout.DEFAULT_PRIVATE_CONTRACT
+        )
+        private_blockers = public_abi_preflight_candidate.private_layout.validate_manifest(
+            private_payload,
+            private_contract,
+        )
+        private_report = public_abi_preflight_candidate.private_layout.build_report(
+            private_payload,
+            private_blockers,
+        )
+        redaction_payload = public_abi_preflight_candidate.identifier_redaction.load_evidence(
+            public_abi_preflight_candidate.DEFAULT_IDENTIFIER_REDACTION
+        )
+        redaction_blockers = public_abi_preflight_candidate.identifier_redaction.validate_evidence(redaction_payload)
+        redaction_report = public_abi_preflight_candidate.identifier_redaction.build_report(
+            redaction_payload,
+            redaction_blockers,
+        )
+        principal_payload = public_abi_preflight_candidate.principal_invalidation.load_json(
+            public_abi_preflight_candidate.DEFAULT_PRINCIPAL_INVALIDATION
+        )
+        principal_validation = public_abi_preflight_candidate.principal_invalidation.validate_manifest(
+            principal_payload,
+            check_mode="consume",
+        )
+        principal_report = public_abi_preflight_candidate.principal_invalidation.build_report(
+            principal_payload,
+            principal_validation,
+            check_mode="consume",
+        )
+    except (OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        add(
+            blockers,
+            "public_abi_preflight_candidate_unreadable_or_rejected",
+            "$.public_abi_preflight_candidate",
+            path=str(path),
+            error=str(exc),
+        )
+        return {
+            "provided": True,
+            "status": "blocked",
+            "candidate_only": True,
+            "accepted_for_candidate_review": False,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "blockers": ["public_abi_preflight_candidate_unreadable_or_rejected"],
+        }
+
+    candidate_blockers: list[dict[str, Any]] = []
+    if private_blockers:
+        public_abi_preflight_candidate.add(
+            candidate_blockers,
+            "private_pod_layout_candidate_not_accepted",
+            "$.public_abi_preflight_candidate.private_pod_layout_candidate",
+            layout_blockers=private_report["blockers"],
+        )
+    if redaction_blockers:
+        public_abi_preflight_candidate.add(
+            candidate_blockers,
+            "identifier_redaction_evidence_not_accepted",
+            "$.public_abi_preflight_candidate.identifier_redaction_evidence",
+            input_blockers=redaction_report["blockers"],
+        )
+    if principal_validation.blockers:
+        public_abi_preflight_candidate.add(
+            candidate_blockers,
+            "principal_invalidation_policy_not_accepted",
+            "$.public_abi_preflight_candidate.principal_invalidation_policy",
+            input_blockers=principal_report["blockers"],
+        )
+    header_scan = public_abi_preflight_candidate.scan_public_header(public_header_path, candidate_blockers)
+    public_abi_preflight_candidate.validate_manifest(payload, private_payload, candidate_blockers)
+    public_abi_preflight_candidate.validate_claimed_contract_review_inputs(
+        payload,
+        candidate_blockers,
+        redaction_report=redaction_report,
+        principal_report=principal_report,
+        private_layout_report=private_report,
+    )
+    report = public_abi_preflight_candidate.build_report(
+        payload,
+        candidate_blockers,
+        header_scan=header_scan,
+        private_layout_report=private_report,
+        redaction_report=redaction_report,
+        principal_report=principal_report,
+    )
+    if candidate_blockers:
+        add(
+            blockers,
+            "public_abi_preflight_candidate_not_accepted",
+            "$.public_abi_preflight_candidate",
+            path=str(path),
+            preflight_blockers=report["blockers"],
+        )
+    for key in (
+        "accepted_for_contract_review",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "public_header_allowed",
+        "public_abi_ready",
+        "v1_completion_evidence",
+    ):
+        if report.get(key) is not False:
+            add(blockers, f"public_abi_preflight_candidate_{key}_not_false", f"$.public_abi_preflight_candidate.{key}")
+    for key in ("public_header_symbols_now", "public_capability_bits_now", "public_callback_abi_now"):
+        if report.get(key) != []:
+            add(blockers, f"public_abi_preflight_candidate_{key}_not_empty", f"$.public_abi_preflight_candidate.{key}")
+    return {
+        "provided": True,
+        "status": report.get("status"),
+        "candidate_only": report.get("candidate_only") is True,
+        "accepted_for_candidate_review": report.get("accepted_for_candidate_review") is True,
+        "accepted_for_contract_review": False,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "runtime_ready": False,
+        "public_header_allowed": False,
+        "public_abi_ready": False,
+        "v1_completion_evidence": False,
+        "public_header_symbols_now": [],
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
+        "contract_review_inputs_accepted": report.get("contract_review_inputs_accepted", {}),
+        "required_before_public_abi": report.get("required_before_public_abi", []),
+        "does_not_resolve": report.get("does_not_resolve", []),
+        "blockers": report.get("blockers", []),
+        "non_claims": report.get("non_claims", []),
     }
 
 
@@ -1318,6 +1506,53 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             if principal_policy_intake.get(key) is not False:
                 add(blockers, f"principal_invalidation_policy_evidence_intake_{key}_not_false", f"$.principal_invalidation_policy_evidence_intake.{key}")
 
+    public_abi_preflight_intake = decisions.get("public_abi_preflight_candidate_intake")
+    if not isinstance(public_abi_preflight_intake, dict):
+        add(blockers, "public_abi_preflight_candidate_intake_missing", "$.public_abi_preflight_candidate_intake")
+    else:
+        if public_abi_preflight_intake.get("id") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_INTAKE_ID:
+            add(blockers, "public_abi_preflight_candidate_intake_id_mismatch", "$.public_abi_preflight_candidate_intake.id")
+        if public_abi_preflight_intake.get("status") != "repo_candidate_preflight_required":
+            add(blockers, "public_abi_preflight_candidate_intake_status_mismatch", "$.public_abi_preflight_candidate_intake.status")
+        if public_abi_preflight_intake.get("resolved_input") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT:
+            add(
+                blockers,
+                "public_abi_preflight_candidate_intake_resolved_input_mismatch",
+                "$.public_abi_preflight_candidate_intake.resolved_input",
+            )
+        if public_abi_preflight_intake.get("required_checker") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_CHECKER:
+            add(
+                blockers,
+                "public_abi_preflight_candidate_intake_checker_mismatch",
+                "$.public_abi_preflight_candidate_intake.required_checker",
+            )
+        if public_abi_preflight_intake.get("default_manifest") != str(DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE):
+            add(
+                blockers,
+                "public_abi_preflight_candidate_intake_default_manifest_mismatch",
+                "$.public_abi_preflight_candidate_intake.default_manifest",
+            )
+        if public_abi_preflight_intake.get("non_claim") != REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_NON_CLAIM:
+            add(
+                blockers,
+                "public_abi_preflight_candidate_intake_non_claim_mismatch",
+                "$.public_abi_preflight_candidate_intake.non_claim",
+            )
+        for key in (
+            "promotion_ready",
+            "public_sdk_ready",
+            "runtime_ready",
+            "public_header_allowed",
+            "public_abi_ready",
+            "v1_completion_evidence",
+        ):
+            if public_abi_preflight_intake.get(key) is not False:
+                add(
+                    blockers,
+                    f"public_abi_preflight_candidate_intake_{key}_not_false",
+                    f"$.public_abi_preflight_candidate_intake.{key}",
+                )
+
     not_sufficient = decisions.get("approved_runtime_evidence_not_sufficient")
     if not isinstance(not_sufficient, dict):
         add(blockers, "approved_runtime_evidence_not_sufficient_missing", "$.approved_runtime_evidence_not_sufficient")
@@ -1440,8 +1675,10 @@ def build_report(
     blockers: list[dict[str, Any]],
     check_mode: str,
     principal_policy_report: dict[str, Any] | None = None,
+    public_abi_preflight_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     principal_policy_report = principal_policy_report or {}
+    public_abi_preflight_report = public_abi_preflight_report or {}
     runtime_ready = (
         runtime_report.get("approved_runtime_evidence_present") is True
         and runtime_report.get("runtime_evidence_ready") is True
@@ -1467,6 +1704,8 @@ def build_report(
             resolved_inputs.append(REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT)
         if principal_policy_report.get("accepted_for_policy_review") is True:
             resolved_inputs.append(PRINCIPAL_INVALIDATION_POLICY_REVIEW_INPUT)
+        if public_abi_preflight_report.get("accepted_for_candidate_review") is True:
+            resolved_inputs.append(REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_RESOLVED_INPUT)
     return {
         "schema": REPORT_SCHEMA,
         "surface": decisions.get("surface"),
@@ -1539,10 +1778,35 @@ def build_report(
             "public_header_allowed": False,
             "principal_invalidation_ready": False,
         },
+        "public_abi_preflight_candidate": {
+            "provided": public_abi_preflight_report.get("provided") is True,
+            "status": public_abi_preflight_report.get("status"),
+            "candidate_only": public_abi_preflight_report.get("candidate_only") is True,
+            "accepted_for_candidate_review": public_abi_preflight_report.get("accepted_for_candidate_review") is True,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "contract_review_inputs_accepted": public_abi_preflight_report.get(
+                "contract_review_inputs_accepted",
+                {},
+            ),
+            "required_before_public_abi": public_abi_preflight_report.get("required_before_public_abi", []),
+            "does_not_resolve": public_abi_preflight_report.get("does_not_resolve", []),
+            "blockers": public_abi_preflight_report.get("blockers", []),
+            "non_claims": public_abi_preflight_report.get("non_claims", []),
+        },
         "non_claims": [
             "approved runtime evidence intake does not add public header symbols, capability bits, callbacks, lookup, mutation, return override, or v1 SDK readiness",
             "identifier-redaction evidence intake does not resolve the full privacy blocker, add public header symbols, or make player identity promotion-ready",
             "principal invalidation policy intake is candidate-only and does not resolve the full lifetime/generation/scope blocker or prove runtime lifecycle ordering",
+            "public ABI preflight candidate intake is candidate-only and does not resolve public ABI layout, SDK consumer tests, lifecycle cleanup, or v1 completion",
         ],
     }
 
@@ -1559,6 +1823,11 @@ def main() -> int:
     runtime_report = approved_runtime_report(args.approved_runtime_evidence, blockers)
     redaction_report = identifier_redaction_report(args.identifier_redaction_evidence, blockers)
     principal_policy_report = principal_invalidation_policy_report(args.principal_invalidation_policy, blockers)
+    public_abi_preflight_report = public_abi_preflight_candidate_report(
+        args.public_abi_preflight_candidate,
+        args.public_header,
+        blockers,
+    )
     report = build_report(
         decisions,
         runtime_report,
@@ -1568,6 +1837,7 @@ def main() -> int:
         blockers,
         check_mode,
         principal_policy_report,
+        public_abi_preflight_report,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

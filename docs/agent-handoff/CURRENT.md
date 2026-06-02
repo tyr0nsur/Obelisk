@@ -203,13 +203,14 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated identity/SDK guardrail round aligned stale SDK route docs to the
-  source-bound default blocker (`approved_runtime_evidence_missing`) and hardened
-  principal lifecycle preflight replay to exact runtime path bindings:
-  `server_binary.path`, `obelisk_root`, installed wrapper path, and per-instance marker
-  dir. This is offline/request hygiene only; no runtime/server op, route unlock, SDK/P0
-  credit, or public ABI promotion.
-- Pending delegated audit findings to preserve after compaction: wire player identity
-  public ABI preflight into public-contract readiness/gap gates; tighten operator receipt
-  exact shape/positive-claim rejection; reject unapproved/protected receipt sidecars
-  before reading or hashing them.
+- Latest delegated identity/SDK guardrail round wired player identity public ABI preflight
+  into public-contract readiness/gap and first-evidence route diagnostics. The preflight
+  now replays private POD layout, identifier-redaction, principal-invalidation, and public
+  header checks before accepting claimed review inputs; it remains candidate-only and
+  grants no public ABI, SDK, runtime, promotion, or v1 credit. Operator approval receipts
+  now require exact canonical shape/non-claims and reject positive authorization/readiness
+  text. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
+  `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`; no runtime/server op.
+- Pending delegated safety finding to preserve after compaction: reject protected or
+  unapproved request/env/operator sidecars before reading, hashing, subprocess replay, or
+  digest binding in lifecycle window/bundle evidence paths.

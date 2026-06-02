@@ -78,6 +78,98 @@ POSITIVE_CAPABILITY_VALUE_RE = re.compile(
     r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
     re.IGNORECASE,
 )
+FORBIDDEN_RECEIPT_AUTHORIZATION_CLAIM_RE = re.compile(
+    r"(?:\b(?:server[_ -]?operations?|runtime(?:[_ -]?(?:work|capture|window|sdk))?|"
+    r"public[_ -]?sdk|v1(?:[_ -]?sdk)?(?:[_ -]?completion)?|player[_ -]?identity|"
+    r"promotion|sdk|lookup|permissions?|admin|commands?)\b.{0,80}"
+    r"\b(?:authorized|authorizes|approved|allowed|enabled|supported|promoted|promotion|"
+    r"ready|readiness|complete|completed|completion|delivered)\b|"
+    r"\b(?:authorizes?|approves?|allows?|permits?)\b.{0,80}"
+    r"\b(?:server|runtime|marker|env|starts?|restarts?|stops?|public[_ -]?sdk|v1|"
+    r"player[_ -]?identity|promotion|lookup|permissions?|admin|commands?)\b)",
+    re.IGNORECASE,
+)
+RECEIPT_NEGATED_CLAIM_RE = re.compile(
+    r"\b(?:does\s+not|do\s+not|not|non[_ -]?authorization|no)\b",
+    re.IGNORECASE,
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS = [
+    "generated receipt template only; does not record operator approval",
+    "completed receipt binds one current-turn request pack only",
+    "receipt does not authorize future windows, standing approval, Discord, GitHub publication, public SDK readiness, runtime readiness, or v1 completion",
+    "receipt does not promote public player identity, permissions/admin, command response, lookup, mutation, return override, or ResourceHandle",
+]
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_TOP_LEVEL_KEYS = frozenset(
+    (
+        "schema",
+        "status",
+        "receipt_completed",
+        "operator_current_turn_approval_recorded",
+        "approval_scope",
+        "bound_request_pack",
+        "bound_artifacts",
+        "request_pack_digest",
+        "operator_completion",
+        "non_authorization_flags",
+        "non_claims",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCOPE_KEYS = frozenset(
+    (
+        "scope_type",
+        "standing_approval",
+        "reusable",
+        "future_windows_authorized",
+        "scope_expansion_authorized",
+        "unbound_artifacts_authorized",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS = frozenset(
+    (
+        "run_id",
+        "target",
+        "approved_window",
+        "obelisk_commit",
+        "ark_binary_sha256",
+        "server_binary_path",
+        "restart_expectation",
+        "final_posture",
+        "user_policy",
+        "notice_path",
+        "copied_evidence_dir",
+        "copied_log_path",
+        "window_manifest_path",
+        "rollback",
+    )
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_TARGET_KEYS = frozenset(("instance", "map"))
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_WINDOW_KEYS = frozenset(("start_utc", "end_utc"))
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_ROLLBACK_KEYS = frozenset(("owner", "delta"))
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_ARTIFACTS_KEYS = frozenset(
+    ("window_request_json", "observer_window_env", "operator_approval_request_md")
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_ARTIFACT_KEYS = frozenset(("path", "sha256", "size_bytes"))
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_COMPLETION_KEYS = frozenset(
+    ("approval_recorded_at_utc", "approved_by_role", "approval_source", "attestation")
+)
+EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS = frozenset(
+    (
+        "request_pack_acceptance_authorizes_runtime",
+        "generated_template_authorizes_runtime",
+        "server_operations_authorized_by_template",
+        "runtime_work_authorized_by_template",
+        "discord_authorized",
+        "github_publication_authorized",
+        "publication_authorized",
+        "promotion_ready",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "v1_completion_ready",
+        "secrets_included",
+        "player_private_data_included",
+    )
+)
 
 REQUIRED_TIMESTAMP_FIELDS = (
     "approved_window_start_utc",
@@ -461,6 +553,133 @@ def bound_artifact_from_file(path: Path) -> dict[str, Any]:
     }
 
 
+def add_unexpected_receipt_keys(
+    blockers: list[dict[str, Any]],
+    obj: dict[str, Any],
+    allowed_keys: frozenset[str],
+    path: str,
+) -> None:
+    for key in sorted(obj):
+        if key not in allowed_keys:
+            key_path = f"{path}.{key}" if path else key
+            add(
+                blockers,
+                "operator_approval_receipt_unexpected_key",
+                "operator_approval_receipt_path",
+                key_path=key_path,
+            )
+
+
+def receipt_string_values(value: Any, path: str = "") -> list[tuple[str, str]]:
+    if isinstance(value, str):
+        return [(path, value)]
+    if isinstance(value, dict):
+        values: list[tuple[str, str]] = []
+        for key, child in value.items():
+            child_path = f"{path}.{key}" if path else str(key)
+            values.extend(receipt_string_values(child, child_path))
+        return values
+    if isinstance(value, list):
+        values = []
+        for index, child in enumerate(value):
+            values.extend(receipt_string_values(child, f"{path}[{index}]"))
+        return values
+    return []
+
+
+def receipt_string_has_forbidden_authorization_claim(value: str) -> bool:
+    for segment in re.split(r"(?:[\n.;]|\bbut\b|\bhowever\b)+", value):
+        match = FORBIDDEN_RECEIPT_AUTHORIZATION_CLAIM_RE.search(segment)
+        if match is None:
+            continue
+        prefix = segment[: match.start()]
+        if RECEIPT_NEGATED_CLAIM_RE.search(prefix):
+            continue
+        return True
+    return False
+
+
+def validate_operator_approval_receipt_shape(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    add_unexpected_receipt_keys(
+        blockers,
+        payload,
+        EXPECTED_OPERATOR_APPROVAL_RECEIPT_TOP_LEVEL_KEYS,
+        "",
+    )
+    scope = payload.get("approval_scope")
+    if isinstance(scope, dict):
+        add_unexpected_receipt_keys(
+            blockers,
+            scope,
+            EXPECTED_OPERATOR_APPROVAL_RECEIPT_SCOPE_KEYS,
+            "approval_scope",
+        )
+    bound_request = payload.get("bound_request_pack")
+    if isinstance(bound_request, dict):
+        add_unexpected_receipt_keys(
+            blockers,
+            bound_request,
+            EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_REQUEST_KEYS,
+            "bound_request_pack",
+        )
+        receipt_target = bound_request.get("target")
+        if isinstance(receipt_target, dict):
+            add_unexpected_receipt_keys(
+                blockers,
+                receipt_target,
+                EXPECTED_OPERATOR_APPROVAL_RECEIPT_TARGET_KEYS,
+                "bound_request_pack.target",
+            )
+        receipt_window = bound_request.get("approved_window")
+        if isinstance(receipt_window, dict):
+            add_unexpected_receipt_keys(
+                blockers,
+                receipt_window,
+                EXPECTED_OPERATOR_APPROVAL_RECEIPT_WINDOW_KEYS,
+                "bound_request_pack.approved_window",
+            )
+        rollback = bound_request.get("rollback")
+        if isinstance(rollback, dict):
+            add_unexpected_receipt_keys(
+                blockers,
+                rollback,
+                EXPECTED_OPERATOR_APPROVAL_RECEIPT_ROLLBACK_KEYS,
+                "bound_request_pack.rollback",
+            )
+    bound = payload.get("bound_artifacts")
+    if isinstance(bound, dict):
+        add_unexpected_receipt_keys(
+            blockers,
+            bound,
+            EXPECTED_OPERATOR_APPROVAL_RECEIPT_BOUND_ARTIFACTS_KEYS,
+            "bound_artifacts",
+        )
+        for key, artifact in bound.items():
+            if isinstance(artifact, dict):
+                add_unexpected_receipt_keys(
+                    blockers,
+                    artifact,
+                    EXPECTED_OPERATOR_APPROVAL_RECEIPT_ARTIFACT_KEYS,
+                    f"bound_artifacts.{key}",
+                )
+    completion = payload.get("operator_completion")
+    if isinstance(completion, dict):
+        add_unexpected_receipt_keys(
+            blockers,
+            completion,
+            EXPECTED_OPERATOR_APPROVAL_RECEIPT_COMPLETION_KEYS,
+            "operator_completion",
+        )
+    flags = payload.get("non_authorization_flags")
+    if isinstance(flags, dict):
+        add_unexpected_receipt_keys(
+            blockers,
+            flags,
+            EXPECTED_OPERATOR_APPROVAL_RECEIPT_FLAG_KEYS,
+            "non_authorization_flags",
+        )
+
+
 def validate_operator_approval_receipt(
     fields: dict[str, str],
     manifest_path: Path,
@@ -489,6 +708,18 @@ def validate_operator_approval_receipt(
     if not isinstance(payload, dict):
         add(blockers, "operator_approval_receipt_not_object", "operator_approval_receipt_path")
         return
+
+    validate_operator_approval_receipt_shape(payload, blockers)
+    for string_path, value in receipt_string_values(payload):
+        if receipt_string_has_forbidden_authorization_claim(value):
+            add(
+                blockers,
+                "operator_approval_receipt_forbidden_authorization_claim",
+                "operator_approval_receipt_path",
+                key_path=string_path,
+            )
+    if payload.get("non_claims") != EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS:
+        add(blockers, "operator_approval_receipt_non_claims_mismatch", "operator_approval_receipt_path")
 
     if payload.get("schema") != APPROVAL_RECEIPT_SCHEMA:
         add(blockers, "operator_approval_receipt_schema_mismatch", "operator_approval_receipt_path")

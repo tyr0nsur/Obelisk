@@ -510,6 +510,92 @@ class WindowManifestCheckerTests(unittest.TestCase):
             self.assertIn(reason, report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_operator_approval_receipt_unexpected_keys(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            receipt_path = Path(fields["operator_approval_receipt_path"])
+            if not receipt_path.is_absolute():
+                receipt_path = root / receipt_path
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            payload["extra_top_level"] = "unexpected"
+            payload["approval_scope"]["extra_scope"] = False
+            payload["bound_request_pack"]["target"]["extra_target"] = "unexpected"
+            payload["bound_artifacts"]["window_request_json"]["extra_artifact"] = "unexpected"
+            receipt_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_approval_receipt_unexpected_key", report["blockers"])
+        key_paths = {
+            detail.get("key_path")
+            for detail in report["blocker_details"]
+            if detail["reason"] == "operator_approval_receipt_unexpected_key"
+        }
+        self.assertEqual(
+            {
+                "extra_top_level",
+                "approval_scope.extra_scope",
+                "bound_request_pack.target.extra_target",
+                "bound_artifacts.window_request_json.extra_artifact",
+            },
+            key_paths,
+        )
+        self.assertFalse(report["ready"])
+
+    def test_rejects_operator_approval_receipt_noncanonical_non_claims(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            receipt_path = Path(fields["operator_approval_receipt_path"])
+            if not receipt_path.is_absolute():
+                receipt_path = root / receipt_path
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            payload["non_claims"] = payload["non_claims"][:-1]
+            receipt_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_approval_receipt_non_claims_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_operator_approval_receipt_positive_authorization_claims(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            receipt_path = Path(fields["operator_approval_receipt_path"])
+            if not receipt_path.is_absolute():
+                receipt_path = root / receipt_path
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            payload["operator_completion"]["approved_by_role"] = "runtime server operations authorized"
+            receipt_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_approval_receipt_forbidden_authorization_claim", report["blockers"])
+        key_paths = {
+            detail.get("key_path")
+            for detail in report["blocker_details"]
+            if detail["reason"] == "operator_approval_receipt_forbidden_authorization_claim"
+        }
+        self.assertEqual({"operator_completion.approved_by_role"}, key_paths)
+        self.assertFalse(report["ready"])
+
     def test_rejects_preflight_pre_checked_at_before_approved_window(self) -> None:
         result = self.run_checker_in_approved_workspace(
             manifest_lines(),
