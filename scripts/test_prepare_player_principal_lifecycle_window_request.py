@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -18,7 +19,18 @@ SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
 
 
+def future_window() -> tuple[str, str, str]:
+    start = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microsecond=0)
+    end = start + timedelta(minutes=10)
+    return (
+        start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle",
+        start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+
+
 def base_args(output_dir: Path) -> list[str]:
+    run_id, start, end = future_window()
     return [
         sys.executable,
         str(SCRIPT),
@@ -27,13 +39,13 @@ def base_args(output_dir: Path) -> list[str]:
         "--map",
         "TheIsland",
         "--run-id",
-        "20260601T120000Z-player-principal-lifecycle",
+        run_id,
         "--obelisk-commit",
         TEST_COMMIT,
         "--approved-window-start-utc",
-        "2026-06-01T12:00:00Z",
+        start,
         "--approved-window-end-utc",
-        "2026-06-01T12:10:00Z",
+        end,
         "--binary-sha256",
         SHA,
         "--restart-expectation",
@@ -100,10 +112,7 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(request["schema"], "obelisk.player-principal-lifecycle-window-request.v1")
         self.assertEqual(request["status"], "candidate_only_request_pack")
         self.assertEqual(request["approval_required"], "current-turn operator-approved runtime window, not standing approval")
-        self.assertEqual(
-            request["copied_log_path"],
-            "/servidor/ark/workspace-offline/live-validation-logs/20260601T120000Z-player-principal-lifecycle/Obelisk.log",
-        )
+        self.assertEqual(request["copied_log_path"], f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/Obelisk.log")
         self.assertIn("enable-player-principal-lifecycle-observer", request["marker_set"])
         self.assertIn("enable-reflection-scanner", request["forbidden_markers"])
         self.assertIn("does not claim stable principal identity", request["non_claims"])
@@ -174,14 +183,31 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             bad_run_result = subprocess.run(bad_run, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             bad_window = base_args(Path(tmp) / "bad-window")
-            bad_window[bad_window.index("--approved-window-start-utc") + 1] = "2026-06-01T12:10:00Z"
-            bad_window[bad_window.index("--approved-window-end-utc") + 1] = "2026-06-01T12:00:00Z"
+            start = datetime.now(timezone.utc) + timedelta(hours=1)
+            bad_window[bad_window.index("--run-id") + 1] = (
+                start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+            )
+            bad_window[bad_window.index("--approved-window-start-utc") + 1] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
+            bad_window[bad_window.index("--approved-window-end-utc") + 1] = (
+                start - timedelta(minutes=1)
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
             bad_window_result = subprocess.run(bad_window, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         self.assertNotEqual(bad_run_result.returncode, 0)
         self.assertIn("--run-id must match", bad_run_result.stderr)
         self.assertNotEqual(bad_window_result.returncode, 0)
         self.assertIn("must be before", bad_window_result.stderr)
+
+    def test_rejects_expired_approved_window(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = base_args(Path(tmp) / "request")
+            args[args.index("--run-id") + 1] = "20260101T120000Z-player-principal-lifecycle"
+            args[args.index("--approved-window-start-utc") + 1] = "2026-01-01T12:00:00Z"
+            args[args.index("--approved-window-end-utc") + 1] = "2026-01-01T12:10:00Z"
+            result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must be in the future", result.stderr)
 
     def test_rejects_run_id_window_start_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -195,7 +221,13 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
     def test_rejects_approved_window_longer_than_first_window_limit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             args = base_args(Path(tmp) / "request")
-            args[args.index("--approved-window-end-utc") + 1] = "2026-06-01T12:11:00Z"
+            start = datetime.strptime(
+                args[args.index("--approved-window-start-utc") + 1],
+                "%Y-%m-%dT%H:%M:%SZ",
+            ).replace(tzinfo=timezone.utc)
+            args[args.index("--approved-window-end-utc") + 1] = (
+                start + timedelta(minutes=11)
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
             result = subprocess.run(args, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         self.assertNotEqual(result.returncode, 0)

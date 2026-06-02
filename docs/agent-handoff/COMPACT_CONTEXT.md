@@ -910,6 +910,14 @@ priorities, and do not use history files as the active source of truth.
   completion remains fail-closed with `stable_claim_allowed=false`, complete-SDK progress
   `0/12`, and P0 progress `0/4`. Next true blocker is approved copied runtime principal
   lifecycle evidence; no runtime/server operation is authorized by this planning closure.
+- Follow-up delegated runtime-evidence request hardening closed the next offline hygiene
+  gaps before any live window: request-pack generation rejects expired approved windows,
+  `check_player_principal_lifecycle_window_request.py` replay-checks the exact
+  `operator-approval-request.md` sidecar beside JSON/env, bundle preflight validates any
+  present approved runtime manifest with the approved-evidence checker, and SDK blocker
+  guidance no longer asks for already-closed bound lifecycle provenance. This does not
+  authorize runtime/server work. The next offline public-contract lane is an
+  identity-specific `privacy.identifier_redaction` policy/checker over sanitized snapshots.
 
 ## Agent Coordination
 

@@ -290,6 +290,53 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
     return state
 
 
+def approved_runtime_manifest_check_state(
+    approved_bundle: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "checked": False,
+        "ready": False,
+        "exit_code": None,
+        "schema": None,
+        "stderr": "",
+        "next_blocker": None,
+    }
+    if not approved_bundle["exists"]:
+        return state
+    state["checked"] = True
+    exit_code, payload, stderr = run_json_check(
+        [
+            sys.executable,
+            str(CHECKER),
+            "--json",
+            str(approved_bundle["path"]),
+        ]
+    )
+    state["exit_code"] = exit_code
+    state["stderr"] = stderr
+    if isinstance(payload, dict):
+        state["schema"] = payload.get("schema")
+        state["ready"] = (
+            payload.get("approved_runtime_evidence_present") is True
+            and payload.get("runtime_evidence_ready") is True
+            and payload.get("promotion_ready") is False
+            and payload.get("public_sdk_ready") is False
+            and payload.get("runtime_ready") is False
+        )
+        state["blockers"] = payload.get("blockers", [])
+        state["next_blocker"] = payload.get("next_blocker")
+    if not state["ready"]:
+        add_blocker(
+            blockers,
+            "approved_runtime_manifest_check_failed",
+            "approved_runtime_manifest",
+            exit_code=exit_code,
+            approved_runtime_check_blockers=state.get("blockers", []),
+        )
+    return state
+
+
 def next_required_preflight_artifacts(
     copied_log: dict[str, Any],
     window_manifest: dict[str, Any],
@@ -440,6 +487,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
 
     bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
     approved_bundle = file_state(bundle_manifest, "approved_runtime_manifest", blockers)
+    approved_bundle_check = approved_runtime_manifest_check_state(approved_bundle, blockers)
     bundle_inputs_ready = (
         copied_log["exists"]
         and window_manifest["exists"]
@@ -456,15 +504,21 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         and preflight_post["exists"]
         and request_check["ready"]
     )
+    ready = bool(input_ready and not (approved_bundle["exists"] and not approved_bundle_check["ready"]))
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
-        "ready": bool(input_ready),
+        "ready": ready,
         "bundle_inputs_ready": bool(bundle_inputs_ready),
         "request_pack_ready": bool(request_pack_ready),
         "request_pack_is_runtime_evidence": False,
         "approved_runtime_manifest_present": bool(approved_bundle["exists"]),
-        "approved_runtime_evidence_ready": False,
+        "approved_runtime_evidence_ready": bool(approved_bundle_check["ready"]),
         "next_blocker": (
+            "identity_public_contract_gate_missing"
+            if approved_bundle_check["ready"]
+            else "approved_runtime_evidence_not_accepted"
+            if approved_bundle["exists"]
+            else
             "run_offline_evidence_bundle_builder"
             if input_ready and not approved_bundle["exists"]
             else "copied_log_and_window_manifest_required"
@@ -481,6 +535,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
             "preflight_pre": preflight_pre,
             "preflight_post": preflight_post,
             "approved_runtime_manifest": approved_bundle,
+            "approved_runtime_manifest_check": approved_bundle_check,
         },
         "next_required_artifacts": next_required_preflight_artifacts(
             copied_log,

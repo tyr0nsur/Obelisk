@@ -146,6 +146,8 @@ def validate_args(args: argparse.Namespace) -> None:
     end = parse_utc(args.approved_window_end_utc, "--approved-window-end-utc")
     if not start < end:
         raise SystemExit("--approved-window-start-utc must be before --approved-window-end-utc")
+    if end <= datetime.now(timezone.utc):
+        raise SystemExit("--approved-window-end-utc must be in the future")
     if (end - start).total_seconds() > MAX_APPROVED_WINDOW_SECONDS:
         raise SystemExit("--approved-window duration must not exceed 10 minutes")
     if args.restart_expectation == "stop-after-window" and args.final_posture != "stopped":

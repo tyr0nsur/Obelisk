@@ -19,6 +19,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from check_public_sdk_v1_completion import (
+    blocker_guidance,
     permissions_admin_structured_promotion_evidence_missing,
     player_identity_structured_promotion_evidence_missing,
     release_statement_satisfies_exclusion_contract,
@@ -5986,6 +5987,23 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             self.assertFalse(row["counts_toward_complete_sdk_claim"])
         self.assertTrue(unlocked_row["route_gate_claim_satisfied"])
         self.assertTrue(unlocked_row["counts_toward_complete_sdk_claim"])
+
+    def test_route_gate_locked_guidance_points_to_runtime_evidence_not_closed_binding(self) -> None:
+        guidance = "\n".join(
+            blocker_guidance(
+                {
+                    "p0_dependency_chain_route_gate_locked_surfaces": [
+                        "obelisk.player_identity.v1",
+                    ],
+                },
+                "p0_dependency_chain_route_gate_locked",
+            )
+        )
+
+        self.assertIn("approved runtime principal lifecycle evidence", guidance)
+        self.assertIn("reviewed identity public contract", guidance)
+        self.assertNotIn("bind lifecycle", guidance)
+        self.assertNotIn("supply bound", guidance)
 
     def test_commands_replies_requires_response_path_semantic_evidence_terms(self) -> None:
         import importlib.util

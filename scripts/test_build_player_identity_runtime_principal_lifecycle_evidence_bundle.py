@@ -27,6 +27,7 @@ from prepare_player_principal_lifecycle_window_request import (
     NON_CLAIMS,
     WINDOW_MARKERS,
     env_lines,
+    markdown_request,
     operator_live_ops_brief,
 )
 
@@ -104,6 +105,7 @@ def preflight_payload(
     copied_log_path: Path,
     env_file: Path | None = None,
     env_sha256: str | None = None,
+    checked_at_utc: str,
 ) -> str:
     payload = {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
@@ -129,7 +131,7 @@ def preflight_payload(
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": True,
-        "checked_at_utc": "2026-06-02T08:30:00Z",
+        "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
     }
@@ -152,6 +154,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         sidecar_dir = temp_dir / "player-principal-preflight" / RUN_ID
         request_pack = sidecar_dir / "window-request.json"
         observer_env = sidecar_dir / "observer-window.env"
+        operator_request = sidecar_dir / "operator-approval-request.md"
         preflight_pre = manifest.parent / "preflight-pre.json"
         preflight_post = manifest.parent / "preflight-post.json"
         window = future_window()
@@ -206,6 +209,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             request_pack,
             json.dumps(request_payload, sort_keys=True) + "\n",
         )
+        write_sidecar(
+            operator_request,
+            markdown_request(request_payload, env_lines(request_args)),
+        )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
             preflight_payload(
@@ -217,6 +224,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 copied_log_path=copied_log,
                 env_file=observer_env,
                 env_sha256=observer_env_sha256,
+                checked_at_utc=window["actual_start"],
             ),
         )
         preflight_post_sha256 = write_sidecar(
@@ -228,6 +236,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 map_name="TheIsland",
                 window_manifest_path=manifest,
                 copied_log_path=copied_log,
+                checked_at_utc=window["end"],
             ),
         )
         manifest.write_text(
@@ -421,6 +430,51 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             "ready means the offline bundle builder has the copied inputs it needs; it does not mean approved runtime evidence already exists",
             report["non_claims"],
         )
+
+    def test_preflight_validates_present_approved_manifest(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = copied_log.parent / "approved-bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            preflight = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(preflight.returncode, 0)
+        report = json.loads(preflight.stdout)
+        self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertTrue(report["approved_runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
+        self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checked"])
+        self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["ready"])
+
+    def test_preflight_rejects_invalid_present_approved_manifest(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            self.write_window_manifest(temp_dir, copied_log)
+            approved_dir = copied_log.parent / "approved-bundle"
+            approved_dir.mkdir(parents=True, exist_ok=True)
+            (approved_dir / "approved-runtime-principal-lifecycle-evidence.json").write_text(
+                json.dumps({"schema": "not-approved"}),
+                encoding="utf-8",
+            )
+
+            preflight = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(preflight.returncode, 1)
+        report = json.loads(preflight.stdout)
+        self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+        self.assertIn("approved_runtime_manifest_check_failed", report["blockers"])
+        self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checked"])
 
     def test_preflight_rejects_bad_request_pack_even_with_log_and_manifest_inputs(self) -> None:
         with self.temp_offline_workspace() as temp:

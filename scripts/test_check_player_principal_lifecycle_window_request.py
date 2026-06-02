@@ -112,6 +112,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_ready"])
         self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
+        self.assertTrue(report["operator_request_verified"])
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertIn("does not authorize server operations", report["non_claims"][1])
         brief = request["operator_live_ops_brief"]
@@ -179,6 +180,34 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_operator_request_markdown_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            markdown_path = output_dir / "operator-approval-request.md"
+            markdown_path.write_text(
+                markdown_path.read_text(encoding="utf-8").replace("dispatch limit=0", "dispatch limit=1"),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_request_verified"])
+        self.assertIn("operator_request_markdown_mismatch", report["blockers"])
+
+    def test_rejects_missing_operator_request_markdown_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            (output_dir / "operator-approval-request.md").unlink()
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_request_verified"])
+        self.assertIn("operator_request_unreadable", report["blockers"])
 
     def test_rejects_post_run_verification_command_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

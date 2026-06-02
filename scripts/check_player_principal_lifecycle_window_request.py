@@ -35,6 +35,7 @@ from prepare_player_principal_lifecycle_window_request import (
     UTC_RE,
     WINDOW_MARKERS,
     env_lines,
+    markdown_request,
     post_run_verification_commands,
     run_id_for_window_start,
 )
@@ -176,6 +177,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("request_json", type=Path, help="window-request.json from the request pack.")
     parser.add_argument("--env-file", type=Path, required=True, help="observer-window.env from the same request pack.")
+    parser.add_argument(
+        "--operator-request",
+        type=Path,
+        help="operator-approval-request.md from the same request pack; defaults to the sibling file.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
     return parser.parse_args()
 
@@ -236,6 +242,21 @@ def read_env(path: Path, blockers: list[dict[str, Any]]) -> list[str]:
             add(blockers, "env_value_multiline", key)
         lines.append(f"{key}={value}")
     return lines
+
+
+def read_text_sidecar(path: Path, label: str, blockers: list[dict[str, Any]]) -> str | None:
+    try:
+        reject_symlink_component(path, label)
+        resolved = protected_paths.reject_protected_input_path(
+            path,
+            label,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        return resolved.read_text(encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        add(blockers, f"{label}_unreadable", label, path=str(path), error=str(exc))
+        return None
 
 
 def require_keys(
@@ -591,7 +612,26 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
     return Validation(blockers=blockers, payload=payload)
 
 
-def build_report(validation: Validation) -> dict[str, Any]:
+def validate_operator_request_markdown(
+    payload: dict[str, Any],
+    env: list[str],
+    markdown: str | None,
+    blockers: list[dict[str, Any]],
+) -> bool:
+    if markdown is None:
+        return False
+    try:
+        expected = markdown_request(payload, env)
+    except (KeyError, TypeError) as exc:
+        add(blockers, "operator_request_markdown_projection_failed", "operator_request", error=str(exc))
+        return False
+    if markdown != expected:
+        add(blockers, "operator_request_markdown_mismatch", "operator_request")
+        return False
+    return True
+
+
+def build_report(validation: Validation, *, operator_request_verified: bool = False) -> dict[str, Any]:
     accepted = not validation.blockers
     payload = validation.payload or {}
     return {
@@ -610,6 +650,7 @@ def build_report(validation: Validation) -> dict[str, Any]:
         "blockers": [blocker["reason"] for blocker in validation.blockers],
         "blocker_details": validation.blockers,
         "next_blocker": "operator_current_turn_runtime_window_approval_required" if accepted else "request_pack_not_accepted",
+        "operator_request_verified": operator_request_verified,
         "target": payload.get("target"),
         "run_id": payload.get("run_id"),
         "approval_required": APPROVAL_TEXT,
@@ -626,9 +667,17 @@ def main() -> int:
     blockers: list[dict[str, Any]] = []
     payload = read_json(args.request_json)
     env = read_env(args.env_file, blockers)
+    operator_request_path = args.operator_request or (args.request_json.parent / "operator-approval-request.md")
+    operator_request_markdown = read_text_sidecar(operator_request_path, "operator_request", blockers)
     validation = validate_payload(payload, env)
     validation.blockers[:0] = blockers
-    report = build_report(validation)
+    operator_request_verified = validate_operator_request_markdown(
+        payload,
+        env,
+        operator_request_markdown,
+        validation.blockers,
+    )
+    report = build_report(validation, operator_request_verified=operator_request_verified)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

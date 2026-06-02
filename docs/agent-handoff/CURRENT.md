@@ -148,14 +148,15 @@ This file is an active routing table only. Durable evidence belongs in
   work only: request-pack acceptance keeps `server_operations_authorized=false`,
   `runtime_work_authorized=false`, public/runtime/promotion/v1 readiness false, and
   `next_blocker=operator_current_turn_runtime_window_approval_required`. Preserve checked
-  `operator_live_ops_brief`, reviewed server binary path/SHA, exact env/marker and
-  forbidden-marker boundaries, pre/post evidence paths, structured preflight/window
+  `operator_live_ops_brief`, exact `operator-approval-request.md` sidecar, reviewed server
+  binary path/SHA, exact env/marker and forbidden-marker boundaries, pre/post evidence paths, structured preflight/window
   binding, post-run verification commands, canonical rollback delta, and no runtime/server
   authorization.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, the
   next blocker is `identity_public_contract_gate_missing`; review the player identity
   contract before permissions/admin, command response, or commands/replies ABI. The
-  primary offline gap remains `privacy.identifier_redaction`.
+  primary offline gap remains `privacy.identifier_redaction`; next offline work is an
+  identity-specific identifier-redaction policy/checker over sanitized snapshots only.
 - Runtime/ABI hardening: gameplay-policy rollback-failure orphan coverage now includes
   structure, inventory, and item-return paths in `PluginManagerTests`; repeating timer
   cleanup under an in-flight callback during `UnloadAll` is now covered.
@@ -206,8 +207,9 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest guardrails closed command-response readiness provenance, commands/replies report-root
-  binding, mission-leaf accounting, permissions/admin identity-certificate dependency, and
-  default identity planning-source provenance. SDK structured promotion evidence for command
-  response/replies requires planning-checker source-artifact rebinding before those rows can
-  count. Provenance-only; default route/SDK remain fail-closed:
+  binding, mission-leaf accounting, permissions/admin identity-certificate dependency,
+  default identity planning-source provenance, and runtime-evidence request hygiene:
+  request packs reject expired windows, operator Markdown sidecars are replay-checked,
+  approved runtime manifests are validated in bundle preflight, and stale route-lock
+  guidance now points to runtime evidence plus identity contract. Provenance-only; default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, complete-SDK `0/12`, P0 `0/4`.

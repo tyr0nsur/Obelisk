@@ -4048,7 +4048,7 @@ def blocker_guidance(report: dict[str, Any], blocker: str) -> list[str]:
         "p0_dependency_chain_route_gate_locked": [
             "A P0 dependency-chain surface has promoted-looking evidence while the command/permission route gate remains identity-locked.",
             f"Surfaces: {format_human_list(report.get('p0_dependency_chain_route_gate_locked_surfaces'))}.",
-            "Action: bind lifecycle-anchor provenance and unlock the route gate before counting identity, permissions, command response, or commands/replies toward complete SDK wording.",
+            "Action: resolve the current route-lock blocker first: produce approved runtime principal lifecycle evidence, then complete the reviewed identity public contract before counting identity, permissions, command response, or commands/replies toward complete SDK wording.",
         ],
         "complete_sdk_claim_requires_promoted_demand_families": [
             "The complete/full/production SDK claim requires promoted demand families, not only excluded or post-v1 outcomes.",

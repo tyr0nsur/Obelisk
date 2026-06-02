@@ -2054,3 +2054,29 @@ provenance gap. It does not approve runtime evidence, runtime/server work, publi
 permissions/admin ABI, command response/replies readiness, public SDK readiness, promotion,
 release readiness, or stable/complete SDK wording. SDK accounting remains fail-closed with
 `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+
+## Runtime-Evidence Request Hygiene Hardening
+
+The next delegated round split audit across live-ops request packs, SDK route/accounting,
+identity public-contract privacy, and UE4/offline evidence. Integrated findings:
+
+- `prepare_player_principal_lifecycle_window_request.py` must reject expired approved
+  windows at generation time; relying on the checker to reject stale packs is too late for
+  operator-facing next actions.
+- `check_player_principal_lifecycle_window_request.py` must validate the exact
+  `operator-approval-request.md` sidecar beside the request JSON/env, because the Markdown
+  is the human approval artifact for any future live window.
+- `build_player_identity_runtime_principal_lifecycle_evidence_bundle.py --preflight-only`
+  must validate any present approved runtime manifest with the approved-evidence checker
+  before reporting `approved_runtime_evidence_ready=true`; a present invalid JSON now routes
+  to `approved_runtime_evidence_not_accepted`.
+- `check_public_sdk_v1_completion.py` route-lock guidance now points to approved runtime
+  principal lifecycle evidence and reviewed identity public contract, not the already closed
+  bound lifecycle-anchor provenance step.
+
+This is offline hygiene only. It does not authorize runtime/server work, marker/env edits,
+Discord, public identity, public ABI/header readiness, permissions/admin, command response,
+commands/replies, promotion, release readiness, or stable/complete SDK wording. The useful
+next offline public-contract lane is an identity-specific `privacy.identifier_redaction`
+policy/checker over sanitized snapshots only; more broad FName/GObjects/core/static
+rediscovery is not useful for the current blocker.

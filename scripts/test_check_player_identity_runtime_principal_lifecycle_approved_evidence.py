@@ -38,6 +38,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     NON_CLAIMS,
     WINDOW_MARKERS,
     env_lines,
+    markdown_request,
     operator_live_ops_brief,
 )
 
@@ -171,6 +172,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     manifest_path = live_dir / "window-manifest.env"
     request_pack_path = sidecar_dir / "window-request.json"
     observer_env_path = sidecar_dir / "observer-window.env"
+    operator_request_path = sidecar_dir / "operator-approval-request.md"
     preflight_pre_path = live_dir / "preflight-pre.json"
     preflight_post_path = live_dir / "preflight-post.json"
     target = {"instance": "arkserver2", "map": "TheIsland"}
@@ -225,6 +227,10 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     observer_env = write_sidecar(
         observer_env_path,
         "\n".join(observer_env_lines) + "\n",
+    )
+    write_sidecar(
+        operator_request_path,
+        markdown_request(request_payload, observer_env_lines),
     )
     preflight_pre = write_sidecar(
         preflight_pre_path,
