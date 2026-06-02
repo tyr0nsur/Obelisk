@@ -65,7 +65,103 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         header_path.write_text(header if header is not None else HEADER.read_text(encoding="utf-8"), encoding="utf-8")
         return decisions_path, surfaces_path, header_path
 
+    def make_response_readiness(self) -> dict:
+        return {
+            "schema": "obelisk.reflection-snapshot-readiness.v1",
+            "evidence_scope": "second_source_layout_evidence_only",
+            "gate_mode": "planning_layout_intake",
+            "second_source_status": "compared",
+            "strict_identity_indices": False,
+            "target_sets": ["command-chat-response-route-planning"],
+            "target_filters": RESPONSE_TARGETS,
+            "totals": {
+                "targets": 3,
+                "comparable": 3,
+                "blocked": 0,
+                "second_source_accepted": 3,
+                "second_source_inconclusive": 0,
+                "second_source_missing": 0,
+                "second_source_rejected": 0,
+            },
+            "modules": [
+                {
+                    "module": "base-snapshots",
+                    "targets": 3,
+                    "comparable": 3,
+                    "blocked": 0,
+                    "second_source": {
+                        "accepted": 3,
+                        "inconclusive": 0,
+                        "missing": 0,
+                        "rejected": 0,
+                    },
+                    "target_details": [
+                        {
+                            "target": target,
+                            "comparable": True,
+                            "second_source_status": "accepted",
+                            "block_reasons": [],
+                        }
+                        for target in RESPONSE_TARGETS
+                    ],
+                }
+            ],
+            "planning_layout_gate": {
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "ready": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+            },
+            "promotion_gate": {
+                "ready_scope": "planning_only",
+                "layout_ready": True,
+                "ready": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "blockers": [{"reason": "planning_layout_intake_not_promotion_gate"}],
+            },
+            "target_set_guidance": [
+                {
+                    "target_set": "command-chat-response-route-planning",
+                    "classification": "command_chat_response_route_guidance_only_candidate",
+                    "why_blocked": [
+                        "planning_guidance_only",
+                        "not_release_readiness_target",
+                        "public_response_path_blocked",
+                        "player_identity_principal_blocked",
+                        "permissions_admin_blocked",
+                        "command_router_blocked",
+                        "runtime_observation_requires_separate_approval",
+                    ],
+                    "snapshot_prep_checks": [
+                        "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+                        "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+                        "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+                        "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+                        "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout",
+                    ],
+                    "non_claim": "does not promote command/chat response path, public reply/send-chat ABI, command router, permissions, player identity, raw FString access, mutation, return override, runtime hooks, or release readiness",
+                }
+            ],
+        }
+
     def write_response_report(self, root: Path) -> Path:
+        readiness_path = root / "command-chat-response-route-planning-readiness.json"
+        readiness_path.write_text(json.dumps(self.make_response_readiness()), encoding="utf-8")
+        response_report = READINESS.response_path_readiness.build_report(
+            readiness_path,
+            READINESS.response_path_readiness.DEFAULT_DECISIONS,
+            READINESS.response_path_readiness.DEFAULT_PUBLIC_HEADER,
+            READINESS.response_path_readiness.DEFAULT_SURFACES,
+        )
+        report_path = root / "response.json"
+        report_path.write_text(json.dumps(response_report), encoding="utf-8")
+        return report_path
+
+    def write_summary_response_report(self, root: Path) -> Path:
         response_report = {
             "schema": "obelisk.command-chat-response-public-readiness-check.v1",
             "valid": True,
@@ -76,6 +172,7 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             "target_filters": RESPONSE_TARGETS,
             "readiness_status": "compared",
             "decisions_status": "blocked",
+            "surfaces_status": "planning",
             "public_readiness_ready": False,
             "public_header_allowed": False,
             "promotion_ready": False,
@@ -111,6 +208,35 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
+
+    def test_rejects_summary_only_response_path_report_without_source_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report_path = self.write_summary_response_report(Path(temp_dir))
+            result = self.run_checker("--response-path-report", str(report_path), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_source_artifacts_missing", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_response_path_report_with_unverifiable_source_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            response_report = json.loads(report_path.read_text(encoding="utf-8"))
+            response_report["readiness_path"] = ""
+            response_report["decisions_path"] = None
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            result = self.run_checker("--response-path-report", str(report_path), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_unverifiable", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
 
     def test_rejects_missing_response_path_report(self) -> None:
         result = self.run_checker("--json", check=False)
@@ -613,6 +739,7 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertIn("response_path_report_target_filters_mismatch", report["blockers"])
         self.assertIn("response_path_report_readiness_status_mismatch", report["blockers"])
         self.assertIn("response_path_report_decisions_status_mismatch", report["blockers"])
+        self.assertIn("response_path_report_surfaces_status_mismatch", report["blockers"])
 
     def test_rejects_optional_response_path_minimal_raw_readiness(self) -> None:
         response_readiness = {
@@ -640,12 +767,17 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
             "target_filters": RESPONSE_TARGETS,
             "readiness_status": "compared",
             "decisions_status": "blocked",
+            "surfaces_status": "planning",
             "public_readiness_ready": True,
             "public_header_allowed": False,
             "promotion_ready": True,
             "public_sdk_ready": False,
             "public_abi_ready": False,
             "runtime_ready": False,
+            "readiness_path": "/offline/command-chat-response-route-planning-readiness.json",
+            "decisions_path": "/offline/command_chat_response_public_contract_decisions.json",
+            "surfaces_path": "/offline/public_sdk_surfaces.json",
+            "public_header_path": "/offline/ObeliskApi.h",
             "blockers": [],
         }
         with tempfile.TemporaryDirectory() as temp_dir:

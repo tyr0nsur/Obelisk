@@ -122,10 +122,19 @@ This file is an active routing table only. Durable evidence belongs in
   readiness now scans nested `CMakeLists.txt` and `*.cmake` files outside ignored
   build/local/cache roots so nested CMake runtime/shared wiring cannot over-attest the
   consume-only Mission frontier.
-- Deferred audited guardrails: standalone `commands/replies` public-readiness should
-  reject unverifiable summary-only `--response-path-report` JSON and require source
-  artifact paths or a child checker-produced report. Route gate remains less exposed
-  because it composes the child report itself.
+- 2026-06-02 commands/replies response-path provenance hardening: standalone
+  `commands/replies` public-readiness now rejects summary-only
+  `--response-path-report` JSON unless the child response-path report carries the
+  checker-emitted `readiness_path`, `decisions_path`, `surfaces_path`,
+  `public_header_path`, and acceptable `surfaces_status` provenance fields. These embedded
+  paths are treated as report provenance strings only; the checker validates the report
+  file itself and does not reopen temp-path provenance. Route gate remains planning-only
+  and still blocks at `approved_runtime_evidence_missing`; SDK completion remains
+  fail-closed at `stable_claim_allowed=false`, P0 `0/4`, and complete SDK `0/12`.
+- Deferred audited guardrail: structure build-policy offline intake should validate
+  manifest-level `obelisk.structure_census.v1` surface status/list placement/support tier
+  and public-contract posture so a manifest-only promotion overclaim cannot pass the
+  consume-only structure checker.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

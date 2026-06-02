@@ -27,6 +27,12 @@ RESPONSE_PATH_REPORT_SCHEMA = "obelisk.command-chat-response-public-readiness-ch
 RESPONSE_PATH_READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 SURFACE = "obelisk.commands_replies.v1"
 RESPONSE_PATH_SURFACE = "obelisk.command_chat_response_path.v1"
+RESPONSE_PATH_SOURCE_ARTIFACT_KEYS = (
+    "readiness_path",
+    "decisions_path",
+    "surfaces_path",
+    "public_header_path",
+)
 DEPENDENCY_CHAIN = (
     "obelisk.player_identity.v1",
     "obelisk.permissions_admin.v1",
@@ -851,6 +857,30 @@ def validate_public_header(path: Path, blockers: list[dict[str, Any]]) -> None:
 def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     schema = payload.get("schema")
     if schema == RESPONSE_PATH_REPORT_SCHEMA:
+        missing_source_artifacts = [
+            key
+            for key in RESPONSE_PATH_SOURCE_ARTIFACT_KEYS
+            if key not in payload
+        ]
+        if missing_source_artifacts:
+            add(
+                blockers,
+                "response_path_report_source_artifacts_missing",
+                "$.response_path_report",
+                missing=missing_source_artifacts,
+            )
+        unverifiable_source_artifacts = {
+            key: payload.get(key)
+            for key in RESPONSE_PATH_SOURCE_ARTIFACT_KEYS
+            if key in payload and (not isinstance(payload.get(key), str) or payload.get(key) == "")
+        }
+        if unverifiable_source_artifacts:
+            add(
+                blockers,
+                "response_path_report_unverifiable",
+                "$.response_path_report",
+                artifacts=unverifiable_source_artifacts,
+            )
         if payload.get("valid") is not True or payload.get("accepted_for_planning") is not True:
             add(blockers, "response_path_report_not_accepted_for_planning", "$.response_path_report")
         if payload.get("planning_only") is not True:
@@ -898,6 +928,14 @@ def validate_response_path_report(payload: dict[str, Any], blockers: list[dict[s
                 "$.response_path_report.decisions_status",
                 expected="blocked",
                 value=payload.get("decisions_status"),
+            )
+        if payload.get("surfaces_status") not in ("planning", "post-v1"):
+            add(
+                blockers,
+                "response_path_report_surfaces_status_mismatch",
+                "$.response_path_report.surfaces_status",
+                expected=["planning", "post-v1"],
+                value=payload.get("surfaces_status"),
             )
         if payload.get("blockers") != []:
             add(

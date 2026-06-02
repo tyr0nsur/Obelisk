@@ -285,3 +285,45 @@ Remaining focused offline finding:
 
 This round still does not approve runtime work, public identity, public permissions/admin,
 command replies, Mission SDK, release readiness, or a stable SDK claim.
+
+## Commands Replies Response-Path Provenance Guardrail
+
+The next supervised round closed the standalone commands/replies response-path report
+gap:
+
+- `scripts/check_commands_replies_public_readiness.py` now requires
+  `--response-path-report` payloads using
+  `obelisk.command-chat-response-public-readiness-check.v1` to carry the child checker's
+  provenance fields: `readiness_path`, `decisions_path`, `surfaces_path`, and
+  `public_header_path`.
+- Missing provenance fails with `response_path_report_source_artifacts_missing`.
+  Empty or non-string provenance fails with `response_path_report_unverifiable`.
+- The checker also requires child `surfaces_status` to be `planning` or `post-v1`. This
+  catches summary fixtures that copied readiness/decisions status but omitted the
+  response-path surface posture.
+- Embedded paths are provenance strings only. The standalone commands/replies checker
+  validates the response report file path itself, but does not reopen embedded child
+  paths because the response-path checker can emit temporary or CLI-overridden path
+  strings.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_chat_response_public_readiness scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
+  passed with 64 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  passed as planning-only with current blocker `approved_runtime_evidence_missing`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  still failed closed with `stable_claim_allowed=false`, complete-SDK progress `0/12`,
+  and P0 progress `0/4`.
+- `git diff --check` passed.
+
+Remaining focused offline finding:
+
+- `scripts/check_structure_build_policy_offline_intake.py` should validate manifest-level
+  `obelisk.structure_census.v1` posture, not only the unique surface ID. A manifest-only
+  overclaim should fail if the surface is promoted, missing from the planning list,
+  assigned the wrong support tier, or carries a non-empty public contract while the
+  structure build-policy artifact remains consume-only planning evidence.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Structure SDK, release readiness, or a stable SDK claim.
