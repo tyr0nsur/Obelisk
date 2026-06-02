@@ -114,8 +114,9 @@ ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
         "single_module_summary",
     )
 )
+EXPECTED_ROLLBACK_DELTA = "removed_observer_env_and_markers_preserved_disable_plugins"
 ALLOWED_OPERATIONAL_WINDOW_ROLLBACK_KEYS = frozenset(
-    ("completed", "observer_env_survived", "observer_marker_survived")
+    ("completed", "observer_env_survived", "observer_marker_survived", "delta")
 )
 ALLOWED_OPERATIONAL_WINDOW_CLAIMS_KEYS = frozenset(("delivery_claim", "principal_claim"))
 OPERATIONAL_WINDOW_REPLAY_KEYS = (
@@ -1137,6 +1138,13 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         for key in ("observer_env_survived", "observer_marker_survived"):
             if rollback.get(key) is not False:
                 add(blockers, "operational_window_rollback_marker_survived", f"{label}.rollback.{key}")
+        if rollback.get("delta") != EXPECTED_ROLLBACK_DELTA:
+            add(
+                blockers,
+                "operational_window_rollback_delta_mismatch",
+                f"{label}.rollback.delta",
+                expected=EXPECTED_ROLLBACK_DELTA,
+            )
     claims = window.get("claims")
     if not isinstance(claims, dict) or claims.get("delivery_claim") != "none" or claims.get("principal_claim") != "none":
         add(blockers, "operational_window_claims_not_none", f"{label}.claims")

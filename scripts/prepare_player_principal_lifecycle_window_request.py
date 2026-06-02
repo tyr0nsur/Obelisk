@@ -23,6 +23,7 @@ from snapshot_evidence_pack import reject_symlink_component
 
 SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
+EXPECTED_SERVER_BINARY_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
 RUN_ID_SUFFIX = "-player-principal-lifecycle"
 SAFE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -59,6 +60,7 @@ FORBIDDEN_MARKERS = [
     "enable-chat-reflection",
     "enable-chat-route-observer",
     "enable-inventory-reflection",
+    "enable-inventory-action-redacted-observer",
     "enable-structure-reflection",
     "enable-item-return-events",
 ]
@@ -87,6 +89,11 @@ def parse_args() -> argparse.Namespace:
         "--binary-sha256",
         default=EXPECTED_BINARY_SHA256,
         help="Expected ShooterGameServer SHA256.",
+    )
+    parser.add_argument(
+        "--server-binary-path",
+        default=EXPECTED_SERVER_BINARY_PATH,
+        help="Exact ShooterGameServer path for the future approved window; recorded only, not read.",
     )
     parser.add_argument(
         "--restart-expectation",
@@ -130,6 +137,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--binary-sha256 must be lowercase SHA256 hex")
     if args.binary_sha256 != EXPECTED_BINARY_SHA256:
         raise SystemExit(f"--binary-sha256 must match reviewed ARK SHA256 {EXPECTED_BINARY_SHA256}")
+    if args.server_binary_path != EXPECTED_SERVER_BINARY_PATH:
+        raise SystemExit(f"--server-binary-path must match reviewed ARK path {EXPECTED_SERVER_BINARY_PATH}")
     if not is_reviewed_obelisk_commit(args.obelisk_commit):
         raise SystemExit("--obelisk-commit must be a reviewed 40-character lowercase Git SHA")
     start = parse_utc(args.approved_window_start_utc, "--approved-window-start-utc")
@@ -169,13 +178,14 @@ def env_lines(args: argparse.Namespace) -> list[str]:
 
 def request_payload(args: argparse.Namespace) -> dict[str, Any]:
     evidence_dir = EVIDENCE_ROOT / args.run_id
-    return {
+    payload = {
         "schema": SCHEMA,
         "status": "candidate_only_request_pack",
         "approval_required": APPROVAL_TEXT,
         "target": {"instance": args.instance, "map": args.map_name},
         "run_id": args.run_id,
         "ark_binary_sha256": args.binary_sha256,
+        "server_binary_path": args.server_binary_path,
         "obelisk_commit": args.obelisk_commit,
         "approved_window": {
             "start_utc": args.approved_window_start_utc,
@@ -197,6 +207,57 @@ def request_payload(args: argparse.Namespace) -> dict[str, Any]:
         },
         "non_claims": NON_CLAIMS,
     }
+    payload["operator_live_ops_brief"] = operator_live_ops_brief(payload, env_lines(args))
+    return payload
+
+
+def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str, Any]:
+    window = payload["approved_window"]
+    return {
+        "target": payload["target"],
+        "feature_gates": {
+            "observer": "player_principal_lifecycle_only",
+            "plugins_disabled": True,
+            "process_event_hook": True,
+            "dispatch_limit": 0,
+            "log_limit": 10,
+            "scanner_debug_and_callback_escape_gates": "forbidden",
+        },
+        "server_binary": {
+            "path": payload["server_binary_path"],
+            "sha256": payload["ark_binary_sha256"],
+        },
+        "marker_changes": {
+            "set": payload["marker_set"],
+            "forbidden": payload["forbidden_markers"],
+        },
+        "env_snapshot": env,
+        "start_restart_stop_window": {
+            "start_utc": window["start_utc"],
+            "end_utc": window["end_utc"],
+            "expectation": payload["restart_expectation"],
+            "final_posture": payload["final_posture"],
+        },
+        "notice_path": payload["notice_path"],
+        "user_policy": payload["user_policy"],
+        "evidence_capture": {
+            "copied_evidence_dir": payload["copied_evidence_dir"],
+            "copied_log_path": payload["copied_log_path"],
+            "window_manifest_path": payload["window_manifest_path"],
+            "observer_env_file": payload["observer_env_file"],
+            "single_module_summary": "player_principal_lifecycle",
+            "copied_log_only": True,
+        },
+        "rollback": payload["rollback"],
+        "post_run_stable_posture": {
+            "required": True,
+            "expected": payload["final_posture"],
+            "stable_markers_preserved": ["enable-process-event-hook", "disable-plugins"],
+            "observer_markers_removed": True,
+        },
+        "approval_boundary": APPROVAL_TEXT,
+        "non_authorization": "brief only; request-pack acceptance does not authorize operations",
+    }
 
 
 def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
@@ -214,6 +275,7 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
         f"target map={target['map']}",
         f"run_id={payload['run_id']}",
         f"ARK binary SHA256={payload['ark_binary_sha256']}",
+        f"ARK binary path={payload['server_binary_path']}",
         f"Obelisk commit/build={payload['obelisk_commit']}",
         f"approved UTC window={window['start_utc']}/{window['end_utc']}",
         f"restart expectation={payload['restart_expectation']}",

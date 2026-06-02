@@ -15,6 +15,7 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
 BUILDER = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
 CHECKER = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
@@ -25,6 +26,16 @@ WINDOW_END = WINDOW_START + timedelta(minutes=10)
 RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+
+from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    APPROVAL_TEXT,
+    EXPECTED_SERVER_BINARY_PATH,
+    FORBIDDEN_MARKERS,
+    NON_CLAIMS,
+    WINDOW_MARKERS,
+    env_lines,
+    operator_live_ops_brief,
+)
 
 
 def write_sidecar(path: Path, text: str) -> str:
@@ -128,89 +139,56 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         observer_env = sidecar_dir / "observer-window.env"
         preflight_pre = manifest_path.parent / "preflight-pre.json"
         preflight_post = manifest_path.parent / "preflight-post.json"
+        request_args = type(
+            "Args",
+            (),
+            {
+                "instance": "arkserver2",
+                "map_name": "TheIsland",
+                "binary_sha256": SHA,
+            },
+        )()
+        observer_env_lines = env_lines(request_args)
+        request_payload = {
+            "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+            "run_id": RUN_ID,
+            "status": "candidate_only_request_pack",
+            "approval_required": APPROVAL_TEXT,
+            "ark_binary_sha256": SHA,
+            "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
+            "obelisk_commit": summary["evidence"]["obelisk_commit"],
+            "target": {"instance": "arkserver2", "map": "TheIsland"},
+            "approved_window": {
+                "start_utc": WINDOW_START.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "end_utc": WINDOW_END.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+            "restart_expectation": "restart",
+            "final_posture": "stable",
+            "user_policy": "no_regular_users",
+            "notice_path": "not_applicable",
+            "copied_evidence_dir": str(Path(source["path"]).parent),
+            "copied_log_path": source["path"],
+            "window_manifest_path": str(manifest_path),
+            "observer_env_file": "observer-window.env",
+            "marker_set": WINDOW_MARKERS,
+            "forbidden_markers": FORBIDDEN_MARKERS,
+            "rollback": {
+                "owner": "operator",
+                "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+            },
+            "non_claims": NON_CLAIMS,
+        }
+        request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
+            request_payload,
+            observer_env_lines,
+        )
         request_pack_sha256 = write_sidecar(
             request_pack,
-            json.dumps(
-                {
-                    "schema": "obelisk.player-principal-lifecycle-window-request.v1",
-                    "run_id": RUN_ID,
-                    "status": "candidate_only_request_pack",
-                    "approval_required": "current-turn operator-approved runtime window, not standing approval",
-                    "ark_binary_sha256": SHA,
-                    "obelisk_commit": summary["evidence"]["obelisk_commit"],
-                    "target": {"instance": "arkserver2", "map": "TheIsland"},
-                    "approved_window": {
-                        "start_utc": WINDOW_START.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                        "end_utc": WINDOW_END.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                    "restart_expectation": "restart",
-                    "final_posture": "stable",
-                    "user_policy": "no_regular_users",
-                    "notice_path": "not_applicable",
-                    "copied_evidence_dir": str(Path(source["path"]).parent),
-                    "copied_log_path": source["path"],
-                    "window_manifest_path": str(manifest_path),
-                    "observer_env_file": "observer-window.env",
-                    "marker_set": [
-                        "enable-process-event-hook",
-                        "disable-plugins",
-                        "allow-observer-debug-window",
-                        "allow-experimental-observers",
-                        "enable-player-principal-lifecycle-observer",
-                    ],
-                    "forbidden_markers": [
-                        "allow-ptrace",
-                        "enable-debug-control",
-                        "enable-reflection-scanner",
-                        "enable-native-exec-probes",
-                        "allow-global-process-event-callbacks",
-                        "allow-filtered-process-event-callbacks",
-                        "allow-call-process-event",
-                        "allow-process-event-blocking",
-                        "request-static-fname-probe",
-                        "enable-chat-events",
-                        "enable-chat-reflection",
-                        "enable-chat-route-observer",
-                        "enable-inventory-reflection",
-                        "enable-structure-reflection",
-                        "enable-item-return-events",
-                    ],
-                    "rollback": {
-                        "owner": "operator",
-                        "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
-                    },
-                    "non_claims": [
-                        "does not authorize server operations",
-                        "does not authorize marker/env changes",
-                        "does not authorize starts, restarts, or stops",
-                        "does not authorize Discord/community notices",
-                        "does not promote public player identity",
-                        "does not claim stable principal identity",
-                        "does not promote permissions/admin",
-                        "does not promote command/chat response or commands/replies",
-                        "does not authorize lookup, persistence, mutation, return override, plugin delivery, runtime readiness, public SDK readiness, or v1 SDK completion",
-                    ],
-                },
-                sort_keys=True,
-            )
-            + "\n",
+            json.dumps(request_payload, sort_keys=True) + "\n",
         )
         observer_env_sha256 = write_sidecar(
             observer_env,
-            "\n".join(
-                [
-                    "OBELISK_INSTANCE_ID=arkserver2",
-                    "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
-                    "OBELISK_DISABLE_PLUGINS=1",
-                    "OBELISK_WRAPPER_PROFILE=observer-debug",
-                    "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
-                    f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={SHA}",
-                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
-                    "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
-                    "OBELISK_PE_TRACE_LIMIT=0",
-                ]
-            )
-            + "\n",
+            "\n".join(observer_env_lines) + "\n",
         )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
@@ -359,6 +337,10 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 "consume-only lifecycle evidence reviewed",
             )
             self.assertTrue(manifest["operational_window"]["operational_window_manifest_ready"])
+            self.assertEqual(
+                manifest["operational_window"]["rollback"]["delta"],
+                "removed_observer_env_and_markers_preserved_disable_plugins",
+            )
             self.assertFalse(manifest["approval"]["server_operations_authorized_by_this_manifest"])
             self.assertFalse(manifest["promotion_ready"])
 

@@ -140,7 +140,10 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 runtime evidence: prepare, but do not run, a fresh live-ops brief for approved copied
   runtime principal lifecycle evidence. It must name target instance/map, feature gates,
   marker/env changes, restart/start window, notice path if players are involved, evidence
-  capture, rollback, and post-run stable posture.
+  capture, rollback, and post-run stable posture. The request-pack now carries a checked
+  `operator_live_ops_brief`, reviewed server binary path/SHA, explicit pre/post evidence
+  paths, exact env/marker boundaries, and canonical rollback delta; acceptance still only
+  advances to current-turn operator approval required.
 - P0 public contract: after approved runtime principal lifecycle evidence exists, review
   the player identity contract before permissions/admin, command response, or
   commands/replies ABI.
@@ -169,3 +172,8 @@ This file is an active routing table only. Durable evidence belongs in
   provenance, SDK-route overclaim audit, UE4 snapshot fixture provenance, and handoff
   continuity. Integrated result: snapshot-root hash binding is enforced before bound
   identity route advancement; no public SDK/runtime/permissions overclaim path was found.
+- Latest runtime-evidence preparation round used four lead-scoped read-only agents:
+  live-ops brief completeness, runtime observer safety, approved-evidence provenance, and
+  handoff continuity. Integrated result: request packs now include a validated
+  operator-live-ops brief, forbid the inventory-action observer marker, bind request-pack
+  commit/binary fields to the window manifest, and preserve canonical rollback delta.

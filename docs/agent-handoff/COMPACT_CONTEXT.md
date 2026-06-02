@@ -799,6 +799,24 @@ priorities, and do not use history files as the active source of truth.
   - SDK-route audit found no public SDK/runtime/permissions/admin/commands overclaim path
     from this provenance fix. SDK completion remains fail-closed with
     `stable_claim_allowed=false`.
+- Delegated runtime-evidence preparation round on 2026-06-02 tightened the next
+  player-principal lifecycle request/manifest route without authorizing runtime:
+  - Four read-only sub-agent scopes were lead-delegated and closed: live-ops brief
+    completeness, runtime observer safety, approved-evidence provenance, and
+    handoff/knowledge continuity.
+  - `prepare_player_principal_lifecycle_window_request.py` now emits a structured
+    `operator_live_ops_brief` with target, reviewed server binary path/SHA, feature
+    gates, marker/env snapshot, start/restart/stop window, notice path, evidence capture,
+    rollback, and post-run posture. The request checker validates the brief exactly.
+  - Request packs now forbid `enable-inventory-action-redacted-observer`, bind
+    `server_binary_path`, and the window manifest checker rejects request-pack
+    `obelisk_commit`/binary drift before evidence can be accepted.
+  - Window/approved evidence now preserves and validates canonical rollback delta
+    `removed_observer_env_and_markers_preserved_disable_plugins`.
+  - Remaining future-only gaps: bind preflight sidecars more strongly to run id/target/map
+    and copied evidence paths, then request an exact current-turn runtime window only if
+    the operator approves it. No runtime/server/marker/env work is authorized by these
+    artifacts.
 
 ## Agent Coordination
 

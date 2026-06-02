@@ -98,6 +98,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             prepare_pack(output_dir)
             result = self.run_checker(output_dir)
             report = json.loads(result.stdout)
+            request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
 
         self.assertTrue(report["ready"])
         self.assertTrue(report["request_pack_ready"])
@@ -113,6 +114,13 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(report["next_blocker"], "operator_current_turn_runtime_window_approval_required")
         self.assertEqual(report["target"], {"instance": "arkserver2", "map": "TheIsland"})
         self.assertIn("does not authorize server operations", report["non_claims"][1])
+        brief = request["operator_live_ops_brief"]
+        self.assertEqual({"instance": "arkserver2", "map": "TheIsland"}, brief["target"])
+        self.assertEqual(SHA, brief["server_binary"]["sha256"])
+        self.assertEqual("player_principal_lifecycle_only", brief["feature_gates"]["observer"])
+        self.assertEqual(0, brief["feature_gates"]["dispatch_limit"])
+        self.assertEqual(10, brief["feature_gates"]["log_limit"])
+        self.assertEqual("stable", brief["post_run_stable_posture"]["expected"])
 
     def test_rejects_env_snapshot_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -132,6 +140,21 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("observer_env_snapshot_mismatch", report["blockers"])
         self.assertIn("observer_env_required_key_missing_or_mismatch", report["blockers"])
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
+
+    def test_rejects_operator_live_ops_brief_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["operator_live_ops_brief"]["feature_gates"]["dispatch_limit"] = 1
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_live_ops_brief_mismatch", report["blockers"])
 
     def test_rejects_nested_live_validation_alias_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

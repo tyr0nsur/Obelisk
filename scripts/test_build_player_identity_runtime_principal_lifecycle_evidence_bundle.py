@@ -22,10 +22,12 @@ import build_player_identity_runtime_principal_lifecycle_evidence_bundle as bund
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_TEXT,
     EXPECTED_BINARY_SHA256,
+    EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
     WINDOW_MARKERS,
     env_lines,
+    operator_live_ops_brief,
 )
 
 BUNDLE = SCRIPT_DIR / "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py"
@@ -152,45 +154,47 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 "binary_sha256": EXPECTED_BINARY_SHA256,
             },
         )()
-        request_pack_sha256 = write_sidecar(
-            request_pack,
-            json.dumps(
-                {
-                    "schema": "obelisk.player-principal-lifecycle-window-request.v1",
-                    "run_id": RUN_ID,
-                    "status": "candidate_only_request_pack",
-                    "approval_required": APPROVAL_TEXT,
-                    "ark_binary_sha256": EXPECTED_BINARY_SHA256,
-                    "obelisk_commit": TEST_COMMIT,
-                    "target": {"instance": "arkserver2", "map": "TheIsland"},
-                    "approved_window": {
-                        "start_utc": window["start"],
-                        "end_utc": window["end"],
-                    },
-                    "restart_expectation": "restart",
-                    "final_posture": "stable",
-                    "user_policy": "no_regular_users",
-                    "notice_path": "not_applicable",
-                    "copied_evidence_dir": str(copied_log.parent),
-                    "copied_log_path": str(copied_log),
-                    "window_manifest_path": str(manifest),
-                    "observer_env_file": "observer-window.env",
-                    "marker_set": WINDOW_MARKERS,
-                    "forbidden_markers": FORBIDDEN_MARKERS,
-                    "rollback": {
-                        "owner": "operator",
-                        "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
-                    },
-                    "non_claims": NON_CLAIMS,
-                },
-                sort_keys=True,
-            )
-            + "\n",
-        )
         observer_env_sha256 = write_sidecar(
             observer_env,
             "\n".join(env_lines(request_args))
             + "\n",
+        )
+        request_payload = {
+            "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+            "run_id": RUN_ID,
+            "status": "candidate_only_request_pack",
+            "approval_required": APPROVAL_TEXT,
+            "ark_binary_sha256": EXPECTED_BINARY_SHA256,
+            "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
+            "obelisk_commit": TEST_COMMIT,
+            "target": {"instance": "arkserver2", "map": "TheIsland"},
+            "approved_window": {
+                "start_utc": window["start"],
+                "end_utc": window["end"],
+            },
+            "restart_expectation": "restart",
+            "final_posture": "stable",
+            "user_policy": "no_regular_users",
+            "notice_path": "not_applicable",
+            "copied_evidence_dir": str(copied_log.parent),
+            "copied_log_path": str(copied_log),
+            "window_manifest_path": str(manifest),
+            "observer_env_file": "observer-window.env",
+            "marker_set": WINDOW_MARKERS,
+            "forbidden_markers": FORBIDDEN_MARKERS,
+            "rollback": {
+                "owner": "operator",
+                "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+            },
+            "non_claims": NON_CLAIMS,
+        }
+        request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
+            request_payload,
+            env_lines(request_args),
+        )
+        request_pack_sha256 = write_sidecar(
+            request_pack,
+            json.dumps(request_payload, sort_keys=True) + "\n",
         )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
@@ -715,7 +719,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("window manifest obelisk_commit does not match runtime observer summary", result.stderr)
+        self.assertIn("request_pack_obelisk_commit_mismatch", result.stderr)
 
     def test_fails_closed_when_runtime_gate_limit_does_not_match_first_window_budget(self) -> None:
         lines = [

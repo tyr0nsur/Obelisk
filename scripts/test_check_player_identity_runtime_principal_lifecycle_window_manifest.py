@@ -24,6 +24,14 @@ assert SPEC is not None and SPEC.loader is not None
 CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
+from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    EXPECTED_SERVER_BINARY_PATH,
+    FORBIDDEN_MARKERS,
+    NON_CLAIMS,
+    WINDOW_MARKERS,
+    env_lines,
+    operator_live_ops_brief,
+)
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
 GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
@@ -37,7 +45,7 @@ def future_window_fields() -> dict[str, str]:
     capture_end = start + timedelta(minutes=8)
     rollback_end = start + timedelta(minutes=10)
     run_id = start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
-    return {
+    payload = {
         "run_id": run_id,
         "approved_window_start_utc": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "approved_window_end_utc": rollback_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -46,6 +54,7 @@ def future_window_fields() -> dict[str, str]:
         "rollback_start_utc": capture_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "rollback_end_utc": rollback_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    return payload
 
 
 def rewrite_lines_for_window(lines: list[str], fields: dict[str, str]) -> list[str]:
@@ -124,13 +133,14 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
     if not copied_log_path.is_absolute():
         copied_log_path = base / copied_log_path
     window_manifest_path = base / "window-manifest.env"
-    return {
+    payload = {
         "schema": "obelisk.player-principal-lifecycle-window-request.v1",
         "status": "candidate_only_request_pack",
         "approval_required": "current-turn operator-approved runtime window, not standing approval",
         "target": {"instance": target[0], "map": target[1]},
         "run_id": fields["run_id"],
         "ark_binary_sha256": ARK_SHA,
+        "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
         "obelisk_commit": fields.get("obelisk_commit", "missing-obelisk-commit"),
         "approved_window": {
             "start_utc": fields["approved_window_start_utc"],
@@ -144,46 +154,25 @@ def request_pack_payload(fields: dict[str, str], base: Path) -> dict:
         "copied_log_path": str(copied_log_path),
         "window_manifest_path": str(window_manifest_path),
         "observer_env_file": "observer-window.env",
-        "marker_set": [
-            "enable-process-event-hook",
-            "disable-plugins",
-            "allow-observer-debug-window",
-            "allow-experimental-observers",
-            "enable-player-principal-lifecycle-observer",
-        ],
-        "forbidden_markers": [
-            "allow-ptrace",
-            "enable-debug-control",
-            "enable-reflection-scanner",
-            "enable-native-exec-probes",
-            "allow-global-process-event-callbacks",
-            "allow-filtered-process-event-callbacks",
-            "allow-call-process-event",
-            "allow-process-event-blocking",
-            "request-static-fname-probe",
-            "enable-chat-events",
-            "enable-chat-reflection",
-            "enable-chat-route-observer",
-            "enable-inventory-reflection",
-            "enable-structure-reflection",
-            "enable-item-return-events",
-        ],
+        "marker_set": WINDOW_MARKERS,
+        "forbidden_markers": FORBIDDEN_MARKERS,
         "rollback": {
             "owner": "operator",
             "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
         },
-        "non_claims": [
-            "does not authorize server operations",
-            "does not authorize marker/env changes",
-            "does not authorize starts, restarts, or stops",
-            "does not authorize Discord/community notices",
-            "does not promote public player identity",
-            "does not claim stable principal identity",
-            "does not promote permissions/admin",
-            "does not promote command/chat response or commands/replies",
-            "does not authorize lookup, persistence, mutation, return override, plugin delivery, runtime readiness, public SDK readiness, or v1 SDK completion",
-        ],
+        "non_claims": NON_CLAIMS,
     }
+    args = type(
+        "Args",
+        (),
+        {
+            "instance": target[0],
+            "map_name": target[1],
+            "binary_sha256": ARK_SHA,
+        },
+    )()
+    payload["operator_live_ops_brief"] = operator_live_ops_brief(payload, env_lines(args))
+    return payload
 
 
 def preflight_payload(
@@ -810,6 +799,17 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("forbidden_public_capability_or_readiness_value", report["blockers"])
         self.assertFalse(report["ready"])
 
+    def test_rejects_noncanonical_rollback_delta(self) -> None:
+        result = self.run_checker(
+            manifest_lines(rollback_delta="removed_observer_markers_only"),
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("rollback_delta_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_claims_dispatch_and_budget_that_would_enable_delivery(self) -> None:
         result = self.run_checker(
             manifest_lines(
@@ -947,6 +947,50 @@ class WindowManifestCheckerTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("request_pack_window_request_check_failed", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_obelisk_commit_mismatch(self) -> None:
+        workspace = Path("/servidor/ark/workspace-offline")
+        if not workspace.is_dir() or not os.access(workspace, os.W_OK):
+            self.skipTest("/servidor/ark/workspace-offline is not writable in this environment")
+        with tempfile.TemporaryDirectory(prefix="obelisk-test-player-principal-", dir=workspace) as tmp:
+            root = Path(tmp)
+            exact_dir = root / "live-validation-logs" / RUN_ID
+            exact_log = exact_dir / "Obelisk.log"
+            exact_manifest = exact_dir / "window-manifest.env"
+            exact_dir.mkdir(parents=True, exist_ok=True)
+            lines = []
+            for line in manifest_lines():
+                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                    lines.append(f"copied_log_path={exact_log}")
+                else:
+                    lines.append(line)
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            fields = write_sidecars(exact_manifest.parent, fields)
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = exact_manifest.parent / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["obelisk_commit"] = "abcdef1234567890abcdef1234567890abcdef12"
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            exact_manifest.write_text(
+                "\n".join(f"{key}={value}" for key, value in fields.items()) + "\n",
+                encoding="utf-8",
+            )
+            exact_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), str(exact_manifest), "--json"],
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_obelisk_commit_mismatch", report["blockers"])
         self.assertFalse(report["ready"])
 
     def test_rejects_preflight_sidecar_content_drift_even_with_matching_sha(self) -> None:

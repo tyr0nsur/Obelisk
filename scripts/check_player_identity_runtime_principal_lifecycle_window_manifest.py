@@ -119,6 +119,7 @@ REQUIRED_SIMPLE_FIELDS = (
 )
 ACCEPTED_USER_POLICIES = frozenset(("no_regular_users", "operator_approved_beta_users"))
 EXPECTED_APPROVAL = "current-turn operator-approved runtime window, not standing approval"
+EXPECTED_ROLLBACK_DELTA = "removed_observer_env_and_markers_preserved_disable_plugins"
 ALLOWED_FIELDS = frozenset(
     (
         *REQUIRED_TIMESTAMP_FIELDS,
@@ -537,6 +538,22 @@ def validate_request_pack(fields: dict[str, str], manifest_path: Path, blockers:
         add(blockers, "request_pack_schema_mismatch", "request_pack_path")
     if payload.get("run_id") != fields.get("run_id"):
         add(blockers, "request_pack_run_id_mismatch", "request_pack_path")
+    if payload.get("obelisk_commit") != fields.get("obelisk_commit"):
+        add(
+            blockers,
+            "request_pack_obelisk_commit_mismatch",
+            "request_pack_path",
+            expected=fields.get("obelisk_commit"),
+            actual=payload.get("obelisk_commit"),
+        )
+    if payload.get("ark_binary_sha256") != EXPECTED_BINARY_SHA256:
+        add(
+            blockers,
+            "request_pack_ark_binary_sha256_mismatch",
+            "request_pack_path",
+            expected=EXPECTED_BINARY_SHA256,
+            actual=payload.get("ark_binary_sha256"),
+        )
     copied_log_text = fields.get("copied_log_path")
     if copied_log_text:
         copied_log_status = protected_paths.protected_path_status(
@@ -757,8 +774,14 @@ def validate_manifest(fields: dict[str, str], manifest_path: Path) -> Validation
     for key in ("observer_env_survived", "observer_marker_survived"):
         if parse_bool(fields.get(key)) is not False:
             add(blockers, f"{key}_not_false", key, expected=False)
-    if not fields.get("rollback_delta"):
-        add(blockers, "rollback_delta_missing", "rollback_delta")
+    if fields.get("rollback_delta") != EXPECTED_ROLLBACK_DELTA:
+        add(
+            blockers,
+            "rollback_delta_mismatch",
+            "rollback_delta",
+            expected=EXPECTED_ROLLBACK_DELTA,
+            actual=fields.get("rollback_delta"),
+        )
 
     if len(timestamps) == len(REQUIRED_TIMESTAMP_FIELDS):
         if timestamps["approved_window_start_utc"] >= timestamps["approved_window_end_utc"]:
@@ -1039,6 +1062,7 @@ def build_report(fields: dict[str, str], validation: Validation, manifest_path: 
             "completed": parse_bool(fields.get("rollback_completed")),
             "observer_env_survived": parse_bool(fields.get("observer_env_survived")),
             "observer_marker_survived": parse_bool(fields.get("observer_marker_survived")),
+            "delta": fields.get("rollback_delta"),
         },
         "user_policy": validation.user_policy,
         "log_budget": fields.get("log_budget"),

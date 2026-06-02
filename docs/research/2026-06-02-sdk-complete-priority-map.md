@@ -672,6 +672,59 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Runtime Principal Lifecycle Request Brief Hardening
+
+The next P0 preparation round tightened the future player-principal lifecycle runtime
+evidence request and replay path without authorizing runtime. The lead delegated four
+read-only scopes and kept integration ownership:
+
+- live-ops brief completeness;
+- runtime observer safety;
+- approved-evidence bundle/replay provenance;
+- handoff and knowledge-continuity audit.
+
+Integrated changes:
+
+- `scripts/prepare_player_principal_lifecycle_window_request.py` now emits a structured
+  `operator_live_ops_brief` inside `window-request.json`. The brief records target
+  instance/map, reviewed `ShooterGameServer` path plus SHA, feature gates, exact marker
+  set and forbidden marker list, observer env snapshot, start/restart/stop window, notice
+  path, evidence capture paths, rollback, post-run stable posture, and explicit
+  non-authorization.
+- `scripts/check_player_principal_lifecycle_window_request.py` validates that brief
+  exactly and keeps request-pack acceptance as pre-window planning only. The request pack
+  now also records and checks `server_binary_path`.
+- `enable-inventory-action-redacted-observer` was added to the player-principal request
+  pack forbidden marker list, matching wrapper/posture/preflight safety expectations.
+- `scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py` now
+  rejects request packs whose `obelisk_commit` or ARK binary SHA drift from the checked
+  window manifest, and requires the canonical rollback delta
+  `removed_observer_env_and_markers_preserved_disable_plugins`.
+- `scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py` now
+  allows, preserves, and validates that canonical rollback delta in
+  `operational_window.rollback`.
+
+Read-only findings preserved:
+
+- Runtime observer exclusivity remains primarily enforced by the wrapper, preflight, and
+  posture checkers rather than only by the observer translation unit. This is acceptable
+  for the operational path, but future defense-in-depth could duplicate selected
+  exclusivity checks in runtime if a wrapper bypass becomes realistic.
+- Preflight sidecars are still not fully bound to run id, target map, copied log path,
+  window manifest path, and request pack path. The next offline guardrail should extend
+  preflight JSON output and window-manifest validation before any runtime request is made.
+- No current-turn runtime/server approval exists. These request packs remain planning
+  artifacts and their next blocker is operator current-turn runtime window approval.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_player_principal_lifecycle_window_request scripts.test_check_player_identity_runtime_principal_lifecycle_window_manifest`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_runtime_principal_lifecycle_evidence_bundle scripts.test_check_player_identity_runtime_principal_lifecycle_approved_evidence scripts.test_build_player_identity_runtime_principal_lifecycle_approved_manifest`
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## Lifecycle Anchor Snapshot Provenance Binding
 
 The next P0-focused supervised round closed the remaining offline provenance gap for the

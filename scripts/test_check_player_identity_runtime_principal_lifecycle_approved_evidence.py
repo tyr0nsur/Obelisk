@@ -16,6 +16,7 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
 SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
@@ -24,6 +25,16 @@ TEST_COMMIT = "a" * 40
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 APPROVED_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
+
+from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
+    APPROVAL_TEXT,
+    EXPECTED_SERVER_BINARY_PATH,
+    FORBIDDEN_MARKERS,
+    NON_CLAIMS,
+    WINDOW_MARKERS,
+    env_lines,
+    operator_live_ops_brief,
+)
 
 
 def add_output_artifact_identity(payload: dict) -> dict:
@@ -151,89 +162,53 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         "start_utc": "2026-06-01T12:00:00Z",
         "end_utc": "2026-06-01T12:10:00Z",
     }
-    marker_set = [
-        "enable-process-event-hook",
-        "disable-plugins",
-        "allow-observer-debug-window",
-        "allow-experimental-observers",
-        "enable-player-principal-lifecycle-observer",
-    ]
-    forbidden_markers = [
-        "allow-ptrace",
-        "enable-debug-control",
-        "enable-reflection-scanner",
-        "enable-native-exec-probes",
-        "allow-global-process-event-callbacks",
-        "allow-filtered-process-event-callbacks",
-        "allow-call-process-event",
-        "allow-process-event-blocking",
-        "request-static-fname-probe",
-        "enable-chat-events",
-        "enable-chat-reflection",
-        "enable-chat-route-observer",
-        "enable-inventory-reflection",
-        "enable-structure-reflection",
-        "enable-item-return-events",
-    ]
-    non_claims = [
-        "does not authorize server operations",
-        "does not authorize marker/env changes",
-        "does not authorize starts, restarts, or stops",
-        "does not authorize Discord/community notices",
-        "does not promote public player identity",
-        "does not claim stable principal identity",
-        "does not promote permissions/admin",
-        "does not promote command/chat response or commands/replies",
-        "does not authorize lookup, persistence, mutation, return override, plugin delivery, runtime readiness, public SDK readiness, or v1 SDK completion",
-    ]
+    request_args = type(
+        "Args",
+        (),
+        {
+            "instance": "arkserver2",
+            "map_name": "TheIsland",
+            "binary_sha256": SHA,
+        },
+    )()
+    observer_env_lines = env_lines(request_args)
+    request_payload = {
+        "schema": "obelisk.player-principal-lifecycle-window-request.v1",
+        "status": "candidate_only_request_pack",
+        "approval_required": APPROVAL_TEXT,
+        "target": target,
+        "run_id": RUN_ID,
+        "ark_binary_sha256": SHA,
+        "server_binary_path": EXPECTED_SERVER_BINARY_PATH,
+        "obelisk_commit": TEST_COMMIT,
+        "approved_window": approved_window,
+        "restart_expectation": "restart",
+        "final_posture": "stable",
+        "user_policy": "no_regular_users",
+        "notice_path": "not_applicable",
+        "copied_evidence_dir": str(live_dir),
+        "copied_log_path": str(copied_log),
+        "window_manifest_path": str(manifest_path),
+        "observer_env_file": "observer-window.env",
+        "marker_set": WINDOW_MARKERS,
+        "forbidden_markers": FORBIDDEN_MARKERS,
+        "rollback": {
+            "owner": "operator",
+            "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
+        },
+        "non_claims": NON_CLAIMS,
+    }
+    request_payload["operator_live_ops_brief"] = operator_live_ops_brief(
+        request_payload,
+        observer_env_lines,
+    )
     request = write_sidecar(
         request_pack_path,
-        json.dumps(
-            {
-                "schema": "obelisk.player-principal-lifecycle-window-request.v1",
-                "status": "candidate_only_request_pack",
-                "approval_required": "current-turn operator-approved runtime window, not standing approval",
-                "target": target,
-                "run_id": RUN_ID,
-                "ark_binary_sha256": SHA,
-                "obelisk_commit": TEST_COMMIT,
-                "approved_window": approved_window,
-                "restart_expectation": "restart",
-                "final_posture": "stable",
-                "user_policy": "no_regular_users",
-                "notice_path": "not_applicable",
-                "copied_evidence_dir": str(live_dir),
-                "copied_log_path": str(copied_log),
-                "window_manifest_path": str(manifest_path),
-                "observer_env_file": "observer-window.env",
-                "marker_set": marker_set,
-                "forbidden_markers": forbidden_markers,
-                "rollback": {
-                    "owner": "operator",
-                    "delta": "remove observer env and markers, preserve stable enable-process-event-hook and disable-plugins",
-                },
-                "non_claims": non_claims,
-            },
-            sort_keys=True,
-        )
-        + "\n",
+        json.dumps(request_payload, sort_keys=True) + "\n",
     )
     observer_env = write_sidecar(
         observer_env_path,
-        "\n".join(
-            [
-                "OBELISK_INSTANCE_ID=arkserver2",
-                "OBELISK_ENABLE_PROCESS_EVENT_HOOK=1",
-                "OBELISK_DISABLE_PLUGINS=1",
-                "OBELISK_WRAPPER_PROFILE=observer-debug",
-                "OBELISK_ENABLE_PLAYER_PRINCIPAL_LIFECYCLE_OBSERVER=1",
-                f"OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_BINARY_SHA256={SHA}",
-                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_LOG_LIMIT=10",
-                "OBELISK_PLAYER_PRINCIPAL_LIFECYCLE_DISPATCH_LIMIT=0",
-                "OBELISK_PE_TRACE_LIMIT=0",
-            ]
-        )
-        + "\n",
+        "\n".join(observer_env_lines) + "\n",
     )
     preflight_pre = write_sidecar(
         preflight_pre_path,
@@ -381,6 +356,7 @@ def manifest() -> dict:
                 "completed": True,
                 "observer_env_survived": False,
                 "observer_marker_survived": False,
+                "delta": "removed_observer_env_and_markers_preserved_disable_plugins",
             },
             "claims": {"delivery_claim": "none", "principal_claim": "none"},
             "user_policy": "no_regular_users",
@@ -502,6 +478,7 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
                 "completed": True,
                 "observer_env_survived": False,
                 "observer_marker_survived": False,
+                "delta": "removed_observer_env_and_markers_preserved_disable_plugins",
             },
             "claims": {"delivery_claim": "none", "principal_claim": "none"},
             "user_policy": "no_regular_users",
@@ -1148,6 +1125,15 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn("operational_window_claims_keys_unexpected", report["blockers"])
         self.assertIn("consumer_boundary_case_keys_unexpected", report["blockers"])
         self.assertIn("promotion_gate_keys_unexpected", report["blockers"])
+
+    def test_rejects_operational_window_rollback_delta_drift(self) -> None:
+        payload = manifest()
+        payload["operational_window"]["rollback"]["delta"] = "removed_observer_markers_only"
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_rollback_delta_mismatch", report["blockers"])
 
     def test_rejects_identity_or_ue_leakage_inside_operational_window(self) -> None:
         payload = manifest()

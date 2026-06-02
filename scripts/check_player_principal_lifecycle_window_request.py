@@ -25,6 +25,7 @@ from snapshot_evidence_pack import first_symlink_component, reject_symlink_compo
 from prepare_player_principal_lifecycle_window_request import (
     APPROVAL_TEXT,
     EXPECTED_BINARY_SHA256,
+    EXPECTED_SERVER_BINARY_PATH,
     FORBIDDEN_MARKERS,
     NON_CLAIMS,
     REQUIRED_ENV,
@@ -51,6 +52,7 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
         "target",
         "run_id",
         "ark_binary_sha256",
+        "server_binary_path",
         "obelisk_commit",
         "approved_window",
         "restart_expectation",
@@ -63,6 +65,7 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
         "observer_env_file",
         "marker_set",
         "forbidden_markers",
+        "operator_live_ops_brief",
         "rollback",
         "non_claims",
     )
@@ -70,6 +73,54 @@ EXPECTED_TOP_LEVEL_KEYS = frozenset(
 EXPECTED_TARGET_KEYS = frozenset(("instance", "map"))
 EXPECTED_WINDOW_KEYS = frozenset(("start_utc", "end_utc"))
 EXPECTED_ROLLBACK_KEYS = frozenset(("owner", "delta"))
+EXPECTED_OPERATOR_BRIEF_KEYS = frozenset(
+    (
+        "target",
+        "feature_gates",
+        "server_binary",
+        "marker_changes",
+        "env_snapshot",
+        "start_restart_stop_window",
+        "notice_path",
+        "user_policy",
+        "evidence_capture",
+        "rollback",
+        "post_run_stable_posture",
+        "approval_boundary",
+        "non_authorization",
+    )
+)
+EXPECTED_SERVER_BINARY_KEYS = frozenset(("path", "sha256"))
+EXPECTED_FEATURE_GATE_KEYS = frozenset(
+    (
+        "observer",
+        "plugins_disabled",
+        "process_event_hook",
+        "dispatch_limit",
+        "log_limit",
+        "scanner_debug_and_callback_escape_gates",
+    )
+)
+EXPECTED_MARKER_CHANGE_KEYS = frozenset(("set", "forbidden"))
+EXPECTED_WINDOW_BRIEF_KEYS = frozenset(("start_utc", "end_utc", "expectation", "final_posture"))
+EXPECTED_EVIDENCE_CAPTURE_KEYS = frozenset(
+    (
+        "copied_evidence_dir",
+        "copied_log_path",
+        "window_manifest_path",
+        "observer_env_file",
+        "single_module_summary",
+        "copied_log_only",
+    )
+)
+EXPECTED_POST_RUN_KEYS = frozenset(
+    (
+        "required",
+        "expected",
+        "stable_markers_preserved",
+        "observer_markers_removed",
+    )
+)
 ALLOWED_RESTART_EXPECTATIONS = frozenset(("none", "start", "restart", "stop-after-window"))
 ALLOWED_FINAL_POSTURES = frozenset(("stable", "stopped"))
 ALLOWED_USER_POLICIES = frozenset(("no_regular_users", "operator_approved_beta_users"))
@@ -232,7 +283,7 @@ def is_negated_after_match(value: str, end: int) -> bool:
 
 
 def find_forbidden_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
-    if trail == "$.non_claims":
+    if trail in ("$.non_claims", "$.operator_live_ops_brief.marker_changes.forbidden"):
         return None
     if isinstance(value, dict):
         for key, child in value.items():
@@ -251,7 +302,7 @@ def find_forbidden_claim(value: Any, trail: str = "$") -> tuple[str, str] | None
 
 
 def validate_secret_free(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
-    if trail in ("$.forbidden_markers", "$.non_claims"):
+    if trail in ("$.forbidden_markers", "$.non_claims", "$.operator_live_ops_brief.marker_changes.forbidden"):
         return
     if isinstance(value, dict):
         for key, child in value.items():
@@ -329,6 +380,7 @@ def args_for_env(payload: dict[str, Any]) -> argparse.Namespace:
         approved_window_start_utc=window["start_utc"],
         approved_window_end_utc=window["end_utc"],
         binary_sha256=payload["ark_binary_sha256"],
+        server_binary_path=payload["server_binary_path"],
         restart_expectation=payload["restart_expectation"],
         final_posture=payload["final_posture"],
         user_policy=payload["user_policy"],
@@ -337,6 +389,78 @@ def args_for_env(payload: dict[str, Any]) -> argparse.Namespace:
         output_dir=Path("."),
         json=True,
     )
+
+
+def expected_operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str, Any] | None:
+    try:
+        window = payload["approved_window"]
+        return {
+            "target": payload["target"],
+            "feature_gates": {
+                "observer": "player_principal_lifecycle_only",
+                "plugins_disabled": True,
+                "process_event_hook": True,
+                "dispatch_limit": 0,
+                "log_limit": 10,
+                "scanner_debug_and_callback_escape_gates": "forbidden",
+            },
+            "server_binary": {
+                "path": payload["server_binary_path"],
+                "sha256": payload["ark_binary_sha256"],
+            },
+            "marker_changes": {
+                "set": payload["marker_set"],
+                "forbidden": payload["forbidden_markers"],
+            },
+            "env_snapshot": env,
+            "start_restart_stop_window": {
+                "start_utc": window["start_utc"],
+                "end_utc": window["end_utc"],
+                "expectation": payload["restart_expectation"],
+                "final_posture": payload["final_posture"],
+            },
+            "notice_path": payload["notice_path"],
+            "user_policy": payload["user_policy"],
+            "evidence_capture": {
+                "copied_evidence_dir": payload["copied_evidence_dir"],
+                "copied_log_path": payload["copied_log_path"],
+                "window_manifest_path": payload["window_manifest_path"],
+                "observer_env_file": payload["observer_env_file"],
+                "single_module_summary": "player_principal_lifecycle",
+                "copied_log_only": True,
+            },
+            "rollback": payload["rollback"],
+            "post_run_stable_posture": {
+                "required": True,
+                "expected": payload["final_posture"],
+                "stable_markers_preserved": ["enable-process-event-hook", "disable-plugins"],
+                "observer_markers_removed": True,
+            },
+            "approval_boundary": APPROVAL_TEXT,
+            "non_authorization": "brief only; request-pack acceptance does not authorize operations",
+        }
+    except (KeyError, TypeError):
+        return None
+
+
+def validate_operator_live_ops_brief(payload: dict[str, Any], env: list[str], blockers: list[dict[str, Any]]) -> None:
+    brief = require_keys(
+        payload.get("operator_live_ops_brief"),
+        required=EXPECTED_OPERATOR_BRIEF_KEYS,
+        label="operator_live_ops_brief",
+        blockers=blockers,
+    )
+    if brief is None:
+        return
+    require_keys(brief.get("feature_gates"), required=EXPECTED_FEATURE_GATE_KEYS, label="operator_live_ops_brief_feature_gates", blockers=blockers)
+    require_keys(brief.get("server_binary"), required=EXPECTED_SERVER_BINARY_KEYS, label="operator_live_ops_brief_server_binary", blockers=blockers)
+    require_keys(brief.get("marker_changes"), required=EXPECTED_MARKER_CHANGE_KEYS, label="operator_live_ops_brief_marker_changes", blockers=blockers)
+    require_keys(brief.get("start_restart_stop_window"), required=EXPECTED_WINDOW_BRIEF_KEYS, label="operator_live_ops_brief_window", blockers=blockers)
+    require_keys(brief.get("evidence_capture"), required=EXPECTED_EVIDENCE_CAPTURE_KEYS, label="operator_live_ops_brief_evidence_capture", blockers=blockers)
+    require_keys(brief.get("post_run_stable_posture"), required=EXPECTED_POST_RUN_KEYS, label="operator_live_ops_brief_post_run_stable_posture", blockers=blockers)
+    expected = expected_operator_live_ops_brief(payload, env)
+    if expected is not None and brief != expected:
+        add(blockers, "operator_live_ops_brief_mismatch", "operator_live_ops_brief", expected=expected, actual=brief)
 
 
 def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
@@ -356,6 +480,7 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
         add(blockers, "non_claims_mismatch", "non_claims")
     if payload.get("observer_env_file") != "observer-window.env":
         add(blockers, "observer_env_file_mismatch", "observer_env_file")
+    validate_operator_live_ops_brief(payload, env, blockers)
     target = require_keys(payload.get("target"), required=EXPECTED_TARGET_KEYS, label="target", blockers=blockers)
     if target:
         for key in ("instance", "map"):
@@ -403,6 +528,14 @@ def validate_payload(payload: dict[str, Any], env: list[str]) -> Validation:
     sha = string_at(payload, "ark_binary_sha256", blockers)
     if sha is not None and (not SHA256_RE.fullmatch(sha) or sha != EXPECTED_BINARY_SHA256):
         add(blockers, "ark_binary_sha256_not_reviewed", "ark_binary_sha256", expected=EXPECTED_BINARY_SHA256)
+    server_binary_path = string_at(payload, "server_binary_path", blockers)
+    if server_binary_path is not None and server_binary_path != EXPECTED_SERVER_BINARY_PATH:
+        add(
+            blockers,
+            "server_binary_path_not_reviewed",
+            "server_binary_path",
+            expected=EXPECTED_SERVER_BINARY_PATH,
+        )
     commit = string_at(payload, "obelisk_commit", blockers)
     if commit is not None and not is_reviewed_obelisk_commit(commit):
         add(blockers, "obelisk_commit_invalid", "obelisk_commit")
