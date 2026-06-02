@@ -900,10 +900,14 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             {
                 "notes": [
                     "public SDK is ready",
-                    "public header is allowed",
-                    "v1 completion is ready",
-                    "stable claim is ready",
-                ],
+                "public header is allowed",
+                "v1 completion is ready",
+                "stable claim is ready",
+                "stable SDK is ready",
+                "complete SDK is ready",
+                "full SDK is supported",
+                "production SDK is supported",
+            ],
                 "stable_claim_allowed": True,
                 "v1_completion_ready": True,
                 "publicSdkReady": True,
@@ -915,6 +919,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("notes[1]:positive_text_claim", claims)
         self.assertIn("notes[2]:positive_text_claim", claims)
         self.assertIn("notes[3]:positive_text_claim", claims)
+        self.assertIn("notes[4]:positive_text_claim", claims)
+        self.assertIn("notes[5]:positive_text_claim", claims)
+        self.assertIn("notes[6]:positive_text_claim", claims)
+        self.assertIn("notes[7]:positive_text_claim", claims)
         self.assertIn("stable_claim_allowed", claims)
         self.assertIn("v1_completion_ready", claims)
         self.assertIn("publicSdkReady", claims)
@@ -1320,6 +1328,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "command response path is live",
                         "reply endpoint is live",
                         "send chat API is operational",
+                        "stable SDK is ready",
+                        "complete SDK is ready",
+                        "production SDK is supported",
                     ],
                 },
             }
@@ -1365,6 +1376,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.notes[5]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[6]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[7]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[8]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[9]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[10]:positive_text_claim", result["public_or_runtime_claims"])
 
 
 if __name__ == "__main__":

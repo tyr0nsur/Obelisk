@@ -721,6 +721,15 @@ class WindowManifestCheckerTests(unittest.TestCase):
             self.assertEqual(fields["run_id"], RUN_ID)
             self.assertEqual(fields["copied_log_path"], str(copied_log.resolve()))
             self.assertEqual(fields["copied_log_sha256"], GOOD_SHA)
+            self.assertEqual(fields["request_pack_path"], str(copied_log.parent / "window-request.json"))
+            self.assertEqual(fields["observer_env_path"], str(copied_log.parent / "observer-window.env"))
+            self.assertEqual(
+                fields["operator_approval_receipt_path"],
+                str(copied_log.parent / "operator-approval-receipt.json"),
+            )
+            self.assertNotIn("player-principal-preflight", fields["request_pack_path"])
+            self.assertNotIn("player-principal-preflight", fields["observer_env_path"])
+            self.assertNotIn("player-principal-preflight", fields["operator_approval_receipt_path"])
 
     def test_emit_template_from_copied_log_rejects_protected_live_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

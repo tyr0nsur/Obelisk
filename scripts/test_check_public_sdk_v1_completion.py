@@ -1875,18 +1875,22 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "planning_only": True,
                 "promotion_ready": False,
                 "public_sdk_ready": False,
+                "public_sdk": True,
                 "public_abi_ready": False,
                 "runtime_ready": False,
                 "public_header_allowed": False,
+                "public_header_ready": True,
                 "checks": [
                     {
                         "name": "commands_replies_public_readiness",
+                        "public_response_path_ready": True,
                         "public_command_router_allowed": True,
                         "public_reply_or_send_chat_abi_allowed": True,
                         "public_reply_api": True,
                         "public_send_chat_api": True,
                         "public_reply_abi_allowed": True,
                         "public_send_chat_abi_allowed": "ready",
+                        "send_chat_ready": True,
                         "public-reply-api": True,
                         "publicSendChatApi": True,
                         "reply_send_chat_router_claims_allowed": True,
@@ -1904,6 +1908,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "command response path is live",
                             "reply endpoint is live",
                             "send chat API is operational",
+                            "stable SDK is ready",
+                            "complete SDK is ready",
+                            "production SDK is supported",
                         ],
                     }
                 ],
@@ -1911,11 +1918,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
 
         self.assertIn("checks[0].public_command_router_allowed", claims)
+        self.assertIn("checks[0].public_response_path_ready", claims)
         self.assertIn("checks[0].public_reply_or_send_chat_abi_allowed", claims)
         self.assertIn("checks[0].public_reply_api", claims)
         self.assertIn("checks[0].public_send_chat_api", claims)
         self.assertIn("checks[0].public_reply_abi_allowed", claims)
         self.assertIn("checks[0].public_send_chat_abi_allowed", claims)
+        self.assertIn("checks[0].send_chat_ready", claims)
         self.assertIn("checks[0].public-reply-api", claims)
         self.assertIn("checks[0].publicSendChatApi", claims)
         self.assertIn("checks[0].reply_send_chat_router_claims_allowed", claims)
@@ -1932,6 +1941,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[4]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[5]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[6]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[7]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[8]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[9]:positive_text_claim", claims)
 
     def test_completion_gate_rejects_route_gate_alias_claims_without_claims_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

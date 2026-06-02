@@ -134,7 +134,8 @@ POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
     r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
     r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
-    r"public[_ -]?(?:sdk|header)|v1[_ -]?completion|stable[_ -]?claim"
+    r"public[_ -]?(?:sdk|header)|v1[_ -]?completion|stable[_ -]?claim|"
+    r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
     r")\b(?:\s+(?:is|are))?\s+"
     r"\b(?:public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
     re.IGNORECASE,

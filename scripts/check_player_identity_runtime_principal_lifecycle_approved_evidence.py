@@ -592,13 +592,6 @@ def validate_operational_window_artifact(
         )
 
 
-def request_check_failed_only_because_window_expired(blocker: dict[str, Any]) -> bool:
-    if blocker.get("reason") != "request_pack_window_request_check_failed":
-        return False
-    request_blockers = blocker.get("request_check_blockers")
-    return isinstance(request_blockers, list) and set(request_blockers) == {"approved_window_expired"}
-
-
 def replay_operational_window_manifest(window: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     manifest = window.get("manifest")
     path_text = manifest.get("path") if isinstance(manifest, dict) else None
@@ -611,7 +604,11 @@ def replay_operational_window_manifest(window: dict[str, Any], blockers: list[di
     try:
         try:
             fields = window_manifest_checker.load_manifest(manifest_path)
-            validation = window_manifest_checker.validate_manifest(fields, manifest_path)
+            validation = window_manifest_checker.validate_manifest(
+                fields,
+                manifest_path,
+                post_window_replay=True,
+            )
         except (OSError, SystemExit) as exc:
             add(
                 blockers,
@@ -623,26 +620,21 @@ def replay_operational_window_manifest(window: dict[str, Any], blockers: list[di
     finally:
         window_manifest_checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_window_roots
 
-    replay_blockers = [
-        blocker
-        for blocker in validation.blockers
-        if not request_check_failed_only_because_window_expired(blocker)
-    ]
-    if replay_blockers:
+    if validation.blockers:
         add(
             blockers,
             "operational_window_manifest_check_failed",
             "$.operational_window.manifest",
-            replay_blockers=[blocker["reason"] for blocker in replay_blockers],
+            replay_blockers=[blocker["reason"] for blocker in validation.blockers],
+            replay_blocker_details=validation.blockers,
         )
 
-    replay_validation = window_manifest_checker.Validation(
-        blockers=replay_blockers,
-        target=validation.target,
-        user_policy=validation.user_policy,
-        copied_log_status=validation.copied_log_status,
+    replay_report = window_manifest_checker.build_report(
+        fields,
+        validation,
+        manifest_path,
+        post_window_replay=True,
     )
-    replay_report = window_manifest_checker.build_report(fields, replay_validation, manifest_path)
     replay_projection = {
         key: replay_report.get(key)
         for key in OPERATIONAL_WINDOW_REPLAY_KEYS

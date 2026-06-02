@@ -675,36 +675,88 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         payload.pop("output_artifact_identity", None)
         add_output_artifact_identity(payload)
 
-    def test_request_check_expiry_exception_is_exact(self) -> None:
-        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_expiry_filter")
+    def test_operational_window_replay_delegates_manifest_post_window_mode(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_replay_post_window")
+        window = {"manifest": {"path": "/tmp/window-manifest.env"}}
+        replay_projection = {key: window.get(key) for key in checker.OPERATIONAL_WINDOW_REPLAY_KEYS}
+        validation = checker.window_manifest_checker.Validation(
+            blockers=[],
+            target=None,
+            user_policy=None,
+            copied_log_status=None,
+        )
 
-        self.assertTrue(
-            checker.request_check_failed_only_because_window_expired(
-                {
-                    "reason": "request_pack_window_request_check_failed",
-                    "request_check_blockers": ["approved_window_expired"],
-                }
-            )
-        )
-        self.assertFalse(
-            checker.request_check_failed_only_because_window_expired(
-                {
-                    "reason": "request_pack_window_request_check_failed",
-                    "request_check_blockers": [
-                        "approved_window_expired",
-                        "operator_request_markdown_mismatch",
+        with (
+            mock.patch.object(checker.window_manifest_checker, "load_manifest", return_value={"run_id": RUN_ID}),
+            mock.patch.object(
+                checker.window_manifest_checker,
+                "validate_manifest",
+                return_value=validation,
+            ) as validate,
+            mock.patch.object(
+                checker.window_manifest_checker,
+                "build_report",
+                return_value=replay_projection,
+            ) as build,
+        ):
+            blockers: list[dict] = []
+            checker.replay_operational_window_manifest(window, blockers)
+
+        self.assertEqual([], blockers)
+        self.assertTrue(validate.call_args.kwargs["post_window_replay"])
+        self.assertTrue(build.call_args.kwargs["post_window_replay"])
+
+    def test_operational_window_replay_preserves_mixed_or_duplicate_request_blockers(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_replay_blockers")
+        for request_blockers in (
+            ["approved_window_expired", "operator_request_markdown_mismatch"],
+            ["approved_window_expired", "approved_window_expired"],
+        ):
+            with self.subTest(request_blockers=request_blockers):
+                window = {"manifest": {"path": "/tmp/window-manifest.env"}}
+                replay_projection = {key: window.get(key) for key in checker.OPERATIONAL_WINDOW_REPLAY_KEYS}
+                validation = checker.window_manifest_checker.Validation(
+                    blockers=[
+                        {
+                            "reason": "request_pack_window_request_check_failed",
+                            "label": "request_pack_path",
+                            "request_check_blockers": request_blockers,
+                        }
                     ],
-                }
-            )
-        )
-        self.assertFalse(
-            checker.request_check_failed_only_because_window_expired(
-                {
-                    "reason": "request_pack_window_request_check_failed",
-                    "request_check_blockers": [],
-                }
-            )
-        )
+                    target=None,
+                    user_policy=None,
+                    copied_log_status=None,
+                )
+
+                with (
+                    mock.patch.object(
+                        checker.window_manifest_checker,
+                        "load_manifest",
+                        return_value={"run_id": RUN_ID},
+                    ),
+                    mock.patch.object(
+                        checker.window_manifest_checker,
+                        "validate_manifest",
+                        return_value=validation,
+                    ),
+                    mock.patch.object(
+                        checker.window_manifest_checker,
+                        "build_report",
+                        return_value=replay_projection,
+                    ),
+                ):
+                    blockers: list[dict] = []
+                    checker.replay_operational_window_manifest(window, blockers)
+
+                self.assertEqual(
+                    ["operational_window_manifest_check_failed"],
+                    [blocker["reason"] for blocker in blockers],
+                )
+                self.assertEqual(["request_pack_window_request_check_failed"], blockers[0]["replay_blockers"])
+                self.assertEqual(
+                    request_blockers,
+                    blockers[0]["replay_blocker_details"][0]["request_check_blockers"],
+                )
 
     def test_rejects_mutated_window_manifest_even_when_embedded_sha_is_updated(self) -> None:
         payload = manifest()

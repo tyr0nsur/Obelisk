@@ -1865,10 +1865,14 @@ def template_fields_from_copied_log(copied_log: Path) -> dict[str, str]:
         raise SystemExit("--copied-log must be live-validation-logs/<run-id>/Obelisk.log")
     if RUN_ID_RE.fullmatch(run_id) is None:
         raise SystemExit(f"--copied-log run id is invalid: {run_id}")
+    sidecar_dir = status.resolved.parent
     return {
         "run_id": run_id,
         "copied_log_path": str(status.resolved),
         "copied_log_sha256": hashlib.sha256(status.resolved.read_bytes()).hexdigest(),
+        "request_pack_path": str(sidecar_dir / "window-request.json"),
+        "observer_env_path": str(sidecar_dir / "observer-window.env"),
+        "operator_approval_receipt_path": str(sidecar_dir / "operator-approval-receipt.json"),
     }
 
 

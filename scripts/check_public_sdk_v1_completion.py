@@ -197,12 +197,19 @@ SCOPED_RELEASE_STATEMENT_ALLOWED_BLOCKERS = {
 COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "promotion_ready",
     "public_sdk_ready",
+    "public_sdk",
     "public_abi_ready",
     "public_abi_allowed",
+    "public_reply_abi_ready",
+    "public_response_path_ready",
     "runtime_ready",
+    "send_chat_ready",
     "public_header_allowed",
+    "public_header_ready",
     "public_readiness_ready",
+    "public_bridge_abi_allowed",
     "public_command_router_allowed",
+    "public_response_abi_allowed",
     "public_reply_or_send_chat_abi_allowed",
     "public_reply_abi_allowed",
     "public_send_chat_abi_allowed",
@@ -251,7 +258,8 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
     r"send[-\s]?chat\s+abi|reply\s+endpoint|command\s+routing|permissions/admin|replies\s+api|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
-    r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
+    r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
+    r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
     r")\b.{0,80}\b(?:is|are|now|becomes?|became)?\s*"
     r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b",
     re.IGNORECASE,
@@ -261,7 +269,8 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
     r".{0,80}\b(?:"
     r"reply\s+api|reply\s+abi|reply\s+endpoint|send[-\s]?chat\s+api|command\s+router|"
     r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
-    r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion"
+    r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
+    r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
     r")\b",
     re.IGNORECASE,
 )
