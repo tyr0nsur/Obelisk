@@ -239,8 +239,12 @@ def build_manifest(
         "approved_runtime_evidence_present": True,
         "runtime_evidence_ready": True,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "approval": {
             "runtime_evidence_reviewed": True,
             "reviewed_by": reviewed_by,

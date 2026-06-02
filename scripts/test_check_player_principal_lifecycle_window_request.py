@@ -353,6 +353,43 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertFalse(report["operator_request_verified"])
         self.assertIn("operator_request_unreadable", report["blockers"])
 
+    def test_rejects_env_file_from_different_request_pack_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            other_output_dir = Path(tmp) / "other-request"
+            prepare_pack(output_dir)
+            prepare_pack(other_output_dir)
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--env-file", str(other_output_dir / "observer-window.env")],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("env_file_not_sibling_of_request_json", report["blockers"])
+
+    def test_rejects_operator_request_from_different_request_pack_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            other_output_dir = Path(tmp) / "other-request"
+            prepare_pack(output_dir)
+            other_output_dir.mkdir()
+            (other_output_dir / "operator-approval-request.md").write_text(
+                (output_dir / "operator-approval-request.md").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--operator-request", str(other_output_dir / "operator-approval-request.md")],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_request_verified"])
+        self.assertIn("operator_request_not_sibling_of_request_json", report["blockers"])
+
     def test_rejects_already_started_approved_window(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp) / "request"

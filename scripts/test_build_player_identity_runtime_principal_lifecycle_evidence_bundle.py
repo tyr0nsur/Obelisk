@@ -1196,6 +1196,78 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertIsNone(state["sha256"])
         self.assertEqual(["request_pack_not_approved_offline_workspace"], [blocker["reason"] for blocker in blockers])
 
+    def test_request_pack_check_does_not_read_protected_sidecars(self) -> None:
+        blockers: list[dict] = []
+
+        with mock.patch.object(
+            bundle_builder,
+            "run_json_check",
+            side_effect=AssertionError("protected request-pack sidecars must not be checked"),
+        ):
+            state = bundle_builder.request_pack_check_state(
+                {
+                    "exists": True,
+                    "path": Path("/servidor/ark/obelisk/protected-window-request.json"),
+                    "approved_offline_workspace": False,
+                    "protected": True,
+                },
+                {
+                    "exists": True,
+                    "path": Path("/servidor/ark/obelisk/protected-observer-window.env"),
+                    "approved_offline_workspace": False,
+                    "protected": True,
+                },
+                blockers,
+            )
+
+        self.assertFalse(state["checked"])
+        self.assertFalse(state["ready"])
+        self.assertEqual([], blockers)
+
+    def test_approved_manifest_check_does_not_read_protected_manifest(self) -> None:
+        blockers: list[dict] = []
+        with mock.patch.object(
+            bundle_builder,
+            "run_json_check",
+            side_effect=AssertionError("protected approved-runtime manifest must not be checked"),
+        ):
+            state = bundle_builder.approved_runtime_manifest_check_state(
+                {
+                    "exists": True,
+                    "path": Path("/servidor/ark/obelisk/approved-runtime-principal-lifecycle-evidence.json"),
+                    "approved_offline_workspace": False,
+                    "protected": True,
+                },
+                blockers,
+            )
+
+        self.assertFalse(state["checked"])
+        self.assertFalse(state["ready"])
+        self.assertEqual([], blockers)
+
+    def test_preflight_manifest_parser_rejects_duplicate_and_unsafe_keys_before_using_them(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            manifest = Path(temp) / "window-manifest.env"
+            manifest.write_text(
+                "\n".join(
+                    [
+                        "request_pack_path=window-request.json",
+                        "request_pack_path=/servidor/ark/obelisk/protected-window-request.json",
+                        "observer/env/path=observer-window.env",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            blockers: list[dict] = []
+
+            fields = bundle_builder.read_manifest_fields(manifest, blockers)
+
+        self.assertEqual({"request_pack_path": "window-request.json"}, fields)
+        reasons = [blocker["reason"] for blocker in blockers]
+        self.assertIn("window_manifest_duplicate_key", reasons)
+        self.assertIn("window_manifest_key_unsafe", reasons)
+
     def test_fails_closed_for_events_before_safe_gate(self) -> None:
         lines = runtime_log_lines()
         lines.insert(

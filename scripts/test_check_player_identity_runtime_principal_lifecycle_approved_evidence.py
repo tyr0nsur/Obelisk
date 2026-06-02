@@ -376,8 +376,12 @@ def manifest() -> dict:
         "approved_runtime_evidence_present": True,
         "runtime_evidence_ready": True,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "approval": {
             "runtime_evidence_reviewed": True,
             "reviewed_by": "runtime-reviewer",
@@ -505,8 +509,12 @@ def manifest_for_copied_log(copied_log: Path) -> dict:
         "approved_runtime_evidence_present": True,
         "runtime_evidence_ready": True,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "approval": {
             "runtime_evidence_reviewed": True,
             "reviewed_by": "runtime-reviewer",
@@ -642,8 +650,12 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertTrue(report["approved_runtime_evidence_present"])
         self.assertTrue(report["runtime_evidence_ready"])
         self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_header_allowed"])
         self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["v1_completion_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["public_capability_bits_now"], [])
+        self.assertEqual(report["public_callback_abi_now"], [])
         self.assertEqual(report["remaining_blockers"], [])
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(
@@ -1145,6 +1157,32 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("public_sdk_ready_not_false", report["blockers"])
         self.assertIn("forbidden_identity_or_ue_internal_leakage", report["blockers"])
+
+    def test_requires_explicit_no_public_contract_surface(self) -> None:
+        cases = (
+            ("public_header_allowed", None, "top_level_fields_missing_required"),
+            ("v1_completion_ready", None, "top_level_fields_missing_required"),
+            ("public_capability_bits_now", None, "top_level_fields_missing_required"),
+            ("public_callback_abi_now", None, "top_level_fields_missing_required"),
+            ("public_header_allowed", True, "public_header_allowed_not_false"),
+            ("v1_completion_ready", True, "v1_completion_ready_not_false"),
+            ("public_capability_bits_now", ["player_identity"], "public_capability_bits_now_not_empty"),
+            ("public_callback_abi_now", ["on_player_identity"], "public_callback_abi_now_not_empty"),
+        )
+        for key, value, blocker in cases:
+            with self.subTest(key=key, value=value):
+                payload = manifest()
+                if value is None:
+                    payload.pop(key)
+                else:
+                    payload[key] = value
+                payload.pop("output_artifact_identity")
+                add_output_artifact_identity(payload)
+                result = self.run_checker(payload, check=False)
+                report = json.loads(result.stdout)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(blocker, report["blockers"])
 
     def test_rejects_extended_private_identity_terms_from_current_notes(self) -> None:
         payload = manifest()

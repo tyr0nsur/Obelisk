@@ -34,7 +34,10 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     NON_CLAIMS,
     WINDOW_MARKERS,
     env_lines,
+    markdown_request,
+    operator_approval_receipt_payload,
     operator_live_ops_brief,
+    post_window_replay_contract,
 )
 
 
@@ -54,6 +57,7 @@ def preflight_payload(
     copied_log_path: Path,
     env_file: Path | None = None,
     env_sha256: str | None = None,
+    checked_at_utc: str = "2026-06-01T12:00:00Z",
 ) -> str:
     payload = {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
@@ -79,7 +83,7 @@ def preflight_payload(
         "marker_dir": f"/servidor/ark/obelisk/state/instances/{instance}",
         "offline_only": False,
         "allow_stopped": True,
-        "checked_at_utc": "2026-06-01T12:00:00Z",
+        "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
         "non_claim": "preflight only; not runtime approval and not permission to touch servers",
     }
@@ -144,9 +148,11 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         source = summary["evidence"]["sources"][0]
         manifest_path = temp_dir / "live-validation-logs" / RUN_ID / "window-manifest.env"
-        sidecar_dir = temp_dir / "player-principal-preflight" / RUN_ID
+        sidecar_dir = manifest_path.parent
         request_pack = sidecar_dir / "window-request.json"
         observer_env = sidecar_dir / "observer-window.env"
+        operator_request = sidecar_dir / "operator-approval-request.md"
+        operator_approval_receipt = sidecar_dir / "operator-approval-receipt.json"
         preflight_pre = manifest_path.parent / "preflight-pre.json"
         preflight_post = manifest_path.parent / "preflight-post.json"
         request_args = type(
@@ -192,6 +198,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
             request_payload,
             observer_env_lines,
         )
+        request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
         request_pack_sha256 = write_sidecar(
             request_pack,
             json.dumps(request_payload, sort_keys=True) + "\n",
@@ -199,6 +206,26 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
         observer_env_sha256 = write_sidecar(
             observer_env,
             "\n".join(observer_env_lines) + "\n",
+        )
+        write_sidecar(
+            operator_request,
+            markdown_request(request_payload, observer_env_lines),
+        )
+        operator_approval_receipt_sha256 = write_sidecar(
+            operator_approval_receipt,
+            json.dumps(
+                operator_approval_receipt_payload(
+                    request_payload,
+                    request_json_path=request_pack,
+                    request_md_path=operator_request,
+                    env_path=observer_env,
+                    operator_approved=True,
+                    operator_reference="test-current-turn-approval",
+                    approved_at_utc=WINDOW_START.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                ),
+                sort_keys=True,
+            )
+            + "\n",
         )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
@@ -211,6 +238,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 copied_log_path=Path(source["path"]),
                 env_file=observer_env,
                 env_sha256=observer_env_sha256,
+                checked_at_utc=(WINDOW_START + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             ),
         )
         preflight_post_sha256 = write_sidecar(
@@ -222,6 +250,7 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                 map_name="TheIsland",
                 window_manifest_path=manifest_path,
                 copied_log_path=Path(source["path"]),
+                checked_at_utc=WINDOW_END.strftime("%Y-%m-%dT%H:%M:%SZ"),
             ),
         )
         manifest_path.write_text(
@@ -241,6 +270,8 @@ class BuildApprovedRuntimePrincipalLifecycleManifestTests(unittest.TestCase):
                     f"request_pack_sha256={request_pack_sha256}",
                     f"observer_env_path={observer_env}",
                     f"observer_env_sha256={observer_env_sha256}",
+                    f"operator_approval_receipt_path={operator_approval_receipt}",
+                    f"operator_approval_receipt_sha256={operator_approval_receipt_sha256}",
                     f"preflight_pre_path={preflight_pre}",
                     f"preflight_pre_sha256={preflight_pre_sha256}",
                     f"preflight_post_path={preflight_post}",

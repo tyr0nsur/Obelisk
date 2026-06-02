@@ -571,6 +571,7 @@ for marker in \
     enable-chat-reflection \
     enable-chat-route-observer \
     enable-inventory-reflection \
+    enable-inventory-action-redacted-observer \
     enable-structure-reflection \
     enable-item-return-events
 do

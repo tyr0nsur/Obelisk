@@ -281,6 +281,53 @@ def read_text_sidecar(path: Path, label: str, blockers: list[dict[str, Any]]) ->
         return None
 
 
+def validate_request_pack_sidecar_paths(
+    *,
+    request_json_path: Path,
+    env_file_path: Path,
+    operator_request_path: Path,
+    blockers: list[dict[str, Any]],
+) -> None:
+    expected_names = {
+        "request_json": "window-request.json",
+        "env_file": "observer-window.env",
+        "operator_request": "operator-approval-request.md",
+    }
+    paths = {
+        "request_json": request_json_path,
+        "env_file": env_file_path,
+        "operator_request": operator_request_path,
+    }
+    resolved: dict[str, Path] = {}
+    for label, path in paths.items():
+        if path.name != expected_names[label]:
+            add(
+                blockers,
+                f"{label}_filename_mismatch",
+                label,
+                expected=expected_names[label],
+                actual=path.name,
+            )
+        try:
+            resolved[label] = path.expanduser().resolve(strict=True)
+        except OSError as exc:
+            add(blockers, f"{label}_path_unresolved", label, path=str(path), error=str(exc))
+    request_parent = resolved.get("request_json")
+    if request_parent is None:
+        return
+    request_dir = request_parent.parent
+    for label in ("env_file", "operator_request"):
+        sidecar = resolved.get(label)
+        if sidecar is not None and sidecar.parent != request_dir:
+            add(
+                blockers,
+                f"{label}_not_sibling_of_request_json",
+                label,
+                expected_dir=str(request_dir),
+                actual_dir=str(sidecar.parent),
+            )
+
+
 def require_keys(
     obj: Any,
     *,
@@ -768,9 +815,15 @@ def tolerate_post_window_expiry_only(blockers: list[dict[str, Any]]) -> bool:
 def main() -> int:
     args = parse_args()
     blockers: list[dict[str, Any]] = []
+    operator_request_path = args.operator_request or (args.request_json.parent / "operator-approval-request.md")
+    validate_request_pack_sidecar_paths(
+        request_json_path=args.request_json,
+        env_file_path=args.env_file,
+        operator_request_path=operator_request_path,
+        blockers=blockers,
+    )
     payload = read_json(args.request_json)
     env = read_env(args.env_file, blockers)
-    operator_request_path = args.operator_request or (args.request_json.parent / "operator-approval-request.md")
     operator_request_markdown = read_text_sidecar(operator_request_path, "operator_request", blockers)
     validation = validate_payload(payload, env)
     validation.blockers[:0] = blockers
@@ -780,6 +833,8 @@ def main() -> int:
         operator_request_markdown,
         validation.blockers,
     )
+    if any(blocker.get("label") == "operator_request" for blocker in validation.blockers):
+        operator_request_verified = False
     post_window_replay_expiry_tolerated = False
     if args.post_window_replay:
         post_window_replay_expiry_tolerated = tolerate_post_window_expiry_only(validation.blockers)

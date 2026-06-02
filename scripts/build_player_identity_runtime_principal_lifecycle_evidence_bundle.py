@@ -202,6 +202,10 @@ def offline_readable_file_state(state: dict[str, Any]) -> bool:
     )
 
 
+def unprotected_existing_file_state(state: dict[str, Any]) -> bool:
+    return state.get("exists") is True and state.get("protected") is not True
+
+
 def run_json_check(command: list[str]) -> tuple[int, dict[str, Any] | None, str]:
     result = subprocess.run(command, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     payload: dict[str, Any] | None = None
@@ -228,6 +232,8 @@ def request_pack_check_state(
         "stderr": "",
     }
     if not request_pack["exists"] or not observer_env["exists"]:
+        return state
+    if not unprotected_existing_file_state(request_pack) or not unprotected_existing_file_state(observer_env):
         return state
     state["checked"] = True
     exit_code, payload, stderr = run_json_check(
@@ -325,6 +331,8 @@ def approved_runtime_manifest_check_state(
     }
     if not approved_bundle["exists"]:
         return state
+    if not unprotected_existing_file_state(approved_bundle):
+        return state
     state["checked"] = True
     exit_code, payload, stderr = run_json_check(
         [
@@ -421,7 +429,27 @@ def read_manifest_fields(path: Path, blockers: list[dict[str, Any]]) -> dict[str
             add_blocker(blockers, "window_manifest_line_not_key_value", "window_manifest", line=line_number)
             continue
         key, value = line.split("=", 1)
-        fields[key.strip()] = value.strip()
+        key = key.strip()
+        value = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", key):
+            add_blocker(
+                blockers,
+                "window_manifest_key_unsafe",
+                "window_manifest",
+                line=line_number,
+                key=key,
+            )
+            continue
+        if key in fields:
+            add_blocker(
+                blockers,
+                "window_manifest_duplicate_key",
+                "window_manifest",
+                line=line_number,
+                key=key,
+            )
+            continue
+        fields[key] = value
     return fields
 
 

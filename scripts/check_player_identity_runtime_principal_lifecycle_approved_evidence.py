@@ -41,8 +41,12 @@ REQUIRED_TOP_LEVEL_KEYS = frozenset(
         "approved_runtime_evidence_present",
         "runtime_evidence_ready",
         "promotion_ready",
+        "public_header_allowed",
         "public_sdk_ready",
+        "v1_completion_ready",
         "runtime_ready",
+        "public_capability_bits_now",
+        "public_callback_abi_now",
         "output_artifact_identity",
         "approval",
         "operational_window",
@@ -1347,6 +1351,16 @@ def validate_promotion_gate(gate: Any, blockers: list[dict[str, Any]]) -> None:
             add(blockers, f"promotion_gate_{key}_not_false", f"$.promotion_gate.{key}")
 
 
+def validate_no_public_contract_surface(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    for key in ("promotion_ready", "public_header_allowed", "public_sdk_ready", "v1_completion_ready", "runtime_ready"):
+        if payload.get(key) is not False:
+            add(blockers, f"{key}_not_false", f"$.{key}")
+    for key in ("public_capability_bits_now", "public_callback_abi_now"):
+        value = payload.get(key)
+        if value != []:
+            add(blockers, f"{key}_not_empty", f"$.{key}")
+
+
 def find_forbidden_key(value: Any, trail: str = "$") -> tuple[str, str] | None:
     if trail in ALLOWED_FORBIDDEN_LEAF_PATHS:
         return None
@@ -1441,9 +1455,7 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
         add(blockers, "approved_runtime_evidence_present_not_true", "$.approved_runtime_evidence_present")
     if payload.get("runtime_evidence_ready") is not True:
         add(blockers, "runtime_evidence_ready_not_true", "$.runtime_evidence_ready")
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
-        if payload.get(key) is not False:
-            add(blockers, f"{key}_not_false", f"$.{key}")
+    validate_no_public_contract_surface(payload, blockers)
     validate_approval(payload.get("approval"), blockers)
     validate_output_artifact_identity(payload, blockers)
     observed_runtime_cases = validate_runtime_summary(payload.get("source_summary"), blockers)
@@ -1488,8 +1500,12 @@ def build_report(payload: dict[str, Any], validation: Validation, *, check_mode:
         "approved_runtime_evidence_present": evidence_accepted,
         "runtime_evidence_ready": evidence_accepted,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "remaining_blockers": [] if accepted else ["approved_runtime_evidence_not_accepted"],
         "next_blocker": (
             NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE
