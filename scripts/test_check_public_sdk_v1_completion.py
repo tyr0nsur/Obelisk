@@ -310,6 +310,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "lifecycle.owner_cleanup",
                         "separation.downstream_surfaces",
                     ],
+                    "private_candidate_contract": {
+                        "candidate_only": True,
+                        "promotion_ready": False,
+                        "public_sdk_ready": False,
+                        "public_header_allowed": False,
+                    },
                     "approved_runtime_evidence": {
                         "approved_runtime_evidence_present": True,
                         "runtime_evidence_ready": True,
@@ -4812,7 +4818,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 }
             )
 
-        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
 
     def test_player_identity_structured_promotion_rejects_source_less_runtime_report(self) -> None:
         with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PlayerIdentityEvidence") as core_dir:
@@ -4847,7 +4853,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
             missing = player_identity_structured_promotion_evidence_missing(artifacts)
 
-        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
+        self.assertIn("public_contract_readiness_report:promotion_blockers_remaining", missing)
+        self.assertIn("public_contract_readiness_report:private_candidate_contract_candidate_only", missing)
 
     def test_identity_structured_contract_report_must_keep_full_blocker_set(self) -> None:
         missing = self.identity_structured_missing_for_contract_report(
@@ -4870,7 +4878,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
 
     def test_identity_structured_contract_report_must_have_no_checker_blockers(self) -> None:
         missing = self.identity_structured_missing_for_contract_report(
@@ -4900,7 +4908,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(missing, ["public_contract_readiness_report:fields_invalid"])
+        self.assertIn("public_contract_readiness_report:fields_invalid", missing)
+        self.assertIn("public_contract_readiness_report:promotion_blockers_remaining", missing)
 
     def test_candidate_only_player_identity_preflight_test_does_not_promote_completion_blocker(self) -> None:
         manifest, _ = complete_excluded_manifest()
@@ -6147,6 +6156,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "approved_runtime_evidence_present": True,
                             "runtime_evidence_ready": True,
                         },
+                        "private_candidate_contract": {
+                            "candidate_only": True,
+                            "promotion_ready": False,
+                            "public_sdk_ready": False,
+                            "public_header_allowed": False,
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -6243,15 +6258,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("promoted_surface_required_evidence_terms_missing", payload["blockers"])
         self.assertIn("promoted_surface_structured_evidence_missing", payload["blockers"])
         self.assertEqual(
-            payload["promoted_surfaces_missing_structured_evidence"],
-            {
-                "obelisk.permissions_admin.v1": [
-                    "executed_test_report:missing",
-                    "player_identity_promotion_certificate:missing",
-                    "public_readiness_report:missing",
-                    "query_failclosed_report:missing",
-                ]
-            },
+            payload["promoted_surfaces_missing_structured_evidence"]["obelisk.permissions_admin.v1"],
+            [
+                "executed_test_report:missing",
+                "player_identity_promotion_certificate:missing",
+                "public_readiness_report:missing",
+                "query_failclosed_report:missing",
+            ],
         )
 
     def test_promoted_command_response_requires_semantic_evidence_terms(self) -> None:
@@ -6854,7 +6867,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             }
             bad_hash_missing = permissions_admin_structured_promotion_evidence_missing(permissions_evidence)
 
-        self.assertEqual(valid_missing, [])
+        self.assertEqual(
+            valid_missing,
+            [
+                "player_identity_public_contract_readiness_report:promotion_blockers_remaining",
+                "player_identity_public_contract_readiness_report:private_candidate_contract_candidate_only",
+                "player_identity_public_contract_readiness_report:private_candidate_contract_promotion_ready_false",
+                "player_identity_public_contract_readiness_report:private_candidate_contract_public_sdk_ready_false",
+                "player_identity_public_contract_readiness_report:private_candidate_contract_public_header_allowed_false",
+            ],
+        )
         self.assertIn("player_identity_promotion_certificate:fields_invalid", bad_surface_missing)
         self.assertIn(
             "player_identity_promotion_certificate:sha256_mismatch",

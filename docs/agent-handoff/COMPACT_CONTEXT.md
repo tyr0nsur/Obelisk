@@ -1002,6 +1002,14 @@ priorities, and do not use history files as the active source of truth.
   checker validates it, and window-manifest replay compares request/env/preflight/manifest
   sidecars plus the `--post-window-replay` command before tolerating an expiry-only nested
   request check. No runtime/server operation was authorized.
+- 2026-06-02 follow-up identity/SDK guardrail audit: `identity.fail_closed` is now covered
+  only as contract-review input by the principal-invalidation policy lane; it does not
+  resolve the full lifetime blocker or open public ABI/header. SDK completion rejects
+  player-identity public-contract readiness reports that still carry lifetime/ABI/cleanup
+  blockers or `private_candidate_contract.candidate_only=true` as promoted evidence, and
+  permissions/admin certificates replay the same identity validator. Next offline delta is
+  a private candidate POD layout evidence lane for `abi.public_pod_contract`, still leaving
+  `abi.layout`/SDK consumer coverage missing until a real public ABI promotion path exists.
 
 ## Agent Coordination
 

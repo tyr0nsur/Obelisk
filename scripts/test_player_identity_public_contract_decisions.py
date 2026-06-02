@@ -33,16 +33,25 @@ REQUIRED_IDS = {
 
 FORBIDDEN_HEADER_TOKENS = {
     "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+    "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL",
     "OBELISK_API_CAPABILITY_PLAYER_PRINCIPALS",
     "OBELISK_PLAYER_IDENTITY_EVENT_ABI_VERSION",
+    "OBELISK_PLAYER_PRINCIPAL_EVENT_ABI_VERSION",
     "ObeliskPlayerIdentity",
+    "ObeliskPlayerPrincipalEvent",
+    "ObeliskPlayerPrincipalDescriptor",
     "ObeliskPlayerPrincipal",
     "ObeliskPlayerId",
     "ObeliskPlayerHandle",
     "RegisterPlayerIdentity",
+    "RegisterPlayerPrincipal",
     "UnregisterPlayerIdentity",
+    "UnregisterPlayerPrincipal",
     "DescribePlayerIdentity",
+    "DescribePlayerPrincipal",
     "ResolvePlayerIdentity",
+    "ResolvePlayerPrincipal",
+    "GetPlayerPrincipal",
 }
 
 
@@ -161,6 +170,18 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         self.assertFalse(candidate["public_sdk_ready"])
         self.assertFalse(candidate["runtime_ready"])
         self.assertEqual(
+            set(candidate["candidate_descriptor_fields_or_equivalent"]),
+            {
+                "abi_version",
+                "struct_size",
+                "supported_event_kind_mask",
+                "supported_scope_flags",
+                "supported_state_flags",
+                "supported_invalidation_reason_flags",
+                "contract_flags",
+            },
+        )
+        self.assertEqual(
             set(candidate["candidate_event_payload_fields_or_equivalent"]),
             {
                 "abi_version",
@@ -174,6 +195,26 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
                 "event_sequence",
                 "server_process_epoch",
                 "reserved",
+            },
+        )
+        self.assertEqual(
+            set(candidate["required_payload_properties"]),
+            {
+                "POD C ABI only",
+                "front-loaded abi_version and struct_size",
+                "append-only fields after promotion",
+                "copied Obelisk-owned storage",
+                "no UE pointers",
+                "no raw ProcessEvent params",
+                "no FString or raw string ownership crossing the ABI",
+                "no FName/GObjects indices",
+                "no platform account ids",
+                "no player names",
+                "no tribe ids",
+                "no network addresses",
+                "no lookup handle",
+                "principal handles are process-local and non-persistent",
+                "no mutation or return override authority",
             },
         )
         self.assertEqual(
@@ -224,19 +265,30 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         payload = self.load_decisions()
         candidate = payload["proposed_public_pod_abi_candidate"]
 
-        registration = set(candidate["candidate_registration_shape_or_equivalent"])
-        for required in (
-            "nonzero plugin_owner_token required",
-            "owner-token unregister required",
-            "plugin init failure removes registrations",
-            "plugin unload removes registrations and drains in-flight callbacks",
-        ):
-            with self.subTest(required=required):
-                self.assertIn(required, registration)
+        self.assertEqual(
+            set(candidate["candidate_registration_shape_or_equivalent"]),
+            {
+                "nonzero plugin_owner_token required",
+                "event-kind mask required",
+                "opaque uint64 registration handle returned on success",
+                "registration handles are process-local and non-persistent",
+                "owner-token unregister required",
+                "plugin init failure removes registrations",
+                "plugin unload removes registrations and drains in-flight callbacks",
+                "callback payload storage is valid only for the callback",
+            },
+        )
 
-        policy = set(candidate["candidate_capability_policy"])
-        self.assertIn("missing capability fails closed", policy)
-        self.assertIn("missing or zero owner token fails closed", policy)
+        self.assertEqual(
+            set(candidate["candidate_capability_policy"]),
+            {
+                "named player identity capability bit required before use",
+                "capability must be captured in the init-time API table",
+                "missing capability fails closed",
+                "missing or zero owner token fails closed",
+                "later marker or env changes cannot widen a plugin's captured capability",
+            },
+        )
 
     def test_surface_manifest_still_has_no_public_identity_contract(self) -> None:
         surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
@@ -300,7 +352,7 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
         )
         self.assertIn("does not resolve the full lifetime/generation/scope blocker", intake["non_claim"])
 
-    def test_runtime_evidence_intake_test_is_covered_without_promotion(self) -> None:
+    def test_contract_review_input_tests_are_covered_without_promotion(self) -> None:
         payload = self.load_decisions()
         tests = {
             item["id"]: item
@@ -322,9 +374,26 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
                 "scripts/test_player_identity_public_contract_decisions.py",
             },
         )
+        fail_closed = tests["identity.fail_closed"]
+        self.assertEqual(fail_closed["status"], "covered")
+        self.assertEqual(fail_closed["coverage_status"], "contract_review_input_only")
+        self.assertFalse(fail_closed["promotion_ready"])
+        self.assertFalse(fail_closed["public_sdk_ready"])
+        self.assertFalse(fail_closed["runtime_ready"])
+        self.assertFalse(fail_closed["public_header_allowed"])
+        self.assertEqual(
+            set(fail_closed["covered_by"]),
+            {
+                "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json",
+                "scripts/check_player_identity_principal_invalidation_policy.py",
+                "scripts/test_check_player_identity_principal_invalidation_policy.py",
+                "scripts/check_player_identity_public_contract_gap_report.py",
+                "scripts/test_check_player_identity_public_contract_gap_report.py",
+            },
+        )
 
         for test_id, item in tests.items():
-            if test_id != "runtime.evidence_intake":
+            if test_id not in {"identity.fail_closed", "runtime.evidence_intake"}:
                 with self.subTest(test_id=test_id):
                     self.assertEqual(item["status"], "missing")
 

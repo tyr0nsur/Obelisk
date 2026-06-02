@@ -41,6 +41,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     env_lines,
     markdown_request,
     operator_live_ops_brief,
+    post_window_replay_contract,
 )
 
 
@@ -168,7 +169,7 @@ def preflight_payload(
 def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     workspace = copied_log.parents[2]
     live_dir = copied_log.parent
-    sidecar_dir = workspace / "player-principal-preflight" / RUN_ID
+    sidecar_dir = live_dir
     copied_log_sha256 = hashlib.sha256(copied_log.read_bytes()).hexdigest()
     manifest_path = live_dir / "window-manifest.env"
     request_pack_path = sidecar_dir / "window-request.json"
@@ -221,6 +222,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         request_payload,
         observer_env_lines,
     )
+    request_payload["post_window_replay_contract"] = post_window_replay_contract(request_payload)
     request = write_sidecar(
         request_pack_path,
         json.dumps(request_payload, sort_keys=True) + "\n",

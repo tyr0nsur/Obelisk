@@ -100,8 +100,13 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(report["public_callback_abi_now"], [])
         self.assertTrue(report["public_header_scan"]["readable"])
         self.assertEqual(report["public_header_scan"]["detected_player_identity_tokens"], [])
-        self.assertEqual(report["required_tests_before_public_header"]["covered_for_contract_review_only"], ["runtime.evidence_intake"])
+        self.assertEqual(
+            report["required_tests_before_public_header"]["covered_for_contract_review_only"],
+            ["identity.fail_closed", "runtime.evidence_intake"],
+        )
         self.assertIn("abi.layout", report["required_tests_before_public_header"]["remaining_missing"])
+        self.assertIn("sdk.consumer", report["required_tests_before_public_header"]["remaining_missing"])
+        self.assertNotIn("identity.fail_closed", report["required_tests_before_public_header"]["remaining_missing"])
         self.assertIn("privacy.identifier_redaction", report["remaining_blockers"])
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate")
         self.assertNotEqual(report["next_blocker"], "public_readiness")

@@ -2833,6 +2833,9 @@ def player_identity_structured_promotion_evidence_missing(
     else:
         approved_runtime = contract_report.get("approved_runtime_evidence")
         approved_runtime = approved_runtime if isinstance(approved_runtime, dict) else {}
+        remaining_blockers = set(contract_report.get("remaining_blockers", []))
+        private_candidate_contract = contract_report.get("private_candidate_contract")
+        private_candidate_contract = private_candidate_contract if isinstance(private_candidate_contract, dict) else {}
         if not (
             contract_report.get("schema") == "obelisk.player-identity-public-contract-readiness-check.v1"
             and contract_report.get("surface") == "obelisk.player_identity.v1"
@@ -2850,6 +2853,17 @@ def player_identity_structured_promotion_evidence_missing(
             and approved_runtime.get("runtime_evidence_ready") is True
         ):
             missing.append("public_contract_readiness_report:fields_invalid")
+        if remaining_blockers & {
+            "lifetime.generation_scope_invalidation",
+            "abi.public_pod_contract",
+            "lifecycle.owner_cleanup",
+        }:
+            missing.append("public_contract_readiness_report:promotion_blockers_remaining")
+        if private_candidate_contract.get("candidate_only") is True:
+            missing.append("public_contract_readiness_report:private_candidate_contract_candidate_only")
+        for key in ("promotion_ready", "public_sdk_ready", "public_header_allowed"):
+            if private_candidate_contract.get(key) is False:
+                missing.append(f"public_contract_readiness_report:private_candidate_contract_{key}_false")
 
     missing.extend(
         executed_test_report_missing(

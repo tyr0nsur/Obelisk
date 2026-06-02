@@ -210,11 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
 - Latest delegated identity/gap rounds integrated read-only agents. Gap/readiness reports
   consume sanitized `privacy.identifier_redaction` and repo-local
-  `players-identity-principal-invalidation-policy` as review inputs only; visible gap
-  stays `lifetime.generation_scope_invalidation`, with explicit remaining inputs
-  `runtime.lifecycle_evidence`, `lifetime.principal_scope`, `lifetime.invalidation_events`,
-  `lifetime.reconnect_duplicate_stale_policy`, and `abi.public_pod_contract`.
-  SDK accounting tests route `completion_gate_accepted=true` plus `planning_only=true` as
-  P0 route credit `0/4`. Request packs now emit checked `post_window_replay_contract`
-  sidecars and manifest replay rejects sidecar/check drift; next offline P0 task is
-  lifetime/scope/invalidation plus private ABI contract review. No runtime/server op.
+  `players-identity-principal-invalidation-policy` as review inputs only; visible gap stays
+  `lifetime.generation_scope_invalidation`, with remaining inputs `runtime.lifecycle_evidence`,
+  lifetime scope/invalidation/reconnect policy, and `abi.public_pod_contract`.
+  SDK accounting rejects planning route credit and rejects candidate-only/private identity
+  contract reports as promoted evidence, including through permissions/admin certificates.
+  Request packs emit checked `post_window_replay_contract` sidecars and reject sidecar/check
+  drift; next offline P0 task is a candidate-only private POD layout evidence lane for
+  `abi.public_pod_contract`, without marking `abi.layout` covered. No runtime/server op.

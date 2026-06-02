@@ -92,6 +92,13 @@ REQUIRED_TESTS_BEFORE_PUBLIC_HEADER = {
     "runtime.evidence_intake",
 }
 CONTRACT_REVIEW_INPUT_ONLY_TESTS = {
+    "identity.fail_closed": {
+        "docs/research/player-identity-planning-sources/players-identity-principal-invalidation-policy.json",
+        "scripts/check_player_identity_principal_invalidation_policy.py",
+        "scripts/test_check_player_identity_principal_invalidation_policy.py",
+        "scripts/check_player_identity_public_contract_gap_report.py",
+        "scripts/test_check_player_identity_public_contract_gap_report.py",
+    },
     "runtime.evidence_intake": {
         "scripts/check_player_identity_public_contract_readiness.py",
         "scripts/test_check_player_identity_public_contract_readiness.py",
