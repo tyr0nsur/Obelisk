@@ -42,6 +42,9 @@ DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE = Path(
 DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE = Path(
     "docs/research/player-identity-planning-sources/player-identity-public-abi-preflight-candidate.json"
 )
+DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT = Path(
+    "docs/research/player-identity-planning-sources/player-identity-owner-token-sdk-consumer-contract.json"
+)
 REQUIRED_IDENTIFIER_REDACTION_CHECKER = "scripts/check_player_identity_identifier_redaction_evidence.py"
 REQUIRED_PRINCIPAL_INVALIDATION_POLICY_CHECKER = "scripts/check_player_identity_principal_invalidation_policy.py"
 REQUIRED_PUBLIC_ABI_PREFLIGHT_CANDIDATE_INTAKE_ID = "public_abi_preflight_candidate"
@@ -308,6 +311,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
         help="Candidate-only public ABI preflight routing artifact; never promotion evidence.",
+    )
+    parser.add_argument(
+        "--owner-token-sdk-consumer-contract",
+        type=Path,
+        default=DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
+        help="Candidate-only owner-token SDK consumer contract; never promotion evidence.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report.")
     return parser.parse_args()
@@ -1213,6 +1222,89 @@ def validate_public_abi_preflight_candidate(
     return report
 
 
+def validate_owner_token_sdk_consumer_contract(
+    path: Path,
+    public_abi_preflight_path: Path,
+    public_header_path: Path,
+    blockers: list[dict[str, Any]],
+    public_abi_preflight_report: dict[str, Any],
+) -> dict[str, Any]:
+    checker_path = SCRIPT_DIR / "check_player_identity_owner_token_sdk_consumer_contract.py"
+    if not checker_path.exists() or not path.exists():
+        return {
+            "provided": False,
+            "source": "public_abi_preflight_derived_stub",
+            "ready": public_abi_preflight_report.get("accepted_for_candidate_review") is True,
+            "accepted_for_candidate_review": public_abi_preflight_report.get("accepted_for_candidate_review") is True,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "sdk_consumer": public_abi_preflight_report.get("sdk_consumer_contract", {}),
+            "lifecycle_owner_cleanup": {
+                "required_checks": public_abi_preflight_report.get("required_owner_token_lifecycle", []),
+            },
+            "does_not_resolve": ["sdk.consumer", "lifecycle.owner_cleanup", "v1_completion"],
+            "blockers": public_abi_preflight_report.get("blockers", []),
+        }
+
+    try:
+        import check_player_identity_owner_token_sdk_consumer_contract as owner_token_sdk_consumer
+
+        payload = owner_token_sdk_consumer.load_json(path)
+        contract_blockers: list[dict[str, Any]] = []
+        preflight_payload, preflight_report = owner_token_sdk_consumer.validate_preflight(
+            public_abi_preflight_path,
+            public_header_path,
+            contract_blockers,
+        )
+        owner_token_sdk_consumer.validate_manifest(payload, preflight_payload, contract_blockers)
+        report = owner_token_sdk_consumer.build_report(
+            payload,
+            contract_blockers,
+            preflight_report=preflight_report,
+        )
+    except (ImportError, OSError, json.JSONDecodeError, ValueError, SystemExit) as exc:
+        add(
+            blockers,
+            "owner_token_sdk_consumer_contract_unreadable_or_rejected",
+            "--owner-token-sdk-consumer-contract",
+            path=str(path),
+            error=str(exc),
+        )
+        return {
+            "provided": True,
+            "ready": False,
+            "accepted_for_candidate_review": False,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "blockers": ["owner_token_sdk_consumer_contract_unreadable_or_rejected"],
+        }
+    if contract_blockers:
+        add(
+            blockers,
+            "owner_token_sdk_consumer_contract_not_accepted",
+            "--owner-token-sdk-consumer-contract",
+            path=str(path),
+            contract_blockers=report["blockers"],
+        )
+    return {"provided": True, "source": "owner_token_sdk_consumer_contract", **report}
+
+
 def build_report(
     args: argparse.Namespace,
     blockers: list[dict[str, Any]],
@@ -1224,6 +1316,7 @@ def build_report(
     principal_invalidation_policy_report: dict[str, Any],
     private_pod_layout_report: dict[str, Any],
     public_abi_preflight_report: dict[str, Any],
+    owner_token_sdk_consumer_report: dict[str, Any],
 ) -> dict[str, Any]:
     redaction_accepted = identifier_redaction_evidence.get("accepted_for_contract_review") is True
     principal_policy_accepted = principal_invalidation_policy_report.get("accepted_for_policy_review") is True
@@ -1268,8 +1361,8 @@ def build_report(
             "id": "abi.public_pod_contract",
             "status": "blocked",
             "private_layout_candidate_accepted": private_layout_accepted,
-            "next_input": "contract review of private POD payload, descriptor, capability, owner-token, and append-only layout-test plan",
-            "does_not_resolve": ["abi.public_pod_contract", "abi.layout", "sdk.consumer"],
+            "next_input": "contract review of private POD payload, descriptor, capability, owner-token, SDK-consumer, and append-only layout-test plan",
+            "does_not_resolve": ["abi.public_pod_contract", "abi.layout", "sdk.consumer", "lifecycle.owner_cleanup"],
             "non_claim": (
                 "private layout candidate acceptance does not add public header symbols, "
                 "capability bits, callbacks, ABI layout guarantees, SDK consumer readiness, "
@@ -1292,6 +1385,9 @@ def build_report(
         "contract_review_inputs_resolved": resolved_inputs,
         "remaining_contract_gate_inputs": remaining_contract_gate_inputs,
         "public_abi_promotion_preflight": public_abi_preflight_report,
+        "candidate_owner_token_lifecycle": public_abi_preflight_report.get("required_owner_token_lifecycle", []),
+        "sdk_consumer_contract": public_abi_preflight_report.get("sdk_consumer_contract", {}),
+        "owner_token_sdk_consumer_contract": owner_token_sdk_consumer_report,
         "next_offline_actions": next_offline_actions,
         "runtime_evidence_missing": True,
         "inputs": {
@@ -1303,6 +1399,7 @@ def build_report(
             "principal_invalidation_policy": str(args.principal_invalidation_policy),
             "private_pod_layout_candidate": str(args.private_pod_layout_candidate),
             "public_abi_preflight_candidate": str(args.public_abi_preflight_candidate),
+            "owner_token_sdk_consumer_contract": str(args.owner_token_sdk_consumer_contract),
         },
         "decisions": {
             "schema": decisions.get("schema"),
@@ -1366,6 +1463,13 @@ def main() -> int:
         identifier_redaction_evidence,
         principal_invalidation_policy_report,
     )
+    owner_token_sdk_consumer_report = validate_owner_token_sdk_consumer_contract(
+        args.owner_token_sdk_consumer_contract,
+        args.public_abi_preflight_candidate,
+        args.public_header,
+        blockers,
+        public_abi_preflight_report,
+    )
     header_scan = scan_public_header(args.public_header, blockers)
 
     report = build_report(
@@ -1379,6 +1483,7 @@ def main() -> int:
         principal_invalidation_policy_report,
         private_pod_layout_report,
         public_abi_preflight_report,
+        owner_token_sdk_consumer_report,
     )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

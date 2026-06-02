@@ -87,6 +87,22 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
         self.assertIn("runtime.lifecycle_evidence", report["required_before_public_abi"])
         self.assertIn("abi.layout", report["required_before_public_abi"])
         self.assertIn("sdk.consumer", report["required_before_public_abi"])
+        self.assertIn("nonzero plugin_owner_token required", report["required_owner_token_lifecycle"])
+        self.assertIn("missing capability fails closed", report["required_capability_policy"])
+        self.assertEqual(report["sdk_consumer_contract"]["source"], "derived_compatibility_stub")
+        self.assertTrue(report["sdk_consumer_contract"]["candidate_only"])
+        self.assertTrue(report["sdk_consumer_contract"]["accepted_for_candidate_review"])
+        self.assertFalse(report["sdk_consumer_contract"]["accepted_for_contract_review"])
+        self.assertFalse(report["sdk_consumer_contract"]["public_sdk_ready"])
+        self.assertIn(
+            "consumer checks struct_size before reading identity payload or descriptor fields",
+            report["sdk_consumer_contract"]["required_behavior"],
+        )
+        self.assertIn(
+            "consumer treats registration handles as process-local and non-persistent",
+            report["sdk_consumer_contract"]["required_behavior"],
+        )
+        self.assertIn("lifecycle.owner_cleanup", report["sdk_consumer_contract"]["does_not_resolve"])
         self.assertIn("v1_completion", report["does_not_resolve"])
         self.assertEqual(report["blockers"], [])
 
@@ -113,6 +129,39 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
         self.assertIn("v1_completion_evidence_not_false", report["blockers"])
         self.assertIn("public_header_symbols_now_not_empty", report["blockers"])
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
+
+    def test_rejects_sdk_consumer_contract_overclaim_or_weakened_rules(self) -> None:
+        payload = self.manifest()
+        payload["sdk_consumer_contract"] = {
+            "status": "ready",
+            "candidate_only": False,
+            "accepted_for_contract_review": True,
+            "promotion_ready": True,
+            "public_sdk_ready": True,
+            "runtime_ready": True,
+            "public_header_allowed": True,
+            "public_abi_ready": True,
+            "v1_completion_evidence": True,
+            "public_header_symbols_now": ["ObeliskPlayerPrincipalEvent"],
+            "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
+            "public_callback_abi_now": ["ObeliskPlayerPrincipalCallback"],
+            "required_behavior": [
+                "consumer checks the captured capability bit before registering identity callbacks",
+            ],
+            "does_not_resolve": ["sdk.consumer"],
+        }
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sdk_consumer_contract_status_mismatch", report["blockers"])
+        self.assertIn("sdk_consumer_contract_candidate_only_not_true", report["blockers"])
+        self.assertIn("sdk_consumer_contract_public_sdk_ready_not_false", report["blockers"])
+        self.assertIn("sdk_consumer_contract_public_header_symbols_now_not_empty", report["blockers"])
+        self.assertIn("sdk_consumer_contract_required_behavior_missing", report["blockers"])
+        self.assertIn("sdk_consumer_contract_does_not_resolve_missing", report["blockers"])
+        self.assertFalse(report["sdk_consumer_contract"]["public_sdk_ready"])
 
     def test_rejects_missing_runtime_owner_or_capability_requirements(self) -> None:
         payload = self.manifest()

@@ -211,10 +211,10 @@ This file is an active routing table only. Durable evidence belongs in
   now require exact canonical shape/non-claims and reject positive authorization/readiness
   text. Default route/SDK remain fail-closed at `approved_runtime_evidence_missing`,
   `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated sidecar-safety round closed the lifecycle window/bundle read-before-
-  reject gap: protected or unapproved request/env/operator sidecars, copied logs, receipt
-  artifacts, replay subprocesses, digest binding, and bundle `window-manifest.env` parsing
-  are rejected before content reads/hashes/check execution. Next useful no-runtime SDK
-  action: define a candidate-only player identity owner-token lifecycle plus SDK-consumer
-  promotion contract for `abi.layout`, `sdk.consumer`, `lifecycle.owner_cleanup`, and
-  downstream separation, preserving no public symbols/capability bits/callback ABI/runtime/SDK/v1 credit.
+- Latest delegated owner-token/SDK-consumer round added a candidate-only player identity
+  planning contract plus checker/test for `abi.layout`, `sdk.consumer`,
+  `lifecycle.owner_cleanup`, and downstream separation. Public ABI preflight, gap, and
+  readiness reports now consume the contract or a preflight-derived stub while forcing no
+  public symbols/capability bits/callback ABI/runtime/SDK/v1 credit. Validated with
+  focused unittest/checker/gap/diff checks; next useful no-runtime action is to align
+  route/SDK-completion diagnostics around the explicit bound identity manifests.

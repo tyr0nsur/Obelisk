@@ -156,6 +156,21 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertEqual(abi_preflight["public_header_symbols_now"], [])
         self.assertEqual(abi_preflight["public_capability_bits_now"], [])
         self.assertEqual(abi_preflight["public_callback_abi_now"], [])
+        self.assertIn("nonzero plugin_owner_token required", abi_preflight["required_owner_token_lifecycle"])
+        self.assertIn("missing capability fails closed", abi_preflight["required_capability_policy"])
+        self.assertEqual(abi_preflight["sdk_consumer_contract"]["source"], "derived_compatibility_stub")
+        self.assertFalse(abi_preflight["sdk_consumer_contract"]["accepted_for_contract_review"])
+        self.assertFalse(abi_preflight["sdk_consumer_contract"]["public_sdk_ready"])
+        self.assertIn(
+            "consumer treats callback payload storage as callback-local",
+            abi_preflight["sdk_consumer_contract"]["required_behavior"],
+        )
+        self.assertIn("lifecycle.owner_cleanup", abi_preflight["sdk_consumer_contract"]["does_not_resolve"])
+        owner_contract = report["owner_token_sdk_consumer_contract"]
+        self.assertIn(owner_contract["source"], {"owner_token_sdk_consumer_contract", "public_abi_preflight_derived_stub"})
+        self.assertFalse(owner_contract["accepted_for_contract_review"])
+        self.assertFalse(owner_contract["public_sdk_ready"])
+        self.assertFalse(owner_contract["runtime_ready"])
 
     def test_accepts_identifier_redaction_evidence_for_contract_review_only(self) -> None:
         result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction_manifest())
@@ -207,6 +222,46 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
         self.assertIn("identifier_redaction_evidence_public_sdk_ready_not_false", report["blockers"])
         self.assertEqual(report["next_blocker"], "player_identity_public_contract_gate_not_accepted")
+
+    def test_rejects_public_abi_preflight_sdk_consumer_overclaim(self) -> None:
+        preflight = self.public_abi_preflight_candidate()
+        preflight["sdk_consumer_contract"] = {
+            "status": "blocked",
+            "candidate_only": True,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": True,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "required_behavior": [
+                "consumer checks the captured capability bit before registering identity callbacks",
+            ],
+            "does_not_resolve": ["sdk.consumer"],
+        }
+
+        result = self.run_checker(
+            self.decisions(),
+            approved_manifest(),
+            public_abi_preflight_candidate=preflight,
+            check=False,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_abi_preflight_candidate_not_accepted", report["blockers"])
+        self.assertIn(
+            "sdk_consumer_contract_public_sdk_ready_not_false",
+            report["public_abi_preflight_candidate"]["blockers"],
+        )
+        self.assertIn(
+            "sdk_consumer_contract_required_behavior_missing",
+            report["public_abi_preflight_candidate"]["blockers"],
+        )
 
     def test_rejects_identifier_redaction_evidence_route_unlock_claim(self) -> None:
         redaction = redaction_manifest()

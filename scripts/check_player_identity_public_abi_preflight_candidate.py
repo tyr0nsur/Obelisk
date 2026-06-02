@@ -69,6 +69,22 @@ REQUIRED_OWNER_TOKEN_LIFECYCLE = {
     "plugin unload removes registrations and drains in-flight callbacks",
     "callback payload storage is valid only for the callback",
 }
+REQUIRED_SDK_CONSUMER_CONTRACT = {
+    "consumer checks struct_size before reading identity payload or descriptor fields",
+    "consumer checks the captured capability bit before registering identity callbacks",
+    "consumer requires nonzero plugin_owner_token before owner-token registration",
+    "consumer treats callback payload storage as callback-local",
+    "consumer treats principal handles as process-local and non-persistent",
+    "consumer treats registration handles as process-local and non-persistent",
+    "consumer uses owner-token unregister for every successful registration handle",
+    "consumer does not use identity for lookup, permissions/admin, commands/replies, persistence, mutation, return override, or send-chat identity",
+}
+REQUIRED_SDK_CONSUMER_DOES_NOT_RESOLVE = {
+    "sdk.consumer",
+    "lifecycle.owner_cleanup",
+    "public_abi_ready",
+    "v1_completion",
+}
 REQUIRED_NON_CLAIMS = {
     "candidate-only public ABI preflight for offline routing",
     "does not add public header symbols",
@@ -125,6 +141,118 @@ def field_names(layout: dict[str, Any]) -> list[str]:
     if not isinstance(fields, list):
         return []
     return [str(field.get("name")) for field in fields if isinstance(field, dict)]
+
+
+def analyze_sdk_consumer_contract(payload: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    blockers: list[dict[str, Any]] = []
+    contract = payload.get("sdk_consumer_contract")
+    if contract is None:
+        required_before_public_abi = string_set(payload, "required_before_public_abi")
+        does_not_resolve = string_set(payload, "does_not_resolve")
+        owner_token_lifecycle = string_set(payload, "required_owner_token_lifecycle")
+        missing_inputs = {
+            "required_before_public_abi": sorted({"sdk.consumer", "lifecycle.owner_cleanup"} - required_before_public_abi),
+            "does_not_resolve": sorted({"sdk.consumer", "lifecycle.owner_cleanup", "v1_completion"} - does_not_resolve),
+            "required_owner_token_lifecycle": sorted(REQUIRED_OWNER_TOKEN_LIFECYCLE - owner_token_lifecycle),
+        }
+        missing_inputs = {key: value for key, value in missing_inputs.items() if value}
+        if missing_inputs:
+            add(blockers, "sdk_consumer_contract_derived_inputs_missing", "$.sdk_consumer_contract", missing=missing_inputs)
+        return (
+            {
+                "source": "derived_compatibility_stub",
+                "status": "blocked",
+                "candidate_only": True,
+                "accepted_for_candidate_review": not blockers,
+                "accepted_for_contract_review": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "runtime_ready": False,
+                "public_header_allowed": False,
+                "public_abi_ready": False,
+                "v1_completion_evidence": False,
+                "required_behavior": sorted(REQUIRED_SDK_CONSUMER_CONTRACT),
+                "owner_token_lifecycle": payload.get("required_owner_token_lifecycle", []),
+                "does_not_resolve": sorted(REQUIRED_SDK_CONSUMER_DOES_NOT_RESOLVE),
+                "public_header_symbols_now": [],
+                "public_capability_bits_now": [],
+                "public_callback_abi_now": [],
+            },
+            blockers,
+        )
+
+    if not isinstance(contract, dict):
+        add(blockers, "sdk_consumer_contract_not_object", "$.sdk_consumer_contract")
+        contract = {}
+    for key, expected in (("status", "blocked"),):
+        if contract.get(key) != expected:
+            add(blockers, f"sdk_consumer_contract_{key}_mismatch", f"$.sdk_consumer_contract.{key}", value=contract.get(key))
+    if contract.get("candidate_only") is not True:
+        add(blockers, "sdk_consumer_contract_candidate_only_not_true", "$.sdk_consumer_contract.candidate_only")
+    for key in (
+        "accepted_for_contract_review",
+        "promotion_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "public_header_allowed",
+        "public_abi_ready",
+        "v1_completion_evidence",
+    ):
+        if contract.get(key) is not False:
+            add(blockers, f"sdk_consumer_contract_{key}_not_false", f"$.sdk_consumer_contract.{key}")
+    for key in ("public_header_symbols_now", "public_capability_bits_now", "public_callback_abi_now"):
+        if contract.get(key, []) != []:
+            add(blockers, f"sdk_consumer_contract_{key}_not_empty", f"$.sdk_consumer_contract.{key}")
+    required_behavior = contract.get("required_behavior")
+    if not isinstance(required_behavior, list) or not all(isinstance(item, str) for item in required_behavior):
+        add(blockers, "sdk_consumer_contract_required_behavior_not_string_list", "$.sdk_consumer_contract.required_behavior")
+        required_behavior_set = set()
+    else:
+        required_behavior_set = set(required_behavior)
+    missing_behavior = sorted(REQUIRED_SDK_CONSUMER_CONTRACT - required_behavior_set)
+    if missing_behavior:
+        add(
+            blockers,
+            "sdk_consumer_contract_required_behavior_missing",
+            "$.sdk_consumer_contract.required_behavior",
+            missing=missing_behavior,
+        )
+    does_not_resolve = contract.get("does_not_resolve")
+    if not isinstance(does_not_resolve, list) or not all(isinstance(item, str) for item in does_not_resolve):
+        add(blockers, "sdk_consumer_contract_does_not_resolve_not_string_list", "$.sdk_consumer_contract.does_not_resolve")
+        does_not_resolve_set = set()
+    else:
+        does_not_resolve_set = set(does_not_resolve)
+    missing_non_resolutions = sorted(REQUIRED_SDK_CONSUMER_DOES_NOT_RESOLVE - does_not_resolve_set)
+    if missing_non_resolutions:
+        add(
+            blockers,
+            "sdk_consumer_contract_does_not_resolve_missing",
+            "$.sdk_consumer_contract.does_not_resolve",
+            missing=missing_non_resolutions,
+        )
+    return (
+        {
+            "source": "manifest",
+            "status": contract.get("status"),
+            "candidate_only": contract.get("candidate_only") is True,
+            "accepted_for_candidate_review": not blockers,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "required_behavior": contract.get("required_behavior", []),
+            "owner_token_lifecycle": payload.get("required_owner_token_lifecycle", []),
+            "does_not_resolve": contract.get("does_not_resolve", []),
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+        },
+        blockers,
+    )
 
 
 def strip_c_comments_and_strings(text: str) -> str:
@@ -253,6 +381,8 @@ def validate_manifest(payload: dict[str, Any], private_payload: dict[str, Any], 
         missing = sorted(required - string_set(payload, key))
         if missing:
             add(blockers, f"{key}_missing_required", f"$.{key}", missing=missing)
+    _sdk_report, sdk_blockers = analyze_sdk_consumer_contract(payload)
+    blockers.extend(sdk_blockers)
 
     event = payload.get("event_payload")
     descriptor = payload.get("descriptor")
@@ -322,6 +452,7 @@ def build_report(
     redaction_report: dict[str, Any],
     principal_report: dict[str, Any],
 ) -> dict[str, Any]:
+    sdk_consumer_contract, _sdk_blockers = analyze_sdk_consumer_contract(payload)
     return {
         "schema": REPORT_SCHEMA,
         "surface": SURFACE,
@@ -343,6 +474,9 @@ def build_report(
         "contract_review_inputs_accepted": payload.get("contract_review_inputs_accepted", {}),
         "required_before_public_abi": payload.get("required_before_public_abi", []),
         "does_not_resolve": payload.get("does_not_resolve", []),
+        "required_capability_policy": payload.get("required_capability_policy", []),
+        "required_owner_token_lifecycle": payload.get("required_owner_token_lifecycle", []),
+        "sdk_consumer_contract": sdk_consumer_contract,
         "event_payload": payload.get("event_payload", {}),
         "descriptor": payload.get("descriptor", {}),
         "private_pod_layout_candidate": {

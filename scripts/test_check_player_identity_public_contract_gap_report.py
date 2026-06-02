@@ -234,6 +234,23 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("runtime.lifecycle_evidence", abi_preflight["required_before_public_abi"])
         self.assertIn("abi.layout", abi_preflight["required_before_public_abi"])
         self.assertIn("sdk.consumer", abi_preflight["required_before_public_abi"])
+        self.assertIn("nonzero plugin_owner_token required", abi_preflight["required_owner_token_lifecycle"])
+        self.assertIn("missing capability fails closed", abi_preflight["required_capability_policy"])
+        self.assertEqual(abi_preflight["sdk_consumer_contract"]["source"], "derived_compatibility_stub")
+        self.assertFalse(abi_preflight["sdk_consumer_contract"]["accepted_for_contract_review"])
+        self.assertFalse(abi_preflight["sdk_consumer_contract"]["public_sdk_ready"])
+        self.assertIn(
+            "consumer requires nonzero plugin_owner_token before owner-token registration",
+            abi_preflight["sdk_consumer_contract"]["required_behavior"],
+        )
+        self.assertIn("lifecycle.owner_cleanup", abi_preflight["sdk_consumer_contract"]["does_not_resolve"])
+        self.assertEqual(report["sdk_consumer_contract"], abi_preflight["sdk_consumer_contract"])
+        self.assertEqual(report["candidate_owner_token_lifecycle"], abi_preflight["required_owner_token_lifecycle"])
+        owner_contract = report["owner_token_sdk_consumer_contract"]
+        self.assertIn(owner_contract["source"], {"owner_token_sdk_consumer_contract", "public_abi_preflight_derived_stub"})
+        self.assertFalse(owner_contract["accepted_for_contract_review"])
+        self.assertFalse(owner_contract["public_sdk_ready"])
+        self.assertFalse(owner_contract["runtime_ready"])
         self.assertIn("v1_completion", abi_preflight["does_not_resolve"])
         self.assertIn("candidate-only public ABI preflight for offline routing", abi_preflight["non_claims"])
         lifetime_action = next(
@@ -285,7 +302,10 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         )
         self.assertTrue(abi_action["private_layout_candidate_accepted"])
         self.assertEqual(abi_action["status"], "blocked")
-        self.assertEqual(abi_action["does_not_resolve"], ["abi.public_pod_contract", "abi.layout", "sdk.consumer"])
+        self.assertEqual(
+            abi_action["does_not_resolve"],
+            ["abi.public_pod_contract", "abi.layout", "sdk.consumer", "lifecycle.owner_cleanup"],
+        )
         self.assertTrue(report["runtime_evidence_missing"])
         self.assertEqual(report["surface_manifest"]["status"], "planning")
         self.assertEqual(report["surface_manifest"]["public_contract"], [])
@@ -361,6 +381,41 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("decisions_public_abi_preflight_candidate_intake_missing", report["blockers"])
+
+    def test_rejects_public_abi_preflight_sdk_consumer_overclaim(self) -> None:
+        preflight = self.load_public_abi_preflight_candidate()
+        preflight["sdk_consumer_contract"] = {
+            "status": "blocked",
+            "candidate_only": True,
+            "accepted_for_contract_review": False,
+            "promotion_ready": False,
+            "public_sdk_ready": True,
+            "runtime_ready": False,
+            "public_header_allowed": False,
+            "public_abi_ready": False,
+            "v1_completion_evidence": False,
+            "public_header_symbols_now": [],
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "required_behavior": [
+                "consumer checks the captured capability bit before registering identity callbacks",
+            ],
+            "does_not_resolve": ["sdk.consumer"],
+        }
+
+        result = self.run_checker(public_abi_preflight_candidate=preflight)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_abi_preflight_candidate_not_accepted", report["blockers"])
+        self.assertIn(
+            "sdk_consumer_contract_public_sdk_ready_not_false",
+            report["public_abi_promotion_preflight"]["blockers"],
+        )
+        self.assertIn(
+            "sdk_consumer_contract_required_behavior_missing",
+            report["public_abi_promotion_preflight"]["blockers"],
+        )
 
     def test_rejects_invalid_identifier_redaction_evidence(self) -> None:
         evidence = self.load_identifier_redaction_evidence()

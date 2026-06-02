@@ -1626,6 +1626,13 @@ def player_identity_public_contract_gap_diagnosis(
         redaction_diagnosis,
         principal_policy_gap_report,
     )
+    owner_token_sdk_consumer_report = public_contract_gap_report.validate_owner_token_sdk_consumer_contract(
+        public_contract_gap_report.DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
+        public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
+        public_header,
+        report_blockers,
+        public_abi_preflight_report,
+    )
     header_scan = public_contract_gap_report.scan_public_header(public_header, report_blockers)
     args = argparse.Namespace(
         decisions=decisions,
@@ -1635,6 +1642,7 @@ def player_identity_public_contract_gap_diagnosis(
         principal_invalidation_policy=principal_invalidation_policy_manifest or APPROVED_PRINCIPAL_INVALIDATION_POLICY_FALLBACK,
         private_pod_layout_candidate=public_contract_gap_report.DEFAULT_PRIVATE_POD_LAYOUT_CANDIDATE,
         public_abi_preflight_candidate=public_contract_gap_report.DEFAULT_PUBLIC_ABI_PREFLIGHT_CANDIDATE,
+        owner_token_sdk_consumer_contract=public_contract_gap_report.DEFAULT_OWNER_TOKEN_SDK_CONSUMER_CONTRACT,
         public_header=public_header,
     )
     report = public_contract_gap_report.build_report(
@@ -1648,6 +1656,7 @@ def player_identity_public_contract_gap_diagnosis(
         principal_policy_gap_report,
         private_pod_layout_report,
         public_abi_preflight_report,
+        owner_token_sdk_consumer_report,
     )
 
     if report.get("schema") != public_contract_gap_report.SCHEMA:
