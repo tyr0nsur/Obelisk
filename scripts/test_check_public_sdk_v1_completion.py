@@ -68,7 +68,15 @@ def write_executed_test_artifact(
     *,
     command: str | None = None,
     argv: list[str] | None = None,
+    public_sdk_surfaces: Path = PUBLIC_SDK_SURFACES,
+    public_header: Path = PUBLIC_HEADER,
 ) -> str:
+    def binding_path_text(input_path: Path) -> str:
+        try:
+            return str(input_path.resolve().relative_to(REPO_ROOT))
+        except ValueError:
+            return str(input_path.resolve())
+
     payload: dict[str, object] = {
         "schema": PROMOTED_SURFACE_TEST_EXECUTION_ARTIFACT_SCHEMA,
         "surface_id": surface_id,
@@ -80,12 +88,12 @@ def write_executed_test_artifact(
         "output_sha256": "0" * 64,
         "inputs": {
             "public_sdk_surfaces": {
-                "path": str(PUBLIC_SDK_SURFACES.relative_to(REPO_ROOT)),
-                "sha256": sha256_file(PUBLIC_SDK_SURFACES),
+                "path": binding_path_text(public_sdk_surfaces),
+                "sha256": sha256_file(public_sdk_surfaces),
             },
             "public_header": {
-                "path": str(PUBLIC_HEADER.relative_to(REPO_ROOT)),
-                "sha256": sha256_file(PUBLIC_HEADER),
+                "path": binding_path_text(public_header),
+                "sha256": sha256_file(public_header),
             },
         },
     }
@@ -728,6 +736,48 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("command_permission_route_gate_blockers_not_empty", payload["blockers"])
         self.assertTrue(payload["command_permission_route_gate"]["valid"])
 
+    def test_completion_gate_binds_executed_test_artifacts_to_selected_manifest_and_header(self) -> None:
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="ActiveManifestBinding") as core_dir:
+            root = Path(core_dir)
+            evidence = self.write_player_identity_structured_promotion_artifacts(root)
+            manifest_path = root / "custom-public-sdk-surfaces.json"
+            header_path = root / "CustomObeliskApi.h"
+            header_path.write_text("#pragma once\n#define OBELISK_CUSTOM_HEADER 1\n", encoding="utf-8")
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["evidence"] = evidence
+                    break
+            if "obelisk.player_identity.v1" not in manifest["promoted_surfaces"]:
+                manifest["promoted_surfaces"].append("obelisk.player_identity.v1")
+            if "obelisk.player_identity.v1" in manifest["planning_surfaces"]:
+                manifest["planning_surfaces"].remove("obelisk.player_identity.v1")
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            build_policy_checker = self.write_fake_structure_build_policy_checker(
+                root / "fake_structure_build_policy.py"
+            )
+
+            result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--public-header",
+                str(header_path),
+                "--structure-build-policy-offline-intake",
+                str(build_policy_checker),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        missing = payload["promoted_surfaces_missing_structured_evidence"]["obelisk.player_identity.v1"]
+        self.assertIn("promoted_surface_structured_evidence_missing", payload["blockers"])
+        self.assertIn("executed_test_report:inputs.public_sdk_surfaces_path_invalid", missing)
+        self.assertIn("executed_test_report:inputs.public_sdk_surfaces_sha256_mismatch", missing)
+        self.assertIn("executed_test_report:inputs.public_header_path_invalid", missing)
+        self.assertIn("executed_test_report:inputs.public_header_sha256_mismatch", missing)
+        self.assertFalse(payload["stable_claim_allowed"])
+
     def test_completion_gate_rejects_non_default_route_gate_without_test_override(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             route_gate_path = self.write_fake_route_gate(Path(temp_dir) / "fake_route_gate.py")
@@ -826,16 +876,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             structure_build_policy["schema"],
             "obelisk.structure-build-policy-offline-intake-check.v1",
         )
-        self.assertFalse(structure_build_policy["ready"])
-        self.assertEqual(structure_build_policy["status"], "blocked")
+        self.assertTrue(structure_build_policy["ready"])
+        self.assertEqual(structure_build_policy["status"], "accepted_planning_only")
         self.assertTrue(structure_build_policy["planning_only"])
         self.assertFalse(structure_build_policy["promotion_ready"])
         self.assertFalse(structure_build_policy["public_sdk_ready"])
         self.assertFalse(structure_build_policy["runtime_ready"])
         self.assertFalse(structure_build_policy["enforcement_ready"])
-        self.assertIn("forbidden_string_claim", structure_build_policy["blockers"])
-        self.assertIn("structure_build_policy_offline_intake_invalid", payload["blockers"])
-        self.assertIn("structure_build_policy_offline_intake_blockers_not_empty", payload["blockers"])
+        self.assertEqual(structure_build_policy["blockers"], [])
+        self.assertNotIn("structure_build_policy_offline_intake_invalid", payload["blockers"])
+        self.assertNotIn("structure_build_policy_offline_intake_blockers_not_empty", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
         self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(
@@ -6086,11 +6136,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            identity_executed_report_path = write_executed_test_artifact(
-                identity_executed_report,
-                "obelisk.player_identity.v1",
-                argv=["python3", "-m", "unittest", "player_identity_promotion"],
-            )
+            identity_executed_report_path = str(identity_executed_report.relative_to(REPO_ROOT))
 
             manifest, release_statement = complete_excluded_manifest()
             promoted_ids = {"obelisk.player_identity.v1", "obelisk.permissions_admin.v1"}
@@ -6154,6 +6200,17 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ) + "\n"
             manifest_path = core_path / "public_sdk_surfaces.json"
             statement_path = core_path / "RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            identity_executed_report_path = write_executed_test_artifact(
+                identity_executed_report,
+                "obelisk.player_identity.v1",
+                argv=["python3", "-m", "unittest", "player_identity_promotion"],
+                public_sdk_surfaces=manifest_path,
+            )
+            for surface in manifest["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["evidence"]["executed_test_report"] = identity_executed_report_path
+                    break
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             statement_path.write_text(release_statement, encoding="utf-8")
             result = self.run_checker(
@@ -6389,7 +6446,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         try:
             module.surface_has_promotion_evidence = lambda surface: True
             module.surface_missing_required_promotion_evidence = lambda surface: []
-            module.surface_missing_structured_promotion_evidence = lambda surface: []
+            module.surface_missing_structured_promotion_evidence = (
+                lambda surface, manifest_path=PUBLIC_SDK_SURFACES, public_header_path=PUBLIC_HEADER: []
+            )
 
             surface = {
                 "id": "obelisk.player_identity.v1",
@@ -6612,6 +6671,110 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertEqual(missing, [])
+
+    def test_executed_test_artifact_must_match_active_manifest_and_header_bindings(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="ExecutedReportActiveInputs",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest_path = root / "custom-public-sdk-surfaces.json"
+            header_path = root / "CustomObeliskApi.h"
+            stale_artifact = root / "stale_permissions_admin_executed_tests.json"
+            active_artifact = root / "active_permissions_admin_executed_tests.json"
+            manifest_path.write_text(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"), encoding="utf-8")
+            header_path.write_text("#pragma once\n#define OBELISK_CUSTOM_HEADER 1\n", encoding="utf-8")
+            stale_artifact_path = write_executed_test_artifact(
+                stale_artifact,
+                "obelisk.permissions_admin.v1",
+                argv=["python3", "-m", "unittest", "permissions_admin_promotion"],
+            )
+            active_artifact_path = write_executed_test_artifact(
+                active_artifact,
+                "obelisk.permissions_admin.v1",
+                argv=["python3", "-m", "unittest", "permissions_admin_promotion"],
+                public_sdk_surfaces=manifest_path,
+                public_header=header_path,
+            )
+
+            stale_missing = module.executed_test_report_missing(
+                {"executed_test_report": stale_artifact_path},
+                "obelisk.permissions_admin.v1",
+                manifest_path,
+                header_path,
+            )
+            active_missing = module.executed_test_report_missing(
+                {"executed_test_report": active_artifact_path},
+                "obelisk.permissions_admin.v1",
+                manifest_path,
+                header_path,
+            )
+
+        self.assertIn("executed_test_report:inputs.public_sdk_surfaces_path_invalid", stale_missing)
+        self.assertIn("executed_test_report:inputs.public_header_path_invalid", stale_missing)
+        self.assertEqual(active_missing, [])
+
+    def test_readiness_source_artifacts_must_match_active_manifest_and_header(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="ReadinessActiveInputs",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest_path = root / "custom-public-sdk-surfaces.json"
+            header_path = root / "CustomObeliskApi.h"
+            response_path_report_root = root / "command-chat-response-public-readiness"
+            response_path_report_root.mkdir()
+            response_path_report = response_path_report_root / "command-chat-response-public-readiness.json"
+            manifest_path.write_text(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"), encoding="utf-8")
+            header_path.write_text("#pragma once\n#define OBELISK_CUSTOM_HEADER 1\n", encoding="utf-8")
+            response_path_report.write_text("{}", encoding="utf-8")
+            stale_report = {
+                "decisions_path": str(
+                    REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
+                ),
+                "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                "public_header_path": str(PUBLIC_HEADER),
+                "response_path_report_path": str(response_path_report),
+                "response_path_report_root": str(response_path_report_root),
+            }
+            active_report = {
+                **stale_report,
+                "surfaces_path": str(manifest_path),
+                "public_header_path": str(header_path),
+            }
+
+            stale_missing = module.commands_replies_public_readiness_source_artifacts_missing(
+                stale_report,
+                "public_readiness_report",
+                manifest_path,
+                header_path,
+            )
+            active_missing = module.commands_replies_public_readiness_source_artifacts_missing(
+                active_report,
+                "public_readiness_report",
+                manifest_path,
+                header_path,
+            )
+
+        self.assertIn("public_readiness_report:surfaces_path_mismatch", stale_missing)
+        self.assertIn("public_readiness_report:public_header_path_mismatch", stale_missing)
+        self.assertEqual(active_missing, [])
 
     def test_permissions_admin_structured_promotion_requires_identity_promotion_certificate(self) -> None:
         with tempfile.TemporaryDirectory(
@@ -6923,6 +7086,150 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             )
 
         self.assertEqual(missing, [])
+
+    def test_commands_replies_nested_command_response_executed_tests_use_active_inputs(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory(
+            dir=REPO_ROOT / "tests" / "core",
+            prefix="CommandsRepliesNestedActiveInputs",
+        ) as core_dir:
+            root = Path(core_dir)
+            manifest_path = root / "custom-public-sdk-surfaces.json"
+            header_path = root / "CustomObeliskApi.h"
+            manifest_path.write_text(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"), encoding="utf-8")
+            header_path.write_text("#pragma once\n#define OBELISK_CUSTOM_HEADER 1\n", encoding="utf-8")
+            response_readiness = root / "command-chat-response-route-planning-readiness.json"
+            response_readiness.write_text(
+                json.dumps(
+                    {
+                        "source_root": str(root),
+                        "producer": {
+                            "script": "scripts/compare_reflection_snapshots.py",
+                            "output_name": "command-chat-response-route-planning-readiness.json",
+                            "argv": [
+                                "scripts/compare_reflection_snapshots.py",
+                                "--target-set",
+                                "command-chat-response-route-planning",
+                                "--readiness-report",
+                                str(response_readiness),
+                                "--json",
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_report_root = root / "command-chat-response-public-readiness"
+            response_report_root.mkdir()
+            response_report = response_report_root / "command-chat-response-public-readiness.json"
+            response_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "target_set": "command-chat-response-route-planning",
+                        "readiness_status": "compared",
+                        "decisions_status": "blocked",
+                        "surfaces_status": "planning",
+                        "readiness_root": str(root),
+                        "readiness_path": str(response_readiness),
+                        "decisions_path": str(
+                            REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+                        ),
+                        "surfaces_path": str(manifest_path),
+                        "public_header_path": str(header_path),
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            replies_report = root / "commands_replies_public_readiness.json"
+            replies_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.commands-replies-public-readiness-check.v1",
+                        "surface": "obelisk.commands_replies.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "public_command_router_allowed": False,
+                        "public_reply_or_send_chat_abi_allowed": False,
+                        "public_response_path_allowed": False,
+                        "decisions_status": "blocked",
+                        "commands_replies_surface_status": "planning",
+                        "dependency_chain": [
+                            "obelisk.player_identity.v1",
+                            "obelisk.permissions_admin.v1",
+                            "obelisk.command_chat_response_path.v1",
+                        ],
+                        "decisions_path": str(
+                            REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
+                        ),
+                        "surfaces_path": str(manifest_path),
+                        "public_header_path": str(header_path),
+                        "response_path_report_path": str(response_report),
+                        "response_path_report_root": str(response_report_root),
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_executed = write_executed_test_artifact(
+                root / "command_response_executed_tests.json",
+                "obelisk.command_chat_response_path.v1",
+                command="python3 -m unittest command_response_promotion",
+            )
+            replies_executed = write_executed_test_artifact(
+                root / "commands_replies_executed_tests.json",
+                "obelisk.commands_replies.v1",
+                argv=["cmake", "--build", "commands_replies_sdk_consumer"],
+                public_sdk_surfaces=manifest_path,
+                public_header=header_path,
+            )
+
+            missing = module.commands_replies_structured_promotion_evidence_missing(
+                {
+                    "public_readiness_report": str(replies_report.relative_to(REPO_ROOT)),
+                    "command_response_promotion_evidence": {
+                        "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
+                        "executed_test_report": response_executed,
+                    },
+                    "executed_test_report": replies_executed,
+                },
+                manifest_path,
+                header_path,
+            )
+
+        self.assertIn(
+            "command_response_executed_test_report:inputs.public_sdk_surfaces_path_invalid",
+            missing,
+        )
+        self.assertIn(
+            "command_response_executed_test_report:inputs.public_header_path_invalid",
+            missing,
+        )
+        self.assertNotIn("executed_test_report:inputs.public_sdk_surfaces_path_invalid", missing)
+        self.assertNotIn("executed_test_report:inputs.public_header_path_invalid", missing)
 
     def test_command_response_structured_promotion_rejects_summary_only_readiness_report(self) -> None:
         import importlib.util

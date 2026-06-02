@@ -2505,6 +2505,8 @@ def readiness_json_provenance_missing(readiness_path: Path, readiness_root: Path
 def command_response_public_readiness_source_artifacts_missing(
     report: dict[str, Any],
     reason_prefix: str,
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
     resolved: dict[str, Path] = {}
@@ -2518,9 +2520,9 @@ def command_response_public_readiness_source_artifacts_missing(
         DEFAULT_COMMAND_RESPONSE_PUBLIC_CONTRACT_DECISIONS,
     ):
         missing.append(f"{reason_prefix}:decisions_path_mismatch")
-    if not report_path_matches_default(resolved.get("surfaces_path"), DEFAULT_MANIFEST):
+    if not report_path_matches_default(resolved.get("surfaces_path"), manifest_path):
         missing.append(f"{reason_prefix}:surfaces_path_mismatch")
-    if not report_path_matches_default(resolved.get("public_header_path"), DEFAULT_PUBLIC_HEADER):
+    if not report_path_matches_default(resolved.get("public_header_path"), public_header_path):
         missing.append(f"{reason_prefix}:public_header_path_mismatch")
     readiness_path = resolved.get("readiness_path")
     if readiness_path is not None:
@@ -2541,6 +2543,8 @@ def command_response_public_readiness_source_artifacts_missing(
 def commands_replies_public_readiness_source_artifacts_missing(
     report: dict[str, Any],
     reason_prefix: str,
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[str]:
     missing: list[str] = []
     resolved: dict[str, Path] = {}
@@ -2554,9 +2558,9 @@ def commands_replies_public_readiness_source_artifacts_missing(
         DEFAULT_COMMANDS_REPLIES_PUBLIC_CONTRACT_DECISIONS,
     ):
         missing.append(f"{reason_prefix}:decisions_path_mismatch")
-    if not report_path_matches_default(resolved.get("surfaces_path"), DEFAULT_MANIFEST):
+    if not report_path_matches_default(resolved.get("surfaces_path"), manifest_path):
         missing.append(f"{reason_prefix}:surfaces_path_mismatch")
-    if not report_path_matches_default(resolved.get("public_header_path"), DEFAULT_PUBLIC_HEADER):
+    if not report_path_matches_default(resolved.get("public_header_path"), public_header_path):
         missing.append(f"{reason_prefix}:public_header_path_mismatch")
     response_path_report_path, response_path_report_errors = resolve_report_source_artifact(
         report.get("response_path_report_path"),
@@ -2677,6 +2681,13 @@ def repo_relative_text(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
 
 
+def artifact_input_binding_path_text(path: Path) -> str:
+    try:
+        return repo_relative_text(path.resolve())
+    except ValueError:
+        return str(path.resolve())
+
+
 def executed_test_artifact_missing_provenance(report: dict[str, Any]) -> list[str]:
     missing: list[str] = []
     if report.get("producer") != PROMOTED_SURFACE_TEST_EXECUTION_PRODUCER:
@@ -2689,18 +2700,26 @@ def executed_test_artifact_missing_provenance(report: dict[str, Any]) -> list[st
     return missing
 
 
-def executed_test_artifact_missing_input_bindings(report: dict[str, Any]) -> list[str]:
+def executed_test_artifact_missing_input_bindings(
+    report: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
     inputs = report.get("inputs")
     if not isinstance(inputs, dict):
         return ["executed_test_report:inputs_missing"]
-    for key, expected_path in PROMOTED_SURFACE_TEST_EXECUTION_INPUT_BINDINGS.items():
+    expected_bindings = {
+        "public_sdk_surfaces": manifest_path,
+        "public_header": public_header_path,
+    }
+    for key, expected_path in expected_bindings.items():
         binding = inputs.get(key)
         if not isinstance(binding, dict):
             missing.append(f"executed_test_report:inputs.{key}_missing")
             continue
-        expected_relative = repo_relative_text(expected_path)
-        if binding.get("path") != expected_relative:
+        expected_path_text = artifact_input_binding_path_text(expected_path)
+        if binding.get("path") != expected_path_text:
             missing.append(f"executed_test_report:inputs.{key}_path_invalid")
         actual_sha256 = sha256_file(expected_path)
         binding_sha256 = binding.get("sha256")
@@ -2713,7 +2732,12 @@ def executed_test_artifact_missing_input_bindings(report: dict[str, Any]) -> lis
     return missing
 
 
-def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> list[str]:
+def executed_test_report_missing(
+    evidence: dict[str, Any],
+    surface_id: str,
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
     executed, error = load_repo_relative_json_artifact(evidence.get("executed_test_report"))
     if error is not None:
@@ -2741,11 +2765,21 @@ def executed_test_report_missing(evidence: dict[str, Any], surface_id: str) -> l
         missing.append("executed_test_report:exit_code_not_zero")
     missing.extend(executed_test_artifact_hash_problems(executed))
     missing.extend(executed_test_artifact_missing_provenance(executed))
-    missing.extend(executed_test_artifact_missing_input_bindings(executed))
+    missing.extend(
+        executed_test_artifact_missing_input_bindings(
+            executed,
+            manifest_path,
+            public_header_path,
+        )
+    )
     return missing
 
 
-def player_identity_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+def player_identity_structured_promotion_evidence_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
     runtime_manifest, runtime_manifest_errors = load_hash_bound_json_artifact_binding(
         evidence.get("approved_runtime_evidence_manifest"),
@@ -2817,7 +2851,14 @@ def player_identity_structured_promotion_evidence_missing(evidence: dict[str, An
         ):
             missing.append("public_contract_readiness_report:fields_invalid")
 
-    missing.extend(executed_test_report_missing(evidence, "obelisk.player_identity.v1"))
+    missing.extend(
+        executed_test_report_missing(
+            evidence,
+            "obelisk.player_identity.v1",
+            manifest_path,
+            public_header_path,
+        )
+    )
     return missing
 
 
@@ -2857,7 +2898,11 @@ def load_hash_bound_json_artifact_binding(
     return payload, []
 
 
-def player_identity_promotion_certificate_missing(evidence: dict[str, Any]) -> list[str]:
+def player_identity_promotion_certificate_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
     certificate, certificate_errors = load_hash_bound_json_artifact_binding(
         evidence.get("player_identity_promotion_certificate"),
@@ -2882,15 +2927,29 @@ def player_identity_promotion_certificate_missing(evidence: dict[str, Any]) -> l
     if not isinstance(identity_evidence, dict):
         missing.append("player_identity_promotion_certificate:evidence_missing")
     else:
-        dependency_missing = player_identity_structured_promotion_evidence_missing(identity_evidence)
+        dependency_missing = player_identity_structured_promotion_evidence_missing(
+            identity_evidence,
+            manifest_path,
+            public_header_path,
+        )
         for reason in dependency_missing:
             missing.append(f"player_identity_{reason}")
     return missing
 
 
-def permissions_admin_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+def permissions_admin_structured_promotion_evidence_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
-    missing.extend(player_identity_promotion_certificate_missing(evidence))
+    missing.extend(
+        player_identity_promotion_certificate_missing(
+            evidence,
+            manifest_path,
+            public_header_path,
+        )
+    )
 
     query_report, query_error = load_repo_relative_json_evidence(evidence.get("query_failclosed_report"))
     if query_error is not None:
@@ -2933,11 +2992,22 @@ def permissions_admin_structured_promotion_evidence_missing(evidence: dict[str, 
     ):
         missing.append("public_readiness_report:fields_invalid")
 
-    missing.extend(executed_test_report_missing(evidence, "obelisk.permissions_admin.v1"))
+    missing.extend(
+        executed_test_report_missing(
+            evidence,
+            "obelisk.permissions_admin.v1",
+            manifest_path,
+            public_header_path,
+        )
+    )
     return missing
 
 
-def command_response_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+def command_response_structured_promotion_evidence_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
@@ -2966,14 +3036,27 @@ def command_response_structured_promotion_evidence_missing(evidence: dict[str, A
             command_response_public_readiness_source_artifacts_missing(
                 readiness_report,
                 "public_readiness_report",
+                manifest_path,
+                public_header_path,
             )
         )
 
-    missing.extend(executed_test_report_missing(evidence, "obelisk.command_chat_response_path.v1"))
+    missing.extend(
+        executed_test_report_missing(
+            evidence,
+            "obelisk.command_chat_response_path.v1",
+            manifest_path,
+            public_header_path,
+        )
+    )
     return missing
 
 
-def commands_replies_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+def commands_replies_structured_promotion_evidence_missing(
+    evidence: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     missing: list[str] = []
     readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
     if readiness_error is not None:
@@ -3007,6 +3090,8 @@ def commands_replies_structured_promotion_evidence_missing(evidence: dict[str, A
             commands_replies_public_readiness_source_artifacts_missing(
                 readiness_report,
                 "public_readiness_report",
+                manifest_path,
+                public_header_path,
             )
         )
 
@@ -3016,15 +3101,30 @@ def commands_replies_structured_promotion_evidence_missing(evidence: dict[str, A
             "public_readiness_report": evidence.get("command_response_public_readiness_report"),
             "executed_test_report": evidence.get("command_response_executed_test_report"),
         }
-    dependency_missing = command_response_structured_promotion_evidence_missing(command_response_evidence)
+    dependency_missing = command_response_structured_promotion_evidence_missing(
+        command_response_evidence,
+        manifest_path,
+        public_header_path,
+    )
     for reason in dependency_missing:
         missing.append(f"command_response_{reason}")
 
-    missing.extend(executed_test_report_missing(evidence, "obelisk.commands_replies.v1"))
+    missing.extend(
+        executed_test_report_missing(
+            evidence,
+            "obelisk.commands_replies.v1",
+            manifest_path,
+            public_header_path,
+        )
+    )
     return missing
 
 
-def surface_missing_structured_promotion_evidence(surface: dict[str, Any]) -> list[str]:
+def surface_missing_structured_promotion_evidence(
+    surface: dict[str, Any],
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
+) -> list[str]:
     surface_id = surface.get("id")
     if surface.get("status") != "promoted":
         return []
@@ -3032,13 +3132,13 @@ def surface_missing_structured_promotion_evidence(surface: dict[str, Any]) -> li
     if not isinstance(evidence, dict):
         return ["evidence:missing"]
     if surface_id == "obelisk.player_identity.v1":
-        return player_identity_structured_promotion_evidence_missing(evidence)
+        return player_identity_structured_promotion_evidence_missing(evidence, manifest_path, public_header_path)
     if surface_id == "obelisk.permissions_admin.v1":
-        return permissions_admin_structured_promotion_evidence_missing(evidence)
+        return permissions_admin_structured_promotion_evidence_missing(evidence, manifest_path, public_header_path)
     if surface_id == "obelisk.command_chat_response_path.v1":
-        return command_response_structured_promotion_evidence_missing(evidence)
+        return command_response_structured_promotion_evidence_missing(evidence, manifest_path, public_header_path)
     if surface_id == "obelisk.commands_replies.v1":
-        return commands_replies_structured_promotion_evidence_missing(evidence)
+        return commands_replies_structured_promotion_evidence_missing(evidence, manifest_path, public_header_path)
     return []
 
 
@@ -3150,6 +3250,8 @@ def completion_blocker_outcome_rows(
     post_v1_or_excluded: set[str],
     release_statement_text: str | None,
     command_permission_route_gate: dict[str, Any] | None = None,
+    manifest_path: Path = DEFAULT_MANIFEST,
+    public_header_path: Path = DEFAULT_PUBLIC_HEADER,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     counts_by_surface: dict[str, bool] = {}
@@ -3176,7 +3278,11 @@ def completion_blocker_outcome_rows(
         release_statement_outcome = release_statement_recorded_outcome(release_statement_text, surface_id)
         promotion_evidence_satisfied = bool(surface) and status == "promoted" and surface_has_promotion_evidence(surface)
         missing_required_terms = surface_missing_required_promotion_evidence(surface)
-        missing_structured_evidence = surface_missing_structured_promotion_evidence(surface)
+        missing_structured_evidence = surface_missing_structured_promotion_evidence(
+            surface,
+            manifest_path,
+            public_header_path,
+        )
         release_statement_contract_satisfied = False
         if status == "promoted":
             release_statement_contract_satisfied = release_statement_outcome == "promoted"
@@ -3821,7 +3927,11 @@ def build_report(
             missing_required_terms = surface_missing_required_promotion_evidence(surface)
             if missing_required_terms:
                 promoted_missing_required_evidence_terms[surface_id] = missing_required_terms
-            missing_structured_evidence = surface_missing_structured_promotion_evidence(surface)
+            missing_structured_evidence = surface_missing_structured_promotion_evidence(
+                surface,
+                manifest_path,
+                public_header_path,
+            )
             if missing_structured_evidence:
                 promoted_missing_structured_evidence[surface_id] = missing_structured_evidence
         elif status == "planning":
@@ -3966,6 +4076,8 @@ def build_report(
         post_v1_or_excluded,
         release_statement_text,
         command_permission_route_gate,
+        manifest_path,
+        public_header_path,
     )
     blocker_outcome_summary = completion_blocker_outcome_summary(blocker_outcome_rows)
     p0_scoped_non_complete_outcomes = blocker_outcome_summary["p0_scoped_non_complete_outcomes"]

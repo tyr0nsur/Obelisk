@@ -212,9 +212,8 @@ This file is an active routing table only. Durable evidence belongs in
   accounting, permissions/admin certificate dependency, default identity source provenance,
   and request hygiene. Default route/SDK remain fail-closed:
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
-- Latest delegated SDK accounting round integrated central Structure census and
-  Structure build-policy reports in `check_public_sdk_v1_completion.py`. Canonical SDK
-  completion now exposes Structure evidence and fails closed on the build-policy child
-  blockers; census remains candidate-ready/non-promotional. Pending SDK guardrail:
-  active `--manifest`/header binding for executed-test artifacts. SDK remains
-  fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
+- Latest delegated SDK guardrail round bound P0 executed-test and readiness source
+  artifacts to active `--manifest`/`--public-header`, including nested command-response
+  evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
+  build-policy now passes planning-only with no central `structure_*` blockers. SDK
+  remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.

@@ -956,13 +956,17 @@ priorities, and do not use history files as the active source of truth.
 - Follow-up delegated SDK accounting pass integrated the pending Structure side-lane:
   `check_public_sdk_v1_completion.py` now accepts Structure census/build-policy checker
   overrides, runs both child reports, includes them in canonical JSON, adds blocker
-  guidance, and tests missing checkers/overclaim/fail-closed cases. Current canonical SDK
-  completion exposes `structure_census_readiness` as `ready=true,status=candidate_ready`
-  and fails closed on `structure_build_policy_offline_intake_invalid` plus
-  `structure_build_policy_offline_intake_blockers_not_empty`. This is central accounting
-  evidence only; no Structure SDK/runtime/enforcement/v1 completion readiness is claimed.
-  Deferred SDK guardrail from read-only audit: executed-test artifacts still need active
-  `--manifest`/`--public-header` path+hash binding instead of default-only bindings.
+  guidance, and tests missing checkers/overclaim/fail-closed cases.
+- Follow-up delegated SDK guardrail pass closed the active-input binding gap: promoted P0
+  executed-test artifacts and command-response/commands-replies readiness source artifacts
+  must now match the active `--manifest` and `--public-header`, including nested
+  command-response dependency evidence inside commands/replies. The same round fixed the
+  Structure build-policy standalone checker scope so unrelated manifest-wide public SDK
+  wording and unrelated promoted surfaces no longer produce Structure blockers; canonical
+  build-policy now reports `ready=true,status=accepted_planning_only`, while SDK
+  completion remains fail-closed at complete SDK `0/12`, P0 `0/4`, and
+  `stable_claim_allowed=false`. Next offline identity side-lane: sanitized
+  `privacy.identifier_redaction` evidence as contract-review input only.
 
 ## Agent Coordination
 

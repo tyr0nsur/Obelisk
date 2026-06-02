@@ -373,6 +373,42 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
         self.assertEqual(payload["non_claim_matrix"]["runtime_hooks"], "not_claimed")
         self.assertEqual(payload["blockers"], [])
 
+    def test_manifest_wide_public_sdk_text_and_unrelated_promotions_do_not_block_structure_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_payload = self.readiness_payload()
+            self.add_snapshot_details(root, readiness_payload)
+            readiness = root / "readiness.json"
+            readiness.write_text(json.dumps(readiness_payload, sort_keys=True), encoding="utf-8")
+            manifest_payload = self.manifest_payload(
+                readiness,
+                hashlib.sha256(readiness.read_bytes()).hexdigest(),
+            )
+            manifest_payload["compatibility_statement"] = (
+                "The public SDK compatibility map may mention public SDK readiness in "
+                "global release policy text without promoting Structure build-policy."
+            )
+            manifest_payload["stable_release_contract"] = {
+                "meaning": "Only promoted foundation surfaces are stable; Structure build-policy remains blocked."
+            }
+            manifest_payload["surfaces"].append(
+                {
+                    "id": "obelisk.descriptors.v1",
+                    "status": "promoted",
+                    "support_tier": "stable",
+                    "public_contract": ["descriptor helpers"],
+                }
+            )
+            manifest = root / "public_sdk_surfaces.json"
+            manifest.write_text(json.dumps(manifest_payload, sort_keys=True), encoding="utf-8")
+
+            result = self.run_checker("--manifest", str(manifest), "--json")
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(payload["ready"])
+        self.assertEqual(payload["blockers"], [])
+
     def test_manifest_surface_posture_overclaims_fail_closed(self) -> None:
         cases = [
             (

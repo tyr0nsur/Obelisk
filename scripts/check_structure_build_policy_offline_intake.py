@@ -1293,11 +1293,12 @@ def main() -> int:
         scan_for_forbidden_true_ready(readiness, blockers, "$.readiness")
         scan_for_forbidden_true_claims(readiness, blockers, "$.readiness")
         scan_for_forbidden_string_claims(readiness, blockers, "$.readiness")
-    if manifest is not None:
-        scan_for_forbidden_runtime_inputs(manifest, blockers, "$.manifest")
-        scan_for_forbidden_true_ready(manifest, blockers, "$.manifest")
-        scan_for_forbidden_true_claims(manifest, blockers, "$.manifest")
-        scan_for_forbidden_string_claims(manifest, blockers, "$.manifest")
+    if surface is not None:
+        surface_path = "$.manifest.surfaces[obelisk.structure_census.v1]"
+        scan_for_forbidden_runtime_inputs(surface, blockers, surface_path)
+        scan_for_forbidden_true_ready(surface, blockers, surface_path)
+        scan_for_forbidden_true_claims(surface, blockers, surface_path)
+        scan_for_forbidden_string_claims(surface, blockers, surface_path)
 
     report = build_report(blockers, readiness_path=readiness_path, readiness_sha256=readiness_sha256)
     print(json.dumps(report, indent=2, sort_keys=True))
