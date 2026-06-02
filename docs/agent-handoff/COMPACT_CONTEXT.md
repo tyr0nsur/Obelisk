@@ -940,6 +940,14 @@ priorities, and do not use history files as the active source of truth.
   request/contract gates; route/SDK remain fail-closed with
   `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, complete SDK `0/12`,
   and P0 `0/4`.
+- Follow-up delegated evidence-completion guardrail pass integrated four more scoped
+  read-only findings: runtime principal lifecycle request/window checks now require
+  checker `ready=true` plus exit zero, private player-identity candidates must document
+  stale-handle fail-closed tuple semantics, inventory target-set evidence must carry
+  pinned scope/report accounting, and SDK release wording rejects bare
+  "complete/full/production/stable SDK" claims. Canonical route gate remains
+  planning-only at `approved_runtime_evidence_missing`; SDK completion remains expected
+  fail-closed with `stable_claim_allowed=false`, complete SDK `0/12`, and P0 `0/4`.
 
 ## Agent Coordination
 

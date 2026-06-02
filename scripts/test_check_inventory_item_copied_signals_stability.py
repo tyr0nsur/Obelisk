@@ -146,8 +146,16 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
                     ],
                     "target_set_evidence": [
                         {"target_set": "structure-observer-intake"},
-                        {"target_set": stability.EXPECTED_INVENTORY_TARGET_SET},
-                        {"target_set": stability.EXPECTED_ITEM_RETURN_TARGET_SET},
+                        {
+                            "target_set": stability.EXPECTED_INVENTORY_TARGET_SET,
+                            "reports": ["docs/research/2026-05-29-minimal-second-source-readiness.md"],
+                            "scope": "layout-only compact inventory/structure backing; no standalone module-specific inventory or structure surface",
+                        },
+                        {
+                            "target_set": stability.EXPECTED_ITEM_RETURN_TARGET_SET,
+                            "reports": ["docs/research/2026-05-30-item-return-only-policy-slice.md"],
+                            "scope": "second-source accepted copied ReturnValue-only item backing for AllowEquipItem, CanRepair, and UseItemOntoItem; no standalone item or inventory module surface, no identity, no lookup, no mutation, no return override, and no ResourceHandle",
+                        },
                     ],
                     "excluded_target_sets": [
                         {"target_set": stability.EXCLUDED_INVENTORY_ACTION_TARGET_SET}
@@ -390,6 +398,23 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
 
         reasons = set(payload["blockers"])
         self.assertIn("inventory_copied_release_readiness_target_sets_mismatch", reasons)
+
+    def test_inventory_target_set_evidence_accounting_scope_and_reports_must_stay_pinned(self) -> None:
+        fixtures = self.make_fixture()
+        event = fixtures["public_gameplay_events"]["promoted_events"][0]
+        evidence_by_target = {item["target_set"]: item for item in event["target_set_evidence"]}
+        evidence_by_target[stability.EXPECTED_INVENTORY_TARGET_SET]["scope"] = "Inventory SDK ready"
+        evidence_by_target[stability.EXPECTED_INVENTORY_TARGET_SET]["reports"] = []
+        evidence_by_target[stability.EXPECTED_ITEM_RETURN_TARGET_SET]["scope"] = "ReturnValue-only item backing"
+        evidence_by_target[stability.EXPECTED_ITEM_RETURN_TARGET_SET]["reports"] = ["/servidor/ark/live.log"]
+
+        result = self.run_fixture(fixtures, check=False)
+        payload = json.loads(result.stdout)
+
+        reasons = set(payload["blockers"])
+        self.assertIn("gameplay_policy_inventory_target_set_evidence_scope_guardrail_missing", reasons)
+        self.assertIn("gameplay_policy_inventory_target_set_evidence_reports_missing", reasons)
+        self.assertIn("gameplay_policy_inventory_target_set_evidence_report_live_path", reasons)
 
     def test_non_copied_payload_contract_wording_is_rejected(self) -> None:
         fixtures = self.make_fixture()

@@ -133,6 +133,16 @@ REQUIRED_STALE_POLICY = {
     "stale handles never resolve to a different player",
     "lookup-by-public-handle remains unavailable unless separately promoted",
 }
+REQUIRED_PRIVATE_CANDIDATE_STALE_HANDLE_FAIL_CLOSED_SEMANTICS = {
+    "principal_handle, principal_generation, and principal_scope_flags must be evaluated as one tuple",
+    "missing principal_generation fails closed",
+    "missing principal_scope_flags fails closed",
+    "stale generation fails closed",
+    "unsupported scope fails closed",
+    "server_process_epoch mismatch fails closed",
+    "stale handles never resolve to a different player",
+    "lookup-by-public-handle remains unavailable unless separately promoted",
+}
 REQUIRED_ABI_PAYLOAD_SHAPE_PROPERTIES = {
     "POD C ABI",
     "append-only after promotion",
@@ -194,7 +204,7 @@ HEADER_SYMBOL_RE = re.compile(
 IDENTIFIER_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 NEGATIVE_CONTEXT_RE = re.compile(
     r"\b(?:no|not|non[-_ ]|does\s+not|do\s+not|cannot|can't|forbid(?:den|s)?|"
-    r"redact(?:ed|ion)?|excludes?|without|until|missing|blocked|blocker|"
+    r"redact(?:ed|ion)?|excludes?|without|until|missing|blocked|blocker|unavailable|"
     r"must[_ -]?not[_ -]?expose|no_)\b",
     re.IGNORECASE,
 )
@@ -801,6 +811,14 @@ def validate_private_candidate(candidate: dict[str, Any], blockers: list[dict[st
             "--private-candidate-contract",
             exposures=exposures,
         )
+    require_string_list_contains(
+        candidate,
+        "candidate_stale_handle_fail_closed_semantics",
+        REQUIRED_PRIVATE_CANDIDATE_STALE_HANDLE_FAIL_CLOSED_SEMANTICS,
+        blockers,
+        "private_candidate_stale_handle_fail_closed_semantics_missing",
+        "$.candidate_stale_handle_fail_closed_semantics",
+    )
 
 
 def build_report(

@@ -210,11 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest guardrails closed command-response readiness provenance, commands/replies report-root
-  binding, mission-leaf accounting, permissions/admin identity-certificate dependency, default identity planning-source provenance, and runtime-evidence request hygiene:
-  request packs reject expired windows, Markdown sidecars replay-check, approved runtime
-  manifests preflight-check, and stale route-lock guidance points to runtime evidence plus identity contract. Default route/SDK remain fail-closed:
-  `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, complete-SDK `0/12`, P0 `0/4`.
-- Latest delegated guardrail round integrated privacy log-schema hardening, optional
-  redaction-evidence intake, and approved-evidence sidecar path short-circuiting before
-  hashing protected/symlinked/non-approved paths. SDK remains fail-closed at `0/12`.
+- Latest guardrails closed command-response/report-root provenance, mission-leaf
+  accounting, permissions/admin certificate dependency, default identity source provenance,
+  and request hygiene. Default route/SDK remain fail-closed:
+  `approved_runtime_evidence_missing`, `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`.
+- Latest delegated guardrail round integrated privacy/redaction intake, approved-evidence
+  path hash short-circuiting, request/window exit-code gates, private-candidate stale-handle
+  semantics, inventory evidence accounting, and bare complete/full/production/stable SDK
+  claim rejection. SDK remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.

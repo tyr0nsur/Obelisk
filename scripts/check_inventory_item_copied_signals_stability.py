@@ -40,6 +40,26 @@ EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS = (
     EXPECTED_INVENTORY_TARGET_SET,
     EXPECTED_ITEM_RETURN_TARGET_SET,
 )
+EXPECTED_TARGET_SET_EVIDENCE_SCOPE_TERMS = {
+    EXPECTED_INVENTORY_TARGET_SET: (
+        "layout-only",
+        "no standalone",
+        "module-specific",
+        "inventory",
+    ),
+    EXPECTED_ITEM_RETURN_TARGET_SET: (
+        "ReturnValue-only",
+        "AllowEquipItem",
+        "CanRepair",
+        "UseItemOntoItem",
+        "no standalone item or inventory module surface",
+        "no identity",
+        "no lookup",
+        "no mutation",
+        "no return override",
+        "ResourceHandle",
+    ),
+}
 
 EXPECTED_ALLOWED_SIGNALS: tuple[dict[str, Any], ...] = (
     {
@@ -379,11 +399,15 @@ def find_gameplay_policy_event(payload: dict[str, Any]) -> dict[str, Any] | None
 
 
 def target_set_evidence_names(event: dict[str, Any]) -> set[str]:
+    return set(target_set_evidence_by_name(event))
+
+
+def target_set_evidence_by_name(event: dict[str, Any]) -> dict[str, dict[str, Any]]:
     evidence = event.get("target_set_evidence")
     if not isinstance(evidence, list):
-        return set()
+        return {}
     return {
-        str(item.get("target_set"))
+        str(item.get("target_set")): item
         for item in evidence
         if isinstance(item, dict) and item.get("target_set") is not None
     }
@@ -557,7 +581,8 @@ def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict
             missing=missing_target_sets,
             value=sorted(target_sets),
         )
-    evidence_target_sets = target_set_evidence_names(event)
+    evidence_by_target_set = target_set_evidence_by_name(event)
+    evidence_target_sets = set(evidence_by_target_set)
     missing_evidence_sets = sorted(set(EXPECTED_INVENTORY_RELEASE_READINESS_TARGET_SETS) - evidence_target_sets)
     if missing_evidence_sets:
         add(
@@ -567,6 +592,49 @@ def validate_public_gameplay_events(payload: dict[str, Any], blockers: list[dict
             missing=missing_evidence_sets,
             value=sorted(evidence_target_sets),
         )
+    for target_set, required_scope_terms in EXPECTED_TARGET_SET_EVIDENCE_SCOPE_TERMS.items():
+        evidence = evidence_by_target_set.get(target_set)
+        if evidence is None:
+            continue
+        evidence_label = f"{label}.{GAMEPLAY_POLICY_EVENT}.target_set_evidence[{target_set}]"
+        scope = str(evidence.get("scope") or "")
+        for term in required_scope_terms:
+            if term not in scope:
+                add(
+                    blockers,
+                    "gameplay_policy_inventory_target_set_evidence_scope_guardrail_missing",
+                    f"{evidence_label}.scope",
+                    target_set=target_set,
+                    term=term,
+                    value=scope,
+                )
+        reports = evidence.get("reports")
+        if not isinstance(reports, list) or not reports:
+            add(
+                blockers,
+                "gameplay_policy_inventory_target_set_evidence_reports_missing",
+                f"{evidence_label}.reports",
+                target_set=target_set,
+                value=reports,
+            )
+            continue
+        for index, report in enumerate(reports):
+            if not isinstance(report, str) or not report:
+                add(
+                    blockers,
+                    "gameplay_policy_inventory_target_set_evidence_report_invalid",
+                    f"{evidence_label}.reports[{index}]",
+                    target_set=target_set,
+                    value=report,
+                )
+            elif "/servidor/ark" in report:
+                add(
+                    blockers,
+                    "gameplay_policy_inventory_target_set_evidence_report_live_path",
+                    f"{evidence_label}.reports[{index}]",
+                    target_set=target_set,
+                    value=report,
+                )
     excluded_target_sets = excluded_target_set_names(event)
     if EXCLUDED_INVENTORY_ACTION_TARGET_SET not in excluded_target_sets:
         add(

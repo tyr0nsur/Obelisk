@@ -421,6 +421,16 @@ REQUIRED_PRIVATE_CANDIDATE_INVALIDATION_SEMANTICS = {
     "server restart invalidates all process-local principal handles",
     "failed evidence validation invalidates the candidate and keeps public identity blocked",
 }
+REQUIRED_PRIVATE_CANDIDATE_STALE_HANDLE_FAIL_CLOSED_SEMANTICS = {
+    "principal_handle, principal_generation, and principal_scope_flags must be evaluated as one tuple",
+    "missing principal_generation fails closed",
+    "missing principal_scope_flags fails closed",
+    "stale generation fails closed",
+    "unsupported scope fails closed",
+    "server_process_epoch mismatch fails closed",
+    "stale handles never resolve to a different player",
+    "lookup-by-public-handle remains unavailable unless separately promoted",
+}
 REQUIRED_PRIVATE_CANDIDATE_DOWNSTREAM_POLICY = {
     "permissions/admin cannot consume identity until this surface is promoted with public ABI and tests",
     "command/chat response cannot consume identity until permissions/admin is promoted",
@@ -966,6 +976,11 @@ def validate_private_candidate_contract(payload: dict[str, Any], blockers: list[
         ("candidate_event_kind_semantics", REQUIRED_PRIVATE_CANDIDATE_EVENT_KIND_SEMANTICS, "private_candidate_event_kind_semantics_missing"),
         ("candidate_scope_semantics", REQUIRED_PRIVATE_CANDIDATE_SCOPE_SEMANTICS, "private_candidate_scope_semantics_missing"),
         ("candidate_invalidation_semantics", REQUIRED_PRIVATE_CANDIDATE_INVALIDATION_SEMANTICS, "private_candidate_invalidation_semantics_missing"),
+        (
+            "candidate_stale_handle_fail_closed_semantics",
+            REQUIRED_PRIVATE_CANDIDATE_STALE_HANDLE_FAIL_CLOSED_SEMANTICS,
+            "private_candidate_stale_handle_fail_closed_semantics_missing",
+        ),
         ("candidate_downstream_dependency_policy", REQUIRED_PRIVATE_CANDIDATE_DOWNSTREAM_POLICY, "private_candidate_downstream_policy_missing"),
         ("non_claims", REQUIRED_PRIVATE_CANDIDATE_NON_CLAIMS, "private_candidate_non_claims_missing"),
     ):

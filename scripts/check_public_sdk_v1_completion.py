@@ -465,6 +465,10 @@ AFFIRMATIVE_RELEASE_CLAIM_PATTERNS = (
     r"(?:available|ready|supported|included|shipped|public|promoted)\s+in\s+v1\b",
 )
 FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
+    r"\b(?:this|statement|release)\s+"
+    r"(?:is|declares?|approves?|allows?|authorizes?)\s+"
+    r"(?:the\s+)?(?:complete|full|production|stable)\s+"
+    r"(?:sdk|api|support)\b",
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
     r"\b(?:sdk|api|support)\s+v?1(?:\.0)?\s*[:,-]\s*"
     r"(?:complete|full|production[- ]?ready|stable)\b",

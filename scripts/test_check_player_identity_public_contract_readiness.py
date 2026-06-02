@@ -249,6 +249,56 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         )
         self.assertIn("This artifact does not claim stable principal identity.", detail["missing"])
 
+    def test_rejects_private_candidate_contract_missing_stale_handle_fail_closed_rule(self) -> None:
+        decisions = self.decisions()
+        private_contract = json.loads(
+            (REPO_ROOT / "docs/research/2026-06-01-player-identity-private-candidate-contract.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        private_contract["candidate_stale_handle_fail_closed_semantics"].remove(
+            "stale handles never resolve to a different player"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            private_path = root / "private-candidate.json"
+            private_path.write_text(json.dumps(private_contract), encoding="utf-8")
+            decisions_path = root / "decisions.json"
+            runtime_path = root / "approved-runtime.json"
+            decisions_path.write_text(json.dumps(decisions), encoding="utf-8")
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--decisions",
+                    str(decisions_path),
+                    "--private-candidate-contract",
+                    str(private_path),
+                    "--approved-runtime-evidence",
+                    str(runtime_path),
+                    "--json",
+                ],
+                check=False,
+                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+        report = json.loads(result.stdout)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_candidate_stale_handle_fail_closed_semantics_missing", report["blockers"])
+        detail = next(
+            blocker
+            for blocker in report["blocker_details"]
+            if blocker["reason"] == "private_candidate_stale_handle_fail_closed_semantics_missing"
+        )
+        self.assertIn("stale handles never resolve to a different player", detail["missing"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_blocks_promote_public_and_runtime_modes(self) -> None:
         for flag, blocker in (
             ("--promote", "promote_blocked_until_player_identity_public_contract_promotion"),

@@ -136,6 +136,16 @@
     "server restart invalidates all process-local principal handles",
     "failed evidence validation invalidates the candidate and keeps public identity blocked"
   ],
+  "candidate_stale_handle_fail_closed_semantics": [
+    "principal_handle, principal_generation, and principal_scope_flags must be evaluated as one tuple",
+    "missing principal_generation fails closed",
+    "missing principal_scope_flags fails closed",
+    "stale generation fails closed",
+    "unsupported scope fails closed",
+    "server_process_epoch mismatch fails closed",
+    "stale handles never resolve to a different player",
+    "lookup-by-public-handle remains unavailable unless separately promoted"
+  ],
   "candidate_downstream_dependency_policy": [
     "permissions/admin cannot consume identity until this surface is promoted with public ABI and tests",
     "command/chat response cannot consume identity until permissions/admin is promoted",

@@ -189,7 +189,7 @@ def file_state(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[s
         add_blocker(blockers, f"{label}_not_approved_offline_workspace", label, path=str(status.resolved))
     if not status.resolved.is_file():
         add_blocker(blockers, f"{label}_missing", label, path=str(status.resolved))
-    else:
+    elif not status.protected and status.approved_offline_workspace:
         state["sha256"] = sha256_file(status.resolved)
     return state
 
@@ -236,7 +236,8 @@ def request_pack_check_state(
     state["stderr"] = stderr
     if isinstance(payload, dict):
         state["schema"] = payload.get("schema")
-        state["ready"] = payload.get("ready") is True and payload.get("request_pack_ready") is True
+        state["checker_ready"] = payload.get("ready") is True
+        state["ready"] = exit_code == 0 and payload.get("ready") is True and payload.get("request_pack_ready") is True
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")
     if not state["ready"]:
@@ -273,8 +274,10 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
     state["stderr"] = stderr
     if isinstance(payload, dict):
         state["schema"] = payload.get("schema")
+        state["checker_ready"] = payload.get("ready") is True
         state["ready"] = (
-            payload.get("ready") is True
+            exit_code == 0
+            and payload.get("ready") is True
             and payload.get("operational_window_manifest_ready") is True
         )
         state["blockers"] = payload.get("blockers", [])

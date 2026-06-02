@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -610,6 +611,71 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertFalse(state["ready"])
         self.assertIn("approved_runtime_manifest_check_failed", [blocker["reason"] for blocker in blockers])
 
+    def test_request_pack_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:
+        original = bundle_builder.run_json_check
+        blockers: list[dict] = []
+
+        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+            return (
+                1,
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request-check.v1",
+                    "ready": True,
+                    "request_pack_ready": True,
+                    "blockers": [],
+                    "next_blocker": "operator_current_turn_runtime_window_approval_required",
+                },
+                "nonzero exit",
+            )
+
+        try:
+            bundle_builder.run_json_check = fake_run_json_check
+            state = bundle_builder.request_pack_check_state(
+                {"exists": True, "path": Path("player-principal-lifecycle-window-request.json")},
+                {"exists": True, "path": Path("player-principal-lifecycle-observer.env")},
+                blockers,
+            )
+        finally:
+            bundle_builder.run_json_check = original
+
+        self.assertTrue(state["checked"])
+        self.assertEqual(state["exit_code"], 1)
+        self.assertTrue(state["checker_ready"])
+        self.assertFalse(state["ready"])
+        self.assertIn("request_pack_check_failed", [blocker["reason"] for blocker in blockers])
+
+    def test_window_manifest_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:
+        original = bundle_builder.run_json_check
+        blockers: list[dict] = []
+
+        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+            return (
+                1,
+                {
+                    "schema": "obelisk.players-identity-runtime-principal-lifecycle-window-manifest-check.v1",
+                    "ready": True,
+                    "operational_window_manifest_ready": True,
+                    "blockers": [],
+                    "next_blocker": "approved_runtime_observer_log_summary_and_manifest_missing",
+                },
+                "nonzero exit",
+            )
+
+        try:
+            bundle_builder.run_json_check = fake_run_json_check
+            state = bundle_builder.window_manifest_check_state(
+                {"exists": True, "path": Path("player-principal-lifecycle-window-manifest.txt")},
+                blockers,
+            )
+        finally:
+            bundle_builder.run_json_check = original
+
+        self.assertTrue(state["checked"])
+        self.assertEqual(state["exit_code"], 1)
+        self.assertTrue(state["checker_ready"])
+        self.assertFalse(state["ready"])
+        self.assertIn("window_manifest_check_failed", [blocker["reason"] for blocker in blockers])
+
     def test_builds_complete_consume_only_bundle(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
@@ -838,6 +904,57 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("--output-dir must not be a symlink", result.stderr)
             self.assertFalse((target / "bundle" / "runtime-observer-summary.json").exists())
+
+    def test_file_state_does_not_hash_protected_existing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected_root = root / "server"
+            offline_root = root / "workspace-offline"
+            protected_root.mkdir()
+            offline_root.mkdir()
+            path = protected_root / "request-pack.json"
+            path.write_text("{}", encoding="utf-8")
+            blockers: list[dict] = []
+
+            with mock.patch.object(bundle_builder, "SERVER_ROOT", protected_root), mock.patch.object(
+                bundle_builder,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (offline_root,),
+            ), mock.patch.object(bundle_builder, "sha256_file", side_effect=AssertionError("sha256_file should not run")):
+                state = bundle_builder.file_state(path, "request_pack", blockers)
+
+        self.assertTrue(state["exists"])
+        self.assertTrue(state["protected"])
+        self.assertFalse(state["approved_offline_workspace"])
+        self.assertIsNone(state["sha256"])
+        self.assertIn("request_pack_under_protected_server_root", [blocker["reason"] for blocker in blockers])
+        self.assertIn("request_pack_not_approved_offline_workspace", [blocker["reason"] for blocker in blockers])
+
+    def test_file_state_does_not_hash_unapproved_existing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            protected_root = root / "server"
+            offline_root = root / "workspace-offline"
+            unapproved_root = root / "other-offline"
+            protected_root.mkdir()
+            offline_root.mkdir()
+            unapproved_root.mkdir()
+            path = unapproved_root / "request-pack.json"
+            path.write_text("{}", encoding="utf-8")
+            blockers: list[dict] = []
+
+            with mock.patch.object(bundle_builder, "SERVER_ROOT", protected_root), mock.patch.object(
+                bundle_builder,
+                "APPROVED_OFFLINE_WORKSPACE_ROOTS",
+                (offline_root,),
+            ), mock.patch.object(bundle_builder, "sha256_file", side_effect=AssertionError("sha256_file should not run")):
+                state = bundle_builder.file_state(path, "request_pack", blockers)
+
+        self.assertTrue(state["exists"])
+        self.assertFalse(state["protected"])
+        self.assertFalse(state["approved_offline_workspace"])
+        self.assertIsNone(state["sha256"])
+        self.assertEqual(["request_pack_not_approved_offline_workspace"], [blocker["reason"] for blocker in blockers])
 
     def test_fails_closed_for_events_before_safe_gate(self) -> None:
         lines = runtime_log_lines()

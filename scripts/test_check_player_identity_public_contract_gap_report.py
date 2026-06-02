@@ -370,6 +370,27 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             },
         )
 
+    def test_rejects_private_candidate_missing_stale_handle_fail_closed_rule(self) -> None:
+        candidate = self.load_private_candidate()
+        candidate["candidate_stale_handle_fail_closed_semantics"].remove(
+            "stale handles never resolve to a different player"
+        )
+
+        result = self.run_checker(candidate=candidate)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private_candidate_stale_handle_fail_closed_semantics_missing", report["blockers"])
+        detail = next(
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "private_candidate_stale_handle_fail_closed_semantics_missing"
+        )
+        self.assertIn("stale handles never resolve to a different player", detail["missing"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_forbidden_negative_non_claims_remain_allowed(self) -> None:
         candidate = copy.deepcopy(self.load_private_candidate())
 
