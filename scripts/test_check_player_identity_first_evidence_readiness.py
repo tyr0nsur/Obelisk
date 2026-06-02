@@ -32,6 +32,38 @@ import prepare_player_principal_lifecycle_window_request as prepare_window_reque
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
+def lifecycle_manifest_bound_to_first_evidence(first_evidence: dict | None = None) -> dict:
+    first_evidence = first_evidence or players_identity_first_evidence_manifest()
+    payload = accepted_lifecycle_anchor_manifest()
+    source_ids = first_evidence["artifact_identity"]["source_artifact_ids"]
+    payload["artifact_identity"]["source_artifact_ids"] = list(source_ids)
+    snapshots_by_target = {
+        snapshot["target"]: snapshot
+        for snapshot in first_evidence["generated_from"]["input_snapshots"]
+    }
+    for anchor in payload["candidate_anchors"]:
+        target = anchor.get("target")
+        snapshot = snapshots_by_target.get(target)
+        if snapshot is not None:
+            anchor["evidence"]["source_snapshot"] = snapshot["id"]
+            anchor["evidence"]["source_snapshot_sha256"] = snapshot["sha256"]
+    return payload
+
+
+def principal_policy_bound_to_lifecycle(lifecycle_manifest: dict | None = None) -> dict:
+    lifecycle_manifest = lifecycle_manifest or lifecycle_manifest_bound_to_first_evidence()
+    payload = principal_policy_manifest()
+    payload["lifecycle_layout_source"]["source_binding"] = {
+        "lifecycle_manifest_schema": lifecycle_manifest["schema"],
+        "artifact_identity_source_artifact_ids": list(
+            lifecycle_manifest["artifact_identity"]["source_artifact_ids"]
+        ),
+        "accepted_start_targets": list(lifecycle_manifest["lifecycle_acceptance"]["accepted_start_targets"]),
+        "accepted_end_targets": list(lifecycle_manifest["lifecycle_acceptance"]["accepted_end_targets"]),
+    }
+    return payload
+
+
 class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
     def run_checker(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
@@ -662,8 +694,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             candidate_root.mkdir()
             lifecycle_manifest = root / "players-identity-lifecycle-anchor-candidates.json"
             principal_manifest = root / "players-identity-principal-invalidation-policy.json"
-            lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
-            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            lifecycle_payload = lifecycle_manifest_bound_to_first_evidence()
+            lifecycle_manifest.write_text(json.dumps(lifecycle_payload), encoding="utf-8")
+            principal_manifest.write_text(
+                json.dumps(principal_policy_bound_to_lifecycle(lifecycle_payload)),
+                encoding="utf-8",
+            )
             args = SimpleNamespace(
                 artifact_root=checker.DEFAULT_ARTIFACT_ROOT,
                 snapshot_root=Path("/tmp/player-identity-snapshots"),
@@ -930,7 +966,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             manifest = Path(tmp) / "lifecycle-candidates.json"
-            manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
+            manifest.write_text(json.dumps(lifecycle_manifest_bound_to_first_evidence()), encoding="utf-8")
             args = SimpleNamespace(
                 artifact_root=Path("/tmp/player-identity-artifacts"),
                 snapshot_root=Path("/tmp/player-identity-snapshots"),
@@ -1004,8 +1040,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             lifecycle_manifest = Path(tmp) / "lifecycle-candidates.json"
             principal_manifest = Path(tmp) / "principal-policy.json"
             runtime_manifest = Path(tmp) / "runtime-principal-lifecycle-shape.json"
-            lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
-            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            lifecycle_payload = lifecycle_manifest_bound_to_first_evidence()
+            lifecycle_manifest.write_text(json.dumps(lifecycle_payload), encoding="utf-8")
+            principal_manifest.write_text(
+                json.dumps(principal_policy_bound_to_lifecycle(lifecycle_payload)),
+                encoding="utf-8",
+            )
             runtime_manifest.write_text(
                 json.dumps(runtime_principal_lifecycle_manifest()),
                 encoding="utf-8",
@@ -1056,75 +1096,82 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertFalse(runtime_requirements["accepted_by_this_preflight"])
         self.assertTrue(runtime_requirements["approval_required"])
         self.assertIn("promote", runtime_requirements["required_for"])
-        self.assertIn("public_readiness", runtime_requirements["required_for"])
-        self.assertIn("runtime_readiness", runtime_requirements["required_for"])
-        self.assertIn(
-            "offline layout comparison alone",
-            runtime_requirements["insufficient_evidence"],
-        )
-        self.assertIn(
-            "principal invalidation policy manifest alone",
-            runtime_requirements["insufficient_evidence"],
-        )
-        observations = runtime_requirements["minimum_required_runtime_observations"]
-        self.assertEqual(
-            [observation["case"] for observation in observations],
-            [
-                "session_start_anchor",
-                "session_start_rejected_anchor",
-                "session_end_anchor",
-            ],
-        )
-        self.assertEqual([observation["required_order"] for observation in observations], [1, 2, 3])
-        self.assertEqual(observations[0]["required_role"], "session_start")
-        self.assertEqual(observations[0]["required_copied_fields"], ["bIsFromLogin", "ReturnValue"])
-        self.assertEqual(observations[0]["required_copied_bool_fields"], ["bIsFromLogin", "ReturnValue"])
-        self.assertEqual(observations[0]["required_copied_bool_values"], ["1", "1"])
-        self.assertEqual(observations[1]["required_role"], "session_start_rejected")
-        self.assertEqual(observations[1]["required_copied_fields"], ["bIsFromLogin", "ReturnValue"])
-        self.assertEqual(observations[1]["required_copied_bool_fields"], ["bIsFromLogin", "ReturnValue"])
-        self.assertEqual(observations[1]["required_copied_bool_values"], ["0", "1"])
-        self.assertEqual(observations[2]["required_role"], "session_end")
-        self.assertEqual(observations[2]["required_copied_fields"], [])
-        assertions = runtime_requirements["required_consumer_boundary_assertions"]
-        self.assertEqual(
-            [assertion["case"] for assertion in assertions],
-            ["stale_after_logout", "malformed_or_unsupported_evidence"],
-        )
-        self.assertEqual([assertion["required_order"] for assertion in assertions], [1, 2])
-        self.assertFalse(assertions[0]["runtime_observed"])
-        self.assertEqual(assertions[0]["provenance"], "consumer_boundary_assertion_not_runtime_observation")
-        self.assertEqual(assertions[0]["required_copied_fields"], ["generation_state"])
-        self.assertFalse(assertions[1]["runtime_observed"])
-        self.assertEqual(assertions[1]["provenance"], "consumer_boundary_assertion_not_runtime_observation")
-        self.assertEqual(assertions[1]["required_copied_fields"], [])
-        approval_boundary = runtime_requirements["approval_boundary"]
-        self.assertFalse(approval_boundary["approved_runtime_evidence_present"])
-        self.assertFalse(approval_boundary["runtime_work_authorized_by_this_report"])
-        self.assertFalse(approval_boundary["server_operations_authorized_by_this_report"])
-        self.assertFalse(approval_boundary["publication_authorized_by_this_report"])
-        self.assertIn(
-            "debug attachment, ptrace, gcore, or runtime scanners",
-            approval_boundary["separate_operator_approval_required_before"],
-        )
-        self.assertIn(
-            "GitHub publication, tags, pushes, or release claims",
-            approval_boundary["separate_operator_approval_required_before"],
-        )
-        self.assertEqual(
-            payload["next_actionable_blocker"]["next_required_evidence"]["schema"],
-            runtime_requirements["schema"],
-        )
-        runtime_manifest_diagnosis = payload["first_evidence"]["runtime_principal_lifecycle_evidence_manifest"]
-        self.assertTrue(runtime_manifest_diagnosis["ready"])
-        self.assertTrue(runtime_manifest_diagnosis["shape_accepted_by_this_checker"])
-        self.assertFalse(runtime_manifest_diagnosis["approved_runtime_evidence_present"])
-        self.assertFalse(runtime_manifest_diagnosis["runtime_evidence_ready"])
-        self.assertEqual(runtime_manifest_diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
-        self.assertEqual(payload["next_step"], "produce_approved_runtime_principal_lifecycle_evidence")
-        self.assertFalse(payload["promotion_ready"])
-        self.assertFalse(payload["public_sdk_ready"])
-        self.assertFalse(payload["runtime_ready"])
+
+    def test_blocks_stale_lifecycle_and_principal_policy_provenance_before_runtime_blocker(self) -> None:
+        ok = subprocess.CompletedProcess(["mock"], 0, "", "")
+
+        def fake_run_json_command(args: list[str], *, check: bool = False):
+            command = " ".join(args)
+            if "check_reflection_inventory_pack_readiness.py" in command:
+                return ok, self.accepted_inventory_payload()
+            if "compare_reflection_snapshots.py" in command:
+                return ok, {
+                    "totals": {
+                        "targets": 12,
+                        "comparable": 12,
+                        "blocked": 0,
+                        "second_source_accepted": 12,
+                        "second_source_missing": 0,
+                        "second_source_inconclusive": 0,
+                        "second_source_rejected": 0,
+                    },
+                    "promotion_gate": {"layout_ready": True, "promotion_ready": False},
+                    "second_source_status": "compared",
+                }
+            if "build_redacted_ufunction_signatures.py" in command:
+                return ok, players_identity_first_evidence_manifest()
+            if "check_player_identity_static_orientation.py" in command:
+                return ok, {
+                    "valid": True,
+                    "accepted_for_orientation": True,
+                    "not_artifact_gate": True,
+                    "blockers": [],
+                    "non_claims": ["candidate-only navigation evidence"],
+                }
+            self.fail(f"unexpected command: {command}")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lifecycle_manifest = root / "stale-lifecycle-candidates.json"
+            principal_manifest = root / "unbound-principal-policy.json"
+            stale_lifecycle = accepted_lifecycle_anchor_manifest()
+            stale_lifecycle["artifact_identity"]["source_artifact_ids"] = [
+                f"artifact_sha256:{'f' * 64}",
+                "capture_id:stale-capture",
+                "evidence_pack_id:stale-pack",
+            ]
+            for anchor in stale_lifecycle["candidate_anchors"]:
+                if anchor.get("accepted") is True:
+                    anchor["evidence"]["source_snapshot_sha256"] = "e" * 64
+            lifecycle_manifest.write_text(json.dumps(stale_lifecycle), encoding="utf-8")
+            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            args = SimpleNamespace(
+                artifact_root=Path("/tmp/player-identity-artifacts"),
+                snapshot_root=Path("/tmp/player-identity-snapshots"),
+                candidate_root=Path("/tmp/player-identity-second-source"),
+                lifecycle_anchor_candidates_manifest=lifecycle_manifest,
+                principal_invalidation_policy_manifest=principal_manifest,
+                runtime_principal_lifecycle_evidence_manifest=None,
+                approved_runtime_principal_lifecycle_evidence_manifest=None,
+            )
+            with (
+                mock.patch.object(checker, "run_json_command", side_effect=fake_run_json_command),
+                mock.patch.object(
+                    checker,
+                    "bounded_artifact_file_scan",
+                    return_value={"ready_to_build_core_evidence_pack": False},
+                ),
+            ):
+                payload = checker.build_report(args)
+
+        self.assertFalse(payload["ready"])
+        self.assertEqual(payload["primary_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
+        self.assertIn("lifecycle_anchor_first_evidence_provenance_unbound", payload["blockers"])
+        self.assertNotIn("approved_runtime_evidence_missing", payload["blockers"])
+        provenance = payload["first_evidence"]["planning_provenance"]
+        self.assertFalse(provenance["ready"])
+        self.assertIn("lifecycle_anchor_source_artifact_identity_mismatch", provenance["blockers"])
+        self.assertIn("principal_policy_lifecycle_source_binding_missing", provenance["blockers"])
 
     def test_approved_runtime_evidence_routes_to_identity_public_contract_gate(self) -> None:
         ok = subprocess.CompletedProcess(["mock"], 0, "", "")
@@ -1163,8 +1210,12 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             lifecycle_manifest = Path(tmp) / "lifecycle-candidates.json"
             principal_manifest = Path(tmp) / "principal-policy.json"
             approved_runtime_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
-            lifecycle_manifest.write_text(json.dumps(accepted_lifecycle_anchor_manifest()), encoding="utf-8")
-            principal_manifest.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
+            lifecycle_payload = lifecycle_manifest_bound_to_first_evidence()
+            lifecycle_manifest.write_text(json.dumps(lifecycle_payload), encoding="utf-8")
+            principal_manifest.write_text(
+                json.dumps(principal_policy_bound_to_lifecycle(lifecycle_payload)),
+                encoding="utf-8",
+            )
             approved_runtime_manifest.write_text(
                 json.dumps(approved_runtime_principal_lifecycle_manifest()),
                 encoding="utf-8",

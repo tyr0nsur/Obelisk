@@ -61,8 +61,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertEqual(
             {
                 "current_surface": "obelisk.player_identity.v1",
-                "current_blocker": "approved_runtime_evidence_missing",
-                "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
+                "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+                "next_action": "bind_lifecycle_anchor_and_principal_policy_sources",
                 "next_after_runtime_evidence": "identity_public_contract_gate_missing",
                 "permissions_admin_unlocked": False,
                 "command_response_unlocked": False,
@@ -71,7 +71,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "source_checker_exit_code": 1,
                 "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
                 "source_checker_parse_error": None,
-                "source_checker_primary_blocker": "approved_runtime_evidence_missing",
+                "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
                 "source_checker_next_blocker": None,
                 "source_checker_status": "blocked",
                 "source_checker_ready": False,
@@ -88,7 +88,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             {
                 "locked": True,
                 "blocked_until": [
-                    "approved_runtime_principal_lifecycle_evidence",
+                    "bound_lifecycle_anchor_and_principal_policy_sources",
                     "reviewed_identity_public_contract",
                 ],
                 "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
@@ -150,7 +150,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 any("player_identity_public_contract_gap" in blocker for blocker in report["blockers"])
             )
 
-    def test_critical_path_phase_accepts_only_current_runtime_evidence_blocker(self) -> None:
+    def test_critical_path_phase_accepts_allowed_identity_lock_blockers(self) -> None:
         phase = {
             "current_surface": "obelisk.player_identity.v1",
             "current_blocker": "approved_runtime_evidence_missing",
@@ -171,6 +171,11 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         }
         self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
 
+        phase["current_blocker"] = "lifecycle_anchor_first_evidence_provenance_unbound"
+        phase["source_checker_primary_blocker"] = "lifecycle_anchor_first_evidence_provenance_unbound"
+        self.assertEqual([], ROUTE_GATE.validate_critical_path_phase(phase))
+
+        phase["source_checker_primary_blocker"] = "approved_runtime_evidence_missing"
         phase["current_blocker"] = "identity_public_contract_gate_missing"
         blockers = ROUTE_GATE.validate_critical_path_phase(phase)
         self.assertIn("critical_path_identity_gate_unexpected_blocker", blockers)

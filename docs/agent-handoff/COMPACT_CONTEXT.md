@@ -340,9 +340,12 @@ priorities, and do not use history files as the active source of truth.
   bundle at
   `/servidor/ark/workspace-offline/player-identity-principal-invalidation-policy-20260531T231247Z/`
   is accepted by the offline artifact gate. Passing both lifecycle-anchor and
-  principal-invalidation manifests to the first-evidence readiness checker now keeps
-  consume-gate acceptance and exposes approved copied runtime principal lifecycle
-  evidence, reported as `approved_runtime_evidence_missing`, as the primary blocker.
+  principal-invalidation manifests to the first-evidence readiness checker is no longer
+  sufficient unless those planning artifacts are bound to the same first-evidence source
+  artifact identity. The active aggregate blocker is
+  `lifecycle_anchor_first_evidence_provenance_unbound`; only after lifecycle/principal
+  source binding is produced should the route advance back to approved copied runtime
+  principal lifecycle evidence, reported as `approved_runtime_evidence_missing`.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

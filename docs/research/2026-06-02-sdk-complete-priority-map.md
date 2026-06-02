@@ -664,6 +664,38 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Player Identity Aggregate Provenance Closure
+
+The next supervised P0 identity round closed the deferred aggregate provenance gap:
+
+- `scripts/check_player_identity_first_evidence_readiness.py` now exposes lifecycle
+  candidate `artifact_identity.source_artifact_ids` and accepted-anchor snapshot hashes
+  to the aggregate checker, extracts principal-policy lifecycle source binding, and emits
+  `first_evidence.planning_provenance` with a non-claim boundary.
+- The aggregate checker now blocks on
+  `lifecycle_anchor_first_evidence_provenance_unbound` before
+  `approved_runtime_evidence_missing` when standalone lifecycle-anchor or principal-policy
+  planning artifacts cannot prove they came from the same first-evidence source identity.
+  Bound test fixtures can still advance to `approved_runtime_evidence_missing`; stale or
+  unbound fixtures cannot.
+- `scripts/check_command_permission_route_gate.py` now treats
+  `lifecycle_anchor_first_evidence_provenance_unbound` as an allowed identity-lock
+  planning-only blocker, alongside `approved_runtime_evidence_missing`, while still
+  requiring the identity checker to exit blocked with readiness/public/runtime flags
+  false and permissions/command unlocks false.
+- The standalone principal invalidation policy checker remains consume-mode
+  backward-compatible for unbound candidate manifests; stricter source binding is enforced
+  by the aggregate readiness checker where the policy is used to advance the P0 route.
+
+Current route posture changes accordingly: the immediate offline P0 next step is to bind
+the lifecycle anchor and principal policy sources to the first-evidence source identity.
+Approved copied runtime principal lifecycle evidence remains required after that, and
+public identity review remains after approved runtime evidence.
+
+This round still does not approve runtime work, public identity, public permissions/admin,
+command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
+ResourceHandle, release readiness, or a stable SDK claim.
+
 ## P0 Report Provenance And Release Template Guardrails
 
 The next supervised P0/offline audit round closed two report replay paths and one release

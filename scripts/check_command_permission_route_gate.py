@@ -46,7 +46,16 @@ REQUIRED_PLANNING_ONLY_CHECKS = {
     "command_chat_response_public_readiness",
     "commands_replies_public_readiness",
 }
-CURRENT_CRITICAL_PATH_BLOCKER = "approved_runtime_evidence_missing"
+ALLOWED_IDENTITY_LOCK_BLOCKERS = {
+    "lifecycle_anchor_first_evidence_provenance_unbound": {
+        "next_action": "bind_lifecycle_anchor_and_principal_policy_sources",
+        "blocked_until": "bound_lifecycle_anchor_and_principal_policy_sources",
+    },
+    "approved_runtime_evidence_missing": {
+        "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
+        "blocked_until": "approved_runtime_principal_lifecycle_evidence",
+    },
+}
 FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "promotion_ready",
     "public_sdk_ready",
@@ -416,12 +425,13 @@ def build_critical_path_phase() -> dict[str, Any]:
         next_blocker = report.get("next_blocker")
     current_blocker = primary_blocker or next_blocker
 
+    blocker_route = ALLOWED_IDENTITY_LOCK_BLOCKERS.get(str(current_blocker), {})
     return {
         "current_surface": "obelisk.player_identity.v1",
         "current_blocker": current_blocker,
         "source_checker_primary_blocker": primary_blocker,
         "source_checker_next_blocker": next_blocker,
-        "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
+        "next_action": blocker_route.get("next_action", "resolve_identity_lock_blocker"),
         "next_after_runtime_evidence": "identity_public_contract_gate_missing",
         "permissions_admin_unlocked": False,
         "command_response_unlocked": False,
@@ -459,9 +469,9 @@ def validate_critical_path_phase(phase: dict[str, Any]) -> list[str]:
         blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
     if phase.get("source_checker_accepted_for_internal_planning") is not False:
         blockers.append("critical_path_identity_readiness_ready_flag_overclaim")
-    if phase.get("source_checker_primary_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:
+    if phase.get("source_checker_primary_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_readiness_blocker_missing")
-    if phase.get("current_blocker") != CURRENT_CRITICAL_PATH_BLOCKER:
+    if phase.get("current_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
         blockers.append("critical_path_identity_gate_unexpected_blocker")
     if phase.get("current_blocker") in {"identity_public_contract_gate", "identity_public_contract_gate_missing"}:
         blockers.append("critical_path_runtime_evidence_blocker_must_remain_current")
@@ -556,7 +566,10 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "route_lock": {
             "locked": not validate_critical_path_phase(critical_path_phase),
             "blocked_until": [
-                "approved_runtime_principal_lifecycle_evidence",
+                ALLOWED_IDENTITY_LOCK_BLOCKERS.get(
+                    str(critical_path_phase.get("current_blocker")),
+                    {},
+                ).get("blocked_until", "allowed_identity_lock_blocker"),
                 "reviewed_identity_public_contract",
             ],
             "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",

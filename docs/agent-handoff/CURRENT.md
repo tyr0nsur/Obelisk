@@ -246,13 +246,18 @@ This file is an active routing table only. Durable evidence belongs in
   broad-claim detector while `stable_claim_allowed=false`. This remains offline
   guardrail work only; no public permissions/admin, command response, commands/replies,
   runtime readiness, release readiness, or v1 completion is promoted.
-- New deferred P0 identity provenance risk: player-identity first-evidence can still
-  accept standalone lifecycle-anchor and principal-policy planning artifacts that are
-  valid in isolation without proving they came from the same accepted reflection
-  inventory, first-evidence output, snapshot root, or source artifact hashes. Treat the
-  next identity offline hardening target as aggregate artifact/source binding; do not
-  reinterpret this as runtime approval or as a reason to rerun broad lifecycle layout
-  discovery.
+- 2026-06-02 P0 identity aggregate provenance closure: player-identity first-evidence now
+  rejects standalone lifecycle-anchor/principal-policy planning artifacts unless they are
+  bound to the first-evidence source artifact identity and the principal policy binds back
+  to the lifecycle manifest's source identity and accepted anchors. The active route gate
+  now accepts `lifecycle_anchor_first_evidence_provenance_unbound` as an identity-lock
+  planning-only blocker, with all promotion/public/runtime flags false. This supersedes
+  the earlier `approved_runtime_evidence_missing` primary blocker until the offline
+  lifecycle/principal source binding is produced; after that binding, approved copied
+  runtime principal lifecycle evidence is still required before public identity review.
+  This is offline guardrail work only and does not approve runtime capture, public
+  identity, permissions/admin, command response, commands/replies, release readiness, or
+  v1 completion.
 - Plugin Hub is post-SDK-complete planning only. Do not route active rounds to Plugin Hub
   examples, packaging, intake tooling, or package hardening while SDK blockers remain open.
 - The real P0 route for a complete SDK is identity/principal -> permissions/admin ->

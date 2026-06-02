@@ -1039,6 +1039,25 @@ def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str
         and accepted_start_targets == expected_start
         and accepted_end_targets == expected_end
     )
+    artifact_identity = payload.get("artifact_identity")
+    source_artifact_ids = (
+        string_list(artifact_identity.get("source_artifact_ids"))
+        if isinstance(artifact_identity, dict)
+        else []
+    )
+    accepted_anchor_snapshot_sha256_by_target: dict[str, str] = {}
+    for anchor in payload.get("candidate_anchors", []):
+        if not isinstance(anchor, dict) or anchor.get("accepted") is not True:
+            continue
+        target = anchor.get("target")
+        evidence = anchor.get("evidence")
+        source_snapshot_sha256 = (
+            evidence.get("source_snapshot_sha256")
+            if isinstance(evidence, dict) and isinstance(evidence.get("source_snapshot_sha256"), str)
+            else None
+        )
+        if isinstance(target, str) and source_snapshot_sha256:
+            accepted_anchor_snapshot_sha256_by_target[target] = source_snapshot_sha256
     return {
         **base,
         "ready": ready,
@@ -1051,6 +1070,9 @@ def lifecycle_anchor_candidate_manifest_diagnosis(path: Path | None) -> dict[str
         "lifecycle_acceptance_blockers": lifecycle_blockers,
         "artifact_status": payload.get("artifact_status"),
         "readiness_classification": payload.get("readiness_classification"),
+        "schema": payload.get("schema"),
+        "artifact_identity_source_artifact_ids": source_artifact_ids,
+        "accepted_anchor_snapshot_sha256_by_target": accepted_anchor_snapshot_sha256_by_target,
     }
 
 
@@ -1102,6 +1124,12 @@ def principal_invalidation_policy_diagnosis(path: Path | None) -> dict[str, Any]
     validation = principal_invalidation_policy.validate_manifest(payload, check_mode="consume")
     blockers = [blocker["reason"] for blocker in validation.blockers]
     policy_consume_ready = not blockers
+    lifecycle_layout_source = payload.get("lifecycle_layout_source")
+    source_binding = (
+        lifecycle_layout_source.get("source_binding")
+        if isinstance(lifecycle_layout_source, dict) and isinstance(lifecycle_layout_source.get("source_binding"), dict)
+        else {}
+    )
     return {
         **base,
         "ready": policy_consume_ready,
@@ -1112,7 +1140,79 @@ def principal_invalidation_policy_diagnosis(path: Path | None) -> dict[str, Any]
         "principal_fields": validation.principal_fields,
         "invalidation_cases": validation.invalidation_cases,
         "negative_consumer_rules": validation.negative_rules,
+        "lifecycle_source_binding": source_binding,
     }
+
+
+def first_evidence_source_artifact_ids(first_evidence_payload: dict[str, Any] | None) -> list[str]:
+    if not isinstance(first_evidence_payload, dict):
+        return []
+    artifact_identity = first_evidence_payload.get("artifact_identity")
+    if not isinstance(artifact_identity, dict):
+        return []
+    return string_list(artifact_identity.get("source_artifact_ids"))
+
+
+def first_evidence_snapshot_sha256_by_target(first_evidence_payload: dict[str, Any] | None) -> dict[str, str]:
+    if not isinstance(first_evidence_payload, dict):
+        return {}
+    generated_from = first_evidence_payload.get("generated_from")
+    input_snapshots = (
+        generated_from.get("input_snapshots")
+        if isinstance(generated_from, dict) and isinstance(generated_from.get("input_snapshots"), list)
+        else []
+    )
+    result: dict[str, str] = {}
+    for snapshot in input_snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        target = snapshot.get("target")
+        sha256 = snapshot.get("sha256")
+        if isinstance(target, str) and isinstance(sha256, str):
+            result[target] = sha256
+    return result
+
+
+def planning_provenance_blockers(
+    *,
+    first_evidence_payload: dict[str, Any] | None,
+    lifecycle_candidate_diagnosis: dict[str, Any],
+    principal_policy_diagnosis: dict[str, Any],
+) -> list[str]:
+    blockers: list[str] = []
+    if lifecycle_candidate_diagnosis.get("ready") is True:
+        first_source_ids = first_evidence_source_artifact_ids(first_evidence_payload)
+        lifecycle_source_ids = string_list(lifecycle_candidate_diagnosis.get("artifact_identity_source_artifact_ids"))
+        if not first_source_ids or lifecycle_source_ids != first_source_ids:
+            blockers.append("lifecycle_anchor_source_artifact_identity_mismatch")
+        first_snapshot_by_target = first_evidence_snapshot_sha256_by_target(first_evidence_payload)
+        lifecycle_snapshot_by_target = lifecycle_candidate_diagnosis.get("accepted_anchor_snapshot_sha256_by_target")
+        lifecycle_snapshot_by_target = (
+            lifecycle_snapshot_by_target if isinstance(lifecycle_snapshot_by_target, dict) else {}
+        )
+        for target in ("ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"):
+            if target in first_snapshot_by_target and lifecycle_snapshot_by_target.get(target) != first_snapshot_by_target.get(target):
+                blockers.append("lifecycle_anchor_source_snapshot_mismatch")
+                break
+
+    if principal_policy_diagnosis.get("policy_consume_ready") is True:
+        binding = principal_policy_diagnosis.get("lifecycle_source_binding")
+        if not isinstance(binding, dict) or not binding:
+            blockers.append("principal_policy_lifecycle_source_binding_missing")
+        else:
+            if binding.get("lifecycle_manifest_schema") != lifecycle_candidate_diagnosis.get("schema"):
+                blockers.append("principal_policy_lifecycle_schema_mismatch")
+            if binding.get("artifact_identity_source_artifact_ids") != lifecycle_candidate_diagnosis.get(
+                "artifact_identity_source_artifact_ids"
+            ):
+                blockers.append("principal_policy_lifecycle_source_artifact_identity_mismatch")
+            if binding.get("accepted_start_targets") != lifecycle_candidate_diagnosis.get("accepted_start_targets"):
+                blockers.append("principal_policy_lifecycle_start_targets_mismatch")
+            if binding.get("accepted_end_targets") != lifecycle_candidate_diagnosis.get("accepted_end_targets"):
+                blockers.append("principal_policy_lifecycle_end_targets_mismatch")
+    if blockers:
+        return ["lifecycle_anchor_first_evidence_provenance_unbound", *sorted(set(blockers))]
+    return []
 
 
 def runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path | None) -> dict[str, Any]:
@@ -1612,6 +1712,13 @@ def next_actionable_blocker(
             "code": "players_identity_first_evidence_consume_gate_blocked",
             "blocked_until": "validate_offline_artifact_gate_consume_accepts_players_identity_first_evidence",
             "why": "the first-evidence builder emitted candidate JSON, but the offline artifact consume gate rejected it",
+        }
+    if "lifecycle_anchor_first_evidence_provenance_unbound" in downstream_blockers:
+        return {
+            **base,
+            "code": "lifecycle_anchor_first_evidence_provenance_unbound",
+            "blocked_until": "bound_lifecycle_anchor_and_principal_policy_sources",
+            "why": "standalone lifecycle/principal planning artifacts must prove they come from the same first-evidence source artifacts before advancing to runtime evidence",
         }
     if "accepted_lifecycle_anchors_missing" in downstream_blockers:
         return {
@@ -2162,14 +2269,20 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     )
     approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True
     runtime_evidence_requirements = runtime_principal_lifecycle_evidence_requirements()
+    planning_provenance = planning_provenance_blockers(
+        first_evidence_payload=first_evidence_payload,
+        lifecycle_candidate_diagnosis=lifecycle_candidate_diagnosis,
+        principal_policy_diagnosis=principal_policy_diagnosis,
+    )
     lifecycle_ready = (
         lifecycle_diagnosis["session_start_accepted"] is True
         and lifecycle_diagnosis["session_end_accepted"] is True
+        and not planning_provenance
     )
     principal_policy_ready = principal_policy_diagnosis.get("policy_consume_ready") is True
     principal_invalidation_ready = (
         lifecycle_diagnosis.get("principal_invalidation_ready") is True
-        or principal_policy_ready
+        or (principal_policy_ready and not planning_provenance)
     )
     layout_accepted = second_source_layout_accepted(
         coverage_payload_valid=coverage_payload_valid,
@@ -2213,6 +2326,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         and first_evidence_consume_gate.get("ready") is not True
     ):
         downstream_blockers.append("players_identity_first_evidence_consume_gate_blocked")
+    if planning_provenance:
+        downstream_blockers.append("lifecycle_anchor_first_evidence_provenance_unbound")
     if not lifecycle_ready:
         downstream_blockers.append("accepted_lifecycle_anchors_missing")
     if lifecycle_ready and not principal_invalidation_ready:
@@ -2526,6 +2641,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "generated_lifecycle_anchors": first_evidence_lifecycle_diagnosis,
             "lifecycle_anchor_candidates": lifecycle_candidate_diagnosis,
             "principal_invalidation_policy": principal_policy_diagnosis,
+            "planning_provenance": {
+                "ready": not planning_provenance,
+                "blockers": planning_provenance,
+                "non_claim": (
+                    "aggregate provenance binding only; does not promote runtime evidence, "
+                    "public identity, permissions/admin, commands, SDK readiness, or v1 completion"
+                ),
+            },
             "runtime_principal_lifecycle_evidence": runtime_evidence_requirements,
             "runtime_principal_lifecycle_evidence_manifest": runtime_evidence_manifest_diagnosis,
             "approved_runtime_principal_lifecycle_evidence_manifest": approved_runtime_evidence_manifest_diagnosis,
