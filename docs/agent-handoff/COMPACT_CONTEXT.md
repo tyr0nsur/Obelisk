@@ -748,6 +748,25 @@ priorities, and do not use history files as the active source of truth.
     Default route and SDK completion remain fail-closed at
     `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`,
     complete-SDK progress `0/12`, and P0 progress `0/4`.
+- Delegated player-identity planning-source producer round on 2026-06-02 closed all
+  sub-agents and added the offline tool for the current P0 provenance blocker:
+  - `scripts/build_player_identity_planning_source_manifests.py` rebuilds
+    `players-identity-first-evidence.json` from sanitized UFunction snapshots and emits
+    source-aligned lifecycle/principal planning manifests plus a build report.
+  - The producer validates generated first-evidence, lifecycle, principal, and binder
+    alignment before writing outputs; outputs are planning-only and keep promotion/public
+    SDK/public ABI/runtime/v1 readiness false.
+  - A real transient producer run plus
+    `scripts/check_command_permission_route_gate_bound_identity_sources.py` returned
+    `valid=true`, `blockers=[]`, and
+    `critical_path_phase.current_blocker=approved_runtime_evidence_missing`, with
+    `runtime_work_authorized=false` and `server_operations_authorized=false`.
+  - The default route still remains blocked at
+    `lifecycle_anchor_first_evidence_provenance_unbound` unless explicit aligned manifests
+    are supplied. SDK completion remains fail-closed:
+    `stable_claim_allowed=false`, complete-SDK progress `0/12`, P0 progress `0/4`.
+  - Next true blocker is approved copied runtime principal lifecycle evidence; no runtime,
+    marker/env/server action is authorized without a fresh live-ops brief.
 
 ## Agent Coordination
 

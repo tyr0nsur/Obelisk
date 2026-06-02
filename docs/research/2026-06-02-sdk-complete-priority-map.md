@@ -715,6 +715,45 @@ command response, command replies, Inventory/Items SDKs, Structure SDK,
 Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a stable SDK
 claim.
 
+## Player Identity Planning Source Producer
+
+The next delegated P0 identity round converted the deferred offline next action into a
+deterministic producer:
+
+- Added `scripts/build_player_identity_planning_source_manifests.py`.
+- The producer rebuilds `players-identity-first-evidence.json` from sanitized UFunction
+  snapshots, constructs accepted candidate-only lifecycle anchors for
+  `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`, constructs the
+  candidate-only opaque principal invalidation policy, binds the principal source to the
+  lifecycle artifact identity, and validates all generated manifests with the existing
+  first-evidence, lifecycle, principal, and binder checks before writing output.
+- Added `scripts/test_build_player_identity_planning_source_manifests.py` covering the
+  source-aligned build, bound route proof, protected output rejection, symlink output
+  rejection, and missing focal lifecycle snapshot failure.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_build_player_identity_planning_source_manifests scripts.test_bind_player_identity_planning_sources scripts.test_check_player_identity_first_evidence_readiness scripts.test_check_command_permission_route_gate_bound_identity_sources`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile scripts/build_player_identity_planning_source_manifests.py scripts/test_build_player_identity_planning_source_manifests.py`
+- A transient run of `scripts/build_player_identity_planning_source_manifests.py --output-dir <tmp>/planning --json` followed by `scripts/check_command_permission_route_gate_bound_identity_sources.py --lifecycle-anchor-candidates-manifest <tmp>/planning/players-identity-lifecycle-anchor-candidates.json --principal-invalidation-policy-manifest <tmp>/planning/players-identity-principal-invalidation-policy.json --json`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+
+The transient bound route proof returned `valid=true`, `blockers=[]`, and
+`critical_path_phase.current_blocker=approved_runtime_evidence_missing`, with
+`promotion_ready=false`, `public_sdk_ready=false`, `runtime_ready=false`,
+`runtime_work_authorized=false`, and `server_operations_authorized=false`. The default
+route remains planning-only at `lifecycle_anchor_first_evidence_provenance_unbound`
+unless explicit aligned manifests are supplied. SDK completion remains fail-closed:
+`stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+
+This round does not approve runtime work, public identity, public permissions/admin,
+command response, command replies, Inventory/Items SDKs, Structure SDK,
+Mission/Transfer/Dino/Tribe SDKs, ResourceHandle, release readiness, or a stable SDK
+claim. The next true blocker is approved copied runtime principal lifecycle evidence,
+which still requires a fresh scoped live-ops brief before any marker/env/server/runtime
+action.
+
 ## Delegated Guardrail And Plugin Retention Hardening
 
 A later supervised round delegated four scoped audits/workers after compaction:
