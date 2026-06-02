@@ -2372,6 +2372,56 @@ No runtime/server operation, marker/env change, ReflectionScanner, ptrace/gcore,
 GitHub publication, public ABI/header opening, promotion, release readiness, or
 stable/complete SDK claim was authorized.
 
+## Route-Blocker Summary And Delegated Evidence Audit
+
+A supervised read-only delegation round covered P0 route semantics, live-ops request/window
+wording, SDK accounting, and runtime/ABI cleanup follow-up. The lead integrated the route
+gate findings; runtime/server work remained unauthorized.
+
+Integrated changes:
+
+- `scripts/check_command_permission_route_gate.py` now exposes route-state summary fields
+  at top level: `route_blocked`, `dependency_chain_locked`,
+  `route_lock_invariant_valid`, `current_route_blocker`,
+  `remaining_route_blockers`, `next_route_action`, and
+  `next_route_blocker_after_runtime_evidence`.
+- `route_lock.locked` now means the dependency chain remains locked by the current route
+  blocker. Checker hygiene is reported separately as `route_lock.invariant_valid` and
+  top-level `route_lock_invariant_valid`.
+- The recursive overclaim detector now rejects positive runtime/server authorization
+  aliases such as `serverOperationsAuthorized=true`, `runtime_work_authorized=true`,
+  `runtimeApprovalGranted=true`, `operator_approval_granted=true`, and text claims like
+  runtime work or server operations being authorized.
+- Route-gate tests now assert that default and bound no-runtime-evidence routes are
+  planning-only but explicitly blocked at `approved_runtime_evidence_missing`, and that
+  the accepted-runtime-evidence transition can only reach
+  `identity_public_contract_gate_missing` while P0 unlock flags stay false.
+
+Delegated findings kept for the next offline hardening pass:
+
+- Live-ops request/preflight sidecars should add explicit false flags for
+  `server_operations_authorized`, `runtime_work_authorized`, `runtime_ready`,
+  `public_sdk_ready`, and related promotion claims, and window-manifest validation should
+  reject positive claims in consumed preflight sidecars.
+- Request-pack markdown should make copied sidecar commands carry an exact
+  current-turn-approval-required projection before execution.
+- `MissionCopiedBoolEventDispatcher` remains internal/test-only and must not be promoted
+  without `PluginManager` owner cleanup and retry-stable `DestroyUserData` coverage.
+  Current plugin-facing dispatcher families remain covered by existing cleanup retry
+  paths; no runtime dispatcher change was integrated in this round.
+
+Validation stayed offline-only:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_command_permission_route_gate`
+  passed 40 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
+  stayed valid/planning-only with `route_blocked=true`,
+  `current_route_blocker=approved_runtime_evidence_missing`,
+  `route_lock.locked=true`, `route_lock.invariant_valid=true`, and `blockers=[]`.
+- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_public_sdk_v1_completion.py --json`
+  exited 1 as expected with `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`, and route
+  blocker `approved_runtime_evidence_missing`.
+
 ## Window Preflight Sidecar Posture Guardrail
 
 A supervised four-agent round split live-ops/request-pack, SDK/P0 accounting,

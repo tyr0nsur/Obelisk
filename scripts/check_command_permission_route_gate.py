@@ -111,6 +111,11 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "v1_completion_evidence",
     "v1_completion_ready",
     "stable_claim_allowed",
+    "operator_approval_granted",
+    "runtime_approval",
+    "runtime_approval_granted",
+    "runtime_work_authorized",
+    "server_operations_authorized",
 }
 BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE = re.compile(
     r"^(?:"
@@ -143,10 +148,11 @@ POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
     r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
     r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
+    r"runtime[_ -]?work|server[_ -]?operations?|operator[_ -]?approval|runtime[_ -]?approval|"
     r"public[_ -]?(?:sdk|header)|v1[_ -]?completion|stable[_ -]?claim|"
     r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
     r")\b(?:\s+(?:is|are))?\s+"
-    r"\b(?:public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
+    r"\b(?:authorized|granted|public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|operational|supported)\b",
     re.IGNORECASE,
 )
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED = re.compile(
@@ -806,12 +812,23 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     critical_path_phase = build_critical_path_phase(args)
     blockers.extend(validate_critical_path_phase(critical_path_phase))
     blockers.extend(validate_identity_lock_mode(args, critical_path_phase))
+    current_route_blocker = critical_path_phase.get("current_blocker")
+    remaining_route_blockers = [current_route_blocker] if current_route_blocker is not None else []
+    route_blocked = bool(remaining_route_blockers)
+    route_lock_blockers = route_lock_blocked_until(current_route_blocker)
 
     return {
         "schema": REPORT_SCHEMA,
         "valid": not blockers,
         "accepted_for_planning": not blockers,
         "planning_only": True,
+        "route_blocked": route_blocked,
+        "dependency_chain_locked": route_blocked,
+        "route_lock_invariant_valid": not blockers,
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": remaining_route_blockers,
+        "next_route_action": critical_path_phase.get("next_action"),
+        "next_route_blocker_after_runtime_evidence": critical_path_phase.get("next_after_runtime_evidence"),
         "promotion_ready": False,
         "public_sdk_ready": False,
         "public_abi_ready": False,
@@ -825,8 +842,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         ],
         "critical_path_phase": critical_path_phase,
         "route_lock": {
-            "locked": not blockers,
-            "blocked_until": route_lock_blocked_until(critical_path_phase.get("current_blocker")),
+            "locked": route_blocked,
+            "invariant_valid": not blockers,
+            "blocked_until": route_lock_blockers,
             "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
         },
         "checks": [

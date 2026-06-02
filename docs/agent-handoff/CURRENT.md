@@ -210,8 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
 - Latest supervised rounds used four read-only subagents plus lead integration. Integrated
-  offline window-manifest hardening and runtime/ABI retry-stable copied-event
-  `DestroyUserData` cleanup. SDK/P0 accounting still has no drift; Mission side-lane
-  checks remain internal/non-public. Default route/SDK remain fail-closed at
+  offline window-manifest hardening, runtime/ABI retry-stable copied-event
+  `DestroyUserData` cleanup, and route-gate blocker summary fields (`route_blocked`,
+  `current_route_blocker`, `remaining_route_blockers`, `route_lock_invariant_valid`). SDK/P0 accounting still has no drift; Mission copied-bool
+  remains internal/non-public. Pending delegated live-ops follow-up: add explicit false
+  runtime/server authorization flags to preflight/request sidecars and reject positive
+  claims in consumed preflight JSON. Default route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`. No runtime/server op.

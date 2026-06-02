@@ -7469,6 +7469,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             valid_missing,
             [
+                "player_identity_approved_runtime_evidence_manifest:validation_failed",
+                "player_identity_approved_runtime_evidence_report:replay_mismatch:approved_runtime_evidence_present",
+                "player_identity_approved_runtime_evidence_report:replay_mismatch:runtime_evidence_ready",
+                "player_identity_approved_runtime_evidence_report:replay_mismatch:next_blocker",
                 "player_identity_public_contract_readiness_report:promotion_blockers_remaining",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_candidate_only",
                 "player_identity_public_contract_readiness_report:private_candidate_contract_promotion_ready_false",

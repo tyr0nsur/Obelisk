@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -12,6 +11,7 @@ import unittest
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -147,6 +147,19 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
+        self.assertTrue(report["route_blocked"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertTrue(report["route_lock_invariant_valid"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertEqual(
+            "produce_approved_runtime_principal_lifecycle_evidence",
+            report["next_route_action"],
+        )
+        self.assertEqual(
+            "identity_public_contract_gate_missing",
+            report["next_route_blocker_after_runtime_evidence"],
+        )
         self.assertEqual(
             [
                 "obelisk.player_identity.v1",
@@ -190,6 +203,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertEqual(
             {
                 "locked": True,
+                "invariant_valid": True,
                 "blocked_until": [
                     "approved_runtime_principal_lifecycle_evidence",
                     "reviewed_identity_public_contract",
@@ -219,27 +233,59 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 json.dumps(approved_runtime_principal_lifecycle_manifest()),
                 encoding="utf-8",
             )
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--approved-runtime-principal-lifecycle-evidence-manifest",
-                    str(approved_runtime),
-                    "--json",
-                ],
-                cwd=REPO_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+            args = SimpleNamespace(
+                query_failclosed_artifact=QUERY_CONTRACT,
+                player_identity_decisions=IDENTITY_DECISIONS,
+                public_sdk_surfaces=PUBLIC_SDK_SURFACES,
+                player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+                public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+                command_response_root=None,
+                command_response_readiness=None,
+                player_identity_artifact_root=None,
+                player_identity_snapshot_root=None,
+                player_identity_candidate_root=None,
+                player_identity_lifecycle_anchor_candidates_manifest=None,
+                player_identity_principal_invalidation_policy_manifest=None,
+                player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
             )
-        report = json.loads(result.stdout)
+            phase = {
+                "current_surface": "obelisk.player_identity.v1",
+                "current_blocker": "identity_public_contract_gate_missing",
+                "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+                "source_checker_next_blocker": None,
+                "next_action": "review_identity_public_contract_gate",
+                "next_after_runtime_evidence": "identity_public_contract_gate_missing",
+                "permissions_admin_unlocked": False,
+                "command_response_unlocked": False,
+                "commands_replies_unlocked": False,
+                "source_checker": "check_player_identity_first_evidence_readiness.py",
+                "source_checker_exit_code": 1,
+                "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+                "source_checker_parse_error": None,
+                "source_checker_status": "blocked",
+                "source_checker_ready": False,
+                "source_checker_accepted_for_internal_planning": False,
+                "source_checker_blockers": ["identity_public_contract_gate_missing"],
+                "source_checker_manifest_sources": identity_manifest_sources(),
+                "planning_only": True,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+            }
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase):
+                report = ROUTE_GATE.build_report(args)
         phase = report["critical_path_phase"]
 
-        self.assertEqual(result.returncode, 0)
         self.assertTrue(report["valid"])
         self.assertTrue(report["planning_only"])
         self.assertEqual([], report["blockers"])
+        self.assertTrue(report["route_blocked"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertTrue(report["route_lock_invariant_valid"])
+        self.assertEqual("identity_public_contract_gate_missing", report["current_route_blocker"])
+        self.assertEqual(["identity_public_contract_gate_missing"], report["remaining_route_blockers"])
         self.assertEqual("identity_public_contract_gate_missing", phase["current_blocker"])
         self.assertEqual("identity_public_contract_gate_missing", phase["source_checker_primary_blocker"])
         self.assertEqual(["identity_public_contract_gate_missing"], phase["source_checker_blockers"])
@@ -253,6 +299,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertEqual(
             {
                 "locked": True,
+                "invariant_valid": True,
                 "blocked_until": ["reviewed_identity_public_contract"],
                 "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
             },
@@ -313,6 +360,11 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
+        self.assertTrue(report["route_blocked"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertTrue(report["route_lock_invariant_valid"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
         self.assertEqual([], report["blockers"])
         phase = report["critical_path_phase"]
         self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
@@ -1380,6 +1432,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "public_abi_allowed": "ready",
                     "publicAbiReady": True,
                     "runtimeReady": True,
+                    "serverOperationsAuthorized": True,
+                    "runtime_work_authorized": True,
+                    "runtimeApprovalGranted": True,
+                    "operator_approval_granted": True,
                     "permissions-admin-ready": True,
                     "publicBridgeAbiAllowed": True,
                     "public response abi allowed": True,
@@ -1400,6 +1456,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "stable SDK is ready",
                         "complete SDK is ready",
                         "production SDK is supported",
+                        "runtime work is authorized",
+                        "server operations are authorized",
+                        "operator approval is granted",
                     ],
                 },
             }
@@ -1429,6 +1488,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.public_abi_allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.publicAbiReady", result["public_or_runtime_claims"])
         self.assertIn("nested.runtimeReady", result["public_or_runtime_claims"])
+        self.assertIn("nested.serverOperationsAuthorized", result["public_or_runtime_claims"])
+        self.assertIn("nested.runtime_work_authorized", result["public_or_runtime_claims"])
+        self.assertIn("nested.runtimeApprovalGranted", result["public_or_runtime_claims"])
+        self.assertIn("nested.operator_approval_granted", result["public_or_runtime_claims"])
         self.assertIn("nested.permissions-admin-ready", result["public_or_runtime_claims"])
         self.assertIn("nested.publicBridgeAbiAllowed", result["public_or_runtime_claims"])
         self.assertIn("nested.public response abi allowed", result["public_or_runtime_claims"])
@@ -1448,6 +1511,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.notes[8]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[9]:positive_text_claim", result["public_or_runtime_claims"])
         self.assertIn("nested.notes[10]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[11]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[12]:positive_text_claim", result["public_or_runtime_claims"])
+        self.assertIn("nested.notes[13]:positive_text_claim", result["public_or_runtime_claims"])
 
 
 if __name__ == "__main__":
