@@ -230,6 +230,7 @@ def request_pack_check_state(
             str(request_pack["path"]),
             "--env-file",
             str(observer_env["path"]),
+            "--post-window-replay",
         ]
     )
     state["exit_code"] = exit_code
@@ -240,6 +241,10 @@ def request_pack_check_state(
         state["ready"] = exit_code == 0 and payload.get("ready") is True and payload.get("request_pack_ready") is True
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")
+        state["post_window_replay"] = payload.get("post_window_replay") is True
+        state["post_window_replay_expiry_tolerated"] = (
+            payload.get("post_window_replay_expiry_tolerated") is True
+        )
     if not state["ready"]:
         add_blocker(
             blockers,

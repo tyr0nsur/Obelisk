@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Validate an offline player-principal lifecycle window request pack.
 
-This checker is pre-window only. It validates a secret-free request pack before an
-operator decides whether to approve a runtime evidence window. Acceptance does not
+This checker is pre-window strict by default. It validates a secret-free request pack before an
+operator decides whether to approve a runtime evidence window. Post-window replay may tolerate
+only a completed window whose sole stale condition is approved_window_expired. Acceptance does not
 authorize server operations, marker/env changes, runtime capture, Discord, publication,
 public identity, permissions/admin, commands, or SDK readiness.
 """
@@ -114,6 +115,8 @@ EXPECTED_EVIDENCE_CAPTURE_KEYS = frozenset(
         "copied_log_path",
         "window_manifest_path",
         "observer_env_file",
+        "operator_approval_receipt_path",
+        "operator_approval_receipt_required",
         "single_module_summary",
         "copied_log_only",
     )
@@ -132,6 +135,7 @@ EXPECTED_REPLAY_CONTRACT_SIDECAR_KEYS = frozenset(
     (
         "request_pack_path",
         "observer_env_path",
+        "operator_approval_receipt_path",
         "preflight_pre_path",
         "preflight_post_path",
         "window_manifest_path",
@@ -194,6 +198,11 @@ def parse_args() -> argparse.Namespace:
         "--operator-request",
         type=Path,
         help="operator-approval-request.md from the same request pack; defaults to the sibling file.",
+    )
+    parser.add_argument(
+        "--post-window-replay",
+        action="store_true",
+        help="Replay completed evidence after the window; tolerates only approved_window_expired.",
     )
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
     return parser.parse_args()
@@ -445,6 +454,7 @@ def validate_post_window_replay_contract(payload: dict[str, Any], blockers: list
     for key, expected_name in (
         ("request_pack_path", "window-request.json"),
         ("observer_env_path", "observer-window.env"),
+        ("operator_approval_receipt_path", "operator-approval-receipt.json"),
         ("preflight_pre_path", "preflight-pre.json"),
         ("preflight_post_path", "preflight-post.json"),
         ("window_manifest_path", "window-manifest.env"),
@@ -526,6 +536,10 @@ def expected_operator_live_ops_brief(payload: dict[str, Any], env: list[str]) ->
                 "copied_log_path": payload["copied_log_path"],
                 "window_manifest_path": payload["window_manifest_path"],
                 "observer_env_file": payload["observer_env_file"],
+                "operator_approval_receipt_path": payload["post_window_replay_contract"]["sidecars"][
+                    "operator_approval_receipt_path"
+                ],
+                "operator_approval_receipt_required": "completed_operator_receipt",
                 "single_module_summary": "player_principal_lifecycle",
                 "copied_log_only": True,
             },
@@ -742,6 +756,15 @@ def build_report(validation: Validation, *, operator_request_verified: bool = Fa
     }
 
 
+def tolerate_post_window_expiry_only(blockers: list[dict[str, Any]]) -> bool:
+    if len(blockers) != 1:
+        return False
+    if blockers[0].get("reason") != "approved_window_expired":
+        return False
+    blockers.clear()
+    return True
+
+
 def main() -> int:
     args = parse_args()
     blockers: list[dict[str, Any]] = []
@@ -757,7 +780,12 @@ def main() -> int:
         operator_request_markdown,
         validation.blockers,
     )
+    post_window_replay_expiry_tolerated = False
+    if args.post_window_replay:
+        post_window_replay_expiry_tolerated = tolerate_post_window_expiry_only(validation.blockers)
     report = build_report(validation, operator_request_verified=operator_request_verified)
+    report["post_window_replay"] = bool(args.post_window_replay)
+    report["post_window_replay_expiry_tolerated"] = post_window_replay_expiry_tolerated
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

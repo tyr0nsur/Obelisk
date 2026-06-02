@@ -503,6 +503,11 @@ def validate_operator_approval_receipt(
     approved_at = completion.get("approval_recorded_at_utc")
     if not isinstance(approved_at, str) or UTC_TIMESTAMP_RE.fullmatch(approved_at) is None:
         add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt_path")
+    approved_by_role = completion.get("approved_by_role")
+    if not isinstance(approved_by_role, str) or not approved_by_role.strip():
+        add(blockers, "operator_approval_receipt_approved_by_role_invalid", "operator_approval_receipt_path")
+    if completion.get("approval_source") != "current_turn_operator_message":
+        add(blockers, "operator_approval_receipt_approval_source_mismatch", "operator_approval_receipt_path")
     if completion.get("attestation") != "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY":
         add(blockers, "operator_approval_receipt_attestation_mismatch", "operator_approval_receipt_path")
 
@@ -526,6 +531,22 @@ def validate_operator_approval_receipt(
     if not isinstance(bound_request, dict):
         add(blockers, "operator_approval_receipt_bound_request_pack_missing", "operator_approval_receipt_path")
         bound_request = {}
+    request_payload: dict[str, Any] = {}
+    request_path_text = fields.get("request_pack_path")
+    if request_path_text:
+        request_path = manifest_relative_path(request_path_text, manifest_path)
+        request_status = protected_paths.protected_path_status(
+            request_path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        if request_status.resolved.is_file():
+            try:
+                loaded_request = json.loads(request_status.resolved.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                loaded_request = None
+            if isinstance(loaded_request, dict):
+                request_payload = loaded_request
     if bound_request.get("run_id") != fields.get("run_id"):
         add(blockers, "operator_approval_receipt_run_id_mismatch", "operator_approval_receipt_path")
     if bound_request.get("obelisk_commit") != fields.get("obelisk_commit"):
@@ -556,6 +577,9 @@ def validate_operator_approval_receipt(
     )
     if bound_request.get("window_manifest_path") != expected_manifest_path:
         add(blockers, "operator_approval_receipt_window_manifest_path_mismatch", "operator_approval_receipt_path")
+    for key in ("restart_expectation", "final_posture", "user_policy", "notice_path", "rollback"):
+        if request_payload and bound_request.get(key) != request_payload.get(key):
+            add(blockers, f"operator_approval_receipt_{key}_mismatch", "operator_approval_receipt_path")
 
     receipt_target = bound_request.get("target")
     if not isinstance(receipt_target, dict):
@@ -579,7 +603,6 @@ def validate_operator_approval_receipt(
     if not isinstance(bound, dict):
         add(blockers, "operator_approval_receipt_bound_artifacts_missing", "operator_approval_receipt_path")
         return
-    request_path_text = fields.get("request_pack_path")
     env_path_text = fields.get("observer_env_path")
     expected_operator_request = None
     request_status = None
@@ -913,6 +936,9 @@ def validate_request_pack_replay_contract(
         else None,
         "observer_env_path": manifest_relative_path(fields["observer_env_path"], manifest_path)
         if fields.get("observer_env_path")
+        else None,
+        "operator_approval_receipt_path": manifest_relative_path(fields["operator_approval_receipt_path"], manifest_path)
+        if fields.get("operator_approval_receipt_path")
         else None,
         "preflight_pre_path": manifest_relative_path(fields["preflight_pre_path"], manifest_path)
         if fields.get("preflight_pre_path")

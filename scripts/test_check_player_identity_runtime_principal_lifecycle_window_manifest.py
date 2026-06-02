@@ -455,6 +455,61 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertEqual(report["remaining_blockers"], [])
         self.assertEqual(report["next_blocker"], "approved_runtime_observer_log_summary_and_manifest_missing")
 
+    def test_rejects_operator_approval_receipt_completion_metadata_drift(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            receipt_path = Path(fields["operator_approval_receipt_path"])
+            if not receipt_path.is_absolute():
+                receipt_path = root / receipt_path
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            payload["operator_completion"]["approved_by_role"] = ""
+            payload["operator_completion"]["approval_source"] = "standing_approval"
+            receipt_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operator_approval_receipt_approved_by_role_invalid", report["blockers"])
+        self.assertIn("operator_approval_receipt_approval_source_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_operator_approval_receipt_bound_request_pack_drift(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            receipt_path = Path(fields["operator_approval_receipt_path"])
+            if not receipt_path.is_absolute():
+                receipt_path = root / receipt_path
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            payload["bound_request_pack"]["restart_expectation"] = "stop-after-window"
+            payload["bound_request_pack"]["final_posture"] = "stopped"
+            payload["bound_request_pack"]["user_policy"] = "operator_approved_beta_users"
+            payload["bound_request_pack"]["notice_path"] = "changed-notice"
+            payload["bound_request_pack"]["rollback"]["delta"] = "changed"
+            receipt_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        for reason in (
+            "operator_approval_receipt_restart_expectation_mismatch",
+            "operator_approval_receipt_final_posture_mismatch",
+            "operator_approval_receipt_user_policy_mismatch",
+            "operator_approval_receipt_notice_path_mismatch",
+            "operator_approval_receipt_rollback_mismatch",
+        ):
+            self.assertIn(reason, report["blockers"])
+        self.assertFalse(report["ready"])
+
     def test_rejects_preflight_pre_checked_at_before_approved_window(self) -> None:
         result = self.run_checker_in_approved_workspace(
             manifest_lines(),
@@ -1200,6 +1255,58 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 request_pack = root / request_pack
             payload = json.loads(request_pack.read_text(encoding="utf-8"))
             payload["post_window_replay_contract"]["sidecars"]["preflight_pre_path"] = "/tmp/preflight-pre.json"
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+            observer_env = Path(fields["observer_env_path"])
+            if not observer_env.is_absolute():
+                observer_env = root / observer_env
+            operator_request = request_pack.parent / "operator-approval-request.md"
+            operator_request.write_text(
+                markdown_request(payload, observer_env.read_text(encoding="utf-8").splitlines()),
+                encoding="utf-8",
+            )
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_post_window_replay_contract_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_post_window_replay_contract_missing_receipt_sidecar(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["post_window_replay_contract"]["sidecars"].pop("operator_approval_receipt_path")
+            request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("request_pack_post_window_replay_contract_mismatch", report["blockers"])
+        self.assertFalse(report["ready"])
+
+    def test_rejects_request_pack_post_window_replay_contract_receipt_sidecar_drift(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            if not request_pack.is_absolute():
+                request_pack = root / request_pack
+            payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload["post_window_replay_contract"]["sidecars"][
+                "operator_approval_receipt_path"
+            ] = "/tmp/operator-approval-receipt.json"
             request_pack.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
             fields["request_pack_sha256"] = hashlib.sha256(request_pack.read_bytes()).hexdigest()
             observer_env = Path(fields["observer_env_path"])

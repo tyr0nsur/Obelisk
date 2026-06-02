@@ -448,6 +448,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             [True, True, True, False],
         )
         self.assertTrue(report["next_required_artifacts"][3]["satisfies_approved_runtime_evidence"])
+        self.assertNotIn("request_pack_check_failed", report["blockers"])
         self.assertNotIn("copied_log_missing", report["blockers"])
         self.assertNotIn("window_manifest_missing", report["blockers"])
         self.assertIn(
@@ -670,8 +671,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
     def test_request_pack_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:
         original = bundle_builder.run_json_check
         blockers: list[dict] = []
+        observed_commands: list[list[str]] = []
 
-        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+        def fake_run_json_check(command: list[str]) -> tuple[int, dict, str]:
+            observed_commands.append(command)
             return (
                 1,
                 {
@@ -698,6 +701,77 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(state["exit_code"], 1)
         self.assertTrue(state["checker_ready"])
         self.assertFalse(state["ready"])
+        self.assertIn("request_pack_check_failed", [blocker["reason"] for blocker in blockers])
+        self.assertTrue(observed_commands)
+        self.assertIn("--post-window-replay", observed_commands[0])
+
+    def test_request_pack_check_accepts_post_window_replay_expired_only(self) -> None:
+        original = bundle_builder.run_json_check
+        blockers: list[dict] = []
+
+        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+            return (
+                0,
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request-check.v1",
+                    "ready": True,
+                    "request_pack_ready": True,
+                    "post_window_replay": True,
+                    "post_window_replay_expiry_tolerated": True,
+                    "blockers": [],
+                    "next_blocker": "operator_current_turn_runtime_window_approval_required",
+                },
+                "",
+            )
+
+        try:
+            bundle_builder.run_json_check = fake_run_json_check
+            state = bundle_builder.request_pack_check_state(
+                {"exists": True, "path": Path("player-principal-lifecycle-window-request.json")},
+                {"exists": True, "path": Path("player-principal-lifecycle-observer.env")},
+                blockers,
+            )
+        finally:
+            bundle_builder.run_json_check = original
+
+        self.assertTrue(state["checked"])
+        self.assertTrue(state["ready"])
+        self.assertTrue(state["post_window_replay"])
+        self.assertTrue(state["post_window_replay_expiry_tolerated"])
+        self.assertNotIn("request_pack_check_failed", [blocker["reason"] for blocker in blockers])
+
+    def test_request_pack_check_rejects_post_window_replay_expired_plus_other_blocker(self) -> None:
+        original = bundle_builder.run_json_check
+        blockers: list[dict] = []
+
+        def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+            return (
+                1,
+                {
+                    "schema": "obelisk.player-principal-lifecycle-window-request-check.v1",
+                    "ready": False,
+                    "request_pack_ready": False,
+                    "post_window_replay": True,
+                    "post_window_replay_expiry_tolerated": False,
+                    "blockers": ["approved_window_expired", "operator_request_markdown_mismatch"],
+                    "next_blocker": "request_pack_not_accepted",
+                },
+                "blocked",
+            )
+
+        try:
+            bundle_builder.run_json_check = fake_run_json_check
+            state = bundle_builder.request_pack_check_state(
+                {"exists": True, "path": Path("player-principal-lifecycle-window-request.json")},
+                {"exists": True, "path": Path("player-principal-lifecycle-observer.env")},
+                blockers,
+            )
+        finally:
+            bundle_builder.run_json_check = original
+
+        self.assertTrue(state["checked"])
+        self.assertFalse(state["ready"])
+        self.assertEqual(state["blockers"], ["approved_window_expired", "operator_request_markdown_mismatch"])
         self.assertIn("request_pack_check_failed", [blocker["reason"] for blocker in blockers])
 
     def test_window_manifest_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:

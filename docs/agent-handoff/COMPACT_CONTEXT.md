@@ -118,6 +118,10 @@ priorities, and do not use history files as the active source of truth.
   default route: `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` source
   hashes are checked against the actual `--snapshot-root` files before the route may
   report `approved_runtime_evidence_missing`.
+  Operator approval receipt handling is provenance-only: request preparation writes only
+  `operator-approval-receipt.template.json`; post-window replay requires a completed
+  `operator-approval-receipt.json`, exact current-turn completion metadata, bound-request
+  parity, and request replay that tolerates only `approved_window_expired`.
 - `docs/permissions_admin_public_contract_decisions.json` blocks any public
   permissions/admin ABI until principal generation, principal scope, cache keying, and
   stale/scope-mismatch fail-closed behavior are resolved on top of promoted copied

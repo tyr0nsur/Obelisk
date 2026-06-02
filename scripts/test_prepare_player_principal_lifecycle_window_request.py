@@ -141,6 +141,10 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             replay_contract["sidecars"]["preflight_pre_path"],
             f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/preflight-pre.json",
         )
+        self.assertEqual(
+            replay_contract["sidecars"]["operator_approval_receipt_path"],
+            f"/servidor/ark/workspace-offline/live-validation-logs/{request['run_id']}/operator-approval-receipt.json",
+        )
         self.assertIn("--post-window-replay", replay_contract["checks"]["window_manifest_replay"])
         self.assertIn("does not authorize runtime work", replay_contract["non_authorization"])
         self.assertIn("enable-player-principal-lifecycle-observer", request["marker_set"])
@@ -189,6 +193,8 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertIn("log limit=10", markdown)
         self.assertIn("Post-window replay contract:", markdown)
         self.assertIn("preflight_pre_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
+        self.assertIn("operator_approval_receipt_path=/servidor/ark/workspace-offline/live-validation-logs/", markdown)
+        self.assertIn("completed operator-approval-receipt.json", markdown)
         self.assertIn("--post-window-replay", markdown)
         self.assertIn(
             "scripts/check_player_principal_lifecycle_preflight.sh --instance arkserver2 --map TheIsland "

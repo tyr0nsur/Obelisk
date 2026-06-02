@@ -234,6 +234,7 @@ def post_window_replay_contract(
         "sidecars": {
             "request_pack_path": str(evidence_dir / "window-request.json"),
             "observer_env_path": str(evidence_dir / "observer-window.env"),
+            "operator_approval_receipt_path": str(evidence_dir / "operator-approval-receipt.json"),
             "preflight_pre_path": str(evidence_dir / "preflight-pre.json"),
             "preflight_post_path": str(evidence_dir / "preflight-post.json"),
             "window_manifest_path": str(evidence_dir / "window-manifest.env"),
@@ -252,6 +253,9 @@ def post_window_replay_contract(
 
 def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str, Any]:
     window = payload["approved_window"]
+    replay_contract = payload.get("post_window_replay_contract")
+    if not isinstance(replay_contract, dict):
+        replay_contract = post_window_replay_contract(payload)
     return {
         "target": payload["target"],
         "feature_gates": {
@@ -284,6 +288,8 @@ def operator_live_ops_brief(payload: dict[str, Any], env: list[str]) -> dict[str
             "copied_log_path": payload["copied_log_path"],
             "window_manifest_path": payload["window_manifest_path"],
             "observer_env_file": payload["observer_env_file"],
+            "operator_approval_receipt_path": replay_contract["sidecars"]["operator_approval_receipt_path"],
+            "operator_approval_receipt_required": "completed_operator_receipt",
             "single_module_summary": "player_principal_lifecycle",
             "copied_log_only": True,
         },
@@ -373,11 +379,13 @@ def markdown_request(payload: dict[str, Any], env: list[str]) -> str:
             for key in (
                 "request_pack_path",
                 "observer_env_path",
+                "operator_approval_receipt_path",
                 "preflight_pre_path",
                 "preflight_post_path",
                 "window_manifest_path",
             )
         ],
+        "operator_approval_receipt_requirement=completed operator-approval-receipt.json; generated template is not replay evidence",
         " ".join(payload["post_window_replay_contract"]["checks"]["window_manifest_replay"]),
         payload["post_window_replay_contract"]["non_authorization"],
         "```",

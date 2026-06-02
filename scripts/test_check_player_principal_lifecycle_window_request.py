@@ -73,7 +73,13 @@ def prepare_pack(output_dir: Path) -> None:
 
 
 class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
-    def run_checker(self, output_dir: Path, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_checker(
+        self,
+        output_dir: Path,
+        *,
+        check: bool = True,
+        extra_args: list[str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
             [
                 sys.executable,
@@ -81,6 +87,7 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
                 str(output_dir / "window-request.json"),
                 "--env-file",
                 str(output_dir / "observer-window.env"),
+                *(extra_args or []),
                 "--json",
             ],
             check=False,
@@ -122,6 +129,11 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertEqual(0, brief["feature_gates"]["dispatch_limit"])
         self.assertEqual(10, brief["feature_gates"]["log_limit"])
         self.assertEqual("stable", brief["post_run_stable_posture"]["expected"])
+        self.assertEqual(
+            request["post_window_replay_contract"]["sidecars"]["operator_approval_receipt_path"],
+            brief["evidence_capture"]["operator_approval_receipt_path"],
+        )
+        self.assertEqual("completed_operator_receipt", brief["evidence_capture"]["operator_approval_receipt_required"])
         self.assertEqual(
             [
                 [
@@ -232,6 +244,102 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
         self.assertIn("post_window_replay_contract_observer_env_path_not_approved_offline_workspace", report["blockers"])
+
+    def test_rejects_post_window_replay_contract_receipt_path_outside_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["post_window_replay_contract"]["sidecars"][
+                "operator_approval_receipt_path"
+            ] = "/tmp/operator-approval-receipt.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "operator-approval-request.md").write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("post_window_replay_contract_mismatch", report["blockers"])
+        self.assertIn(
+            "post_window_replay_contract_operator_approval_receipt_path_not_approved_offline_workspace",
+            report["blockers"],
+        )
+
+    def test_post_window_replay_tolerates_expired_window_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            old_run_id = request["run_id"]
+            request = json.loads(json.dumps(request).replace(old_run_id, "20260101T000000Z-player-principal-lifecycle"))
+            request["approved_window"]["start_utc"] = "2026-01-01T00:00:00Z"
+            request["approved_window"]["end_utc"] = "2026-01-01T00:10:00Z"
+            request["run_id"] = "20260101T000000Z-player-principal-lifecycle"
+            request["operator_live_ops_brief"]["start_restart_stop_window"]["start_utc"] = "2026-01-01T00:00:00Z"
+            request["operator_live_ops_brief"]["start_restart_stop_window"]["end_utc"] = "2026-01-01T00:10:00Z"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "observer-window.env").write_text(
+                "\n".join(REQUEST_CHECKER.env_lines(REQUEST_CHECKER.args_for_env(request))) + "\n",
+                encoding="utf-8",
+            )
+            (output_dir / "operator-approval-request.md").write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, extra_args=["--post-window-replay"])
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["post_window_replay"])
+        self.assertTrue(report["post_window_replay_expiry_tolerated"])
+        self.assertEqual([], report["blockers"])
+
+    def test_post_window_replay_rejects_expired_window_plus_markdown_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            old_run_id = request["run_id"]
+            request = json.loads(json.dumps(request).replace(old_run_id, "20260101T000000Z-player-principal-lifecycle"))
+            request["approved_window"]["start_utc"] = "2026-01-01T00:00:00Z"
+            request["approved_window"]["end_utc"] = "2026-01-01T00:10:00Z"
+            request["run_id"] = "20260101T000000Z-player-principal-lifecycle"
+            request["operator_live_ops_brief"]["start_restart_stop_window"]["start_utc"] = "2026-01-01T00:00:00Z"
+            request["operator_live_ops_brief"]["start_restart_stop_window"]["end_utc"] = "2026-01-01T00:10:00Z"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            (output_dir / "observer-window.env").write_text(
+                "\n".join(REQUEST_CHECKER.env_lines(REQUEST_CHECKER.args_for_env(request))) + "\n",
+                encoding="utf-8",
+            )
+            markdown_path = output_dir / "operator-approval-request.md"
+            markdown_path.write_text(
+                REQUEST_CHECKER.markdown_request(
+                    request,
+                    (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines(),
+                ).replace("dispatch limit=0", "dispatch limit=1"),
+                encoding="utf-8",
+            )
+            result = self.run_checker(output_dir, check=False, extra_args=["--post-window-replay"])
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["ready"])
+        self.assertFalse(report["post_window_replay_expiry_tolerated"])
+        self.assertIn("approved_window_expired", report["blockers"])
+        self.assertIn("operator_request_markdown_mismatch", report["blockers"])
 
     def test_rejects_missing_operator_request_markdown_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -208,12 +208,13 @@ This file is an active routing table only. Durable evidence belongs in
   evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
   build-policy now passes planning-only with no central `structure_*` blockers. SDK
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated identity/runtime round: operator approval receipt lane is
-  implemented as request/window provenance only. Preparation emits
-  `operator-approval-receipt.template.json`; window manifests require a completed,
-  digest-bound `operator-approval-receipt.json`; bundle and approved-evidence replay keep
-  it verified without counting it as runtime evidence, route unlock, P0 credit, or SDK
-  progress. Latest delegated ABI round added a candidate-only public ABI preflight
-  artifact/checker for player identity; it documents accepted review inputs but keeps
+- Latest delegated identity/runtime round: operator approval receipt lane remains
+  request/window provenance only and is now bound into the post-window replay contract.
+  Preparation emits only `operator-approval-receipt.template.json`; replay requires a
+  completed `operator-approval-receipt.json`, exact current-turn completion metadata, full
+  bound-request parity, and post-window request checks that tolerate only
+  `approved_window_expired`. This does not count as runtime evidence, route unlock, P0
+  credit, SDK progress, or server approval. Latest delegated ABI round added a
+  candidate-only public ABI preflight artifact/checker for player identity; it keeps
   header symbols, capability bits, callback ABI, promotion, SDK, and v1 completion false.
   Runtime evidence and SDK/P0 completion remain unresolved; no runtime/server op.
