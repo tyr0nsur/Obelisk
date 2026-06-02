@@ -5032,6 +5032,67 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             },
         )
 
+    def test_command_response_required_terms_do_not_replace_structured_promotion_evidence(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="CommandChatResponsePromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="command_chat_response_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "CommandChatResponsePromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "command_chat_response_promotion_plugin.c"
+            abi_test.write_text("// promoted command response ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted command response SDK placeholder\n", encoding="utf-8")
+            surface = {
+                "id": "obelisk.command_chat_response_path.v1",
+                "status": "promoted",
+                "evidence": {
+                    "surface_id": "obelisk.command_chat_response_path.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                    "terms": [
+                        "promoted player identity/principal semantics",
+                        "promoted permission/authority checks for directed responses",
+                        "copied append-only response ABI with capability gates and owner-scoped cleanup",
+                        "privacy, redaction, rate-limit, abuse, audit, and cross-instance routing semantics for command/chat responses",
+                        "no raw UE pointer, raw ProcessEvent parameter, or raw FString response API",
+                    ],
+                },
+            }
+            missing = module.surface_missing_structured_promotion_evidence(surface)
+            rows = module.completion_blocker_outcome_rows(
+                ["obelisk.command_chat_response_path.v1"],
+                {"obelisk.command_chat_response_path.v1": surface},
+                set(),
+                "obelisk.command_chat_response_path.v1: promoted - reviewed ABI and SDK evidence.\n",
+            )
+
+        self.assertEqual(
+            missing,
+            [
+                "public_readiness_report:missing",
+                "executed_test_report:missing",
+            ],
+        )
+        self.assertTrue(rows[0]["promotion_evidence_satisfied"])
+        self.assertTrue(rows[0]["required_promotion_evidence_terms_satisfied"])
+        self.assertFalse(rows[0]["structured_promotion_evidence_satisfied"])
+        self.assertFalse(rows[0]["counts_toward_complete_sdk_claim"])
+
     def test_commands_replies_requires_response_path_semantic_evidence_terms(self) -> None:
         import importlib.util
 
@@ -5061,6 +5122,46 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.command_chat_response_path.v1 dependency resolved through its own future promotion gate for replies/send-chat",
                 "command lifecycle, abuse, rate-limit, and moderation boundaries",
                 "copied append-only command/reply ABI with capability gates, owner-scoped cleanup, and SDK consumer tests",
+            ],
+        )
+
+    def test_commands_replies_required_terms_do_not_replace_structured_promotion_evidence(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        missing = module.surface_missing_structured_promotion_evidence(
+            {
+                "id": "obelisk.commands_replies.v1",
+                "status": "promoted",
+                "evidence": {
+                    "surface_id": "obelisk.commands_replies.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": ["tests/core/CommandsRepliesPromotionTests.cpp"],
+                    "sdk_consumer_tests": ["tests/sdk_consumer/commands_replies_promotion_plugin.c"],
+                    "terms": [
+                        "promoted player identity/principal semantics",
+                        "promoted permission/authority model",
+                        "obelisk.command_chat_response_path.v1 dependency resolved through its own future promotion gate for replies/send-chat",
+                        "copied append-only command/reply ABI with capability gates, owner-scoped cleanup, and SDK consumer tests",
+                        "command lifecycle, abuse, rate-limit, and moderation boundaries",
+                    ],
+                },
+            }
+        )
+
+        self.assertEqual(
+            missing,
+            [
+                "public_readiness_report:missing",
+                "command_response_public_readiness_report:missing",
+                "command_response_executed_test_report:missing",
+                "executed_test_report:missing",
             ],
         )
 

@@ -1975,6 +1975,75 @@ def permissions_admin_structured_promotion_evidence_missing(evidence: dict[str, 
     return missing
 
 
+def command_response_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
+    if readiness_error is not None:
+        missing.append(f"public_readiness_report:{readiness_error}")
+    elif not (
+        readiness_report.get("schema") == "obelisk.command-chat-response-public-readiness-check.v1"
+        and readiness_report.get("surface") == "obelisk.command_chat_response_path.v1"
+        and readiness_report.get("valid") is True
+        and readiness_report.get("accepted_for_planning") is True
+        and readiness_report.get("planning_only") is True
+        and readiness_report.get("public_readiness_ready") is False
+        and readiness_report.get("promotion_ready") is False
+        and readiness_report.get("public_header_allowed") is False
+        and readiness_report.get("public_abi_ready") is False
+        and readiness_report.get("public_sdk_ready") is False
+        and readiness_report.get("runtime_ready") is False
+        and readiness_report.get("target_set") == "command-chat-response-route-planning"
+        and readiness_report.get("readiness_status") == "compared"
+        and readiness_report.get("decisions_status") == "blocked"
+        and readiness_report.get("surfaces_status") in {"planning", "post-v1"}
+        and readiness_report.get("blockers") == []
+    ):
+        missing.append("public_readiness_report:fields_invalid")
+
+    missing.extend(executed_test_report_missing(evidence, "obelisk.command_chat_response_path.v1"))
+    return missing
+
+
+def commands_replies_structured_promotion_evidence_missing(evidence: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    readiness_report, readiness_error = load_repo_relative_json_evidence(evidence.get("public_readiness_report"))
+    if readiness_error is not None:
+        missing.append(f"public_readiness_report:{readiness_error}")
+    elif not (
+        readiness_report.get("schema") == "obelisk.commands-replies-public-readiness-check.v1"
+        and readiness_report.get("surface") == "obelisk.commands_replies.v1"
+        and readiness_report.get("valid") is True
+        and readiness_report.get("accepted_for_planning") is True
+        and readiness_report.get("planning_only") is True
+        and readiness_report.get("public_readiness_ready") is False
+        and readiness_report.get("public_header_allowed") is False
+        and readiness_report.get("public_abi_ready") is False
+        and readiness_report.get("runtime_ready") is False
+        and readiness_report.get("public_command_router_allowed") is False
+        and readiness_report.get("public_reply_or_send_chat_abi_allowed") is False
+        and readiness_report.get("public_response_path_allowed") is False
+        and readiness_report.get("decisions_status") == "blocked"
+        and readiness_report.get("commands_replies_surface_status") in {"planning", "post-v1"}
+        and readiness_report.get("dependency_chain")
+        == [
+            "obelisk.player_identity.v1",
+            "obelisk.permissions_admin.v1",
+            "obelisk.command_chat_response_path.v1",
+        ]
+        and readiness_report.get("blockers") == []
+    ):
+        missing.append("public_readiness_report:fields_invalid")
+
+    dependency_missing = command_response_structured_promotion_evidence_missing(
+        {"public_readiness_report": evidence.get("command_response_public_readiness_report")}
+    )
+    for reason in dependency_missing:
+        missing.append(f"command_response_{reason}")
+
+    missing.extend(executed_test_report_missing(evidence, "obelisk.commands_replies.v1"))
+    return missing
+
+
 def surface_missing_structured_promotion_evidence(surface: dict[str, Any]) -> list[str]:
     surface_id = surface.get("id")
     if surface.get("status") != "promoted":
@@ -1986,6 +2055,10 @@ def surface_missing_structured_promotion_evidence(surface: dict[str, Any]) -> li
         return player_identity_structured_promotion_evidence_missing(evidence)
     if surface_id == "obelisk.permissions_admin.v1":
         return permissions_admin_structured_promotion_evidence_missing(evidence)
+    if surface_id == "obelisk.command_chat_response_path.v1":
+        return command_response_structured_promotion_evidence_missing(evidence)
+    if surface_id == "obelisk.commands_replies.v1":
+        return commands_replies_structured_promotion_evidence_missing(evidence)
     return []
 
 
@@ -2107,6 +2180,7 @@ def completion_blocker_outcome_rows(
         release_statement_outcome = release_statement_recorded_outcome(release_statement_text, surface_id)
         promotion_evidence_satisfied = bool(surface) and status == "promoted" and surface_has_promotion_evidence(surface)
         missing_required_terms = surface_missing_required_promotion_evidence(surface)
+        missing_structured_evidence = surface_missing_structured_promotion_evidence(surface)
         release_statement_contract_satisfied = False
         if status == "promoted":
             release_statement_contract_satisfied = release_statement_outcome == "promoted"
@@ -2134,6 +2208,7 @@ def completion_blocker_outcome_rows(
         counts_toward_complete_sdk_claim = (
             promotion_evidence_satisfied
             and not missing_required_terms
+            and not missing_structured_evidence
             and release_statement_contract_satisfied
             and manifest_outcome == "promoted"
             and dependency_claims_satisfied
@@ -2153,6 +2228,8 @@ def completion_blocker_outcome_rows(
                 "promotion_evidence_satisfied": promotion_evidence_satisfied,
                 "required_promotion_evidence_terms_satisfied": not missing_required_terms,
                 "missing_required_promotion_evidence_terms": missing_required_terms,
+                "structured_promotion_evidence_satisfied": not missing_structured_evidence,
+                "missing_structured_promotion_evidence": missing_structured_evidence,
                 "dependency_claims_satisfied": dependency_claims_satisfied,
                 "scoped_non_complete_outcome_only": scoped_non_complete_outcome_only,
                 "counts_toward_complete_sdk_claim": counts_toward_complete_sdk_claim,

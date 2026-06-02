@@ -136,6 +136,37 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             report["blockers"],
         )
 
+    def test_rejects_generic_readiness_metadata_in_decisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["metadata"] = {
+                "public_sdk_ready": True,
+                "runtime_ready": True,
+                "promotion_ready": True,
+                "v1_sdk_ready": True,
+                "release_ready": True,
+                "public_abi_ready": True,
+            }
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for key in (
+            "public_sdk_ready",
+            "runtime_ready",
+            "promotion_ready",
+            "v1_sdk_ready",
+            "release_ready",
+            "public_abi_ready",
+        ):
+            self.assertIn(
+                f"forbidden_positive_resource_handle_claim:$.decisions.metadata.{key}",
+                report["blockers"],
+            )
+
     def test_rejects_public_sdk_surface_promotion_or_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -261,6 +292,41 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             "$.surfaces[obelisk.object_identity_resource_handle.v1].object_lookup",
             report["blockers"],
         )
+
+    def test_rejects_generic_readiness_metadata_in_surface_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
+                    surface["metadata"] = {
+                        "public_sdk_ready": True,
+                        "runtime_ready": True,
+                        "promotion_ready": True,
+                        "v1_sdk_ready": True,
+                        "release_ready": True,
+                        "public_abi_ready": True,
+                    }
+                    break
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for key in (
+            "public_sdk_ready",
+            "runtime_ready",
+            "promotion_ready",
+            "v1_sdk_ready",
+            "release_ready",
+            "public_abi_ready",
+        ):
+            self.assertIn(
+                "forbidden_positive_resource_handle_claim:"
+                f"$.surfaces[obelisk.object_identity_resource_handle.v1].metadata.{key}",
+                report["blockers"],
+            )
 
     def test_rejects_public_header_resource_handle_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

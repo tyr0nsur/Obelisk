@@ -66,6 +66,12 @@ FORBIDDEN_PUBLIC_EVENT_TERMS = (
     "object lookup API is included",
 )
 FORBIDDEN_TRUE_KEYS = (
+    "promotion_ready",
+    "public_abi_ready",
+    "public_sdk_ready",
+    "release_ready",
+    "runtime_ready",
+    "v1_sdk_ready",
     "object_identity_ready",
     "post_callback_resource_handle_ready",
     "public_object_identity_ready",

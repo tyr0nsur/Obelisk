@@ -672,6 +672,52 @@ This round still does not approve runtime work, public identity, public permissi
 command replies, Inventory/Items SDKs, Structure SDK, Mission/Transfer/Dino/Tribe SDKs,
 ResourceHandle, release readiness, or a stable SDK claim.
 
+## Command/Replies Structured Promotion Evidence And Alias Closure
+
+The next supervised round closed the remaining P0 synthetic promotion-accounting gap for
+the command response and commands/replies dependency chain:
+
+- `scripts/check_public_sdk_v1_completion.py` now requires promoted
+  `obelisk.command_chat_response_path.v1` evidence to include a repo-relative
+  `obelisk.command-chat-response-public-readiness-check.v1` report with planning-only
+  false public/runtime/promotion flags, compared readiness status, blocked decisions
+  status, planning/post-v1 surface status, and empty blockers. It also requires a
+  structured `obelisk.promoted-surface-test-execution.v1` report for executed ABI and SDK
+  consumer tests.
+- Promoted `obelisk.commands_replies.v1` evidence now requires its structured
+  `obelisk.commands-replies-public-readiness-check.v1` report, a structured
+  command-response public-readiness dependency report, and an executed ABI/SDK test
+  report. Prose terms and placeholder ABI/SDK paths alone no longer satisfy structured
+  promotion evidence.
+- Completion blocker accounting now records
+  `structured_promotion_evidence_satisfied=false` and keeps
+  `counts_toward_complete_sdk_claim=false` when a promoted row lacks structured evidence,
+  even if generic evidence paths and all required semantic terms are present.
+- Inventory copied-signal stability now rejects additional public gameplay event
+  readiness aliases: `v1_sdk_ready`, `release_ready`, and `public_abi_ready`.
+- ResourceHandle/object-identity readiness now rejects generic readiness booleans such as
+  `public_sdk_ready`, `runtime_ready`, `promotion_ready`, `v1_sdk_ready`, `release_ready`,
+  and `public_abi_ready` when they appear as extra metadata in the decisions payload or
+  the ResourceHandle surface row.
+
+Read-only side-lane audits still found two deferred guardrails:
+
+- Wire `scripts/check_object_identity_resource_handle_public_contract_readiness.py` into
+  SDK completion accounting, analogous to the inventory copied-signal checker, so complete
+  SDK reports include ResourceHandle/object-identity posture.
+- Tighten Structure census/build-policy readiness scanners for generic boolean aliases,
+  status-string aliases such as `sdk_status=ready` or `promotion_status=promoted`, and
+  build-policy public-contract/header aliases.
+
+Validation:
+
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_public_sdk_v1_completion`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_inventory_item_copied_signals_stability scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+
+This round remains offline guardrail work only. It does not promote command response,
+commands/replies, Inventory/Items SDKs, ResourceHandle, Structure SDK, runtime readiness,
+release readiness, or a stable SDK claim.
+
 ## Player Identity Public Contract And Bound Planning Input Hardening
 
 The next supervised P0 identity guardrail round closed two offline input-provenance and

@@ -368,6 +368,16 @@ priorities, and do not use history files as the active source of truth.
   fails the stricter wrapper as not source-bound to generated first evidence; regenerate or
   align source-bound manifests before expecting the wrapper to advance to
   `approved_runtime_evidence_missing`.
+  Later SDK-completion hardening also applies structured promotion-evidence requirements
+  to command response and commands/replies: generic ABI/SDK paths plus prose terms no
+  longer let those P0 rows count toward complete SDK accounting. Command response needs
+  its structured public-readiness report plus executed ABI/SDK tests; commands/replies
+  needs its structured readiness report, structured command-response dependency evidence,
+  and executed ABI/SDK tests. Inventory copied-signal and ResourceHandle readiness
+  scanners now reject additional generic readiness aliases (`v1_sdk_ready`,
+  `release_ready`, `public_abi_ready`, and related ResourceHandle metadata booleans).
+  Deferred next guardrails: wire ResourceHandle readiness into SDK completion accounting,
+  and close Structure alias/string overclaim gaps.
   The report still carries a requirements-only
   `first_evidence.runtime_principal_lifecycle_evidence` block for the future approved
   runtime window; it is not accepted evidence and must not be used for promotion. The

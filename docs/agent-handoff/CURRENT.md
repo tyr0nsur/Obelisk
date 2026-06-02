@@ -254,6 +254,21 @@ This file is an active routing table only. Durable evidence belongs in
   broad-claim detector while `stable_claim_allowed=false`. This remains offline
   guardrail work only; no public permissions/admin, command response, commands/replies,
   runtime readiness, release readiness, or v1 completion is promoted.
+- 2026-06-02 P0 promotion-evidence accounting closure: SDK v1 completion now requires
+  promoted `obelisk.command_chat_response_path.v1` rows to carry structured command
+  response public-readiness report evidence plus an executed ABI/SDK test report, and
+  promoted `obelisk.commands_replies.v1` rows to carry structured commands/replies
+  readiness, structured command-response dependency evidence, and executed ABI/SDK test
+  evidence. Completion-blocker rows now keep `counts_toward_complete_sdk_claim=false`
+  when structured promotion evidence is missing, even if generic ABI/SDK paths and all
+  prose terms are present. Inventory copied-signal stability also rejects
+  `v1_sdk_ready`, `release_ready`, and `public_abi_ready` aliases in
+  `docs/public_gameplay_events.json`, and ResourceHandle readiness rejects generic
+  readiness booleans in decisions and the ResourceHandle surface row. Remaining deferred
+  guardrails: wire ResourceHandle readiness into SDK completion accounting, and close the
+  Structure alias/string gaps found by read-only audit. This is offline guardrail work
+  only; command response, commands/replies, Inventory/Items SDK, ResourceHandle, runtime,
+  release readiness, and v1 completion remain unpromoted.
 - 2026-06-02 P0 identity aggregate provenance closure: player-identity first-evidence now
   rejects standalone lifecycle-anchor/principal-policy planning artifacts unless they are
   bound to the first-evidence source artifact identity and the principal policy binds back
