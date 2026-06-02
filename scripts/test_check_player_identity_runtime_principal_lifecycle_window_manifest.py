@@ -32,6 +32,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     env_lines,
     markdown_request,
     operator_live_ops_brief,
+    operator_approval_receipt_payload,
     post_window_replay_contract,
 )
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
@@ -89,6 +90,8 @@ def manifest_lines(**overrides: str | None) -> list[str]:
         "request_pack_sha256": "0" * 64,
         "observer_env_path": "observer-window.env",
         "observer_env_sha256": "0" * 64,
+        "operator_approval_receipt_path": "operator-approval-receipt.json",
+        "operator_approval_receipt_sha256": "0" * 64,
         "preflight_pre_path": "preflight-pre.json",
         "preflight_pre_sha256": "0" * 64,
         "preflight_post_path": "preflight-post.json",
@@ -250,6 +253,9 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
     if not request_pack_path.is_absolute():
         request_pack_path = base / request_pack_path
     operator_request_path = request_pack_path.parent / "operator-approval-request.md"
+    receipt_path = Path(fields.get("operator_approval_receipt_path", "operator-approval-receipt.json"))
+    if not receipt_path.is_absolute():
+        receipt_path = base / receipt_path
     request_payload = request_pack_payload(fields, base)
     contents = {
         "request_pack": json.dumps(request_payload, sort_keys=True) + "\n",
@@ -305,6 +311,20 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents[content_key], encoding="utf-8")
         updated[sha_key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    if "operator_approval_receipt_path" in updated:
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        receipt = operator_approval_receipt_payload(
+            request_payload,
+            request_json_path=request_pack_path,
+            request_md_path=operator_request_path,
+            env_path=observer_env_path,
+            operator_approved=True,
+            operator_reference="test-current-turn-approval",
+            approved_at_utc=fields["approved_window_start_utc"],
+        )
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
+        updated["operator_approval_receipt_path"] = str(receipt_path)
+        updated["operator_approval_receipt_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
     updated.pop("operator_request_path", None)
     updated.pop("operator_request_sha256", None)
     return updated

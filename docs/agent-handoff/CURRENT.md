@@ -208,13 +208,11 @@ This file is an active routing table only. Durable evidence belongs in
   evidence for commands/replies. Structure build-policy scanner scope is fixed: canonical
   build-policy now passes planning-only with no central `structure_*` blockers. SDK
   remains fail-closed at `0/12`, P0 `0/4`; no runtime/server op.
-- Latest delegated identity/runtime round: private redaction, candidate invalidation
-  policy, and private POD layout are review inputs only; `abi.public_pod_contract`,
-  `abi.layout`, SDK consumer, runtime evidence, and SDK/P0 completion remain unresolved.
-  Runtime bundle preflight now reports `request_pack_ready` only when the request/env,
-  preflight sidecars, and window-manifest replay all validate. Sub-agents found no P0
-  counting escape; next offline deltas are a digest-bound operator approval receipt and,
-  after that, a candidate-only public ABI promotion preflight. Anchor hashes for
-  `HandleNewPlayer`/`OnLogout` are repo-local and bound; full offline inventory/core pack
-  proof remains external/offline-workspace unless a redacted repo-local artifact is added.
-  No runtime/server op.
+- Latest delegated identity/runtime round: operator approval receipt lane is
+  implemented as request/window provenance only. Preparation emits
+  `operator-approval-receipt.template.json`; window manifests require a completed,
+  digest-bound `operator-approval-receipt.json`; bundle and approved-evidence replay keep
+  it verified without counting it as runtime evidence, route unlock, P0 credit, or SDK
+  progress. Tests cover prepare/request, window manifest, bundle, approved evidence,
+  first-evidence, route, and SDK fail-closed state. Runtime evidence and SDK/P0 completion
+  remain unresolved; no runtime/server op.

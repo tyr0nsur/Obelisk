@@ -29,6 +29,7 @@ from prepare_player_principal_lifecycle_window_request import (
     WINDOW_MARKERS,
     env_lines,
     markdown_request,
+    operator_approval_receipt_payload,
     operator_live_ops_brief,
     post_window_replay_contract,
 )
@@ -157,6 +158,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         request_pack = sidecar_dir / "window-request.json"
         observer_env = sidecar_dir / "observer-window.env"
         operator_request = sidecar_dir / "operator-approval-request.md"
+        operator_approval_receipt = sidecar_dir / "operator-approval-receipt.json"
         preflight_pre = manifest.parent / "preflight-pre.json"
         preflight_post = manifest.parent / "preflight-post.json"
         window = future_window()
@@ -216,6 +218,22 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             operator_request,
             markdown_request(request_payload, env_lines(request_args)),
         )
+        operator_approval_receipt_sha256 = write_sidecar(
+            operator_approval_receipt,
+            json.dumps(
+                operator_approval_receipt_payload(
+                    request_payload,
+                    request_json_path=request_pack,
+                    request_md_path=operator_request,
+                    env_path=observer_env,
+                    operator_approved=True,
+                    operator_reference="test-current-turn-approval",
+                    approved_at_utc=window["start"],
+                ),
+                sort_keys=True,
+            )
+            + "\n",
+        )
         preflight_pre_sha256 = write_sidecar(
             preflight_pre,
             preflight_payload(
@@ -259,6 +277,8 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                     f"request_pack_sha256={request_pack_sha256}",
                     f"observer_env_path={observer_env}",
                     f"observer_env_sha256={observer_env_sha256}",
+                    f"operator_approval_receipt_path={operator_approval_receipt}",
+                    f"operator_approval_receipt_sha256={operator_approval_receipt_sha256}",
                     f"preflight_pre_path={preflight_pre}",
                     f"preflight_pre_sha256={preflight_pre_sha256}",
                     f"preflight_post_path={preflight_post}",
@@ -392,12 +412,13 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             [
                 "copied_obelisk_log",
                 "checked_window_manifest_env",
+                "operator_approval_receipt",
                 "approved_runtime_principal_lifecycle_evidence_manifest",
             ],
         )
         self.assertEqual(
             [artifact["present"] for artifact in report["next_required_artifacts"]],
-            [False, False, False],
+            [False, False, False, False],
         )
         self.assertIn("request_pack_check_failed", report["blockers"])
         self.assertIn("copied_log_missing", report["blockers"])
@@ -424,9 +445,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(report["next_blocker"], "run_offline_evidence_bundle_builder")
         self.assertEqual(
             [artifact["present"] for artifact in report["next_required_artifacts"]],
-            [True, True, False],
+            [True, True, True, False],
         )
-        self.assertTrue(report["next_required_artifacts"][2]["satisfies_approved_runtime_evidence"])
+        self.assertTrue(report["next_required_artifacts"][3]["satisfies_approved_runtime_evidence"])
         self.assertNotIn("copied_log_missing", report["blockers"])
         self.assertNotIn("window_manifest_missing", report["blockers"])
         self.assertIn(

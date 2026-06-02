@@ -6562,6 +6562,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "runtime_ready": False,
                     "route_lock_locked": True,
                     "current_blocker": "approved_runtime_evidence_missing",
+                    "operator_approval_receipt_verified": True,
                     "blockers": [],
                 }
             )

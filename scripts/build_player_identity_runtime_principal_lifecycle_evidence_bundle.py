@@ -365,6 +365,12 @@ def next_required_preflight_artifacts(
             False,
         ),
         (
+            "operator_approval_receipt",
+            approved_bundle.get("operator_approval_receipt", {}),
+            "offline_runtime_principal_lifecycle_bundle_builder_input",
+            False,
+        ),
+        (
             "approved_runtime_principal_lifecycle_evidence_manifest",
             approved_bundle,
             "approved_runtime_evidence_missing",
@@ -491,6 +497,14 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "preflight_post",
         blockers,
     )
+    operator_approval_receipt = file_state(
+        sidecar_path(
+            "operator_approval_receipt_path",
+            resolved / "sidecars" / run_id / "operator-approval-receipt.json",
+        ),
+        "operator_approval_receipt",
+        blockers,
+    )
     request_check = request_pack_check_state(request_pack, observer_env, blockers)
     window_check = window_manifest_check_state(window_manifest, blockers)
 
@@ -509,11 +523,13 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     request_pack_ready = (
         request_pack["exists"]
         and observer_env["exists"]
+        and operator_approval_receipt["exists"]
         and preflight_pre["exists"]
         and preflight_post["exists"]
         and request_check["ready"]
         and window_check["ready"]
     )
+    approved_bundle["operator_approval_receipt"] = operator_approval_receipt
     ready = bool(input_ready and not (approved_bundle["exists"] and not approved_bundle_check["ready"]))
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
@@ -541,6 +557,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
             "window_manifest_check": window_check,
             "request_pack": request_pack,
             "observer_env": observer_env,
+            "operator_approval_receipt": operator_approval_receipt,
             "request_pack_check": request_check,
             "preflight_pre": preflight_pre,
             "preflight_post": preflight_post,
@@ -600,6 +617,9 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
         raise SystemExit("window manifest obelisk_commit must be a reviewed 40-character lowercase Git SHA")
     if window.get("obelisk_commit") != evidence_commit:
         raise SystemExit("window manifest obelisk_commit does not match runtime observer summary")
+    receipt = window.get("operator_approval_receipt")
+    if not isinstance(receipt, dict) or receipt.get("verified") is not True:
+        raise SystemExit("window manifest check missing verified operator approval receipt")
     modules = summary.get("modules")
     principal = modules.get("player_principal_lifecycle") if isinstance(modules, dict) else None
     functions = principal.get("functions") if isinstance(principal, dict) else None

@@ -40,6 +40,7 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
     WINDOW_MARKERS,
     env_lines,
     markdown_request,
+    operator_approval_receipt_payload,
     operator_live_ops_brief,
     post_window_replay_contract,
 )
@@ -175,6 +176,7 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
     request_pack_path = sidecar_dir / "window-request.json"
     observer_env_path = sidecar_dir / "observer-window.env"
     operator_request_path = sidecar_dir / "operator-approval-request.md"
+    operator_approval_receipt_path = sidecar_dir / "operator-approval-receipt.json"
     preflight_pre_path = live_dir / "preflight-pre.json"
     preflight_post_path = live_dir / "preflight-post.json"
     target = {"instance": "arkserver2", "map": "TheIsland"}
@@ -235,6 +237,22 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         operator_request_path,
         markdown_request(request_payload, observer_env_lines),
     )
+    operator_approval_receipt = write_sidecar(
+        operator_approval_receipt_path,
+        json.dumps(
+            operator_approval_receipt_payload(
+                request_payload,
+                request_json_path=request_pack_path,
+                request_md_path=operator_request_path,
+                env_path=observer_env_path,
+                operator_approved=True,
+                operator_reference="test-current-turn-approval",
+                approved_at_utc=approved_window["start_utc"],
+            ),
+            sort_keys=True,
+        )
+        + "\n",
+    )
     preflight_pre = write_sidecar(
         preflight_pre_path,
         preflight_payload(
@@ -279,6 +297,8 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
                 f"request_pack_sha256={request['sha256']}",
                 f"observer_env_path={observer_env_path}",
                 f"observer_env_sha256={observer_env['sha256']}",
+                f"operator_approval_receipt_path={operator_approval_receipt_path}",
+                f"operator_approval_receipt_sha256={operator_approval_receipt['sha256']}",
                 f"preflight_pre_path={preflight_pre_path}",
                 f"preflight_pre_sha256={preflight_pre['sha256']}",
                 f"preflight_post_path={preflight_post_path}",
@@ -318,6 +338,10 @@ def operational_sidecars(copied_log: Path) -> dict[str, dict]:
         "manifest": manifest,
         "request_pack": request,
         "observer_env": observer_env,
+        "operator_approval_receipt": {
+            **operator_approval_receipt,
+            "verified": True,
+        },
         "preflight": {
             "pre": preflight_pre,
             "post": preflight_post,

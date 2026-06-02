@@ -265,6 +265,7 @@ def build_manifest(
             "copied_log": window.get("copied_log"),
             "request_pack": window.get("request_pack"),
             "observer_env": window.get("observer_env"),
+            "operator_approval_receipt": window.get("operator_approval_receipt"),
             "preflight": window.get("preflight"),
             "posture": window.get("posture"),
             "rollback": window.get("rollback"),

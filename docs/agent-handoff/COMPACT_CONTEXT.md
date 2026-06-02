@@ -1025,6 +1025,13 @@ priorities, and do not use history files as the active source of truth.
   the next offline runtime delta as a digest-bound `operator-approval-receipt.json`; ABI
   work should stay candidate-only until approved runtime lifecycle evidence exists. No
   runtime/server operation was performed.
+- 2026-06-02 delegated approval-receipt round: lead delegated schema/design, window
+  manifest integration, fixture migration, and SDK/accounting impact audits. Preparation
+  now emits `operator-approval-receipt.template.json`; window manifests require a
+  completed digest-bound `operator-approval-receipt.json`; bundle and approved-evidence
+  replay project it as verified provenance only. Receipt verification does not unlock
+  runtime evidence, route gates, P0 accounting, or SDK completion. No runtime/server
+  operation was performed.
 
 ## Agent Coordination
 

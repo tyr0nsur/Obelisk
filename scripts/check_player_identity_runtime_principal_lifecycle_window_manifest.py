@@ -22,6 +22,12 @@ from typing import Any
 
 import protected_paths
 from player_principal_commit_validation import is_reviewed_obelisk_commit
+from prepare_player_principal_lifecycle_window_request import (
+    APPROVAL_RECEIPT_SCHEMA,
+    APPROVAL_TEXT as REQUEST_APPROVAL_TEXT,
+    EXPECTED_SERVER_BINARY_PATH,
+    request_pack_digest,
+)
 from snapshot_evidence_pack import reject_symlink_component
 
 
@@ -89,6 +95,8 @@ REQUIRED_SIMPLE_FIELDS = (
     "request_pack_sha256",
     "observer_env_path",
     "observer_env_sha256",
+    "operator_approval_receipt_path",
+    "operator_approval_receipt_sha256",
     "preflight_pre_path",
     "preflight_pre_sha256",
     "preflight_post_path",
@@ -420,6 +428,230 @@ def validate_sidecar_file(
         if actual_sha256 != sha_text:
             add(blockers, f"{sha_key}_mismatch", sha_key, expected=sha_text, actual=actual_sha256)
     return "approved_offline_workspace" if status.approved_offline_workspace else "unprotected_offline"
+
+
+def artifact_from_fields(
+    fields: dict[str, str],
+    manifest_path: Path,
+    *,
+    path_key: str,
+    sha_key: str,
+) -> dict[str, str] | None:
+    path_text = fields.get(path_key)
+    sha_text = fields.get(sha_key)
+    if not path_text or not sha_text:
+        return None
+    path = manifest_relative_path(path_text, manifest_path)
+    status = protected_paths.protected_path_status(
+        path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    return {"path": str(status.resolved), "sha256": sha_text}
+
+
+def bound_artifact_from_file(path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size_bytes": len(data),
+    }
+
+
+def validate_operator_approval_receipt(
+    fields: dict[str, str],
+    manifest_path: Path,
+    target: Target,
+    blockers: list[dict[str, Any]],
+) -> None:
+    receipt_text = fields.get("operator_approval_receipt_path")
+    if not receipt_text:
+        return
+    receipt_path = manifest_relative_path(receipt_text, manifest_path)
+    status = protected_paths.protected_path_status(
+        receipt_path,
+        protected_root=SERVER_ROOT,
+        approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+    )
+    if status.protected or not status.approved_offline_workspace or not status.resolved.is_file():
+        return
+    try:
+        payload = json.loads(status.resolved.read_text(encoding="utf-8"))
+    except OSError as exc:
+        add(blockers, "operator_approval_receipt_unreadable", "operator_approval_receipt_path", detail=str(exc))
+        return
+    except json.JSONDecodeError as exc:
+        add(blockers, "operator_approval_receipt_json_invalid", "operator_approval_receipt_path", detail=str(exc))
+        return
+    if not isinstance(payload, dict):
+        add(blockers, "operator_approval_receipt_not_object", "operator_approval_receipt_path")
+        return
+
+    if payload.get("schema") != APPROVAL_RECEIPT_SCHEMA:
+        add(blockers, "operator_approval_receipt_schema_mismatch", "operator_approval_receipt_path")
+    if payload.get("status") != "completed_operator_receipt":
+        add(blockers, "operator_approval_receipt_status_not_completed", "operator_approval_receipt_path")
+    if payload.get("receipt_completed") is not True:
+        add(blockers, "operator_approval_receipt_receipt_completed_not_true", "operator_approval_receipt_path")
+    if payload.get("operator_current_turn_approval_recorded") is not True:
+        add(blockers, "operator_approval_receipt_current_turn_approval_not_recorded", "operator_approval_receipt_path")
+    completion = payload.get("operator_completion")
+    if not isinstance(completion, dict):
+        add(blockers, "operator_approval_receipt_operator_completion_missing", "operator_approval_receipt_path")
+        completion = {}
+    approved_at = completion.get("approval_recorded_at_utc")
+    if not isinstance(approved_at, str) or UTC_TIMESTAMP_RE.fullmatch(approved_at) is None:
+        add(blockers, "operator_approval_receipt_approved_at_utc_invalid", "operator_approval_receipt_path")
+    if completion.get("attestation") != "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY":
+        add(blockers, "operator_approval_receipt_attestation_mismatch", "operator_approval_receipt_path")
+
+    scope = payload.get("approval_scope")
+    if not isinstance(scope, dict):
+        add(blockers, "operator_approval_receipt_scope_missing", "operator_approval_receipt_path")
+        scope = {}
+    if scope.get("scope_type") != "exact_bound_player_principal_lifecycle_window_only":
+        add(blockers, "operator_approval_receipt_scope_type_mismatch", "operator_approval_receipt_path")
+    for key in (
+        "standing_approval",
+        "reusable",
+        "future_windows_authorized",
+        "scope_expansion_authorized",
+        "unbound_artifacts_authorized",
+    ):
+        if scope.get(key) is not False:
+            add(blockers, f"operator_approval_receipt_scope_{key}_not_false", "operator_approval_receipt_path")
+
+    bound_request = payload.get("bound_request_pack")
+    if not isinstance(bound_request, dict):
+        add(blockers, "operator_approval_receipt_bound_request_pack_missing", "operator_approval_receipt_path")
+        bound_request = {}
+    if bound_request.get("run_id") != fields.get("run_id"):
+        add(blockers, "operator_approval_receipt_run_id_mismatch", "operator_approval_receipt_path")
+    if bound_request.get("obelisk_commit") != fields.get("obelisk_commit"):
+        add(blockers, "operator_approval_receipt_obelisk_commit_mismatch", "operator_approval_receipt_path")
+    if bound_request.get("ark_binary_sha256") != EXPECTED_BINARY_SHA256:
+        add(blockers, "operator_approval_receipt_ark_binary_sha256_mismatch", "operator_approval_receipt_path")
+    if bound_request.get("server_binary_path") != EXPECTED_SERVER_BINARY_PATH:
+        add(blockers, "operator_approval_receipt_server_binary_path_mismatch", "operator_approval_receipt_path")
+    expected_copied_log_path = (
+        str(
+            protected_paths.protected_path_status(
+                manifest_relative_path(fields["copied_log_path"], manifest_path),
+                protected_root=SERVER_ROOT,
+                approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+            ).resolved
+        )
+        if fields.get("copied_log_path")
+        else None
+    )
+    if expected_copied_log_path and bound_request.get("copied_log_path") != expected_copied_log_path:
+        add(blockers, "operator_approval_receipt_copied_log_path_mismatch", "operator_approval_receipt_path")
+    expected_manifest_path = str(
+        protected_paths.protected_path_status(
+            manifest_path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        ).resolved
+    )
+    if bound_request.get("window_manifest_path") != expected_manifest_path:
+        add(blockers, "operator_approval_receipt_window_manifest_path_mismatch", "operator_approval_receipt_path")
+
+    receipt_target = bound_request.get("target")
+    if not isinstance(receipt_target, dict):
+        add(blockers, "operator_approval_receipt_target_missing", "operator_approval_receipt_path")
+    else:
+        if receipt_target.get("instance") != target.instance:
+            add(blockers, "operator_approval_receipt_instance_mismatch", "operator_approval_receipt_path")
+        if receipt_target.get("map") != target.map_name:
+            add(blockers, "operator_approval_receipt_map_mismatch", "operator_approval_receipt_path")
+
+    receipt_window = bound_request.get("approved_window")
+    if not isinstance(receipt_window, dict):
+        add(blockers, "operator_approval_receipt_window_missing", "operator_approval_receipt_path")
+    else:
+        if receipt_window.get("start_utc") != fields.get("approved_window_start_utc"):
+            add(blockers, "operator_approval_receipt_window_start_mismatch", "operator_approval_receipt_path")
+        if receipt_window.get("end_utc") != fields.get("approved_window_end_utc"):
+            add(blockers, "operator_approval_receipt_window_end_mismatch", "operator_approval_receipt_path")
+
+    bound = payload.get("bound_artifacts")
+    if not isinstance(bound, dict):
+        add(blockers, "operator_approval_receipt_bound_artifacts_missing", "operator_approval_receipt_path")
+        return
+    request_path_text = fields.get("request_pack_path")
+    env_path_text = fields.get("observer_env_path")
+    expected_operator_request = None
+    request_status = None
+    env_status = None
+    if request_path_text:
+        request_path = manifest_relative_path(request_path_text, manifest_path)
+        request_status = protected_paths.protected_path_status(
+            request_path,
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+        operator_request = request_status.resolved.parent / "operator-approval-request.md"
+        if operator_request.is_file():
+            expected_operator_request = bound_artifact_from_file(operator_request)
+        else:
+            add(blockers, "operator_approval_request_sidecar_missing", "operator_approval_receipt_path", expected=str(operator_request))
+    if env_path_text:
+        env_status = protected_paths.protected_path_status(
+            manifest_relative_path(env_path_text, manifest_path),
+            protected_root=SERVER_ROOT,
+            approved_roots=APPROVED_OFFLINE_WORKSPACE_ROOTS,
+        )
+    expected_request = bound_artifact_from_file(request_status.resolved) if request_status and request_status.resolved.is_file() else None
+    expected_env = bound_artifact_from_file(env_status.resolved) if env_status and env_status.resolved.is_file() else None
+    for key, expected in (
+        ("window_request_json", expected_request),
+        ("observer_window_env", expected_env),
+        ("operator_approval_request_md", expected_operator_request),
+    ):
+        actual = bound.get(key)
+        if expected is None:
+            continue
+        if actual != expected:
+            add(blockers, f"operator_approval_receipt_{key}_artifact_mismatch", "operator_approval_receipt_path", expected=expected, actual=actual)
+
+    if request_status and env_status and expected_operator_request is not None:
+        expected_digest = request_pack_digest(
+            request_json_path=request_status.resolved,
+            env_path=env_status.resolved,
+            request_md_path=Path(expected_operator_request["path"]),
+        )
+        if payload.get("request_pack_digest") != expected_digest:
+            add(
+                blockers,
+                "operator_approval_receipt_digest_mismatch",
+                "operator_approval_receipt_path",
+                expected=expected_digest,
+                actual=payload.get("request_pack_digest"),
+            )
+
+    flags = payload.get("non_authorization_flags")
+    if not isinstance(flags, dict):
+        add(blockers, "operator_approval_receipt_non_authorization_flags_missing", "operator_approval_receipt_path")
+        flags = {}
+    for key in (
+        "request_pack_acceptance_authorizes_runtime",
+        "generated_template_authorizes_runtime",
+        "server_operations_authorized_by_template",
+        "runtime_work_authorized_by_template",
+        "discord_authorized",
+        "github_publication_authorized",
+        "publication_authorized",
+        "promotion_ready",
+        "public_abi_ready",
+        "public_sdk_ready",
+        "runtime_ready",
+        "v1_completion_ready",
+        "secrets_included",
+        "player_private_data_included",
+    ):
+        if flags.get(key) is not False:
+            add(blockers, f"operator_approval_receipt_{key}_not_false", "operator_approval_receipt_path")
 
 
 def validate_preflight_content(
@@ -957,6 +1189,14 @@ def validate_manifest(
         fields,
         manifest_path,
         blockers,
+        path_key="operator_approval_receipt_path",
+        sha_key="operator_approval_receipt_sha256",
+        expected_name="operator-approval-receipt.json",
+    )
+    validate_sidecar_file(
+        fields,
+        manifest_path,
+        blockers,
         path_key="preflight_pre_path",
         sha_key="preflight_pre_sha256",
         expected_name="preflight-pre.json",
@@ -986,6 +1226,7 @@ def validate_manifest(
         target=target,
     )
     validate_request_pack(fields, manifest_path, blockers, post_window_replay=post_window_replay)
+    validate_operator_approval_receipt(fields, manifest_path, target, blockers)
     user_policy = validate_user_policy(fields, blockers)
 
     for key in ("pre_posture", "post_posture"):
@@ -1140,6 +1381,11 @@ def build_template_fields() -> dict[str, str]:
             "20260601T120000Z-player-principal-lifecycle/observer-window.env"
         ),
         "observer_env_sha256": "0" * 64,
+        "operator_approval_receipt_path": (
+            "/servidor/ark/workspace-offline/player-principal-preflight/"
+            "20260601T120000Z-player-principal-lifecycle/operator-approval-receipt.json"
+        ),
+        "operator_approval_receipt_sha256": "0" * 64,
         "preflight_pre_path": (
             "/servidor/ark/workspace-offline/live-validation-logs/"
             "20260601T120000Z-player-principal-lifecycle/preflight-pre.json"
@@ -1317,6 +1563,11 @@ def build_report(
         "observer_env": {
             "path": resolved_field_path("observer_env_path"),
             "sha256": fields.get("observer_env_sha256"),
+        },
+        "operator_approval_receipt": {
+            "path": resolved_field_path("operator_approval_receipt_path"),
+            "sha256": fields.get("operator_approval_receipt_sha256"),
+            "verified": accepted,
         },
         "preflight": {
             "pre": {

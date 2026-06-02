@@ -22,6 +22,7 @@ from snapshot_evidence_pack import reject_symlink_component
 
 
 SCHEMA = "obelisk.player-principal-lifecycle-window-request.v1"
+APPROVAL_RECEIPT_SCHEMA = "obelisk.player-principal-lifecycle-operator-approval-receipt.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 EXPECTED_SERVER_BINARY_PATH = "/servidor/ark/serverfiles/ShooterGame/Binaries/Linux/ShooterGameServer"
 RUN_ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z-player-principal-lifecycle$")
@@ -408,6 +409,121 @@ def artifact(path: Path) -> dict[str, str]:
     }
 
 
+def bound_artifact(path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size_bytes": len(data),
+    }
+
+
+def request_pack_digest(
+    *,
+    request_json_path: Path,
+    request_md_path: Path,
+    env_path: Path,
+) -> dict[str, str]:
+    domain = b"obelisk.player-principal-lifecycle.request-pack.v1"
+    material = b"\0".join(
+        (
+            domain,
+            b"window-request.json",
+            request_json_path.read_bytes(),
+            b"observer-window.env",
+            env_path.read_bytes(),
+            b"operator-approval-request.md",
+            request_md_path.read_bytes(),
+        )
+    )
+    return {
+        "algorithm": "sha256",
+        "domain": domain.decode("ascii"),
+        "sha256": hashlib.sha256(material).hexdigest(),
+    }
+
+
+def operator_approval_receipt_payload(
+    payload: dict[str, Any],
+    *,
+    request_json_path: Path,
+    request_md_path: Path,
+    env_path: Path,
+    operator_approved: bool = False,
+    operator_reference: str = "pending_operator_completion",
+    approved_at_utc: str = "pending_operator_completion",
+) -> dict[str, Any]:
+    status = "completed_operator_receipt" if operator_approved else "generated_template"
+    return {
+        "schema": APPROVAL_RECEIPT_SCHEMA,
+        "status": status,
+        "receipt_completed": operator_approved,
+        "operator_current_turn_approval_recorded": operator_approved,
+        "approval_scope": {
+            "scope_type": "exact_bound_player_principal_lifecycle_window_only",
+            "standing_approval": False,
+            "reusable": False,
+            "future_windows_authorized": False,
+            "scope_expansion_authorized": False,
+            "unbound_artifacts_authorized": False,
+        },
+        "bound_request_pack": {
+            "run_id": payload["run_id"],
+            "target": payload["target"],
+            "approved_window": payload["approved_window"],
+            "obelisk_commit": payload["obelisk_commit"],
+            "ark_binary_sha256": payload["ark_binary_sha256"],
+            "server_binary_path": payload["server_binary_path"],
+            "restart_expectation": payload["restart_expectation"],
+            "final_posture": payload["final_posture"],
+            "user_policy": payload["user_policy"],
+            "notice_path": payload["notice_path"],
+            "copied_evidence_dir": payload["copied_evidence_dir"],
+            "copied_log_path": payload["copied_log_path"],
+            "window_manifest_path": payload["window_manifest_path"],
+            "rollback": payload["rollback"],
+        },
+        "bound_artifacts": {
+            "window_request_json": bound_artifact(request_json_path),
+            "observer_window_env": bound_artifact(env_path),
+            "operator_approval_request_md": bound_artifact(request_md_path),
+        },
+        "request_pack_digest": request_pack_digest(
+            request_json_path=request_json_path,
+            request_md_path=request_md_path,
+            env_path=env_path,
+        ),
+        "operator_completion": {
+            "approval_recorded_at_utc": approved_at_utc if operator_approved else None,
+            "approved_by_role": operator_reference if operator_approved else None,
+            "approval_source": "current_turn_operator_message" if operator_approved else None,
+            "attestation": "APPROVE_EXACT_BOUND_PLAYER_PRINCIPAL_LIFECYCLE_WINDOW_ONLY" if operator_approved else None,
+        },
+        "non_authorization_flags": {
+            "request_pack_acceptance_authorizes_runtime": False,
+            "generated_template_authorizes_runtime": False,
+            "server_operations_authorized_by_template": False,
+            "runtime_work_authorized_by_template": False,
+            "discord_authorized": False,
+            "github_publication_authorized": False,
+            "publication_authorized": False,
+            "promotion_ready": False,
+            "public_abi_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "v1_completion_ready": False,
+            "secrets_included": False,
+            "player_private_data_included": False,
+        },
+        "non_claims": [
+            "generated receipt template only; does not record operator approval",
+            "completed receipt binds one current-turn request pack only",
+            "receipt does not authorize future windows, standing approval, Discord, GitHub publication, public SDK readiness, runtime readiness, or v1 completion",
+            "receipt does not promote public player identity, permissions/admin, command response, lookup, mutation, return override, or ResourceHandle",
+        ],
+    }
+
+
 def main() -> int:
     args = parse_args()
     validate_args(args)
@@ -420,10 +536,25 @@ def main() -> int:
     env_path = output_dir / "observer-window.env"
     request_json_path = output_dir / "window-request.json"
     request_md_path = output_dir / "operator-approval-request.md"
+    receipt_template_path = output_dir / "operator-approval-receipt.template.json"
 
     env_path.write_text("\n".join(env) + "\n", encoding="utf-8")
     request_json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     request_md_path.write_text(markdown_request(payload, env), encoding="utf-8")
+    receipt_template_path.write_text(
+        json.dumps(
+            operator_approval_receipt_payload(
+                payload,
+                request_json_path=request_json_path,
+                request_md_path=request_md_path,
+                env_path=env_path,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     report = {
         "schema": SCHEMA,
@@ -442,6 +573,7 @@ def main() -> int:
             "observer_env": artifact(env_path),
             "request_json": artifact(request_json_path),
             "operator_request": artifact(request_md_path),
+            "operator_approval_receipt_template": artifact(receipt_template_path),
         },
         "target": payload["target"],
         "run_id": args.run_id,

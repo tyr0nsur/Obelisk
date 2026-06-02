@@ -78,12 +78,16 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
             env = (output_dir / "observer-window.env").read_text(encoding="utf-8").splitlines()
             markdown = (output_dir / "operator-approval-request.md").read_text(encoding="utf-8")
+            receipt_template = json.loads(
+                (output_dir / "operator-approval-receipt.template.json").read_text(encoding="utf-8")
+            )
             output_sha256 = {
                 filename: hashlib.sha256((output_dir / filename).read_bytes()).hexdigest()
                 for filename in (
                     "observer-window.env",
                     "window-request.json",
                     "operator-approval-request.md",
+                    "operator-approval-receipt.template.json",
                 )
             }
 
@@ -103,12 +107,25 @@ class PreparePlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             ("observer_env", "observer-window.env"),
             ("request_json", "window-request.json"),
             ("operator_request", "operator-approval-request.md"),
+            ("operator_approval_receipt_template", "operator-approval-receipt.template.json"),
         ):
             self.assertEqual(report["outputs"][name]["path"], str(output_dir / filename))
             self.assertEqual(
                 report["outputs"][name]["sha256"],
                 output_sha256[filename],
             )
+        self.assertFalse((output_dir / "operator-approval-receipt.json").exists())
+        self.assertEqual(
+            receipt_template["schema"],
+            "obelisk.player-principal-lifecycle-operator-approval-receipt.v1",
+        )
+        self.assertEqual(receipt_template["status"], "generated_template")
+        self.assertFalse(receipt_template["receipt_completed"])
+        self.assertFalse(receipt_template["operator_current_turn_approval_recorded"])
+        self.assertFalse(receipt_template["approval_scope"]["standing_approval"])
+        self.assertFalse(receipt_template["approval_scope"]["reusable"])
+        for value in receipt_template["non_authorization_flags"].values():
+            self.assertFalse(value)
         self.assertEqual(request["schema"], "obelisk.player-principal-lifecycle-window-request.v1")
         self.assertEqual(request["status"], "candidate_only_request_pack")
         self.assertEqual(request["approval_required"], "current-turn operator-approved runtime window, not standing approval")

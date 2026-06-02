@@ -87,6 +87,7 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
         "copied_log",
         "request_pack",
         "observer_env",
+        "operator_approval_receipt",
         "preflight",
         "posture",
         "rollback",
@@ -101,7 +102,7 @@ ALLOWED_OPERATIONAL_WINDOW_KEYS = frozenset(
     )
 )
 ALLOWED_OPERATIONAL_WINDOW_COPIED_LOG_KEYS = frozenset(("path", "path_status", "sha256"))
-ALLOWED_OPERATIONAL_WINDOW_ARTIFACT_KEYS = frozenset(("path", "sha256"))
+ALLOWED_OPERATIONAL_WINDOW_ARTIFACT_KEYS = frozenset(("path", "sha256", "verified"))
 ALLOWED_OPERATIONAL_WINDOW_PREFLIGHT_KEYS = frozenset(("pre", "post"))
 ALLOWED_OPERATIONAL_WINDOW_POSTURE_KEYS = frozenset(
     (
@@ -150,6 +151,7 @@ OPERATIONAL_WINDOW_REPLAY_KEYS = (
     "copied_log",
     "request_pack",
     "observer_env",
+    "operator_approval_receipt",
     "preflight",
     "posture",
     "rollback",
@@ -312,6 +314,7 @@ ALLOWED_FORBIDDEN_KEY_PATHS = (
     "$.privacy_boundary.mutation_allowed",
     "$.privacy_boundary.return_override_allowed",
     "$.source_summary.modules.player_principal_lifecycle",
+    "$.operational_window.operator_approval_receipt",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.HandleNewPlayer.details.principal_id_logged",
     "$.source_summary.modules.player_principal_lifecycle.functions.ShooterGameMode.OnLogout.details.principal_id_logged",
 )
@@ -326,6 +329,7 @@ ALLOWED_FORBIDDEN_LEAF_PATHS = (
     "$.operational_window.copied_log.path",
     "$.operational_window.request_pack.path",
     "$.operational_window.observer_env.path",
+    "$.operational_window.operator_approval_receipt.path",
     "$.operational_window.preflight.pre.path",
     "$.operational_window.preflight.post.path",
     "$.operational_window.posture.observer_exclusivity",
@@ -1111,6 +1115,13 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         blockers,
         run_id=run_id,
         expected_name="observer-window.env",
+    )
+    validate_operational_window_artifact(
+        window.get("operator_approval_receipt"),
+        f"{label}.operator_approval_receipt",
+        blockers,
+        run_id=run_id,
+        expected_name="operator-approval-receipt.json",
     )
     preflight = window.get("preflight")
     if not isinstance(preflight, dict):
