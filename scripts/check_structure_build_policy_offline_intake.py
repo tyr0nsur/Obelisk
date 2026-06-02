@@ -21,7 +21,7 @@ READINESS_SCHEMA = "obelisk.reflection-snapshot-readiness.v1"
 SNAPSHOT_SCHEMA = "obelisk.ufunction-chain.snapshot.v1"
 SURFACE_ID = "obelisk.structure_census.v1"
 TARGET_SET = "structure-build-policy-offline-intake"
-EXPECTED_SURFACE_STATUS = "planning"
+EXPECTED_SURFACE_STATUSES = {"planning", "excluded"}
 EXPECTED_SURFACE_SUPPORT_TIER = "blocked"
 EXPECTED_STATUS = "planning-layout-second-source-accepted"
 EXPECTED_READINESS_ENVELOPE = {
@@ -481,23 +481,27 @@ def validate_surface_manifest_posture(
 ) -> None:
     promoted_surfaces = manifest_string_list(manifest, "promoted_surfaces")
     planning_surfaces = manifest_string_list(manifest, "planning_surfaces")
+    post_v1_or_excluded_surfaces = manifest_string_list(manifest, "post_v1_or_excluded_surfaces")
 
     if SURFACE_ID in promoted_surfaces:
         add(blockers, "structure_surface_in_promoted_surfaces", surface=SURFACE_ID)
-    if SURFACE_ID not in planning_surfaces:
-        add(blockers, "structure_surface_missing_from_planning_surfaces", surface=SURFACE_ID)
 
     if surface is None:
         return
 
-    if surface.get("status") != EXPECTED_SURFACE_STATUS:
+    status = surface.get("status")
+    if status not in EXPECTED_SURFACE_STATUSES:
         add(
             blockers,
             "surface_status_mismatch",
             surface=SURFACE_ID,
-            expected=EXPECTED_SURFACE_STATUS,
-            value=surface.get("status"),
+            expected=sorted(EXPECTED_SURFACE_STATUSES),
+            value=status,
         )
+    if status == "planning" and SURFACE_ID not in planning_surfaces:
+        add(blockers, "structure_surface_missing_from_planning_surfaces", surface=SURFACE_ID)
+    if status == "excluded" and SURFACE_ID not in post_v1_or_excluded_surfaces:
+        add(blockers, "structure_surface_missing_from_post_v1_or_excluded_surfaces", surface=SURFACE_ID)
     if surface.get("support_tier") != EXPECTED_SURFACE_SUPPORT_TIER:
         add(
             blockers,

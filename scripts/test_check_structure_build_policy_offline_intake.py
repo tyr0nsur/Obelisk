@@ -281,14 +281,16 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
                 "obelisk.permissions_admin.v1",
                 "obelisk.command_chat_response_path.v1",
                 "obelisk.commands_replies.v1",
-                "obelisk.structure_census.v1",
                 "obelisk.mission_transfer_dino_tribe.v1",
+            ],
+            "post_v1_or_excluded_surfaces": [
+                "obelisk.structure_census.v1",
             ],
             "surfaces": [
                 {
                     "id": "obelisk.structure_census.v1",
                     "category": "structure observer and build policy",
-                    "status": "planning",
+                    "status": "excluded",
                     "support_tier": "blocked",
                     "public_contract": [],
                     "evidence": {
@@ -417,9 +419,9 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
                 "structure_surface_in_promoted_surfaces",
             ),
             (
-                "planning_surfaces",
-                lambda payload: payload["planning_surfaces"].remove("obelisk.structure_census.v1"),
-                "structure_surface_missing_from_planning_surfaces",
+                "post_v1_or_excluded_surfaces",
+                lambda payload: payload["post_v1_or_excluded_surfaces"].remove("obelisk.structure_census.v1"),
+                "structure_surface_missing_from_post_v1_or_excluded_surfaces",
             ),
             (
                 "status",

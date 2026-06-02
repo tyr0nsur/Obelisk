@@ -1054,6 +1054,15 @@ priorities, and do not use history files as the active source of truth.
   paths. Default route/SDK still fail closed at `approved_runtime_evidence_missing`,
   SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`; no runtime/server operation was
   performed.
+- 2026-06-02 delegated Structure non-complete accounting pass: `obelisk.structure_census.v1`
+  is now explicitly `excluded` in `docs/public_sdk_surfaces.json`, removed from
+  `planning_surfaces`, and named in `post_v1_or_excluded_surfaces` plus the scoped release
+  statement with exact no-StructureEvents/no-census/no-identity/no-lookup/no-build-policy/
+  no-collision/no-ownership wording. Structure census and build-policy checkers remain
+  accepted only as offline/planning evidence with public SDK/runtime/promotion/enforcement
+  false. SDK completion with the scoped statement remains blocked at
+  `stable_claim_allowed=false`, SDK `0/12`, P0 `0/4`; no runtime/server operation was
+  performed.
 
 ## Agent Coordination
 

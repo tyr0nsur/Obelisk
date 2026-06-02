@@ -72,7 +72,6 @@
     "obelisk.permissions_admin.v1",
     "obelisk.command_chat_response_path.v1",
     "obelisk.commands_replies.v1",
-    "obelisk.structure_census.v1",
     "obelisk.mission_transfer_dino_tribe.v1"
   ],
   "v1_sdk_completion_blockers": [
@@ -104,6 +103,7 @@
   "post_v1_or_excluded_surfaces": [
     "obelisk.inventory_items_mutation.v1",
     "obelisk.object_identity_resource_handle.v1",
+    "obelisk.structure_census.v1",
     "obelisk.lifecycle_ops_recovery.v1",
     "obelisk.player_services_economy_mobility.v1",
     "obelisk.operator_ingress_storage.v1",
@@ -707,7 +707,7 @@
     {
       "id": "obelisk.structure_census.v1",
       "category": "structure observer and build policy",
-      "status": "planning",
+      "status": "excluded",
       "support_tier": "blocked",
       "public_contract": [],
       "depends_on": [

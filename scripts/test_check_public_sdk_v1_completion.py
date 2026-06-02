@@ -940,15 +940,15 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             0,
         )
         self.assertIn("obelisk.player_identity.v1", progress["completion_blockers_without_manifest_outcome"])
-        self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 6)
-        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 6)
+        self.assertEqual(progress["completion_blockers_without_manifest_outcome_count"], 5)
+        self.assertGreaterEqual(progress["unresolved_completion_blocker_count"], 5)
         self.assertFalse(progress["stable_claim_allowed"])
         self.assertIn("status accounting", progress["outcome_accounting_note"])
         self.assertIn("never contribute percentage", progress["outcome_accounting_note"])
         self.assertIn("accounting only", progress["non_claim"])
         self.assertIn("core-first release readiness", " ".join(payload["non_claims"]))
-        self.assertEqual(progress["manifest_outcome_missing_count"], 6)
-        self.assertEqual(progress["release_statement_outcome_missing_count"], 6)
+        self.assertEqual(progress["manifest_outcome_missing_count"], 5)
+        self.assertEqual(progress["release_statement_outcome_missing_count"], 7)
         self.assertEqual(progress["dependency_chain_remaining_count"], 4)
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["total"], 12)
         self.assertEqual(
@@ -958,7 +958,6 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.permissions_admin.v1",
                 "obelisk.command_chat_response_path.v1",
                 "obelisk.commands_replies.v1",
-                "obelisk.structure_census.v1",
                 "obelisk.mission_transfer_dino_tribe.v1",
             ],
         )
@@ -968,6 +967,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             [
                 "obelisk.inventory_items_mutation.v1",
                 "obelisk.object_identity_resource_handle.v1",
+                "obelisk.structure_census.v1",
                 "obelisk.lifecycle_ops_recovery.v1",
                 "obelisk.player_services_economy_mobility.v1",
                 "obelisk.operator_ingress_storage.v1",
@@ -2397,6 +2397,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.object_identity_resource_handle.v1",
                 "obelisk.operator_ingress_storage.v1",
                 "obelisk.player_services_economy_mobility.v1",
+                "obelisk.structure_census.v1",
             ],
         )
         self.assertEqual(payload["promoted_surfaces_with_unresolved_dependencies"], {})
@@ -2529,6 +2530,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 "obelisk.object_identity_resource_handle.v1",
                 "obelisk.operator_ingress_storage.v1",
                 "obelisk.player_services_economy_mobility.v1",
+                "obelisk.structure_census.v1",
             ],
         )
         self.assertEqual(
@@ -2550,7 +2552,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             [],
         )
         self.assertFalse(payload["v1_sdk_report_sections"]["no_live_progress"]["stable_claim_allowed"])
-        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing_count"], 6)
+        self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["manifest_outcome_missing_count"], 5)
         self.assertEqual(payload["v1_sdk_blocker_outcome_summary"]["release_statement_outcome_missing_count"], 0)
         outcome_by_surface = {
             row["surface"]: row for row in payload["v1_sdk_blocker_outcomes"]
@@ -2631,6 +2633,114 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("obelisk.inventory_items_mutation.v1", payload["release_statement_missing_blocker_outcomes"])
         self.assertFalse(payload["stable_claim_allowed"])
         self.assertIn("v1_completion_required_false", payload["blockers"])
+
+    def test_structure_excluded_outcome_is_bookkeeping_only_and_requires_exact_wording(self) -> None:
+        surface_id = "obelisk.structure_census.v1"
+        manifest = json.loads(PUBLIC_SDK_SURFACES.read_text(encoding="utf-8"))
+        for surface in manifest["surfaces"]:
+            if surface["id"] == surface_id:
+                surface["status"] = "excluded"
+                surface["public_contract"] = []
+                break
+        manifest["planning_surfaces"] = [
+            item for item in manifest["planning_surfaces"] if item != surface_id
+        ]
+        if surface_id not in manifest["post_v1_or_excluded_surfaces"]:
+            manifest["post_v1_or_excluded_surfaces"].append(surface_id)
+
+        exact_structure_exclusion = (
+            f"{surface_id}: excluded - no StructureEvents SDK, structure census, "
+            "structure identity, structure lookup, build placement policy, "
+            "no-collision policy, or ownership lookup API is included in v1.\n"
+        )
+        exact_statement = (
+            "Reviewed against docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json.\n"
+            f"{exact_structure_exclusion}"
+            "The complete SDK is ready.\n"
+            "The full SDK is ready.\n"
+            "The production SDK is ready.\n"
+        )
+        imprecise_statement = (
+            "Reviewed against docs/SDK_V1_COMPATIBILITY.md and docs/public_sdk_surfaces.json.\n"
+            f"{surface_id}: excluded - no StructureEvents SDK, structure census, "
+            "structure identity, structure lookup, or build-policy API is included in v1.\n"
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
+            exact_statement_path = Path(temp_dir) / "EXACT_RELEASE_STATEMENT.md"
+            imprecise_statement_path = Path(temp_dir) / "IMPRECISE_RELEASE_STATEMENT.md"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            exact_statement_path.write_text(exact_statement, encoding="utf-8")
+            imprecise_statement_path.write_text(imprecise_statement, encoding="utf-8")
+
+            exact_result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(exact_statement_path),
+                "--json",
+                check=False,
+            )
+            imprecise_result = self.run_checker(
+                "--manifest",
+                str(manifest_path),
+                "--release-statement",
+                str(imprecise_statement_path),
+                "--json",
+                check=False,
+            )
+
+        exact_payload = json.loads(exact_result.stdout)
+        self.assertEqual(exact_result.returncode, 1)
+        self.assertFalse(exact_payload["stable_claim_allowed"])
+        self.assertFalse(exact_payload["v1_sdk_progress"]["stable_claim_allowed"])
+        self.assertIn("release_statement_forbidden_broad_claims", exact_payload["blockers"])
+        forbidden_claims = "\n".join(exact_payload["release_statement_forbidden_broad_claims"])
+        for claim in ("complete SDK", "full SDK", "production SDK"):
+            with self.subTest(claim=claim):
+                self.assertIn(claim, forbidden_claims)
+        self.assertEqual(exact_payload["v1_sdk_progress"]["p0_chain_promoted_count"], 0)
+        self.assertEqual(
+            exact_payload["v1_sdk_progress"]["p0_chain_scoped_non_complete_outcome_count"],
+            0,
+        )
+        self.assertIn(
+            surface_id,
+            exact_payload["v1_sdk_progress"]["completion_blockers_with_manifest_post_v1_or_excluded_outcome"],
+        )
+        self.assertIn(
+            surface_id,
+            exact_payload["v1_sdk_progress"][
+                "completion_blockers_with_release_statement_post_v1_or_excluded_outcome"
+            ],
+        )
+        exact_row = next(
+            row for row in exact_payload["v1_sdk_blocker_outcomes"] if row["surface"] == surface_id
+        )
+        self.assertFalse(exact_row["is_p0_dependency_chain"])
+        self.assertEqual(exact_row["manifest_outcome"], "excluded")
+        self.assertEqual(exact_row["release_statement_outcome"], "excluded")
+        self.assertTrue(exact_row["release_statement_contract_satisfied"])
+        self.assertFalse(exact_row["counts_toward_complete_sdk_claim"])
+        self.assertTrue(exact_row["unresolved_for_complete_sdk_claim"])
+
+        imprecise_payload = json.loads(imprecise_result.stdout)
+        self.assertEqual(imprecise_result.returncode, 1)
+        self.assertIn("release_statement_missing_exclusion_contract", imprecise_payload["blockers"])
+        self.assertEqual(imprecise_payload["release_statement_missing_exclusion_contracts"], [surface_id])
+        self.assertNotIn(
+            surface_id,
+            imprecise_payload["v1_sdk_progress"][
+                "completion_blockers_with_release_statement_post_v1_or_excluded_outcome"
+            ],
+        )
+        imprecise_row = next(
+            row for row in imprecise_payload["v1_sdk_blocker_outcomes"] if row["surface"] == surface_id
+        )
+        self.assertEqual(imprecise_row["release_statement_outcome"], "excluded")
+        self.assertFalse(imprecise_row["release_statement_contract_satisfied"])
+        self.assertFalse(imprecise_row["counts_toward_complete_sdk_claim"])
 
     def test_scoped_release_statement_scope_rejects_broad_v1_claim(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

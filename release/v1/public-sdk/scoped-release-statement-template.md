@@ -13,9 +13,9 @@ Remaining full-gate blockers not resolved by this scoped statement:
   dependency chain for a complete SDK. Do not classify them as post-v1 in this template;
   a scoped non-complete release may only exclude them with explicit no-SDK wording while
   preserving `scripts/check_public_sdk_v1_completion.py --json` as blocked.
-- obelisk.structure_census.v1 remains planning; promote a narrow copied structure ABI or
-  explicitly exclude StructureEvents, census, identity, lookup, build policy, no-collision
-  policy, and ownership lookup.
+- obelisk.structure_census.v1 is explicitly excluded as non-complete accounting; promote
+  a narrow copied structure ABI in a later release before claiming StructureEvents,
+  census, identity, lookup, build policy, no-collision policy, or ownership lookup.
 - obelisk.mission_transfer_dino_tribe.v1 remains planning; promote or explicitly exclude
   mission, transfer, dino policy/cosmetics/carry rules, tribe identity/notices/policy, and
   buff/status.
@@ -25,6 +25,7 @@ Remaining full-gate blockers not resolved by this scoped statement:
 
 obelisk.lifecycle_ops_recovery.v1: post-v1 - no plugin watchdog API, plugin crash recovery API, hot plugin reload API, Obelisk hot reload API, process restart orchestration API, server recovery API, operator reload command API, detached-worker ingress API, or restart-state recovery API is included in v1
 obelisk.inventory_items_mutation.v1: post-v1 - no Inventory SDK, Items SDK, give item API, remove item API, kits/rewards API, engram/progression API, inventory lookup, item handles, item mutation, return override, or ResourceHandle API is included in v1
+obelisk.structure_census.v1: excluded - no StructureEvents SDK, structure census, structure identity, structure lookup, build placement policy, no-collision policy, or ownership lookup API is included in v1
 obelisk.object_identity_resource_handle.v1: post-v1 - no object identity, UObject identity, object lookup, ResourceHandle, post-callback object handle, structure handle, item handle, inventory handle, dino handle, tribe handle, buff/status handle, mission/transfer correlation handle, economy/mobility handle, or area-policy object handle API is included in v1
 obelisk.player_services_economy_mobility.v1: post-v1 - no economy API, shop API, rewards API, kits API, stats API, homes API, teleport API, safe-zone API, area policy API, broadcast/timed notice service, or cross-instance persistence API is included in v1
 obelisk.operator_ingress_storage.v1: post-v1 - no RCON, operator reload command API, Unicode/operator text encoding API, webhook, database/storage, secret manager, external ingress, or cross-instance storage API is included in v1

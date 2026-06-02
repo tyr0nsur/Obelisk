@@ -4005,7 +4005,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         structure = surfaces["obelisk.structure_census.v1"]
         candidate = structure["readiness_checker_candidate"]
 
-        self.assertEqual(structure["status"], "planning")
+        self.assertEqual(structure["status"], "excluded")
+        self.assertIn("obelisk.structure_census.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertNotIn("obelisk.structure_census.v1", manifest["planning_surfaces"])
         self.assertEqual(structure["support_tier"], "blocked")
         self.assertEqual(structure["public_contract"], [])
         self.assertEqual(candidate["status"], "candidate-only")
@@ -4060,12 +4062,15 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "BuildPolicy",
         )
 
+        manifest = json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))
         structure = next(
             surface
-            for surface in json.loads(PUBLIC_SDK_SURFACES_MANIFEST.read_text(encoding="utf-8"))["surfaces"]
+            for surface in manifest["surfaces"]
             if surface["id"] == "obelisk.structure_census.v1"
         )
-        self.assertEqual(structure["status"], "planning")
+        self.assertEqual(structure["status"], "excluded")
+        self.assertIn("obelisk.structure_census.v1", manifest["post_v1_or_excluded_surfaces"])
+        self.assertNotIn("obelisk.structure_census.v1", manifest["planning_surfaces"])
         self.assertEqual(structure["support_tier"], "blocked")
         self.assertEqual(structure["public_contract"], [])
         self.assertEqual(

@@ -2131,3 +2131,28 @@ The UE4/offline audit found no broad dump/reversing task higher value than these
 request/contract guardrails for the current blocker. This remains offline-only and does
 not authorize runtime/server work, marker/env edits, Discord, publication, public ABI,
 promotion, release readiness, or stable/complete SDK wording.
+
+## Structure Exclusion Accounting And Scoped Statement Closure
+
+A delegated Structure accounting round split review across SDK completion accounting,
+release wording, P0 invariants, and focused test work. Integrated offline changes:
+
+- `obelisk.structure_census.v1` is explicitly classified as `excluded` in
+  `docs/public_sdk_surfaces.json`, removed from `planning_surfaces`, and included in
+  `post_v1_or_excluded_surfaces` while staying in `v1_sdk_completion_blockers`.
+- `release/v1/public-sdk/scoped-release-statement-template.md` now carries exact
+  non-complete wording for Structure: no StructureEvents SDK, structure census, structure
+  identity, structure lookup, build placement policy, no-collision policy, or ownership
+  lookup API is included in v1.
+- `scripts/check_structure_build_policy_offline_intake.py` now accepts either `planning`
+  or `excluded` Structure status as non-promoting offline accounting, while still rejecting
+  promoted/public/runtime/enforcement overclaims.
+- Completion tests now prove the Structure exclusion is bookkeeping only: it does not
+  count toward complete SDK progress, broad complete/full/production SDK wording is
+  rejected, and imprecise Structure exclusion text fails the release-statement contract.
+
+Validation remained offline-only. Targeted tests and checkers confirmed
+`stable_claim_allowed=false`, complete SDK `0/12`, P0 `0/4`, and Structure census/build
+policy public SDK/runtime/promotion/enforcement flags all false. No runtime/server work,
+`/servidor/ark` writes, marker/env edits, Discord, public ABI/header readiness, promotion,
+release readiness, or stable/complete SDK claim was authorized.
