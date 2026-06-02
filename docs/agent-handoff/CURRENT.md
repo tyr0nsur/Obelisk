@@ -212,9 +212,9 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest guardrails closed command-response readiness provenance, mission-leaf umbrella
-  accounting, permissions/admin identity-certificate dependency, and player-principal
-  request/window prep. Commands/replies now rejects copied child response-path reports
-  outside the canonical report-root path; this is provenance-only, not response/replies
-  readiness. Default route/SDK remain fail-closed: `lifecycle_anchor_first_evidence_provenance_unbound`,
-  `stable_claim_allowed=false`, complete-SDK progress `0/12`, and P0 progress `0/4`.
+- Latest guardrails closed command-response readiness provenance, commands/replies report-root
+  binding, mission-leaf accounting, permissions/admin identity-certificate dependency, and
+  player-principal request/window prep. SDK structured promotion evidence for command
+  response/replies now requires planning-checker source-artifact rebinding before those rows
+  can count. Provenance-only; default route/SDK remain fail-closed:
+  `lifecycle_anchor_first_evidence_provenance_unbound`, `stable_claim_allowed=false`, complete-SDK `0/12`, P0 `0/4`.

@@ -29,6 +29,27 @@ DEFAULT_OBJECT_IDENTITY_RESOURCE_HANDLE_READINESS = (
 DEFAULT_MISSION_TRANSFER_DINO_TRIBE_OUTCOME_ACCOUNTING = (
     REPO_ROOT / "scripts" / "check_mission_transfer_dino_tribe_v1_outcome_accounting.py"
 )
+DEFAULT_COMMAND_RESPONSE_PUBLIC_CONTRACT_DECISIONS = (
+    REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+)
+DEFAULT_COMMANDS_REPLIES_PUBLIC_CONTRACT_DECISIONS = (
+    REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
+)
+COMMAND_RESPONSE_PUBLIC_READINESS_SOURCE_ARTIFACT_KEYS = (
+    "readiness_path",
+    "decisions_path",
+    "surfaces_path",
+    "public_header_path",
+)
+COMMANDS_REPLIES_PUBLIC_READINESS_SOURCE_ARTIFACT_KEYS = (
+    "decisions_path",
+    "surfaces_path",
+    "public_header_path",
+)
+COMMANDS_REPLIES_RESPONSE_PATH_REPORT_NAME = "command-chat-response-public-readiness.json"
+COMMAND_RESPONSE_READINESS_PRODUCER_SCRIPT = "scripts/compare_reflection_snapshots.py"
+COMMAND_RESPONSE_READINESS_OUTPUT_NAME = "command-chat-response-route-planning-readiness.json"
+COMMAND_RESPONSE_READINESS_TARGET_SET = "command-chat-response-route-planning"
 OBJECT_IDENTITY_RESOURCE_HANDLE_DECISIONS_FILENAME = (
     "object_identity_resource_handle_public_contract_decisions.json"
 )
@@ -2233,6 +2254,156 @@ def load_repo_relative_json_evidence(raw_path: Any) -> tuple[dict[str, Any] | No
     return payload, None
 
 
+def resolve_report_source_artifact(raw_path: Any, reason_prefix: str) -> tuple[Path | None, list[str]]:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None, [f"{reason_prefix}:source_artifact_missing"]
+    path = Path(raw_path)
+    if not path.is_absolute():
+        relative = repo_relative_evidence_path(raw_path)
+        if relative is None:
+            return None, [f"{reason_prefix}:source_artifact_path_not_repo_relative"]
+        path = REPO_ROOT / relative
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return None, [f"{reason_prefix}:source_artifact_unresolvable"]
+    if not resolved.is_file():
+        return None, [f"{reason_prefix}:source_artifact_path_not_file"]
+    return resolved, []
+
+
+def report_path_matches_default(path: Path | None, expected: Path) -> bool:
+    if path is None:
+        return False
+    try:
+        return path == expected.resolve()
+    except OSError:
+        return False
+
+
+def readiness_json_provenance_missing(readiness_path: Path, readiness_root: Path, reason_prefix: str) -> list[str]:
+    missing: list[str] = []
+    try:
+        readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return [f"{reason_prefix}:readiness_json_unreadable"]
+    if not isinstance(readiness, dict):
+        return [f"{reason_prefix}:readiness_json_not_object"]
+    source_root = readiness.get("source_root")
+    if not isinstance(source_root, str) or not source_root.strip():
+        missing.append(f"{reason_prefix}:readiness_source_root_missing")
+    else:
+        try:
+            if Path(source_root).resolve() != readiness_root:
+                missing.append(f"{reason_prefix}:readiness_source_root_mismatch")
+        except OSError:
+            missing.append(f"{reason_prefix}:readiness_source_root_unresolvable")
+    producer = readiness.get("producer")
+    if not isinstance(producer, dict):
+        missing.append(f"{reason_prefix}:readiness_producer_missing")
+        return missing
+    if producer.get("script") != COMMAND_RESPONSE_READINESS_PRODUCER_SCRIPT:
+        missing.append(f"{reason_prefix}:readiness_producer_script_mismatch")
+    if producer.get("output_name") != COMMAND_RESPONSE_READINESS_OUTPUT_NAME:
+        missing.append(f"{reason_prefix}:readiness_producer_output_name_mismatch")
+    argv = producer.get("argv")
+    if not isinstance(argv, list) or not all(isinstance(item, str) and item.strip() for item in argv):
+        missing.append(f"{reason_prefix}:readiness_producer_argv_missing")
+        return missing
+    if COMMAND_RESPONSE_READINESS_PRODUCER_SCRIPT not in argv:
+        missing.append(f"{reason_prefix}:readiness_producer_argv_script_missing")
+    if "--target-set" not in argv:
+        missing.append(f"{reason_prefix}:readiness_producer_argv_target_set_missing")
+    else:
+        target_set_index = argv.index("--target-set") + 1
+        if target_set_index >= len(argv) or argv[target_set_index] != COMMAND_RESPONSE_READINESS_TARGET_SET:
+            missing.append(f"{reason_prefix}:readiness_producer_argv_target_set_mismatch")
+    if "--readiness-report" not in argv:
+        missing.append(f"{reason_prefix}:readiness_producer_argv_readiness_report_missing")
+    if "--json" not in argv:
+        missing.append(f"{reason_prefix}:readiness_producer_argv_json_missing")
+    return missing
+
+
+def command_response_public_readiness_source_artifacts_missing(
+    report: dict[str, Any],
+    reason_prefix: str,
+) -> list[str]:
+    missing: list[str] = []
+    resolved: dict[str, Path] = {}
+    for key in COMMAND_RESPONSE_PUBLIC_READINESS_SOURCE_ARTIFACT_KEYS:
+        path, errors = resolve_report_source_artifact(report.get(key), f"{reason_prefix}:{key}")
+        missing.extend(errors)
+        if path is not None:
+            resolved[key] = path
+    if not report_path_matches_default(
+        resolved.get("decisions_path"),
+        DEFAULT_COMMAND_RESPONSE_PUBLIC_CONTRACT_DECISIONS,
+    ):
+        missing.append(f"{reason_prefix}:decisions_path_mismatch")
+    if not report_path_matches_default(resolved.get("surfaces_path"), DEFAULT_MANIFEST):
+        missing.append(f"{reason_prefix}:surfaces_path_mismatch")
+    if not report_path_matches_default(resolved.get("public_header_path"), DEFAULT_PUBLIC_HEADER):
+        missing.append(f"{reason_prefix}:public_header_path_mismatch")
+    readiness_path = resolved.get("readiness_path")
+    if readiness_path is not None:
+        readiness_root = readiness_path.parent
+        readiness_root_value = report.get("readiness_root")
+        if not isinstance(readiness_root_value, str) or not readiness_root_value.strip():
+            missing.append(f"{reason_prefix}:readiness_root_missing")
+        else:
+            try:
+                if Path(readiness_root_value).resolve() != readiness_root:
+                    missing.append(f"{reason_prefix}:readiness_root_mismatch")
+            except OSError:
+                missing.append(f"{reason_prefix}:readiness_root_unresolvable")
+        missing.extend(readiness_json_provenance_missing(readiness_path, readiness_root, reason_prefix))
+    return missing
+
+
+def commands_replies_public_readiness_source_artifacts_missing(
+    report: dict[str, Any],
+    reason_prefix: str,
+) -> list[str]:
+    missing: list[str] = []
+    resolved: dict[str, Path] = {}
+    for key in COMMANDS_REPLIES_PUBLIC_READINESS_SOURCE_ARTIFACT_KEYS:
+        path, errors = resolve_report_source_artifact(report.get(key), f"{reason_prefix}:{key}")
+        missing.extend(errors)
+        if path is not None:
+            resolved[key] = path
+    if not report_path_matches_default(
+        resolved.get("decisions_path"),
+        DEFAULT_COMMANDS_REPLIES_PUBLIC_CONTRACT_DECISIONS,
+    ):
+        missing.append(f"{reason_prefix}:decisions_path_mismatch")
+    if not report_path_matches_default(resolved.get("surfaces_path"), DEFAULT_MANIFEST):
+        missing.append(f"{reason_prefix}:surfaces_path_mismatch")
+    if not report_path_matches_default(resolved.get("public_header_path"), DEFAULT_PUBLIC_HEADER):
+        missing.append(f"{reason_prefix}:public_header_path_mismatch")
+    response_path_report_path, response_path_report_errors = resolve_report_source_artifact(
+        report.get("response_path_report_path"),
+        f"{reason_prefix}:response_path_report_path",
+    )
+    missing.extend(response_path_report_errors)
+    response_path_report_root_value = report.get("response_path_report_root")
+    response_path_report_root: Path | None = None
+    if not isinstance(response_path_report_root_value, str) or not response_path_report_root_value.strip():
+        missing.append(f"{reason_prefix}:response_path_report_root_missing")
+    else:
+        try:
+            response_path_report_root = Path(response_path_report_root_value).resolve()
+        except OSError:
+            missing.append(f"{reason_prefix}:response_path_report_root_unresolvable")
+    if response_path_report_path is not None and response_path_report_root is not None:
+        expected_response_path_report = (
+            response_path_report_root / COMMANDS_REPLIES_RESPONSE_PATH_REPORT_NAME
+        )
+        if response_path_report_path != expected_response_path_report:
+            missing.append(f"{reason_prefix}:response_path_report_path_mismatch")
+    return missing
+
+
 def current_repo_head() -> str | None:
     try:
         result = subprocess.run(
@@ -2582,6 +2753,13 @@ def command_response_structured_promotion_evidence_missing(evidence: dict[str, A
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
+    else:
+        missing.extend(
+            command_response_public_readiness_source_artifacts_missing(
+                readiness_report,
+                "public_readiness_report",
+            )
+        )
 
     missing.extend(executed_test_report_missing(evidence, "obelisk.command_chat_response_path.v1"))
     return missing
@@ -2616,6 +2794,13 @@ def commands_replies_structured_promotion_evidence_missing(evidence: dict[str, A
         and readiness_report.get("blockers") == []
     ):
         missing.append("public_readiness_report:fields_invalid")
+    else:
+        missing.extend(
+            commands_replies_public_readiness_source_artifacts_missing(
+                readiness_report,
+                "public_readiness_report",
+            )
+        )
 
     command_response_evidence = evidence.get("command_response_promotion_evidence")
     if not isinstance(command_response_evidence, dict):

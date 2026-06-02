@@ -2010,11 +2010,13 @@ Additional validation:
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest scripts.test_check_commands_replies_public_readiness scripts.test_check_command_permission_route_gate`
 - `PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_command_permission_route_gate.py --json`
 
-Residual future-promotion risk: SDK structured promotion evidence helpers for command
-response and commands/replies still validate summarized repo-relative evidence reports
-rather than replaying the full source-artifact rebinding performed by the planning
-readiness checkers. This does not create a current overclaim while the route gate remains
-locked and planning-only.
+Structured promotion evidence for command response/replies now requires the same
+source-artifact bindings used by the planning readiness checkers before those rows can
+count toward SDK completion. Command response evidence must carry bound readiness,
+decisions, surfaces, public-header paths, and readiness producer provenance; commands/
+replies evidence must also bind its own decisions/surfaces/header paths plus the canonical
+child response-path report root/name. This remains provenance-only and does not create
+response/replies readiness while the route gate is locked and planning-only.
 
 This round does not authorize runtime/server work, `/servidor/ark` writes, marker/env
 changes, Discord, GitHub publication, release refs, public identity, permissions/admin

@@ -6326,6 +6326,152 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             replies_executed_report = core_path / "commands_replies_executed_tests.json"
             for path in (response_abi, response_sdk, replies_abi, replies_sdk):
                 path.write_text("// synthetic executed promotion fixture\n", encoding="utf-8")
+            response_readiness = core_path / "command-chat-response-route-planning-readiness.json"
+            response_readiness.write_text(
+                json.dumps(
+                    {
+                        "source_root": str(core_path),
+                        "producer": {
+                            "script": "scripts/compare_reflection_snapshots.py",
+                            "output_name": "command-chat-response-route-planning-readiness.json",
+                            "argv": [
+                                "scripts/compare_reflection_snapshots.py",
+                                "--target-set",
+                                "command-chat-response-route-planning",
+                                "--readiness-report",
+                                str(response_readiness),
+                                "--json",
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_report_root = core_path / "command-chat-response-public-readiness"
+            response_report_root.mkdir()
+            response_report = response_report_root / "command-chat-response-public-readiness.json"
+            response_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "target_set": "command-chat-response-route-planning",
+                        "readiness_status": "compared",
+                        "decisions_status": "blocked",
+                        "surfaces_status": "planning",
+                        "readiness_root": str(core_path),
+                        "readiness_path": str(response_readiness),
+                        "decisions_path": str(
+                            REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+                        ),
+                        "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                        "public_header_path": str(PUBLIC_HEADER),
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            replies_report = core_path / "commands_replies_public_readiness.json"
+            replies_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.commands-replies-public-readiness-check.v1",
+                        "surface": "obelisk.commands_replies.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "runtime_ready": False,
+                        "public_command_router_allowed": False,
+                        "public_reply_or_send_chat_abi_allowed": False,
+                        "public_response_path_allowed": False,
+                        "decisions_status": "blocked",
+                        "commands_replies_surface_status": "planning",
+                        "dependency_chain": [
+                            "obelisk.player_identity.v1",
+                            "obelisk.permissions_admin.v1",
+                            "obelisk.command_chat_response_path.v1",
+                        ],
+                        "decisions_path": str(
+                            REPO_ROOT / "docs" / "commands_replies_public_contract_decisions.json"
+                        ),
+                        "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                        "public_header_path": str(PUBLIC_HEADER),
+                        "response_path_report_path": str(response_report),
+                        "response_path_report_root": str(response_report_root),
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_executed = write_executed_test_artifact(
+                response_executed_report,
+                "obelisk.command_chat_response_path.v1",
+                command="python3 -m unittest command_response_promotion",
+            )
+            replies_executed = write_executed_test_artifact(
+                replies_executed_report,
+                "obelisk.commands_replies.v1",
+                argv=["cmake", "--build", "commands_replies_sdk_consumer"],
+            )
+
+            missing = module.surface_missing_structured_promotion_evidence(
+                {
+                    "id": "obelisk.commands_replies.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        "public_readiness_report": str(replies_report.relative_to(REPO_ROOT)),
+                        "command_response_promotion_evidence": {
+                            "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
+                            "executed_test_report": response_executed,
+                        },
+                        "executed_test_report": replies_executed,
+                    },
+                }
+            )
+
+        self.assertEqual(missing, [])
+
+    def test_command_response_structured_promotion_rejects_summary_only_readiness_report(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="CommandResponseSummaryOnly",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="command_response_summary_only",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            (core_path / "CommandChatResponsePromotionTests.cpp").write_text(
+                "// synthetic executed promotion fixture\n",
+                encoding="utf-8",
+            )
+            (sdk_path / "command_chat_response_promotion_plugin.c").write_text(
+                "// synthetic executed promotion fixture\n",
+                encoding="utf-8",
+            )
             response_report = core_path / "command_response_public_readiness.json"
             response_report.write_text(
                 json.dumps(
@@ -6345,6 +6491,108 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "readiness_status": "compared",
                         "decisions_status": "blocked",
                         "surfaces_status": "planning",
+                        "blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_executed = write_executed_test_artifact(
+                core_path / "command_response_executed_tests.json",
+                "obelisk.command_chat_response_path.v1",
+                command="python3 -m unittest command_response_promotion",
+            )
+
+            missing = module.surface_missing_structured_promotion_evidence(
+                {
+                    "id": "obelisk.command_chat_response_path.v1",
+                    "status": "promoted",
+                    "evidence": {
+                        "public_readiness_report": str(response_report.relative_to(REPO_ROOT)),
+                        "executed_test_report": response_executed,
+                    },
+                }
+            )
+
+        self.assertIn("public_readiness_report:readiness_path:source_artifact_missing", missing)
+        self.assertIn("public_readiness_report:decisions_path:source_artifact_missing", missing)
+        self.assertIn("public_readiness_report:surfaces_path:source_artifact_missing", missing)
+        self.assertIn("public_readiness_report:public_header_path:source_artifact_missing", missing)
+
+    def test_commands_replies_structured_promotion_rejects_summary_only_readiness_report(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("check_public_sdk_v1_completion", SCRIPT)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="CommandsRepliesSummaryOnly",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="commands_replies_summary_only",
+            ) as sdk_dir,
+        ):
+            core_path = Path(core_dir)
+            sdk_path = Path(sdk_dir)
+            for path in (
+                core_path / "CommandChatResponsePromotionTests.cpp",
+                sdk_path / "command_chat_response_promotion_plugin.c",
+                core_path / "CommandsRepliesPromotionTests.cpp",
+                sdk_path / "commands_replies_promotion_plugin.c",
+            ):
+                path.write_text("// synthetic executed promotion fixture\n", encoding="utf-8")
+            response_readiness = core_path / "command-chat-response-route-planning-readiness.json"
+            response_readiness.write_text(
+                json.dumps(
+                    {
+                        "source_root": str(core_path),
+                        "producer": {
+                            "script": "scripts/compare_reflection_snapshots.py",
+                            "output_name": "command-chat-response-route-planning-readiness.json",
+                            "argv": [
+                                "scripts/compare_reflection_snapshots.py",
+                                "--target-set",
+                                "command-chat-response-route-planning",
+                                "--readiness-report",
+                                str(response_readiness),
+                                "--json",
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            response_report = core_path / "command_response_public_readiness.json"
+            response_report.write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.command-chat-response-public-readiness-check.v1",
+                        "surface": "obelisk.command_chat_response_path.v1",
+                        "valid": True,
+                        "accepted_for_planning": True,
+                        "planning_only": True,
+                        "public_readiness_ready": False,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_abi_ready": False,
+                        "public_sdk_ready": False,
+                        "runtime_ready": False,
+                        "target_set": "command-chat-response-route-planning",
+                        "readiness_status": "compared",
+                        "decisions_status": "blocked",
+                        "surfaces_status": "planning",
+                        "readiness_root": str(core_path),
+                        "readiness_path": str(response_readiness),
+                        "decisions_path": str(
+                            REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
+                        ),
+                        "surfaces_path": str(PUBLIC_SDK_SURFACES),
+                        "public_header_path": str(PUBLIC_HEADER),
                         "blockers": [],
                     }
                 ),
@@ -6379,12 +6627,12 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 encoding="utf-8",
             )
             response_executed = write_executed_test_artifact(
-                response_executed_report,
+                core_path / "command_response_executed_tests.json",
                 "obelisk.command_chat_response_path.v1",
                 command="python3 -m unittest command_response_promotion",
             )
             replies_executed = write_executed_test_artifact(
-                replies_executed_report,
+                core_path / "commands_replies_executed_tests.json",
                 "obelisk.commands_replies.v1",
                 argv=["cmake", "--build", "commands_replies_sdk_consumer"],
             )
@@ -6404,7 +6652,9 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                 }
             )
 
-        self.assertEqual(missing, [])
+        self.assertIn("public_readiness_report:decisions_path:source_artifact_missing", missing)
+        self.assertIn("public_readiness_report:surfaces_path:source_artifact_missing", missing)
+        self.assertIn("public_readiness_report:public_header_path:source_artifact_missing", missing)
 
     def test_dependency_chain_accounting_keeps_invalid_promoted_identity_visible(self) -> None:
         manifest, release_statement = complete_excluded_manifest()

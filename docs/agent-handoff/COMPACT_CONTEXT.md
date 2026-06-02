@@ -906,7 +906,9 @@ priorities, and do not use history files as the active source of truth.
   commands/replies hardening now requires the child response-path report at
   `<response-path-report-root>/command-chat-response-public-readiness.json`, with the
   route gate forwarding a temp report root while preserving the original response
-  readiness root. This remains provenance-only, not response/replies readiness.
+  readiness root. SDK structured promotion evidence for command response/replies now
+  requires those planning-checker source-artifact bindings before promoted rows can
+  count. This remains provenance-only, not response/replies readiness.
 
 ## Agent Coordination
 
