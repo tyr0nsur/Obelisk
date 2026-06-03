@@ -135,6 +135,60 @@ PUBLIC_HEADER_TOKEN_RE = re.compile(
 )
 IDENTIFIER_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 HEADER_ALLOWLIST = {"OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY"}
+NEGATIVE_CONTEXT_RE = re.compile(
+    r"\b(?:no|not|non[-_ ]|does\s+not|do\s+not|cannot|can't|forbid(?:den|s)?|"
+    r"excludes?|without|until|missing|blocked|blocker|unavailable|required[_ -]?before|"
+    r"must[_ -]?not|no_)\b",
+    re.IGNORECASE,
+)
+PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
+    "public_header_ready": re.compile(
+        r"\bpublic[-_ ]+header(?:[-_ ]+symbols?)?\s+(?:is\s+|are\s+)?"
+        r"(?:allowed|available|ready|exposed|promoted|enabled|unlocked|supported)",
+        re.IGNORECASE,
+    ),
+    "public_capability_available": re.compile(
+        r"\b(?:public[-_ ]+)?(?:identity[-_ ]+)?capability(?:[-_ ]+bits?)?\s+(?:is\s+|are\s+)?"
+        r"(?:available|ready|enabled|exposed|promoted|unlocked|supported)",
+        re.IGNORECASE,
+    ),
+    "public_callback_abi": re.compile(
+        r"\b(?:public[-_ ]+)?callback[-_ ]+abi\s+(?:is\s+)?"
+        r"(?:available|ready|exposed|promoted|enabled|supported)",
+        re.IGNORECASE,
+    ),
+    "public_sdk_ready": re.compile(
+        r"\bpublic[-_ ]+sdk\s+(?:is\s+)?(?:ready|available|promoted|enabled|complete|supported)",
+        re.IGNORECASE,
+    ),
+    "runtime_ready": re.compile(
+        r"\bruntime\s+(?:is\s+)?(?:ready|enabled|authorized|available|promoted|supported)",
+        re.IGNORECASE,
+    ),
+    "promotion_ready": re.compile(
+        r"\bpromotion\s+(?:is\s+)?(?:ready|authorized|complete|available)",
+        re.IGNORECASE,
+    ),
+    "v1_completion_ready": re.compile(
+        r"\bv1(?:[-_ ]+sdk)?[-_ ]+completion\s+(?:is\s+)?(?:ready|complete|available|promoted)",
+        re.IGNORECASE,
+    ),
+    "public_contract_ready": re.compile(
+        r"\bpublic[-_ ]+contract\s+(?:is\s+)?(?:allowed|ready|available|promoted|enabled|complete)",
+        re.IGNORECASE,
+    ),
+    "player_identity_promoted": re.compile(r"\b(?:promotes?|promoted)\s+obelisk\.player_identity\.v1\b", re.IGNORECASE),
+    "public_capability_symbol": re.compile(r"\bOBELISK_API_CAPABILITY_PLAYER[A-Z0-9_]*\b"),
+    "public_player_header_symbol": re.compile(
+        r"\b(?:ObeliskPlayer[A-Za-z0-9_]*|RegisterPlayer[A-Za-z0-9_]*)\b"
+    ),
+    "source_artifact_ready_alias": re.compile(
+        r"\b(?:public[-_ ]+sdk|public[-_ ]+header|public[-_ ]+abi|callback[-_ ]+abi|"
+        r"capability[-_ ]+bits?|runtime|promotion|v1[-_ ]+completion)[-_ ]+"
+        r"(?:ready|allowed|available|enabled|promoted|complete|exposed)\b",
+        re.IGNORECASE,
+    ),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -183,6 +237,56 @@ def walk_json(value: Any, path: str = "$") -> list[tuple[str, Any]]:
         for index, item in enumerate(value):
             items.extend(walk_json(item, f"{path}[{index}]"))
     return items
+
+
+def has_negative_context(value: str, match_start: int) -> bool:
+    normalized = value.replace("_", " ")
+    clause_start = max(normalized.rfind(";", 0, match_start), normalized.rfind(".", 0, match_start))
+    clause_end_candidates = [
+        index
+        for index in (
+            normalized.find(";", match_start),
+            normalized.find(".", match_start),
+        )
+        if index != -1
+    ]
+    clause_end = min(clause_end_candidates) if clause_end_candidates else len(normalized)
+    prefix = normalized[clause_start + 1 : match_start]
+    suffix = normalized[match_start:clause_end]
+    if re.search(r"(?:^|\b)non[-_ ]*$", prefix, re.IGNORECASE):
+        return True
+    if NEGATIVE_CONTEXT_RE.search(prefix):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:forbidden|unavailable|blocked|redacted|cannot|can't|false)\b|"
+            r"\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
+            suffix,
+            re.IGNORECASE,
+        )
+    )
+
+
+def public_text_overclaims(value: Any, path: str = "$") -> list[dict[str, str]]:
+    claims: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            normalized_key = normalize_contract_key(key)
+            if normalized_key not in PUBLIC_READINESS_FALSE_KEYS and normalized_key not in PUBLIC_EMPTY_LIST_KEYS:
+                claims.extend(public_text_overclaims(str(key), item_path))
+            claims.extend(public_text_overclaims(item, item_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            claims.extend(public_text_overclaims(item, f"{path}[{index}]"))
+    elif isinstance(value, str):
+        for term, pattern in PUBLIC_TEXT_OVERCLAIM_PATTERNS.items():
+            for match in pattern.finditer(value):
+                if has_negative_context(value, match.start()):
+                    continue
+                claims.append({"path": path, "term": term, "value": value})
+                break
+    return claims
 
 
 def field_names(layout: dict[str, Any]) -> list[str]:
@@ -392,6 +496,9 @@ def validate_no_public_overclaim_aliases(payload: dict[str, Any], blockers: list
             add(blockers, "public_readiness_claim_not_false", path, value=item)
         if normalized_key in PUBLIC_EMPTY_LIST_KEYS and item != []:
             add(blockers, "public_artifact_claim_not_empty", path, value=item)
+    text_claims = public_text_overclaims(payload)
+    if text_claims:
+        add(blockers, "public_text_or_source_overclaim", "$", claims=text_claims)
 
 
 def validate_manifest(payload: dict[str, Any], private_payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:

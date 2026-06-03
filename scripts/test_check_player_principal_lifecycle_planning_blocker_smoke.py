@@ -180,6 +180,57 @@ class PlayerPrincipalLifecyclePlanningBlockerSmokeTests(unittest.TestCase):
         self.assertIn("policy.candidate_summary.counts_toward_public_sdk", labels)
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
 
+    def test_rejects_nested_camel_case_positive_claim_alias_in_planning_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "planning"
+            copy_planning_sources(root)
+            policy_path = root / POLICY_NAME
+            payload = load_json(policy_path)
+            payload["candidate_summary"] = {
+                "approvedRuntimeEvidencePresent": True,
+                "publicSdkReady": True,
+                "stableClaimAllowed": "yes",
+                "v1CompletionReady": {"ready": True},
+            }
+            write_json(policy_path, payload)
+
+            result = self.run_checker(root, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        claim_details = [
+            detail
+            for detail in report["blocker_details"]
+            if detail["reason"] == "planning_manifest_nested_positive_claim"
+        ]
+        labels = {detail["label"] for detail in claim_details}
+        self.assertIn("policy.candidate_summary.approvedRuntimeEvidencePresent", labels)
+        self.assertIn("policy.candidate_summary.publicSdkReady", labels)
+        self.assertIn("policy.candidate_summary.stableClaimAllowed", labels)
+        self.assertIn("policy.candidate_summary.v1CompletionReady", labels)
+
+    def test_rejects_text_positive_claim_in_planning_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "planning"
+            copy_planning_sources(root)
+            policy_path = root / POLICY_NAME
+            payload = load_json(policy_path)
+            payload["candidate_summary"] = {
+                "summary": "approved runtime evidence present; SDK complete",
+            }
+            write_json(policy_path, payload)
+
+            result = self.run_checker(root, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        text_details = [
+            detail
+            for detail in report["blocker_details"]
+            if detail["reason"] == "planning_manifest_text_positive_claim"
+        ]
+        self.assertEqual([detail["label"] for detail in text_details], ["policy.candidate_summary.summary"])
+
     def test_allows_nested_negative_claim_context_in_planning_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "planning"

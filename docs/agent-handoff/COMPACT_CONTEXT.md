@@ -1509,6 +1509,26 @@ priorities, and do not use history files as the active source of truth.
   design, py_compile, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`;
   no runtime/server operation.
+- 2026-06-03 supervised 4-agent runtime-evidence/identity-contract/SDK-accounting/
+  reversing-hygiene round: approved-runtime replay audit made no edits and confirmed
+  request packs, preflight sidecars, window manifests, completed receipts, and stale
+  approved-bundle sidecars remain non-evidence unless the approved runtime evidence
+  checker accepts the bound post-window manifest/log set. Player identity public ABI
+  preflight, public-contract readiness/gap, and owner-token SDK consumer checks now reject
+  recursive positive text or source-key claims for public headers, capability bits,
+  callback ABI, public SDK/runtime/promotion/v1 readiness, player identity promotion, and
+  stable/complete SDK wording while preserving negated non-claims. Player-principal
+  planning smoke rejects camelCase positive aliases and explicit positive text such as
+  approved runtime evidence present or SDK complete. Research notes mark stale lifecycle
+  target-gap/admin routes as historical so future agents do not restart broad FName/
+  GObjects/core/admin or lifecycle-layout work. SDK accounting audit made no edits and
+  found no count-through bypass: P0 promoted-for-claim remains `0`, route blocker remains
+  `approved_runtime_evidence_missing`. Validations passed: identity checker suite 374,
+  focused identity ABI/contract/owner-token/gap suite 100, planning smoke 8, route JSON
+  valid/planning-only, planning-smoke JSON ready/non-authorizing, SDK JSON blocked by
+  design, py_compile, and `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

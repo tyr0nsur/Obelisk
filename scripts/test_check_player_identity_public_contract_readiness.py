@@ -609,6 +609,27 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("public_callback_abi_now_not_empty", report["blockers"])
         self.assertIn("contract_gate_input_flag_not_false", report["blockers"])
 
+    def test_rejects_public_text_or_source_artifact_overclaims_in_decisions(self) -> None:
+        decisions = self.decisions()
+        decisions["source_artifacts"] = {"public_sdk_alias": "docs/research/public-sdk-ready.json"}
+        decisions["review_notes"] = [
+            "public header symbols are available",
+            "OBELISK_API_CAPABILITY_PLAYER_IDENTITY is available",
+            "callback ABI exposed for RegisterPlayerIdentity",
+        ]
+
+        result = self.run_checker(decisions, approved_manifest(), check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_text_or_source_overclaim", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "public_text_or_source_overclaim")
+        paths = {claim["path"] for claim in detail["claims"]}
+        self.assertIn("$.source_artifacts.public_sdk_alias", paths)
+        self.assertIn("$.review_notes[0]", paths)
+        self.assertIn("$.review_notes[1]", paths)
+        self.assertIn("$.review_notes[2]", paths)
+
     def test_rejects_decision_gate_rerouted_to_public_readiness(self) -> None:
         decisions = self.decisions()
         gate = decisions["decision_gate"]

@@ -1,5 +1,18 @@
 # Player Identity First Evidence
 
+## Current Supersession
+
+Historical first-evidence plan. Later route hardening closed the 12-target fixture/admin
+coverage path and accepted source-bound lifecycle-anchor planning manifests for
+`ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`. This note remains useful
+for privacy, redaction, and non-claim rationale, but not as the current route blocker.
+Do not rerun broad FName/GObjects/core discovery, admin snapshots, second-source layout,
+or lifecycle layout work for the current binary. The active blocker is
+`approved_runtime_evidence_missing`: approved copied runtime principal lifecycle evidence
+is still absent and requires a current-turn operator-approved live-ops window. After that
+evidence is accepted, the only allowed next blocker is locked planning-only
+`identity_public_contract_gate_missing`.
+
 ## Objective
 
 Audit the `players_identity_lifecycle` planning lane and define the smallest evidence
@@ -22,6 +35,12 @@ runtime tools, change target sets, widen public SDK scope, or promote identity.
 - `scripts/reflection_target_sets.py`
 
 ## Current Blockers
+
+Historical section. The current aggregate route has already consumed accepted
+candidate-only lifecycle-anchor and principal-invalidation planning manifests. The
+remaining current blocker is `approved_runtime_evidence_missing`; the bullets below
+explain why the lane still does not promote public identity, permissions, commands, or
+economy SDK work.
 
 The current lane is not ready to start public permissions, command, or economy SDK work.
 The block is not a lack of demand. It is a lack of accepted identity lifecycle evidence.
@@ -254,23 +273,15 @@ per-target rows, per-field rows, forced-redacted fields, forbidden fields, full 
 coverage metadata, required non-claims, and nested readiness/public-SDK overclaims; a
 status-only or empty evidence object must fail closed.
 
-The current fixture gap is exact: the committed snapshot manifest has 10/12
-`players-identity-lifecycle-intake` targets and lacks only
-`ShooterPlayerController.ServerListPlayers` and
-`ShooterPlayerController.ServerKickPlayer`. That fixture gap is not directly actionable
-from the repository alone: the current route first requires a reviewed non-protected
-`obelisk.core-dump-evidence-pack.v1`, then a full 12-target
-`obelisk.reflection-inventory-pack.v1` built from that evidence pack. Direct
-`/servidor/ark` workspace reads, direct-core planning, ScriptStruct inventories, and
-two-function-only inventories must not be used as substitutes. After the full reflection
-inventory pack is accepted, `scripts/plan_ufunction_focal_snapshots.py` must be called
-with only the two exact admin targets:
-`--target ShooterPlayerController.ServerListPlayers` and
-`--target ShooterPlayerController.ServerKickPlayer`. The planner intentionally rejects
-`--target-set players-identity-lifecycle-intake` for focal snapshot planning so the full
-12-target coverage stays in the reflection inventory pack and does not expand into
-unneeded snapshot commands. The emitted commands remain candidate-only and do not reread a
-core or rely on Git state.
+Historical fixture gap: the original committed snapshot manifest had 10/12
+`players-identity-lifecycle-intake` targets and lacked
+`ShooterPlayerController.ServerListPlayers` plus
+`ShooterPlayerController.ServerKickPlayer`. That gap is now closed for the current route;
+do not rerun the admin focal planning or snapshot discovery path for the current binary
+unless a reviewed artifact contradicts the committed fixtures and source-bound planning
+manifests. Direct `/servidor/ark` workspace reads, direct-core planning, ScriptStruct
+inventories, broad default candidate scans, and two-function-only inventories still must
+not be used as substitutes for approved offline artifacts.
 
 Demand review of local plugin source dictionaries reinforces priority rather than
 promotion: plugin authors expect player identity, tribe identity, command/RCON registries,
@@ -371,11 +382,12 @@ current artifacts, tests, or an explicitly approved runtime evidence window:
    - `players-identity-lifecycle-intake` remains `planning_only`, not release readiness,
      until a separate release statement changes it.
    - A complete `obelisk.players-identity-first-evidence.v1` pack covers all 12 targets.
-   - The missing sanitized `ShooterPlayerController.ServerListPlayers` and
-     `ShooterPlayerController.ServerKickPlayer` snapshots are present.
-   - At least one session-start/login/connect anchor and one
-     session-end/logout/disconnect anchor are accepted, or promotion remains explicitly
-     blocked.
+   - The previously missing sanitized `ShooterPlayerController.ServerListPlayers` and
+     `ShooterPlayerController.ServerKickPlayer` snapshots remain present.
+   - The candidate-only `ShooterGameMode.HandleNewPlayer` and
+     `ShooterGameMode.OnLogout` lifecycle layout anchors remain source-bound and accepted
+     for planning; promotion remains blocked until approved copied runtime principal
+     lifecycle evidence is accepted.
    - Anchor evidence includes exact `Outer.Function`, `ParmsSize`, property order,
      offsets, sizes, property classes, and second-source comparison.
    - `PlayerDataID`, Steam/EOS/platform IDs, names, IPs, tribe IDs, arrays, strings,
@@ -428,7 +440,8 @@ current artifacts, tests, or an explicitly approved runtime evidence window:
 - This note does not add or approve public player identity, permissions, commands,
   economy, admin, tribe, mission, transfer, chat moderation, replies, send-chat,
   persistence, database, storage, webhook, or RCON APIs.
-- This note does not claim an accepted login/logout target exists.
+- This note does not claim candidate-only `HandleNewPlayer` / `OnLogout` layout anchors
+  are public login/logout runtime evidence.
 - This note does not claim `ServerListPlayers`, `ServerKickPlayer`, tribe functions,
   mission functions, transfer functions, or chat functions are safe public identity
   anchors.

@@ -649,6 +649,42 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     "return_override_allowed": re.compile(r"return[_ -]?override\s+(?:is\s+)?allowed", re.IGNORECASE),
     "resource_handle_supported": re.compile(r"resource[_ -]?handle\s+(?:is\s+)?supported", re.IGNORECASE),
 }
+PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
+    **APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS,
+    "public_header_ready": re.compile(
+        r"\bpublic[-_ ]+header(?:[-_ ]+symbols?)?\s+(?:is\s+|are\s+)?"
+        r"(?:allowed|available|ready|exposed|promoted|enabled|unlocked|supported)",
+        re.IGNORECASE,
+    ),
+    "public_callback_abi": re.compile(
+        r"\b(?:public[-_ ]+)?callback[-_ ]+abi\s+(?:is\s+)?"
+        r"(?:available|ready|exposed|promoted|enabled|supported)",
+        re.IGNORECASE,
+    ),
+    "public_contract_ready": re.compile(
+        r"\bpublic[-_ ]+contract\s+(?:is\s+)?(?:allowed|ready|available|promoted|enabled|complete)",
+        re.IGNORECASE,
+    ),
+    "runtime_ready": re.compile(
+        r"\bruntime\s+(?:is\s+)?(?:ready|enabled|authorized|available|promoted|supported)",
+        re.IGNORECASE,
+    ),
+    "promotion_ready": re.compile(
+        r"\bpromotion\s+(?:is\s+)?(?:ready|authorized|complete|available)",
+        re.IGNORECASE,
+    ),
+    "player_identity_promoted": re.compile(r"\b(?:promotes?|promoted)\s+obelisk\.player_identity\.v1\b", re.IGNORECASE),
+    "public_capability_symbol": re.compile(r"\bOBELISK_API_CAPABILITY_PLAYER[A-Z0-9_]*\b"),
+    "public_player_header_symbol": re.compile(
+        r"\b(?:ObeliskPlayer[A-Za-z0-9_]*|RegisterPlayer[A-Za-z0-9_]*)\b"
+    ),
+    "source_artifact_ready_alias": re.compile(
+        r"\b(?:public[-_ ]+sdk|public[-_ ]+header|public[-_ ]+abi|callback[-_ ]+abi|"
+        r"capability[-_ ]+bits?|runtime|promotion|v1[-_ ]+completion)[-_ ]+"
+        r"(?:ready|allowed|available|enabled|promoted|complete|exposed)\b",
+        re.IGNORECASE,
+    ),
+}
 NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES = (
     ".private_pod_layout_candidate.accepted_for_contract_review",
     ".identifier_redaction_evidence.accepted_for_contract_review",
@@ -782,7 +818,8 @@ def has_negative_context(value: str, match_start: int) -> bool:
         return True
     return bool(
         re.search(
-            r"\b(?:forbidden|unavailable|blocked|redacted)\b|\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
+            r"\b(?:forbidden|unavailable|blocked|redacted|cannot|can't|false)\b|"
+            r"\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
             suffix,
             re.IGNORECASE,
         )
@@ -816,6 +853,40 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
                 overclaims.append({"path": path, "term": term, "value": report})
                 break
     return overclaims
+
+
+def public_text_overclaims(value: Any, path: str = "$") -> list[dict[str, str]]:
+    claims: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            normalized_key = normalize_contract_key(key)
+            if normalized_key not in READINESS_FALSE_KEYS and normalized_key not in EMPTY_PUBLIC_LIST_KEYS:
+                claims.extend(public_text_overclaims(str(key), item_path))
+            claims.extend(public_text_overclaims(item, item_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            claims.extend(public_text_overclaims(item, f"{path}[{index}]"))
+    elif isinstance(value, str):
+        for term, pattern in PUBLIC_TEXT_OVERCLAIM_PATTERNS.items():
+            for match in pattern.finditer(value):
+                if has_negative_context(value, match.start()):
+                    continue
+                claims.append({"path": path, "term": term, "value": value})
+                break
+    return claims
+
+
+def validate_public_text_overclaims(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    *,
+    label: str,
+    reason: str = "public_text_or_source_overclaim",
+) -> None:
+    claims = public_text_overclaims(value)
+    if claims:
+        add(blockers, reason, "$", input=label, claims=claims)
 
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -1829,6 +1900,7 @@ def validate_candidate_only_pod_abi(candidate: Any, blockers: list[dict[str, Any
 
 
 def validate_private_candidate_contract(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    validate_public_text_overclaims(payload, blockers, label="private_candidate_contract")
     label = "private_candidate_contract"
     if payload.get("schema") != PRIVATE_CANDIDATE_SCHEMA:
         add(blockers, "private_candidate_contract_schema_mismatch", "$.private_candidate_contract.schema")
@@ -2015,6 +2087,7 @@ def validate_required_before_public_header(decisions: dict[str, Any], blockers: 
 
 
 def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    validate_public_text_overclaims(decisions, blockers, label="decisions")
     if decisions.get("schema") != DECISION_SCHEMA:
         add(blockers, "decision_schema_mismatch", "$.schema")
     if decisions.get("surface") != SURFACE:

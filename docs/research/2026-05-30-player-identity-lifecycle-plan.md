@@ -1,5 +1,16 @@
 # Player Identity Lifecycle Plan
 
+## Current Supersession
+
+Historical seed plan. Later player-identity evidence closed the 12-target fixture/admin
+coverage route and accepted `ShooterGameMode.HandleNewPlayer` plus
+`ShooterGameMode.OnLogout` as candidate-only lifecycle layout anchors. Do not use this
+note to restart broad FName/GObjects/core discovery, admin snapshots, second-source
+layout, or lifecycle layout work for the current binary. The active P0 blocker is
+approved copied runtime principal lifecycle evidence under a current-turn
+operator-approved live-ops window, followed by the locked planning-only
+`identity_public_contract_gate_missing` review.
+
 ## Objective
 
 Define the next small offline plan for `players_identity_lifecycle` using only existing

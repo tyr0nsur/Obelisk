@@ -161,6 +161,25 @@ class PlayerIdentityPublicAbiPreflightCandidateTests(unittest.TestCase):
         self.assertIn("$.claims.callbackAbi", labels)
         self.assertIn("$.claims.ready", labels)
 
+    def test_rejects_public_text_or_source_artifact_overclaim(self) -> None:
+        payload = self.manifest()
+        payload.setdefault("source_artifacts", {})["public_sdk_alias"] = "docs/research/public-sdk-ready.json"
+        payload["review_notes"] = [
+            "OBELISK_API_CAPABILITY_PLAYER_IDENTITY is available",
+            "callback ABI exposed for RegisterPlayerIdentityEventWithOwnerTokenHandle",
+        ]
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_text_or_source_overclaim", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "public_text_or_source_overclaim")
+        paths = {claim["path"] for claim in detail["claims"]}
+        self.assertIn("$.source_artifacts.public_sdk_alias", paths)
+        self.assertIn("$.review_notes[0]", paths)
+        self.assertIn("$.review_notes[1]", paths)
+
     def test_rejects_sdk_consumer_contract_overclaim_or_weakened_rules(self) -> None:
         payload = self.manifest()
         payload["sdk_consumer_contract"] = {

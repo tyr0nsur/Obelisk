@@ -41,24 +41,64 @@ NO_PUBLIC_SDK_NON_CLAIM = "no public SDK, public ABI, release, or v1 completion 
 APPROVED_MANIFEST_CHECKER = "scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py"
 APPROVED_MANIFEST_BUILDER = "scripts/build_player_identity_runtime_principal_lifecycle_approved_manifest.py"
 POSITIVE_CLAIM_ALIAS_RE = (
+    "approvedruntimeevidencepresent",
+    "approved_runtime_evidence_present",
+    "approvedruntimeevidenceready",
+    "approved_runtime_evidence_ready",
+    "publicsdkready",
     "public_sdk",
+    "publicabiready",
     "public_abi",
+    "publicheaderallowed",
     "public_header",
+    "runtimeready",
     "runtime_ready",
+    "runtimeevidenceready",
     "runtime_evidence_ready",
+    "runtimeworkauthorized",
     "runtime_work_authorized",
+    "serveroperationsauthorized",
     "server_operations_authorized",
+    "promotionready",
     "promotion_ready",
+    "v1completionready",
     "v1_completion",
+    "completesdk",
     "complete_sdk",
+    "stableclaimallowed",
     "stable_claim",
+    "stablesdk",
     "stable_sdk",
+    "productionready",
     "production_ready",
+    "releaseready",
     "release_ready",
+    "runtimev1",
     "runtime_v1",
+    "countstowardpublicsdk",
     "counts_toward_public_sdk",
+    "countstowardruntime",
     "counts_toward_runtime",
+    "countstowardv1completion",
     "counts_toward_v1_completion",
+)
+POSITIVE_CLAIM_TEXT_RE = (
+    "approved runtime evidence present",
+    "approved runtime evidence ready",
+    "runtime evidence ready",
+    "runtime ready",
+    "runtime work authorized",
+    "server operations authorized",
+    "public sdk ready",
+    "public abi ready",
+    "public header allowed",
+    "v1 completion ready",
+    "complete sdk",
+    "sdk complete",
+    "stable claim allowed",
+    "stable sdk",
+    "production ready",
+    "release ready",
 )
 NEGATIVE_CONTEXT_KEYS = frozenset(
     (
@@ -182,6 +222,10 @@ def normalized_claim_key(value: str) -> str:
     return "".join(ch.lower() if ch.isalnum() else "_" for ch in value).strip("_")
 
 
+def normalized_claim_text(value: str) -> str:
+    return " ".join("".join(ch.lower() if ch.isalnum() else " " for ch in value).split())
+
+
 def is_negative_context(path: tuple[str, ...]) -> bool:
     return any(normalized_claim_key(part) in NEGATIVE_CONTEXT_KEYS for part in path)
 
@@ -204,6 +248,15 @@ def validate_no_nested_positive_claims(value: Any, blockers: list[dict[str, Any]
     elif isinstance(value, list):
         for index, child in enumerate(value):
             validate_no_nested_positive_claims(child, blockers, label, (*path, str(index)))
+    elif isinstance(value, str) and not is_negative_context(path):
+        normalized = normalized_claim_text(value)
+        if any(alias in normalized for alias in POSITIVE_CLAIM_TEXT_RE):
+            add(
+                blockers,
+                "planning_manifest_text_positive_claim",
+                f"{label}.{'.'.join(path)}",
+                value=value,
+            )
 
 
 def output_entry(report: dict[str, Any], key: str) -> dict[str, Any] | None:

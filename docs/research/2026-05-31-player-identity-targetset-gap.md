@@ -7,7 +7,10 @@ Historical note: this gap is superseded for fixture coverage. The committed
 `ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`.
 The current active blocker is approved runtime principal lifecycle evidence, followed by
 the player identity public-contract review; this note remains useful only for the
-candidate-only field-policy rationale.
+candidate-only field-policy rationale. Do not use the historical blockers or commands
+below to restart broad FName/GObjects/core discovery, admin snapshot generation,
+second-source layout, or lifecycle layout work for the current binary unless a reviewed
+artifact contradicts the current source-bound planning manifests.
 
 ## Objective
 

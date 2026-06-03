@@ -810,6 +810,27 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
             report["public_abi_promotion_preflight"]["blockers"],
         )
 
+    def test_rejects_public_text_or_source_artifact_overclaims_in_decisions(self) -> None:
+        decisions = self.load_decisions()
+        decisions["source_artifacts"] = {"public_sdk_alias": "docs/research/public-sdk-ready.json"}
+        decisions["review_notes"] = [
+            "public header symbols are available",
+            "OBELISK_API_CAPABILITY_PLAYER_IDENTITY is available",
+            "callback ABI exposed for RegisterPlayerIdentity",
+        ]
+
+        result = self.run_checker(decisions=decisions)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public_text_or_source_overclaim", report["blockers"])
+        detail = next(item for item in report["blocker_details"] if item["reason"] == "public_text_or_source_overclaim")
+        paths = {claim["path"] for claim in detail["claims"]}
+        self.assertIn("$.source_artifacts.public_sdk_alias", paths)
+        self.assertIn("$.review_notes[0]", paths)
+        self.assertIn("$.review_notes[1]", paths)
+        self.assertIn("$.review_notes[2]", paths)
+
     def test_sanitizes_public_abi_preflight_helper_overclaims(self) -> None:
         overclaim = {
             "status": "blocked",

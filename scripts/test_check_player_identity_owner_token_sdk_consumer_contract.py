@@ -179,6 +179,26 @@ class PlayerIdentityOwnerTokenSdkConsumerContractTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["v1_completion_evidence"])
 
+    def test_rejects_nested_text_or_source_artifact_overclaims(self) -> None:
+        payload = self.manifest()
+        payload["source_artifacts"]["public_sdk_alias"] = "docs/research/public-sdk-ready.json"
+        payload["sdk_consumer"]["notes"] = [
+            "public header symbols are available",
+            "OBELISK_API_CAPABILITY_PLAYER_IDENTITY is available",
+        ]
+        payload["lifecycle_owner_cleanup"]["notes"] = "callback ABI exposed for RegisterPlayerIdentity"
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nested_public_runtime_or_completion_claims", report["blockers"])
+        claim_paths = {claim["path"] for claim in report["public_or_runtime_claims"]}
+        self.assertIn("$.source_artifacts.public_sdk_alias", claim_paths)
+        self.assertIn("$.sdk_consumer.notes[0]", claim_paths)
+        self.assertIn("$.sdk_consumer.notes[1]", claim_paths)
+        self.assertIn("$.lifecycle_owner_cleanup.notes", claim_paths)
+
 
 if __name__ == "__main__":
     unittest.main()

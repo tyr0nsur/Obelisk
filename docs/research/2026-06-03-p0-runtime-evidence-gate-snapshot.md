@@ -96,7 +96,8 @@ Buff consume/readiness checker rather than stale compact bool-tail repair.
 These updates reduce false positives only. They are not approved runtime
 evidence and do not authorize SDK completion, runtime work, server operations,
 publication, or stable-release wording.
-evidence is accepted, the route may advance only to locked planning blocker
+After approved runtime evidence is accepted, the route may advance only to locked
+planning blocker
 `identity_public_contract_gate_missing`, with all public SDK, public ABI,
 runtime, promotion, permissions/admin, command response, commands/replies, and
 v1 completion flags still false until the separate public contract gate is
@@ -389,6 +390,38 @@ dependency-accounting gaps without running a server or changing the blocker:
 Validated offline: full SDK completion suite 221, identity ABI/contract/
 owner-token suite 96, runtime/preflight suite 204, side-lane accounting 25,
 preflight shell, route JSON valid/planning-only, SDK JSON blocked by design,
+py_compile, and `git diff --check`. The stable state remains
+`current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
+P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Runtime Evidence And Identity Text-Overclaim Hardening
+
+The next supervised 4-agent round closed recovery/context and offline
+overclaim gaps without changing the P0 blocker:
+
+- Runtime replay audit confirmed request packs, preflight sidecars, window
+  manifests, completed receipts, and stale approved-bundle sidecars still do
+  not count as approved runtime evidence unless the approved runtime evidence
+  checker accepts the bound post-window manifest/log set.
+- Player identity public ABI preflight, public-contract readiness/gap, and
+  owner-token SDK consumer checks now reject recursive positive text or
+  source-key claims for public headers, capability bits, callback ABI, public
+  SDK/runtime/promotion/v1 readiness, player identity promotion, and stable or
+  complete SDK wording while preserving negated non-claim contexts.
+- Player-principal planning smoke rejects camelCase positive aliases and
+  explicit positive text claims such as approved runtime evidence present or
+  SDK complete while remaining planning-only and non-authorizing.
+- Historical lifecycle/admin target-gap research notes now state that old
+  FName/GObjects/core/admin and lifecycle-layout routes are superseded for the
+  current blocker and must not be restarted without new reviewed evidence.
+- SDK completion accounting audit found no count-through bypass: promoted P0
+  rows still require promoted manifest status, promotion evidence, required
+  semantic terms, structured evidence/certificates, matching release-statement
+  promoted outcome, dependency order, and route-gate satisfaction.
+
+Validated offline: identity checker suite 374, focused identity ABI/contract/
+owner-token/gap suite 100, planning smoke 8, route JSON valid/planning-only,
+planning-smoke JSON ready/non-authorizing, SDK JSON blocked by design,
 py_compile, and `git diff --check`. The stable state remains
 `current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
 P0 progress `0/4`, and `stable_claim_allowed=false`.

@@ -426,3 +426,22 @@ This file is an active routing table only. Durable evidence belongs in
   accounting 25, preflight shell, py_compile, route JSON valid/planning-only, SDK JSON
   blocked by design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
   `git diff --check`. No runtime/server operation. Agents closed.
+- Latest round delegated approved-runtime replay audit, player identity public-contract
+  guardrails, SDK completion accounting audit, and reversing research hygiene. Integrated
+  result: request packs, preflight sidecars, window manifests, receipts, and stale
+  approved-bundle sidecars still do not count unless the approved runtime evidence checker
+  accepts the bound post-window manifest/log set. Public ABI preflight, public-contract
+  gap/readiness, and owner-token SDK consumer checks now recursively reject positive text
+  or source-key claims for public header/capability/callback ABI, player identity
+  promotion, public SDK/runtime/promotion/v1 readiness, and SDK-complete/stable wording
+  while preserving negated/non-claim contexts. Player-principal planning smoke now also
+  rejects camelCase positive aliases and explicit positive text such as approved runtime
+  evidence present or SDK complete. Research notes mark old lifecycle/admin target-gap
+  plans as historical so future agents do not restart broad FName/GObjects/core/admin or
+  lifecycle-layout work. SDK accounting audit found no count-through bypass: P0 rows still
+  require promoted status, evidence, structured certificates, release-statement outcome,
+  dependency order, and route-gate satisfaction. Validation passed: identity checker suite
+  374, focused identity ABI/contract/owner-token/gap suite 100, planning smoke 8, route
+  JSON valid/planning-only, planning-smoke JSON ready/non-authorizing, SDK JSON blocked by
+  design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, py_compile, and
+  `git diff --check`. No runtime/server operation. Agents closed.

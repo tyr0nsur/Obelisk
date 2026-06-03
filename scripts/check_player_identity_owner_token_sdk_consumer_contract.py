@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -120,6 +121,60 @@ FORBIDDEN_STRUCTURED_CLAIM_KEYS = {
     "v1completionevidence",
     "v1completionready",
 }
+NEGATIVE_CONTEXT_RE = re.compile(
+    r"\b(?:no|not|non[-_ ]|does\s+not|do\s+not|cannot|can't|forbid(?:den|s)?|"
+    r"excludes?|without|until|missing|blocked|blocker|unavailable|required[_ -]?before|"
+    r"must[_ -]?not|no_)\b",
+    re.IGNORECASE,
+)
+PUBLIC_TEXT_OVERCLAIM_PATTERNS = {
+    "public_header_ready": re.compile(
+        r"\bpublic[-_ ]+header(?:[-_ ]+symbols?)?\s+(?:is\s+|are\s+)?"
+        r"(?:allowed|available|ready|exposed|promoted|enabled|unlocked|supported)",
+        re.IGNORECASE,
+    ),
+    "public_capability_available": re.compile(
+        r"\b(?:public[-_ ]+)?(?:identity[-_ ]+)?capability(?:[-_ ]+bits?)?\s+(?:is\s+|are\s+)?"
+        r"(?:available|ready|enabled|exposed|promoted|unlocked|supported)",
+        re.IGNORECASE,
+    ),
+    "public_callback_abi": re.compile(
+        r"\b(?:public[-_ ]+)?callback[-_ ]+abi\s+(?:is\s+)?"
+        r"(?:available|ready|exposed|promoted|enabled|supported)",
+        re.IGNORECASE,
+    ),
+    "public_sdk_ready": re.compile(
+        r"\bpublic[-_ ]+sdk\s+(?:is\s+)?(?:ready|available|promoted|enabled|complete|supported)",
+        re.IGNORECASE,
+    ),
+    "runtime_ready": re.compile(
+        r"\bruntime\s+(?:is\s+)?(?:ready|enabled|authorized|available|promoted|supported)",
+        re.IGNORECASE,
+    ),
+    "promotion_ready": re.compile(
+        r"\bpromotion\s+(?:is\s+)?(?:ready|authorized|complete|available)",
+        re.IGNORECASE,
+    ),
+    "v1_completion_ready": re.compile(
+        r"\bv1(?:[-_ ]+sdk)?[-_ ]+completion\s+(?:is\s+)?(?:ready|complete|available|promoted)",
+        re.IGNORECASE,
+    ),
+    "public_contract_ready": re.compile(
+        r"\bpublic[-_ ]+contract\s+(?:is\s+)?(?:allowed|ready|available|promoted|enabled|complete)",
+        re.IGNORECASE,
+    ),
+    "player_identity_promoted": re.compile(r"\b(?:promotes?|promoted)\s+obelisk\.player_identity\.v1\b", re.IGNORECASE),
+    "public_capability_symbol": re.compile(r"\bOBELISK_API_CAPABILITY_PLAYER[A-Z0-9_]*\b"),
+    "public_player_header_symbol": re.compile(
+        r"\b(?:ObeliskPlayer[A-Za-z0-9_]*|RegisterPlayer[A-Za-z0-9_]*)\b"
+    ),
+    "source_artifact_ready_alias": re.compile(
+        r"\b(?:public[-_ ]+sdk|public[-_ ]+header|public[-_ ]+abi|callback[-_ ]+abi|"
+        r"capability[-_ ]+bits?|runtime|promotion|v1[-_ ]+completion)[-_ ]+"
+        r"(?:ready|allowed|available|enabled|promoted|complete|exposed)\b",
+        re.IGNORECASE,
+    ),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -172,6 +227,61 @@ def collect_structured_overclaims(value: Any, path: str = "$") -> list[dict[str,
     elif isinstance(value, list):
         for index, item in enumerate(value):
             claims.extend(collect_structured_overclaims(item, f"{path}[{index}]"))
+    elif isinstance(value, str):
+        claims.extend(collect_text_overclaims(value, path))
+    return claims
+
+
+def has_negative_context(value: str, match_start: int) -> bool:
+    normalized = value.replace("_", " ")
+    clause_start = max(normalized.rfind(";", 0, match_start), normalized.rfind(".", 0, match_start))
+    clause_end_candidates = [
+        index
+        for index in (
+            normalized.find(";", match_start),
+            normalized.find(".", match_start),
+        )
+        if index != -1
+    ]
+    clause_end = min(clause_end_candidates) if clause_end_candidates else len(normalized)
+    prefix = normalized[clause_start + 1 : match_start]
+    suffix = normalized[match_start:clause_end]
+    if re.search(r"(?:^|\b)non[-_ ]*$", prefix, re.IGNORECASE):
+        return True
+    if NEGATIVE_CONTEXT_RE.search(prefix):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:forbidden|unavailable|blocked|redacted|cannot|can't|false)\b|"
+            r"\bdoes\s+not\b|\bdo\s+not\b|\bmust\s+not\b",
+            suffix,
+            re.IGNORECASE,
+        )
+    )
+
+
+def collect_text_overclaims(value: str, path: str) -> list[dict[str, str]]:
+    claims: list[dict[str, str]] = []
+    for term, pattern in PUBLIC_TEXT_OVERCLAIM_PATTERNS.items():
+        for match in pattern.finditer(value):
+            if has_negative_context(value, match.start()):
+                continue
+            claims.append({"path": path, "term": term, "value": value})
+            break
+    return claims
+
+
+def collect_public_source_key_overclaims(value: Any, path: str = "$") -> list[dict[str, str]]:
+    claims: list[dict[str, str]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_path = f"{path}.{key}"
+            if normalized_key(str(key)) not in FORBIDDEN_STRUCTURED_CLAIM_KEYS:
+                claims.extend(collect_text_overclaims(str(key), item_path))
+            claims.extend(collect_public_source_key_overclaims(item, item_path))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            claims.extend(collect_public_source_key_overclaims(item, f"{path}[{index}]"))
     return claims
 
 
@@ -379,17 +489,8 @@ def validate_manifest(payload: dict[str, Any], preflight_payload: dict[str, Any]
         require_strings(downstream, "must_remain_blocked", REQUIRED_BLOCKED_DOWNSTREAM, blockers)
         require_strings(downstream, "required_checks", REQUIRED_DOWNSTREAM_CHECKS, blockers)
 
-    nested_claims = [
-        claim
-        for claim in collect_structured_overclaims(
-            {
-                "abi_layout": payload.get("abi_layout"),
-                "sdk_consumer": payload.get("sdk_consumer"),
-                "lifecycle_owner_cleanup": payload.get("lifecycle_owner_cleanup"),
-                "downstream_separation": payload.get("downstream_separation"),
-            }
-        )
-    ]
+    nested_claims = collect_structured_overclaims(payload)
+    nested_claims.extend(collect_public_source_key_overclaims(payload))
     if nested_claims:
         add(
             blockers,
