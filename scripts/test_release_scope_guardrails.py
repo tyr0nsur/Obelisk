@@ -1596,8 +1596,28 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         self.assertIn('installed_headers="$(find "${INSTALL_ROOT}/include" -type f', layout_test)
         self.assertIn('obelisk/ObeliskApi.h', layout_test)
         self.assertIn("SDK install published unexpected public headers", layout_test)
+        self.assertIn("require_installed_public_header_has_no_blocked_symbols", layout_test)
+        self.assertIn(
+            'require_installed_public_header_has_no_blocked_symbols "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"',
+            layout_test,
+        )
+        self.assertIn("Installed SDK public header exposes blocked symbols", layout_test)
         self.assertIn('OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT="${REPO_DIR}/plugins"', layout_test)
         self.assertIn('OBELISK_RELEASE_SCOPE_EXTERN_ROOT="${REPO_DIR}/extern"', layout_test)
+        for blocked_header_symbol in (
+            "OBELISK_API_CAPABILITY_RESOURCE_HANDLES",
+            "ObeliskResourceHandle",
+            "RegisterInventoryAction",
+            "MissionCopiedBool",
+            "TransferBAccept",
+            "ObeliskPlayerPrincipal",
+            "ObeliskCommandContext",
+            "ObeliskPermissionQuery",
+            "ObeliskMutation",
+            "ReturnOverride",
+        ):
+            with self.subTest(file="scripts/test_install_obelisk_layout.sh", blocked_header_symbol=blocked_header_symbol):
+                self.assertIn(blocked_header_symbol, layout_test)
 
         external_examples = (
             (

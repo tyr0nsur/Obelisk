@@ -238,6 +238,21 @@ REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
     "cross-instance/process-local scope decision resolved",
     "public docs state exact non-claims and downstream dependency order",
 }
+REQUIRED_ALIAS_GUARDRAILS_FALSE = {
+    "contractReviewed",
+    "identityContractReady",
+    "publicIdentityReady",
+    "publicPrincipalReady",
+    "principalHandleAbiReady",
+    "identityHeaderAllowed",
+    "identityHeaderReady",
+    "principalLookupReady",
+    "realIdentityReady",
+    "redactionEvidencePromotesIdentity",
+}
+REQUIRED_ALIAS_GUARDRAILS_NON_CLAIM = (
+    "Alias guardrails are false-only until identity_public_contract_gate is reviewed."
+)
 REQUIRED_PUBLIC_IDENTIFIER_FORBIDDEN = {
     "SteamID",
     "EOS ID",
@@ -352,10 +367,12 @@ READINESS_FALSE_KEYS = {
     "identity_public_contract_reviewed",
     "player_identity_promoted",
     "player_identity_ready",
+    "public_principal_ready",
     "player_principal_ready",
     "principal_abi_ready",
     "principal_handle_abi_ready",
     "principal_handle_ready",
+    "principal_lookup_ready",
     "promotion",
     "promotion_ready",
     "public_identity_allowed",
@@ -368,6 +385,8 @@ READINESS_FALSE_KEYS = {
     "public_abi_ready",
     "public_sdk_v1_completion_claim",
     "public_sdk_v1_completion_ready",
+    "real_identity_ready",
+    "redaction_evidence_promotes_identity",
     "v1_completion_claim",
     "v1_completion_evidence",
     "v1_completion_ready",
@@ -448,6 +467,13 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE = re.compile(
 )
 APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     "public_identity_ready": re.compile(r"public\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_principal_ready": re.compile(r"public\s+(?:player\s+)?principal\s+(?:is\s+)?ready", re.IGNORECASE),
+    "real_identity_ready": re.compile(r"real\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
+    "principal_lookup_ready": re.compile(r"(?:principal|player)\s+lookup\s+(?:is\s+)?ready", re.IGNORECASE),
+    "redaction_evidence_promotes_identity": re.compile(
+        r"redaction\s+evidence\s+promotes?\s+(?:public\s+)?(?:player\s+)?identity",
+        re.IGNORECASE,
+    ),
     "public_sdk_ready": re.compile(r"public\s+sdk\s+(?:is\s+)?ready", re.IGNORECASE),
     "public_abi_ready": re.compile(r"public\s+abi\s+(?:is\s+)?ready", re.IGNORECASE),
     "v1_completion_ready": re.compile(r"v1\s+(?:sdk\s+)?completion\s+(?:is\s+)?ready", re.IGNORECASE),
@@ -645,6 +671,32 @@ def validate_false_flags(value: Any, blockers: list[dict[str, Any]], label: str)
         key = path.rsplit(".", 1)[-1]
         if normalize_contract_key(key) in READINESS_FALSE_KEYS and item is not False:
             add(blockers, "readiness_flag_not_false", path, input=label, value=item)
+
+
+def alias_guardrails_false() -> dict[str, bool]:
+    return {key: False for key in sorted(REQUIRED_ALIAS_GUARDRAILS_FALSE)}
+
+
+def validate_alias_guardrails(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    aliases = decisions.get("alias_guardrails")
+    if not isinstance(aliases, dict):
+        add(blockers, "decisions_alias_guardrails_missing", "$.alias_guardrails")
+        return
+    for key in sorted(REQUIRED_ALIAS_GUARDRAILS_FALSE):
+        if aliases.get(key) is not False:
+            add(
+                blockers,
+                "decisions_alias_guardrail_not_false",
+                f"$.alias_guardrails.{key}",
+                value=aliases.get(key),
+            )
+    if aliases.get("non_claim") != REQUIRED_ALIAS_GUARDRAILS_NON_CLAIM:
+        add(
+            blockers,
+            "decisions_alias_guardrails_non_claim_mismatch",
+            "$.alias_guardrails.non_claim",
+            value=aliases.get("non_claim"),
+        )
 
 
 def validate_empty_public_lists(value: Any, blockers: list[dict[str, Any]], label: str) -> None:
@@ -1141,6 +1193,7 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             )
     if decisions.get("public_header_allowed") is not False:
         add(blockers, "decisions_public_header_allowed_not_false", "$.public_header_allowed")
+    validate_alias_guardrails(decisions, blockers)
     if missing_required(decisions.get("forbidden_public_contract"), REQUIRED_FORBIDDEN_PUBLIC_CONTRACT):
         add(
             blockers,
@@ -1659,6 +1712,9 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
         )
         accepted = False
     overclaims = non_promotional_contract_review_report_overclaims(
+        payload,
+        allowed_true_paths=set(),
+    ) + non_promotional_contract_review_report_overclaims(
         report,
         allowed_true_paths={"$.accepted_for_contract_review"},
     )
@@ -1687,6 +1743,17 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
             value=report.get("resolved_inputs"),
         )
         accepted = False
+    if report.get("next_blocker") in {
+        "identity_public_contract_gate",
+        APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER,
+    }:
+        add(
+            blockers,
+            "identifier_redaction_evidence_route_unlock_claimed",
+            "--identifier-redaction-evidence.next_blocker",
+            value=report.get("next_blocker"),
+        )
+        accepted = False
     if not accepted and not redaction_blockers:
         add(
             blockers,
@@ -1704,7 +1771,13 @@ def validate_identifier_redaction_evidence(path: Path, blockers: list[dict[str, 
         "public_sdk_ready": False,
         "runtime_ready": False,
         "public_header_allowed": False,
-        "blockers": report.get("blockers", []) + (["public_contract_overclaim"] if overclaims else []),
+        "blockers": report.get("blockers", [])
+        + (["public_contract_overclaim"] if overclaims else [])
+        + (
+            ["route_unlock_claimed"]
+            if report.get("next_blocker") in {"identity_public_contract_gate", APPROVED_RUNTIME_EVIDENCE_NEXT_BLOCKER}
+            else []
+        ),
         "non_claims": report.get("non_claims", []),
     }
 
@@ -2563,6 +2636,19 @@ def build_report(
         "public_sdk_ready": False,
         "runtime_ready": False,
         "public_header_allowed": False,
+        "public_contract_gate_aliases": alias_guardrails_false(),
+        "identity_public_contract_gate_missing": {
+            "active": True,
+            "cannot_unlock_without": [
+                "reviewed public identity contract",
+                "privacy, redaction, logging, and persistence semantics",
+                "principal invalidation and cross-instance/process-local semantics",
+                "public ABI/header/capability contract",
+                "SDK consumer and append-only ABI tests",
+                "promotion certificate or equivalent reviewed release artifact",
+            ],
+            "redactionEvidencePromotesIdentity": False,
+        },
         "primary_offline_gap": primary_offline_gap,
         "contract_review_inputs_resolved": resolved_inputs,
         "remaining_contract_gate_inputs": remaining_contract_gate_inputs,

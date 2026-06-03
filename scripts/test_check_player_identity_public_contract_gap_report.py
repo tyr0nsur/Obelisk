@@ -217,6 +217,17 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_header_allowed"])
+        for alias in (
+            "publicPrincipalReady",
+            "identityHeaderReady",
+            "principalLookupReady",
+            "realIdentityReady",
+            "redactionEvidencePromotesIdentity",
+        ):
+            self.assertFalse(report["public_contract_gate_aliases"][alias])
+        self.assertFalse(
+            report["identity_public_contract_gate_missing"]["redactionEvidencePromotesIdentity"]
+        )
         self.assertEqual(report["current_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(report["next_blocker"], "approved_runtime_evidence_missing")
         self.assertEqual(report["primary_offline_gap"], "lifetime.generation_scope_invalidation")
@@ -597,8 +608,13 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
                 "contractReviewed": True,
                 "identityContractReady": True,
+                "publicPrincipalReady": True,
                 "principalHandleAbiReady": True,
                 "identityHeaderAllowed": True,
+                "identityHeaderReady": True,
+                "principalLookupReady": True,
+                "realIdentityReady": True,
+                "redactionEvidencePromotesIdentity": True,
                 "claims": {
                     "public_contract_ready": True,
                     "publicSdkReady": True,
@@ -636,8 +652,13 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.claims.nested.v1CompletionReady", paths)
         self.assertIn("$.contractReviewed", paths)
         self.assertIn("$.identityContractReady", paths)
+        self.assertIn("$.publicPrincipalReady", paths)
         self.assertIn("$.principalHandleAbiReady", paths)
         self.assertIn("$.identityHeaderAllowed", paths)
+        self.assertIn("$.identityHeaderReady", paths)
+        self.assertIn("$.principalLookupReady", paths)
+        self.assertIn("$.realIdentityReady", paths)
+        self.assertIn("$.redactionEvidencePromotesIdentity", paths)
         self.assertFalse(runtime_report["accepted_for_contract_review"])
         self.assertIsNone(runtime_report["resolved_input"])
         self.assertEqual(runtime_report["resolved_inputs"], [])
@@ -671,6 +692,11 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         decisions["identityContractReady"] = True
         decisions["principalHandleAbiReady"] = True
         decisions["identityHeaderAllowed"] = True
+        decisions["alias_guardrails"]["publicPrincipalReady"] = True
+        decisions["alias_guardrails"]["identityHeaderReady"] = True
+        decisions["alias_guardrails"]["principalLookupReady"] = True
+        decisions["alias_guardrails"]["realIdentityReady"] = True
+        decisions["alias_guardrails"]["redactionEvidencePromotesIdentity"] = True
         decisions["contract_gate_inputs"][0]["promotion_blocker_resolved"] = True
         decisions["contract_gate_inputs"][1]["public_sdk_ready"] = True
         decisions["proposed_public_pod_abi_candidate"]["runtime_ready"] = True
@@ -695,6 +721,16 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         self.assertIn("$.identityContractReady", labels)
         self.assertIn("$.principalHandleAbiReady", labels)
         self.assertIn("$.identityHeaderAllowed", labels)
+        alias_labels = {
+            detail["label"]
+            for detail in report["blocker_details"]
+            if detail["reason"] == "decisions_alias_guardrail_not_false"
+        }
+        self.assertIn("$.alias_guardrails.publicPrincipalReady", alias_labels)
+        self.assertIn("$.alias_guardrails.identityHeaderReady", alias_labels)
+        self.assertIn("$.alias_guardrails.principalLookupReady", alias_labels)
+        self.assertIn("$.alias_guardrails.realIdentityReady", alias_labels)
+        self.assertIn("$.alias_guardrails.redactionEvidencePromotesIdentity", alias_labels)
         self.assertIn("decisions_contract_gate_input_flag_not_false", report["blockers"])
 
     def test_rejects_missing_or_weakened_identifier_redaction_intake(self) -> None:

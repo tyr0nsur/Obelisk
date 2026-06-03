@@ -89,6 +89,53 @@ require_not_contains() {
     fi
 }
 
+require_installed_public_header_has_no_blocked_symbols() {
+    local header_path="$1"
+    local forbidden_symbols=(
+        "OBELISK_API_CAPABILITY_RESOURCE_HANDLE"
+        "OBELISK_API_CAPABILITY_RESOURCE_HANDLES"
+        "OBELISK_RESOURCE_HANDLE_ABI_VERSION"
+        "ObeliskResourceHandle"
+        "ResourceHandle"
+        "GetResource"
+        "ResolveResource"
+        "GObjects"
+        "GUObjectArray"
+        "GNames"
+        "OBELISK_API_CAPABILITY_INVENTORY_ACTIONS"
+        "ObeliskInventoryAction"
+        "RegisterInventoryAction"
+        "OBELISK_API_CAPABILITY_MISSION_COPIED_BOOL"
+        "MissionCopiedBool"
+        "OBELISK_API_CAPABILITY_TRANSFER_BACCEPT"
+        "TransferBAccept"
+        "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL"
+        "ObeliskPlayerPrincipal"
+        "RegisterPlayerPrincipal"
+        "OBELISK_API_CAPABILITY_COMMANDS"
+        "ObeliskCommandContext"
+        "RegisterCommand"
+        "OBELISK_API_CAPABILITY_PERMISSION"
+        "ObeliskPermissionQuery"
+        "OBELISK_API_CAPABILITY_RESOURCE_MUTATION"
+        "ObeliskMutation"
+        "ReturnOverride"
+    )
+    local symbol
+    local offenders=""
+
+    for symbol in "${forbidden_symbols[@]}"; do
+        if grep -F "${symbol}" "${header_path}" >/dev/null; then
+            offenders+="${symbol}"$'\n'
+        fi
+    done
+
+    if [[ -n "${offenders}" ]]; then
+        printf 'Installed SDK public header exposes blocked symbols:\n%s' "${offenders}" >&2
+        exit 1
+    fi
+}
+
 require_dynamic_exports() {
     local path="$1"
     shift
@@ -449,6 +496,7 @@ if [[ "${installed_headers}" != "obelisk/ObeliskApi.h" ]]; then
     printf '%s\n' "${installed_headers}" >&2
     exit 1
 fi
+require_installed_public_header_has_no_blocked_symbols "${INSTALL_ROOT}/include/obelisk/ObeliskApi.h"
 
 if find "${INSTALL_ROOT}/lib" -maxdepth 1 -name '*.incoming.*' | grep -q .; then
     echo "Runtime install left incoming temporary files in ${INSTALL_ROOT}/lib" >&2

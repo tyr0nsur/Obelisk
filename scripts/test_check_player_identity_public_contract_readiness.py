@@ -126,6 +126,17 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_contract_allowed"])
         self.assertFalse(report["public_header_allowed"])
+        for alias in (
+            "publicPrincipalReady",
+            "identityHeaderReady",
+            "principalLookupReady",
+            "realIdentityReady",
+            "redactionEvidencePromotesIdentity",
+        ):
+            self.assertFalse(report["public_contract_gate_aliases"][alias])
+        self.assertFalse(
+            report["identity_public_contract_gate_missing"]["redactionEvidencePromotesIdentity"]
+        )
         self.assertEqual(report["public_header_symbols_now"], [])
         self.assertEqual(report["public_capability_bits_now"], [])
         self.assertEqual(report["public_callback_abi_now"], [])
@@ -292,6 +303,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
     def test_rejects_identifier_redaction_evidence_that_overclaims_or_fails_validation(self) -> None:
         redaction = redaction_manifest()
         redaction["public_sdk_ready"] = True
+        redaction["redactionEvidencePromotesIdentity"] = True
         redaction["sample_logs"][0]["message"] = "free form sanitized log"
 
         result = self.run_checker(self.decisions(), approved_manifest(), redaction=redaction, check=False)
@@ -300,9 +312,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("identifier_redaction_evidence_not_accepted", report["blockers"])
         self.assertIn("identifier_redaction_evidence_public_sdk_ready_not_false", report["blockers"])
+        self.assertIn("identifier_redaction_evidence_public_contract_overclaim", report["blockers"])
         self.assertEqual(report["current_blocker"], "identity_public_contract_gate_missing")
         self.assertEqual(report["next_blocker"], "identity_public_contract_gate_missing")
         self.assertIn("runtime.lifecycle_evidence", report["resolved_inputs"])
+        self.assertNotIn("privacy.identifier_redaction", report["resolved_inputs"])
 
     def test_rejects_stale_source_bound_planning_manifest_verification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -404,7 +418,7 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             ):
                 report = checker.identifier_redaction_report(path, blockers)
 
-        self.assertTrue(report["accepted_for_contract_review"])
+        self.assertFalse(report["accepted_for_contract_review"])
         self.assertIn(
             "identifier_redaction_evidence_route_unlock_claimed",
             [blocker["reason"] for blocker in blockers],
@@ -599,6 +613,11 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         decisions["public_callback_abi_now"] = ["ObeliskPlayerPrincipalCallback"]
         decisions["contract_gate_inputs"][0]["promotion_ready"] = True
         decisions["contract_gate_inputs"][1]["public_header_allowed"] = True
+        decisions["alias_guardrails"]["publicPrincipalReady"] = True
+        decisions["alias_guardrails"]["identityHeaderReady"] = True
+        decisions["alias_guardrails"]["principalLookupReady"] = True
+        decisions["alias_guardrails"]["realIdentityReady"] = True
+        decisions["alias_guardrails"]["redactionEvidencePromotesIdentity"] = True
         result = self.run_checker(decisions, approved_manifest(), check=False)
         report = json.loads(result.stdout)
 
@@ -608,6 +627,17 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
         self.assertIn("public_callback_abi_now_not_empty", report["blockers"])
         self.assertIn("contract_gate_input_flag_not_false", report["blockers"])
+        self.assertIn("alias_guardrail_not_false", report["blockers"])
+        alias_labels = {
+            detail["label"]
+            for detail in report["blocker_details"]
+            if detail["reason"] == "alias_guardrail_not_false"
+        }
+        self.assertIn("$.alias_guardrails.publicPrincipalReady", alias_labels)
+        self.assertIn("$.alias_guardrails.identityHeaderReady", alias_labels)
+        self.assertIn("$.alias_guardrails.principalLookupReady", alias_labels)
+        self.assertIn("$.alias_guardrails.realIdentityReady", alias_labels)
+        self.assertIn("$.alias_guardrails.redactionEvidencePromotesIdentity", alias_labels)
 
     def test_rejects_public_text_or_source_artifact_overclaims_in_decisions(self) -> None:
         decisions = self.decisions()
@@ -1289,9 +1319,14 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             report = original_build_report(payload, validation, check_mode=check_mode)
             report["nestedClaims"] = {
                 "publicSdkReady": True,
+                "publicPrincipalReady": True,
                 "public-header-allowed": "ready",
                 "publicHeaderSymbolsNow": ["ObeliskPlayerPrincipalEvent"],
-                "downstream": {"v1CompletionReady": True},
+                "downstream": {
+                    "v1CompletionReady": True,
+                    "principalLookupReady": True,
+                    "redactionEvidencePromotesIdentity": True,
+                },
             }
             return report
 
@@ -1317,9 +1352,12 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
         )
         paths = {claim["path"] for claim in overclaims}
         self.assertIn("$.nestedClaims.publicSdkReady", paths)
+        self.assertIn("$.nestedClaims.publicPrincipalReady", paths)
         self.assertIn("$.nestedClaims.public-header-allowed", paths)
         self.assertIn("$.nestedClaims.publicHeaderSymbolsNow", paths)
         self.assertIn("$.nestedClaims.downstream.v1CompletionReady", paths)
+        self.assertIn("$.nestedClaims.downstream.principalLookupReady", paths)
+        self.assertIn("$.nestedClaims.downstream.redactionEvidencePromotesIdentity", paths)
         self.assertFalse(report["accepted_for_contract_review"])
 
     def test_approved_runtime_report_must_not_overclaim_public_header_allowed(self) -> None:

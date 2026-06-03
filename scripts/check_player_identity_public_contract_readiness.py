@@ -217,6 +217,21 @@ REQUIRED_APPROVED_RUNTIME_EVIDENCE_MINIMUM_GATES = {
     "ABI layout and SDK consumer tests passing",
     "public docs state exact non-claims and downstream dependency order",
 }
+REQUIRED_ALIAS_GUARDRAILS_FALSE = {
+    "contractReviewed",
+    "identityContractReady",
+    "publicIdentityReady",
+    "publicPrincipalReady",
+    "principalHandleAbiReady",
+    "identityHeaderAllowed",
+    "identityHeaderReady",
+    "principalLookupReady",
+    "realIdentityReady",
+    "redactionEvidencePromotesIdentity",
+}
+REQUIRED_ALIAS_GUARDRAILS_NON_CLAIM = (
+    "Alias guardrails are false-only until identity_public_contract_gate is reviewed."
+)
 FORBIDDEN_APPROVED_RUNTIME_RESOLVED_INPUT_TOKENS = (
     "request_pack",
     "request-pack",
@@ -596,10 +611,12 @@ READINESS_FALSE_KEYS = {
     "identity_public_contract_reviewed",
     "player_identity_promoted",
     "player_identity_ready",
+    "public_principal_ready",
     "player_principal_ready",
     "principal_abi_ready",
     "principal_handle_abi_ready",
     "principal_handle_ready",
+    "principal_lookup_ready",
     "promotion",
     "promotion_ready",
     "public_identity_allowed",
@@ -612,6 +629,8 @@ READINESS_FALSE_KEYS = {
     "public_abi_ready",
     "public_sdk_v1_completion_claim",
     "public_sdk_v1_completion_ready",
+    "real_identity_ready",
+    "redaction_evidence_promotes_identity",
     "v1_completion_claim",
     "v1_completion_ready",
     "v1_completion_evidence",
@@ -662,6 +681,13 @@ APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE = re.compile(
 )
 APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
     "public_identity_ready": re.compile(r"public\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_principal_ready": re.compile(r"public\s+(?:player\s+)?principal\s+(?:is\s+)?ready", re.IGNORECASE),
+    "real_identity_ready": re.compile(r"real\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
+    "principal_lookup_ready": re.compile(r"(?:principal|player)\s+lookup\s+(?:is\s+)?ready", re.IGNORECASE),
+    "redaction_evidence_promotes_identity": re.compile(
+        r"redaction\s+evidence\s+promotes?\s+(?:public\s+)?(?:player\s+)?identity",
+        re.IGNORECASE,
+    ),
     "public_sdk_ready": re.compile(r"public\s+sdk\s+(?:is\s+)?ready", re.IGNORECASE),
     "public_abi_ready": re.compile(r"public\s+abi\s+(?:is\s+)?ready", re.IGNORECASE),
     "v1_completion_ready": re.compile(r"v1\s+(?:sdk\s+)?completion\s+(?:is\s+)?ready", re.IGNORECASE),
@@ -819,6 +845,32 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
 def normalize_contract_key(key: object) -> str:
     separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
     return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def alias_guardrails_false() -> dict[str, bool]:
+    return {key: False for key in sorted(REQUIRED_ALIAS_GUARDRAILS_FALSE)}
+
+
+def validate_alias_guardrails(decisions: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    aliases = decisions.get("alias_guardrails")
+    if not isinstance(aliases, dict):
+        add(blockers, "alias_guardrails_missing", "$.alias_guardrails")
+        return
+    for key in sorted(REQUIRED_ALIAS_GUARDRAILS_FALSE):
+        if aliases.get(key) is not False:
+            add(
+                blockers,
+                "alias_guardrail_not_false",
+                f"$.alias_guardrails.{key}",
+                value=aliases.get(key),
+            )
+    if aliases.get("non_claim") != REQUIRED_ALIAS_GUARDRAILS_NON_CLAIM:
+        add(
+            blockers,
+            "alias_guardrails_non_claim_mismatch",
+            "$.alias_guardrails.non_claim",
+            value=aliases.get("non_claim"),
+        )
 
 
 def has_negative_context(value: str, match_start: int) -> bool:
@@ -1090,9 +1142,20 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
 
     validation_blockers = identifier_redaction.validate_evidence(payload)
     report = identifier_redaction.build_report(payload, validation_blockers)
+    accepted = not validation_blockers
+    overclaims = approved_runtime_report_overclaims(payload) + approved_runtime_report_overclaims(report)
+    if overclaims:
+        add(
+            blockers,
+            "identifier_redaction_evidence_public_contract_overclaim",
+            "$.identifier_redaction_evidence",
+            overclaims=overclaims,
+        )
+        accepted = False
     for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "public_header_allowed"):
         if payload.get(key) is not False or report.get(key) is not False:
             add(blockers, f"identifier_redaction_evidence_{key}_not_false", f"$.identifier_redaction_evidence.{key}")
+            accepted = False
     if validation_blockers:
         add(
             blockers,
@@ -1100,6 +1163,7 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
             "$.identifier_redaction_evidence",
             reasons=[blocker["reason"] for blocker in validation_blockers],
         )
+        accepted = False
     else:
         if report.get("accepted_for_contract_review") is not True:
             add(
@@ -1107,6 +1171,7 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
                 "identifier_redaction_evidence_contract_review_not_accepted",
                 "$.identifier_redaction_evidence.accepted_for_contract_review",
             )
+            accepted = False
         if report.get("resolved_inputs") != [REQUIRED_IDENTIFIER_REDACTION_RESOLVED_INPUT]:
             add(
                 blockers,
@@ -1114,6 +1179,7 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
                 "$.identifier_redaction_evidence.resolved_inputs",
                 value=report.get("resolved_inputs"),
             )
+            accepted = False
         if report.get("next_blocker") in {
             "identity_public_contract_gate",
             NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
@@ -1124,10 +1190,18 @@ def identifier_redaction_report(path: Path | None, blockers: list[dict[str, Any]
                 "$.identifier_redaction_evidence.next_blocker",
                 value=report.get("next_blocker"),
             )
+            accepted = False
+    if not accepted and not validation_blockers:
+        add(
+            blockers,
+            "identifier_redaction_evidence_not_accepted",
+            "$.identifier_redaction_evidence",
+            reasons=["public_contract_overclaim_or_route_unlock"],
+        )
     return {
         "provided": True,
-        "ready": report.get("ready") is True,
-        "accepted_for_contract_review": report.get("accepted_for_contract_review") is True,
+        "ready": accepted and report.get("ready") is True,
+        "accepted_for_contract_review": accepted and report.get("accepted_for_contract_review") is True,
         "resolved_inputs": report.get("resolved_inputs") if isinstance(report.get("resolved_inputs"), list) else [],
         "remaining_blockers": report.get("remaining_blockers") if isinstance(report.get("remaining_blockers"), list) else [],
     }
@@ -2164,6 +2238,7 @@ def validate_decisions(decisions: dict[str, Any], blockers: list[dict[str, Any]]
             )
     if decisions.get("public_header_allowed") is not False:
         add(blockers, "public_header_allowed_not_false", "$.public_header_allowed")
+    validate_alias_guardrails(decisions, blockers)
     if decisions.get("public_header") != "include/obelisk/ObeliskApi.h":
         add(blockers, "public_header_path_mismatch", "$.public_header")
     for key in ("public_header_symbols_now", "public_capability_bits_now", "public_callback_abi_now"):
@@ -2657,6 +2732,19 @@ def build_report(
         "runtime_ready": False,
         "public_contract_allowed": False,
         "public_header_allowed": False,
+        "public_contract_gate_aliases": alias_guardrails_false(),
+        "identity_public_contract_gate_missing": {
+            "active": current_blocker == NEXT_BLOCKER_AFTER_APPROVED_RUNTIME_EVIDENCE,
+            "cannot_unlock_without": [
+                "reviewed public identity contract",
+                "privacy, redaction, logging, and persistence semantics",
+                "principal invalidation and cross-instance/process-local semantics",
+                "public ABI/header/capability contract",
+                "SDK consumer and append-only ABI tests",
+                "promotion certificate or equivalent reviewed release artifact",
+            ],
+            "redactionEvidencePromotesIdentity": False,
+        },
         "public_header_symbols_now": decisions.get("public_header_symbols_now"),
         "public_capability_bits_now": decisions.get("public_capability_bits_now"),
         "public_callback_abi_now": decisions.get("public_callback_abi_now"),

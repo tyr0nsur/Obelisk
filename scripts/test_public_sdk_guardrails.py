@@ -8452,11 +8452,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
 
     def test_public_examples_do_not_use_call_process_event_escape_hatch(self) -> None:
         scanned_roots = [
+            REPO_ROOT / "examples",
             REPO_ROOT / "plugins",
             REPO_ROOT / "tests" / "sdk_consumer",
+            REPO_ROOT / "tests" / "sdk_installed_consumer",
         ]
         allowed_fixture_files = {
             REPO_ROOT / "tests" / "sdk_consumer" / "SdkConsumerFixture.cpp",
+            REPO_ROOT / "tests" / "sdk_installed_consumer" / "consumer_fixture.cpp",
         }
         forbidden = (
             "OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT",

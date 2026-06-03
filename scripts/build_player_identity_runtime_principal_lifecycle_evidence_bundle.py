@@ -318,12 +318,18 @@ def request_pack_check_state(
     if isinstance(payload, dict):
         state["schema"] = payload.get("schema")
         state["checker_ready"] = payload.get("ready") is True
-        state["ready"] = exit_code == 0 and payload.get("ready") is True and payload.get("request_pack_ready") is True
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")
         state["post_window_replay"] = payload.get("post_window_replay") is True
         state["post_window_replay_expiry_tolerated"] = (
             payload.get("post_window_replay_expiry_tolerated") is True
+        )
+        state["ready"] = (
+            exit_code == 0
+            and payload.get("ready") is True
+            and payload.get("request_pack_ready") is True
+            and state["post_window_replay"]
+            and state["post_window_replay_expiry_tolerated"]
         )
     if not state["ready"]:
         add_blocker(

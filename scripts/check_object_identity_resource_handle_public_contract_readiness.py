@@ -34,7 +34,18 @@ REQUIRED_FALSE_KEYS = (
     "runtime_ready",
     "public_resource_handle_ready",
     "post_callback_resource_handle_ready",
+    "serialPolicyReady",
+    "resourceLookupReady",
+    "postCallbackHandleReady",
+    "objectIdentityReady",
+    "runtimeSampleReady",
+    "offline_artifacts_unlock_public_lookup_identity_runtime_sdk",
 )
+REQUIRED_STRICT_NEXT_BLOCKER = (
+    "rejected runtime object samples plus runtime serial reuse/wraparound semantics "
+    "under future approved live-ops brief"
+)
+REQUIRED_OFFLINE_ARTIFACT_POLICY = "candidate-only"
 REQUIRED_DESCRIPTOR_FLAGS = (
     "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_CATEGORY_ONLY",
     "OBELISK_RESOURCE_KIND_DESCRIPTOR_FLAG_NO_IDENTITY",
@@ -75,10 +86,15 @@ FORBIDDEN_TRUE_KEYS = (
     "v1_sdk_ready",
     "object_identity_ready",
     "post_callback_resource_handle_ready",
+    "postCallbackHandleReady",
     "public_object_identity_ready",
     "public_object_lookup_ready",
     "public_resource_handle_ready",
+    "resourceLookupReady",
     "resource_handle_ready",
+    "runtimeSampleReady",
+    "serialPolicyReady",
+    "objectIdentityReady",
 )
 FORBIDDEN_READY_VALUE_KEYS = {
     "object_identity",
@@ -89,7 +105,8 @@ FORBIDDEN_READY_VALUE_KEYS = {
 FORBIDDEN_ALIAS_SUBJECT_RE = re.compile(
     r"(?:resource_?handle|resourcehandle|resource_?lookup|object_?identity|object_?lookup|object_?handle|"
     r"runtime_?object|public_?gobjects|gobjects|static_?globals?|strict_?serial|serial_?policy|"
-    r"serial_?reuse|zero_?serial|runtime_?rejection|post_?callback_?rejection|source_?helper|"
+    r"serial_?reuse|zero_?serial|runtime_?rejection|runtime_?samples?|post_?callback_?handle|"
+    r"post_?callback_?rejection|source_?helper|"
     r"weak_?helper|future_?runtime_?observation|runtime_?observation|wraparound)",
     re.IGNORECASE,
 )
@@ -154,6 +171,7 @@ PUBLIC_CONTRACT_FIELD_KEYS = frozenset(
         "capabilities",
     )
 )
+DECISIONS_TEXT_CLAIM_EXEMPT_KEYS = frozenset(("strict_next_blocker",))
 
 
 def parse_args() -> argparse.Namespace:
@@ -270,7 +288,20 @@ def walk_surface_text_claims(value: Any, blockers: list[str], trail: str) -> Non
 
 
 def walk_decisions_text_claims(value: Any, blockers: list[str], trail: str) -> None:
-    walk_text_claims(value, blockers, trail, "decisions_positive_resource_handle_claim")
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_text = str(key)
+            if key_text in DECISIONS_TEXT_CLAIM_EXEMPT_KEYS:
+                continue
+            walk_decisions_text_claims(child, blockers, f"{trail}.{key_text}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            walk_decisions_text_claims(child, blockers, f"{trail}[{index}]")
+    elif isinstance(value, str):
+        for clause_index, clause in enumerate(re.split(r"[.;\n]+", value)):
+            normalized = clause.strip()
+            if normalized and positive_surface_text_claim(normalized):
+                blockers.append(f"decisions_positive_resource_handle_claim:{trail}[clause:{clause_index}]")
 
 
 def walk_public_event_text_claims(value: Any, blockers: list[str], trail: str) -> None:
@@ -335,6 +366,10 @@ def validate_decisions(decisions: Any, blockers: list[str]) -> None:
         blockers.append("required_public_sdk_surface_support_tier_not_blocked")
     if decisions.get("required_public_contract") != []:
         blockers.append("required_public_contract_not_empty")
+    if decisions.get("strict_next_blocker") != REQUIRED_STRICT_NEXT_BLOCKER:
+        blockers.append("strict_next_blocker_not_runtime_samples_and_serial_semantics")
+    if decisions.get("offline_serial_post_callback_artifacts") != REQUIRED_OFFLINE_ARTIFACT_POLICY:
+        blockers.append("offline_serial_post_callback_artifacts_not_candidate_only")
     flags = decisions.get("required_resource_kind_descriptor_flags")
     if not isinstance(flags, list) or set(REQUIRED_DESCRIPTOR_FLAGS) - set(flags):
         blockers.append("required_resource_kind_descriptor_flags_missing")
@@ -501,6 +536,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "runtime_ready": False,
         "public_resource_handle_ready": False,
         "post_callback_resource_handle_ready": False,
+        "serialPolicyReady": False,
+        "resourceLookupReady": False,
+        "postCallbackHandleReady": False,
+        "objectIdentityReady": False,
+        "runtimeSampleReady": False,
+        "strict_next_blocker": REQUIRED_STRICT_NEXT_BLOCKER,
+        "offline_serial_post_callback_artifacts": REQUIRED_OFFLINE_ARTIFACT_POLICY,
+        "offline_artifacts_unlock_public_lookup_identity_runtime_sdk": False,
         "blockers": sorted(set(blockers)),
         "non_claim": (
             "ResourceHandle and object identity remain post-v1/blocked; copied events and "

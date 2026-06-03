@@ -33,8 +33,13 @@
     "contractReviewed": false,
     "identityContractReady": false,
     "publicIdentityReady": false,
+    "publicPrincipalReady": false,
     "principalHandleAbiReady": false,
     "identityHeaderAllowed": false,
+    "identityHeaderReady": false,
+    "principalLookupReady": false,
+    "realIdentityReady": false,
+    "redactionEvidencePromotesIdentity": false,
     "non_claim": "Alias guardrails are false-only until identity_public_contract_gate is reviewed."
   },
   "private_candidate_contract": "docs/research/2026-06-01-player-identity-private-candidate-contract.json",

@@ -53,6 +53,18 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_resource_handle_ready"])
         self.assertFalse(report["post_callback_resource_handle_ready"])
+        self.assertFalse(report["serialPolicyReady"])
+        self.assertFalse(report["resourceLookupReady"])
+        self.assertFalse(report["postCallbackHandleReady"])
+        self.assertFalse(report["objectIdentityReady"])
+        self.assertFalse(report["runtimeSampleReady"])
+        self.assertEqual(
+            report["strict_next_blocker"],
+            "rejected runtime object samples plus runtime serial reuse/wraparound semantics "
+            "under future approved live-ops brief",
+        )
+        self.assertEqual(report["offline_serial_post_callback_artifacts"], "candidate-only")
+        self.assertFalse(report["offline_artifacts_unlock_public_lookup_identity_runtime_sdk"])
 
     def test_rejects_decisions_that_enable_public_resource_handles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -61,6 +73,7 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             decisions["public_header_allowed"] = True
             decisions["public_resource_handle_ready"] = True
             decisions["required_public_contract"] = ["ObeliskResourceHandle"]
+            decisions["serialPolicyReady"] = True
             decisions_path = write_json(root, "decisions.json", decisions)
 
             result = run_checker("--decisions", str(decisions_path), check=False)
@@ -70,6 +83,24 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
         self.assertIn("public_header_allowed_not_false", report["blockers"])
         self.assertIn("public_resource_handle_ready_not_false", report["blockers"])
         self.assertIn("required_public_contract_not_empty", report["blockers"])
+        self.assertIn("serialPolicyReady_not_false", report["blockers"])
+
+    def test_rejects_decisions_with_missing_strict_runtime_blocker_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["strict_next_blocker"] = "offline serial policy accepted"
+            decisions["offline_serial_post_callback_artifacts"] = "promoted"
+            decisions["offline_artifacts_unlock_public_lookup_identity_runtime_sdk"] = True
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("strict_next_blocker_not_runtime_samples_and_serial_semantics", report["blockers"])
+        self.assertIn("offline_serial_post_callback_artifacts_not_candidate_only", report["blockers"])
+        self.assertIn("offline_artifacts_unlock_public_lookup_identity_runtime_sdk_not_false", report["blockers"])
 
     def test_rejects_positive_resource_handle_claim_in_decisions_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -217,6 +248,11 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 "v1ObjectLookupPromoted": "promoted",
                 "runtimeObjectSamplesPresent": True,
                 "serialReuseWraparoundSafetyProven": True,
+                "serialPolicyReady": True,
+                "resourceLookupReady": True,
+                "postCallbackHandleReady": True,
+                "objectIdentityReady": True,
+                "runtimeSampleReady": True,
             }
             decisions_path = write_json(root, "decisions.json", decisions)
 
@@ -231,6 +267,11 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             "v1ObjectLookupPromoted",
             "runtimeObjectSamplesPresent",
             "serialReuseWraparoundSafetyProven",
+            "serialPolicyReady",
+            "resourceLookupReady",
+            "postCallbackHandleReady",
+            "objectIdentityReady",
+            "runtimeSampleReady",
         ):
             self.assertIn(
                 f"forbidden_positive_resource_handle_claim:$.decisions.metadata.{key}",
@@ -479,6 +520,11 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                         "v1ObjectLookupPromoted": "promoted",
                         "runtimeObjectSamplesPresent": True,
                         "serialReuseWraparoundSafetyProven": True,
+                        "serialPolicyReady": True,
+                        "resourceLookupReady": True,
+                        "postCallbackHandleReady": True,
+                        "objectIdentityReady": True,
+                        "runtimeSampleReady": True,
                     }
                     break
             surfaces_path = write_json(root, "surfaces.json", surfaces)
@@ -494,6 +540,11 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             "v1ObjectLookupPromoted",
             "runtimeObjectSamplesPresent",
             "serialReuseWraparoundSafetyProven",
+            "serialPolicyReady",
+            "resourceLookupReady",
+            "postCallbackHandleReady",
+            "objectIdentityReady",
+            "runtimeSampleReady",
         ):
             self.assertIn(
                 "forbidden_positive_resource_handle_claim:"
@@ -629,6 +680,11 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             events["metadata_surfaces"][0]["v1ObjectLookupPromoted"] = "promoted"
             events["metadata_surfaces"][0]["runtimeObjectSamplesPresent"] = True
             events["metadata_surfaces"][0]["serialReuseWraparoundSafetyProven"] = True
+            events["metadata_surfaces"][0]["serialPolicyReady"] = True
+            events["metadata_surfaces"][0]["resourceLookupReady"] = True
+            events["metadata_surfaces"][0]["postCallbackHandleReady"] = True
+            events["metadata_surfaces"][0]["objectIdentityReady"] = True
+            events["metadata_surfaces"][0]["runtimeSampleReady"] = True
             events_path = write_json(root, "events.json", events)
 
             result = run_checker("--public-events", str(events_path), check=False)
@@ -642,6 +698,11 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
             "v1ObjectLookupPromoted",
             "runtimeObjectSamplesPresent",
             "serialReuseWraparoundSafetyProven",
+            "serialPolicyReady",
+            "resourceLookupReady",
+            "postCallbackHandleReady",
+            "objectIdentityReady",
+            "runtimeSampleReady",
         ):
             self.assertIn(
                 f"forbidden_positive_resource_handle_claim:$.metadata_surfaces[0].{key}",

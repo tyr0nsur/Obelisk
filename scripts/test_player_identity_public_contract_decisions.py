@@ -167,8 +167,13 @@ class PlayerIdentityPublicContractDecisionTests(unittest.TestCase):
             "contractReviewed",
             "identityContractReady",
             "publicIdentityReady",
+            "publicPrincipalReady",
             "principalHandleAbiReady",
             "identityHeaderAllowed",
+            "identityHeaderReady",
+            "principalLookupReady",
+            "realIdentityReady",
+            "redactionEvidencePromotesIdentity",
         ):
             with self.subTest(key=key):
                 self.assertFalse(aliases[key])

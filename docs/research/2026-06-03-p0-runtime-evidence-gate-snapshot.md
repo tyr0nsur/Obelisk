@@ -715,6 +715,81 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Turbo SDK Delegation Checkpoint After Compaction
+
+The lead reconstructed the current route and SDK gates after memory compaction and
+started a fresh four-worker round with disjoint write scopes. This checkpoint records the
+delegation and gate baseline so future compacted sessions do not need to infer it from
+chat history.
+
+Delegated scopes:
+
+- Huygens: approved runtime principal lifecycle request/replay strictness and post-window
+  evidence acceptance hardening.
+- Ampere: player identity public-contract gate, redaction evidence non-overclaim, and
+  no-public-header/no-public-principal unlocks before reviewed contract evidence.
+- Banach: ResourceHandle runtime-evidence planning guardrails, keeping offline serial and
+  post-callback artifacts candidate-only.
+- Kant: runtime ABI/build/release static hardening around owner cleanup retry,
+  owner-token append-only posture, public `CallProcessEvent` exposure, and installed SDK
+  header guardrails.
+
+Observed gate baseline before integrating worker results:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `remaining_route_blockers=["approved_runtime_evidence_missing"]`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, and missing release-statement outcomes for the
+  seven non-P0 bookkeeping rows.
+- Generated scoped release statement plus scope validation: validation passes with
+  `scoped_release_statement.ready=true`, non-P0 bookkeeping rows `7/7`, complete SDK
+  `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+
+Non-claims:
+
+- This checkpoint does not create approved runtime evidence and does not authorize server
+  operations, writes under `/servidor/ark`, marker/env changes, runtime observation,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord sends, GitHub publication,
+  tag updates, release updates, support-tier activation, stable SDK wording, public
+  identity readiness, public ABI readiness, or v1 SDK completion.
+
+Integration result:
+
+- Runtime principal lifecycle bundle preflight now requires the request-pack checker to
+  echo both `post_window_replay=true` and
+  `post_window_replay_expiry_tolerated=true`; a generic ready request-pack result no
+  longer counts as checked post-window replay input.
+- Player identity public-contract readiness now carries false-only alias guardrails for
+  public principal, identity header, principal lookup, real identity, and redaction
+  promotion claims. Redaction evidence fails closed if it claims route unlock or identity
+  promotion.
+- ResourceHandle readiness now carries explicit false aliases for serial policy, resource
+  lookup, post-callback handles, object identity, and runtime samples. The strict next
+  blocker remains rejected runtime object samples plus runtime serial reuse/wraparound
+  semantics under a future approved live-ops brief.
+- ABI/build guardrails now reject blocked symbols in the installed public header and scan
+  public examples plus installed SDK consumers for `CallProcessEvent` escape-hatch use.
+
+Final offline validation for this integration:
+
+- P0 runtime evidence/bundle tests: 125 OK.
+- Player identity public-contract tests: 101 OK.
+- ResourceHandle/serial/post-callback tests: 42 OK.
+- Release/plugin-manager/static build guardrails: 90 OK plus shell syntax checks.
+- Public SDK guardrails: 196 OK.
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, current blocker `approved_runtime_evidence_missing`, and
+  public/runtime/v1 accounting false.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, and seven release-statement outcomes still
+  missing without a statement.
+- Generated scoped release statement validation: exits 0 with scoped bookkeeping `7/7`,
+  SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+- `git diff --check`: OK.
+
 ## P0 Prep, Bound Route, SDK Statement, And Runtime ABI Guardrail Round
 
 Another supervised four-agent round plus lead integration hardened the offline
