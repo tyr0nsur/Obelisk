@@ -39,6 +39,12 @@
 #define ASSERT_ALIGN(type, expected) _Static_assert(_Alignof(type) == (expected), #type " alignment changed")
 #define ASSERT_OFFSET(type, field, expected) \
     _Static_assert(offsetof(type, field) == (expected), #type "." #field " offset changed")
+#define ASSERT_FIELD_AFTER(type, field, previous) \
+    _Static_assert(offsetof(type, field) > offsetof(type, previous), #type "." #field " must remain append-only")
+#define ASSERT_FIELD_ENDS_STRUCT(type, field) \
+    _Static_assert( \
+        offsetof(type, field) + sizeof(((type*)0)->field) == sizeof(type), \
+        #type "." #field " must remain the final ABI field")
 #define ASSERT_U64(name, expected) _Static_assert((name) == (expected), #name " value changed")
 #define ASSERT_ENUM(name, expected) _Static_assert((uint32_t)(name) == (expected), #name " value changed")
 
@@ -200,6 +206,8 @@ ASSERT_OFFSET(ObeliskPluginInitContext, config_dir, 8);
 ASSERT_OFFSET(ObeliskPluginInitContext, config_path, 16);
 ASSERT_OFFSET(ObeliskPluginInitContext, instance_id, 24);
 ASSERT_OFFSET(ObeliskPluginInitContext, plugin_owner_token, 32);
+ASSERT_FIELD_AFTER(ObeliskPluginInitContext, plugin_owner_token, instance_id);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskPluginInitContext, plugin_owner_token);
 
 ASSERT_SIZE(OnProcessEventCallback, sizeof(void*));
 ASSERT_SIZE(ObeliskGameplayPolicyEventCallback, sizeof(void*));
@@ -236,6 +244,9 @@ ASSERT_OFFSET(ObeliskApi, RegisterChatMessageEventWithOwnerTokenHandle, 184);
 ASSERT_OFFSET(ObeliskApi, UnregisterChatMessageEventWithOwnerToken, 192);
 ASSERT_OFFSET(ObeliskApi, RegisterTimerWithOwnerTokenHandle, 200);
 ASSERT_OFFSET(ObeliskApi, UnregisterTimerWithOwnerToken, 208);
+ASSERT_FIELD_AFTER(ObeliskApi, RegisterTimerWithOwnerTokenHandle, UnregisterChatMessageEventWithOwnerToken);
+ASSERT_FIELD_AFTER(ObeliskApi, UnregisterTimerWithOwnerToken, RegisterTimerWithOwnerTokenHandle);
+ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, UnregisterTimerWithOwnerToken);
 
 int main(void)
 {

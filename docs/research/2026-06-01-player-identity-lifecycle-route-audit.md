@@ -33,9 +33,9 @@ mutation, return override, or release claims.
 - `scripts/check_player_identity_runtime_principal_lifecycle_window_manifest.py`
 - `scripts/check_player_principal_lifecycle_preflight.sh`
 
-## Accepted Route
+## Accepted Planned Route
 
-The accepted route is narrow and already documented:
+The accepted planned route is narrow and already documented:
 
 ```text
 reviewed FName root 0x5956f30
@@ -43,7 +43,7 @@ reviewed FName root 0x5956f30
 -> complete player identity reflection inventory
 -> focal HandleNewPlayer / OnLogout snapshots
 -> candidate-only lifecycle anchor and principal policy manifests
--> approved private runtime consume-only observer evidence
+-> future approved private runtime consume-only observer evidence
 -> later, separate public ABI and promotion review
 ```
 

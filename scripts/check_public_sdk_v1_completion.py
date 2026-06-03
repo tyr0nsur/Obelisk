@@ -563,6 +563,8 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"(?:the\s+)?(?:complete|full|production|stable)\s+"
     r"(?:sdk|api|support)\b",
     r"\bv1(?:\.0)?\s+stable(?:\s+(?:sdk|api|support|release|claim|approval|wording))?\b",
+    r"\b(?:obelisk\s+)?v1(?:\.0)?\s+(?:sdk|api|support)?\s*"
+    r"(?:is|are|becomes?|became|reaches?)\s+stable\b",
     r"\b(?:sdk|api|support)\s+v?1(?:\.0)?\s*[:,-]\s*"
     r"(?:complete|full|production[- ]?ready|stable)\b",
     r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+"
@@ -572,6 +574,11 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:available|published|ready|released|shipped)\b",
     r"\b(?:sdk|api|support)\b.{0,40}\b(?:ga|generally[- ]available)\b",
     r"\b1\.0\s+stable\s+(?:sdk|api|support)\b",
+    r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|"
+    r"release[- ]?grade|production|stable)\s+"
+    r"(?:[a-z0-9_/+-]+\s+){1,5}(?:sdk|api|support)\b.{0,80}"
+    r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
+    r"shipped|stable|supported|public|promoted)\b",
     r"\b(?:complete|full|prod(?:uction)?[- ]?ready|production[- ]?grade|release[- ]?grade|production|stable)[- ]+"
     r"(?:sdk|api|support)\b.{0,80}"
     r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
@@ -693,9 +700,9 @@ PLUGIN_HUB_EXPLICIT_PUBLIC_CLAIM = re.compile(
     r"release[- ]?scope|release[- ]?scope|stable\s+sdk\s+includes?)\b",
     re.IGNORECASE,
 )
-CLAUSE_START_PATTERN = re.compile(r"[.;\n]|(?:\s+-\s+)")
+CLAUSE_START_PATTERN = re.compile(r"[.;:\n]|(?:\s+-\s+)")
 BROAD_CLAIM_CLAUSE_START_PATTERN = re.compile(
-    r"[.;\n]|(?:\s+-\s+)|(?:\s+\b(?:and|but)\b\s+)",
+    r"[.;:\n]|(?:\s+-\s+)|(?:\s+\b(?:and|but)\b\s+)",
     re.IGNORECASE,
 )
 BLOCKED_CONTRACT_HEADER_SYMBOL_PATTERNS = {
@@ -1251,31 +1258,40 @@ def command_permission_route_gate_public_or_runtime_claims(payload: dict[str, An
 
 
 def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) -> list[str]:
-    report_blockers = payload.get("blockers", [])
-    if isinstance(report_blockers, list) and report_blockers:
-        return []
-
     claims: list[str] = []
     forbidden_keys = {
         normalized_completion_claim_key(key)
         for key in SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS
     }
 
-    def visit(value: Any, path: str) -> None:
+    def has_local_blockers(value: dict[str, Any]) -> bool:
+        blockers = value.get("blockers")
+        return isinstance(blockers, list) and bool(blockers)
+
+    def starts_report_context(value: dict[str, Any], path: str) -> bool:
+        return path == "" or "schema" in value or "blockers" in value
+
+    def visit(value: Any, path: str, blocked_report_context: bool) -> None:
         if isinstance(value, dict):
+            current_blocked_context = (
+                has_local_blockers(value)
+                if starts_report_context(value, path)
+                else blocked_report_context
+            )
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
                 if (
                     normalized_completion_claim_key(key) in forbidden_keys
                     and is_positive_completion_claim_value(item)
+                    and not current_blocked_context
                 ):
                     claims.append(item_path)
-                visit(item, item_path)
+                visit(item, item_path, current_blocked_context)
         elif isinstance(value, list):
             for index, item in enumerate(value):
-                visit(item, f"{path}[{index}]")
+                visit(item, f"{path}[{index}]", blocked_report_context)
 
-    visit(payload, "")
+    visit(payload, "", False)
     return sorted(set(claims))
 
 

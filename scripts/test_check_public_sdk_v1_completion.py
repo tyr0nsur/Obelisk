@@ -626,6 +626,22 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
 
+    def test_secondary_report_scanner_rejects_nested_report_claim_without_nested_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": ["parent_report_blocked"],
+            "nested_report": {
+                "schema": "obelisk.nested-secondary-report.v1",
+                "blockers": [],
+                "stable_claim_allowed": True,
+            },
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            ["nested_report.stable_claim_allowed"],
+        )
+
     def test_completion_gate_rejects_secondary_stable_claim_without_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             checker_path = self.write_fake_resource_handle_checker(
@@ -645,6 +661,33 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(
             payload["object_identity_resource_handle_readiness"]["completion_claims_without_blocker"],
             ["nested.stable_claim_allowed"],
+        )
+        self.assertFalse(payload["stable_claim_allowed"])
+
+    def test_completion_gate_rejects_nested_secondary_report_stable_claim_without_nested_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_resource_handle_checker(
+                Path(temp_dir) / "fake_resource_handle.py",
+                blockers=["parent_report_blocked"],
+                nested_report={
+                    "schema": "obelisk.nested-secondary-report.v1",
+                    "blockers": [],
+                    "stable_claim_allowed": True,
+                },
+            )
+            result = self.run_checker(
+                "--object-identity-resource-handle-readiness",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER, payload["blockers"])
+        self.assertEqual(
+            payload["object_identity_resource_handle_readiness"]["completion_claims_without_blocker"],
+            ["nested_report.stable_claim_allowed"],
         )
         self.assertFalse(payload["stable_claim_allowed"])
 
@@ -3330,6 +3373,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "The complete-SDK is available.",
             "The GA SDK is published.",
             "The 1.0 stable SDK is ready.",
+            "The stable public SDK is available.",
+            "Obelisk v1.0 is stable.",
+            "Blocked: The complete SDK is ready.",
+            "Excluded surfaces: Inventory SDK is ready in v1.",
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
             statement_path = Path(temp_dir) / "SCOPED_RELEASE_STATEMENT.md"

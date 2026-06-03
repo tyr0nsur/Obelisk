@@ -339,6 +339,34 @@ class BuildRedactedUFunctionSignaturesTest(unittest.TestCase):
         self.assertIs(False, report["safety_summary"]["promotion_ready"])
         self.assertEqual("offline_review_only", report["safety_summary"]["intended_use"])
 
+    def test_command_chat_response_route_planning_fixture_manifest_passes_consume_gate(self) -> None:
+        fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            protected_root = Path(temp_dir) / "server"
+            workspace = protected_root / "workspace-offline"
+            manifest = workspace / "command-chat-response-route-planning.json"
+            report = tool.build_report(
+                snapshot_root=fixture_root,
+                target_sets=["command-chat-response-route-planning"],
+            )
+            write_json(manifest, report)
+
+            result = gate.build_result(
+                argparse.Namespace(
+                    root=workspace,
+                    protected_root=protected_root,
+                    manifest=[manifest],
+                    artifact=[],
+                    expected_binary_sha256=None,
+                    mode="consume",
+                    strict_target_set_coverage=True,
+                    json=True,
+                )
+            )
+
+        self.assertEqual("accepted", result["status"])
+        self.assertEqual([], result["blockers"])
+
     def test_players_identity_first_evidence_uses_committed_admin_snapshots(self) -> None:
         fixture_root = REPO_ROOT / "tests" / "fixtures" / "ufunction_snapshots"
 

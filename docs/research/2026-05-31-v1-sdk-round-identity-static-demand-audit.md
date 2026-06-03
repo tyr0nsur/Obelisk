@@ -7,6 +7,12 @@ ARK binary hash in current offline evidence lane:
 
 ## Summary
 
+Historical status: the two admin sanitized snapshots called out below were later added
+and the 12-target `players-identity-lifecycle-intake` planning set is now fixture-backed.
+The active P0 blocker is approved runtime principal lifecycle evidence, then reviewed
+player identity public contract; this note remains a record of the earlier static-demand
+round and should not be used to request more admin snapshots.
+
 This round keeps the v1 route centered on a complete public SDK contract, not on
 runtime stability alone. The current v1 completion gate remains blocked by design:
 `player_identity`, `structure_census`, and `mission_transfer_dino_tribe` are still
@@ -29,12 +35,12 @@ No agent touched `/servidor/ark`, Discord, GitHub publication, or live servers.
 - Static admin thunk orientation currently remains orientation-only for:
   - `ShooterPlayerController.ServerKickPlayer`
   - `ShooterPlayerController.ServerListPlayers`
-- The `players-identity-lifecycle-intake` lane is still missing two sanitized snapshots:
-  - `ShooterPlayerController.ServerListPlayers`
-  - `ShooterPlayerController.ServerKickPlayer`
-- `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` are useful lifecycle
-  orientation clues, but they are outside the current closed target set and cannot be
-  accepted as lifecycle anchors until the schema/target-set gap is closed.
+- The earlier missing `players-identity-lifecycle-intake` admin snapshots are now closed
+  in committed fixtures; they remain planning-only and do not satisfy runtime evidence.
+- `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` are outside the
+  12-target fixture-backed pressure/risk set and are now separate candidate-only planning
+  lifecycle anchors; they still do not satisfy approved runtime principal lifecycle
+  evidence.
 
 ## Shortest Offline Identity Path
 
@@ -52,12 +58,7 @@ Next commands should produce only candidate/internal evidence:
 
 1. Build the complete core evidence pack with reviewed FName/GObjects inputs.
 2. Build a full reflection inventory pack for `players-identity-lifecycle-intake`.
-3. Plan exactly the two missing focal snapshots with `--target` entries for
-   `ServerListPlayers` and `ServerKickPlayer`; do not use the whole target set as the
-   focal planner input.
-4. Generate sanitized snapshots, review them, then add them to
-   `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_players/`.
-5. Build consume-mode first-evidence artifacts only. `promotion_ready`,
+3. Build consume-mode first-evidence artifacts only. `promotion_ready`,
    `public_sdk_ready`, and `runtime_ready` must stay false.
 
 Fail closed if any input resolves under `/servidor/ark`, hashes mismatch, evidence packs

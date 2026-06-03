@@ -1,5 +1,14 @@
 # Player Identity Target-Set Gap
 
+## Current Status
+
+Historical note: this gap is superseded for fixture coverage. The committed
+`players-identity-lifecycle-intake` fixtures now cover all 12 targets, including
+`ShooterPlayerController.ServerListPlayers` and `ShooterPlayerController.ServerKickPlayer`.
+The current active blocker is approved runtime principal lifecycle evidence, followed by
+the player identity public-contract review; this note remains useful only for the
+candidate-only field-policy rationale.
+
 ## Objective
 
 Identify the exact target-set, test, and tooling changes needed before Obelisk can build
@@ -20,8 +29,8 @@ Current closed targets:
 
 | Target | Current evidence | First-pack role | Field policy |
 | --- | --- | --- | --- |
-| `ShooterPlayerController.ServerListPlayers` | Inventory candidate only: `Params=0`, `ParmsSize=0`; no committed sanitized snapshot. | Admin/session pressure only. | No copied fields; not login proof. |
-| `ShooterPlayerController.ServerKickPlayer` | Inventory candidate only: `Params=2`, `ParmsSize=32`; no committed sanitized snapshot. | Admin/authority pressure only. | All fields redacted until an exact snapshot proves shape; no command or permission claim. |
+| `ShooterPlayerController.ServerListPlayers` | Committed zero-param snapshot, `ParmsSize=0`; planning-only. | Admin/session pressure only. | No copied fields; not login proof. |
+| `ShooterPlayerController.ServerKickPlayer` | Committed snapshot with two redacted params, `ParmsSize=32`; planning-only. | Admin/authority pressure only. | Fields remain redacted; no command or permission claim. |
 | `ShooterPlayerController.ServerSendChatMessage` | Committed snapshot: `ChatMessage StrProperty@0x0 size=16`, `SendMode ByteProperty@0x10 size=1`, `ParmsSize=17`. | Chat privacy precedent. | Text/mode evidence only; no sender identity. |
 | `ShooterPlayerController.ServerRequestTribeLog` | Committed zero-param snapshot, `ParmsSize=0`. | Tribe-control pressure. | No copied identity fields. |
 | `ShooterPlayerController.AllowTribeGroupPermission` | Committed snapshot: enum-like byte, object ref, bool return, `ParmsSize=17`. | Permission-risk shape. | Enum/object redacted; return bool candidate-only. |
@@ -35,13 +44,13 @@ Current closed targets:
 
 ## Exact Blockers
 
-- The target set is incomplete as a fixture-backed pack: `build_redacted_ufunction_signatures.py
-  --target-set players-identity-lifecycle-intake` currently fails with missing
-  `ShooterPlayerController.ServerListPlayers` and
-  `ShooterPlayerController.ServerKickPlayer`.
+- Fixture coverage is closed for the 12-target planning set; this does not promote
+  identity or runtime readiness.
 - No exact session-start/login/connect target and no exact session-end/logout/disconnect
-  target are accepted. The current seed set is pressure/risk classification, not identity
-  lifecycle proof.
+  target inside this 12-target fixture set is accepted. The current seed set is
+  pressure/risk classification, not identity lifecycle proof; the separate
+  `ShooterGameMode.HandleNewPlayer` / `ShooterGameMode.OnLogout` anchors are
+  candidate-only planning inputs.
 - The generic redacted UFunction signature report is not strict enough for player identity:
   identity-like scalar names such as `PlayerDataID` must be forced redacted for this pack,
   not reported as copied scalar candidates.
@@ -58,15 +67,7 @@ Current closed targets:
 No promotion change is needed. The required target-set work is coverage/completeness only:
 
 1. Keep `players-identity-lifecycle-intake` exactly `planning_only`.
-2. Add committed sanitized snapshots for the two existing missing targets before building
-   a full target-set pack:
-   - `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_players/ShooterPlayerController.ServerListPlayers.snapshot.json`
-   - `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/sdk_players/ShooterPlayerController.ServerKickPlayer.snapshot.json`
-3. Add matching `tests/fixtures/ufunction_snapshots/manifest.json` entries under a players
-   fixture namespace such as `sdk_players`.
-4. Update `docs/research/2026-05-27-module-readiness-matrix.md` for any new manifest
-   module name so `scripts/test_ufunction_snapshot_fixtures.py` remains satisfied.
-5. Do not add inferred login/logout names. If future offline inventory names exact
+2. Do not add inferred login/logout names. If future offline inventory names exact
    lifecycle anchors, add them in a separate docs-only review first and keep them
    candidate-only.
 

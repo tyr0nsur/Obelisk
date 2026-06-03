@@ -32,8 +32,9 @@ callback-scope copied payloads.
 
 ## Blockers
 
-- `obelisk.player_identity.v1` is still planning-only and lacks accepted lifecycle
-  anchors, privacy/invalidation semantics, and full second-source evidence.
+- `obelisk.player_identity.v1` is still planning-only and lacks approved runtime
+  principal lifecycle evidence plus reviewed public identity contract. Existing lifecycle
+  anchors and principal invalidation policy are candidate-only planning inputs.
 - `obelisk.permissions_admin.v1` is post-v1 and lacks an authority model, admin boundary,
   and abuse controls.
 - No promoted copied response/send-chat API exists, so commands cannot promise replies.
