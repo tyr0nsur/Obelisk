@@ -332,6 +332,9 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
 def approved_runtime_manifest_check_state(
     approved_bundle: dict[str, Any],
     blockers: list[dict[str, Any]],
+    *,
+    expected_run_id: str | None = None,
+    expected_copied_log_path: Path | None = None,
 ) -> dict[str, Any]:
     state: dict[str, Any] = {
         "checked": False,
@@ -375,6 +378,56 @@ def approved_runtime_manifest_check_state(
         )
         state["blockers"] = payload.get("blockers", [])
         state["next_blocker"] = payload.get("next_blocker")
+    if state["ready"] and (expected_run_id is not None or expected_copied_log_path is not None):
+        try:
+            manifest_payload = load_json(Path(approved_bundle["path"]))
+        except (OSError, json.JSONDecodeError) as exc:
+            add_blocker(
+                blockers,
+                "approved_runtime_manifest_binding_unreadable",
+                "approved_runtime_manifest",
+                detail=str(exc),
+            )
+            state["ready"] = False
+        else:
+            operational_window = manifest_payload.get("operational_window")
+            if not isinstance(operational_window, dict):
+                add_blocker(
+                    blockers,
+                    "approved_runtime_manifest_operational_window_missing",
+                    "approved_runtime_manifest",
+                )
+                state["ready"] = False
+            else:
+                state["run_id"] = operational_window.get("run_id")
+                copied_log = operational_window.get("copied_log")
+                copied_log_path = copied_log.get("path") if isinstance(copied_log, dict) else None
+                state["copied_log_path"] = copied_log_path
+                if expected_run_id is not None and operational_window.get("run_id") != expected_run_id:
+                    add_blocker(
+                        blockers,
+                        "approved_runtime_manifest_run_id_mismatch",
+                        "approved_runtime_manifest",
+                        expected=expected_run_id,
+                        actual=operational_window.get("run_id"),
+                    )
+                    state["ready"] = False
+                if expected_copied_log_path is not None:
+                    expected_copied_log = str(expected_copied_log_path.expanduser().resolve())
+                    actual_copied_log = (
+                        str(Path(copied_log_path).expanduser().resolve())
+                        if isinstance(copied_log_path, str) and copied_log_path
+                        else None
+                    )
+                    if actual_copied_log != expected_copied_log:
+                        add_blocker(
+                            blockers,
+                            "approved_runtime_manifest_copied_log_path_mismatch",
+                            "approved_runtime_manifest",
+                            expected=expected_copied_log,
+                            actual=actual_copied_log,
+                        )
+                        state["ready"] = False
     if not state["ready"]:
         add_blocker(
             blockers,
@@ -612,7 +665,12 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
 
     bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
     approved_bundle = file_state(bundle_manifest, "approved_runtime_manifest", blockers)
-    approved_bundle_check = approved_runtime_manifest_check_state(approved_bundle, blockers)
+    approved_bundle_check = approved_runtime_manifest_check_state(
+        approved_bundle,
+        blockers,
+        expected_run_id=run_id,
+        expected_copied_log_path=resolved / "Obelisk.log",
+    )
     copied_log_and_window_manifest_ready = (
         copied_log["exists"]
         and window_manifest["exists"]

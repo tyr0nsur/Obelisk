@@ -205,6 +205,7 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("--output-dir", documented_flags)
         self.assertIn("--obelisk-commit", documented_flags)
         self.assertIn("--reviewed-by", documented_flags)
+        self.assertIn("--review-note", documented_flags)
         self.assertNotIn("--post-window-replay", documented_flags)
         self.assertNotIn("--json", documented_flags)
 

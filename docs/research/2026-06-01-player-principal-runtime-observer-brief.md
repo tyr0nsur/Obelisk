@@ -264,7 +264,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_player_identity_runtime_principa
   --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
   --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
-  --reviewed-by <reviewer>
+  --reviewed-by <reviewer> \
+  --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
 ```
 
 Then run the generated approved-evidence checker output through consume-only route and

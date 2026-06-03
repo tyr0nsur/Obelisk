@@ -2505,6 +2505,81 @@ namespace
         fs::remove_all(root);
     }
 
+    void TestOwnerTokenGameplayPolicyRegistrationRejectedDuringInitFailureShutdown()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_init_fail_shutdown_register");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_init_fail_shutdown_register.so",
+            .pluginId = "gameplay_policy_init_fail_shutdown_register",
+            .initResult = false,
+            .registerGameplayPolicyInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "gameplay-policy init-failure shutdown-register plugin Init was not called");
+        Require(plugin.shutdownCalls == 1,
+                "gameplay-policy init-failure shutdown-register plugin shutdown was not called");
+        Require(plugin.shutdownGameplayPolicyRegistrationId == 0,
+                "owner-token gameplay policy registration succeeded during init-failure shutdown");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure shutdown-time gameplay policy structure callback survived load failure");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure shutdown-time gameplay policy inventory callback survived load failure");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure shutdown-time gameplay policy item-return callback survived load failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenGameplayPolicyUnregisterAllowedDuringInitFailureShutdown()
+    {
+        const fs::path root =
+            MakeTempRoot("obelisk_plugin_manager_gameplay_policy_init_fail_shutdown_unregister");
+        ConfigureEnvironment(root);
+
+        FakePlugin plugin{
+            .filename = "gameplay_policy_init_fail_shutdown_unregister.so",
+            .pluginId = "gameplay_policy_init_fail_shutdown_unregister",
+            .initResult = false,
+            .registerGameplayPolicyCallback = true,
+            .unregisterGameplayPolicyInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "gameplay-policy init-failure shutdown-unregister plugin Init was not called");
+        Require(plugin.shutdownCalls == 1,
+                "gameplay-policy init-failure shutdown-unregister plugin shutdown was not called");
+        Require(plugin.gameplayPolicyRegistrationId != 0,
+                "gameplay-policy init-failure shutdown-unregister plugin did not register before failing");
+        Require(plugin.shutdownGameplayPolicyUnregisterResult,
+                "owner-token gameplay policy unregister was rejected during init-failure shutdown");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure shutdown-unregistered gameplay policy structure callback survived load failure");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure shutdown-unregistered gameplay policy inventory callback survived load failure");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure shutdown-unregistered gameplay policy item-return callback survived load failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
     void TestOwnerTokenChatMessageEventRegistrationCanUnregister()
     {
         const fs::path root = MakeTempRoot("obelisk_plugin_manager_owner_token_chat_message_handle");
@@ -2756,6 +2831,74 @@ namespace
                 "owner-token chat unregister was rejected while plugin was unloading");
         Require(chatDispatcher.SubscriptionCount() == 0,
                 "shutdown-unregistered owner-token chat callback survived unload");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenChatMessageRegistrationRejectedDuringInitFailureShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_init_fail_shutdown_register");
+        ConfigureEnvironment(root);
+        EnableChatMessageEvents(root);
+
+        FakePlugin plugin{
+            .filename = "chat_message_init_fail_shutdown_register.so",
+            .pluginId = "chat_message_init_fail_shutdown_register",
+            .initResult = false,
+            .registerChatMessageInShutdown = true,
+        };
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "chat init-failure shutdown-register plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "chat init-failure shutdown-register plugin shutdown was not called");
+        Require(plugin.shutdownChatMessageRegistrationId == 0,
+                "owner-token chat registration succeeded during init-failure shutdown");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "init-failure shutdown-time owner-token chat callback survived load failure");
+
+        CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestOwnerTokenChatMessageUnregisterAllowedDuringInitFailureShutdown()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_chat_message_init_fail_shutdown_unregister");
+        ConfigureEnvironment(root);
+        EnableChatMessageEvents(root);
+
+        FakePlugin plugin{
+            .filename = "chat_message_init_fail_shutdown_unregister.so",
+            .pluginId = "chat_message_init_fail_shutdown_unregister",
+            .initResult = false,
+            .registerChatMessageCallback = true,
+            .unregisterChatMessageInShutdown = true,
+        };
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        plugin.chatDispatcher = &chatDispatcher;
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        manager.LoadPlugins((root / "plugins").string());
+
+        Require(plugin.initCalls == 1, "chat init-failure shutdown-unregister plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "chat init-failure shutdown-unregister plugin shutdown was not called");
+        Require(plugin.chatMessageRegistrationId != 0,
+                "chat init-failure shutdown-unregister plugin did not register before failing");
+        Require(plugin.shutdownChatMessageUnregisterResult,
+                "owner-token chat unregister was rejected during init-failure shutdown");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "init-failure shutdown-unregistered owner-token chat callback survived load failure");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -7154,9 +7297,13 @@ int main()
     TestGameplayPolicyItemReturnTrackingFailureInertsRollbackOrphan();
     TestOwnerTokenGameplayPolicyRegistrationRejectedDuringShutdown();
     TestOwnerTokenGameplayPolicyUnregisterAllowedDuringShutdown();
+    TestOwnerTokenGameplayPolicyRegistrationRejectedDuringInitFailureShutdown();
+    TestOwnerTokenGameplayPolicyUnregisterAllowedDuringInitFailureShutdown();
     TestOwnerTokenChatMessageEventRegistrationCanUnregister();
     TestOwnerTokenChatMessageRegistrationRejectedDuringShutdown();
     TestOwnerTokenChatMessageUnregisterAllowedDuringShutdown();
+    TestOwnerTokenChatMessageRegistrationRejectedDuringInitFailureShutdown();
+    TestOwnerTokenChatMessageUnregisterAllowedDuringInitFailureShutdown();
     TestUnloadAllWaitsForInFlightPublicChatMessageBeforeClose();
     TestOwnerTokenTimerRegistrationCanUnregisterAndUnload();
     TestPublicRepeatingTimerFiresAndStopsAfterUnregister();

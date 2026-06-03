@@ -2879,6 +2879,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         installed_shape["counts_toward_complete_sdk_claim"] = True
         installed_shape["release_package_ready"] = True
         installed_shape["public_package_available"] = "available"
+        installed_shape["public_package_published"] = "published"
+        installed_shape["release_package_published"] = True
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = Path(tmpdir) / "public_sdk_surfaces.json"
@@ -2909,6 +2911,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIn(
             "positive_claim:public_package_available",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:public_package_published",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:release_package_published",
             report["installed_sdk_package_shape_guardrail_drift"],
         )
         self.assertEqual(

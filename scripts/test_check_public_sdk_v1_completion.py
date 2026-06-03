@@ -4079,6 +4079,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             }
         ]
         manifest["installed_sdk_package_shape"]["release_package_ready"] = True
+        manifest["installed_sdk_package_shape"]["public_package_published"] = "published"
+        manifest["installed_sdk_package_shape"]["release_package_available"] = True
         manifest["installed_sdk_package_shape"]["sdk_package_ready"] = "ready"
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
@@ -4099,6 +4101,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         )
         self.assertIn(
             "positive_claim:release_package_ready",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:public_package_published",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:release_package_available",
             payload["installed_sdk_package_shape_guardrail_drift"],
         )
         self.assertIn(

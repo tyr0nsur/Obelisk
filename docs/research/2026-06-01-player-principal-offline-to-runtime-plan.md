@@ -208,7 +208,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_player_identity_runtime_principa
   --window-manifest <offline-evidence-root>/window-manifest.env \
   --output-dir <offline-evidence-root>/approved-bundle \
   --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
-  --reviewed-by <reviewer>
+  --reviewed-by <reviewer> \
+  --review-note "bounded redacted lifecycle observer summary accepted for consume-only review"
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/check_player_identity_runtime_principal_lifecycle_approved_evidence.py \
   --json \

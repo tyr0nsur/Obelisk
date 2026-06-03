@@ -615,6 +615,52 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(report["inputs"]["approved_runtime_manifest_check"]["exit_code"], 0)
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checker_ready"])
 
+    def test_preflight_rejects_approved_manifest_copied_from_different_run(self) -> None:
+        old_window_start = globals()["WINDOW_START"]
+        old_run_id = globals()["RUN_ID"]
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = copied_log.parent / "approved-bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            window_manifest = self.write_window_manifest(temp_dir, copied_log)
+            result = self.run_bundle(copied_log, output_dir, window_manifest=window_manifest)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            approved_manifest = output_dir / "approved-runtime-principal-lifecycle-evidence.json"
+
+            try:
+                alternate_start = old_window_start + timedelta(minutes=15)
+                globals()["WINDOW_START"] = alternate_start
+                globals()["RUN_ID"] = alternate_start.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
+                alternate_log = copied_log_path(temp_dir)
+                alternate_log.parent.mkdir(parents=True, exist_ok=True)
+                alternate_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+                self.write_window_manifest(temp_dir, alternate_log)
+                alternate_approved_dir = alternate_log.parent / "approved-bundle"
+                alternate_approved_dir.mkdir(parents=True, exist_ok=True)
+                (alternate_approved_dir / approved_manifest.name).write_bytes(approved_manifest.read_bytes())
+
+                preflight = self.run_preflight(alternate_log.parent)
+            finally:
+                globals()["WINDOW_START"] = old_window_start
+                globals()["RUN_ID"] = old_run_id
+
+        self.assertEqual(preflight.returncode, 1)
+        report = json.loads(preflight.stdout)
+        self.assertFalse(report["ready"])
+        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+        self.assertIn("approved_runtime_manifest_run_id_mismatch", report["blockers"])
+        self.assertIn("approved_runtime_manifest_copied_log_path_mismatch", report["blockers"])
+        approved_check = report["inputs"]["approved_runtime_manifest_check"]
+        self.assertTrue(approved_check["checked"])
+        self.assertFalse(approved_check["ready"])
+        self.assertEqual(approved_check["run_id"], old_run_id)
+        self.assertEqual(approved_check["copied_log_path"], str(copied_log.resolve()))
+
     def test_preflight_surfaces_approved_checker_blockers_after_operator_sidecar_drift(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)
