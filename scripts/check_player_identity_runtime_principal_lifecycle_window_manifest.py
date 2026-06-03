@@ -188,6 +188,18 @@ PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
         "request_pack_acceptance_authorizes_runtime",
     )
 )
+PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS = frozenset(
+    (
+        "server_operations_authorized",
+        "runtime_work_authorized",
+        "runtime_ready",
+        "public_sdk_ready",
+        "public_abi_ready",
+        "promotion_ready",
+        "public_header_allowed",
+        "v1_completion_ready",
+    )
+)
 PREFLIGHT_POSITIVE_TEXT_VALUES = frozenset(
     (
         "1",
@@ -203,6 +215,10 @@ PREFLIGHT_POSITIVE_TEXT_VALUES = frozenset(
         "true",
         "yes",
     )
+)
+EXPECTED_PREFLIGHT_NON_CLAIM = (
+    "preflight only; not runtime approval, not approved runtime evidence, "
+    "and not permission to touch servers"
 )
 
 REQUIRED_TIMESTAMP_FIELDS = (
@@ -711,6 +727,23 @@ def validate_preflight_non_authorization_claims(
     *,
     path_key: str,
 ) -> None:
+    for key in sorted(PREFLIGHT_REQUIRED_FALSE_AUTHORIZATION_FLAGS):
+        if payload.get(key) is not False:
+            add(
+                blockers,
+                f"{path_key}_{key}_missing_or_not_false",
+                path_key,
+                key_path=key,
+                actual=payload.get(key),
+            )
+    if payload.get("non_claim") != EXPECTED_PREFLIGHT_NON_CLAIM:
+        add(
+            blockers,
+            f"{path_key}_non_claim_mismatch",
+            path_key,
+            expected=EXPECTED_PREFLIGHT_NON_CLAIM,
+            actual=payload.get("non_claim"),
+        )
     for key_path, key, value in iter_json_object_entries(payload):
         if key in PREFLIGHT_FORBIDDEN_POSITIVE_FLAG_KEYS and preflight_flag_value_is_positive(value):
             add(

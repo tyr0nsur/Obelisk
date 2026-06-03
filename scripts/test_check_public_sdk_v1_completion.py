@@ -2282,6 +2282,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                         "permissions_admin_ready": True,
                         "permissions_ready": True,
                         "permission_ready": True,
+                        "operator_approval_granted": True,
+                        "runtime_approval": True,
+                        "runtime_approval_granted": True,
+                        "runtime_work_authorized": True,
+                        "server_operations_authorized": True,
                         "reply_allowed": 1,
                         "send_chat_allowed": "true",
                         "notes": [
@@ -2298,6 +2303,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                             "SDK is stable",
                             "API is production ready",
                             "planning-only report says stable SDK is ready",
+                            "runtime work is authorized",
+                            "server operations are authorized",
+                            "operator approval is granted",
+                            "runtime approval is granted",
                             "stable SDK remains blocked",
                             {
                                 "non_claims": [
@@ -2326,6 +2335,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].permissions_admin_ready", claims)
         self.assertIn("checks[0].permissions_ready", claims)
         self.assertIn("checks[0].permission_ready", claims)
+        self.assertIn("checks[0].operator_approval_granted", claims)
+        self.assertIn("checks[0].runtime_approval", claims)
+        self.assertIn("checks[0].runtime_approval_granted", claims)
+        self.assertIn("checks[0].runtime_work_authorized", claims)
+        self.assertIn("checks[0].server_operations_authorized", claims)
         self.assertIn("checks[0].reply_allowed", claims)
         self.assertIn("checks[0].send_chat_allowed", claims)
         self.assertIn("checks[0].notes[0]:positive_text_claim", claims)
@@ -2341,9 +2355,13 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("checks[0].notes[10]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[11]:positive_text_claim", claims)
         self.assertIn("checks[0].notes[12]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[13]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[14].non_claims[0]:positive_text_claim", claims)
-        self.assertNotIn("checks[0].notes[14].non_claims[1]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[13]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[14]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[15]:positive_text_claim", claims)
+        self.assertIn("checks[0].notes[16]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[17]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[18].non_claims[0]:positive_text_claim", claims)
+        self.assertNotIn("checks[0].notes[18].non_claims[1]:positive_text_claim", claims)
         self.assertIn("complete_sdk_ready", claims)
         self.assertIn("full_api_supported", claims)
         self.assertIn("production_support_ready", claims)

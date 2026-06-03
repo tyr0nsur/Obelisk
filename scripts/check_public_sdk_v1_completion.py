@@ -231,6 +231,11 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "v1_completion_evidence",
     "v1_completion_ready",
     "stable_claim_allowed",
+    "operator_approval_granted",
+    "runtime_approval",
+    "runtime_approval_granted",
+    "runtime_work_authorized",
+    "server_operations_authorized",
 )
 SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "public_abi_ready",
@@ -277,18 +282,20 @@ COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_RE = re.compile(
     r"\b(?:"
     r"reply\s+api|reply\s+abi|send[-\s]?chat\s+api|command\s+router|"
     r"send[-\s]?chat\s+abi|reply\s+endpoint|command\s+routing|permissions/admin|replies\s+api|"
-    r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
+    r"response\s+path|runtime\s+delivery|runtime\s+readiness|runtime\s+work|"
+    r"server\s+operations?|operator\s+approval|runtime\s+approval|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
     r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
     r")\b.{0,80}\b(?:is|are|now|becomes?|became)?\s*"
-    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b",
+    r"\b(?:authorized|granted|public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b",
     re.IGNORECASE,
 )
 COMMAND_PERMISSION_ROUTE_GATE_POSITIVE_CLAIM_REVERSED = re.compile(
-    r"\b(?:public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b"
+    r"\b(?:authorized|granted|public|ready|available|allowed|enabled|promoted|supported|unlocked|live|operational)\b"
     r".{0,80}\b(?:"
     r"reply\s+api|reply\s+abi|reply\s+endpoint|send[-\s]?chat\s+api|command\s+router|"
-    r"response\s+path|runtime\s+delivery|runtime\s+readiness|"
+    r"response\s+path|runtime\s+delivery|runtime\s+readiness|runtime\s+work|"
+    r"server\s+operations?|operator\s+approval|runtime\s+approval|"
     r"public\s+abi|public\s+sdk|public\s+header|v1\s+completion|"
     r"(?:complete|full|stable|production(?:[-\s]?(?:ready|grade))?)\s+(?:sdk|api|support)"
     r")\b",
@@ -3958,6 +3965,27 @@ def completion_blocker_outcome_rows(
 
 
 def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    completion_blockers_promoted_for_claim = [
+        row["surface"]
+        for row in rows
+        if row.get("counts_toward_complete_sdk_claim") is True
+    ]
+    completion_blockers_remaining_for_claim = [
+        row["surface"]
+        for row in rows
+        if row.get("unresolved_for_complete_sdk_claim") is True
+    ]
+    p0_dependency_chain_surfaces = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is True
+    ]
+    p0_dependency_chain_promoted_for_claim = [
+        row["surface"]
+        for row in rows
+        if row.get("is_p0_dependency_chain") is True
+        and row.get("counts_toward_complete_sdk_claim") is True
+    ]
     manifest_outcome_missing = [
         row["surface"] for row in rows if row.get("manifest_outcome") is None
     ]
@@ -4028,6 +4056,18 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
     ]
     return {
         "total": len(rows),
+        "complete_sdk_blocker_total": len(rows),
+        "complete_sdk_blockers_promoted_for_claim_count": len(
+            completion_blockers_promoted_for_claim
+        ),
+        "complete_sdk_blockers_remaining_for_claim_count": len(
+            completion_blockers_remaining_for_claim
+        ),
+        "p0_dependency_chain_total": len(p0_dependency_chain_surfaces),
+        "p0_dependency_chain_promoted_for_claim_count": len(
+            p0_dependency_chain_promoted_for_claim
+        ),
+        "p0_dependency_chain_remaining_for_claim_count": len(dependency_chain_remaining),
         "manifest_outcome_missing_count": len(manifest_outcome_missing),
         "release_statement_outcome_missing_count": len(release_statement_outcome_missing),
         "p0_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
@@ -4044,6 +4084,10 @@ def completion_blocker_outcome_summary(rows: list[dict[str, Any]]) -> dict[str, 
         ),
         "route_gate_non_counting_surface_count": len(route_gate_non_counting_surfaces),
         "route_gate_non_counting_blocker_count": len(route_gate_non_counting_blockers),
+        "complete_sdk_blockers_promoted_for_claim": completion_blockers_promoted_for_claim,
+        "complete_sdk_blockers_remaining_for_claim": completion_blockers_remaining_for_claim,
+        "p0_dependency_chain_surfaces": p0_dependency_chain_surfaces,
+        "p0_dependency_chain_promoted_for_claim": p0_dependency_chain_promoted_for_claim,
         "manifest_outcome_missing": manifest_outcome_missing,
         "release_statement_outcome_missing": release_statement_outcome_missing,
         "p0_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
@@ -4909,6 +4953,41 @@ def build_report(
         blockers.append("p0_dependency_chain_route_gate_locked")
     ready = not blockers
     stable_claim_allowed = manifest_stable_claim_allowed and ready
+    completion_blockers_remaining_for_claim = blocker_outcome_summary[
+        "complete_sdk_blockers_remaining_for_claim"
+    ]
+    p0_chain_remaining_for_claim = blocker_outcome_summary["dependency_chain_remaining"]
+    complete_sdk_blocker_claim_accounting = {
+        "total": completion_blocker_total,
+        "promoted_for_claim_count": len(completion_blockers_counting_toward_claim),
+        "remaining_for_claim_count": len(completion_blockers_remaining_for_claim),
+        "promoted_for_claim_ratio": (
+            f"{len(completion_blockers_counting_toward_claim)}/{completion_blocker_total}"
+        ),
+        "promoted_for_claim_surfaces": completion_blockers_counting_toward_claim,
+        "remaining_for_claim_surfaces": completion_blockers_remaining_for_claim,
+        "stable_claim_allowed": stable_claim_allowed,
+        "non_claim": (
+            "Only rows with counts_toward_complete_sdk_claim=true count here; "
+            "manifest or release-statement post-v1/excluded bookkeeping never increments this total."
+        ),
+    }
+    p0_dependency_chain_claim_accounting = {
+        "total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
+        "promoted_for_claim_count": len(p0_chain_counting_toward_claim),
+        "remaining_for_claim_count": len(p0_chain_remaining_for_claim),
+        "promoted_for_claim_ratio": (
+            f"{len(p0_chain_counting_toward_claim)}/{len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN)}"
+        ),
+        "promoted_for_claim_surfaces": p0_chain_counting_toward_claim,
+        "remaining_for_claim_surfaces": p0_chain_remaining_for_claim,
+        "route_gate_current_blockers": blocker_outcome_summary["route_gate_current_blockers"],
+        "stable_claim_allowed": stable_claim_allowed,
+        "non_claim": (
+            "P0 dependency-chain rows must be promoted with evidence and pass the route gate; "
+            "excluded/post-v1 outcomes are scoped non-complete bookkeeping only."
+        ),
+    }
     report_sections = categorized_v1_report_sections(
         manifest=manifest,
         blockers=blockers,
@@ -5028,6 +5107,8 @@ def build_report(
         "route_gate_non_counting_blocker_count": len(route_gate_non_counting_blockers),
         "p0_dependency_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,
         "unpromoted_required_dependency_chain": required_dependency_chain_unresolved_for_claim,
+        "complete_sdk_blocker_claim_accounting": complete_sdk_blocker_claim_accounting,
+        "p0_dependency_chain_claim_accounting": p0_dependency_chain_claim_accounting,
         "promoted_blockers_without_evidence": sorted(set(promoted_without_evidence) & completion_blocker_set),
         "non_promoted_with_public_contract": sorted(set(non_promoted_with_contract)),
         "non_promoted_with_public_abi": sorted(set(non_promoted_with_public_abi)),
@@ -5045,8 +5126,24 @@ def build_report(
         "v1_sdk_progress": {
             "completion_blocker_total": completion_blocker_total,
             "completion_blockers_promoted_count": len(completion_blockers_counting_toward_claim),
+            "complete_sdk_blocker_total": completion_blocker_total,
+            "complete_sdk_blockers_promoted_for_claim_count": len(
+                completion_blockers_counting_toward_claim
+            ),
+            "complete_sdk_blockers_remaining_for_claim_count": len(
+                completion_blockers_remaining_for_claim
+            ),
+            "complete_sdk_blockers_promoted_for_claim": completion_blockers_counting_toward_claim,
+            "complete_sdk_blockers_remaining_for_claim": completion_blockers_remaining_for_claim,
+            "complete_sdk_blocker_claim_accounting": complete_sdk_blocker_claim_accounting,
             "p0_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
             "p0_chain_promoted_count": len(p0_chain_counting_toward_claim),
+            "p0_dependency_chain_total": len(CANONICAL_V1_REQUIRED_DEPENDENCY_CHAIN),
+            "p0_dependency_chain_promoted_for_claim_count": len(p0_chain_counting_toward_claim),
+            "p0_dependency_chain_remaining_for_claim_count": len(p0_chain_remaining_for_claim),
+            "p0_dependency_chain_promoted_for_claim": p0_chain_counting_toward_claim,
+            "p0_dependency_chain_remaining_for_claim": p0_chain_remaining_for_claim,
+            "p0_dependency_chain_claim_accounting": p0_dependency_chain_claim_accounting,
             "p0_chain_scoped_non_complete_outcomes": p0_scoped_non_complete_outcomes,
             "p0_chain_scoped_non_complete_outcome_count": len(p0_scoped_non_complete_outcomes),
             "p0_chain_route_gate_locked_surfaces": p0_route_gate_locked_promoted_surfaces,

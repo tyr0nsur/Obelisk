@@ -209,6 +209,14 @@ def preflight_payload(
     return {
         "schema": "obelisk.player-principal-lifecycle-preflight.v1",
         "ready": True,
+        "server_operations_authorized": False,
+        "runtime_work_authorized": False,
+        "runtime_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "promotion_ready": False,
+        "public_header_allowed": False,
+        "v1_completion_ready": False,
         "mode": mode,
         "run_id": run_id,
         "instance": instance,
@@ -232,7 +240,7 @@ def preflight_payload(
         "allow_stopped": False,
         "checked_at_utc": checked_at_utc,
         "posture_check": "accepted",
-        "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+        "non_claim": "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers",
     }
 
 
@@ -783,6 +791,42 @@ class WindowManifestCheckerTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("preflight_pre_path_allow_stopped_not_false", report["blockers"])
+
+    def test_rejects_preflight_sidecar_missing_non_authorization_flag(self) -> None:
+        def mutate(root: Path, fields: dict[str, str]) -> None:
+            preflight_path = Path(fields["preflight_pre_path"])
+            if not preflight_path.is_absolute():
+                preflight_path = root / preflight_path
+            payload = json.loads(preflight_path.read_text(encoding="utf-8"))
+            payload.pop("runtime_work_authorized")
+            preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["preflight_pre_sha256"] = hashlib.sha256(preflight_path.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_runtime_work_authorized_missing_or_not_false", report["blockers"])
+
+    def test_rejects_stale_preflight_non_claim_wording(self) -> None:
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=self.mutate_preflight_field(
+                "preflight_pre_path",
+                "preflight_pre_sha256",
+                "non_claim",
+                "preflight only; not runtime approval and not permission to touch servers",
+            ),
+        )
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preflight_pre_path_non_claim_mismatch", report["blockers"])
 
     def test_rejects_preflight_pre_positive_runtime_public_flags(self) -> None:
         forbidden_flags = (

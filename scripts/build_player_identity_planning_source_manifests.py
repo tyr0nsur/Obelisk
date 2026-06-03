@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -42,9 +43,19 @@ def parse_args() -> argparse.Namespace:
         default=build_redacted_ufunction_signatures.DEFAULT_SNAPSHOT_ROOT,
         help="Sanitized UFunction snapshot root used for first-evidence and focal lifecycle snapshots.",
     )
-    parser.add_argument("--output-dir", type=Path, required=True, help="Directory for generated planning manifests.")
+    parser.add_argument("--output-dir", type=Path, help="Directory for generated planning manifests.")
+    parser.add_argument(
+        "--verify-existing-dir",
+        type=Path,
+        help="Regenerate into a temporary directory and verify an existing planning-manifest directory is current.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit the build report JSON to stdout.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.output_dir is None and args.verify_existing_dir is None:
+        parser.error("one of --output-dir or --verify-existing-dir is required")
+    if args.output_dir is not None and args.verify_existing_dir is not None:
+        parser.error("--output-dir and --verify-existing-dir are mutually exclusive")
+    return args
 
 
 def sha256_file(path: Path) -> str:
@@ -72,6 +83,14 @@ def safe_snapshot_root(path: Path) -> Path:
     resolved = protected_paths.reject_protected_input_path(path, "snapshot-root")
     if not resolved.is_dir():
         raise SystemExit(f"snapshot-root is not a directory: {resolved}")
+    return resolved
+
+
+def safe_existing_dir(path: Path) -> Path:
+    protected_paths.reject_symlink_component(path, "verify-existing-dir")
+    resolved = protected_paths.reject_protected_input_path(path, "verify-existing-dir")
+    if not resolved.is_dir():
+        raise SystemExit(f"verify-existing-dir is not a directory: {resolved}")
     return resolved
 
 
@@ -559,10 +578,8 @@ def build_report(
     }
 
 
-def main() -> int:
-    args = parse_args()
-    snapshot_root = safe_snapshot_root(args.snapshot_root)
-    output_dir = binder.prepare_output_dir(args.output_dir)
+def build_into_dir(*, snapshot_root: Path, output_dir: Path) -> dict[str, Any]:
+    output_dir = binder.prepare_output_dir(output_dir)
 
     first_evidence = build_redacted_ufunction_signatures.build_players_identity_first_evidence(
         snapshot_root=snapshot_root
@@ -629,6 +646,111 @@ def main() -> int:
         lifecycle_snapshot_root_binding=lifecycle_snapshot_root_binding,
     )
     binder.atomic_write_json(report_path, report)
+    return report
+
+
+def verify_existing_dir(*, snapshot_root: Path, existing_dir: Path) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="obelisk-player-identity-planning-verify-") as temp_dir:
+        generated_dir = Path(temp_dir) / "generated"
+        generated_report = build_into_dir(snapshot_root=snapshot_root, output_dir=generated_dir)
+
+        blockers: list[dict[str, Any]] = []
+        checked_outputs: dict[str, dict[str, Any]] = {}
+        for name in (
+            FIRST_EVIDENCE_OUTPUT_NAME,
+            binder.LIFECYCLE_OUTPUT_NAME,
+            binder.PRINCIPAL_OUTPUT_NAME,
+        ):
+            existing_path = existing_dir / name
+            generated_path = generated_dir / name
+            if not existing_path.is_file():
+                blockers.append({"reason": "planning_manifest_missing", "path": str(existing_path)})
+                continue
+            existing_sha = sha256_file(existing_path)
+            generated_sha = sha256_file(generated_path)
+            checked_outputs[name] = {
+                "path": str(existing_path),
+                "existing_sha256": existing_sha,
+                "generated_sha256": generated_sha,
+                "matches_generated": existing_sha == generated_sha,
+            }
+            if existing_sha != generated_sha:
+                blockers.append(
+                    {
+                        "reason": "stale_or_mismatched_planning_manifest",
+                        "path": str(existing_path),
+                        "expected_generated_sha256": generated_sha,
+                        "actual_sha256": existing_sha,
+                    }
+                )
+
+        existing_report_path = existing_dir / REPORT_OUTPUT_NAME
+        if not existing_report_path.is_file():
+            blockers.append({"reason": "planning_manifest_build_report_missing", "path": str(existing_report_path)})
+        else:
+            existing_report = load_json(existing_report_path, "existing build report")
+            if existing_report.get("schema") != REPORT_SCHEMA:
+                blockers.append(
+                    {
+                        "reason": "planning_manifest_build_report_schema_mismatch",
+                        "path": str(existing_report_path),
+                        "actual": existing_report.get("schema"),
+                    }
+                )
+            existing_outputs = existing_report.get("outputs") if isinstance(existing_report.get("outputs"), dict) else {}
+            output_key_by_name = {
+                FIRST_EVIDENCE_OUTPUT_NAME: "first_evidence",
+                binder.LIFECYCLE_OUTPUT_NAME: "lifecycle_anchor_candidates",
+                binder.PRINCIPAL_OUTPUT_NAME: "principal_invalidation_policy",
+            }
+            for file_name, output_key in output_key_by_name.items():
+                record = existing_outputs.get(output_key) if isinstance(existing_outputs, dict) else None
+                expected_sha = checked_outputs.get(file_name, {}).get("existing_sha256")
+                actual_sha = record.get("sha256") if isinstance(record, dict) else None
+                if actual_sha != expected_sha:
+                    blockers.append(
+                        {
+                            "reason": "planning_manifest_build_report_output_hash_mismatch",
+                            "path": str(existing_report_path),
+                            "output": output_key,
+                            "expected_sha256": expected_sha,
+                            "actual_sha256": actual_sha,
+                        }
+                    )
+
+        valid = not blockers and generated_report.get("valid") is True
+        return {
+            "schema": REPORT_SCHEMA,
+            "mode": "verify_existing",
+            "valid": valid,
+            "accepted_for_planning": valid,
+            "planning_only": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "runtime_ready": False,
+            "v1_completion_ready": False,
+            "server_operations_authorized": False,
+            "runtime_work_authorized": False,
+            "snapshot_root": str(snapshot_root),
+            "verify_existing_dir": str(existing_dir),
+            "blockers": blockers,
+            "checked_outputs": checked_outputs,
+            "generated_report_valid": generated_report.get("valid") is True,
+            "non_claims": NON_CLAIMS,
+        }
+
+
+def main() -> int:
+    args = parse_args()
+    snapshot_root = safe_snapshot_root(args.snapshot_root)
+    if args.verify_existing_dir is not None:
+        report = verify_existing_dir(
+            snapshot_root=snapshot_root,
+            existing_dir=safe_existing_dir(args.verify_existing_dir),
+        )
+    else:
+        report = build_into_dir(snapshot_root=snapshot_root, output_dir=args.output_dir)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1

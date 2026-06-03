@@ -690,7 +690,7 @@ payload = {
     "allow_stopped": os.environ["OBELISK_PREFLIGHT_ALLOW_STOPPED"] == "1",
     "checked_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     "posture_check": "accepted",
-    "non_claim": "preflight only; not runtime approval and not permission to touch servers",
+    "non_claim": "preflight only; not runtime approval, not approved runtime evidence, and not permission to touch servers",
 }
 print(json.dumps(payload, indent=2, sort_keys=True))
 PY

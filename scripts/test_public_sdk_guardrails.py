@@ -2867,6 +2867,46 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("v1 completion", human)
         self.assertIn("stable SDK wording", human)
 
+    def test_public_sdk_v1_completion_json_exposes_stable_blocker_accounting_totals(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        report = checker["build_report"](PUBLIC_SDK_SURFACES_MANIFEST)
+
+        complete_accounting = report["complete_sdk_blocker_claim_accounting"]
+        p0_accounting = report["p0_dependency_chain_claim_accounting"]
+        progress = report["v1_sdk_progress"]
+        summary = report["v1_sdk_blocker_outcome_summary"]
+
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertFalse(complete_accounting["stable_claim_allowed"])
+        self.assertFalse(p0_accounting["stable_claim_allowed"])
+        self.assertEqual(report["command_permission_route_gate"]["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn("approved_runtime_evidence_missing", p0_accounting["route_gate_current_blockers"])
+
+        self.assertEqual(complete_accounting["total"], 12)
+        self.assertEqual(complete_accounting["promoted_for_claim_count"], 0)
+        self.assertEqual(complete_accounting["remaining_for_claim_count"], 12)
+        self.assertEqual(complete_accounting["promoted_for_claim_ratio"], "0/12")
+        self.assertEqual(progress["complete_sdk_blocker_total"], 12)
+        self.assertEqual(progress["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(progress["complete_sdk_blockers_remaining_for_claim_count"], 12)
+        self.assertEqual(summary["complete_sdk_blocker_total"], 12)
+        self.assertEqual(summary["complete_sdk_blockers_promoted_for_claim_count"], 0)
+        self.assertEqual(summary["complete_sdk_blockers_remaining_for_claim_count"], 12)
+
+        self.assertEqual(p0_accounting["total"], 4)
+        self.assertEqual(p0_accounting["promoted_for_claim_count"], 0)
+        self.assertEqual(p0_accounting["remaining_for_claim_count"], 4)
+        self.assertEqual(p0_accounting["promoted_for_claim_ratio"], "0/4")
+        self.assertEqual(progress["p0_dependency_chain_total"], 4)
+        self.assertEqual(progress["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(progress["p0_dependency_chain_remaining_for_claim_count"], 4)
+        self.assertEqual(summary["p0_dependency_chain_total"], 4)
+        self.assertEqual(summary["p0_dependency_chain_promoted_for_claim_count"], 0)
+        self.assertEqual(summary["p0_dependency_chain_remaining_for_claim_count"], 4)
+
     def test_public_sdk_completion_checker_blocks_claim_wording_for_blocked_surface_synonyms(self) -> None:
         checker = runpy.run_path(
             str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),

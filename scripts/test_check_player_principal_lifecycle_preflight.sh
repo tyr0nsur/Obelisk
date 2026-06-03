@@ -139,6 +139,7 @@ assert payload["server_binary"]["sha256"] == server_sha
 assert payload["env_file"] is None
 assert datetime.fromisoformat(payload["checked_at_utc"].removesuffix("Z") + "+00:00").tzinfo == timezone.utc
 assert "not runtime approval" in payload["non_claim"]
+assert "not approved runtime evidence" in payload["non_claim"]
 PY
 
 proc_root="${TMP_DIR}/proc"

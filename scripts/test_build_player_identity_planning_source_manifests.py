@@ -101,6 +101,55 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
         self.assertEqual("approved_runtime_evidence_missing", bound_report["critical_path_phase"]["current_blocker"])
         self.assertEqual([], bound_report["blockers"])
 
+    def test_verifies_committed_source_aligned_manifests(self) -> None:
+        result = self.run_tool(
+            [
+                "--verify-existing-dir",
+                str(REPO_ROOT / "docs/research/player-identity-planning-sources"),
+                "--json",
+            ]
+        )
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertFalse(report["server_operations_authorized"])
+        self.assertFalse(report["runtime_work_authorized"])
+        self.assertEqual([], report["blockers"])
+        for record in report["checked_outputs"].values():
+            self.assertTrue(record["matches_generated"])
+
+    def test_verify_existing_dir_rejects_stale_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            existing = Path(temp_dir) / "planning"
+            subprocess.run(
+                [
+                    "cp",
+                    "-a",
+                    str(REPO_ROOT / "docs/research/player-identity-planning-sources"),
+                    str(existing),
+                ],
+                check=True,
+            )
+            stale_path = existing / "players-identity-lifecycle-anchor-candidates.json"
+            stale = json.loads(stale_path.read_text(encoding="utf-8"))
+            stale["candidate_anchors"] = []
+            stale_path.write_text(json.dumps(stale, sort_keys=True) + "\n", encoding="utf-8")
+
+            result = self.run_tool(["--verify-existing-dir", str(existing), "--json"], check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn(
+            "stale_or_mismatched_planning_manifest",
+            [blocker["reason"] for blocker in report["blockers"]],
+        )
+
     def test_rejects_protected_output_dir_before_writing(self) -> None:
         result = self.run_tool(
             ["--output-dir", "/servidor/ark/player-identity-planning-source-manifests"],
