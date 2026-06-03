@@ -19,6 +19,29 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 turbo SDK visibility/non-claim round after `36e191b` delegated four scopes:
+  SDK completion/release-statement bookkeeping, Mission/Transfer/Dino/Tribe/Buff
+  side-lane accounting, ResourceHandle/object identity, and build/install/package-shape
+  release boundaries.
+- Integrated changes: secondary route/side-lane reports now reject standalone
+  release-looking `support_tier`/status fields without blockers; Mission/Transfer/Dino/
+  Tribe/Buff release statements and candidate evidence reject module SDK/API and
+  ABI/header callback readiness/public claims; ResourceHandle/object identity rejects
+  public GObjects, static globals, strict serial, zero-serial, source/helper, runtime
+  rejection, and future runtime observation readiness aliases; install/release dry-run
+  output now says `would publish` package-shape artifacts instead of completed installs;
+  README exposes current gate totals SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, and `approved_runtime_evidence_missing`.
+- Validation observed: SDK completion suite 226 OK, public SDK guardrails 194 OK,
+  Mission/Transfer/Dino/Tribe/Buff 32 OK, ResourceHandle checker 25 OK,
+  ResourceHandle/offline-artifact focus 126 OK, install plugin and install layout OK,
+  release readiness options OK, route JSON valid/planning-only, SDK JSON blocked by
+  design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
+  `git diff --check` OK.
+- No server/runtime operation, protected live-path write, marker/env change,
+  ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or
+  push occurred.
+
 - 2026-06-03 turbo SDK guardrail round after compaction delegated four scopes directly:
   P0 lifecycle/request-window route safety, permissions/command downstream,
   operator ingress/storage, and C ABI/runtime cleanup/default-deny. Two new workers were

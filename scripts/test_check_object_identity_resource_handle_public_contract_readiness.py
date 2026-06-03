@@ -237,6 +237,44 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 report["blockers"],
             )
 
+    def test_rejects_evidence_category_readiness_claims_in_decisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decisions = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            decisions["release_claims"] = [
+                "Zero-serial samples and strict serial policy prove public SDK readiness.",
+                "Future runtime observation plan makes v1 completion supported.",
+            ]
+            decisions["metadata"] = {
+                "strictSerialPolicyPublicSdkReady": True,
+                "zeroSerialSamplesRuntimeReady": "satisfied",
+                "publicGObjectsReady": "supported",
+                "futureRuntimeObservationPlanV1Complete": True,
+            }
+            decisions_path = write_json(root, "decisions.json", decisions)
+
+            result = run_checker("--decisions", str(decisions_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("decisions_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+        for key in (
+            "strictSerialPolicyPublicSdkReady",
+            "zeroSerialSamplesRuntimeReady",
+            "publicGObjectsReady",
+            "futureRuntimeObservationPlanV1Complete",
+        ):
+            self.assertIn(
+                f"forbidden_positive_resource_handle_claim:$.decisions.metadata.{key}",
+                report["blockers"],
+            )
+
     def test_rejects_public_sdk_surface_promotion_or_contract(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -435,6 +473,44 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 report["blockers"],
             )
 
+    def test_rejects_static_global_and_helper_flag_surface_readiness_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            for surface in surfaces["surfaces"]:
+                if surface.get("id") == "obelisk.object_identity_resource_handle.v1":
+                    surface["evidence"]["claim"] = (
+                        "Static globals and source helper flags establish post-callback safety "
+                        "and promotion readiness."
+                    )
+                    surface["metadata"] = {
+                        "sourceHelperFlagsPostCallbackSafetyProven": True,
+                        "runtimeRejectionSamplesLookupReady": True,
+                    }
+                    break
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("surface_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+        for key in (
+            "sourceHelperFlagsPostCallbackSafetyProven",
+            "runtimeRejectionSamplesLookupReady",
+        ):
+            self.assertIn(
+                "forbidden_positive_resource_handle_claim:"
+                f"$.surfaces[obelisk.object_identity_resource_handle.v1].metadata.{key}",
+                report["blockers"],
+            )
+
     def test_rejects_public_header_resource_handle_symbols(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -543,6 +619,32 @@ class ObjectIdentityResourceHandlePublicContractReadinessTests(unittest.TestCase
                 f"forbidden_positive_resource_handle_claim:$.metadata_surfaces[0].{key}",
                 report["blockers"],
             )
+
+    def test_rejects_public_event_gobjects_and_runtime_observation_readiness_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            events = json.loads(PUBLIC_EVENTS.read_text(encoding="utf-8"))
+            events["metadata_surfaces"][0]["claim"] = (
+                "Public GObjects lookup is included after future runtime observation completion."
+            )
+            events["metadata_surfaces"][0]["publicGObjectsReady"] = True
+            events_path = write_json(root, "events.json", events)
+
+            result = run_checker("--public-events", str(events_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any(
+                blocker.startswith("public_events_positive_resource_handle_claim:")
+                for blocker in report["blockers"]
+            ),
+            report["blockers"],
+        )
+        self.assertIn(
+            "forbidden_positive_resource_handle_claim:$.metadata_surfaces[0].publicGObjectsReady",
+            report["blockers"],
+        )
 
     def test_rejects_symlinked_input_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

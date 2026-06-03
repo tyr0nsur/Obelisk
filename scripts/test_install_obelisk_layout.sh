@@ -5,10 +5,11 @@ usage() {
     cat <<'EOF'
 Usage: scripts/test_install_obelisk_layout.sh <clean-install-root>
 
-Validates the installer, installed runtime layout, CMake SDK package, and public SDK
-consumer examples. Pass a fresh empty absolute install root, such as one created with
-mktemp -d /tmp/obelisk-layout-check.XXXXXX. The test performs a backup reinstall, so
-reusing a populated root can leave stale backup artifacts that make the result unclear.
+Validates the installer, installed runtime layout, CMake SDK package, and installed SDK
+package-shape consumer examples. Pass a fresh empty absolute install root, such as one
+created with mktemp -d /tmp/obelisk-layout-check.XXXXXX. The test performs a backup
+reinstall, so reusing a populated root can leave stale backup artifacts that make the
+result unclear.
 
 Options:
   -h, --help  Show this help.
@@ -221,6 +222,38 @@ if ! grep -F 'Managed install path must not be a symlink' "${WORK_DIR}/symlink-s
     cat "${WORK_DIR}/symlink-subpath.err" >&2
     exit 1
 fi
+
+dry_run_root="${WORK_DIR}/dry-run-root"
+"${REPO_DIR}/scripts/install_obelisk.sh" --build-dir "${BUILD_DIR}" --dry-run "${dry_run_root}" \
+    >"${WORK_DIR}/dry-run.out"
+if [[ -e "${dry_run_root}" ]]; then
+    echo "install_obelisk.sh dry-run created the install root" >&2
+    find "${dry_run_root}" -maxdepth 4 -print >&2
+    exit 1
+fi
+if ! grep -F 'DRY-RUN: Obelisk install would publish runtime/SDK package-shape artifacts to' \
+    "${WORK_DIR}/dry-run.out" >/dev/null; then
+    echo "dry-run install output did not describe would-publish package-shape scope" >&2
+    cat "${WORK_DIR}/dry-run.out" >&2
+    exit 1
+fi
+if grep -F 'Obelisk installed to' "${WORK_DIR}/dry-run.out" >/dev/null; then
+    echo "dry-run install output claimed a completed install" >&2
+    cat "${WORK_DIR}/dry-run.out" >&2
+    exit 1
+fi
+for dry_run_non_claim in \
+    "runtime/live-ops approval" \
+    "Plugin Hub readiness/publication" \
+    "support-tier activation" \
+    "stable SDK claim" \
+    "v1 SDK completion"; do
+    if ! grep -F "${dry_run_non_claim}" "${WORK_DIR}/dry-run.out" >/dev/null; then
+        echo "dry-run install output missed non-claim boundary: ${dry_run_non_claim}" >&2
+        cat "${WORK_DIR}/dry-run.out" >&2
+        exit 1
+    fi
+done
 
 fake_bin="${WORK_DIR}/fake-bin"
 failure_root="${WORK_DIR}/failure-root"
@@ -700,4 +733,4 @@ require_external_sdk_compile_commands \
     "${CONFIG_PATH}" \
     "install-layout-test"
 
-echo "Install layout and public SDK consumer validation passed for ${INSTALL_ROOT}"
+echo "Install layout and installed SDK package-shape consumer validation passed for ${INSTALL_ROOT}"

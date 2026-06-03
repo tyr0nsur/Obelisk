@@ -130,6 +130,18 @@ if grep -Fq -- "Public SDK v1 completion gate completed." scripts/check_release_
     printf 'release gate must not use generic v1 completion completed wording\n' >&2
     exit 1
 fi
+if ! grep -Fq -- "Scoped release-readiness baseline and gameplay/module second-source layout-evidence gates completed." scripts/check_release_readiness.sh; then
+    printf 'missing scoped second-source layout-evidence pass wording in release gate\n' >&2
+    exit 1
+fi
+if ! grep -Fq -- "Scoped release-readiness baseline checks completed; gameplay/module second-source layout-evidence gate was not run." scripts/check_release_readiness.sh; then
+    printf 'missing scoped second-source layout-evidence skipped wording in release gate\n' >&2
+    exit 1
+fi
+if grep -Fq -- "Release readiness baseline and gameplay/module second-source promotion checks completed." scripts/check_release_readiness.sh; then
+    printf 'release gate must not use generic second-source promotion completed wording\n' >&2
+    exit 1
+fi
 if ! grep -Fq -- "Release gate output is evidence for this exact gate only" scripts/check_release_readiness.sh; then
     printf 'missing release gate final non-claim wording\n' >&2
     exit 1

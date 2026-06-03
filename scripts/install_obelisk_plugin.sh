@@ -140,5 +140,9 @@ fi
 run install -m 755 "${PLUGIN_SRC}" "${PLUGIN_TMP}"
 run mv -f "${PLUGIN_TMP}" "${PLUGIN_DST}"
 
-echo "Obelisk plugin installed to ${PLUGIN_DST}"
+if [[ "${DRY_RUN}" == "1" ]]; then
+    echo "DRY-RUN: Obelisk plugin install would publish ${plugin_name} to ${PLUGIN_DST}"
+else
+    echo "Obelisk plugin installed to ${PLUGIN_DST}"
+fi
 echo "Plugin file publication only; no Plugin Hub readiness/publication, support-tier activation, public SDK scope, runtime/live-ops approval, or v1 SDK completion is granted."

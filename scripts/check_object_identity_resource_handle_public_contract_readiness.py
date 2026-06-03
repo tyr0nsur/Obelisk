@@ -88,23 +88,31 @@ FORBIDDEN_READY_VALUE_KEYS = {
 }
 FORBIDDEN_ALIAS_SUBJECT_RE = re.compile(
     r"(?:resource_?handle|resourcehandle|resource_?lookup|object_?identity|object_?lookup|object_?handle|"
-    r"runtime_?object|serial_?reuse|wraparound)",
+    r"runtime_?object|public_?gobjects|gobjects|static_?globals?|strict_?serial|serial_?policy|"
+    r"serial_?reuse|zero_?serial|runtime_?rejection|post_?callback_?rejection|source_?helper|"
+    r"weak_?helper|future_?runtime_?observation|runtime_?observation|wraparound)",
     re.IGNORECASE,
 )
 FORBIDDEN_ALIAS_CONTEXT_RE = re.compile(
     r"(?:public|runtime|v1|sdk|abi|release|promot|ready|readiness|enabled|allowed|available|"
-    r"post_?callback|samples?|safety|policy)",
+    r"post_?callback|lookup|identity|samples?|safety|policy|proven|complete|completion|satisfied|"
+    r"stable|supported|included)",
     re.IGNORECASE,
 )
 SURFACE_FORBIDDEN_TERM_RE = re.compile(
     r"(?:resourcehandle|resource[_ -]?handle|resource[_ -]?lookup|object[_ -]?identity|object[_ -]?lookup|"
+    r"public[_ -]?gobjects|gobjects|static[_ -]?globals?|strict[_ -]?serial|serial[_ -]?policy|"
+    r"serial[_ -]?reuse|zero[_ -]?serial|runtime[_ -]?rejection[_ -]?samples?|"
+    r"post[_ -]?callback[_ -]?rejection[_ -]?contracts?|source[_ -]?helper[_ -]?flags?|"
+    r"weak[_ -]?helper|future[_ -]?runtime[_ -]?observation|runtime[_ -]?observation[_ -]?plans?|"
     r"post[_ -]?callback[_ -]?object[_ -]?(?:correlation|handle|identity)|"
     r"(?:structure|item|inventory|dino|tribe|buff|mission|transfer|economy|mobility|area[_ -]?policy)[_ -]?handle)",
     re.IGNORECASE,
 )
 SURFACE_POSITIVE_CLAIM_RE = re.compile(
     r"(?:public[_ -]?sdk|ready|readiness|allowed|available|enabled|included|"
-    r"includes?|ships?|part[_ -]?of[_ -]?v1|promoted|supported|lookup[_ -]?api|handle[_ -]?api)",
+    r"includes?|ships?|part[_ -]?of[_ -]?v1|promoted|promotion|supported|stable|accepted|"
+    r"complete|completion|satisf(?:y|ies|ied)|prove[ns]?|lookup[_ -]?api|handle[_ -]?api)",
     re.IGNORECASE,
 )
 DESCRIPTOR_SURFACE_IDS = frozenset(
@@ -182,7 +190,23 @@ def positive_claim(value: Any) -> bool:
     if value is True:
         return True
     if isinstance(value, str):
-        return value.casefold() in {"allowed", "available", "enabled", "live", "promoted", "ready", "true", "yes"}
+        return value.casefold() in {
+            "accepted",
+            "allowed",
+            "available",
+            "complete",
+            "enabled",
+            "included",
+            "live",
+            "promoted",
+            "proven",
+            "ready",
+            "satisfied",
+            "stable",
+            "supported",
+            "true",
+            "yes",
+        }
     return False
 
 

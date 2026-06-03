@@ -697,6 +697,64 @@ Non-claims:
   readiness/publication, support-tier activation, release readiness, stable SDK wording,
   or v1 SDK completion.
 
+## SDK Visibility And Package-Shape Non-Claim Round
+
+A follow-up supervised round after commit `36e191b` stayed offline-only and focused on
+public-facing progress wording plus secondary checker reports. Four scopes were delegated:
+SDK completion/release-statement bookkeeping, Mission/Transfer/Dino/Tribe/Buff side-lane
+accounting, ResourceHandle/object identity, and build/install/package-shape release
+boundaries.
+
+Integrated findings:
+
+- `check_public_sdk_v1_completion.py` now rejects standalone release-looking
+  `support_tier` and status fields in secondary route/side-lane reports when they lack
+  local blockers, while still allowing generic candidate `status: ready` outside SDK,
+  release, route, support, or runtime context.
+- Mission/Transfer/Dino/Tribe/Buff accounting now rejects release-statement and candidate
+  evidence wording that implies module SDK/API or ABI/header callback readiness.
+- ResourceHandle/object identity readiness now rejects readiness aliases for public
+  GObjects, static globals, strict serial policy, zero-serial samples, source/helper
+  flags, runtime rejection samples, post-callback rejection contracts, and future runtime
+  observation plans.
+- Install and plugin-install dry-runs now say they would publish package-shape artifacts
+  instead of reporting a completed install. Release-gate second-source wording says
+  scoped layout-evidence gates instead of generic promotion completion.
+- The main README now exposes the current executable SDK gate totals: complete SDK
+  `0/12`, P0 `0/4`, `stable_claim_allowed=false`, and
+  `approved_runtime_evidence_missing`.
+
+Observed validation:
+
+- `python3 -m unittest scripts.test_check_public_sdk_v1_completion` passed 226 tests.
+- `python3 scripts/test_public_sdk_guardrails.py` passed 194 tests.
+- `python3 scripts/test_check_mission_transfer_dino_tribe_v1_outcome_accounting.py`
+  passed 32 tests.
+- `python3 -m unittest scripts.test_check_object_identity_resource_handle_public_contract_readiness`
+  passed 25 tests.
+- `python3 -m unittest scripts.test_validate_offline_artifact_gate -k resource_handle -k zero_serial -k post_callback -k uobject_flag -k weak_helper`
+  passed 126 tests.
+- `bash scripts/test_install_obelisk_plugin.sh`, `bash scripts/test_check_release_readiness_options.sh`,
+  and `bash scripts/test_install_obelisk_layout.sh <tmp-root>` passed.
+- `python3 scripts/check_mission_transfer_dino_tribe_v1_outcome_accounting.py --json`
+  remained candidate-only/non-public.
+- `python3 scripts/check_object_identity_resource_handle_public_contract_readiness.py --json`
+  remained valid/planning-only with public/runtime flags false.
+- `python3 scripts/check_command_permission_route_gate.py --json` remained
+  `valid=true`, `planning_only=true`, and `current_route_blocker=approved_runtime_evidence_missing`.
+- `python3 scripts/check_public_sdk_v1_completion.py --json` exited blocked by design
+  with SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+- `git diff --check` passed.
+
+Non-claims:
+
+- This round does not create approved runtime principal lifecycle evidence and does not
+  promote player identity/principal, permissions/admin, command response, commands/replies,
+  Mission/Transfer/Dino/Tribe/Buff SDKs, ResourceHandle/object identity, operator
+  ingress/storage, public ABI/header readiness, runtime readiness, Plugin Hub
+  readiness/publication, support-tier activation, release readiness, stable SDK wording,
+  or v1 SDK completion.
+
 ## Offline Reversing Research Hygiene Audit
 
 Delegated worker 4/4 audited the current research index, current P0 snapshot,

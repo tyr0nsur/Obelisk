@@ -1040,6 +1040,50 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_standalone_support_tier_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "route_side_lane_report": {
+                "support_tier": "release-supported copied principal",
+                "status": "release-supported seed",
+            },
+            "side_lane_summary": {
+                "declared_support_tier": "release-supported seed",
+            },
+            "candidate_summary": {
+                "support_tier": "candidate-only",
+                "status": "candidate_ready",
+            },
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "route_side_lane_report.status",
+                "route_side_lane_report.support_tier",
+                "side_lane_summary.declared_support_tier",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_status_ready_under_completion_context(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "sdk_release": {"status": "ready"},
+            "public_route_report": {"state": "available"},
+            "side_lane_report": {"status": "ready"},
+            "candidate_summary": {"status": "ready"},
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "public_route_report.state",
+                "sdk_release.status",
+            ],
+        )
+
     def test_secondary_report_scanner_allows_split_section_claim_when_report_has_blocker(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",

@@ -355,7 +355,10 @@ FORBIDDEN_CLAIM_PATTERNS = (
     r"\b(?:Mission|Transfer|Dino|Tribe|Buff(?:/status| status)?|BuffStatus)\s+"
     r"(?:module|surface|callback|callbacks|descriptor|descriptors|capability|capabilities|"
     r"capability\s+bit|C\s+ABI|ABI)\b",
+    r"\b(?:public\s+)?module\s+(?:SDK|API|callback|callbacks|descriptor|descriptors|capability|capabilities|"
+    r"capability\s+bit|C\s+ABI|ABI)\b",
     r"\bpublic\s+(?:SDK|API|ABI|module|surface|callback|descriptor|capability|capability\s+bit|C\s+ABI)\b",
+    r"\b(?:public\s+)?(?:(?:C\s+ABI|ABI|SDK)\s+)?header\s+callbacks?\b",
     r"\b(?:callback|descriptor|capability|capability\s+bit)\s+"
     r"(?:is\s+)?(?:published|available|ready|enabled)\b",
     r"\bidentity\b",
@@ -377,8 +380,13 @@ FORBIDDEN_CLAIM_PATTERNS = (
 FORBIDDEN_CLAIM_RE = re.compile("|".join(f"(?:{pattern})" for pattern in FORBIDDEN_CLAIM_PATTERNS), re.IGNORECASE)
 CANDIDATE_READY_CLAIM_PATTERNS = (
     r"\b(?:public\s+SDK|public\s+ABI|runtime|runtime\s+observer|runtime\s+hook|"
-    r"v1|v1\s+SDK|promotion|release)\s+(?:is\s+)?(?:ready|readiness|complete|completion)\b",
+    r"v1|v1\s+SDK|module\s+SDK|module\s+API|header\s+callbacks?|"
+    r"ABI\s+header\s+callbacks?|C\s+ABI\s+header\s+callbacks?|promotion|release)\s+"
+    r"(?:is\s+|are\s+)?(?:ready|readiness|complete|completion|available|published|enabled)\b",
     r"\b(?:ready|complete)\s+for\s+v1\b",
+    r"\b(?:ready|complete|available|published|enabled)\s+"
+    r"(?:module\s+SDK|module\s+API|header\s+callbacks?|ABI\s+header\s+callbacks?|"
+    r"C\s+ABI\s+header\s+callbacks?)\b",
     r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready)\b",
     r"\b(?:complete|full|production|stable)\s+SDK\s+(?:claim\s+)?"
     r"(?:is\s+)?(?:allowed|ready|complete)\b",

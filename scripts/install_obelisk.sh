@@ -358,5 +358,9 @@ if ! publish_staged_sdk_package; then
     exit 1
 fi
 
-echo "Obelisk installed to ${ROOT}"
+if [[ "${DRY_RUN}" == "1" ]]; then
+    echo "DRY-RUN: Obelisk install would publish runtime/SDK package-shape artifacts to ${ROOT}"
+else
+    echo "Obelisk installed to ${ROOT}"
+fi
 echo "Install layout/package-shape evidence only; no runtime/live-ops approval, Plugin Hub readiness/publication, support-tier activation, stable SDK claim, or v1 SDK completion is granted."

@@ -247,6 +247,18 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             with self.subTest(file="README.md", item=item):
                 self.assertIn(item, readme)
 
+    def test_readme_exposes_current_sdk_completion_gate_totals(self) -> None:
+        readme = read("README.md")
+
+        for item in [
+            "complete-SDK progress is\n  `0/12`",
+            "the P0 dependency chain is `0/4`",
+            "`stable_claim_allowed=false`",
+            "the active route blocker is `approved_runtime_evidence_missing`",
+        ]:
+            with self.subTest(file="README.md", item=item):
+                self.assertIn(item, readme)
+
     def test_resource_programming_scope_stays_category_only_in_release_docs(self) -> None:
         release = read("docs/RELEASE.md")
         compact_release = normalized(release)

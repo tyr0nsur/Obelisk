@@ -851,9 +851,9 @@ git status --short --ignored
 check_clean_tree
 
 if [[ "${REQUIRE_SECOND_SOURCE_READINESS}" == "1" ]]; then
-    printf '\nRelease readiness baseline and gameplay/module second-source promotion checks completed.\n'
+    printf '\nScoped release-readiness baseline and gameplay/module second-source layout-evidence gates completed.\n'
 else
-    printf '\nRelease readiness baseline checks completed; gameplay/module second-source promotion gate was not run.\n'
+    printf '\nScoped release-readiness baseline checks completed; gameplay/module second-source layout-evidence gate was not run.\n'
 fi
 if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
     printf 'Public SDK v1 stable claim gate passed.\n'

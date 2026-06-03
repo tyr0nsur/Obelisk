@@ -49,6 +49,9 @@ v1 SDK direction:
 - RC and post-RC surfaces improve plugin-author readiness, but they do not
   replace the complete v1 SDK blocker track or authorize `v1.0 stable`,
   complete, full, or production SDK wording.
+- The current executable SDK gate remains blocked: complete-SDK progress is
+  `0/12`, the P0 dependency chain is `0/4`, `stable_claim_allowed=false`, and
+  the active route blocker is `approved_runtime_evidence_missing`.
 - Active narrow blocker examples stay exact: player identity needs approved copied runtime
   principal lifecycle evidence, and ResourceHandle needs rejected runtime object
   samples plus runtime serial reuse/wraparound semantics. Plugin Hub remains

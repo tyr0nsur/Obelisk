@@ -431,6 +431,26 @@ BROAD_RELEASE_SUPPORT_TIER_VALUE_KEYS = {
     "release_supported",
     "release_supported_seed",
 }
+SECONDARY_REPORT_STANDALONE_COMPLETION_STATUS_VALUE_KEYS = {
+    "complete",
+    "full",
+    "production_grade",
+    "production_ready",
+    "release_grade",
+    "release_ready",
+    "release_supported",
+    "release_supported_seed",
+    "stable",
+    "stable_sdk",
+    "v1_completion",
+    "v1_sdk_stable",
+    "v1_stable_sdk",
+}
+SECONDARY_REPORT_STANDALONE_COMPLETION_CONTEXT_RE = re.compile(
+    r"\b(?:complete|full|stable|public|production|release|sdk|api|support|"
+    r"v1|route|runtime|plugin\s+hub|pluginhub)\b",
+    re.IGNORECASE,
+)
 BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r"^(?:"
     r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
@@ -1766,6 +1786,45 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             return normalized_completion_claim_key(value) in BROAD_RELEASE_SUPPORT_TIER_VALUE_KEYS
         return False
 
+    def path_has_completion_status_context(path: str) -> bool:
+        if not path:
+            return False
+        return (
+            SECONDARY_REPORT_STANDALONE_COMPLETION_CONTEXT_RE.search(
+                normalized_claim_text(path)
+            )
+            is not None
+        )
+
+    def is_positive_standalone_status_claim(
+        key_name: str,
+        value: Any,
+        path: str,
+    ) -> bool:
+        if key_name not in SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS:
+            return False
+        value_name = normalized_completion_claim_key(value) if isinstance(value, str) else ""
+        if key_name in {"support_tier", "declared_support_tier", "tier"}:
+            if value_name in (
+                BROAD_RELEASE_SUPPORT_TIER_VALUE_KEYS
+                | SECONDARY_REPORT_STANDALONE_COMPLETION_STATUS_VALUE_KEYS
+            ) or value_name.startswith("release_supported"):
+                return True
+            return (
+                isinstance(value, str)
+                and SECONDARY_REPORT_STANDALONE_COMPLETION_CONTEXT_RE.search(
+                    normalized_claim_text(value)
+                )
+                is not None
+                and is_positive_completion_claim_value(value)
+            )
+        if (
+            value_name in SECONDARY_REPORT_STANDALONE_COMPLETION_STATUS_VALUE_KEYS
+            or value_name.startswith("release_supported")
+        ):
+            return True
+        return is_positive_completion_claim_value(value) and path_has_completion_status_context(path)
+
     def split_completion_claim_paths(value: dict[str, Any], path: str) -> list[str]:
         has_claim_descriptor = False
         positive_status_paths: list[str] = []
@@ -1802,6 +1861,15 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                         )
                     )
                     and is_positive_completion_claim_value(item)
+                    and not current_blocked_context
+                ):
+                    claims.append(item_path)
+                if (
+                    is_positive_standalone_status_claim(
+                        normalized_completion_claim_key(key),
+                        item,
+                        item_path,
+                    )
                     and not current_blocked_context
                 ):
                     claims.append(item_path)

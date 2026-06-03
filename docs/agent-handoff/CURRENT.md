@@ -200,6 +200,22 @@ This file is an active routing table only. Durable evidence belongs in
 
 
 - Latest integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
+  after `36e191b`: SDK completion/release-statement bookkeeping to Jason,
+  Mission/Transfer/Dino/Tribe/Buff side-lanes to Herschel, ResourceHandle/object identity
+  to Mendel, and build/install/package-shape release boundaries to Meitner. Integrated
+  changes harden secondary route/side-lane reports against standalone release-looking
+  `support_tier`/status claims, side-lane release/candidate evidence against module
+  SDK/API and ABI/header callback readiness, ResourceHandle against public GObjects,
+  static globals, strict serial, zero-serial, source/helper, runtime rejection, and future
+  runtime observation readiness aliases, and install/release output so dry-runs say
+  `would publish` package-shape artifacts instead of completed installs. README now names
+  the current executable SDK gate totals: SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, blocker `approved_runtime_evidence_missing`. Evidence:
+  SDK completion suite 226, public SDK guardrails 194, side-lane 32, ResourceHandle 25,
+  ResourceHandle/offline-artifact focus 126, install plugin, install layout, release
+  readiness options, route JSON valid/planning-only, SDK JSON blocked, and
+  `git diff --check`. No runtime/server/Discord/GitHub operation.
+- Previous integration note: 2026-06-03 turbo SDK guardrail round delegated four scopes
   directly after compaction: P0 lifecycle/request-window route safety to Hypatia,
   permissions/command downstream to Harvey, operator ingress/storage to Russell, and
   C ABI/runtime cleanup/default-deny to Carver. Due the active thread limit, two scopes

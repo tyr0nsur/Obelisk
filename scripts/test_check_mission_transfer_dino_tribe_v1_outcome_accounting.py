@@ -990,6 +990,73 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         )
         self.assertIn("$.leaf_decision_units[buff_status].evidence.source_target_set", labels)
 
+    def test_release_statement_rejects_module_sdk_and_header_callback_readiness(self) -> None:
+        statement = (
+            f"{SURFACE_ID}: excluded - mission excluded; transfer excluded; "
+            "dino_policy excluded; tribe_policy excluded; buff_status excluded. "
+            "Module SDK is ready. ABI header callbacks are available. "
+            "Header callbacks are enabled for copied bool lanes.\n"
+        )
+        result = self.run_checker(statement=statement, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_forbidden_claims", report["blockers"])
+        self.assertIn("release_statement_ready_overclaims", report["blockers"])
+        self.assertIn("Module SDK", report["release_statement"]["forbidden_claims"])
+        self.assertIn("ABI header callbacks", report["release_statement"]["forbidden_claims"])
+        self.assertIn("Header callbacks", report["release_statement"]["forbidden_claims"])
+        self.assertIn("Module SDK is ready", report["release_statement"]["ready_claims"])
+        self.assertIn("ABI header callbacks are available", report["release_statement"]["ready_claims"])
+        self.assertIn("Header callbacks are enabled", report["release_statement"]["ready_claims"])
+
+    def test_candidate_evidence_rejects_module_sdk_and_header_callback_readiness(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        gameplay["evidence"]["notes"] = (
+            "The copied bool policy slice makes the module SDK available and header callbacks published."
+        )
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["buff_status"]["evidence"] = {
+            "bool_tail_evidence": (
+                "Bool-tail evidence completes the module SDK and ABI header callbacks are ready."
+            )
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("surface_candidate_evidence_forbidden_claim", report["blockers"])
+        self.assertIn("surface_candidate_ready_overclaim", report["blockers"])
+        self.assertIn("leaf_candidate_evidence_forbidden_claim", report["blockers"])
+        self.assertIn("leaf_candidate_ready_overclaim", report["blockers"])
+        claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] in {"surface_candidate_evidence_forbidden_claim", "leaf_candidate_evidence_forbidden_claim"}
+        }
+        self.assertIn("module SDK", claims)
+        self.assertIn("header callbacks", claims)
+        self.assertIn("ABI header callbacks", claims)
+
+    def test_candidate_evidence_allows_negated_module_sdk_and_header_callback_non_claims(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["mission"]["evidence"] = {
+            "notes": (
+                "The copied bool policy slice does not promote a module SDK. "
+                "ABI header callbacks remain blocked and no header callbacks are available."
+            )
+        }
+
+        result = self.run_checker(manifest=manifest)
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["blockers"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

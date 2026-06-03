@@ -33,6 +33,16 @@ assert_contains() {
     fi
 }
 
+assert_not_contains() {
+    local file="$1"
+    local pattern="$2"
+    if grep -Eq "${pattern}" "${file}"; then
+        echo "Expected ${file} not to match ${pattern}" >&2
+        cat "${file}" >&2
+        exit 1
+    fi
+}
+
 plugin_src="${TMP_DIR}/ExamplePlugin.so"
 root="${TMP_DIR}/root"
 printf 'first\n' > "${plugin_src}"
@@ -77,6 +87,13 @@ dry_root="${TMP_DIR}/dry-root"
 "${INSTALLER}" --dry-run "${plugin_src}" "${dry_root}" > "${TMP_DIR}/dry-run.out"
 assert_not_exists "${dry_root}"
 assert_contains "${TMP_DIR}/dry-run.out" 'DRY-RUN:'
+assert_contains "${TMP_DIR}/dry-run.out" 'DRY-RUN: Obelisk plugin install would publish ExamplePlugin.so'
+assert_not_contains "${TMP_DIR}/dry-run.out" 'Obelisk plugin installed to'
+assert_contains "${TMP_DIR}/dry-run.out" 'Plugin Hub readiness/publication'
+assert_contains "${TMP_DIR}/dry-run.out" 'support-tier activation'
+assert_contains "${TMP_DIR}/dry-run.out" 'public SDK scope'
+assert_contains "${TMP_DIR}/dry-run.out" 'runtime/live-ops approval'
+assert_contains "${TMP_DIR}/dry-run.out" 'v1 SDK completion'
 
 if "${INSTALLER}" --dry-run "${plugin_src}" "${dry_root}" "${TMP_DIR}/other-root" \
     >"${TMP_DIR}/extra-root.out" 2>"${TMP_DIR}/extra-root.err"; then
