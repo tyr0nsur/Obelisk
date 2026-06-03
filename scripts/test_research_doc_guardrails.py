@@ -981,6 +981,64 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, compact)
 
+    def test_arkapi_aseapi_nextgen_references_remain_names_demand_only(self) -> None:
+        readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        aseapi_scan = (
+            REPO_ROOT / "docs/research/2026-05-30-aseapi-reference-scan.md"
+        ).read_text(encoding="utf-8")
+        nextgen_inventory = (
+            REPO_ROOT / "docs/research/2026-05-30-nextgenplugins-reference-inventory.md"
+        ).read_text(encoding="utf-8")
+        demand_map = (
+            REPO_ROOT / "docs/research/2026-06-01-aseapi-name-demand-map.md"
+        ).read_text(encoding="utf-8")
+
+        readme_compact = normalized(readme)
+        for phrase in (
+            "ArkApi/AseApi material remains a names/demand reference only, not an architecture, ergonomics, behavior, or implementation reference.",
+            "ArkApi/AseApi/NextGenPlugins demand can keep a blocked idea visible, but it cannot change the support tier without a named promotion gate.",
+            "Allows ArkServerApi/AseApi as names/demand evidence only while banning copied architecture, ergonomics, behavior, offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns.",
+            "Records the local ArkApi plugin-source clone as a future Plugin Hub demand signal only, not as runtime evidence or portable implementation source.",
+            "Maps high-demand dictionary-only plugin capability families to candidate Obelisk surfaces and likely UE4 names without promoting SDK, runtime, mutation, or Plugin Hub work.",
+        ):
+            with self.subTest(file="docs/research/README.md", phrase=phrase):
+                self.assertIn(phrase, readme_compact)
+
+        aseapi_compact = normalized(aseapi_scan)
+        for phrase in (
+            "Useful, but only as a names and demand dictionary for evidence promotion.",
+            "It is not a behavior map, compatibility target, architecture guide, ergonomics guide, implementation guide, or evidence source for public Obelisk SDK surfaces.",
+            "Do not use AseApi for:",
+            "Memory offsets, vtable definitions, direct `GetNativePointerField` accessors, direct `NativeCall` wrappers, or copied C++ struct layouts.",
+            "Behavior parity, control flow, command parsers, schemas, constants, return semantics, or source-level implementation patterns.",
+            "Every AseApi-derived name must be revalidated through Obelisk before it can become an Obelisk target:",
+        ):
+            with self.subTest(file="aseapi-reference-scan", phrase=phrase):
+                self.assertIn(phrase, aseapi_compact)
+
+        nextgen_compact = normalized(nextgen_inventory)
+        for phrase in (
+            "Use this material only as names and demand evidence.",
+            "do not copy Windows ArkApi code, offsets, MSVC ABI assumptions, vtables, memory layouts, direct UE pointer API patterns, constants, schemas, control flow, command parsers, or implementation details into Obelisk.",
+            "It is not a source-mining checklist",
+            "These revisions are provenance for demand analysis only; they are not runtime evidence and do not authorize copied implementation, offsets, layouts, ABI assumptions, or ArkApi compatibility claims.",
+            "Use this clone as names/demand evidence only, not as architecture guidance or source code to port.",
+            "Do not trust `DECLARE_HOOK` declarations as Linux ABI, direct UE pointer wrappers as safe public API shape, or ArkApi return constants as accepted Linux ARK behavior.",
+        ):
+            with self.subTest(file="nextgenplugins-reference-inventory", phrase=phrase):
+                self.assertIn(phrase, nextgen_compact)
+
+        demand_compact = normalized(demand_map)
+        for phrase in (
+            "Status: dictionary/demand synthesis only; no promotion evidence",
+            "No runtime probing, server access, scanner run, debugger, offset derivation, ABI change, source porting, command parser inspection, schema extraction, or implementation copying was performed.",
+            "AseApi and NextGenPlugins names below are dictionary/demand signals only.",
+            "must not be used as architecture, behavior, ergonomics, implementation, source, offset, vtable, layout, ABI, wrapper, constant, schema, command parser, return semantic, or algorithm sources.",
+            "Do not cite AseApi or NextGenPlugins line numbers, signatures, structs, command names, schemas, constants, parser behavior, return values, or hook wrappers as Obelisk evidence.",
+        ):
+            with self.subTest(file="aseapi-name-demand-map", phrase=phrase):
+                self.assertIn(phrase, demand_compact)
+
 
 if __name__ == "__main__":
     unittest.main()

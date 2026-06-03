@@ -1234,6 +1234,16 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             )
         )
 
+    def test_rejects_runtime_evidence_claim_source_aliases(self) -> None:
+        for text in (
+            "window request counts as approved runtime evidence",
+            "operator approval request proves approved runtime evidence",
+            "observer window env is approved runtime evidence",
+            "source marker counts as approved runtime evidence",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(REQUEST_CHECKER.contains_unnegated_positive_capability_claim(text))
+
     def test_accepts_negated_runtime_readiness_suffix_claims(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):
             with self.subTest(text=text):

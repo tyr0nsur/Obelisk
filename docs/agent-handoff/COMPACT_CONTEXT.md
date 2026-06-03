@@ -19,6 +19,23 @@ priorities, and do not use history files as the active source of truth.
 
 ## Latest Local Checkpoint
 
+- 2026-06-03 follow-up supervised 4-agent hardening plus lead integration closed more
+  offline guardrail gaps only. No server/runtime operation, protected live-path write,
+  marker/env change, ReflectionScanner, ptrace/gcore, broad tracing, Discord send,
+  GitHub publish, tag, or push occurred.
+- Delegated scopes: P0 route/evidence-bundle aliases; public SDK completion split
+  section/release wording; inventory/structure side-lane separator aliases; offline
+  reversing/research no-repeat and ArkApi/AseApi/NextGen source-boundary hygiene.
+- Integrated lead scope: Discord helper now rejects more internal gate/test status
+  phrases: gate complete, gate passed, route valid, SDK blocked, tests passed, and
+  validation passed.
+- Current route state is unchanged: `current_route_blocker=approved_runtime_evidence_missing`,
+  SDK completion `0/12`, P0 dependency chain `0/4`, `stable_claim_allowed=false`, and
+  `stable_release_contract_claim_allowed=false`.
+- Side-lane outputs remain non-public/non-runtime: inventory copied signals report
+  `public_sdk_ready=false` and `v1_completion_ready=false`; Structure census remains
+  `candidate-only`; Structure build-policy remains `accepted_planning_only`.
+
 - 2026-06-03 supervised 4-agent hardening plus lead integration closed offline guardrail
   gaps only. No server/runtime operation, protected live-path write, marker/env change,
   ReflectionScanner, ptrace/gcore, broad tracing, Discord send, GitHub publish, tag, or

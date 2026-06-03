@@ -492,7 +492,7 @@ class InventoryItemCopiedSignalsStabilityTests(unittest.TestCase):
     def test_source_marker_inventory_sdk_side_lane_claim_is_rejected(self) -> None:
         fixtures = self.make_fixture()
         event = fixtures["public_gameplay_events"]["promoted_events"][0]
-        event["source_marker"] = "Inventory SDK ready from copied signal side lane"
+        event["source_marker"] = "Inventory-SDK ready from copied signal side lane"
 
         result = self.run_fixture(fixtures, check=False)
         payload = json.loads(result.stdout)

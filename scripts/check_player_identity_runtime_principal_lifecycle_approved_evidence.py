@@ -372,8 +372,10 @@ FORBIDDEN_KEY_RE = re.compile(
 )
 POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
     r"(?:public[_ -]?(?:sdk|player[_ -]?identity|header)|"
-    r"(?:(?:request[_ -]?pack|preflight|(?:completed[_ -]?)?receipt|"
-    r"operator[_ -]?approval[_ -]?receipt|window[_ -]?manifest|copied[_ -]?(?:log|bundle)|"
+    r"(?:(?:request[_ -]?pack|window[_ -]?request|preflight|(?:completed[_ -]?)?receipt|"
+    r"operator[_ -]?approval[_ -]?(?:request|receipt)|operator[_ -]?request|"
+    r"approval[_ -]?request|window[_ -]?manifest|observer[_ -]?(?:window[_ -]?)?env|"
+    r"window[_ -]?env|env(?:ironment)?|(?:source[_ -]?)?markers?|copied[_ -]?(?:log|bundle)|"
     r"stale[_ -]?bundle|sidecars?|artifacts?)[_ -]?"
     r"(?:counts?[_ -]?as|is|are|proves?|provides?|authorizes?|approves?)[_ -]?"
     r"approved[_ -]?runtime[_ -]?evidence)|"

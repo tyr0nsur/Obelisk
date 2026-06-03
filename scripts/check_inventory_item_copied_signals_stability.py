@@ -368,6 +368,14 @@ def is_negated_for_match(text: str, start: int, end: int) -> bool:
     )
 
 
+def flexible_phrase_match(text: str, phrase: str) -> re.Match[str] | None:
+    tokens = [token for token in re.split(r"[^A-Za-z0-9]+", phrase) if token]
+    if not tokens:
+        return None
+    pattern = r"(?<![A-Za-z0-9])" + r"[\W_]*".join(re.escape(token) for token in tokens) + r"(?![A-Za-z0-9])"
+    return re.search(pattern, text, re.IGNORECASE)
+
+
 def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -377,7 +385,7 @@ def scan_public_claim_terms(value: Any, blockers: list[dict[str, Any]], trail: s
             if key in CLAIM_TEXT_SCAN_KEYS:
                 for text_path, text in string_values(child, child_trail):
                     for term in PUBLIC_CLAIM_TERMS:
-                        match = re.search(rf"\b{re.escape(term)}\b", text, re.IGNORECASE)
+                        match = flexible_phrase_match(text, term)
                         if not match:
                             continue
                         if is_negated_for_match(text, match.start(), match.end()):
@@ -395,7 +403,7 @@ def scan_public_sdk_surfaces_inventory_side_lane_claims(
 ) -> None:
     if isinstance(value, str):
         for term in PUBLIC_SDK_SURFACES_INVENTORY_SIDE_LANE_TERMS:
-            match = re.search(rf"\b{re.escape(term)}\b", value, re.IGNORECASE)
+            match = flexible_phrase_match(value, term)
             if not match:
                 continue
             if is_negated_for_match(value, match.start(), match.end()):
@@ -942,13 +950,11 @@ def scan_readiness_claims(value: Any, blockers: list[dict[str, Any]], trail: str
                 add(blockers, "readiness_claim_enabled", child_trail)
             if key in readiness_text_keys:
                 for text_path, text in string_values(child, child_trail):
-                    normalized = text.lower()
                     for phrase in positive_readiness_phrases:
-                        start = normalized.find(phrase)
-                        if start < 0:
+                        match = flexible_phrase_match(text, phrase)
+                        if not match:
                             continue
-                        end = start + len(phrase)
-                        if is_negated_for_match(text, start, end):
+                        if is_negated_for_match(text, match.start(), match.end()):
                             continue
                         add(blockers, "readiness_claim_enabled", text_path, value=text, term=phrase)
                         break

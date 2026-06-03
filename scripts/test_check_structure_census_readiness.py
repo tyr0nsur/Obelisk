@@ -397,7 +397,7 @@ class CheckStructureCensusReadinessTests(unittest.TestCase):
                 "public_sdk_status": "accepted",
                 "negative_note": "no public SDK ready claim",
                 "boundary": "public_sdk_ready=false",
-                "notes": "Structure SDK ready",
+                "notes": "Structure-SDK ready",
             }
             manifest.write_text(json.dumps(payload), encoding="utf-8")
 

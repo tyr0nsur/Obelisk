@@ -1018,6 +1018,44 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_split_section_name_readiness_claims(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "sections": [
+                {"name": "Stable SDK", "status": "ready"},
+                {"title": "Runtime readiness", "state": "available"},
+                {"heading": "Installed SDK package", "result": "published"},
+                {"label": "SDK support tier", "support_tier": "release-supported seed"},
+            ],
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "sections[0].status",
+                "sections[1].state",
+                "sections[2].result",
+                "sections[3].support_tier",
+            ],
+        )
+
+    def test_secondary_report_scanner_allows_split_section_claim_when_report_has_blocker(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": ["sdk_completion_gate_missing"],
+            "sections": [
+                {"name": "Stable SDK", "status": "ready", "blockers": ["stable_claim_blocked"]},
+                {
+                    "heading": "Installed SDK package",
+                    "result": "published",
+                    "blockers": ["package_publication_blocked"],
+                },
+            ],
+        }
+
+        self.assertEqual(secondary_report_completion_claims_without_blocker(payload), [])
+
     def test_route_gate_claim_scanner_rejects_structured_public_runtime_aliases(self) -> None:
         payload = {
             "schema": "obelisk.command-permission-route-gate-check.v1",
@@ -5395,6 +5433,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "The SDK package is available for plugin authors.\n"
             "The public SDK package is published.\n"
             "The release package reaches GA today.\n"
+            "The SDK support tier is release-supported seed.\n"
+            "Package shape declares support_tier=release-supported seed.\n"
             "The installed SDK package is package-shape evidence only, not release package readiness.\n"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -5422,6 +5462,8 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "The SDK package is available for plugin authors.",
             "The public SDK package is published.",
             "The release package reaches GA today.",
+            "The SDK support tier is release-supported seed.",
+            "Package shape declares support_tier=release-supported seed.",
         ):
             with self.subTest(term=term):
                 self.assertIn(term, forbidden_claims)

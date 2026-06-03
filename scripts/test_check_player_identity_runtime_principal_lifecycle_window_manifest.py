@@ -1053,6 +1053,12 @@ class WindowManifestCheckerTests(unittest.TestCase):
             payload["operator_note"] = "runtime work authorized for server operations"
             payload["nested_claim"] = {"public": "public SDK ready and public header allowed"}
             payload["evidence"] = {"note": "preflight counts as approved runtime evidence"}
+            payload["aliases"] = {
+                "window_request": "window request counts as approved runtime evidence",
+                "operator_request": "operator approval request proves approved runtime evidence",
+                "observer_env": "observer window env is approved runtime evidence",
+                "marker": "source marker counts as approved runtime evidence",
+            }
             preflight_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
             fields = {
                 "run_id": RUN_ID,
@@ -1085,7 +1091,18 @@ class WindowManifestCheckerTests(unittest.TestCase):
             for detail in blockers
             if detail["reason"] == "preflight_pre_path_forbidden_authorization_claim"
         }
-        self.assertEqual({"evidence.note", "operator_note", "nested_claim.public"}, key_paths)
+        self.assertEqual(
+            {
+                "aliases.marker",
+                "aliases.observer_env",
+                "aliases.operator_request",
+                "aliases.window_request",
+                "evidence.note",
+                "operator_note",
+                "nested_claim.public",
+            },
+            key_paths,
+        )
 
     def test_rejects_swapped_preflight_checked_at_order(self) -> None:
         def mutate(root: Path, fields: dict[str, str]) -> None:

@@ -152,6 +152,10 @@ class SendDiscordEmbedTests(unittest.TestCase):
             ("status", "Agent status: route JSON is valid"),
             ("scope", "Release gate completed during routine validation"),
             ("field", "Evidence=SDK JSON blocked as expected"),
+            ("description", "Validation passed for release checks"),
+            ("status", "Gate passed for package layout"),
+            ("scope", "Route valid and SDK blocked"),
+            ("field", "Suite=tests passed"),
         )
 
         for location, phrase in forbidden_cases:

@@ -545,6 +545,14 @@ def has_false_ready_literal(text: str) -> bool:
     return re.search(r"\bready\s*[:=]\s*false\b", text, re.IGNORECASE) is not None
 
 
+def flexible_phrase_in_text(text: str, phrase: str) -> bool:
+    tokens = [token for token in re.split(r"[^A-Za-z0-9]+", phrase) if token]
+    if not tokens:
+        return False
+    pattern = r"(?<![A-Za-z0-9])" + r"[\W_]*".join(re.escape(token) for token in tokens) + r"(?![A-Za-z0-9])"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
 def raw_sanitization_reasons(value: Any, *, key: str | None = None, path: str = "") -> list[str]:
     reasons: list[str] = []
     if key in FORBIDDEN_SNAPSHOT_KEYS:
@@ -1158,7 +1166,7 @@ def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | Non
     if POSITIVE_STRING_CLAIM_RE.search(text) is None:
         return None
     for phrase, surface in FORBIDDEN_STRING_DOMAINS.items():
-        if phrase in text:
+        if flexible_phrase_in_text(value, phrase):
             return surface
     return None
 

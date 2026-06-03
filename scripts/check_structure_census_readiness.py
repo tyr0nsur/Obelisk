@@ -260,6 +260,14 @@ def has_false_ready_literal(text: str) -> bool:
     return re.search(r"\bready\s*[:=]\s*false\b", text, re.IGNORECASE) is not None
 
 
+def flexible_phrase_in_text(text: str, phrase: str) -> bool:
+    tokens = [token for token in re.split(r"[^A-Za-z0-9]+", phrase) if token]
+    if not tokens:
+        return False
+    pattern = r"(?<![A-Za-z0-9])" + r"[\W_]*".join(re.escape(token) for token in tokens) + r"(?![A-Za-z0-9])"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
 def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | None:
     text = value.casefold().strip()
     if is_negative_boundary_statement(text) or has_false_ready_literal(text):
@@ -277,7 +285,7 @@ def forbidden_string_claim_surface(key: str, path: str, value: str) -> str | Non
     if STRUCTURE_CENSUS_POSITIVE_STRING_RE.search(text) is None:
         return None
     for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_STRING_DOMAINS.items():
-        if phrase in text:
+        if flexible_phrase_in_text(value, phrase):
             return surface
     return None
 
@@ -678,7 +686,7 @@ def validate_second_source_no_core_surface_claims(
         if STRUCTURE_CENSUS_SECOND_SOURCE_POSITIVE_CLAIM_RE.search(text) is None:
             continue
         for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES.items():
-            if phrase in text:
+            if flexible_phrase_in_text(value, phrase):
                 append_blocker(
                     blockers,
                     "second_source_readiness_surface_overclaim",
@@ -830,7 +838,7 @@ def validate_no_core_surface_claims(policy: dict[str, Any], blockers: list[dict[
         if surface is not None:
             append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=surface, path=trail)
         for phrase, surface in STRUCTURE_CENSUS_FORBIDDEN_CLAIM_PHRASES.items():
-            if phrase in text:
+            if flexible_phrase_in_text(value, phrase):
                 append_blocker(blockers, "structure_census_policy_surface_overclaim", surface=surface, path=trail)
 
 

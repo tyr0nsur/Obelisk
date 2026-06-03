@@ -1220,6 +1220,26 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_rejects_operator_receipt_window_request_alias_runtime_evidence_claim(self) -> None:
+        payload = manifest()
+        self.rewrite_receipt_and_manifest_sha(
+            payload,
+            lambda receipt: receipt["operator_completion"].update(
+                {"approved_by_role": "window request counts as approved runtime evidence"}
+            ),
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
+            report["blockers"],
+        )
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_rejects_future_post_window_operational_window(self) -> None:
         payload = manifest()
         future_start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)

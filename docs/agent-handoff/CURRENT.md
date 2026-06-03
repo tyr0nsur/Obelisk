@@ -200,14 +200,15 @@ This file is an active routing table only. Durable evidence belongs in
 
 
 - Latest integration note: supervised 4-agent round plus lead integration closed offline
-  guardrail gaps without changing the active blocker. Public ABI comments now state raw
-  ProcessEvent callbacks require init-time capability plus live env+marker debug windows;
-  SDK completion release-statement scans reject hidden positive stable/ready wording;
-  Mission/Transfer/Dino/Tribe/Buff candidate markers reject promotion/runtime/public SDK
-  wording; installed CMake/installer/release output now carries explicit false/non-claim
-  markers for runtime, live-ops, Plugin Hub, support tier, stable SDK, and v1 completion;
-  Discord helper rejects internal status phrases. Evidence: route JSON valid/planning-only,
-  SDK JSON blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, mission
-  accounting candidate-only, release/SDK/runtime/layout tests, `ctest` ABI/runtime subset,
-  and `git diff --check`. No runtime/server/Discord/GitHub operation. See
+  guardrail gaps without changing the active blocker. P0 route/evidence scanners now
+  reject window-request/operator-request/observer-env/source-marker aliases as approved
+  runtime evidence. SDK completion now rejects split `name/status` section claims and
+  package/support-tier release-supported wording. Inventory/Structure side lanes now
+  catch separator variants such as `Inventory-SDK ready` and `Structure-SDK ready`.
+  Research guardrails preserve ArkServerApi/AseApi/NextGenPlugins as names/demand only,
+  and Discord helper rejects additional internal gate/test status phrases. Evidence:
+  route JSON valid/planning-only, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, side-lane JSON outputs all non-public/non-runtime,
+  focused P0/SDK/side-lane/research/Discord tests, public SDK guardrails, and
+  `git diff --check`. No runtime/server/Discord/GitHub operation. See
   `COMPACT_CONTEXT.md` and `docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md`.

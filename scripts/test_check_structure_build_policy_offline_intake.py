@@ -623,7 +623,7 @@ class CheckStructureBuildPolicyOfflineIntakeTests(unittest.TestCase):
             )
             candidate = manifest_payload["surfaces"][0]["build_policy_offline_intake_candidate"]
             candidate["status"] = "public-ready"
-            candidate["notes"] = "Structure SDK ready"
+            candidate["notes"] = "Structure-SDK ready"
             manifest, _ = self.write_case(root, readiness_payload, manifest_payload)
             result = self.run_checker("--manifest", str(manifest), "--json", check=False)
 

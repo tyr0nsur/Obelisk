@@ -391,6 +391,46 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "v1_completion_progress_percent",
     "v1_completion_progress_ratio",
 )
+SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS = {
+    "display_name",
+    "heading",
+    "label",
+    "name",
+    "section",
+    "section_name",
+    "summary_name",
+    "title",
+}
+SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS = {
+    "availability",
+    "declared_support_tier",
+    "outcome",
+    "publication",
+    "readiness",
+    "result",
+    "state",
+    "status",
+    "support_tier",
+    "tier",
+    "value",
+}
+SECONDARY_REPORT_SPLIT_COMPLETION_DESCRIPTOR_RE = re.compile(
+    r"\b(?:complete|full|stable|public|production(?: ready| grade)?|release grade)\s+"
+    r"(?:sdk|api|support)\b|"
+    r"\b(?:sdk|api|support)\s+v?1(?: 0)?\b|"
+    r"\bv1(?: 0)?\s+(?:stable|sdk|api|support|completion)\b|"
+    r"\b(?:public\s+(?:sdk|api|abi|header)|runtime\s+(?:readiness|ready|delivery|v1)|"
+    r"stable\s+claim|v1\s+completion)\b|"
+    r"\b(?:(?:installed|public|release|sdk)\s+)?sdk\s+package\b|"
+    r"\b(?:installed|public|release)\s+package\b|"
+    r"\b(?:plugin\s+hub|pluginhub)\b|"
+    r"\bsupport\s+tier\b",
+    re.IGNORECASE,
+)
+BROAD_RELEASE_SUPPORT_TIER_VALUE_KEYS = {
+    "release_supported",
+    "release_supported_seed",
+}
 BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
     r"^(?:"
     r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
@@ -875,6 +915,12 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"\b(?:installed\s+|public\s+|release\s+)?(?:sdk\s+)?package\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available|(?:is|are|reaches?)\s+ga)\b",
+    r"\b(?:installed\s+sdk|public\s+sdk|release\s+package|installed\s+package|"
+    r"public\s+package|sdk|package\s+shape|foundation\s+package)\b.{0,80}"
+    r"\bsupport[_ -]?tier\b.{0,40}\brelease[- ]supported(?:\s+seed)?\b",
+    r"\bsupport[_ -]?tier\b.{0,40}\brelease[- ]supported(?:\s+seed)?\b.{0,80}"
+    r"\b(?:installed\s+sdk|public\s+sdk|release\s+package|installed\s+package|"
+    r"public\s+package|sdk|package\s+shape|foundation\s+package)\b",
     r"\bv1(?:\.0)?\s+(?:sdk|api|support)\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
     r"(?:is|are)?\s*generally\s+available|(?:is|are|reaches?)\s+ga)\b",
@@ -1700,6 +1746,38 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             or tail.endswith("_summary")
         )
 
+    def normalized_claim_text(value: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+        return re.sub(r"[^a-z0-9]+", " ", separated.casefold()).strip()
+
+    def is_split_claim_descriptor(value: Any) -> bool:
+        return (
+            isinstance(value, str)
+            and SECONDARY_REPORT_SPLIT_COMPLETION_DESCRIPTOR_RE.search(
+                normalized_claim_text(value)
+            )
+            is not None
+        )
+
+    def is_positive_split_claim_status(value: Any) -> bool:
+        if is_positive_completion_claim_value(value):
+            return True
+        if isinstance(value, str):
+            return normalized_completion_claim_key(value) in BROAD_RELEASE_SUPPORT_TIER_VALUE_KEYS
+        return False
+
+    def split_completion_claim_paths(value: dict[str, Any], path: str) -> list[str]:
+        has_claim_descriptor = False
+        positive_status_paths: list[str] = []
+        for key, item in value.items():
+            key_name = normalized_completion_claim_key(key)
+            if key_name in SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS and is_split_claim_descriptor(item):
+                has_claim_descriptor = True
+            if key_name in SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS and is_positive_split_claim_status(item):
+                item_path = f"{path}.{key}" if path else str(key)
+                positive_status_paths.append(item_path)
+        return positive_status_paths if has_claim_descriptor else []
+
     def visit(value: Any, path: str, blocked_report_context: bool) -> None:
         if isinstance(value, dict):
             current_blocked_context = (
@@ -1707,6 +1785,8 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                 if starts_report_context(value, path)
                 else blocked_report_context
             )
+            if not current_blocked_context:
+                claims.extend(split_completion_claim_paths(value, path))
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
                 if (

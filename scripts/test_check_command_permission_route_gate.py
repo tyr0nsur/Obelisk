@@ -306,6 +306,20 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             blockers,
         )
 
+    def test_collect_claims_rejects_runtime_evidence_source_aliases(self) -> None:
+        payload = {
+            "runtime_evidence_source": [
+                "window_request",
+                {"operator": "operator_approval_request"},
+                "observer_window_env",
+                "source_marker",
+            ]
+        }
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(payload, include_text_claims=False)
+
+        self.assertEqual(["runtime_evidence_source"], claims)
+
     def test_accepts_current_route_as_planning_only(self) -> None:
         result = self.run_checker("--json")
         report = json.loads(result.stdout)

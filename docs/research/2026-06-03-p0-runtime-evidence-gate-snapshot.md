@@ -619,3 +619,107 @@ Non-claims:
   ptrace/gcore, broad tracing, Discord sends, GitHub publication, tag updates,
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
+
+## Offline Reversing Research Hygiene Audit
+
+Delegated worker 4/4 audited the current research index, current P0 snapshot,
+recent FName/GObjects notes, and external-source reference notes for stale next
+steps.
+
+Findings:
+
+- The current FName/GObjects/core/decompiler lane already carries no-repeat
+  language: reuse reviewed no-scan inputs for the current binary hash and do
+  not restart broad FName, GObjects, core, serial, ReflectionScanner, or
+  decompiler discovery unless a new binary hash or contradictory artifact
+  evidence invalidates the accepted inputs.
+- The active P0 route remains `approved_runtime_evidence_missing`. Historical
+  FName/GObjects/core/admin/lifecycle-layout notes are evidence trails only and
+  do not direct current work away from approved copied runtime principal
+  lifecycle evidence.
+- ArkServerApi/AseApi/NextGenPlugins notes remain names/demand dictionaries
+  only. They must not be used as architecture, ergonomics, behavior,
+  implementation, source, offset, vtable, layout, ABI, wrapper, constant,
+  schema, command parser, return semantic, algorithm, runtime evidence, or
+  portable implementation sources.
+- A focused research-doc guardrail now locks the ArkServerApi/AseApi/
+  NextGenPlugins source-boundary wording in the README and the three reference
+  notes so future audits do not rely on chat-only memory for this rule.
+
+This was an offline documentation/test audit only. It did not run runtime tools,
+touch `/servidor/ark`, start/stop/restart servers, edit markers/env, run
+ReflectionScanner, ptrace/gcore, gdb against live processes, broad scans,
+Discord, GitHub, commit, stage, rebase, tag, or push.
+
+## Route Alias, Split SDK Claim, Side-Lane Separator, And Communication Hardening
+
+The next supervised 4-agent round plus lead integration closed additional
+offline bypasses without changing the active P0 route blocker or SDK completion
+state.
+
+Delegated scopes and integrated findings:
+
+- P0 route/evidence-bundle: source and text scanners now reject aliases such as
+  `window request counts as approved runtime evidence`,
+  `operator approval request proves approved runtime evidence`,
+  `observer window env is approved runtime evidence`, and
+  `source marker counts as approved runtime evidence`. These request/window/env/
+  marker artifacts remain operational preparation only and cannot resolve
+  `approved_runtime_evidence_missing`.
+- SDK completion: structured secondary reports can no longer split a claim
+  across descriptor/status fields such as `{"name": "Stable SDK", "status":
+  "ready"}` or `{"heading": "Installed SDK package", "result": "published"}`.
+  Release statements now also reject package/support-tier wording such as
+  `support_tier=release-supported seed`.
+- Inventory/Structure side lanes: source-marker and alias scanning now handles
+  separator variants such as `Inventory-SDK ready` and `Structure-SDK ready`,
+  preserving non-public/non-runtime status for copied inventory signals,
+  Structure census, and Structure build-policy offline intake.
+- Offline reversing hygiene: the research index/current P0 snapshot and
+  ArkServerApi/AseApi/NextGen notes are locked by guardrail tests as
+  names/demand-only sources. They are not architecture, behavior,
+  implementation, source, offset, vtable, layout, ABI, wrapper, constant,
+  schema, command-parser, return-semantic, algorithm, runtime-evidence, or
+  portable-implementation sources.
+- Community helper: `send_discord_embed.py` now rejects additional internal
+  status phrases such as gate complete, gate passed, route valid, SDK blocked,
+  tests passed, and validation passed.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `remaining_route_blockers=["approved_runtime_evidence_missing"]`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `check_public_sdk_v1_completion.py --json`: exits blocked by design with
+  `ready=false`, `status=blocked`, SDK completion `0/12`, P0 dependency chain
+  `0/4`, `stable_claim_allowed=false`, and current route blocker
+  `approved_runtime_evidence_missing`.
+- `check_inventory_item_copied_signals_stability.py --json`: `ready=true`,
+  `public_sdk_ready=false`, and `v1_completion_ready=false`.
+- `check_structure_census_readiness.py --json`: `outcome=candidate-only`,
+  `public_sdk_ready=false`, `runtime_ready=false`, and `promotion_ready=false`.
+- `check_structure_build_policy_offline_intake.py --json`:
+  `status=accepted_planning_only`, `public_sdk_ready=false`,
+  `runtime_ready=false`, `promotion_ready=false`, and `enforcement_ready=false`.
+
+Validation remained offline-only:
+
+- P0 route/evidence tests: approved runtime principal lifecycle evidence,
+  window manifest, window request, command permission route gate, and route JSON.
+- SDK tests: split-section/release-package focused tests, public SDK guardrails,
+  blocked SDK JSON, and full SDK completion suite when recorded by the lead.
+- Side-lane tests: inventory copied signals, Structure census, Structure
+  build-policy offline intake, plus the three JSON checkers above.
+- Research/community tests: research doc guardrails, Discord embed helper,
+  agent handoff guardrails, and secret guardrails.
+- Hygiene: `git diff --check`.
+
+Non-claims:
+
+- These changes do not create approved runtime evidence and do not authorize
+  server operations, marker/env changes, runtime observation, ReflectionScanner,
+  ptrace/gcore, broad tracing, Discord sends, GitHub publication, tag updates,
+  Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
+  completion.
