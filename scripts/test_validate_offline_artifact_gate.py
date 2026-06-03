@@ -8742,6 +8742,23 @@ class ValidateOfflineArtifactGateTests(unittest.TestCase):
         self.assertIn("zero_serial_negative_samples_row_serial_not_zero", reasons)
         self.assertIn("zero_serial_negative_samples_output_artifact_identity_hash_mismatch", reasons)
 
+    def test_blocks_zero_serial_negative_samples_nested_metadata_readiness_overclaims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            protected = Path(tmp) / "server"
+            workspace = protected / "workspace-offline"
+            manifest = workspace / "zero-serial-negative-samples.json"
+            payload = zero_serial_negative_samples_manifest()
+            payload["sources"][0]["metadata"]["publicResourceHandleReady"] = True
+            payload["sources"][0]["metadata"]["lookup_note"] = "ResourceHandle lookup ready for public SDK"
+            write_json(manifest, payload)
+
+            result = gate.build_result(args(root=workspace, protected_root=protected, manifests=[manifest]))
+
+        reasons = {blocker["reason"] for blocker in result["blockers"]}
+        self.assertIn("zero_serial_negative_samples_metadata_ready_overclaim", reasons)
+        self.assertIn("zero_serial_negative_samples_metadata_public_overclaim_resourcehandle", reasons)
+        self.assertIn("zero_serial_negative_samples_output_artifact_identity_hash_mismatch", reasons)
+
     def test_blocks_zero_serial_negative_samples_missing_identity(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             protected = Path(tmp) / "server"

@@ -441,8 +441,16 @@ RUNTIME_EVIDENCE_READY_SCOPE = "runtime_evidence_only"
 PUBLIC_CONTRACT_REVIEW_READY_SCOPE = "contract_review_input_only"
 BUNDLE_BUILDER_INPUTS_READY_SCOPE = "bundle_builder_inputs_only"
 PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
+    "approved_runtime",
+    "approved_runtime_evidence",
+    "approved_runtime_evidence_only",
+    "approved_runtime_only",
     "approved_bundle",
     BUNDLE_BUILDER_INPUTS_READY_SCOPE,
+    "identity_contract",
+    "identity_contract_only",
+    "identity_public_contract",
+    "identity_public_contract_only",
     "lifecycle_anchor",
     "lifecycle_anchor_candidates",
     "lifecycle_anchor_candidates_only",
@@ -568,6 +576,8 @@ PROMOTION_EVIDENCE_NEGATIVE_TERM_CONTEXT = re.compile(
 STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "approved_bundle",
     "approved-bundle",
+    "approved_runtime",
+    "approved-runtime",
     "approved_runtime_bundle",
     "approved-runtime-bundle",
     "candidate",
@@ -594,6 +604,10 @@ STRICT_PROMOTION_EVIDENCE_PATH_DENY_MARKERS = (
     "lifecycle-anchor",
     "lifecycle_anchor_candidates",
     "lifecycle-anchor-candidates",
+    "identity_contract",
+    "identity-contract",
+    "identity_public_contract",
+    "identity-public-contract",
     "package_shape",
     "placeholder",
     "placeholder_provenance",
@@ -663,8 +677,8 @@ STRICT_PROMOTION_EVIDENCE_SOURCE_MARKER_KEYS = {
     "target_sets",
 }
 STRICT_PROMOTION_EVIDENCE_SOURCE_ONLY_DENY_MARKERS = re.compile(
-    r"(?:approved[-_ ]?runtime[-_ ]?principal[-_ ]?lifecycle[-_ ]?evidence|"
-    r"identity[-_ ]?public[-_ ]?contract(?:[-_ ]?gate[-_ ]?missing)?)",
+    r"(?:approved[-_ ]?runtime(?:[-_ ]?(?:principal[-_ ]?lifecycle)?[-_ ]?evidence)?|"
+    r"identity[-_ ]?(?:public[-_ ]?)?contract(?:[-_ ]?gate[-_ ]?missing)?)",
     re.IGNORECASE,
 )
 STRICT_PROMOTION_EVIDENCE_SCHEMA_DENY_MARKERS = re.compile(

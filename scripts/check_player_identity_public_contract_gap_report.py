@@ -508,6 +508,11 @@ def add(blockers: list[dict[str, Any]], reason: str, label: str, **extra: Any) -
     blockers.append(blocker)
 
 
+def normalize_contract_key(key: object) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
 def load_json(path: Path, label: str, blockers: list[dict[str, Any]]) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -547,14 +552,17 @@ def walk_json_keys(value: Any, path: str = "$") -> Iterable[tuple[str, str]]:
 def validate_false_flags(value: Any, blockers: list[dict[str, Any]], label: str) -> None:
     for path, item in walk_json(value):
         key = path.rsplit(".", 1)[-1]
-        if key in READINESS_FALSE_KEYS and item is not False:
+        if normalize_contract_key(key) in READINESS_FALSE_KEYS and item is not False:
             add(blockers, "readiness_flag_not_false", path, input=label, value=item)
 
 
 def validate_empty_public_lists(value: Any, blockers: list[dict[str, Any]], label: str) -> None:
-    for key in sorted(EMPTY_PUBLIC_LIST_KEYS):
-        if key in value and value.get(key) != []:
-            add(blockers, f"{key}_not_empty", f"$.{key}", input=label, value=value.get(key))
+    if not isinstance(value, dict):
+        return
+    for key, item in value.items():
+        normalized_key = normalize_contract_key(key)
+        if normalized_key in EMPTY_PUBLIC_LIST_KEYS and item != []:
+            add(blockers, f"{normalized_key}_not_empty", f"$.{key}", input=label, value=item)
 
 
 def sanitize_non_promotional_report(
@@ -572,18 +580,19 @@ def sanitize_non_promotional_report(
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             item_path = f"{path}.{key}"
+            normalized_key = normalize_contract_key(key)
             contract_review_allowed = (
-                key == "accepted_for_contract_review"
+                normalized_key == "accepted_for_contract_review"
                 and path != root_path
                 and item_path.endswith(NESTED_CONTRACT_REVIEW_ACCEPTANCE_ALLOWED_SUFFIXES)
             )
-            if key in READINESS_FALSE_KEYS and not contract_review_allowed:
+            if normalized_key in READINESS_FALSE_KEYS and not contract_review_allowed:
                 if item is not False:
                     add(blockers, "nested_readiness_flag_not_false", item_path, input=input_label, value=item)
                 sanitized[key] = False
-            elif key in EMPTY_PUBLIC_LIST_KEYS:
+            elif normalized_key in EMPTY_PUBLIC_LIST_KEYS:
                 if item != []:
-                    add(blockers, f"nested_{key}_not_empty", item_path, input=input_label, value=item)
+                    add(blockers, f"nested_{normalized_key}_not_empty", item_path, input=input_label, value=item)
                 sanitized[key] = []
             else:
                 sanitized[key] = sanitize_non_promotional_report(
@@ -1377,8 +1386,8 @@ def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dic
     if isinstance(report, dict):
         for key, item in report.items():
             item_path = f"{path}.{key}"
-            normalized_key = str(key).replace("-", "_").replace(" ", "_")
-            if key in EMPTY_PUBLIC_LIST_KEYS and item != []:
+            normalized_key = normalize_contract_key(key)
+            if normalized_key in EMPTY_PUBLIC_LIST_KEYS and item != []:
                 overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
             if (
                 normalized_key not in ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS

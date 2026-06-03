@@ -7042,10 +7042,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
             cases = (
                 ("sourceKind", "request_pack"),
+                ("sourceKind", "approvedRuntime"),
+                ("sourceKind", "approved-runtime"),
                 ("sourceKind", "approved_runtime_principal_lifecycle_evidence"),
+                ("evidenceKind", "identityContract"),
+                ("evidenceKind", "identity-contract"),
                 ("evidenceKind", "identity_public_contract_gate_missing"),
                 ("sourceTargetSets", ["preflight"]),
                 ("evidenceKinds", ["live_ops_sidecar"]),
+                ("evidenceKinds", ["approved-runtime-evidence"]),
+                ("sourceKinds", [{"kind": "identity-contract"}]),
             )
             for key, value in cases:
                 with self.subTest(marker_key=key):

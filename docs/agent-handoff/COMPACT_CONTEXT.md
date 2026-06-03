@@ -1421,6 +1421,26 @@ priorities, and do not use history files as the active source of truth.
   py_compile, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent direct-route/source-marker hardening round: direct
+  `check_command_permission_route_gate.py` now derives
+  `identity_public_contract_gate_missing` only from the player-identity source checker's
+  accepted approved-runtime diagnosis, not from the mere presence of
+  `--approved-runtime-principal-lifecycle-evidence-manifest`. Unaccepted/arbitrary
+  manifests keep `approved_runtime_evidence_missing` and are not forwarded to the
+  public-contract gap checker. First-evidence readiness applies the same accepted-only
+  forwarding rule. Public-contract readiness/gap scans normalize camelCase, hyphenated,
+  spaced, and snake_case nested readiness/list aliases. SDK completion rejects
+  camel/hyphen/nested `approvedRuntime` and `identityContract` source/evidence markers
+  without rejecting required semantic evidence terms. ResourceHandle zero-serial metadata
+  rejects nested public/runtime/lookup/SDK overclaims while remaining candidate-only.
+  Durable note:
+  `docs/research/2026-06-03-direct-route-approved-runtime-binding.md`. Validations
+  passed: route gate 48, player identity first-evidence 39, public-contract
+  readiness/gap 83, combined route/identity/contract suite 170,
+  ResourceHandle/offline gate focus 73, full SDK completion suite 214 (`-f`), route JSON
+  valid/planning-only, SDK JSON blocked by design, py_compile, and `git diff --check`.
+  Route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

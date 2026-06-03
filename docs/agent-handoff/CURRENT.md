@@ -332,3 +332,26 @@ This file is an active routing table only. Durable evidence belongs in
   valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`, py_compile, and `git diff --check`. No runtime/server
   operation. Agents closed.
+- Latest round delegated approved-runtime direct-consumer audit, player identity public
+  contract alias hardening, SDK completion source-marker hardening, and ResourceHandle
+  side-lane non-promotion audit. Lead locally hardened the direct command/permission
+  route gate so `--approved-runtime-principal-lifecycle-evidence-manifest` changes the
+  identity route lock only when the source checker exposes an accepted approved-runtime
+  diagnosis (`ready`, `approved_runtime_evidence_present`, `runtime_evidence_ready`, and
+  empty `remaining_blockers`). Arbitrary/unaccepted manifests keep the canonical
+  `approved_runtime_evidence_missing` lock and are not forwarded to the public-contract
+  gap checker. Player identity first-evidence readiness similarly forwards approved
+  runtime evidence to contract-gap intake only after the approved-runtime diagnosis is
+  ready. Public-contract readiness/gap scans now normalize camelCase, hyphenated, spaced,
+  and snake_case readiness/list aliases in nested approved-runtime reports. SDK completion
+  rejects camel/hyphen/nested `approvedRuntime` and `identityContract` source/evidence
+  markers without treating required semantic terms as promotion evidence. ResourceHandle
+  zero-serial negative-sample metadata now rejects nested public/runtime/lookup/SDK
+  overclaims while preserving candidate-only status. Added
+  `docs/research/2026-06-03-direct-route-approved-runtime-binding.md`. Validation passed:
+  route gate 48, player identity first-evidence 39, public-contract readiness/gap 83,
+  combined route/identity/contract suite 170, ResourceHandle/offline gate focus 73, full
+  SDK completion suite 214 (`-f`), route JSON valid/planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, py_compile, and `git diff --check`. No
+  runtime/server operation. Agents closed.

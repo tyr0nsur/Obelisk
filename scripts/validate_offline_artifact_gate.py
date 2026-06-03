@@ -1759,11 +1759,49 @@ def collect_bool_fields(value: object, *, trail: str = "$") -> list[tuple[str, b
     return found
 
 
+def normalized_claim_key(key: str) -> str:
+    key = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key)
+    return re.sub(r"[^a-zA-Z0-9]+", "_", key).strip("_").casefold()
+
+
+def is_ready_overclaim_key(key: str) -> bool:
+    normalized = normalized_claim_key(key)
+    if normalized in READY_OVERCLAIM_KEYS:
+        return True
+    resource_subjects = (
+        "resource_handle",
+        "resourcehandle",
+        "object_identity",
+        "object_lookup",
+        "resource_lookup",
+        "post_callback_resource_handle",
+    )
+    readiness_contexts = (
+        "public",
+        "runtime",
+        "v1",
+        "sdk",
+        "abi",
+        "release",
+        "promot",
+        "ready",
+        "readiness",
+        "enabled",
+        "allowed",
+        "available",
+        "post_callback",
+        "lookup",
+    )
+    return any(subject in normalized for subject in resource_subjects) and any(
+        context in normalized for context in readiness_contexts
+    )
+
+
 def collect_ready_overclaims(value: object, *, trail: str = "$") -> list[tuple[str, bool]]:
     return [
         (child_trail, child)
         for child_trail, child in collect_bool_fields(value, trail=trail)
-        if child is True and child_trail.rsplit(".", 1)[-1] in READY_OVERCLAIM_KEYS
+        if child is True and is_ready_overclaim_key(child_trail.rsplit(".", 1)[-1])
     ]
 
 
@@ -8662,6 +8700,17 @@ def validate_resource_handle_zero_serial_negative_samples_manifest(
                 blockers.append({"reason": "zero_serial_negative_samples_source_not_deterministic", "label": f"{source_label}.deterministic_negative_cohort"})
             if source.get("blockers") not in ([], None):
                 blockers.append({"reason": "zero_serial_negative_samples_source_has_blockers", "label": f"{source_label}.blockers"})
+            metadata = source.get("metadata")
+            if isinstance(metadata, dict):
+                for trail, _value in collect_ready_overclaims(metadata, trail=f"{source_label}.metadata"):
+                    blockers.append({"reason": "zero_serial_negative_samples_metadata_ready_overclaim", "label": trail})
+                for trail, _value, reason in collect_candidate_public_overclaims(metadata):
+                    blockers.append(
+                        {
+                            "reason": f"zero_serial_negative_samples_metadata_public_overclaim_{reason}",
+                            "label": f"{source_label}.metadata:{trail}",
+                        }
+                    )
 
             rows = source.get("zero_serial_negative_samples")
             if not isinstance(rows, list) or not rows:

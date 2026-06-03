@@ -2598,6 +2598,30 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
             diagnosis["blockers"],
         )
 
+    def test_unaccepted_approved_runtime_manifest_keeps_runtime_evidence_blocker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(json.dumps({"not": "approved-runtime-evidence"}), encoding="utf-8")
+
+            result = self.run_checker(
+                [
+                    "--approved-runtime-principal-lifecycle-evidence-manifest",
+                    str(approved_manifest),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(payload["primary_blocker"], "approved_runtime_evidence_missing")
+        self.assertIn("approved_runtime_evidence_missing", payload["blockers"])
+        self.assertNotIn("identity_public_contract_gap_report_invalid", payload["blockers"])
+        self.assertEqual(
+            payload["first_evidence"]["approved_runtime_principal_lifecycle_evidence_manifest"]["remaining_blockers"],
+            ["approved_runtime_evidence_missing"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

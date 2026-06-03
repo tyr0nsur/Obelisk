@@ -1253,6 +1253,46 @@ class PlayerIdentityPublicContractReadinessTests(unittest.TestCase):
             ["approved_runtime_evidence_public_sdk_ready_not_false"],
         )
 
+    def test_approved_runtime_report_rejects_nested_alias_overclaims(self) -> None:
+        original_build_report = checker.approved_evidence.build_report
+
+        def overclaiming_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["nestedClaims"] = {
+                "publicSdkReady": True,
+                "public-header-allowed": "ready",
+                "publicHeaderSymbolsNow": ["ObeliskPlayerPrincipalEvent"],
+                "downstream": {"v1CompletionReady": True},
+            }
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_path = Path(tmp) / "approved-runtime.json"
+            runtime_path.write_text(json.dumps(approved_manifest()), encoding="utf-8")
+            blockers: list[dict] = []
+            with mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}), mock.patch.object(
+                checker.approved_evidence,
+                "build_report",
+                side_effect=overclaiming_report,
+            ):
+                report = checker.approved_runtime_report(runtime_path, blockers)
+
+        self.assertIn(
+            "approved_runtime_evidence_report_public_readiness_overclaim",
+            [blocker["reason"] for blocker in blockers],
+        )
+        overclaims = next(
+            blocker["overclaims"]
+            for blocker in blockers
+            if blocker["reason"] == "approved_runtime_evidence_report_public_readiness_overclaim"
+        )
+        paths = {claim["path"] for claim in overclaims}
+        self.assertIn("$.nestedClaims.publicSdkReady", paths)
+        self.assertIn("$.nestedClaims.public-header-allowed", paths)
+        self.assertIn("$.nestedClaims.publicHeaderSymbolsNow", paths)
+        self.assertIn("$.nestedClaims.downstream.v1CompletionReady", paths)
+        self.assertFalse(report["accepted_for_contract_review"])
+
     def test_approved_runtime_report_must_not_overclaim_public_header_allowed(self) -> None:
         original_build_report = checker.approved_evidence.build_report
 

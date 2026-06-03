@@ -597,7 +597,11 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
                 "public_capability_bits_now": ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"],
                 "claims": {
                     "public_contract_ready": True,
+                    "publicSdkReady": True,
+                    "public-header-allowed": "ready",
+                    "publicHeaderSymbolsNow": ["ObeliskPlayerPrincipalEvent"],
                     "downstream": "identity unlocks permissions now",
+                    "nested": {"v1CompletionReady": True},
                     "summary": "public player identity ready",
                 },
             }
@@ -616,6 +620,16 @@ class PlayerIdentityPublicContractGapReportTests(unittest.TestCase):
         reasons = [blocker["reason"] for blocker in blockers]
         self.assertIn("approved_runtime_evidence_report_public_readiness_overclaim", reasons)
         self.assertIn("approved_runtime_evidence_not_accepted", reasons)
+        overclaims = next(
+            blocker["overclaims"]
+            for blocker in blockers
+            if blocker["reason"] == "approved_runtime_evidence_report_public_readiness_overclaim"
+        )
+        paths = {claim["path"] for claim in overclaims}
+        self.assertIn("$.claims.publicSdkReady", paths)
+        self.assertIn("$.claims.public-header-allowed", paths)
+        self.assertIn("$.claims.publicHeaderSymbolsNow", paths)
+        self.assertIn("$.claims.nested.v1CompletionReady", paths)
         self.assertFalse(runtime_report["accepted_for_contract_review"])
         self.assertIsNone(runtime_report["resolved_input"])
         self.assertEqual(runtime_report["resolved_inputs"], [])

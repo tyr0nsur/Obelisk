@@ -2476,6 +2476,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         getattr(args, "player_principal_lifecycle_window_request", None),
         getattr(args, "player_principal_lifecycle_window_env", None),
     )
+    approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True
+    approved_runtime_evidence_for_contract_gap = (
+        getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None)
+        if approved_runtime_evidence_ready
+        else None
+    )
     public_contract_gap_diagnosis = player_identity_public_contract_gap_diagnosis(
         decisions=getattr(
             args,
@@ -2494,10 +2500,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             REPO_ROOT / "docs" / "research" / "2026-06-02-player-identity-identifier-redaction-evidence.json",
         ),
         principal_invalidation_policy_manifest=effective_principal_invalidation_policy_manifest,
-        approved_runtime_evidence_manifest=getattr(args, "approved_runtime_principal_lifecycle_evidence_manifest", None),
+        approved_runtime_evidence_manifest=approved_runtime_evidence_for_contract_gap,
         public_header=getattr(args, "public_header", REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"),
     )
-    approved_runtime_evidence_ready = approved_runtime_evidence_manifest_diagnosis.get("runtime_evidence_ready") is True
     runtime_evidence_requirements = runtime_principal_lifecycle_evidence_requirements()
     planning_provenance = planning_provenance_blockers(
         first_evidence_payload=first_evidence_payload,

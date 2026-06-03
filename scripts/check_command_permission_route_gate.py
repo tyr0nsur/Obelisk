@@ -388,7 +388,14 @@ def identity_readiness_argv(args: argparse.Namespace | None) -> list[str]:
     return argv
 
 
-def route_checks(args: argparse.Namespace, *, current_route_blocker: str | None) -> list[tuple[str, list[str]]]:
+def route_checks(
+    args: argparse.Namespace,
+    *,
+    current_route_blocker: str | None,
+    approved_runtime_evidence_accepted: bool | None = None,
+) -> list[tuple[str, list[str]]]:
+    if approved_runtime_evidence_accepted is None:
+        approved_runtime_evidence_accepted = current_route_blocker == "identity_public_contract_gate_missing"
     shared_surface_args = ["--surfaces", str(args.public_sdk_surfaces)]
     shared_header_args = ["--public-header", str(args.public_header)]
     route_blocker_args = ["--current-route-blocker", current_route_blocker] if current_route_blocker else []
@@ -405,7 +412,7 @@ def route_checks(args: argparse.Namespace, *, current_route_blocker: str | None)
         "--json",
     ]
     approved_runtime = getattr(args, "player_identity_approved_runtime_principal_lifecycle_evidence_manifest", None)
-    if approved_runtime is not None:
+    if approved_runtime is not None and approved_runtime_evidence_accepted:
         player_identity_gap_args.extend(["--approved-runtime-evidence", str(approved_runtime)])
     command_response_args = [
         "check_command_chat_response_public_readiness.py",
@@ -536,15 +543,26 @@ def validate_identity_planning_binding_args(args: argparse.Namespace) -> list[st
     return []
 
 
-def expected_identity_lock_blocker_for_args(args: argparse.Namespace) -> str:
-    approved_runtime = getattr(args, "player_identity_approved_runtime_principal_lifecycle_evidence_manifest", None)
-    if approved_runtime is not None:
+def approved_runtime_evidence_ready_for_identity_lock(phase: dict[str, Any]) -> bool:
+    diagnosis = phase.get("source_checker_approved_runtime_evidence_manifest")
+    if not isinstance(diagnosis, dict):
+        return False
+    return (
+        diagnosis.get("ready") is True
+        and diagnosis.get("approved_runtime_evidence_present") is True
+        and diagnosis.get("runtime_evidence_ready") is True
+        and diagnosis.get("remaining_blockers") == []
+    )
+
+
+def expected_identity_lock_blocker_for_phase(phase: dict[str, Any]) -> str:
+    if approved_runtime_evidence_ready_for_identity_lock(phase):
         return "identity_public_contract_gate_missing"
     return "approved_runtime_evidence_missing"
 
 
 def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any]) -> list[str]:
-    expected = expected_identity_lock_blocker_for_args(args)
+    expected = expected_identity_lock_blocker_for_phase(phase)
     observed = phase.get("current_blocker")
     source_observed = phase.get("source_checker_primary_blocker")
     blockers: list[str] = []
@@ -784,6 +802,13 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
     )
     current_blocker = primary_blocker or next_blocker
     manifest_sources = identity_manifest_source_diagnostics(args, report)
+    approved_runtime_evidence_manifest = None
+    if report is not None:
+        first_evidence = report.get("first_evidence")
+        if isinstance(first_evidence, dict):
+            approved_runtime_evidence_manifest = first_evidence.get(
+                "approved_runtime_principal_lifecycle_evidence_manifest"
+            )
 
     blocker_route = ALLOWED_IDENTITY_LOCK_BLOCKERS.get(str(current_blocker), {})
     return {
@@ -808,6 +833,7 @@ def build_critical_path_phase(args: argparse.Namespace | None = None) -> dict[st
         "source_checker_blockers": source_blockers,
         "source_checker_public_or_runtime_claims": source_claims,
         "source_checker_manifest_sources": manifest_sources,
+        "source_checker_approved_runtime_evidence_manifest": approved_runtime_evidence_manifest,
         "planning_only": True,
         "promotion_ready": report.get("promotion_ready") is True if report is not None else None,
         "public_sdk_ready": report.get("public_sdk_ready") is True if report is not None else None,
@@ -895,6 +921,7 @@ def validate_locked_child_route_alignment(
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
     critical_path_phase = build_critical_path_phase(args)
     current_route_blocker = critical_path_phase.get("current_blocker")
+    approved_runtime_evidence_accepted = approved_runtime_evidence_ready_for_identity_lock(critical_path_phase)
     child_route_blocker = (
         None
         if current_route_blocker in UPSTREAM_IDENTITY_LOCK_BLOCKERS
@@ -905,7 +932,11 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="obelisk-command-route-gate-") as tmp:
         response_path_report_root = Path(tmp) / "command-chat-response-public-readiness"
         response_path_report_path = response_path_report_root / "command-chat-response-public-readiness.json"
-        for name, argv in route_checks(args, current_route_blocker=child_route_blocker):
+        for name, argv in route_checks(
+            args,
+            current_route_blocker=child_route_blocker,
+            approved_runtime_evidence_accepted=approved_runtime_evidence_accepted,
+        ):
             effective_argv = list(argv)
             if name == "commands_replies_public_readiness":
                 if response_path_report is not None:
