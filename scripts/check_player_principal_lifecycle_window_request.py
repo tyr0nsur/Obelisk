@@ -1064,7 +1064,7 @@ def validate_operator_approval_receipt(
     window_start_dt = None
     if isinstance(approved_window, dict) and isinstance(approved_window.get("start_utc"), str):
         window_start_dt = parse_utc(approved_window["start_utc"])
-    if approval_recorded_dt is not None and request_prepared_dt is not None and approval_recorded_dt < request_prepared_dt:
+    if approval_recorded_dt is not None and request_prepared_dt is not None and approval_recorded_dt <= request_prepared_dt:
         add(
             blockers,
             "operator_approval_receipt_approved_before_request_prepared",

@@ -2877,6 +2877,8 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         installed_shape["non_claim_exports"]["Obelisk_V1_COMPLETION_CLAIM_ALLOWED"] = True
         installed_shape["v1_completion_equivalent_for"] = ["obelisk.player_identity.v1"]
         installed_shape["counts_toward_complete_sdk_claim"] = True
+        installed_shape["release_package_ready"] = True
+        installed_shape["public_package_available"] = "available"
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = Path(tmpdir) / "public_sdk_surfaces.json"
@@ -2899,6 +2901,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         )
         self.assertIn(
             "positive_claim:counts_toward_complete_sdk_claim",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:release_package_ready",
+            report["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:public_package_available",
             report["installed_sdk_package_shape_guardrail_drift"],
         )
         self.assertEqual(
@@ -4929,6 +4939,10 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         self.assertIn("v1_completion_required", sdk_package_shape["not_sufficient_for"])
         self.assertIn(
             "stable_release_contract.claim_allowed",
+            sdk_package_shape["not_sufficient_for"],
+        )
+        self.assertIn(
+            "release package readiness or public package availability",
             sdk_package_shape["not_sufficient_for"],
         )
         self.assertEqual(

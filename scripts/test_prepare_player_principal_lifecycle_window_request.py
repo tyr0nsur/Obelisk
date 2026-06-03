@@ -16,7 +16,11 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRIPT = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 
 
 def future_window() -> tuple[str, str, str]:

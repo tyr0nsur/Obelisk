@@ -39,7 +39,11 @@ SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 WINDOW_START = (datetime.now(timezone.utc) + timedelta(hours=1)).replace(microsecond=0)
 RUN_ID = WINDOW_START.strftime("%Y%m%dT%H%M%SZ") + "-player-principal-lifecycle"
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
-TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 OTHER_TEST_COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
 
 
@@ -1242,19 +1246,25 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             copied_log.parent.mkdir(parents=True, exist_ok=True)
             copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
             result = self.run_bundle(copied_log, output_dir)
-            command = result.args
-            command[command.index("--obelisk-commit") + 1] = "test-commit"
-            placeholder = subprocess.run(
-                command,
-                check=False,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
-            )
+            outcomes = []
+            for invalid_commit in ("test-commit", "a" * 40):
+                command = list(result.args)
+                command[command.index("--obelisk-commit") + 1] = invalid_commit
+                outcomes.append(
+                    subprocess.run(
+                        command,
+                        check=False,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        env={**os.environ, "OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"},
+                    )
+                )
 
-        self.assertNotEqual(placeholder.returncode, 0)
-        self.assertIn("--obelisk-commit must be a reviewed 40-character lowercase Git SHA", placeholder.stderr)
+        for outcome in outcomes:
+            with self.subTest(args=outcome.args):
+                self.assertNotEqual(outcome.returncode, 0)
+                self.assertIn("--obelisk-commit must be a reviewed 40-character lowercase Git SHA", outcome.stderr)
 
     def test_builds_bundle_with_relative_window_manifest_log_path(self) -> None:
         with self.temp_offline_workspace() as temp:

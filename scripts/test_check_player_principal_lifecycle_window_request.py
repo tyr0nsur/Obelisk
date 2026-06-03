@@ -17,7 +17,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PREPARE = SCRIPT_DIR / "prepare_player_principal_lifecycle_window_request.py"
 CHECK = SCRIPT_DIR / "check_player_principal_lifecycle_window_request.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
-TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 
 sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("check_player_principal_lifecycle_window_request", CHECK)
@@ -279,6 +283,26 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             output_dir = Path(tmp) / "request"
             prepare_pack(output_dir)
             receipt_path = write_completed_receipt(output_dir, approved_at_utc="2026-06-01T00:00:00Z")
+            result = self.run_checker(
+                output_dir,
+                check=False,
+                extra_args=["--post-window-replay", "--operator-approval-receipt", str(receipt_path)],
+            )
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["operator_approval_receipt_verified"])
+        self.assertIn("operator_approval_receipt_approved_before_request_prepared", report["blockers"])
+
+    def test_rejects_receipt_approved_at_request_prepared(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request = json.loads((output_dir / "window-request.json").read_text(encoding="utf-8"))
+            receipt_path = write_completed_receipt(
+                output_dir,
+                approved_at_utc=request["prepared_at_utc"],
+            )
             result = self.run_checker(
                 output_dir,
                 check=False,
@@ -966,6 +990,21 @@ class CheckPlayerPrincipalLifecycleWindowRequestTests(unittest.TestCase):
             request = json.loads(request_path.read_text(encoding="utf-8"))
             request["obelisk_commit"] = "reviewed-obelisk-commit"
             request_path.write_text(json.dumps(request), encoding="utf-8")
+            result = self.run_checker(output_dir, check=False)
+            report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("obelisk_commit_invalid", report["blockers"])
+
+    def test_rejects_nonexistent_forty_hex_obelisk_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "request"
+            prepare_pack(output_dir)
+            request_path = output_dir / "window-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            request["obelisk_commit"] = "a" * 40
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+
             result = self.run_checker(output_dir, check=False)
             report = json.loads(result.stdout)
 

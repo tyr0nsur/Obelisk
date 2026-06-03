@@ -6244,6 +6244,7 @@ namespace
             .pluginId = "init_fail_close_throw",
             .initResult = false,
             .throwOnClose = true,
+            .captureApi = true,
         };
         FakeLoader loader;
         loader.Add(plugin);
@@ -6252,12 +6253,28 @@ namespace
 
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "close-throw init-fail plugin accepted a new owner-token timer while retained unloading");
         plugin.throwOnClose = false;
         manager.UnloadAll();
 
         Require(plugin.initCalls == 1, "close-throw init-fail plugin Init was not called");
         Require(plugin.shutdownCalls == 1, "close-throw init-fail plugin shutdown was not called once");
         Require(plugin.closeCalls == 2, "init-failure close error was not retained for retry");
+        Require(plugin.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    plugin.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &plugin) == 0,
+                "close-throw init-fail plugin owner token remained valid after close retry");
 
         CleanupPlugin(plugin);
         fs::remove_all(root);
@@ -6380,6 +6397,7 @@ namespace
 
         FakePlugin pluginA{.filename = "a_first.so", .pluginId = "plugin_a", .hasShutdown = false};
         FakePlugin pluginB{.filename = "b_second.so", .pluginId = "plugin_b", .hasShutdown = false, .throwOnClose = true};
+        pluginB.captureApi = true;
         FakeLoader loader;
         loader.Add(pluginA);
         loader.Add(pluginB);
@@ -6391,11 +6409,27 @@ namespace
         Obelisk::Core::PluginManager manager(loader);
         manager.LoadPlugins((root / "plugins").string());
         manager.UnloadAll();
+        Require(pluginB.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &pluginB) == 0,
+                "close-throw retained plugin accepted a new owner-token timer while unloading");
         pluginB.throwOnClose = false;
         manager.UnloadAll();
 
         Require(pluginA.closeCalls == 1, "unload did not continue after later plugin close threw");
         Require(pluginB.closeCalls == 2, "throwing plugin close was not retained for retry");
+        Require(pluginB.capturedApi.RegisterTimerWithOwnerTokenHandle(
+                    pluginB.initOwnerToken,
+                    1000,
+                    0,
+                    0,
+                    FakeTimerCallback,
+                    &pluginB) == 0,
+                "close-throw plugin owner token remained valid after retained close retry");
 
         CleanupPlugin(pluginA);
         CleanupPlugin(pluginB);

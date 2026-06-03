@@ -986,7 +986,7 @@ def validate_operator_approval_receipt(
         if isinstance(approved_window_start, str) and UTC_TIMESTAMP_RE.fullmatch(approved_window_start)
         else None
     )
-    if approved_at_dt is not None and prepared_at_dt is not None and approved_at_dt < prepared_at_dt:
+    if approved_at_dt is not None and prepared_at_dt is not None and approved_at_dt <= prepared_at_dt:
         add(
             blockers,
             "operator_approval_receipt_approved_before_request_prepared",

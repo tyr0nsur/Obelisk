@@ -109,8 +109,9 @@ lib/cmake/Obelisk/ObeliskTargets.cmake
 ```
 
 That file set is package-shape evidence only, not a `v1.0` completion marker, and does
-not imply private runtime headers, vendored runtime dependencies, Plugin Hub package
-publication, or any blocked gameplay module surface.
+not imply private runtime headers, vendored runtime dependencies, release package
+readiness, public package availability, Plugin Hub package publication, or any blocked
+gameplay module surface.
 The installed CMake package exports explicit non-claim metadata with package-shape status
 and false Plugin Hub publication, v1 completion, public module SDK coverage, and
 production stable SDK claim variables. Consumers must not reinterpret `Obelisk_SDK_FOUND`,

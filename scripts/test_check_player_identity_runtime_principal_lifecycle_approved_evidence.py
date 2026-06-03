@@ -22,7 +22,11 @@ SCRIPT = SCRIPT_DIR / "check_player_identity_runtime_principal_lifecycle_approve
 ANALYZER = SCRIPT_DIR / "analyze_runtime_observer_log.py"
 SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
-TEST_COMMIT = "a" * 40
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 OFFLINE_WORKSPACE = Path("/servidor/ark/workspace-offline")
 LIVE_TEMP_DIRS: list[tempfile.TemporaryDirectory[str]] = []
 APPROVED_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"

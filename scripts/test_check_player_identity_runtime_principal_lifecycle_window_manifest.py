@@ -39,7 +39,11 @@ from prepare_player_principal_lifecycle_window_request import (  # noqa: E402
 RUN_ID = "20260601T120000Z-player-principal-lifecycle"
 COPIED_LOG_TEXT = "copied player principal lifecycle observer log\n"
 GOOD_SHA = hashlib.sha256(COPIED_LOG_TEXT.encode("utf-8")).hexdigest()
-TEST_COMMIT = "1234567890abcdef1234567890abcdef12345678"
+TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 ARK_SHA = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 
 
@@ -518,6 +522,31 @@ class WindowManifestCheckerTests(unittest.TestCase):
                 receipt = exact_dir / receipt
             payload = json.loads(receipt.read_text(encoding="utf-8"))
             payload["operator_completion"]["approval_recorded_at_utc"] = "2026-06-01T00:00:00Z"
+            receipt.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+            fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+        result = self.run_checker_in_approved_workspace(
+            manifest_lines(),
+            check=False,
+            sidecar_mutator=mutate_receipt,
+        )
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["operator_approval_receipt"]["verified"])
+        self.assertIn("operator_approval_receipt_approved_before_request_prepared", report["blockers"])
+
+    def test_rejects_receipt_approved_at_request_prepared(self) -> None:
+        def mutate_receipt(exact_dir: Path, fields: dict[str, str]) -> None:
+            request_pack = Path(fields["request_pack_path"])
+            receipt = Path(fields["operator_approval_receipt_path"])
+            if not request_pack.is_absolute():
+                request_pack = exact_dir / request_pack
+            if not receipt.is_absolute():
+                receipt = exact_dir / receipt
+            request_payload = json.loads(request_pack.read_text(encoding="utf-8"))
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            payload["operator_completion"]["approval_recorded_at_utc"] = request_payload["prepared_at_utc"]
             receipt.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
             fields["operator_approval_receipt_sha256"] = hashlib.sha256(receipt.read_bytes()).hexdigest()
 
@@ -1816,6 +1845,11 @@ class WindowManifestCheckerTests(unittest.TestCase):
         placeholder_report = json.loads(placeholder.stdout)
         self.assertNotEqual(placeholder.returncode, 0)
         self.assertIn("obelisk_commit_invalid", placeholder_report["blockers"])
+
+        nonexistent = self.run_checker(manifest_lines(obelisk_commit="a" * 40), check=False)
+        nonexistent_report = json.loads(nonexistent.stdout)
+        self.assertNotEqual(nonexistent.returncode, 0)
+        self.assertIn("obelisk_commit_invalid", nonexistent_report["blockers"])
 
     def test_rejects_non_exclusive_observer_window_escape_gates(self) -> None:
         result = self.run_checker(

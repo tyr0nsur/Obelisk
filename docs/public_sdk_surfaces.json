@@ -38,6 +38,7 @@
     "not_sufficient_for": [
       "v1_completion_required",
       "stable_release_contract.claim_allowed",
+      "release package readiness or public package availability",
       "Plugin Hub seed/package publication",
       "promotion of blocked gameplay, identity, permissions, command, storage, or mutation surfaces"
     ],

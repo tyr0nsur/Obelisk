@@ -4072,8 +4072,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         manifest["installed_sdk_package_shape"]["not_sufficient_for"] = [
             item
             for item in manifest["installed_sdk_package_shape"]["not_sufficient_for"]
-            if item != "Plugin Hub seed/package publication"
+            if item
+            not in {
+                "Plugin Hub seed/package publication",
+                "release package readiness or public package availability",
+            }
         ]
+        manifest["installed_sdk_package_shape"]["release_package_ready"] = True
+        manifest["installed_sdk_package_shape"]["sdk_package_ready"] = "ready"
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest_path = Path(temp_dir) / "public_sdk_surfaces.json"
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -4085,6 +4091,18 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("status", payload["installed_sdk_package_shape_guardrail_drift"])
         self.assertIn(
             "not_sufficient_for:Plugin Hub seed/package publication",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "not_sufficient_for:release package readiness or public package availability",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:release_package_ready",
+            payload["installed_sdk_package_shape_guardrail_drift"],
+        )
+        self.assertIn(
+            "positive_claim:sdk_package_ready",
             payload["installed_sdk_package_shape_guardrail_drift"],
         )
 
