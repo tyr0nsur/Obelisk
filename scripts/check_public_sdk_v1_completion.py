@@ -5551,6 +5551,10 @@ def print_human_report(report: dict[str, Any]) -> None:
         return
     print("Public SDK v1 completion gate blocked.")
     print("The stable v1 SDK claim remains disabled; this is not a v1.0 complete SDK approval.")
+    print(
+        "Installed SDK/package-shape evidence is package-shape evidence only; it does not "
+        "authorize Plugin Hub publication, v1 completion, or stable SDK wording."
+    )
     outcome_summary = report.get("v1_sdk_blocker_outcome_summary", {})
     if isinstance(outcome_summary, dict):
         print(

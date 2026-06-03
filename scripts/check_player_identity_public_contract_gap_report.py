@@ -312,6 +312,35 @@ FORBIDDEN_CANDIDATE_EXPOSURE_PATTERNS = {
     "mutation": re.compile(r"\bmutat(?:e|ion|ing|able)(?:\b|[_ -])", re.IGNORECASE),
     "return_override": re.compile(r"return[_ -]?override", re.IGNORECASE),
 }
+ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS = {
+    "approved_runtime_evidence_present",
+    "runtime_evidence_ready",
+}
+APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE = re.compile(
+    r"(?:"
+    r"public|sdk|abi|capability|callback|header|identity|principal|permission|admin|"
+    r"command|chat|reply|lookup|storage|persist|mutation|return[_ -]?override|resource[_ -]?handle|v1"
+    r").*(?:ready|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|complete|supported|available)"
+    r"|(?:ready|allowed|promoted|resolved|enabled|authorized|exposed|unlocked|complete|supported|available).*"
+    r"(?:public|sdk|abi|identity|principal|permission|admin|command|chat|reply|lookup|storage|persist|mutation|"
+    r"return[_ -]?override|resource[_ -]?handle|v1)",
+    re.IGNORECASE,
+)
+APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS = {
+    "public_identity_ready": re.compile(r"public\s+(?:player\s+)?identity\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_sdk_ready": re.compile(r"public\s+sdk\s+(?:is\s+)?ready", re.IGNORECASE),
+    "public_abi_ready": re.compile(r"public\s+abi\s+(?:is\s+)?ready", re.IGNORECASE),
+    "v1_completion_ready": re.compile(r"v1\s+(?:sdk\s+)?completion\s+(?:is\s+)?ready", re.IGNORECASE),
+    "capability_available": re.compile(r"(?:identity\s+)?capability\s+(?:bit\s+)?(?:is\s+)?available", re.IGNORECASE),
+    "downstream_unlocked": re.compile(
+        r"(?:identity|principal).*unlock(?:s|ed)?\s+(?:permission|admin|command|chat|reply|lookup|storage)",
+        re.IGNORECASE,
+    ),
+    "lookup_allowed": re.compile(r"(?:player\s+)?lookup\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "mutation_allowed": re.compile(r"mutation\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "return_override_allowed": re.compile(r"return[_ -]?override\s+(?:is\s+)?allowed", re.IGNORECASE),
+    "resource_handle_supported": re.compile(r"resource[_ -]?handle\s+(?:is\s+)?supported", re.IGNORECASE),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -1113,6 +1142,34 @@ def candidate_exposures(candidate: dict[str, Any]) -> list[dict[str, str]]:
     return exposures
 
 
+def approved_runtime_report_overclaims(report: Any, path: str = "$") -> list[dict[str, Any]]:
+    overclaims: list[dict[str, Any]] = []
+    if isinstance(report, dict):
+        for key, item in report.items():
+            item_path = f"{path}.{key}"
+            normalized_key = str(key).replace("-", "_").replace(" ", "_")
+            if key in EMPTY_PUBLIC_LIST_KEYS and item != []:
+                overclaims.append({"path": item_path, "term": "public_surface_list", "value": item})
+            if (
+                normalized_key not in ALLOWED_APPROVED_RUNTIME_REPORT_TRUE_KEYS
+                and item not in (False, None, [], {})
+                and APPROVED_RUNTIME_REPORT_OVERCLAIM_KEY_RE.search(normalized_key)
+            ):
+                overclaims.append({"path": item_path, "term": "readiness_or_authorization_key", "value": item})
+            overclaims.extend(approved_runtime_report_overclaims(item, item_path))
+    elif isinstance(report, list):
+        for index, item in enumerate(report):
+            overclaims.extend(approved_runtime_report_overclaims(item, f"{path}[{index}]"))
+    elif isinstance(report, str):
+        for term, pattern in APPROVED_RUNTIME_REPORT_OVERCLAIM_VALUE_PATTERNS.items():
+            for match in pattern.finditer(report):
+                if has_negative_context(report, match.start()):
+                    continue
+                overclaims.append({"path": path, "term": term, "value": report})
+                break
+    return overclaims
+
+
 def validate_private_candidate(candidate: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
     if candidate.get("schema") != PRIVATE_CANDIDATE_SCHEMA:
         add(blockers, "private_candidate_schema_mismatch", "$.schema", value=candidate.get("schema"))
@@ -1306,6 +1363,15 @@ def validate_approved_runtime_evidence(path: Path | None, blockers: list[dict[st
     validation = approved_runtime_evidence.validate_manifest(payload, check_mode="consume")
     report = approved_runtime_evidence.build_report(payload, validation, check_mode="consume")
     accepted = not validation.blockers
+    overclaims = approved_runtime_report_overclaims(report)
+    if overclaims:
+        add(
+            blockers,
+            "approved_runtime_evidence_report_public_readiness_overclaim",
+            "--approved-runtime-evidence",
+            overclaims=overclaims,
+        )
+        accepted = False
     if not accepted:
         add(
             blockers,

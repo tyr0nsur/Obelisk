@@ -50,6 +50,41 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         )
         self.assertIn("--post-window-replay", runtime_plan)
 
+    def test_player_identity_approved_window_docs_do_not_use_rehearsal_preflight_flags(self) -> None:
+        checklist = (
+            REPO_ROOT
+            / "docs/research/2026-06-01-player-identity-runtime-capture-readiness-checklist.md"
+        ).read_text(encoding="utf-8")
+        runtime_plan = (
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-capture-plan.md"
+        ).read_text(encoding="utf-8")
+
+        rehearsal_section = checklist.split("## Offline Rehearsal Preflight", 1)[1].split(
+            "## Expected Log Cases", 1
+        )[0]
+        self.assertIn("--offline-only", rehearsal_section)
+        self.assertIn("--allow-stopped", rehearsal_section)
+        self.assertIn(
+            "must not be saved as `preflight-pre.json`, `preflight-post.json`",
+            normalized(rehearsal_section),
+        )
+
+        approved_sections = {
+            "runtime-capture-readiness-checklist-offline-bundle": checklist.split(
+                "## Offline Bundle Commands", 1
+            )[1],
+            "runtime-capture-plan-approved-window": runtime_plan.split(
+                "## Exact Approved-Window Preflight", 1
+            )[1],
+        }
+        for name, section in approved_sections.items():
+            bash_commands = re.findall(r"```bash\n(.*?)```", section, flags=re.DOTALL)
+            self.assertTrue(bash_commands)
+            for command in bash_commands:
+                with self.subTest(section=name, command=command.splitlines()[0]):
+                    self.assertNotIn("--offline-only", command)
+                    self.assertNotIn("--allow-stopped", command)
+
     def test_player_identity_runtime_observer_brief_bundle_command_matches_builder_cli(self) -> None:
         documented_flags = self._documented_identity_bundle_flags(
             REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md",

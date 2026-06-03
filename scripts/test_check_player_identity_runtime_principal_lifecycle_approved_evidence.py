@@ -926,6 +926,27 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 self.assertFalse(report["public_sdk_ready"])
                 self.assertFalse(report["runtime_ready"])
 
+    def test_rejects_nested_sidecar_non_claim_positive_claim(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_nested_non_claim")
+        blockers: list[dict] = []
+
+        checker.validate_no_sidecar_overclaims(
+            {
+                "operator_completion": {
+                    "non_claims": [
+                        "public SDK ready",
+                    ],
+                },
+            },
+            "$.operational_window.operator_approval_receipt.path",
+            blockers,
+        )
+
+        self.assertIn(
+            "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",
+            [blocker["reason"] for blocker in blockers],
+        )
+
     def test_rejects_operator_receipt_verified_flag_not_true(self) -> None:
         payload = manifest()
         payload["operational_window"]["operator_approval_receipt"]["verified"] = False

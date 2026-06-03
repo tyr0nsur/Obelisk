@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import re
 import runpy
@@ -2842,6 +2844,28 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for token in forbidden_public_header_tokens:
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
+
+    def test_completion_checker_human_report_surfaces_installed_sdk_non_claim(self) -> None:
+        checker = runpy.run_path(
+            str(REPO_ROOT / "scripts" / "check_public_sdk_v1_completion.py"),
+            run_name="__not_main__",
+        )
+        report = checker["build_report"](PUBLIC_SDK_SURFACES_MANIFEST)
+        self.assertFalse(report["stable_claim_allowed"])
+        self.assertEqual(report["installed_sdk_package_shape_guardrail_drift"], [])
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            checker["print_human_report"](report)
+
+        human = output.getvalue()
+        self.assertIn(
+            "Installed SDK/package-shape evidence is package-shape evidence only",
+            human,
+        )
+        self.assertIn("does not authorize Plugin Hub publication", human)
+        self.assertIn("v1 completion", human)
+        self.assertIn("stable SDK wording", human)
 
     def test_public_sdk_completion_checker_blocks_claim_wording_for_blocked_surface_synonyms(self) -> None:
         checker = runpy.run_path(

@@ -200,9 +200,8 @@ This file is an active routing table only. Durable evidence belongs in
   the current turn.
 - Sub-agents are not alone in the codebase: do not revert unrelated changes; leave edits
   unstaged/uncommitted and report touched paths, validations, and risks.
-- Lead handles delegation directly when the user asks for agents. Before finishing,
-  record delegated scopes, required/used skills, integrated findings, and pending
-  findings in handoff/research notes so compaction does not erase them.
+- Lead handles delegation directly when asked; before finishing, record delegated scopes,
+  skills, integrated findings, and pending findings so compaction does not erase them.
 - Earlier identity route/evidence-hardening rounds made route validation accept
   `identity_public_contract_gate_missing` only as locked planning after approved runtime
   evidence, and route locks now dedupe
@@ -214,6 +213,8 @@ This file is an active routing table only. Durable evidence belongs in
 - Latest supervised rounds integrated readiness/overclaim guardrails, SDK route accounting,
   post-window/receipt checks, identity runtime/stale-input checks, permissions query-field
   exactness, ResourceHandle/Mission nested-claim scanning, bridge/command-report
-  rejection, scratch-vs-durable lifecycle wording, and static timer guardrails. Agents
-  closed; route/SDK remain fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  rejection, scratch-vs-durable lifecycle wording, static timer guardrails, approved-evidence
+  sidecar `non_claims` scanning, gap-report wrapper overclaim rejection, installed-SDK
+  human non-claim wording, and checklist rehearsal flags. Agents closed; route/SDK remain
+  fail-closed at `approved_runtime_evidence_missing`, public/runtime false,
   `stable_claim_allowed=false`. No runtime/server op.

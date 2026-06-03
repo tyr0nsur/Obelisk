@@ -21,6 +21,7 @@ from typing import Any
 import protected_paths
 import analyze_runtime_observer_log as runtime_observer_analyzer
 import check_player_principal_lifecycle_window_manifest as window_manifest_checker
+from prepare_player_principal_lifecycle_window_request import NON_CLAIMS as EXPECTED_REQUEST_PACK_NON_CLAIMS
 from artifact_identity import canonical_json_bytes, complete_artifact_identity
 from snapshot_evidence_pack import first_symlink_component, reject_protected_input_path, reject_symlink_component
 
@@ -346,6 +347,14 @@ REQUIRED_NON_CLAIMS = frozenset(
         "does not promote public player identity, lookup, permissions, commands, moderation, admin authority, mutation, return override, ResourceHandle, or v1 SDK readiness",
         "does not expose Steam/EOS ids, player names, IPs, tribe ids, UE pointers, FNames, GObjects, raw params, or persistent lookup keys",
         "does not authorize server operations, Discord updates, GitHub publication, tags, or release claims",
+    )
+)
+ALLOWED_POSITIVE_MATCH_NON_CLAIMS = frozenset(
+    (
+        *EXPECTED_REQUEST_PACK_NON_CLAIMS,
+        *EXPECTED_OPERATOR_APPROVAL_RECEIPT_NON_CLAIMS,
+        *REQUIRED_OPERATIONAL_WINDOW_NON_CLAIMS,
+        *REQUIRED_NON_CLAIMS,
     )
 )
 FORBIDDEN_KEY_RE = re.compile(
@@ -827,7 +836,11 @@ def validate_no_sidecar_overclaims(value: Any, label: str, blockers: list[dict[s
     elif isinstance(value, list):
         for index, child in enumerate(value):
             validate_no_sidecar_overclaims(child, label, blockers, f"{trail}[{index}]")
-    elif isinstance(value, str) and ".non_claims[" not in trail and contains_unnegated_positive_capability_claim(value):
+    elif (
+        isinstance(value, str)
+        and contains_unnegated_positive_capability_claim(value)
+        and not (".non_claims[" in trail and value in ALLOWED_POSITIVE_MATCH_NON_CLAIMS)
+    ):
         add(
             blockers,
             "operational_window_sidecar_forbidden_public_capability_or_readiness_claim",

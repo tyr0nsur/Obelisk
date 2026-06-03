@@ -64,10 +64,12 @@ allow-experimental-observers
 enable-player-principal-lifecycle-observer
 ```
 
-## Read-Only Preflight
+## Offline Rehearsal Preflight
 
-Use these checks only under the future approved brief. They are read-only and must not be
-used as approval by themselves:
+Use these checks only as offline rehearsal against copied artifacts before a future
+approved brief. They are read-only, must not be used as approval by themselves, and must
+not be saved as `preflight-pre.json`, `preflight-post.json`, or post-window sidecar
+evidence:
 
 ```bash
 scripts/check_player_principal_lifecycle_window_request.py \
