@@ -114,6 +114,13 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
         self.assertEqual(report["dependency"], "obelisk.player_identity.v1")
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["counts_toward_public_sdk"])
+        self.assertFalse(report["counts_toward_runtime"])
+        self.assertFalse(report["counts_toward_v1_completion"])
+        self.assertFalse(report["public_or_runtime_accounting_allowed"])
 
     def test_accepts_candidate_query_failclosed_manifest_only_as_planning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -208,6 +215,9 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertFalse(report["counts_toward_public_sdk"])
 
     def test_internal_authz_reason_flags_do_not_claim_manifest_bit_compatibility(self) -> None:
         header = AUTHZ_DECISION_MODEL.read_text(encoding="utf-8")

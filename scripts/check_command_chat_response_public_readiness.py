@@ -33,6 +33,9 @@ SURFACES_SCHEMA = "obelisk.public-sdk-surfaces.v1"
 SURFACE = "obelisk.command_chat_response_path.v1"
 IDENTITY_SURFACE = "obelisk.player_identity.v1"
 PERMISSIONS_SURFACE = "obelisk.permissions_admin.v1"
+COMMANDS_REPLIES_SURFACE = "obelisk.commands_replies.v1"
+DEPENDENCY_CHAIN = [IDENTITY_SURFACE, PERMISSIONS_SURFACE, SURFACE, COMMANDS_REPLIES_SURFACE]
+CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 TARGET_SET = "command-chat-response-route-planning"
 TARGETS = frozenset(
@@ -1146,12 +1149,24 @@ def build_report(
         "valid": valid,
         "accepted_for_planning": valid,
         "planning_only": valid,
+        "dependency_chain": DEPENDENCY_CHAIN,
+        "dependency_chain_locked": True,
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
         "public_readiness_ready": False,
         "public_header_allowed": False,
         "promotion_ready": False,
         "public_sdk_ready": False,
         "public_abi_ready": False,
         "runtime_ready": False,
+        "non_claim": (
+            "valid planning output does not count command/chat response while player identity remains "
+            "blocked on approved_runtime_evidence_missing"
+        ),
         "surface": SURFACE,
         "target_set": TARGET_SET,
         "target_filters": sorted(TARGETS),

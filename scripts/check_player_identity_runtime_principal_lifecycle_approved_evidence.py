@@ -28,6 +28,7 @@ from snapshot_evidence_pack import first_symlink_component, reject_protected_inp
 
 SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1"
 REPORT_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+SHAPE_FIXTURE_SCHEMA = "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1"
 SUMMARY_SCHEMA = "obelisk.runtime-observer-log-summary.v1"
 EXPECTED_BINARY_SHA256 = "7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520"
 MODULE = "player_principal_lifecycle"
@@ -1417,6 +1418,8 @@ def expected_summary_from_copied_source(
     path_text = source.get("path")
     if not isinstance(path_text, str) or not path_text:
         return None
+    if symlink_component_for_path_text(path_text) is not None:
+        return None
     status = protected_paths.protected_path_status(
         Path(path_text).expanduser(),
         protected_root=SERVER_ROOT,
@@ -1662,6 +1665,7 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
                         f"{label}.path",
                         symlink=str(symlink_component),
                     )
+                    continue
                 if not source_path_is_copied_or_offline(source.get("path")):
                     add(blockers, "source_summary_source_path_not_copied_or_offline", f"{label}.path")
                 elif not source_path_is_approved_offline_workspace(source.get("path")):
@@ -2195,6 +2199,8 @@ def validate_manifest(payload: dict[str, Any], *, check_mode: str) -> Validation
     blockers: list[dict[str, Any]] = []
     if payload.get("schema") != SCHEMA:
         add(blockers, "schema_mismatch", "$.schema")
+        if payload.get("schema") == SHAPE_FIXTURE_SCHEMA:
+            add(blockers, "synthetic_shape_fixture_is_not_approved_runtime_evidence", "$.schema")
         return Validation(blockers, [], [])
     missing = REQUIRED_TOP_LEVEL_KEYS - set(payload)
     unexpected = set(payload) - REQUIRED_TOP_LEVEL_KEYS

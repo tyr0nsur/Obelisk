@@ -32,6 +32,7 @@ IDENTITY_SURFACE = "obelisk.player_identity.v1"
 COMMAND_RESPONSE_SURFACE = "obelisk.command_chat_response_path.v1"
 COMMANDS_REPLIES_SURFACE = "obelisk.commands_replies.v1"
 REQUIRED_P0_CHAIN = [IDENTITY_SURFACE, SURFACE, COMMAND_RESPONSE_SURFACE, COMMANDS_REPLIES_SURFACE]
+CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
 PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = "obelisk.player-identity-promotion-certificate.v1"
 
 REQUIRED_DECISION_IDS = frozenset(
@@ -1220,12 +1221,24 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "valid": not blockers,
         "accepted_for_planning": not blockers and query_artifact_schema is not None,
         "planning_only": True,
+        "dependency_chain": REQUIRED_P0_CHAIN,
+        "dependency_chain_locked": True,
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
         "promotion_ready": False,
         "public_header_allowed": False,
         "public_abi_ready": False,
         "public_sdk_ready": False,
         "runtime_ready": False,
         "dependency": IDENTITY_SURFACE,
+        "non_claim": (
+            "valid planning output does not count permissions/admin while player identity remains blocked "
+            "on approved_runtime_evidence_missing"
+        ),
         "query_failclosed_artifact_schema": query_artifact_schema,
         "blockers": [blocker["reason"] for blocker in blockers],
         "blocker_details": blockers,

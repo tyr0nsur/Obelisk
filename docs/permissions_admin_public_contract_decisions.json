@@ -2,6 +2,18 @@
   "schema": "obelisk.permissions-admin-public-contract-decisions.v1",
   "surface": "obelisk.permissions_admin.v1",
   "status": "blocked",
+  "accounting_lock": {
+    "dependency_chain_locked": true,
+    "current_route_blocker": "approved_runtime_evidence_missing",
+    "remaining_route_blockers": [
+      "approved_runtime_evidence_missing"
+    ],
+    "counts_toward_public_sdk": false,
+    "counts_toward_runtime": false,
+    "counts_toward_v1_completion": false,
+    "public_or_runtime_accounting_allowed": false,
+    "non_claim": "permissions/admin readiness reports may be accepted for planning only; they do not count while player identity remains blocked"
+  },
   "public_header_allowed": false,
   "public_header": "include/obelisk/ObeliskApi.h",
   "public_header_symbols_now": [],

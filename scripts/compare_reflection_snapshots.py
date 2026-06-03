@@ -76,10 +76,7 @@ READINESS_NON_CLAIMS = [
         "return override, ResourceHandle, or runtime hooks"
     ),
 ]
-MISSION_COPIED_BOOL_POLICY_ARTIFACT = (
-    "/home/flowcommunity-ark/obelisk-artifacts/"
-    "mission-copied-bool-tail-policy-slice-20260530T090211Z/"
-)
+MISSION_COPIED_BOOL_FIXTURE_ROOT = "tests/fixtures/ufunction_snapshots"
 MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256 = (
     "f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945"
 )
@@ -373,10 +370,10 @@ TARGET_SET_BLOCKER_GUIDANCE = {
             "runtime_observation_requires_separate_approval",
         ],
         "next_offline_input": (
-            "consume existing offline artifact "
-            f"{MISSION_COPIED_BOOL_POLICY_ARTIFACT} "
-            f"(policy_manifest_sha256={MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256}, "
-            f"artifact_pack_manifest_sha256={MISSION_COPIED_BOOL_ARTIFACT_PACK_MANIFEST_SHA256}) "
+            f"start with repo-local fixture readiness from {MISSION_COPIED_BOOL_FIXTURE_ROOT}; "
+            "if consuming the reviewed external artifact, pass an explicit non-protected "
+            f"--root/--manifest and require policy_manifest_sha256={MISSION_COPIED_BOOL_POLICY_MANIFEST_SHA256}, "
+            f"artifact_pack_manifest_sha256={MISSION_COPIED_BOOL_ARTIFACT_PACK_MANIFEST_SHA256}; "
             "or refresh sanitized mission UFunction snapshots from distinct non-protected "
             "copied/offline artifacts with complete artifact identity"
         ),

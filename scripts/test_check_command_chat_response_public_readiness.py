@@ -408,6 +408,13 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["counts_toward_public_sdk"])
+        self.assertFalse(report["counts_toward_runtime"])
+        self.assertFalse(report["counts_toward_v1_completion"])
+        self.assertFalse(report["public_or_runtime_accounting_allowed"])
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
 

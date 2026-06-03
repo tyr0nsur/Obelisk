@@ -41,6 +41,7 @@ DEPENDENCY_CHAIN = (
     RESPONSE_PATH_SURFACE,
     SURFACE,
 )
+CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
 REQUIRED_DEPENDS_ON = list(DEPENDENCY_CHAIN[:-1])
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 REQUIRED_DECISION_IDS = frozenset(
@@ -1134,6 +1135,29 @@ def validate_response_path_report(
                 "$.response_path_report.planning_only",
                 value=payload.get("planning_only"),
             )
+        if payload.get("dependency_chain_locked") is not True:
+            add(
+                blockers,
+                "response_path_report_dependency_chain_not_locked",
+                "$.response_path_report.dependency_chain_locked",
+                value=payload.get("dependency_chain_locked"),
+            )
+        if payload.get("current_route_blocker") != CURRENT_ROUTE_BLOCKER:
+            add(
+                blockers,
+                "response_path_report_route_blocker_mismatch",
+                "$.response_path_report.current_route_blocker",
+                expected=CURRENT_ROUTE_BLOCKER,
+                value=payload.get("current_route_blocker"),
+            )
+        if payload.get("remaining_route_blockers") != [CURRENT_ROUTE_BLOCKER]:
+            add(
+                blockers,
+                "response_path_report_remaining_route_blockers_mismatch",
+                "$.response_path_report.remaining_route_blockers",
+                expected=[CURRENT_ROUTE_BLOCKER],
+                value=payload.get("remaining_route_blockers"),
+            )
         if payload.get("surface") not in (RESPONSE_PATH_SURFACE, None):
             add(
                 blockers,
@@ -1195,6 +1219,10 @@ def validate_response_path_report(
             "public_sdk_ready",
             "public_abi_ready",
             "runtime_ready",
+            "counts_toward_public_sdk",
+            "counts_toward_runtime",
+            "counts_toward_v1_completion",
+            "public_or_runtime_accounting_allowed",
         ):
             if payload.get(key) is not False:
                 add(
@@ -1307,6 +1335,13 @@ def build_report(
         "planning_only": valid,
         "surface": SURFACE,
         "dependency_chain": list(DEPENDENCY_CHAIN),
+        "dependency_chain_locked": True,
+        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
+        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
         "public_readiness_ready": False,
         "public_abi_ready": False,
         "runtime_ready": False,
@@ -1314,6 +1349,10 @@ def build_report(
         "public_reply_or_send_chat_abi_allowed": False,
         "public_response_path_allowed": False,
         "public_header_allowed": False,
+        "non_claim": (
+            "valid planning output does not count commands/replies while player identity remains "
+            "blocked on approved_runtime_evidence_missing"
+        ),
         "decisions_path": str(decisions_path),
         "surfaces_path": str(surfaces_path),
         "public_header_path": str(public_header_path),

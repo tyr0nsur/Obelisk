@@ -220,6 +220,15 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
         self.assertIn("--response-path-report", commands_replies_check["argv"])
         self.assertIn("--response-path-report-root", commands_replies_check["argv"])
+        for check_name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+            child = next(check for check in report["checks"] if check["name"] == check_name)
+            self.assertTrue(child["dependency_chain_locked"], child)
+            self.assertEqual("approved_runtime_evidence_missing", child["current_route_blocker"], child)
+            self.assertEqual(["approved_runtime_evidence_missing"], child["remaining_route_blockers"], child)
+            self.assertFalse(child["counts_toward_public_sdk"], child)
+            self.assertFalse(child["counts_toward_runtime"], child)
+            self.assertFalse(child["counts_toward_v1_completion"], child)
+            self.assertFalse(child["public_or_runtime_accounting_allowed"], child)
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)
@@ -1121,6 +1130,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                         "public_sdk_ready": False,
                         "public_abi_ready": False,
                         "runtime_ready": False,
+                        "dependency_chain_locked": True,
+                        "current_route_blocker": "approved_runtime_evidence_missing",
+                        "remaining_route_blockers": ["approved_runtime_evidence_missing"],
+                        "counts_toward_public_sdk": False,
+                        "counts_toward_runtime": False,
+                        "counts_toward_v1_completion": False,
+                        "public_or_runtime_accounting_allowed": False,
                     }
                     return subprocess.CompletedProcess(
                         args=[],
@@ -1165,6 +1181,40 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(result["planning_only"])
         self.assertTrue(result["accepted_for_planning"])
         self.assertEqual([], result["public_or_runtime_claims"])
+
+    def test_run_check_rejects_required_locked_child_that_counts_while_identity_blocked(self) -> None:
+        original_run = ROUTE_GATE.subprocess.run
+
+        def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            report = {
+                "schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS["permissions_admin_public_readiness"],
+                "valid": True,
+                "accepted_for_planning": True,
+                "planning_only": True,
+                "dependency_chain_locked": False,
+                "current_route_blocker": "approved_runtime_evidence_missing",
+                "remaining_route_blockers": ["approved_runtime_evidence_missing"],
+                "counts_toward_public_sdk": True,
+                "counts_toward_runtime": False,
+                "counts_toward_v1_completion": False,
+                "public_or_runtime_accounting_allowed": False,
+                "promotion_ready": False,
+                "public_sdk_ready": False,
+                "public_abi_ready": False,
+                "runtime_ready": False,
+                "blockers": [],
+            }
+            return subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps(report), stderr="")
+
+        try:
+            ROUTE_GATE.subprocess.run = fake_run
+            result = ROUTE_GATE.run_check("permissions_admin_public_readiness", ["unused.py", "--json"])
+        finally:
+            ROUTE_GATE.subprocess.run = original_run
+
+        self.assertFalse(result["valid"])
+        self.assertFalse(result["dependency_chain_locked"])
+        self.assertTrue(result["counts_toward_public_sdk"])
 
     def test_route_gate_composes_response_path_report_into_commands_replies(self) -> None:
         original = ROUTE_GATE.run_check

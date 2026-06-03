@@ -249,6 +249,13 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertFalse(report["runtime_ready"])
         self.assertFalse(report["public_command_router_allowed"])
         self.assertFalse(report["public_reply_or_send_chat_abi_allowed"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
+        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertFalse(report["counts_toward_public_sdk"])
+        self.assertFalse(report["counts_toward_runtime"])
+        self.assertFalse(report["counts_toward_v1_completion"])
+        self.assertFalse(report["public_or_runtime_accounting_allowed"])
         self.assertEqual(
             [
                 "obelisk.player_identity.v1",
@@ -944,6 +951,23 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertTrue(report["accepted_for_planning"])
         self.assertFalse(report["public_readiness_ready"])
         self.assertFalse(report["runtime_ready"])
+        self.assertTrue(report["dependency_chain_locked"])
+        self.assertFalse(report["counts_toward_public_sdk"])
+
+    def test_rejects_response_path_report_that_counts_despite_identity_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            response_report = json.loads(report_path.read_text(encoding="utf-8"))
+            response_report["dependency_chain_locked"] = False
+            response_report["counts_toward_public_sdk"] = True
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            result = self.run_checker(*self.response_path_args(report_path, root), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_dependency_chain_not_locked", report["blockers"])
+        self.assertIn("response_path_report_counts_toward_public_sdk_not_false", report["blockers"])
 
     def test_rejects_response_path_report_copied_outside_expected_report_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

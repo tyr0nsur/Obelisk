@@ -687,11 +687,10 @@ class CompareReflectionSnapshotsTests(unittest.TestCase):
         self.assertIn("public_mission_sdk_blocked", mission["why_blocked"])
         self.assertIn("Mission SDK", mission["non_claim"])
         self.assertIn("mission payload decoding", mission["non_claim"])
-        self.assertIn("consume existing offline artifact", mission["next_offline_input"])
-        self.assertIn(
-            "/home/flowcommunity-ark/obelisk-artifacts/mission-copied-bool-tail-policy-slice-20260530T090211Z/",
-            mission["next_offline_input"],
-        )
+        self.assertIn("repo-local fixture readiness", mission["next_offline_input"])
+        self.assertIn("tests/fixtures/ufunction_snapshots", mission["next_offline_input"])
+        self.assertIn("explicit non-protected --root/--manifest", mission["next_offline_input"])
+        self.assertNotIn("/home/flowcommunity-ark/obelisk-artifacts", mission["next_offline_input"])
         self.assertIn(
             "policy_manifest_sha256=f56a191aaecbd52d042efd81423d4a86f4e5a29674660aab9d65bbf496416945",
             mission["next_offline_input"],

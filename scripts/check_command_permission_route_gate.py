@@ -60,6 +60,17 @@ REQUIRED_PLANNING_ONLY_CHECKS = {
     "command_chat_response_public_readiness",
     "commands_replies_public_readiness",
 }
+REQUIRED_LOCKED_CHILD_CHECKS = {
+    "permissions_admin_public_readiness",
+    "command_chat_response_public_readiness",
+    "commands_replies_public_readiness",
+}
+REQUIRED_CHILD_ACCOUNTING_FALSE_KEYS = (
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_v1_completion",
+    "public_or_runtime_accounting_allowed",
+)
 ALLOWED_IDENTITY_LOCK_BLOCKERS = {
     "lifecycle_anchor_first_evidence_provenance_unbound": {
         "next_action": "bind_lifecycle_anchor_and_principal_policy_sources",
@@ -575,6 +586,16 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         )
         and not public_or_runtime_claims
     )
+    if name in REQUIRED_LOCKED_CHILD_CHECKS:
+        check_valid = (
+            check_valid
+            and report is not None
+            and report.get("dependency_chain_locked") is True
+            and report.get("current_route_blocker") in ALLOWED_IDENTITY_LOCK_BLOCKERS
+            and isinstance(report.get("remaining_route_blockers"), list)
+            and report.get("remaining_route_blockers") != []
+            and all(report.get(key) is False for key in REQUIRED_CHILD_ACCOUNTING_FALSE_KEYS)
+        )
 
     return {
         "name": name,
@@ -585,6 +606,15 @@ def run_check(name: str, argv: list[str]) -> dict[str, Any]:
         "expected_schema": expected_schema,
         "planning_only": report.get("planning_only") if report is not None else None,
         "accepted_for_planning": report.get("accepted_for_planning") if report is not None else None,
+        "dependency_chain_locked": report.get("dependency_chain_locked") if report is not None else None,
+        "current_route_blocker": report.get("current_route_blocker") if report is not None else None,
+        "remaining_route_blockers": report.get("remaining_route_blockers") if report is not None else None,
+        "counts_toward_public_sdk": report.get("counts_toward_public_sdk") if report is not None else None,
+        "counts_toward_runtime": report.get("counts_toward_runtime") if report is not None else None,
+        "counts_toward_v1_completion": report.get("counts_toward_v1_completion") if report is not None else None,
+        "public_or_runtime_accounting_allowed": (
+            report.get("public_or_runtime_accounting_allowed") if report is not None else None
+        ),
         "public_or_runtime_claims": public_or_runtime_claims,
         "blockers": report_blockers,
         "parse_error": parse_error,
@@ -807,6 +837,16 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 blockers.append(f"{check['name']}: planning_only must stay true")
             if check["accepted_for_planning"] is not True:
                 blockers.append(f"{check['name']}: accepted_for_planning must stay true")
+        if check["name"] in REQUIRED_LOCKED_CHILD_CHECKS:
+            if check.get("dependency_chain_locked") is not True:
+                blockers.append(f"{check['name']}: dependency_chain_locked must stay true")
+            if check.get("current_route_blocker") not in ALLOWED_IDENTITY_LOCK_BLOCKERS:
+                blockers.append(f"{check['name']}: current_route_blocker must stay an identity lock blocker")
+            if not check.get("remaining_route_blockers"):
+                blockers.append(f"{check['name']}: remaining_route_blockers must stay non-empty")
+            for key in REQUIRED_CHILD_ACCOUNTING_FALSE_KEYS:
+                if check.get(key) is not False:
+                    blockers.append(f"{check['name']}: {key} must stay false")
         if not check["valid"]:
             blockers.append(f"{check['name']}: invalid route prerequisite")
     critical_path_phase = build_critical_path_phase(args)

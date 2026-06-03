@@ -723,6 +723,42 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertIn("approved_runtime_manifest_check_failed", report["blockers"])
         self.assertTrue(report["inputs"]["approved_runtime_manifest_check"]["checked"])
 
+    def test_preflight_rejects_shape_fixture_in_approved_manifest_slot(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            self.write_window_manifest(temp_dir, copied_log)
+            approved_dir = copied_log.parent / "approved-bundle"
+            approved_dir.mkdir(parents=True, exist_ok=True)
+            (approved_dir / "approved-runtime-principal-lifecycle-evidence.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1",
+                        "artifact_status": "synthetic_redacted_fixture",
+                        "readiness_classification": "shape_only_private_fixture",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            preflight = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(preflight.returncode, 1)
+        report = json.loads(preflight.stdout)
+        self.assertTrue(report["approved_runtime_manifest_present"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+        self.assertIn("approved_runtime_manifest_check_failed", report["blockers"])
+        approved_check = report["inputs"]["approved_runtime_manifest_check"]
+        self.assertTrue(approved_check["checked"])
+        self.assertFalse(approved_check["ready"])
+        self.assertIn(
+            "synthetic_shape_fixture_is_not_approved_runtime_evidence",
+            approved_check["blockers"],
+        )
+
     def test_preflight_rejects_bad_request_pack_even_with_log_and_manifest_inputs(self) -> None:
         with self.temp_offline_workspace() as temp:
             temp_dir = Path(temp)

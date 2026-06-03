@@ -678,6 +678,26 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
         )
 
+    def test_rejects_synthetic_shape_fixture_as_approved_runtime_evidence(self) -> None:
+        payload = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence.v1",
+            "artifact_status": "synthetic_redacted_fixture",
+            "readiness_classification": "shape_only_private_fixture",
+            "approved_runtime_evidence_present": False,
+            "runtime_evidence_ready": False,
+        }
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("schema_mismatch", report["blockers"])
+        self.assertIn("synthetic_shape_fixture_is_not_approved_runtime_evidence", report["blockers"])
+        self.assertFalse(report["approved_runtime_evidence_present"])
+        self.assertFalse(report["runtime_evidence_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["next_blocker"], "approved_runtime_evidence_not_accepted")
+
     def rewrite_sidecar_and_refresh_identity(self, payload: dict, artifact: dict, text: str) -> None:
         path = Path(artifact["path"])
         path.write_text(text, encoding="utf-8")
@@ -1177,6 +1197,44 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertIn(
             "operational_window_copied_log_path_symlink_component",
             {blocker["reason"] for blocker in rejected.blockers},
+        )
+
+    def test_source_summary_source_path_symlink_does_not_hash_or_reanalyze(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_source_symlink")
+        old_roots = checker.APPROVED_OFFLINE_WORKSPACE_ROOTS
+        with tempfile.TemporaryDirectory() as tmp:
+            offline_root = Path(tmp)
+            copied_log = offline_root / "live-validation-logs" / RUN_ID / "Obelisk.log"
+            source_link = offline_root / "live-validation-logs" / RUN_ID / "source-link.log"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            source_link.symlink_to(copied_log)
+            payload = manifest_for_copied_log(copied_log)
+            summary = payload["source_summary"]
+            summary["evidence"]["sources"][0]["path"] = str(source_link)
+            blockers: list[dict] = []
+            checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = (offline_root,)
+            try:
+                with mock.patch.object(
+                    checker,
+                    "sha256_file",
+                    side_effect=AssertionError("sha256_file should not run for symlinked source_summary path"),
+                ):
+                    observed = checker.validate_runtime_summary(summary, blockers)
+            finally:
+                checker.APPROVED_OFFLINE_WORKSPACE_ROOTS = old_roots
+
+        self.assertEqual(
+            ["observer_enable", "session_start_anchor", "session_start_rejected_anchor", "session_end_anchor"],
+            observed,
+        )
+        self.assertIn(
+            "source_summary_source_path_symlink_component",
+            {blocker["reason"] for blocker in blockers},
+        )
+        self.assertNotIn(
+            "source_summary_not_derived_from_copied_log",
+            {blocker["reason"] for blocker in blockers},
         )
 
     def test_rejects_fabricated_summary_even_when_source_log_sha_matches(self) -> None:
