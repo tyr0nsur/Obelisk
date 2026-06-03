@@ -452,3 +452,33 @@ suite 221, runtime/preflight suites 256 by delegated audit, route JSON
 valid/planning-only, SDK JSON blocked by design, and `git diff --check`. The
 stable state remains `current_route_blocker=approved_runtime_evidence_missing`,
 SDK progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Command Bridge, SDK Release Wording, And Side-Lane Alias Hardening
+
+The next supervised 4-agent round closed additional nested/secondary alias
+gaps without changing the active P0 blocker:
+
+- Runtime evidence/preflight audit found no remaining scoped path where
+  request packs, preflight/window sidecars, completed receipts, copied logs,
+  aliases, or stale bundle checks count as approved runtime evidence.
+- Permissions/admin query fail-closed now rejects nested route readiness,
+  public/runtime accounting, runtime authorization, server operation, and
+  runtime approval aliases.
+- Command principal authz response bridge and copied response intent planning/
+  lifecycle checks reject route-ready, command-router, reply/send-chat, public
+  ABI/header/SDK/runtime, stable SDK, and v1 completion/accounting aliases.
+  Negated boundary wording remains accepted.
+- SDK completion rejects additional secondary report aliases such as SDK/API/
+  support ready, stable ready, production grade, release grade, and v1 stable
+  SDK variants, plus broad release-statement wording claiming SDK/API/support
+  production or stable readiness.
+- Mission/Transfer/Dino/Tribe/Buff accounting rejects nested completion,
+  stable, promoted, and complete-SDK claim aliases. Release statements that
+  claim leaf promotion without strict promoted leaf evidence now block.
+
+Validated offline: combined six-file suite 332, public SDK guardrails 193,
+command bridge/intent suite 42, permissions/admin query fail-closed 42,
+runtime/preflight suites 256 by delegated audit, route JSON valid/planning-only,
+SDK JSON blocked by design, and `git diff --check`. The stable state remains
+`current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
+P0 progress `0/4`, and `stable_claim_allowed=false`.

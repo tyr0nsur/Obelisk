@@ -285,23 +285,36 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
     def test_rejects_camel_hyphen_space_aliases_and_positive_readiness_texts(self) -> None:
         decisions = self.load_json(DECISIONS)
         decisions["alias_claims"] = {
+            "accountingCredit": "earned",
+            "canonical-route-gate-ready": True,
             "publicReplyAbiReady": True,
+            "publicHeaderReady": True,
             "public-response-path-ready": True,
+            "routeReady": True,
+            "sdkCompletionCredit": "claimed",
             "send chat ready": True,
             "publicAbiReady": True,
             "runtimeReady": True,
             "permissions-admin-ready": True,
             "commandRouterAllowed": True,
+            "commandRouterReady": True,
             "publicBridgeAbiAllowed": True,
             "public response abi allowed": True,
+            "stableClaimAllowed": True,
+            "v1SdkComplete": True,
             "authorityClaimSource": "command text",
             "principal-source": {"source": "operator-config"},
         }
         decisions["positive_claims"] = [
+            "canonical route gate is ready",
+            "SDK completion credit is earned",
+            "v1 SDK is complete",
             "public ABI is ready",
+            "public header is ready",
             "permissions/admin is public and ready",
             "reply endpoint is live",
             "command response path is live",
+            "stable SDK is validated",
         ]
         with tempfile.TemporaryDirectory() as temp_dir:
             paths = self.write_inputs(Path(temp_dir), decisions=decisions)
@@ -310,6 +323,7 @@ class CheckCommandPrincipalAuthzResponseBridgeTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
         self.assertIn("public_or_runtime_overclaim", report["blockers"])
+        self.assertIn("accounting_credit_overclaim", report["blockers"])
         self.assertIn("pre_runtime_principal_or_authority_claim_source", report["blockers"])
         self.assertIn("positive_public_or_runtime_claim", report["blockers"])
 

@@ -51,6 +51,59 @@ FALSE_KEYS = (
     "command_router_allowed",
     "runtime_delivery_allowed",
 )
+FALSE_ONLY_ALIAS_KEYS = frozenset(
+    (
+        "accounting_credit_allowed",
+        "canonical_route_gate_ready",
+        "canonical_route_ready",
+        "command_router_ready",
+        "complete_sdk_claim_allowed",
+        "public_sdk_complete",
+        "public_sdk_stable",
+        "public_header_ready",
+        "public_header_symbols_ready",
+        "reply_abi_allowed",
+        "reply_abi_ready",
+        "reply_api_ready",
+        "reply_ready",
+        "route_claim_allowed",
+        "route_gate_ready",
+        "route_ready",
+        "runtime_delivery_ready",
+        "runtime_readiness_allowed",
+        "runtime_readiness_ready",
+        "sdk_complete",
+        "sdk_completion_allowed",
+        "sdk_completion_claim_allowed",
+        "sdk_completion_evidence",
+        "sdk_completion_ready",
+        "sdk_ready",
+        "sdk_stable",
+        "send_chat_abi_allowed",
+        "send_chat_abi_ready",
+        "send_chat_allowed",
+        "send_chat_api_ready",
+        "stable_claim_allowed",
+        "stable_sdk",
+        "v1_complete",
+        "v1_completion_allowed",
+        "v1_completion_evidence",
+        "v1_sdk_complete",
+    )
+)
+CREDIT_ALIAS_KEYS = frozenset(
+    (
+        "accounting_credit",
+        "blocker_credit",
+        "canonical_route_gate_credit",
+        "public_sdk_credit",
+        "readiness_credit",
+        "route_gate_credit",
+        "sdk_completion_credit",
+        "sdk_credit",
+        "v1_completion_credit",
+    )
+)
 EMPTY_ARRAY_KEYS = (
     "public_header_symbols_now",
     "public_capability_bits_now",
@@ -240,11 +293,20 @@ DEFAULT_FORBIDDEN_HEADER_TOKENS = frozenset(
     )
 )
 POSITIVE_CLAIM_RE = re.compile(
-    r"\b(reply|send[- ]?chat|command router|chat router|runtime delivery|public abi|public sdk|promotion|moderation|broadcast)\b"
-    r".{0,80}\b(allowed|enabled|promoted|ready|public|supported)\b",
+    r"\b("
+    r"accounting\s+credit|canonical\s+route\s+gate|chat router|command router|complete\s+sdk|moderation|"
+    r"promotion|public abi|public header|public sdk|reply(?:\s+(?:api|abi|endpoint))?|route(?:\s+gate)?|"
+    r"runtime(?:\s+(?:delivery|readiness))?|sdk(?:\s+completion)?|send[-_ ]?chat|stable\s+sdk|v1(?:\s+sdk)?|broadcast"
+    r")\b.{0,100}\b("
+    r"allowed|available|awarded|claimed|complete|completed|credited|done|earned|enabled|finished|live|"
+    r"promoted|public|ready|stable|supported|validated"
+    r")\b",
     re.IGNORECASE,
 )
-NEGATED_RE = re.compile(r"\b(blocked|cannot|does not|forbidden|no|not|planning|without|until)\b", re.IGNORECASE)
+NEGATED_RE = re.compile(
+    r"\b(blocked|cannot|does not|fail[s-]?closed|false|forbidden|missing|must|never|no|not|only|planning|reject(?:s|ed)?|without|until)\b",
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -282,6 +344,43 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
 
 def string_list(value: Any) -> list[str]:
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+
+def normalized_key(value: Any) -> str:
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
+
+def has_credit_claim_value(value: Any) -> bool:
+    if value in (False, None, "", [], {}):
+        return False
+    return True
+
+
+def positive_claim_is_negated(value: str, match: re.Match[str]) -> bool:
+    prefix_sentence = re.split(r"[.;\n]", value[: match.start()])[-1]
+    suffix_sentence = re.split(r"[.;\n]", value[match.end() :], maxsplit=1)[0]
+    return (
+        NEGATED_RE.search(prefix_sentence) is not None
+        or NEGATED_RE.search(match.group(0)) is not None
+        or NEGATED_RE.search(suffix_sentence) is not None
+    )
+
+
+def collect_structured_alias_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_trail = f"{trail}.{key}"
+            key_name = normalized_key(key)
+            if key_name in FALSE_ONLY_ALIAS_KEYS and child is not False:
+                add(blockers, "public_or_runtime_alias_overclaim", child_trail, field=str(key), value=child)
+            if key_name in CREDIT_ALIAS_KEYS and has_credit_claim_value(child):
+                add(blockers, "accounting_credit_alias_overclaim", child_trail, field=str(key), value=child)
+            collect_structured_alias_overclaims(child, blockers, child_trail)
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            collect_structured_alias_overclaims(child, blockers, f"{trail}[{index}]")
 
 
 def validate_permission_query_crosswalk(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -691,8 +790,7 @@ def find_positive_claim(value: Any, trail: str = "$") -> tuple[str, str] | None:
                 return found
     elif isinstance(value, str):
         for match in POSITIVE_CLAIM_RE.finditer(value):
-            prefix = value[max(0, match.start() - 80) : match.start()]
-            if not NEGATED_RE.search(prefix):
+            if not positive_claim_is_negated(value, match):
                 return value, trail
     return None
 
@@ -707,7 +805,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     surfaces = load_json(args.surfaces, "surfaces")
 
     forbidden_tokens = validate_main_decisions(decisions, blockers)
+    collect_structured_alias_overclaims(decisions, blockers, "$.decisions")
     validate_dependency_docs(command_response, bridge, commands_replies, permissions, blockers)
+    collect_structured_alias_overclaims(command_response, blockers, "$.command_response")
+    collect_structured_alias_overclaims(bridge, blockers, "$.bridge")
+    collect_structured_alias_overclaims(commands_replies, blockers, "$.commands_replies")
+    collect_structured_alias_overclaims(permissions, blockers, "$.permissions")
     validate_surfaces(surfaces, blockers)
     validate_public_header(args.public_header, forbidden_tokens, blockers)
     query_artifact_schema, query_summary = validate_query_failclosed_artifact(args.query_failclosed_artifact, blockers)

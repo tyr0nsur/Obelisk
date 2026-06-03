@@ -1548,6 +1548,23 @@ priorities, and do not use history files as the active source of truth.
   `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent runtime-evidence/command-bridge/SDK-release/
+  side-lane-accounting round: runtime evidence/preflight audit made no edits and confirmed
+  request packs, receipts, sidecars, copied logs, aliases, and stale bundles remain
+  non-evidence. Permissions/admin query fail-closed now rejects nested route/accounting/
+  runtime-authorization aliases. Command principal authz response bridge and copied
+  response intent planning/lifecycle checks reject route-ready, command-router,
+  reply/send-chat, public ABI/header/SDK/runtime, stable SDK, and v1 completion/accounting
+  aliases while preserving negated non-claims. SDK completion rejects additional secondary
+  report aliases and broad SDK/API/support production, stable, and release-grade wording.
+  Mission/Transfer/Dino/Tribe/Buff accounting rejects nested completion/stable/promoted
+  aliases and release-statement leaf promotion without strict promoted leaf evidence.
+  Validations passed: combined six-file suite 332, public SDK guardrails 193, command
+  bridge/intent suite 42, permissions/admin query fail-closed 42, runtime/preflight suites
+  256 by delegated audit, route JSON valid/planning-only, SDK JSON blocked by design, and
+  `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

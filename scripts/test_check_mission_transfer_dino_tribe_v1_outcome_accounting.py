@@ -333,6 +333,29 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 
+    def test_release_statement_rejects_leaf_promotion_wording_without_promoted_evidence(self) -> None:
+        statement = (
+            f"{SURFACE_ID}: excluded - mission excluded and promoted; transfer excluded; "
+            "dino_policy excluded; tribe_policy excluded; buff_status excluded and promoted. "
+            "No Mission SDK, Transfer SDK, Dino SDK, Tribe SDK, or Buff/status SDK is included in v1.\n"
+        )
+        result = self.run_checker(statement=statement, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("release_statement_leaf_promotions_without_evidence", report["blockers"])
+        details = [
+            item
+            for item in report["blocker_details"]
+            if item["reason"] == "release_statement_leaf_promotions_without_evidence"
+        ]
+        self.assertEqual(details[0]["leaves"], ["mission", "buff_status"])
+        self.assertTrue(report["release_statement"]["leaf_promotions"]["mission"])
+        self.assertTrue(report["release_statement"]["leaf_promotions"]["buff_status"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
     def test_release_statement_rejects_negated_exclusion_as_affirmative_claim(self) -> None:
         statement = (
             f"{SURFACE_ID}: excluded - mission is not excluded; transfer excluded; "
@@ -775,6 +798,46 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         }
         self.assertIn("ResourceHandle", claims)
         self.assertIn("lookup", claims)
+
+    def test_candidate_leaf_rejects_nested_secondary_completion_aliases(self) -> None:
+        manifest = load_manifest()
+        gameplay = surface(manifest)
+        leaf_units = {leaf["id"]: leaf for leaf in gameplay["leaf_decision_units"]}
+        leaf_units["buff_status"]["evidence"] = {
+            "nested": {
+                "counts_toward_complete_sdk_claim": True,
+                "stable_claim_allowed": True,
+                "complete-sdk-claim-allowed": True,
+                "promotion_status": "promoted",
+            },
+            "claim": "This side lane counts toward the complete SDK claim.",
+        }
+
+        result = self.run_checker(manifest=manifest, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("leaf_candidate_ready_overclaim", report["blockers"])
+        fields = {
+            item["label"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim" and "label" in item
+        }
+        self.assertTrue(
+            {
+                "$.leaf_decision_units[buff_status].evidence.nested.counts_toward_complete_sdk_claim",
+                "$.leaf_decision_units[buff_status].evidence.nested.stable_claim_allowed",
+                "$.leaf_decision_units[buff_status].evidence.nested.complete-sdk-claim-allowed",
+                "$.leaf_decision_units[buff_status].evidence.nested.promotion_status",
+                "$.leaf_decision_units[buff_status].evidence",
+            }.issubset(fields)
+        )
+        claims = {
+            item["claim"]
+            for item in report["blocker_details"]
+            if item["reason"] == "leaf_candidate_ready_overclaim" and "claim" in item
+        }
+        self.assertIn("counts toward the complete SDK claim", claims)
 
     def test_candidate_leaf_rejects_public_module_alias_true_fields(self) -> None:
         manifest = load_manifest()

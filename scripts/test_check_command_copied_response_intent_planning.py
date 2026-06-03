@@ -153,6 +153,49 @@ class CommandCopiedResponseIntentPlanningTests(unittest.TestCase):
         self.assertIn("public_capability_bits_now_not_empty", report["blockers"])
         self.assertIn("runtime_delivery_allowed_not_false", report["blockers"])
 
+    def test_rejects_route_sdk_reply_and_credit_alias_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            query_manifest = emit_query_manifest(root)
+            payload = json.loads(DECISIONS.read_text(encoding="utf-8"))
+            payload["alias_claims"] = {
+                "routeReady": True,
+                "canonical-route-gate-ready": True,
+                "publicHeaderReady": True,
+                "replyAbiReady": True,
+                "replyReady": True,
+                "sendChatReady": True,
+                "commandRouterReady": True,
+                "stableClaimAllowed": True,
+                "v1SdkComplete": True,
+                "sdkCompletionCredit": "claimed",
+                "accounting_credit": "earned",
+            }
+            payload["positive_claims"] = [
+                "canonical route gate is ready",
+                "public header is ready",
+                "reply API is ready",
+                "send-chat API is live",
+                "v1 SDK is complete",
+                "SDK completion credit is earned",
+                "stable SDK is validated",
+            ]
+            decisions = write_json(root, "decisions.json", payload)
+
+            result = run_checker(
+                "--decisions",
+                str(decisions),
+                "--query-failclosed-artifact",
+                str(query_manifest),
+                check=False,
+            )
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_or_runtime_alias_overclaim", report["blockers"])
+        self.assertIn("accounting_credit_alias_overclaim", report["blockers"])
+        self.assertIn("positive_public_response_claim", report["blockers"])
+
     def test_rejects_missing_intent_provenance_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

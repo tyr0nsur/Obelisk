@@ -409,9 +409,26 @@ REQUIRED_SOURCE_SEMANTICS = {
 }
 FALSE_ONLY_KEYS = frozenset(
     (
+        "accounting_credit_allowed",
+        "canonical_route_gate_ready",
+        "canonical_route_ready",
+        "command_router_ready",
+        "complete_sdk_claim_allowed",
         "promotion_ready",
         "public_sdk_ready",
+        "public_sdk_complete",
+        "public_sdk_stable",
         "public_abi_ready",
+        "public_header_ready",
+        "public_header_symbols_ready",
+        "reply_abi_ready",
+        "reply_api_ready",
+        "reply_ready",
+        "route_claim_allowed",
+        "route_gate_ready",
+        "route_ready",
+        "runtime_delivery_ready",
+        "runtime_readiness_ready",
         "runtime_ready",
         "public_header_allowed",
         "runtime_wiring_allowed",
@@ -427,7 +444,36 @@ FALSE_ONLY_KEYS = frozenset(
         "public_response_path_ready",
         "response_abi_allowed",
         "capability_bit_allowed",
+        "sdk_complete",
+        "sdk_completion_allowed",
+        "sdk_completion_claim_allowed",
+        "sdk_completion_evidence",
+        "sdk_completion_ready",
+        "sdk_ready",
+        "sdk_stable",
+        "send_chat_abi_ready",
+        "send_chat_allowed",
+        "send_chat_api_ready",
         "send_chat_ready",
+        "stable_claim_allowed",
+        "stable_sdk",
+        "v1_complete",
+        "v1_completion_allowed",
+        "v1_completion_evidence",
+        "v1_sdk_complete",
+    )
+)
+CREDIT_ONLY_KEYS = frozenset(
+    (
+        "accounting_credit",
+        "blocker_credit",
+        "canonical_route_gate_credit",
+        "public_sdk_credit",
+        "readiness_credit",
+        "route_gate_credit",
+        "sdk_completion_credit",
+        "sdk_credit",
+        "v1_completion_credit",
     )
 )
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
@@ -439,15 +485,20 @@ FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = frozenset(("command_text", "operator_config"))
 POSITIVE_CLAIM_RE = re.compile(
     r"\b("
-    r"bridge|capability|command[_ -]?router|command\s+response\s+path|commands?/replies|permissions?/admin|"
-    r"player[_ -]?identity|principal|public\s+abi|reply(?:\s+endpoint)?|response|send[_ -]?chat"
-    r")\b.{0,90}\b(allowed|available|enabled|implemented|live|promoted|public|ready|runtime)\b",
+    r"accounting\s+credit|bridge|capability|canonical\s+route\s+gate|command[_ -]?router|"
+    r"command\s+response\s+path|commands?/replies|complete\s+sdk|permissions?/admin|player[_ -]?identity|"
+    r"principal|public\s+abi|public\s+header|public\s+sdk|reply(?:\s+(?:api|abi|endpoint))?|response|"
+    r"route(?:\s+gate)?|runtime(?:\s+readiness)?|sdk(?:\s+completion)?|send[_ -]?chat|stable\s+sdk|v1(?:\s+sdk)?"
+    r")\b.{0,100}\b("
+    r"allowed|available|awarded|claimed|complete|completed|credited|done|earned|enabled|finished|implemented|"
+    r"live|promoted|ready|runtime|stable|supported|validated"
+    r")\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
     r"\b("
-    r"before|blocked|cannot|does\s+not|fail[s-]?closed|forbidden|missing|must|never|no|not|only|planning|"
-    r"requires?|until|without"
+    r"before|blocked|cannot|closed|does\s+not|fail[s-]?closed|false|forbidden|missing|must|never|no|not|only|planning|"
+    r"reject(?:s|ed)?|requires?|until|without"
     r")\b",
     re.IGNORECASE,
 )
@@ -520,6 +571,22 @@ def contains_forbidden_pre_runtime_claim_source(value: Any) -> bool:
     return False
 
 
+def has_credit_claim_value(value: Any) -> bool:
+    if value in (False, None, "", [], {}):
+        return False
+    return True
+
+
+def positive_claim_is_negated(value: str, match: re.Match[str]) -> bool:
+    prefix_sentence = re.split(r"[.;\n]", value[: match.start()])[-1]
+    suffix_sentence = re.split(r"[.;\n]", value[match.end() :], maxsplit=1)[0]
+    return (
+        NEGATED_CLAIM_RE.search(prefix_sentence) is not None
+        or NEGATED_CLAIM_RE.search(match.group(0)) is not None
+        or NEGATED_CLAIM_RE.search(suffix_sentence) is not None
+    )
+
+
 def collect_strings(value: Any) -> list[str]:
     if isinstance(value, dict):
         observed: list[str] = []
@@ -544,6 +611,8 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
             key_name = normalized_key(key)
             if key_name in FALSE_ONLY_KEYS and child is not False:
                 add(blockers, "public_or_runtime_overclaim", child_trail, field=str(key), value=child)
+            if key_name in CREDIT_ONLY_KEYS and has_credit_claim_value(child):
+                add(blockers, "accounting_credit_overclaim", child_trail, field=str(key), value=child)
             if (
                 key_name in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS
                 and contains_forbidden_pre_runtime_claim_source(child)
@@ -560,10 +629,13 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
         or trail.endswith(".schema")
         or trail.endswith(".surface")
         or trail.endswith(".id")
+        or ".required_tests_before_public_header" in trail
     ):
         return
-    if POSITIVE_CLAIM_RE.search(value) and NEGATED_CLAIM_RE.search(value) is None:
-        add(blockers, "positive_public_or_runtime_claim", trail, value=value)
+    for match in POSITIVE_CLAIM_RE.finditer(value):
+        if not positive_claim_is_negated(value, match):
+            add(blockers, "positive_public_or_runtime_claim", trail, value=value)
+            return
 
 
 def collect_reason_flag_terms(value: Any, blockers: list[dict[str, Any]], trail: str = "$") -> None:

@@ -461,3 +461,20 @@ This file is an active routing table only. Durable evidence belongs in
   valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`, and `git diff --check`. No runtime/server operation.
   Agents closed.
+- Latest round delegated runtime evidence/preflight audit, command bridge/response-intent
+  readiness, SDK release/accounting wording, and Mission/Transfer/Dino/Tribe/Buff
+  side-lane accounting. Integrated result: runtime evidence audit made no edits and
+  confirmed request packs, receipts, sidecars, copied logs, and stale bundles remain
+  non-authoritative. Permissions/admin query fail-closed, command bridge, copied response
+  intent planning/lifecycle, Mission/Transfer/Dino/Tribe/Buff accounting, and SDK
+  completion now reject additional nested/secondary aliases for route readiness, command
+  router/reply/send-chat readiness, public ABI/header/SDK/runtime readiness, runtime
+  authorization, server operations, promotion, stable/production/release-grade SDK
+  wording, and SDK/v1 completion credit while preserving negated non-claims. Mission/
+  Transfer/Dino/Tribe/Buff also rejects leaf promotion claims without strict promoted
+  evidence. Validation passed: combined six-file suite 332, public SDK guardrails 193,
+  command bridge/intent suite 42, permissions/admin query fail-closed 42, runtime/preflight
+  suites 256 by delegated audit, route JSON valid/planning-only at
+  `approved_runtime_evidence_missing`, SDK JSON blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, and `git diff --check`. No runtime/server
+  operation. Agents closed.

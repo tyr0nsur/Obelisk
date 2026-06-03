@@ -1064,6 +1064,37 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         self.assertIn("stable_claim_allowed_string_overclaim", report["blockers"])
         self.assertIn("v1_completion_ready_string_overclaim", report["blockers"])
 
+    def test_rejects_nested_route_accounting_and_authorization_overclaims(self) -> None:
+        payload = manifest()
+        payload["secondary_report"] = {
+            "routeReady": True,
+            "public-route-ready": True,
+            "counts_toward_public_sdk": True,
+            "counts_toward_runtime": True,
+            "counts_toward_v1_completion": True,
+            "public_or_runtime_accounting_allowed": True,
+            "runtime_work_authorized": True,
+            "server_operations_authorized": True,
+            "runtimeApprovalGranted": True,
+        }
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        for blocker in (
+            "route_ready_overclaim",
+            "public_route_ready_overclaim",
+            "counts_toward_public_sdk_overclaim",
+            "counts_toward_runtime_overclaim",
+            "counts_toward_v1_completion_overclaim",
+            "public_or_runtime_accounting_allowed_overclaim",
+            "runtime_work_authorized_overclaim",
+            "server_operations_authorized_overclaim",
+            "runtime_approval_granted_overclaim",
+        ):
+            self.assertIn(blocker, report["blockers"])
+
     def test_rejects_camel_hyphen_space_readiness_aliases_and_positive_texts(self) -> None:
         payload = manifest()
         payload["nested_claim"] = {

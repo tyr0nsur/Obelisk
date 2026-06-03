@@ -84,8 +84,11 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "callback_ready",
     "capability_bit_ready",
     "capability_ready",
+    "complete_sdk_claim_allowed",
+    "counts_toward_complete_sdk_claim",
     "descriptor_ready",
     "dino_sdk_ready",
+    "full_sdk_claim_allowed",
     "identity_available",
     "identity_ready",
     "lookup_available",
@@ -97,13 +100,16 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "mutation_ready",
     "ownership_ready",
     "promotion_ready",
+    "production_sdk_claim_allowed",
     "public_abi_ready",
+    "public_abi_available",
     "public_api_ready",
     "public_callback_ready",
     "public_capability_ready",
     "public_descriptor_ready",
     "public_dino_sdk_ready",
     "public_buff_sdk_ready",
+    "public_sdk_available",
     "public_module_ready",
     "public_module_sdk_ready",
     "public_mission_sdk_ready",
@@ -114,18 +120,36 @@ MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS = {
     "release_ready",
     "resource_handle_available",
     "resource_handle_ready",
+    "runtime_available",
+    "runtime_approved",
+    "runtime_evidence_approved",
     "return_override_available",
     "return_override_ready",
     "runtime_observer_approved",
     "runtime_observer_ready",
     "runtime_hook_ready",
     "runtime_ready",
+    "sdk_complete",
+    "sdk_completion",
+    "sdk_ready",
+    "stable_claim_allowed",
+    "stable_release_claim_allowed",
+    "stable_sdk_claim_allowed",
     "v1_accounted",
     "transfer_sdk_ready",
     "tribe_sdk_ready",
     "v1_complete",
     "v1_completion",
     "v1_ready",
+}
+CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS = {
+    "accounting_route",
+    "promotion_status",
+    "status",
+}
+CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES = {
+    "per_leaf_promoted",
+    "promoted",
 }
 LEAF_ALIASES = {
     "mission": ("mission",),
@@ -356,6 +380,10 @@ CANDIDATE_READY_CLAIM_PATTERNS = (
     r"v1|v1\s+SDK|promotion|release)\s+(?:is\s+)?(?:ready|readiness|complete|completion)\b",
     r"\b(?:ready|complete)\s+for\s+v1\b",
     r"\bv1(?:\.0)?\s+(?:is\s+)?(?:stable|complete|completion|ready)\b",
+    r"\b(?:complete|full|production|stable)\s+SDK\s+(?:claim\s+)?"
+    r"(?:is\s+)?(?:allowed|ready|complete)\b",
+    r"\b(?:stable\s+claim|complete\s+SDK\s+claim)\s+(?:is\s+)?allowed\b",
+    r"\bcounts?\s+toward\s+(?:the\s+)?(?:complete|full|production)\s+SDK\s+claim\b",
 )
 CANDIDATE_READY_CLAIM_RE = re.compile(
     "|".join(f"(?:{pattern})" for pattern in CANDIDATE_READY_CLAIM_PATTERNS),
@@ -531,7 +559,7 @@ def outcome_is_negated(text: str, start: int) -> bool:
 
 def has_unnegated_alias_outcome(text: str, alias: str, outcome: str) -> bool:
     pattern = re.compile(
-        rf"\b{re.escape(alias)}\b.{{0,100}}?\b({re.escape(outcome)})\b",
+        rf"\b{re.escape(alias)}\b[^.;\n]{{0,100}}?\b({re.escape(outcome)})\b",
         re.IGNORECASE,
     )
     for match in pattern.finditer(text):
@@ -870,7 +898,14 @@ def collect_true_ready_overclaims(value: Any, prefix: str = "$") -> list[str]:
     if isinstance(value, dict):
         for key, child in value.items():
             child_path = f"{prefix}.{key}"
-            if key in MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS and child is True:
+            normalized_key = key.lower().replace("-", "_").replace(" ", "_") if isinstance(key, str) else key
+            if normalized_key in MISSION_CANDIDATE_FORBIDDEN_TRUE_KEYS and child is True:
+                overclaims.append(child_path)
+            if (
+                normalized_key in CANDIDATE_FORBIDDEN_PROMOTED_STRING_KEYS
+                and isinstance(child, str)
+                and child.lower().replace("-", "_").replace(" ", "_") in CANDIDATE_FORBIDDEN_PROMOTED_STRING_VALUES
+            ):
                 overclaims.append(child_path)
             overclaims.extend(collect_true_ready_overclaims(child, child_path))
     elif isinstance(value, list):
@@ -1423,6 +1458,16 @@ def build_report(
             "release_statement_ready_overclaims",
             "$.release_statement",
             claims=outcome["ready_claims"],
+        )
+    promoted_statement_leaves = [
+        leaf_id for leaf_id in REQUIRED_LEAVES if outcome["leaf_promotions"].get(leaf_id)
+    ]
+    if promoted_statement_leaves and not all_promoted:
+        add(
+            blockers,
+            "release_statement_leaf_promotions_without_evidence",
+            "$.release_statement",
+            leaves=promoted_statement_leaves,
         )
     if outcome["present"] and not statement_umbrella_excluded and not all_promoted:
         missing = [leaf_id for leaf_id in REQUIRED_LEAVES if not outcome["leaf_exclusions"].get(leaf_id)]

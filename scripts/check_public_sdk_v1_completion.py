@@ -358,6 +358,11 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "p0_dependency_chain_promoted_for_claim_count",
     "p0_dependency_chain_promoted_for_claim_ratio",
     "promoted_for_claim_ratio",
+    "api_ready",
+    "support_ready",
+    "sdk_ready",
+    "production_grade",
+    "production_grade_ready",
     "production_ready",
     "public_abi_ready",
     "public_abi_available",
@@ -365,6 +370,8 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "rc_readiness_ready",
     "release_candidate_ready",
     "release_candidate_readiness_ready",
+    "release_grade",
+    "release_grade_ready",
     "release_ready",
     "release_readiness_ready",
     "route_ready",
@@ -373,6 +380,9 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "v1_completion_ready",
     "stable_claim_allowed",
     "stable_v1_sdk",
+    "stable_ready",
+    "v1_stable_sdk",
+    "v1_sdk_stable",
     "public_sdk_ready",
     "promotion_ready",
     "runtime_ready",
@@ -825,7 +835,7 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"(?:complete|full|production[- ]?ready|stable)\b",
     r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+"
     r"(?:is|are|remains?|stays?)\s+"
-    r"(?:complete|full|production[- ]?ready|production[- ]?grade|stable|ready|supported|public)\b",
+    r"(?:complete|full|production[- ]?ready|production[- ]?grade|production|stable|ready|supported|public)\b",
     r"\b(?:ga|generally[- ]available)\s+(?:sdk|api|support)\b.{0,80}"
     r"\b(?:available|published|ready|released|shipped)\b",
     r"\b(?:sdk|api|support)\b.{0,40}\b(?:ga|generally[- ]available)\b",
@@ -851,7 +861,7 @@ FORBIDDEN_RELEASE_STATEMENT_BROAD_CLAIM_PATTERNS = (
     r"shipped|stable|supported|public|promoted)\b",
     r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+v1(?:\.0)?\s+"
     r"(?:is|are|remains?|stays?)\s+"
-    r"\b(?:allowed|available|complete|full|included|production[- ]?ready|ready|released|"
+    r"\b(?:allowed|available|complete|full|included|production[- ]?ready|production|ready|released|"
     r"shipped|stable|supported|public|promoted)\b",
     r"\b(?:public\s+|obelisk\s+)?(?:sdk|api|support)\s+v1(?:\.0)?\s+"
     r"(?:ships?|launch(?:es|ed)?|goes?\s+live|went\s+live|"
