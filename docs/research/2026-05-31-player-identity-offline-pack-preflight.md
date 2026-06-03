@@ -318,15 +318,16 @@ snapshots, not as identity, Inventory SDK, public SDK, runtime, lookup, or
 
 ## Safe Next Step
 
-The next useful action is to finish the principal privacy and invalidation policy for the
-candidate-only identity lane. Current candidate anchors from static orientation are
-`ShooterGameMode.HandleNewPlayer` (`session_start`) and `ShooterGameMode.OnLogout`
-(`session_end`); offline snapshots now corroborate their layouts, and the
-lifecycle-anchor checker can consume them as accepted candidate-only layout anchors while
-promotion still fails closed. That work must preserve the same non-claims: no public identity,
-permissions, command routing, runtime lookup, mutation, return override, ResourceHandle,
-or complete v1 SDK claim is promoted by fixture coverage, second-source layout, or
-lifecycle layout alone.
+This historical offline pack lane is now consume-only for the current route. The next P0
+runtime-side blocker is approved copied runtime principal lifecycle evidence, followed by
+the reviewed public identity contract gate. Current candidate anchors from static
+orientation are `ShooterGameMode.HandleNewPlayer` (`session_start`) and
+`ShooterGameMode.OnLogout` (`session_end`); offline snapshots corroborate their layouts,
+and the lifecycle-anchor checker can consume them as accepted candidate-only layout
+anchors while promotion still fails closed. That work must preserve the same non-claims:
+no public identity, permissions, command routing, runtime lookup, mutation, return
+override, ResourceHandle, or complete v1 SDK claim is promoted by fixture coverage,
+second-source layout, principal privacy/invalidation policy, or lifecycle layout alone.
 
 The checker and planner also fail closed when the inventory
 `target_set_coverage.target_sets` drifts from the pack manifest `inputs.target_sets`, so

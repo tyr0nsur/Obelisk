@@ -1167,6 +1167,27 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 claims = ROUTE_GATE.collect_public_or_runtime_claims({"claim": text})
                 self.assertEqual([], claims)
 
+    def test_collect_public_or_runtime_claims_rejects_runtime_identity_source_claims(self) -> None:
+        payload = {
+            "nested": {
+                "principal_source": "approved_runtime_principal_lifecycle_evidence",
+                "identity_claim_source": "runtime_lifecycle_evidence",
+                "principal-claim-source": {"source": "runtime-local"},
+                "commandPrincipalSource": ["approved runtime evidence"],
+                "public_identity_source": "reviewed_identity_public_contract",
+                "candidate_source": "runtime_lifecycle_evidence",
+            }
+        }
+
+        claims = ROUTE_GATE.collect_public_or_runtime_claims(payload)
+
+        self.assertIn("nested.principal_source", claims)
+        self.assertIn("nested.identity_claim_source", claims)
+        self.assertIn("nested.principal-claim-source", claims)
+        self.assertIn("nested.commandPrincipalSource", claims)
+        self.assertIn("nested.public_identity_source", claims)
+        self.assertNotIn("nested.candidate_source", claims)
+
     def test_route_check_rejects_child_report_that_drops_planning_only_posture(self) -> None:
         original = ROUTE_GATE.run_check
 
@@ -1595,6 +1616,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     "public response abi allowed": True,
                     "authorityClaimSource": "command text",
                     "principal-source": {"source": "operator-config"},
+                    "identity_claim_source": "approved_runtime_principal_lifecycle_evidence",
+                    "principalClaimSource": "runtime lifecycle evidence",
                     "public-reply-api": True,
                     "publicSendChatApi": True,
                     "permissions_admin_ready": True,
@@ -1651,6 +1674,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("nested.public response abi allowed", result["public_or_runtime_claims"])
         self.assertIn("nested.authorityClaimSource", result["public_or_runtime_claims"])
         self.assertIn("nested.principal-source", result["public_or_runtime_claims"])
+        self.assertIn("nested.identity_claim_source", result["public_or_runtime_claims"])
+        self.assertIn("nested.principalClaimSource", result["public_or_runtime_claims"])
         self.assertIn("nested.public-reply-api", result["public_or_runtime_claims"])
         self.assertIn("nested.publicSendChatApi", result["public_or_runtime_claims"])
         self.assertIn("nested.permissions_admin_ready", result["public_or_runtime_claims"])

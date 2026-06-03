@@ -378,7 +378,7 @@ approval and must not be cited as evidence that a surface is included in v1.
 
 | Surface or demand family | Required v1 outcome | Depends on | Release-statement detail |
 | --- | --- | --- | --- |
-| `obelisk.player_identity.v1` | `promoted` | accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no-complete-SDK wording. |
+| `obelisk.player_identity.v1` | `promoted` | approved runtime principal lifecycle evidence; accepted login/logout ordering and invalidation semantics; privacy/cross-instance semantics; reviewed public identity contract with append-only POD ABI, capability/lifecycle cleanup, and SDK-consumer coverage | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no-complete-SDK wording. |
 | `obelisk.permissions_admin.v1` | `promoted` | promoted player identity/principal | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no permission/admin SDK wording. |
 | `obelisk.command_chat_response_path.v1` | `promoted` | promoted player identity/principal and permissions/admin | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no reply/send-chat/response-path wording. |
 | `obelisk.commands_replies.v1` | `promoted` | promoted player identity, permissions/admin, and command/chat response path | Required P0 chain surface for complete SDK; scoped non-complete releases may exclude it only while preserving no command SDK/router wording. |

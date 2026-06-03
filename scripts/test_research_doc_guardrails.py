@@ -126,6 +126,23 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("ShooterGameMode.OnLogout", compact)
         self.assertIn("candidate/internal planning guidance only", compact)
 
+    def test_player_identity_offline_pack_safe_next_step_points_to_runtime_evidence(self) -> None:
+        offline_pack = (
+            REPO_ROOT / "docs/research/2026-05-31-player-identity-offline-pack-preflight.md"
+        ).read_text(encoding="utf-8")
+        section = offline_pack.split("## Safe Next Step", 1)[1]
+        compact = normalized(section)
+
+        self.assertIn("consume-only for the current route", compact)
+        self.assertIn("approved copied runtime principal lifecycle evidence", compact)
+        self.assertIn("reviewed public identity contract gate", compact)
+        self.assertIn("principal privacy/invalidation policy", compact)
+        self.assertIn("or lifecycle layout alone", compact)
+        self.assertNotIn(
+            "The next useful action is to finish the principal privacy and invalidation policy",
+            section,
+        )
+
     def test_player_identity_runtime_observer_brief_bundle_command_matches_builder_cli(self) -> None:
         documented_flags = self._documented_identity_bundle_flags(
             REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md",

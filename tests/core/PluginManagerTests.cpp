@@ -74,6 +74,8 @@ namespace
         bool UnloadReturned = false;
     };
 
+    struct PlayerPrincipalUnloadFenceState;
+
     struct FakePlugin {
         std::string filename;
         std::string pluginId = "fake_plugin";
@@ -93,6 +95,7 @@ namespace
         bool registerInventoryPolicyCallback = false;
         bool registerItemReturnCallback = false;
         bool registerPlayerPrincipalCallback = false;
+        bool startPlayerPrincipalDispatchDuringInit = false;
         bool registerStructureCallback = false;
         bool registerGameplayPolicyCallback = false;
         bool registerChatMessageCallback = false;
@@ -117,6 +120,9 @@ namespace
         bool mutateApiInInit = false;
         std::atomic<bool>* closeObserved = nullptr;
         TimerFenceState* timerFence = nullptr;
+        PlayerPrincipalUnloadFenceState* initPlayerPrincipalFence = nullptr;
+        std::thread initPlayerPrincipalDispatchThread;
+        std::atomic<size_t> initPlayerPrincipalDispatches{0};
         int getInfoCalls = 0;
         int initCalls = 0;
         int shutdownCalls = 0;
@@ -890,6 +896,49 @@ namespace
             Require(registrationId != 0, "fake player-principal callback registration failed");
         }
 
+        if (g_CurrentFakePlugin->startPlayerPrincipalDispatchDuringInit)
+        {
+            Require(g_CurrentFakePlugin->initPlayerPrincipalFence != nullptr,
+                    "fake plugin requested init player-principal dispatch without fence");
+            const uint64_t registrationId = Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Register(
+                g_CurrentFakePlugin->owner,
+                Obelisk::Core::PlayerPrincipalEventSubscription{
+                    DirectPlayerPrincipalUnloadFenceCallback,
+                    g_CurrentFakePlugin->initPlayerPrincipalFence,
+                });
+            Require(registrationId != 0, "fake init player-principal callback registration failed");
+
+            g_CurrentFakePlugin->initPlayerPrincipalDispatchThread = std::thread([plugin = g_CurrentFakePlugin]() {
+                const std::vector<Obelisk::Core::PlayerPrincipalBoolValue> bools{
+                    {
+                        .Field = Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin,
+                        .Value = true,
+                    },
+                    {
+                        .Field = Obelisk::Core::PlayerPrincipalBoolField::ReturnValue,
+                        .Value = true,
+                    },
+                };
+                const Obelisk::Core::PlayerPrincipalEventView event{
+                    .Kind = Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                    .Action = Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+                    .EventSequence = 1,
+                    .ServerProcessEpoch = 1,
+                    .Bools = bools,
+                };
+                plugin->initPlayerPrincipalDispatches.store(
+                    Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Dispatch(event),
+                    std::memory_order_release);
+            });
+
+            std::unique_lock<std::mutex> lock(g_CurrentFakePlugin->initPlayerPrincipalFence->Mutex);
+            Require(g_CurrentFakePlugin->initPlayerPrincipalFence->Cv.wait_for(
+                        lock,
+                        std::chrono::seconds(2),
+                        [&]() { return g_CurrentFakePlugin->initPlayerPrincipalFence->Entered; }),
+                    "fake init player-principal callback did not enter during init");
+        }
+
         if (g_CurrentFakePlugin->registerStructureCallback)
         {
             const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
@@ -1232,6 +1281,8 @@ namespace
 
     void CleanupPlugin(FakePlugin& plugin)
     {
+        if (plugin.initPlayerPrincipalDispatchThread.joinable())
+            plugin.initPlayerPrincipalDispatchThread.join();
         Obelisk::Core::EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
         if (plugin.chatDispatcher)
             plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
@@ -3640,6 +3691,99 @@ namespace
                 "in-flight timer survived init-failure cleanup");
 
         CleanupPlugin(plugin);
+        fs::remove_all(root);
+    }
+
+    void TestInitFailureWaitsForInFlightDirectPlayerPrincipalDispatchBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_player_principal_init_fail_in_flight");
+        ConfigureEnvironment(root);
+
+        TimerFenceState lifecycleState;
+        PlayerPrincipalUnloadFenceState callbackState;
+        FakePlugin plugin{
+            .filename = "player_principal_init_fail_in_flight.so",
+            .pluginId = "player_principal_init_fail_in_flight",
+            .initResult = false,
+            .timerFence = &lifecycleState,
+        };
+        plugin.startPlayerPrincipalDispatchDuringInit = true;
+        plugin.initPlayerPrincipalFence = &callbackState;
+
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader);
+        std::atomic<bool> loadReturned{false};
+        std::thread loadThread([&]() {
+            manager.LoadPlugins((root / "plugins").string());
+            loadReturned.store(true, std::memory_order_release);
+            lifecycleState.Cv.notify_all();
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(callbackState.Mutex);
+            Require(callbackState.Cv.wait_for(lock, std::chrono::seconds(2), [&callbackState]() {
+                        return callbackState.Entered;
+                    }),
+                    "init-failure player-principal callback did not enter");
+        }
+
+        bool shutdownEntered = false;
+        {
+            std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
+            shutdownEntered = lifecycleState.Cv.wait_for(lock, std::chrono::seconds(2), [&lifecycleState]() {
+                return lifecycleState.ShutdownEntered;
+            });
+        }
+
+        if (!shutdownEntered)
+        {
+            {
+                std::lock_guard<std::mutex> lock(callbackState.Mutex);
+                callbackState.Release = true;
+            }
+            callbackState.Cv.notify_all();
+            loadThread.join();
+            CleanupPlugin(plugin);
+            fs::remove_all(root);
+            Require(false, "init-failure cleanup did not call plugin shutdown while player-principal callback was in flight");
+        }
+
+        bool closedWhileCallbackInFlight = false;
+        {
+            std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
+            closedWhileCallbackInFlight =
+                lifecycleState.Cv.wait_for(lock, std::chrono::milliseconds(100), [&]() {
+                    return lifecycleState.CloseEntered || loadReturned.load(std::memory_order_acquire);
+                });
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(callbackState.Mutex);
+            callbackState.Release = true;
+        }
+        callbackState.Cv.notify_all();
+
+        loadThread.join();
+        CleanupPlugin(plugin);
+
+        Require(plugin.initCalls == 1, "in-flight player-principal init-fail plugin Init was not called");
+        Require(plugin.shutdownCalls == 1,
+                "in-flight player-principal init-fail plugin shutdown was not called");
+        Require(!closedWhileCallbackInFlight,
+                "init-failure cleanup closed plugin while direct player-principal callback was in flight");
+        Require(plugin.initPlayerPrincipalDispatches.load(std::memory_order_acquire) == 1,
+                "init-failure player-principal dispatch did not complete exactly one callback");
+        Require(callbackState.Calls == 1,
+                "init-failure player-principal callback call count mismatch");
+        Require(plugin.closeCalls == 1,
+                "in-flight player-principal init-fail plugin was not closed once");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "in-flight player-principal callback survived init-failure cleanup");
+
         fs::remove_all(root);
     }
 
@@ -7312,6 +7456,7 @@ int main()
     TestUnloadAllWaitsForInFlightRepeatingPluginTimerBeforeCloseAndDoesNotReschedule();
     TestTimerCallbackCleansOnInitFailure();
     TestInitFailureWaitsForInFlightPluginTimerBeforeClose();
+    TestInitFailureWaitsForInFlightDirectPlayerPrincipalDispatchBeforeClose();
     TestOwnerTokenTimerRegistrationRejectedDuringShutdown();
     TestOwnerTokenTimerRegistrationRejectedDuringInitFailureShutdown();
     TestOwnerTokenTimerUnregisterAllowedDuringShutdown();

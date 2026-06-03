@@ -148,12 +148,30 @@ def route_lock_blocked_until(current_blocker: Any) -> list[str]:
     return blocked_until
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = {
     "authority_claim_source",
+    "authz_principal_source",
+    "command_principal_source",
+    "identity_claim_source",
+    "permission_principal_source",
+    "principal_claim_source",
     "principal_source",
+    "public_identity_source",
+    "runtime_identity_source",
 }
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES = {
     "command_text",
     "operator_config",
 }
+FORBIDDEN_PRE_PUBLIC_CONTRACT_CLAIM_SOURCE_VALUE_RE = re.compile(
+    r"(?:"
+    r"(?:approved_?)?runtime(?:_local|_evidence|_lifecycle|_observation|_observed|_principal.*evidence)?|"
+    r"approved_runtime_principal_lifecycle_evidence|"
+    r"runtime_principal_lifecycle_evidence|"
+    r"runtime_lifecycle_evidence|"
+    r"reviewed_identity_public_contract|"
+    r"identity_public_contract|"
+    r"public_identity"
+    r")"
+)
 POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
     r"\b(?:"
     r"command[_ -]?(?:routing|router|response[_ -]?path)|"
@@ -517,7 +535,11 @@ def collect_public_or_runtime_claims(value: Any, *, path: str = "") -> list[str]
 
     def contains_forbidden_claim_source(item: Any) -> bool:
         if isinstance(item, str):
-            return normalized_source(item) in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+            source = normalized_source(item)
+            return (
+                source in FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_VALUES
+                or FORBIDDEN_PRE_PUBLIC_CONTRACT_CLAIM_SOURCE_VALUE_RE.search(source) is not None
+            )
         if isinstance(item, list):
             return any(contains_forbidden_claim_source(child) for child in item)
         if isinstance(item, dict):

@@ -3362,6 +3362,29 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             self.assertIn(normalized(term), compact)
         self.assertNotIn("promoted-minimal", text)
 
+    def test_sdk_v1_player_identity_release_checklist_requires_runtime_and_public_contract(self) -> None:
+        text = PUBLIC_SDK_V1_COMPATIBILITY_DOC.read_text(encoding="utf-8")
+        match = re.search(r"^\| `obelisk\.player_identity\.v1` \|(?P<row>.+)$", text, re.MULTILINE)
+        self.assertIsNotNone(match)
+        row = normalized(match.group("row"))
+
+        for term in (
+            "approved runtime principal lifecycle evidence",
+            "accepted login/logout ordering and invalidation semantics",
+            "privacy/cross-instance semantics",
+            "reviewed public identity contract",
+            "append-only POD ABI",
+            "capability/lifecycle cleanup",
+            "SDK-consumer coverage",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(normalized(term), row)
+
+        self.assertNotIn(
+            normalized("accepted admin snapshots, lifecycle anchors, privacy/invalidation, second source"),
+            row,
+        )
+
     def test_handoff_resume_docs_do_not_redefine_v1_as_runtime_core(self) -> None:
         paths = (
             REPO_ROOT / "docs" / "agent-handoff" / "COMPACT_CONTEXT.md",

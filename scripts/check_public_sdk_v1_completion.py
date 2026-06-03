@@ -286,7 +286,14 @@ COMMAND_PERMISSION_ROUTE_GATE_FORBIDDEN_CLAIM_KEYS = (
     "server_operations_authorized",
 )
 SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
+    *INSTALLED_SDK_PACKAGE_SHAPE_FORBIDDEN_POSITIVE_CLAIM_KEYS,
     "public_abi_ready",
+    "rc_ready",
+    "rc_readiness_ready",
+    "release_candidate_ready",
+    "release_candidate_readiness_ready",
+    "release_ready",
+    "release_readiness_ready",
     "v1_completion_ready",
     "stable_claim_allowed",
     "public_sdk_ready",
@@ -1347,7 +1354,12 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             for key, item in value.items():
                 item_path = f"{path}.{key}" if path else str(key)
                 if (
-                    normalized_completion_claim_key(key) in forbidden_keys
+                    (
+                        normalized_completion_claim_key(key) in forbidden_keys
+                        or BROAD_ROUTE_GATE_CLAIM_KEY_RE.fullmatch(
+                            normalized_completion_claim_key(key)
+                        )
+                    )
                     and is_positive_completion_claim_value(item)
                     and not current_blocked_context
                 ):

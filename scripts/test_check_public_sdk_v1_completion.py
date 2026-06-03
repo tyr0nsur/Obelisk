@@ -599,7 +599,16 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
     def test_secondary_report_scanner_rejects_completion_claims_without_blocker(self) -> None:
         for key in (
+            "complete_sdk_ready",
+            "full_api_supported",
+            "package_shape_release_ready",
+            "public_package_available",
             "public_abi_ready",
+            "rc_ready",
+            "release_candidate_ready",
+            "release_package_ready",
+            "release_ready",
+            "stable_sdk_allowed",
             "v1_completion_ready",
             "stable_claim_allowed",
             "public_sdk_ready",
@@ -641,6 +650,36 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             secondary_report_completion_claims_without_blocker(payload),
             ["nested_report.stable_claim_allowed"],
         )
+
+    def test_completion_gate_rejects_secondary_package_and_rc_claim_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            checker_path = self.write_fake_resource_handle_checker(
+                Path(temp_dir) / "fake_resource_handle.py",
+                nested={
+                    "release_package_ready": True,
+                    "release_candidate_ready": "ready",
+                    "stable_sdk_allowed": True,
+                },
+            )
+            result = self.run_checker(
+                "--object-identity-resource-handle-readiness",
+                str(checker_path),
+                "--json",
+                check=False,
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(SECONDARY_REPORT_COMPLETION_CLAIM_WITHOUT_BLOCKER, payload["blockers"])
+        self.assertEqual(
+            payload["object_identity_resource_handle_readiness"]["completion_claims_without_blocker"],
+            [
+                "nested.release_candidate_ready",
+                "nested.release_package_ready",
+                "nested.stable_sdk_allowed",
+            ],
+        )
+        self.assertFalse(payload["stable_claim_allowed"])
 
     def test_completion_gate_rejects_secondary_stable_claim_without_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
