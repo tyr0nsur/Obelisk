@@ -29,8 +29,11 @@ Reusable facts from the current research lane:
 - ARK binary SHA256:
   `7e7ded49e0c658e74199801d79630bd33da407d3e468e039837bf61a9de7c520`.
 - `players-identity-lifecycle-intake` has complete planning-only fixture coverage.
-- `players-lifecycle-anchor-candidates` has accepted planning-layout evidence for six
-  lifecycle candidates.
+- `players-lifecycle-anchor-candidates` has six committed base fixtures. Durable
+  source-bound second-source lifecycle-anchor evidence is currently limited to
+  `HandleNewPlayer` and `OnLogout`; historical all-six `/tmp` comparison output is
+  scratch triage unless materialized into an approved offline artifact/root with hash
+  binding.
 - The first runtime observer consumes only `HandleNewPlayer` as a candidate
   `session_start` anchor and `OnLogout` as a candidate `session_end` anchor.
 - The accepted first-window `HandleNewPlayer` copied bool cases are:

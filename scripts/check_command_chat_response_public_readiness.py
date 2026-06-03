@@ -311,11 +311,11 @@ NEGATIVE_CONTEXT_TOKENS = (
 )
 POSITIVE_SURFACE_RE = re.compile(
     r"\b("
-    r"public\s+headers?|"
+    r"public\s+headers?|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
     r"repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
     r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
-    r")\b.{0,80}\b(allowed|available|enabled|established|live|operational|promoted|public|ready)\b",
+    r")\b.{0,80}\b(allowed|available|enabled|established|live|operational|promoted|public|ready|supported)\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(

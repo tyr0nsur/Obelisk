@@ -1227,30 +1227,24 @@ def validate_response_path_report(
                     "$.response_path_report",
                     rebuilt_blockers=rebuilt.get("blockers"),
                 )
-            for key in (
-                "valid",
-                "accepted_for_planning",
-                "planning_only",
-                "surface",
-                "target_set",
-                "target_filters",
-                "readiness_root",
-                "readiness_path",
-                "decisions_path",
-                "surfaces_path",
-                "public_header_path",
-                "readiness_status",
-                "decisions_status",
-                "surfaces_status",
-                "public_readiness_ready",
-                "public_header_allowed",
-                "promotion_ready",
-                "public_sdk_ready",
-                "public_abi_ready",
-                "runtime_ready",
-                "blockers",
-            ):
-                if payload.get(key) != rebuilt.get(key):
+            for key in sorted(set(payload) | set(rebuilt)):
+                if key not in payload:
+                    add(
+                        blockers,
+                        "response_path_report_source_artifact_identity_mismatch",
+                        f"$.response_path_report.{key}",
+                        expected=rebuilt.get(key),
+                        value="<missing>",
+                    )
+                elif key not in rebuilt:
+                    add(
+                        blockers,
+                        "response_path_report_source_artifact_identity_mismatch",
+                        f"$.response_path_report.{key}",
+                        expected="<absent>",
+                        value=payload.get(key),
+                    )
+                elif payload.get(key) != rebuilt.get(key):
                     add(
                         blockers,
                         "response_path_report_source_artifact_identity_mismatch",

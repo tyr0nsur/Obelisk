@@ -66,6 +66,27 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         )
         self._assert_identity_bundle_flags_match_builder_cli(documented_flags)
 
+    def test_player_lifecycle_six_candidate_evidence_is_labeled_scratch_not_durable(self) -> None:
+        fixture_gap = (
+            REPO_ROOT / "docs/research/2026-06-01-players-lifecycle-anchor-candidates-fixture-gap.md"
+        ).read_text(encoding="utf-8")
+        runtime_plan = (
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-capture-plan.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("committed base fixtures for all six", fixture_gap)
+        self.assertIn("limited to `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`", fixture_gap)
+        self.assertIn("scratch triage under `/tmp/obelisk-lifecycle-snapshot-probe/`", fixture_gap)
+        self.assertIn("second_source_accepted=6", fixture_gap)
+        self.assertIn("not durable source-bound second-source lifecycle-anchor evidence for all six", fixture_gap)
+        self.assertIn("six committed base fixtures", runtime_plan)
+        self.assertIn("limited to\n  `HandleNewPlayer` and `OnLogout`", runtime_plan)
+        self.assertIn("scratch triage unless materialized into an approved offline artifact/root", runtime_plan)
+        self.assertNotIn(
+            "`players-lifecycle-anchor-candidates` has accepted planning-layout evidence for six",
+            runtime_plan,
+        )
+
     def _documented_identity_bundle_flags(
         self, path: Path, section_start: str, section_end: str
     ) -> set[str]:

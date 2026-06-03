@@ -3788,6 +3788,22 @@ def blocker_outcome_next_action(
     return "choose a reviewed v1 outcome: promote with evidence or explicitly exclude/post-v1 where the contract allows it"
 
 
+def command_permission_route_gate_current_blocker(
+    command_permission_route_gate: dict[str, Any] | None,
+) -> str | None:
+    if not isinstance(command_permission_route_gate, dict):
+        return None
+    current_blocker = command_permission_route_gate.get("current_blocker")
+    if isinstance(current_blocker, str) and current_blocker:
+        return current_blocker
+    critical_path_phase = command_permission_route_gate.get("critical_path_phase")
+    if isinstance(critical_path_phase, dict):
+        nested_current_blocker = critical_path_phase.get("current_blocker")
+        if isinstance(nested_current_blocker, str) and nested_current_blocker:
+            return nested_current_blocker
+    return None
+
+
 def completion_blocker_outcome_rows(
     completion_blockers: list[str],
     surfaces_by_id: dict[str, dict[str, Any]],
@@ -3799,9 +3815,9 @@ def completion_blocker_outcome_rows(
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     counts_by_surface: dict[str, bool] = {}
-    route_gate_current_blocker = None
-    if isinstance(command_permission_route_gate, dict):
-        route_gate_current_blocker = command_permission_route_gate.get("current_blocker")
+    route_gate_current_blocker = command_permission_route_gate_current_blocker(
+        command_permission_route_gate
+    )
     for index, surface_id in enumerate(completion_blockers, start=1):
         surface = surfaces_by_id.get(surface_id, {})
         status = surface.get("status", "missing")

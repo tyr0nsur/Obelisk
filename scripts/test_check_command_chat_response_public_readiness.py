@@ -547,6 +547,32 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
 
         self.assertEqual([], blockers)
 
+    def test_nested_runtime_and_supported_router_claims_are_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "nested_report": {
+                    "structured_evidence": [
+                        {"runtime_claim": "runtime delivery is ready"},
+                        {"router_claim": "command router is supported"},
+                    ],
+                },
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            ["positive_public_surface_claim", "positive_public_surface_claim"],
+            [item["reason"] for item in blockers],
+        )
+        self.assertEqual(
+            [
+                "$.nested_report.structured_evidence[0].runtime_claim",
+                "$.nested_report.structured_evidence[1].router_claim",
+            ],
+            [item["label"] for item in blockers],
+        )
+
     def test_rejects_decision_public_header_overclaims(self) -> None:
         decisions = self.make_decisions()
         decisions["status"] = "promoted"

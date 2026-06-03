@@ -7559,6 +7559,31 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
                     "blockers": [],
                 }
             )
+            nested_raw_report_row = row_for_route_gate(
+                {
+                    "schema": "obelisk.command-permission-route-gate-check.v1",
+                    "valid": True,
+                    "accepted_for_planning": True,
+                    "planning_only": True,
+                    "promotion_ready": False,
+                    "public_sdk_ready": False,
+                    "runtime_ready": False,
+                    "critical_path_phase": {
+                        "current_blocker": "approved_runtime_evidence_missing",
+                        "source_checker_primary_blocker": "approved_runtime_evidence_missing",
+                        "source_checker_status": "blocked",
+                        "source_checker_ready": False,
+                    },
+                    "route_lock": {
+                        "locked": True,
+                        "blocked_until": [
+                            "approved_runtime_principal_lifecycle_evidence",
+                            "reviewed_identity_public_contract",
+                        ],
+                    },
+                    "blockers": [],
+                }
+            )
             unlocked_row = row_for_route_gate(
                 {
                     "valid": True,
@@ -7596,6 +7621,19 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             "approved_runtime_evidence_missing",
         )
         self.assertFalse(planning_only_accepted_row["counts_toward_complete_sdk_claim"])
+        self.assertEqual(
+            nested_raw_report_row["route_gate_current_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        self.assertEqual(
+            nested_raw_report_row["route_gate_non_counting_blocker"],
+            "approved_runtime_evidence_missing",
+        )
+        self.assertIn(
+            "route_gate_blocker:approved_runtime_evidence_missing",
+            nested_raw_report_row["non_counting_reasons"],
+        )
+        self.assertFalse(nested_raw_report_row["counts_toward_complete_sdk_claim"])
         self.assertFalse(unlocked_row["route_gate_claim_satisfied"])
         self.assertTrue(unlocked_row["manifest_promoted_but_non_counting"])
         self.assertFalse(unlocked_row["counts_toward_complete_sdk_claim"])

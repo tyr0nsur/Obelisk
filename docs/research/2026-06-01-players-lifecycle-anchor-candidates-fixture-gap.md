@@ -4,9 +4,15 @@ Date: 2026-06-01
 
 ## Summary
 
-`players-lifecycle-anchor-candidates` is reproducible offline for all six planning-only
-targets across the two player-identity offline cores. The fixture gap identified during
-the first pass has now been closed by adding all six base snapshots under
+`players-lifecycle-anchor-candidates` has committed base fixtures for all six
+planning-only targets. Durable source-bound second-source lifecycle-anchor evidence is
+currently limited to `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout`
+under the approved offline lifecycle-anchor snapshot roots. The historical all-six
+comparison below was scratch triage under `/tmp/obelisk-lifecycle-snapshot-probe/`; it
+must not be cited as durable six-target second-source evidence unless materialized into an
+approved offline artifact/root with hash binding.
+
+The fixture gap identified during the first pass has now been closed by adding all six base snapshots under
 `tests/fixtures/ufunction_snapshots/7e7ded49e0c6/players_lifecycle/` and recording them
 in `tests/fixtures/ufunction_snapshots/manifest.json`.
 
@@ -98,6 +104,9 @@ Scratch readiness report:
 - Result totals: `targets=6`, `comparable=6`, `second_source_accepted=6`, `blocked=0`.
 - Output hash: `a4baa4822c8811759eab068447e4f1ee01285383025e6f7429017a01ede70d6c`
   for `/tmp/obelisk-lifecycle-snapshot-probe/all-six-readiness.json`.
+- This is not durable source-bound second-source lifecycle-anchor evidence for all six
+  candidates; it is scratch triage until the candidate root and report are promoted into
+  an approved offline artifact/root with hash binding.
 
 Promotion-mode check:
 
