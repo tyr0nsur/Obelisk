@@ -105,6 +105,7 @@ Current post-RC research evidence lane (side-lane inventory for research reuse; 
 - [2026-05-29-transfer-second-source-readiness.md](2026-05-29-transfer-second-source-readiness.md)
 - [2026-05-30-transfer-scriptstruct-booltail-refresh.md](2026-05-30-transfer-scriptstruct-booltail-refresh.md)
 - [2026-05-29-transfer-copied-scalar-feasibility.md](2026-05-29-transfer-copied-scalar-feasibility.md)
+- [2026-06-03-tribe-scalar-boundary-design.md](2026-06-03-tribe-scalar-boundary-design.md) (candidate-only internal Tribe scalar/control boundary; no public Tribe SDK, identity, permission enforcement ABI, runtime observer, mutation, return override, or v1 completion)
 - [2026-05-30-redacted-scriptstruct-signatures.md](2026-05-30-redacted-scriptstruct-signatures.md)
 - [2026-05-30-structure-return-only-policy-slice.md](2026-05-30-structure-return-only-policy-slice.md)
 - [2026-05-30-structure-nonpin-copied-scalar-policy-slice.md](2026-05-30-structure-nonpin-copied-scalar-policy-slice.md)

@@ -72,6 +72,7 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         manifest: dict | None = None,
         statement: str | None = None,
         split_note: str | None = None,
+        tribe_snapshot_root: Path | None = None,
         *,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
@@ -97,6 +98,8 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
             if statement is not None:
                 statement_path.write_text(statement, encoding="utf-8")
                 args.extend(["--release-statement", str(statement_path)])
+            if tribe_snapshot_root is not None:
+                args.extend(["--tribe-snapshot-root", str(tribe_snapshot_root)])
             result = subprocess.run(
                 args,
                 cwd=REPO_ROOT,
@@ -187,6 +190,53 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
         )
         self.assertIn("public_mission_sdk_abi", mission["remaining_public_gates"])
         self.assertIn("mission leaf accounting is exactly consume-only internal reusable evidence", mission["non_claims"])
+
+        tribe = report["tribe_leaf_blocker_accounting"]
+        self.assertEqual(
+            tribe["schema"],
+            "obelisk.mission-transfer-dino-tribe-v1-tribe-leaf-blocker-accounting.v1",
+        )
+        self.assertEqual(tribe["lane"], "tribe_scalar_boundary_candidate")
+        self.assertEqual(tribe["outcome"], "internal_planning_only")
+        self.assertTrue(tribe["accepted_for_internal_planning"])
+        self.assertTrue(tribe["candidate_only"])
+        self.assertTrue(tribe["internal_reusable_evidence_only"])
+        self.assertTrue(tribe["not_artifact_gate"])
+        self.assertFalse(tribe["v1_accounted"])
+        self.assertFalse(tribe["tribe_sdk_ready"])
+        self.assertFalse(tribe["public_abi_ready"])
+        self.assertFalse(tribe["public_sdk_ready"])
+        self.assertFalse(tribe["public_tribe_sdk_ready"])
+        self.assertFalse(tribe["runtime_observer_approved"])
+        self.assertFalse(tribe["runtime_ready"])
+        self.assertFalse(tribe["identity_ready"])
+        self.assertFalse(tribe["lookup_ready"])
+        self.assertFalse(tribe["mutation_ready"])
+        self.assertFalse(tribe["promotion_ready"])
+        self.assertFalse(tribe["return_override_ready"])
+        self.assertFalse(tribe["resource_handle_ready"])
+        self.assertFalse(tribe["v1_completion"])
+        self.assertEqual(tribe["focused_checker"], "scripts/check_tribe_scalar_boundary_readiness.py")
+        self.assertEqual(tribe["input_target_set"], "tribe-compact-intake")
+        self.assertEqual(tribe["missing_required_evidence"], [])
+        self.assertTrue(tribe["scalar_boundary"]["checker_ready"])
+        self.assertTrue(tribe["scalar_boundary"]["tribe_scalar_boundary_ready"])
+        self.assertTrue(tribe["scalar_boundary"]["server_request_tribe_log_control_ready"])
+        self.assertEqual(tribe["scalar_boundary"]["accepted_scalar_count"], 3)
+        self.assertIn(
+            "ShooterPlayerController.AllowTribeGroupPermission.TribeGroupPermission",
+            tribe["scalar_boundary"]["accepted_scalar_fields"],
+        )
+        self.assertIn(
+            "ShooterPlayerController.AllowTribeGroupPermission.OnObject",
+            tribe["redaction_boundary"]["required_redactions"],
+        )
+        self.assertIn("privacy_redaction_contract", tribe["remaining_public_gates"])
+        self.assertIn("permission enforcement contract", " ".join(tribe["redaction_boundary"]["forbidden_promotions"]))
+        self.assertIn(
+            "tribe leaf accounting does not promote a public Tribe SDK, ABI, callback, descriptor, or v1 completion",
+            tribe["non_claims"],
+        )
 
         priority = report["leaf_priority"]
         self.assertEqual(priority["schema"], "obelisk.mission-transfer-dino-tribe-v1-leaf-priority.v1")
@@ -608,6 +658,30 @@ class MissionTransferDinoTribeOutcomeAccountingTests(unittest.TestCase):
 
         self.assertTrue(report["ready"])
         self.assertEqual(report["blockers"], [])
+
+    def test_tribe_leaf_accounting_fails_closed_when_scalar_checker_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_root = Path(tmp) / "missing-snapshots"
+            result = self.run_checker(tribe_snapshot_root=missing_root, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(report["ready"])
+        self.assertEqual(report["accounting_route"], "candidate_only")
+        self.assertFalse(report["v1_accounted"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(report["missing_leaf_families"], REQUIRED_LEAVES)
+        self.assertFalse(report["candidate_only_accounting"]["accepted_for_internal_planning"])
+        self.assertIn("tribe_scalar_boundary_checker_blocked", report["blockers"])
+        tribe = report["tribe_leaf_blocker_accounting"]
+        self.assertEqual(tribe["outcome"], "blocked_accounting")
+        self.assertFalse(tribe["accepted_for_internal_planning"])
+        self.assertFalse(tribe["v1_accounted"])
+        self.assertFalse(tribe["public_sdk_ready"])
+        self.assertFalse(tribe["runtime_ready"])
+        self.assertFalse(tribe["promotion_ready"])
 
     def test_transfer_candidate_leaf_rejects_ready_and_resource_handle_overclaims(self) -> None:
         manifest = load_manifest()

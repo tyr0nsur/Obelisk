@@ -1293,6 +1293,22 @@ priorities, and do not use history files as the active source of truth.
   guardrails 29, py_compile, route/SDK JSON, and `git diff --check`. Route/SDK remain
   fail-closed at `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent tribe-accounting/guardrail round: mission/transfer/dino/
+  tribe/buff accounting now reuses the standalone Tribe scalar-boundary readiness report
+  as additive `tribe_leaf_blocker_accounting`, with a CLI `--tribe-snapshot-root` for
+  fail-closed fixture validation. It preserves candidate-only accounting, all five missing
+  leaf families, `v1_accounted=false`, `public_sdk_ready=false`, `runtime_ready=false`,
+  `promotion_ready=false`, and no stable SDK claim. Tests now assert the Tribe lane's
+  accepted scalar count, required redaction, forbidden promotion boundary, and false
+  public/runtime/v1 flags. `docs/research/README.md` indexes the Tribe scalar-boundary
+  design note. SDK completion audit found no side-lane bypass; route gate remains locked
+  at `approved_runtime_evidence_missing`; SDK remains `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`. PluginManager static guardrails now also verify retry
+  shutdown state and retry logging order. Approved-evidence fixture audit made no edits
+  and confirmed isolated temp roots with no new residue. Validations passed: tribe JSON,
+  tribe+accounting unittest 32, PluginManager guardrails 29, approved-evidence 65
+  (sub-agent), route JSON valid/planning-only, SDK JSON blocked by design, py_compile, and
+  `git diff --check`. No runtime/server operation.
 
 ## Agent Coordination
 

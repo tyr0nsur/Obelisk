@@ -397,6 +397,21 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("m_LoadedPlugins.reserve(m_LoadedPlugins.size() + 1)", text)
         self.assertIn("PluginInfo initFailureRetryPlugin", text)
         self.assertIn("shutdownFunc,\n                    true,", text)
+        retry_state_match = re.search(
+            r"PluginInfo initFailureRetryPlugin\s*\{(?P<body>.*?)\n\s*\};",
+            text,
+            re.S,
+        )
+        self.assertIsNotNone(retry_state_match)
+        retry_state_body = retry_state_match.group("body")
+        self.assertIn("pluginOwnerToken", retry_state_body)
+        self.assertIn("shutdownFunc", retry_state_body)
+        self.assertIn("true", retry_state_body)
+        self.assertLess(
+            retry_state_body.index("shutdownFunc"),
+            retry_state_body.index("true"),
+            "Init-failure retry state must remember shutdown was already called.",
+        )
         failure_match = re.search(
             r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
             body,
@@ -451,6 +466,20 @@ class PluginManagerGuardrailTests(unittest.TestCase):
     def test_unload_cleanup_failure_retains_plugin_without_dlclose(self) -> None:
         text = PLUGIN_MANAGER.read_text(encoding="utf-8")
         body = extract_function_body(text, r"void PluginManager::UnloadAll\(\)")
+        shutdown_match = re.search(
+            r"if \(!plugin\.shutdownCalled\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*bool callbacksCleaned",
+            body,
+            re.S,
+        )
+        self.assertIsNotNone(shutdown_match)
+        shutdown_body = shutdown_match.group("body")
+        self.assertIn("CallPluginShutdown(plugin.name, plugin.shutdown)", shutdown_body)
+        self.assertEqual(
+            shutdown_body.count("plugin.shutdownCalled = true"),
+            3,
+            "Unload retry state must mark shutdown as called on success and both exception paths.",
+        )
+
         failure_match = re.search(
             r"if \(!callbacksCleaned\)\s*\{(?P<body>.*?)\n\s*\}\n\n\s*if \(!SafeCloseLibrary",
             body,
@@ -463,6 +492,11 @@ class PluginManagerGuardrailTests(unittest.TestCase):
         self.assertIn("retainPluginForUnloadRetry", failure_body)
         self.assertIn("return", failure_body)
         self.assertIn("continue", failure_body)
+        self.assertLess(
+            failure_body.index("retaining plugin for retry"),
+            failure_body.index("retainPluginForUnloadRetry"),
+            "Cleanup retry visibility must be logged before retaining the mapped plugin.",
+        )
         for forbidden in (
             "RemovePluginOwnerToken(plugin.ownerToken)",
             "ClearPluginOwnerUnloading(plugin.owner)",

@@ -203,17 +203,18 @@ This file is an active routing table only. Durable evidence belongs in
   `identity_public_contract_gate_missing`; SDK completion requires identity contract
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
-- Latest round delegated SDK contract-gate completion audit, runtime cleanup guardrails,
-  UE4 tribe scalar-boundary implementation, and live-ops fixture isolation. Integrated
-  result: SDK completion now requires identity public-contract `contract_gate_inputs` in
-  structured promotion evidence and scans that report for nested public/runtime/v1
-  overclaims; `scripts/check_tribe_scalar_boundary_readiness.py` records internal-only
-  tribe scalar/control readiness for `ServerRequestTribeLog`, `IsInTribe.ReturnValue`,
-  `AllowTribeGroupPermission.TribeGroupPermission`, and `AllowTribeGroupPermission.ReturnValue`
-  while redacting object, array, identity, string/log, lookup, mutation, return-override,
-  ResourceHandle, runtime, public ABI, and v1 claims; approved-runtime evidence tests now
-  use per-test offline temp roots under `/servidor/ark/workspace-offline` instead of a
-  fixed sidecar directory; PluginManager guardrails catch `auto` aliases to event
-  dispatchers before bare unregister calls. Route JSON remains valid/planning-only at
-  `approved_runtime_evidence_missing`; SDK JSON remains blocked with SDK `0/12`, P0
-  `0/4`, `stable_claim_allowed=false`. No runtime/server op. Agents closed.
+- Latest round delegated tribe accounting, SDK completion bypass audit, runtime cleanup
+  guardrails, and live-ops fixture isolation. Integrated result:
+  `check_mission_transfer_dino_tribe_v1_outcome_accounting.py` now consumes the standalone
+  Tribe scalar-boundary checker as `tribe_leaf_blocker_accounting` for candidate-only
+  internal blocker accounting. It preserves all missing leaf-family semantics and keeps
+  tribe, umbrella, public SDK, runtime, promotion, and v1 completion flags false. The
+  research index now lists `docs/research/2026-06-03-tribe-scalar-boundary-design.md`.
+  SDK completion audit found no bypass: the tribe side lane remains non-counting and SDK
+  JSON remains blocked with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`.
+  PluginManager guardrails additionally assert retry state preserves owner token,
+  shutdown function, `shutdownCalled=true`, and retry logging before retention.
+  Approved-runtime evidence fixture audit made no edits and confirmed per-test offline
+  temp roots under `/servidor/ark/workspace-offline` leave no new top-level residue. Route
+  JSON remains valid/planning-only at `approved_runtime_evidence_missing`. No runtime/server
+  op. Agents closed.

@@ -18,6 +18,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from check_tribe_scalar_boundary_readiness import (
+    DEFAULT_SNAPSHOT_ROOT as DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
+    EXPECTED_ACCEPTED_FIELDS as TRIBE_EXPECTED_ACCEPTED_FIELDS,
+    EXPECTED_REQUIRED_REDACTIONS as TRIBE_EXPECTED_REQUIRED_REDACTIONS,
+    REPORT_SCHEMA as TRIBE_SCALAR_BOUNDARY_SCHEMA,
+    TARGET_SET as TRIBE_SCALAR_TARGET_SET,
+    build_report as build_tribe_scalar_boundary_report,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs" / "public_sdk_surfaces.json"
@@ -26,7 +35,9 @@ REPORT_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-outcome-accounting-check
 SURFACE_ID = "obelisk.mission_transfer_dino_tribe.v1"
 REQUIRED_LEAVES = ("mission", "transfer", "dino_policy", "tribe_policy", "buff_status")
 MISSION_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-mission-leaf-blocker-accounting.v1"
+TRIBE_LEAF_ACCOUNTING_SCHEMA = "obelisk.mission-transfer-dino-tribe-v1-tribe-leaf-blocker-accounting.v1"
 MISSION_REQUIRED_EVIDENCE = ("mission-compact-intake", "mission-copied-bool-policy-slice")
+TRIBE_REQUIRED_EVIDENCE = ("tribe-compact-intake",)
 MISSION_COPIED_TARGETS = (
     "MissionType.AddPlayerToMission",
     "MissionType.BPAllowPlayerToLeaveMission",
@@ -47,6 +58,20 @@ MISSION_REDACTED_RECOGNITION_FIELDS = (
     "MissionType.BPOnPlayerRemovedFromMission.Controller",
     "MissionType.GetPlayerUsableItems.Character",
     "MissionType.GetPlayerUsableItems.OutItemIDs",
+)
+TRIBE_PUBLIC_FALSE_KEYS = (
+    "public_sdk_ready",
+    "public_tribe_sdk_ready",
+    "public_abi_ready",
+    "runtime_ready",
+    "runtime_observer_approved",
+    "identity_ready",
+    "lookup_ready",
+    "mutation_ready",
+    "return_override_ready",
+    "resource_handle_ready",
+    "v1_completion_ready",
+    "promotion_ready",
 )
 MISSION_SPLIT_NOTE_REQUIRED_TOKENS = (
     "mission-copied-bool-policy-slice",
@@ -321,6 +346,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST, help="docs/public_sdk_surfaces.json path.")
     parser.add_argument("--split-note", type=Path, default=DEFAULT_SPLIT_NOTE, help="Leaf split research note path.")
+    parser.add_argument(
+        "--tribe-snapshot-root",
+        type=Path,
+        default=DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
+        help="Sanitized UFunction snapshot root for candidate-only Tribe scalar evidence.",
+    )
     parser.add_argument("--release-statement", type=Path, help="Optional reviewed v1 release statement.")
     parser.add_argument("--json", action="store_true", help="Emit a JSON report.")
     return parser.parse_args()
@@ -937,6 +968,153 @@ def build_mission_leaf_blocker_accounting(
     }
 
 
+def validate_tribe_scalar_boundary_report(report: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
+    label = "$.tribe_leaf_blocker_accounting.scalar_boundary_checker_report"
+    if report.get("schema") != TRIBE_SCALAR_BOUNDARY_SCHEMA:
+        add(blockers, "tribe_scalar_boundary_schema_mismatch", f"{label}.schema")
+    if report.get("target_set") != TRIBE_SCALAR_TARGET_SET:
+        add(blockers, "tribe_scalar_boundary_target_set_mismatch", f"{label}.target_set")
+    if report.get("accepted_for_internal_planning") is not True:
+        add(blockers, "tribe_scalar_boundary_not_internal_planning_ready", f"{label}.accepted_for_internal_planning")
+    for key in ("offline_only", "fixture_only", "not_artifact_gate"):
+        if report.get(key) is not True:
+            add(blockers, "tribe_scalar_boundary_safety_flag_mismatch", f"{label}.{key}", key=key)
+    if report.get("blockers"):
+        add(
+            blockers,
+            "tribe_scalar_boundary_checker_blocked",
+            f"{label}.blockers",
+            checker_blockers=report.get("blockers"),
+        )
+    for key in TRIBE_PUBLIC_FALSE_KEYS:
+        if report.get(key) is not False:
+            add(blockers, "tribe_scalar_boundary_public_or_runtime_claim", f"{label}.{key}", key=key)
+
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        add(blockers, "tribe_scalar_boundary_summary_missing", f"{label}.summary")
+        return
+    accepted_fields = string_list(summary.get("accepted_scalar_fields"))
+    missing_accepted = sorted(set(TRIBE_EXPECTED_ACCEPTED_FIELDS) - set(accepted_fields))
+    if missing_accepted:
+        add(
+            blockers,
+            "tribe_scalar_boundary_accepted_fields_missing",
+            f"{label}.summary.accepted_scalar_fields",
+            missing=missing_accepted,
+        )
+    redacted_fields = string_list(summary.get("redacted_fields"))
+    missing_redactions = sorted(set(TRIBE_EXPECTED_REQUIRED_REDACTIONS) - set(redacted_fields))
+    if missing_redactions:
+        add(
+            blockers,
+            "tribe_scalar_boundary_required_redactions_missing",
+            f"{label}.summary.redacted_fields",
+            missing=missing_redactions,
+        )
+
+
+def build_tribe_leaf_blocker_accounting(
+    leaves: dict[str, dict[str, Any]],
+    leaf_family_accounting: dict[str, Any],
+    scalar_report: dict[str, Any],
+) -> dict[str, Any]:
+    leaf = leaves.get("tribe_policy", {})
+    current_evidence = string_list(leaf.get("current_evidence"))
+    missing_required_evidence = sorted(set(TRIBE_REQUIRED_EVIDENCE) - set(current_evidence))
+    gaps = leaf_family_accounting.get("leaf_family_gaps")
+    tribe_gap = (
+        gaps.get("tribe_policy")
+        if isinstance(gaps, dict) and isinstance(gaps.get("tribe_policy"), dict)
+        else {}
+    )
+    summary = scalar_report.get("summary") if isinstance(scalar_report.get("summary"), dict) else {}
+
+    accepted_scalar_fields = string_list(
+        summary.get("accepted_scalar_fields") if isinstance(summary, dict) else None
+    )
+    redacted_fields = string_list(summary.get("redacted_fields") if isinstance(summary, dict) else None)
+    optional_controls = summary.get("optional_controls") if isinstance(summary, dict) else None
+    control_ready = scalar_report.get("server_request_tribe_log_control_ready")
+
+    return {
+        "schema": TRIBE_LEAF_ACCOUNTING_SCHEMA,
+        "leaf": "tribe_policy",
+        "lane": "tribe_scalar_boundary_candidate",
+        "status": leaf.get("status") if isinstance(leaf.get("status"), str) else "missing",
+        "accounting_scope": "candidate-only internal blocker accounting",
+        "accepted_for_internal_planning": (
+            not missing_required_evidence
+            and leaf.get("status") == "planning"
+            and scalar_report.get("accepted_for_internal_planning") is True
+            and not scalar_report.get("blockers")
+        ),
+        "candidate_only": True,
+        "internal_reusable_evidence_only": True,
+        "not_artifact_gate": True,
+        "v1_accounted": bool(tribe_gap.get("v1_accounted")),
+        "tribe_sdk_ready": False,
+        "public_abi_ready": False,
+        "public_sdk_ready": False,
+        "public_tribe_sdk_ready": False,
+        "runtime_observer_approved": False,
+        "runtime_ready": False,
+        "identity_ready": False,
+        "lookup_ready": False,
+        "mutation_ready": False,
+        "promotion_ready": False,
+        "return_override_ready": False,
+        "resource_handle_ready": False,
+        "v1_completion": False,
+        "focused_checker": "scripts/check_tribe_scalar_boundary_readiness.py",
+        "input_target_set": TRIBE_SCALAR_TARGET_SET,
+        "required_evidence": list(TRIBE_REQUIRED_EVIDENCE),
+        "current_evidence": current_evidence,
+        "missing_required_evidence": missing_required_evidence,
+        "scalar_boundary": {
+            "checker_schema": scalar_report.get("schema"),
+            "checker_ready": bool(scalar_report.get("ready")),
+            "tribe_scalar_boundary_ready": bool(scalar_report.get("tribe_scalar_boundary_ready")),
+            "server_request_tribe_log_control_ready": control_ready,
+            "accepted_scalar_fields": accepted_scalar_fields,
+            "accepted_scalar_count": len(accepted_scalar_fields),
+            "optional_controls": optional_controls if isinstance(optional_controls, list) else [],
+        },
+        "redaction_boundary": {
+            "redacted_fields": redacted_fields,
+            "required_redactions": sorted(TRIBE_EXPECTED_REQUIRED_REDACTIONS),
+            "forbidden_promotions": [
+                "public Tribe SDK",
+                "tribe/player identity",
+                "membership or permission enforcement contract",
+                "tribe log, MOTD, notice, string, or text payloads",
+                "online-list and mission-tag arrays",
+                "object pointers and UE references",
+                "lookup",
+                "runtime hook wiring",
+                "mutation",
+                "return override",
+                "ResourceHandle",
+            ],
+        },
+        "remaining_public_gates": string_list(tribe_gap.get("missing_public_gates")),
+        "outcome": (
+            "internal_planning_only"
+            if not missing_required_evidence
+            and leaf.get("status") == "planning"
+            and scalar_report.get("accepted_for_internal_planning") is True
+            and not scalar_report.get("blockers")
+            else "blocked_accounting"
+        ),
+        "non_claims": [
+            "tribe leaf accounting is candidate-only internal reusable evidence",
+            "tribe leaf accounting does not promote a public Tribe SDK, ABI, callback, descriptor, or v1 completion",
+            "tribe leaf accounting does not promote runtime hooks, dispatcher wiring, identity, lookup, arrays, strings, object references, mutation, return override, or ResourceHandle",
+            "tribe leaf accounting keeps scalar permission/control evidence separate from blocked array and string payload work",
+        ],
+    }
+
+
 def validate_public_contracts(
     surface: dict[str, Any],
     leaves: dict[str, dict[str, Any]],
@@ -1123,7 +1301,12 @@ def build_leaf_priority(
     }
 
 
-def build_report(manifest_path: Path, split_note_path: Path, release_statement_path: Path | None = None) -> dict[str, Any]:
+def build_report(
+    manifest_path: Path,
+    split_note_path: Path,
+    release_statement_path: Path | None = None,
+    tribe_snapshot_root: Path = DEFAULT_TRIBE_SCALAR_SNAPSHOT_ROOT,
+) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     manifest = load_json(manifest_path, "manifest")
     split_note = read_optional(split_note_path, "split_note")
@@ -1165,6 +1348,9 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
     if surface.get("status") == "excluded" and not manifest_umbrella_excluded:
         add(blockers, "manifest_excluded_route_missing_leaf_exclusions", "$.leaf_decision_units")
 
+    tribe_scalar_boundary_report = build_tribe_scalar_boundary_report(tribe_snapshot_root)
+    validate_tribe_scalar_boundary_report(tribe_scalar_boundary_report, blockers)
+
     excluded_route = manifest_umbrella_excluded or statement_umbrella_excluded
     validate_public_contracts(surface, leaves, blockers, excluded_route=excluded_route)
 
@@ -1179,6 +1365,11 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
     leaf_family_accounting = build_leaf_family_accounting(surface, leaves, outcome, route, blockers)
     leaf_priority = build_leaf_priority(leaves, leaf_family_accounting, blockers)
     mission_leaf_blocker_accounting = build_mission_leaf_blocker_accounting(leaves, leaf_family_accounting)
+    tribe_leaf_blocker_accounting = build_tribe_leaf_blocker_accounting(
+        leaves,
+        leaf_family_accounting,
+        tribe_scalar_boundary_report,
+    )
 
     return {
         "schema": REPORT_SCHEMA,
@@ -1195,6 +1386,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
         "leaf_statuses": {leaf_id: leaves.get(leaf_id, {}).get("status") for leaf_id in REQUIRED_LEAVES},
         "candidate_only_accounting": leaf_family_accounting,
         "mission_leaf_blocker_accounting": mission_leaf_blocker_accounting,
+        "tribe_leaf_blocker_accounting": tribe_leaf_blocker_accounting,
         "leaf_priority": leaf_priority,
         "missing_leaf_families": leaf_family_accounting["missing_leaf_families"],
         "release_statement": outcome,
@@ -1209,7 +1401,7 @@ def build_report(manifest_path: Path, split_note_path: Path, release_statement_p
 
 def main() -> int:
     args = parse_args()
-    report = build_report(args.manifest, args.split_note, args.release_statement)
+    report = build_report(args.manifest, args.split_note, args.release_statement, args.tribe_snapshot_root)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     elif report["ready"]:
