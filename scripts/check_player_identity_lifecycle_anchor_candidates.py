@@ -57,6 +57,11 @@ ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF = frozenset(
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+PLACEHOLDER_OBELISK_COMMITS = frozenset(("mixed_or_unknown",))
+PLACEHOLDER_SOURCE_ARTIFACT_IDS = {
+    "capture_id": frozenset(("core",)),
+    "evidence_pack_id": frozenset(("core-evidence-pack",)),
+}
 ROLE_TO_ACCEPTANCE_KEYS = {
     "session_start": ("session_start_accepted", "accepted_start_targets"),
     "session_end": ("session_end_accepted", "accepted_end_targets"),
@@ -232,17 +237,7 @@ def validate_source_artifact_ids(value: Any, blockers: list[dict[str, Any]], lab
     if not isinstance(value, list):
         add(blockers, "artifact_identity_source_ids_invalid", label)
         return
-    parsed: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
-    for index, item in enumerate(value):
-        item_label = f"{label}[{index}]"
-        if not isinstance(item, str) or ":" not in item:
-            add(blockers, "artifact_identity_source_id_invalid", item_label)
-            continue
-        key, _, raw = item.partition(":")
-        if key not in parsed:
-            add(blockers, "artifact_identity_source_id_key_unknown", item_label)
-            continue
-        parsed[key].append(raw)
+    parsed = parse_source_artifact_ids(value, blockers, label)
     for key, values in parsed.items():
         if len(values) == 0 or len(values) != len(parsed["artifact_sha256"]):
             add(blockers, "artifact_identity_source_id_count_mismatch", label, field=key, recorded_count=len(values))
@@ -253,6 +248,78 @@ def validate_source_artifact_ids(value: Any, blockers: list[dict[str, Any]], lab
                     add(blockers, "artifact_identity_source_artifact_sha_invalid", label)
             elif SAFE_ID_RE.fullmatch(value) is None:
                 add(blockers, "artifact_identity_source_artifact_id_invalid", label, field=key)
+
+
+def parse_source_artifact_ids(
+    value: Any,
+    blockers: list[dict[str, Any]],
+    label: str,
+) -> dict[str, list[str]]:
+    parsed: dict[str, list[str]] = {"artifact_sha256": [], "capture_id": [], "evidence_pack_id": []}
+    if not isinstance(value, list):
+        return parsed
+    for index, item in enumerate(value):
+        item_label = f"{label}[{index}]"
+        if not isinstance(item, str) or ":" not in item:
+            add(blockers, "artifact_identity_source_id_invalid", item_label)
+            continue
+        key, _, raw = item.partition(":")
+        if key not in parsed:
+            add(blockers, "artifact_identity_source_id_key_unknown", item_label)
+            continue
+        parsed[key].append(raw)
+    return parsed
+
+
+def validate_accepted_anchor_provenance(
+    anchor: dict[str, Any],
+    artifact_identity: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    label: str,
+) -> None:
+    obelisk_commit = artifact_identity.get("obelisk_commit")
+    if obelisk_commit in PLACEHOLDER_OBELISK_COMMITS:
+        add(
+            blockers,
+            "accepted_anchor_artifact_identity_obelisk_commit_placeholder",
+            "$.artifact_identity.obelisk_commit",
+            value=obelisk_commit,
+        )
+
+    parsed_source_ids = parse_source_artifact_ids(
+        artifact_identity.get("source_artifact_ids"),
+        blockers,
+        "$.artifact_identity.source_artifact_ids",
+    )
+    for key, placeholder_values in PLACEHOLDER_SOURCE_ARTIFACT_IDS.items():
+        for value in parsed_source_ids.get(key, []):
+            if value in placeholder_values:
+                add(
+                    blockers,
+                    "accepted_anchor_artifact_identity_source_id_placeholder",
+                    "$.artifact_identity.source_artifact_ids",
+                    field=key,
+                    value=value,
+                )
+
+    corroboration = anchor.get("corroboration")
+    status = corroboration.get("status") if isinstance(corroboration, dict) else None
+    if status == "second_source_accepted":
+        report_sha = corroboration.get("second_source_report_sha256") if isinstance(corroboration, dict) else None
+        if not isinstance(report_sha, str) or SHA256_RE.fullmatch(report_sha) is None:
+            add(
+                blockers,
+                "accepted_anchor_second_source_report_hash_missing",
+                f"{label}.corroboration.second_source_report_sha256",
+            )
+    elif status == "static_accepted":
+        report_sha = corroboration.get("static_report_sha256") if isinstance(corroboration, dict) else None
+        if not isinstance(report_sha, str) or SHA256_RE.fullmatch(report_sha) is None:
+            add(
+                blockers,
+                "accepted_anchor_static_report_hash_missing",
+                f"{label}.corroboration.static_report_sha256",
+            )
 
 
 def validate_artifact_identity(payload: dict[str, Any], blockers: list[dict[str, Any]]) -> None:
@@ -396,7 +463,13 @@ def validate_lifecycle_layout_candidate(
                 )
 
 
-def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> tuple[str | None, str | None, bool]:
+def validate_anchor(
+    anchor: Any,
+    blockers: list[dict[str, Any]],
+    index: int,
+    *,
+    artifact_identity: dict[str, Any],
+) -> tuple[str | None, str | None, bool]:
     label = f"$.candidate_anchors[{index}]"
     if not isinstance(anchor, dict):
         add(blockers, "candidate_anchor_invalid", label)
@@ -447,6 +520,7 @@ def validate_anchor(anchor: Any, blockers: list[dict[str, Any]], index: int) -> 
         status = corroboration.get("status") if isinstance(corroboration, dict) else None
         if status not in CORROBORATED_STATUSES:
             add(blockers, "accepted_anchor_corroboration_missing", f"{label}.corroboration.status")
+        validate_accepted_anchor_provenance(anchor, artifact_identity, blockers, label)
     evidence = anchor.get("evidence")
     if not isinstance(evidence, dict):
         add(blockers, "candidate_anchor_evidence_missing", f"{label}.evidence")
@@ -495,13 +569,14 @@ def validate_manifest_details(payload: dict[str, Any], *, promote: bool = False)
             add(blockers, f"{key}_not_false", f"$.{key}")
 
     validate_artifact_identity(payload, blockers)
+    artifact_identity = payload.get("artifact_identity") if isinstance(payload.get("artifact_identity"), dict) else {}
 
     anchors = payload.get("candidate_anchors")
     if not isinstance(anchors, list):
         add(blockers, "candidate_anchors_not_list", "$.candidate_anchors")
         anchors = []
     for index, anchor in enumerate(anchors):
-        role, target, accepted = validate_anchor(anchor, blockers, index)
+        role, target, accepted = validate_anchor(anchor, blockers, index, artifact_identity=artifact_identity)
         if accepted and role in accepted_by_role and target:
             accepted_by_role[role].append(target)
 

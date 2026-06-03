@@ -105,19 +105,21 @@ priorities, and do not use history files as the active source of truth.
   text claims; nested public reply/send-chat, command routing, permissions/admin, ABI,
   runtime, or v1-completion claims block planning alignment even if a leaf report says
   `valid=true`.
-  Identity now has repo-local source-bound lifecycle/principal planning artifacts in
-  `docs/research/player-identity-planning-sources/`, generated from the current
-  first-evidence and sanitized lifecycle snapshots. The default no-runtime route is
-  blocked at `approved_runtime_evidence_missing`, remains locked/planning-only, and
-  keeps all public/runtime/promotion/SDK readiness flags false; with accepted approved
-  runtime evidence, the route may advance only to `identity_public_contract_gate_missing`,
-  still locked/planning-only. Inventory copied signals remain the higher-value side lane
+  Identity has repo-local lifecycle/principal planning artifacts in
+  `docs/research/player-identity-planning-sources/`, but accepted lifecycle anchors now
+  fail closed until non-placeholder provenance and accepted report hashes are rebound.
+  The default no-runtime route is blocked at
+  `lifecycle_anchor_first_evidence_provenance_unbound`, remains locked/planning-only, and
+  keeps all public/runtime/promotion/SDK readiness flags false; after provenance binding
+  it may advance to `approved_runtime_evidence_missing`, and with accepted approved
+  runtime evidence it may advance only to `identity_public_contract_gate_missing`, still
+  locked/planning-only. Inventory copied signals remain the higher-value side lane
   after identity -> permissions/admin -> command response -> commands/replies, while Structure census is
   explicitly excluded/non-counting and Structure build-policy remains offline planning only.
-  The accepted lifecycle-anchor snapshot binding gap is closed in the current builder and
-  default route: `ShooterGameMode.HandleNewPlayer` and `ShooterGameMode.OnLogout` source
-  hashes are checked against the actual `--snapshot-root` files before the route may
-  report `approved_runtime_evidence_missing`.
+  The lifecycle-anchor checker rejects accepted anchors with `mixed_or_unknown`, generic
+  `capture_id:core` / `evidence_pack_id:core-evidence-pack`, or missing accepted
+  second-source/static report hashes before the route may report
+  `approved_runtime_evidence_missing`.
   Operator approval receipt handling is provenance-only: request preparation writes only
   `operator-approval-receipt.template.json`; post-window replay requires a completed
   `operator-approval-receipt.json`, exact current-turn completion metadata, bound-request
@@ -1183,6 +1185,14 @@ priorities, and do not use history files as the active source of truth.
   `bAccept` remains a useful bool-layout fixture rather than a promoted module route.
   Validation stayed offline-only and route/SDK remained fail-closed. No runtime/server
   operation was performed.
+- 2026-06-03 supervised 4-agent SDK evidence round: accepted lifecycle anchors now reject
+  placeholder artifact identity (`mixed_or_unknown`, `capture_id:core`,
+  `evidence_pack_id:core-evidence-pack`) and missing accepted report hashes. The route
+  gate treats `lifecycle_anchor_first_evidence_provenance_unbound` as a valid upstream
+  planning-only lock and skips downstream P0 child composition until lifecycle provenance
+  is rebound. SDK completion remains blocked with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, public/runtime false. PluginManager guardrails gained
+  copied-dispatcher public-ABI token coverage. No runtime/server operation was performed.
 
 ## Agent Coordination
 

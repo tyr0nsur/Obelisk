@@ -23,12 +23,14 @@ This file is an active routing table only. Durable evidence belongs in
   bookkeeping only.
 - Current accounting: SDK completion remains fail-closed with complete-SDK progress
   `0/12`, P0 promoted count `0/4`, and `stable_claim_allowed=false`.
-- Current identity status: `scripts/build_player_identity_planning_source_manifests.py`
-  produced repo-local source-aligned planning manifests for the default identity route.
-  Default no-runtime-evidence routing now reports `approved_runtime_evidence_missing`,
+- Current identity status: repo-local lifecycle-anchor planning manifests now fail closed
+  because accepted anchors still carry placeholder/mixed provenance and missing report
+  hashes. Default routing reports `lifecycle_anchor_first_evidence_provenance_unbound`,
   with `promotion_ready=false`, `public_sdk_ready=false`, and `runtime_ready=false`.
-  After accepted approved runtime evidence, the only allowed route blocker is
-  `identity_public_contract_gate_missing`, still locked/planning-only.
+  Rebind accepted lifecycle anchors with reviewed non-generic provenance before expecting
+  `approved_runtime_evidence_missing`; after accepted approved runtime evidence, the only
+  allowed later route blocker is `identity_public_contract_gate_missing`, still locked and
+  planning-only.
 
 ## Hard Overrides
 - GitHub work may be delegated only for an evidenced, stable milestone. No tag or
@@ -90,31 +92,30 @@ This file is an active routing table only. Durable evidence belongs in
   commands/replies. Passing it means planning-only alignment, not public ABI, runtime
   readiness, command router readiness, reply/send-chat ABI, or v1 completion.
 - The default route currently reports `valid=true`, `planning_only=true`,
-  `promotion_ready=false`, and current blocker `approved_runtime_evidence_missing`.
+  `promotion_ready=false`, and current blocker
+  `lifecycle_anchor_first_evidence_provenance_unbound`.
 - `scripts/build_player_identity_planning_source_manifests.py --output-dir
   docs/research/player-identity-planning-sources` emitted planning-only
   `players-identity-first-evidence.json`,
   `players-identity-lifecycle-anchor-candidates.json`, and
-  `players-identity-principal-invalidation-policy.json` bound to the current
-  first-evidence source and current snapshot-root hashes for `ShooterGameMode.HandleNewPlayer`
-  and `ShooterGameMode.OnLogout`. The default route consumes those repo-local fallbacks
-  and reports `approved_runtime_evidence_missing`, with runtime/server authorization false.
-  If future accepted approved runtime evidence is supplied, aggregate and bound route
-  validation may accept `identity_public_contract_gate_missing` only as locked,
-  planning-only state with identity, permissions/admin, command response, commands/replies,
-  public SDK, public header, and runtime readiness still false.
-  Route-lock expectation: `approved_runtime_evidence_missing` keeps
+  `players-identity-principal-invalidation-policy.json`, but accepted lifecycle anchors
+  still have placeholder/mixed provenance or missing accepted report hashes. The default
+  route reports `lifecycle_anchor_first_evidence_provenance_unbound`, with runtime/server
+  authorization false, and skips downstream P0 child composition until provenance is
+  rebound. Route-lock expectation: current lifecycle lock keeps
+  `blocked_until=[bound_lifecycle_anchor_and_principal_policy_sources,
+  reviewed_identity_public_contract]`; after rebinding,
+  `approved_runtime_evidence_missing` keeps
   `blocked_until=[approved_runtime_principal_lifecycle_evidence,
-  reviewed_identity_public_contract]`; `identity_public_contract_gate_missing` keeps
-  `blocked_until=[reviewed_identity_public_contract]`.
+  reviewed_identity_public_contract]`.
 - Current recipe: `docs/research/2026-05-31-player-identity-offline-pack-preflight.md`
   remains the safe offline pack route. It requires a non-protected complete
   `obelisk.core-dump-evidence-pack.v1`, accepted `obelisk.reflection-inventory-pack.v1`,
   12/12 candidate fixtures, and accepted distinct second-source layout evidence from the
   vanilla-gdb core. Repo-local lifecycle-anchor and principal-invalidation manifests are
-  consume-only planning inputs and source-bound; remaining blocker is approved runtime
-  principal lifecycle evidence. Do not rerun completed admin snapshot, second-source
-  layout, or lifecycle layout routes.
+  consume-only planning inputs; remaining blocker is first binding accepted lifecycle
+  provenance/report hashes, then approved runtime principal lifecycle evidence. Do not
+  rerun completed admin snapshot, second-source layout, or lifecycle layout routes.
 - Player identity first evidence uses the 12-target `players-identity-lifecycle-intake`
   planning set. `ShooterPlayerController.ServerListPlayers` and
   `ShooterPlayerController.ServerKickPlayer` are exact required admin targets in that set,
@@ -143,13 +144,12 @@ This file is an active routing table only. Durable evidence belongs in
 - P0 identity: use `scripts/build_player_identity_planning_source_manifests.py` when a
   bound route proof is needed, then run
   `scripts/check_command_permission_route_gate_bound_identity_sources.py`. For a
-  no-runtime-evidence bound proof, confirm the wrapper blocker is
-  `approved_runtime_evidence_missing`. If accepted approved runtime evidence is supplied
-  to the route, confirm `identity_public_contract_gate_missing` and keep all
-  unlock/readiness flags false. The previous offline
-  provenance gap for accepted lifecycle-anchor snapshot hashes is closed in the builder
-  and bound wrapper; stale standalone manifests still fail closed unless regenerated or
-  explicitly aligned to the current `--snapshot-root`.
+  no-runtime-evidence proof, first clear
+  `lifecycle_anchor_first_evidence_provenance_unbound` by rebinding accepted lifecycle
+  anchors with reviewed non-placeholder provenance and accepted report hashes; only then
+  expect `approved_runtime_evidence_missing`. If accepted approved runtime evidence is
+  supplied to the route, confirm `identity_public_contract_gate_missing` and keep all
+  unlock/readiness flags false.
 - P0 runtime evidence: prepare, but do not run, a fresh live-ops brief for approved copied
   runtime principal lifecycle evidence. Request/window preparation is offline guardrail
   work only: request-pack acceptance keeps `server_operations_authorized=false`,
@@ -210,11 +210,10 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 keeps it non-counting.
 - Latest round delegated identity intake, SDK accounting, runtime lifecycle, and reversing.
-  approved runtime principal lifecycle summaries must keep `readiness_gate=none` and an
-  observational-only not-ready promotion gate; secondary reports reject nonzero complete-SDK
-  and P0 progress aliases; command-response planning readiness must carry a distinct
-  `--candidate-root`; PluginManager has player-principal cleanup retry/close coverage.
-  Pending: lifecycle-anchor mixed/generic artifact identity needs placeholder/report-hash
-  rejection. Agents closed; route/SDK remain fail-closed at
-  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, public/runtime false,
-  `stable_claim_allowed=false`. No runtime/server op.
+  Integrated result: accepted lifecycle anchors reject placeholder artifact identity and
+  missing report hashes; route gate treats
+  `lifecycle_anchor_first_evidence_provenance_unbound` as the valid upstream planning-only
+  lock and skips downstream P0 child composition until rebound; SDK completion remains
+  fail-closed at SDK `0/12`, P0 `0/4`, public/runtime false,
+  `stable_claim_allowed=false`. Runtime ABI tests added copied-dispatcher token guard
+  coverage. Agents closed; no runtime/server op.

@@ -66,6 +66,7 @@ def lifecycle_layout_anchor(role: str, target: str) -> dict:
     anchor["accepted"] = True
     anchor["acceptance_status"] = "layout_accepted_candidate_only"
     anchor["corroboration"]["status"] = "second_source_accepted"
+    anchor["corroboration"]["second_source_report_sha256"] = SHA
     anchor["blockers"] = []
     if target == "ShooterGameMode.HandleNewPlayer":
         anchor["num_parms"] = 5
@@ -310,6 +311,22 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertTrue(report["ready"])
         self.assertEqual([], report["blockers"])
 
+    def test_unaccepted_candidates_may_record_placeholder_provenance_without_acceptance(self) -> None:
+        payload = manifest()
+        payload["artifact_identity"]["obelisk_commit"] = "mixed_or_unknown"
+        payload["artifact_identity"]["source_artifact_ids"] = [
+            f"artifact_sha256:{SHA}",
+            "capture_id:core",
+            "evidence_pack_id:core-evidence-pack",
+        ]
+
+        result = self.run_checker(payload)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(report["ready"])
+        self.assertEqual([], report["blockers"])
+
     def test_promote_blocks_candidate_only(self) -> None:
         result = self.run_checker(manifest(), "--promote", check=False)
         payload = json.loads(result.stdout)
@@ -389,6 +406,47 @@ class PlayerIdentityLifecycleAnchorCandidateTests(unittest.TestCase):
         self.assertFalse(report["promotion_ready"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_accepted_lifecycle_anchor_with_placeholder_artifact_identity(self) -> None:
+        payload = accepted_lifecycle_anchor_manifest()
+        payload["artifact_identity"]["obelisk_commit"] = "mixed_or_unknown"
+        payload["artifact_identity"]["source_artifact_ids"] = [
+            f"artifact_sha256:{SHA}",
+            "capture_id:core",
+            "evidence_pack_id:core-evidence-pack",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("accepted_anchor_artifact_identity_obelisk_commit_placeholder", report["blockers"])
+        self.assertIn("accepted_anchor_artifact_identity_source_id_placeholder", report["blockers"])
+
+    def test_rejects_second_source_accepted_anchor_without_report_hash(self) -> None:
+        payload = accepted_lifecycle_anchor_manifest()
+        payload["candidate_anchors"][0]["corroboration"]["second_source_report_sha256"] = None
+        payload["candidate_anchors"][1]["corroboration"].pop("second_source_report_sha256")
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("accepted_anchor_second_source_report_hash_missing", report["blockers"])
+
+    def test_rejects_static_accepted_anchor_without_static_report_hash(self) -> None:
+        payload = accepted_lifecycle_anchor_manifest()
+        payload["candidate_anchors"][0]["corroboration"] = {
+            "status": "static_accepted",
+            "second_source_report_sha256": None,
+            "static_report_sha256": None,
+        }
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("accepted_anchor_static_report_hash_missing", report["blockers"])
 
     def test_promote_blocks_layout_anchors_on_invalidation_semantics(self) -> None:
         payload = accepted_lifecycle_anchor_manifest()

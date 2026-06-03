@@ -1181,14 +1181,14 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertNotIn("structure_build_policy_offline_intake_invalid", payload["blockers"])
         self.assertNotIn("structure_build_policy_offline_intake_blockers_not_empty", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
-        self.assertEqual(route_gate["current_blocker"], "approved_runtime_evidence_missing")
+        self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
         self.assertEqual(
             route_gate["source_checker_primary_blocker"],
-            "approved_runtime_evidence_missing",
+            "lifecycle_anchor_first_evidence_provenance_unbound",
         )
         self.assertEqual(
             route_gate["route_lock_blocked_until"],
-            ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
+            ["bound_lifecycle_anchor_and_principal_policy_sources", "reviewed_identity_public_contract"],
         )
         progress = payload["v1_sdk_progress"]
         self.assertEqual(progress["completion_blocker_total"], 12)
@@ -1291,11 +1291,11 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("bookkeeping alone never approves", sections["release_statement_bookkeeping"]["non_claim"])
         self.assertEqual(
             sections["runtime_required_blockers"]["route_gate_current_blockers"],
-            ["approved_runtime_evidence_missing"],
+            ["lifecycle_anchor_first_evidence_provenance_unbound"],
         )
         self.assertEqual(
             sections["next_v1_work"]["route_gate_current_blockers"],
-            ["approved_runtime_evidence_missing"],
+            ["lifecycle_anchor_first_evidence_provenance_unbound"],
         )
         self.assertEqual(payload["player_identity_request_pack_non_evidence_terms_missing"], [])
         self.assertEqual(
@@ -1963,11 +1963,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertIn("obelisk.player_identity.v1", result.stdout)
         self.assertIn("Experimental copied-data seeds still need an explicit v1 outcome", result.stdout)
         self.assertIn("obelisk.chat_message.v1", result.stdout)
-        self.assertIn("P0 route gate: approved_runtime_evidence_missing", result.stdout)
-        self.assertIn("approved_runtime_principal_lifecycle_evidence", result.stdout)
+        self.assertIn("P0 route gate: lifecycle_anchor_first_evidence_provenance_unbound", result.stdout)
+        self.assertIn("bound_lifecycle_anchor_and_principal_policy_sources", result.stdout)
         self.assertIn("reviewed_identity_public_contract", result.stdout)
-        self.assertIn("Request-pack and preflight readiness are non-counting preparation", result.stdout)
-        self.assertIn("do not satisfy approved runtime principal lifecycle evidence", result.stdout)
+        self.assertIn("High-demand v1 completion blockers are still unresolved", result.stdout)
         self.assertIn("Use --json for the full machine-readable report.", result.stdout)
 
     def test_completion_gate_rejects_route_gate_public_or_runtime_claims(self) -> None:
@@ -2265,7 +2264,7 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("command_permission_route_gate_default_source_next_blocker_unexpected", payload["blockers"])
 
-    def test_completion_gate_rejects_default_route_gate_runtime_blocker_drift(self) -> None:
+    def test_completion_gate_rejects_lifecycle_route_gate_missing_source_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             route_gate_path = Path(temp_dir) / "fake_route_gate.py"
             route_gate_path.write_text(
@@ -2303,8 +2302,10 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("command_permission_route_gate_default_blocker_mismatch", payload["blockers"])
-        self.assertIn("command_permission_route_gate_default_source_blocker_mismatch", payload["blockers"])
+        self.assertNotIn("command_permission_route_gate_default_blocker_mismatch", payload["blockers"])
+        self.assertNotIn("command_permission_route_gate_default_source_blocker_mismatch", payload["blockers"])
+        self.assertIn("command_permission_route_gate_source_status_unexpected", payload["blockers"])
+        self.assertIn("command_permission_route_gate_lock_unexpected", payload["blockers"])
         route_gate = payload["command_permission_route_gate"]
         self.assertEqual(route_gate["current_blocker"], "lifecycle_anchor_first_evidence_provenance_unbound")
         self.assertEqual(
@@ -6441,6 +6442,47 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("promoted_surface_evidence_missing", payload["blockers"])
         self.assertEqual(payload["promoted_blockers_without_evidence"], ["obelisk.structure_census.v1"])
+
+    def test_promotion_evidence_rejects_non_evidence_scope_aliases(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "core",
+                prefix="StructureCensusPromotion",
+            ) as core_dir,
+            tempfile.TemporaryDirectory(
+                dir=REPO_ROOT / "tests" / "sdk_consumer",
+                prefix="structure_census_promotion",
+            ) as sdk_dir,
+        ):
+            abi_test = Path(core_dir) / "StructureCensusPromotionTests.cpp"
+            sdk_test = Path(sdk_dir) / "structure_census_promotion_plugin.c"
+            abi_test.write_text("// promoted structure census ABI placeholder\n", encoding="utf-8")
+            sdk_test.write_text("// promoted structure census SDK placeholder\n", encoding="utf-8")
+            base_surface = {
+                "id": "obelisk.structure_census.v1",
+                "status": "promoted",
+                "public_contract": ["ObeliskApi.RegisterStructureCensusCallback"],
+                "evidence": {
+                    "surface_id": "obelisk.structure_census.v1",
+                    "promotion_status": "promoted",
+                    "public_sdk_ready": True,
+                    "abi_tests": [str(abi_test.relative_to(REPO_ROOT))],
+                    "sdk_consumer_tests": [str(sdk_test.relative_to(REPO_ROOT))],
+                },
+            }
+            self.assertTrue(surface_has_promotion_evidence(base_surface))
+
+            cases = (
+                ("evidence_scope", "request_pack_only"),
+                ("claim_scope", "preflight-only"),
+                ("artifactScope", "window_manifest_only"),
+                ("validation_scope", "operator-approval-receipt-only"),
+            )
+            for key, value in cases:
+                with self.subTest(scope_key=key):
+                    surface = json.loads(json.dumps(base_surface))
+                    surface["evidence"][key] = value
+                    self.assertFalse(surface_has_promotion_evidence(surface))
 
     def test_promoted_completion_blocker_rejects_core_test_as_sdk_consumer_evidence(self) -> None:
         manifest, _ = complete_excluded_manifest()

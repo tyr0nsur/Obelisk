@@ -65,6 +65,12 @@ REQUIRED_LOCKED_CHILD_CHECKS = {
     "command_chat_response_public_readiness",
     "commands_replies_public_readiness",
 }
+UPSTREAM_IDENTITY_LOCK_BLOCKERS = {
+    "lifecycle_anchor_first_evidence_provenance_unbound",
+}
+UPSTREAM_SKIPPED_ROUTE_CHECKS = REQUIRED_LOCKED_CHILD_CHECKS | {
+    "player_identity_public_contract_gap",
+}
 REQUIRED_CHILD_ACCOUNTING_FALSE_KEYS = (
     "counts_toward_public_sdk",
     "counts_toward_runtime",
@@ -365,10 +371,10 @@ def identity_readiness_argv(args: argparse.Namespace | None) -> list[str]:
     return argv
 
 
-def route_checks(args: argparse.Namespace, *, current_route_blocker: str) -> list[tuple[str, list[str]]]:
+def route_checks(args: argparse.Namespace, *, current_route_blocker: str | None) -> list[tuple[str, list[str]]]:
     shared_surface_args = ["--surfaces", str(args.public_sdk_surfaces)]
     shared_header_args = ["--public-header", str(args.public_header)]
-    route_blocker_args = ["--current-route-blocker", current_route_blocker]
+    route_blocker_args = ["--current-route-blocker", current_route_blocker] if current_route_blocker else []
     command_response_args = [
         "check_command_chat_response_public_readiness.py",
         *shared_surface_args,
@@ -382,7 +388,7 @@ def route_checks(args: argparse.Namespace, *, current_route_blocker: str) -> lis
         command_response_args.extend(["--readiness", str(args.command_response_readiness)])
 
     query_artifact = str(args.query_failclosed_artifact)
-    return [
+    checks = [
         (
             "player_identity_public_contract_gap",
             [
@@ -443,6 +449,13 @@ def route_checks(args: argparse.Namespace, *, current_route_blocker: str) -> lis
             ],
         ),
     ]
+    if current_route_blocker is None:
+        return [
+            (name, argv)
+            for name, argv in checks
+            if name not in UPSTREAM_SKIPPED_ROUTE_CHECKS
+        ]
+    return checks
 
 
 def validate_command_response_readiness_binding(args: argparse.Namespace) -> list[str]:
@@ -514,6 +527,8 @@ def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any])
     observed = phase.get("current_blocker")
     source_observed = phase.get("source_checker_primary_blocker")
     blockers: list[str] = []
+    if observed in UPSTREAM_IDENTITY_LOCK_BLOCKERS and source_observed == observed:
+        return blockers
     if observed != expected:
         blockers.append(f"critical_path_identity_gate_mode_unexpected_blocker:{observed!r}!={expected!r}")
     if source_observed != expected:
@@ -830,16 +845,20 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     critical_path_phase = build_critical_path_phase(args)
     current_route_blocker = critical_path_phase.get("current_blocker")
     child_route_blocker = (
-        current_route_blocker
-        if current_route_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS
-        else "approved_runtime_evidence_missing"
+        None
+        if current_route_blocker in UPSTREAM_IDENTITY_LOCK_BLOCKERS
+        else (
+            current_route_blocker
+            if current_route_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS
+            else "approved_runtime_evidence_missing"
+        )
     )
     checks = []
     response_path_report: dict[str, Any] | None = None
     with tempfile.TemporaryDirectory(prefix="obelisk-command-route-gate-") as tmp:
         response_path_report_root = Path(tmp) / "command-chat-response-public-readiness"
         response_path_report_path = response_path_report_root / "command-chat-response-public-readiness.json"
-        for name, argv in route_checks(args, current_route_blocker=str(child_route_blocker)):
+        for name, argv in route_checks(args, current_route_blocker=child_route_blocker):
             effective_argv = list(argv)
             if name == "commands_replies_public_readiness":
                 if response_path_report is not None:

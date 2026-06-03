@@ -397,6 +397,17 @@ PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES = {
     "live_validation_sidecar_only",
     "window_manifest_only",
 }
+PROMOTION_EVIDENCE_SCOPE_KEYS = {
+    "accounting_scope",
+    "artifact_scope",
+    "claim_scope",
+    "evidence_scope",
+    "promotion_scope",
+    "readiness_scope",
+    "ready_scope",
+    "source_scope",
+    "validation_scope",
+}
 PROMOTION_EVIDENCE_REQUIRED_TERMS = {
     "obelisk.player_identity.v1": (
         "obelisk.core-dump-evidence-pack.v1",
@@ -1198,6 +1209,10 @@ def run_command_permission_route_gate(
     source_checker_internal_planning = critical_path_phase.get("source_checker_accepted_for_internal_planning")
     route_blockers = payload.get("blockers", [])
     expected_lock_by_blocker = {
+        "lifecycle_anchor_first_evidence_provenance_unbound": [
+            "bound_lifecycle_anchor_and_principal_policy_sources",
+            "reviewed_identity_public_contract",
+        ],
         "approved_runtime_evidence_missing": [
             "approved_runtime_principal_lifecycle_evidence",
             "reviewed_identity_public_contract",
@@ -2588,11 +2603,21 @@ def evidence_has_non_promotional_schema_marker(
 
 
 def evidence_has_forbidden_ready_scope(value: Any) -> bool:
+    def normalized_scope_text(item: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(item))
+        return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
+
     if isinstance(value, dict):
-        ready_scope = value.get("ready_scope")
-        if isinstance(ready_scope, str) and ready_scope in PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES:
-            return True
-        return any(evidence_has_forbidden_ready_scope(item) for item in value.values())
+        for key, item in value.items():
+            if (
+                isinstance(item, str)
+                and normalized_scope_text(key) in PROMOTION_EVIDENCE_SCOPE_KEYS
+                and normalized_scope_text(item) in PROMOTION_EVIDENCE_FORBIDDEN_READY_SCOPES
+            ):
+                return True
+            if evidence_has_forbidden_ready_scope(item):
+                return True
+        return False
     if isinstance(value, list):
         return any(evidence_has_forbidden_ready_scope(item) for item in value)
     return False

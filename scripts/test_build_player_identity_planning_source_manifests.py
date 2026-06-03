@@ -14,7 +14,6 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 SCRIPT = SCRIPT_DIR / "build_player_identity_planning_source_manifests.py"
-BOUND_ROUTE = SCRIPT_DIR / "check_command_permission_route_gate_bound_identity_sources.py"
 
 
 class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
@@ -30,100 +29,37 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
             self.fail(f"tool failed with {result.returncode}\nstdout={result.stdout}\nstderr={result.stderr}")
         return result
 
-    def test_builds_source_aligned_manifests_and_bound_route_stops_at_runtime_evidence(self) -> None:
+    def assert_lifecycle_provenance_guardrail_blocks_generation(
+        self,
+        result: subprocess.CompletedProcess[str],
+    ) -> None:
+        self.assertEqual(1, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertIn("generated lifecycle-anchor candidates failed validation", result.stderr)
+        self.assertIn("accepted_anchor_artifact_identity_obelisk_commit_placeholder", result.stderr)
+        self.assertIn("accepted_anchor_artifact_identity_source_id_placeholder", result.stderr)
+        self.assertIn("accepted_anchor_second_source_report_hash_missing", result.stderr)
+
+    def test_build_fails_closed_on_placeholder_lifecycle_anchor_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "planning"
-            result = self.run_tool(["--output-dir", str(output_dir), "--json"])
-            report = json.loads(result.stdout)
+            result = self.run_tool(["--output-dir", str(output_dir), "--json"], check=False)
 
-            first_path = output_dir / "players-identity-first-evidence.json"
-            lifecycle_path = output_dir / "players-identity-lifecycle-anchor-candidates.json"
-            principal_path = output_dir / "players-identity-principal-invalidation-policy.json"
-            first_evidence = json.loads(first_path.read_text(encoding="utf-8"))
-            lifecycle = json.loads(lifecycle_path.read_text(encoding="utf-8"))
-            principal = json.loads(principal_path.read_text(encoding="utf-8"))
+        self.assert_lifecycle_provenance_guardrail_blocks_generation(result)
 
-            self.assertEqual(0, result.returncode)
-            self.assertTrue(report["valid"])
-            self.assertTrue(report["accepted_for_planning"])
-            self.assertTrue(report["planning_only"])
-            self.assertFalse(report["promotion_ready"])
-            self.assertFalse(report["public_sdk_ready"])
-            self.assertFalse(report["runtime_ready"])
-            self.assertEqual([], report["blockers"])
-            self.assertEqual(
-                first_evidence["artifact_identity"]["source_artifact_ids"],
-                lifecycle["artifact_identity"]["source_artifact_ids"],
-            )
-            self.assertEqual(
-                lifecycle["artifact_identity"]["source_artifact_ids"],
-                principal["lifecycle_layout_source"]["source_binding"]["artifact_identity_source_artifact_ids"],
-            )
-            self.assertEqual(
-                ["ShooterGameMode.HandleNewPlayer"],
-                principal["lifecycle_layout_source"]["source_binding"]["accepted_start_targets"],
-            )
-            self.assertEqual(
-                ["ShooterGameMode.OnLogout"],
-                principal["lifecycle_layout_source"]["source_binding"]["accepted_end_targets"],
-            )
-            snapshot_binding = report["source_alignment"]["lifecycle_snapshot_root_binding"]
-            self.assertTrue(snapshot_binding["ready"])
-            self.assertEqual([], snapshot_binding["blockers"])
-            self.assertEqual(
-                ["ShooterGameMode.HandleNewPlayer", "ShooterGameMode.OnLogout"],
-                snapshot_binding["required_targets"],
-            )
-
-            bound = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOUND_ROUTE),
-                    "--lifecycle-anchor-candidates-manifest",
-                    str(lifecycle_path),
-                    "--principal-invalidation-policy",
-                    str(principal_path),
-                    "--json",
-                ],
-                cwd=REPO_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-        self.assertEqual(0, bound.returncode, bound.stderr)
-        bound_report = json.loads(bound.stdout)
-        self.assertTrue(bound_report["valid"])
-        self.assertTrue(bound_report["accepted_for_planning"])
-        self.assertFalse(bound_report["promotion_ready"])
-        self.assertFalse(bound_report["public_sdk_ready"])
-        self.assertFalse(bound_report["runtime_ready"])
-        self.assertEqual("approved_runtime_evidence_missing", bound_report["critical_path_phase"]["current_blocker"])
-        self.assertEqual([], bound_report["blockers"])
-
-    def test_verifies_committed_source_aligned_manifests(self) -> None:
+    def test_verify_existing_dir_fails_closed_on_committed_placeholder_lifecycle_provenance(self) -> None:
         result = self.run_tool(
             [
                 "--verify-existing-dir",
                 str(REPO_ROOT / "docs/research/player-identity-planning-sources"),
                 "--json",
-            ]
+            ],
+            check=False,
         )
-        report = json.loads(result.stdout)
 
-        self.assertTrue(report["valid"])
-        self.assertTrue(report["accepted_for_planning"])
-        self.assertTrue(report["planning_only"])
-        self.assertFalse(report["promotion_ready"])
-        self.assertFalse(report["public_sdk_ready"])
-        self.assertFalse(report["runtime_ready"])
-        self.assertFalse(report["server_operations_authorized"])
-        self.assertFalse(report["runtime_work_authorized"])
-        self.assertEqual([], report["blockers"])
-        for record in report["checked_outputs"].values():
-            self.assertTrue(record["matches_generated"])
+        self.assert_lifecycle_provenance_guardrail_blocks_generation(result)
 
-    def test_verify_existing_dir_rejects_stale_manifest(self) -> None:
+    def test_verify_existing_dir_stops_before_stale_check_when_generated_lifecycle_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             existing = Path(temp_dir) / "planning"
             subprocess.run(
@@ -141,14 +77,8 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
             stale_path.write_text(json.dumps(stale, sort_keys=True) + "\n", encoding="utf-8")
 
             result = self.run_tool(["--verify-existing-dir", str(existing), "--json"], check=False)
-        report = json.loads(result.stdout)
 
-        self.assertEqual(1, result.returncode)
-        self.assertFalse(report["valid"])
-        self.assertIn(
-            "stale_or_mismatched_planning_manifest",
-            [blocker["reason"] for blocker in report["blockers"]],
-        )
+        self.assert_lifecycle_provenance_guardrail_blocks_generation(result)
 
     def test_rejects_protected_output_dir_before_writing(self) -> None:
         result = self.run_tool(

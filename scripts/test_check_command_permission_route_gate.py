@@ -75,6 +75,39 @@ def identity_manifest_sources(
     }
 
 
+def identity_phase(blocker: str = "approved_runtime_evidence_missing") -> dict:
+    next_action_by_blocker = {
+        "lifecycle_anchor_first_evidence_provenance_unbound": "bind_lifecycle_anchor_and_principal_policy_sources",
+        "approved_runtime_evidence_missing": "produce_approved_runtime_principal_lifecycle_evidence",
+        "identity_public_contract_gate_missing": "review_identity_public_contract_gate",
+    }
+    return {
+        "current_surface": "obelisk.player_identity.v1",
+        "current_blocker": blocker,
+        "source_checker_primary_blocker": blocker,
+        "source_checker_next_blocker": None,
+        "next_action": next_action_by_blocker[blocker],
+        "next_after_runtime_evidence": "identity_public_contract_gate_missing",
+        "permissions_admin_unlocked": False,
+        "command_response_unlocked": False,
+        "commands_replies_unlocked": False,
+        "source_checker": "check_player_identity_first_evidence_readiness.py",
+        "source_checker_exit_code": 1,
+        "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
+        "source_checker_parse_error": None,
+        "source_checker_status": "blocked",
+        "source_checker_ready": False,
+        "source_checker_accepted_for_internal_planning": False,
+        "source_checker_blockers": [blocker],
+        "source_checker_manifest_sources": identity_manifest_sources(),
+        "planning_only": True,
+        "promotion_ready": False,
+        "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "runtime_ready": False,
+    }
+
+
 class CommandPermissionRouteGateTests(unittest.TestCase):
     def run_checker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -99,7 +132,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertEqual(blockers, [])
 
-    def test_identity_lock_mode_requires_bound_route_to_reach_runtime_blocker(self) -> None:
+    def test_identity_lock_mode_accepts_lifecycle_provenance_route_lock(self) -> None:
         args = SimpleNamespace(
             player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
             player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
@@ -111,14 +144,86 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
 
-        self.assertIn(
-            "critical_path_identity_gate_mode_unexpected_blocker:'lifecycle_anchor_first_evidence_provenance_unbound'!='approved_runtime_evidence_missing'",
-            blockers,
+        self.assertEqual([], blockers)
+
+    def test_lifecycle_provenance_route_lock_skips_downstream_p0_children(self) -> None:
+        args = SimpleNamespace(
+            query_failclosed_artifact=QUERY_CONTRACT,
+            player_identity_decisions=IDENTITY_DECISIONS,
+            public_sdk_surfaces=PUBLIC_SDK_SURFACES,
+            player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+            public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+            command_response_root=None,
+            command_response_readiness=None,
+            player_identity_artifact_root=None,
+            player_identity_snapshot_root=None,
+            player_identity_candidate_root=None,
+            player_identity_lifecycle_anchor_candidates_manifest=None,
+            player_identity_principal_invalidation_policy_manifest=None,
+            player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+            json=True,
         )
-        self.assertIn(
-            "critical_path_identity_readiness_mode_unexpected_blocker:'lifecycle_anchor_first_evidence_provenance_unbound'!='approved_runtime_evidence_missing'",
-            blockers,
-        )
+        phase = identity_phase("lifecycle_anchor_first_evidence_provenance_unbound")
+
+        def run_check_with_child_contract(name: str, argv: list[str]) -> dict[str, object]:
+            child_blocker = None
+            if "--current-route-blocker" in argv:
+                child_blocker = argv[argv.index("--current-route-blocker") + 1]
+            result: dict[str, object] = {
+                "name": name,
+                "argv": argv,
+                "exit_code": 0,
+                "valid": True,
+                "report_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                "expected_schema": ROUTE_GATE.EXPECTED_ROUTE_CHECK_SCHEMAS[name],
+                "planning_only": name in ROUTE_GATE.REQUIRED_PLANNING_ONLY_CHECKS,
+                "accepted_for_planning": name in ROUTE_GATE.REQUIRED_PLANNING_ONLY_CHECKS,
+                "dependency_chain_locked": None,
+                "current_route_blocker": None,
+                "remaining_route_blockers": None,
+                "counts_toward_public_sdk": None,
+                "counts_toward_runtime": None,
+                "counts_toward_v1_completion": None,
+                "public_or_runtime_accounting_allowed": None,
+                "public_or_runtime_claims": [],
+                "blockers": [],
+                "parse_error": None,
+                "stderr": "",
+                "report_payload": {},
+            }
+            if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+                self.fail(f"upstream lifecycle provenance lock should skip downstream P0 child {name}")
+                result.update(
+                    {
+                        "dependency_chain_locked": True,
+                        "current_route_blocker": child_blocker,
+                        "remaining_route_blockers": [child_blocker],
+                        "counts_toward_public_sdk": False,
+                        "counts_toward_runtime": False,
+                        "counts_toward_v1_completion": False,
+                        "public_or_runtime_accounting_allowed": False,
+                    }
+                )
+            if name == "command_chat_response_public_readiness":
+                result["report_payload"] = {
+                    "readiness_root": "/tmp",
+                    "readiness_path": f"/tmp/{ROUTE_GATE.COMMAND_RESPONSE_DEFAULT_READINESS_NAME}",
+                }
+            return result
+
+        with (
+            mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase),
+            mock.patch.object(ROUTE_GATE, "run_check", side_effect=run_check_with_child_contract),
+        ):
+            report = ROUTE_GATE.build_report(args)
+
+        self.assertTrue(report["valid"])
+        self.assertEqual("lifecycle_anchor_first_evidence_provenance_unbound", report["current_route_blocker"])
+        self.assertEqual(["lifecycle_anchor_first_evidence_provenance_unbound"], report["remaining_route_blockers"])
+        check_names = {check["name"] for check in report["checks"]}
+        self.assertNotIn("player_identity_public_contract_gap", check_names)
+        self.assertFalse(check_names & ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS)
 
     def test_identity_lock_mode_allows_approved_runtime_evidence_to_reach_public_contract_gate(self) -> None:
         args = SimpleNamespace(
@@ -150,10 +255,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(report["route_blocked"])
         self.assertTrue(report["dependency_chain_locked"])
         self.assertTrue(report["route_lock_invariant_valid"])
-        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
-        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertEqual("lifecycle_anchor_first_evidence_provenance_unbound", report["current_route_blocker"])
         self.assertEqual(
-            "produce_approved_runtime_principal_lifecycle_evidence",
+            ["lifecycle_anchor_first_evidence_provenance_unbound"],
+            report["remaining_route_blockers"],
+        )
+        self.assertEqual(
+            "bind_lifecycle_anchor_and_principal_policy_sources",
             report["next_route_action"],
         )
         self.assertEqual(
@@ -169,43 +277,25 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             ],
             report["dependency_chain"],
         )
-        self.assertEqual(8, len(report["checks"]))
+        self.assertEqual(4, len(report["checks"]))
         self.assertEqual(
-            {
-                "current_surface": "obelisk.player_identity.v1",
-                "current_blocker": "approved_runtime_evidence_missing",
-                "next_action": "produce_approved_runtime_principal_lifecycle_evidence",
-                "next_after_runtime_evidence": "identity_public_contract_gate_missing",
-                "permissions_admin_unlocked": False,
-                "command_response_unlocked": False,
-                "commands_replies_unlocked": False,
-                "source_checker": "check_player_identity_first_evidence_readiness.py",
-                "source_checker_exit_code": 1,
-                "source_checker_schema": "obelisk.player-identity-first-evidence-readiness.v1",
-                "source_checker_parse_error": None,
-                "source_checker_primary_blocker": "approved_runtime_evidence_missing",
-                "source_checker_next_blocker": None,
-                "source_checker_status": "blocked",
-                "source_checker_ready": False,
-                "source_checker_accepted_for_internal_planning": False,
-                "source_checker_blockers": [
-                    "approved_runtime_evidence_missing",
-                ],
-                "source_checker_manifest_sources": identity_manifest_sources(),
-                "planning_only": True,
-                "promotion_ready": False,
-                "public_sdk_ready": False,
-                "public_abi_ready": False,
-                "runtime_ready": False,
-            },
-            report["critical_path_phase"],
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+            report["critical_path_phase"]["current_blocker"],
+        )
+        self.assertEqual(
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+            report["critical_path_phase"]["source_checker_primary_blocker"],
+        )
+        self.assertIn(
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+            report["critical_path_phase"]["source_checker_blockers"],
         )
         self.assertEqual(
             {
                 "locked": True,
                 "invariant_valid": True,
                 "blocked_until": [
-                    "approved_runtime_principal_lifecycle_evidence",
+                    "bound_lifecycle_anchor_and_principal_policy_sources",
                     "reviewed_identity_public_contract",
                 ],
                 "non_claim": "route lock is an offline invariant; it does not promote identity, permissions, commands, runtime readiness, or v1 completion",
@@ -213,22 +303,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             report["route_lock"],
         )
         check_names = {check["name"] for check in report["checks"]}
-        self.assertIn("player_identity_public_contract_gap", check_names)
         self.assertIn("command_copied_response_intent_lifecycle_planning", check_names)
-        commands_replies_check = next(
-            check for check in report["checks"] if check["name"] == "commands_replies_public_readiness"
-        )
-        self.assertIn("--response-path-report", commands_replies_check["argv"])
-        self.assertIn("--response-path-report-root", commands_replies_check["argv"])
-        for check_name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
-            child = next(check for check in report["checks"] if check["name"] == check_name)
-            self.assertTrue(child["dependency_chain_locked"], child)
-            self.assertEqual("approved_runtime_evidence_missing", child["current_route_blocker"], child)
-            self.assertEqual(["approved_runtime_evidence_missing"], child["remaining_route_blockers"], child)
-            self.assertFalse(child["counts_toward_public_sdk"], child)
-            self.assertFalse(child["counts_toward_runtime"], child)
-            self.assertFalse(child["counts_toward_v1_completion"], child)
-            self.assertFalse(child["public_or_runtime_accounting_allowed"], child)
+        self.assertNotIn("player_identity_public_contract_gap", check_names)
+        self.assertFalse(check_names & ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS)
         self.assertEqual([], report["blockers"])
         for check in report["checks"]:
             self.assertTrue(check["valid"], check)
@@ -283,7 +360,20 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "public_abi_ready": False,
                 "runtime_ready": False,
             }
-            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase):
+            original_run_check = ROUTE_GATE.run_check
+
+            def accept_public_contract_gap(name: str, argv: list[str]) -> dict[str, object]:
+                result = original_run_check(name, argv)
+                if name == "player_identity_public_contract_gap":
+                    result["exit_code"] = 0
+                    result["valid"] = True
+                    result["blockers"] = []
+                return result
+
+            with (
+                mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase),
+                mock.patch.object(ROUTE_GATE, "run_check", side_effect=accept_public_contract_gap),
+            ):
                 report = ROUTE_GATE.build_report(args)
         phase = report["critical_path_phase"]
 
@@ -416,9 +506,14 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             principal_path = root / "players-identity-principal-invalidation-policy.json"
             bound_dir = root / "bound"
             lifecycle = accepted_lifecycle_anchor_manifest()
-            lifecycle["artifact_identity"]["source_artifact_ids"] = first_evidence["artifact_identity"][
-                "source_artifact_ids"
+            source_artifact_ids = [
+                f"artifact_sha256:{first_evidence['artifact_identity']['ark_binary_sha256']}",
+                "capture_id:player-lifecycle-candidates",
+                "evidence_pack_id:player-lifecycle-pack",
             ]
+            first_evidence["artifact_identity"]["obelisk_commit"] = "reviewed-commit"
+            first_evidence["artifact_identity"]["source_artifact_ids"] = source_artifact_ids
+            lifecycle["artifact_identity"]["source_artifact_ids"] = source_artifact_ids
             first_evidence_path.write_text(json.dumps(first_evidence), encoding="utf-8")
             lifecycle_path.write_text(json.dumps(lifecycle), encoding="utf-8")
             principal_path.write_text(json.dumps(principal_policy_manifest()), encoding="utf-8")
@@ -464,15 +559,21 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertTrue(report["route_blocked"])
         self.assertTrue(report["dependency_chain_locked"])
         self.assertTrue(report["route_lock_invariant_valid"])
-        self.assertEqual("approved_runtime_evidence_missing", report["current_route_blocker"])
-        self.assertEqual(["approved_runtime_evidence_missing"], report["remaining_route_blockers"])
+        self.assertEqual("lifecycle_anchor_first_evidence_provenance_unbound", report["current_route_blocker"])
+        self.assertEqual(
+            ["lifecycle_anchor_first_evidence_provenance_unbound"],
+            report["remaining_route_blockers"],
+        )
         self.assertEqual([], report["blockers"])
         phase = report["critical_path_phase"]
-        self.assertEqual("approved_runtime_evidence_missing", phase["current_blocker"])
-        self.assertEqual("approved_runtime_evidence_missing", phase["source_checker_primary_blocker"])
+        self.assertEqual("lifecycle_anchor_first_evidence_provenance_unbound", phase["current_blocker"])
+        self.assertEqual(
+            "lifecycle_anchor_first_evidence_provenance_unbound",
+            phase["source_checker_primary_blocker"],
+        )
         self.assertEqual("cli_bound", phase["source_checker_manifest_sources"]["mode"])
         self.assertTrue(phase["source_checker_manifest_sources"]["expected_manifests_received"])
-        self.assertEqual("produce_approved_runtime_principal_lifecycle_evidence", phase["next_action"])
+        self.assertEqual("bind_lifecycle_anchor_and_principal_policy_sources", phase["next_action"])
         self.assertEqual("identity_public_contract_gate_missing", phase["next_after_runtime_evidence"])
         self.assertFalse(phase["permissions_admin_unlocked"])
         self.assertFalse(phase["command_response_unlocked"])
@@ -483,9 +584,9 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertFalse(phase["runtime_ready"])
         self.assertFalse(phase["source_checker_ready"])
         self.assertFalse(phase["source_checker_accepted_for_internal_planning"])
-        self.assertIn("approved_runtime_evidence_missing", phase["source_checker_blockers"])
+        self.assertIn("lifecycle_anchor_first_evidence_provenance_unbound", phase["source_checker_blockers"])
         self.assertEqual(
-            ["approved_runtime_principal_lifecycle_evidence", "reviewed_identity_public_contract"],
+            ["bound_lifecycle_anchor_and_principal_policy_sources", "reviewed_identity_public_contract"],
             report["route_lock"]["blocked_until"],
         )
         for check in report["checks"]:
@@ -538,15 +639,26 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             payload["public_header_allowed"] = True
             decisions.write_text(json.dumps(payload), encoding="utf-8")
 
-            result = self.run_checker(
-                "--player-identity-decisions",
-                str(decisions),
-                "--json",
-                check=False,
+            args = SimpleNamespace(
+                query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+                player_identity_decisions=decisions,
+                public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+                player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+                public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+                command_response_root=None,
+                command_response_readiness=None,
+                player_identity_artifact_root=None,
+                player_identity_snapshot_root=None,
+                player_identity_candidate_root=None,
+                player_identity_lifecycle_anchor_candidates_manifest=None,
+                player_identity_principal_invalidation_policy_manifest=None,
+                player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+                json=True,
             )
-            report = json.loads(result.stdout)
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
 
-            self.assertNotEqual(0, result.returncode)
             self.assertFalse(report["valid"])
             self.assertFalse(report["accepted_for_planning"])
             self.assertTrue(
@@ -1036,7 +1148,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
         try:
             ROUTE_GATE.run_check = fake_run_check
-            report = ROUTE_GATE.build_report(args)
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
         finally:
             ROUTE_GATE.run_check = original
 
@@ -1081,7 +1194,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
         try:
             ROUTE_GATE.run_check = fake_run_check
-            report = ROUTE_GATE.build_report(args)
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
         finally:
             ROUTE_GATE.run_check = original
 
@@ -1218,7 +1332,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
         try:
             ROUTE_GATE.run_check = fake_run_check
-            report = ROUTE_GATE.build_report(args)
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
         finally:
             ROUTE_GATE.run_check = original
 
@@ -1410,7 +1525,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
         try:
             ROUTE_GATE.run_check = fake_run_check
-            report = ROUTE_GATE.build_report(args)
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
         finally:
             ROUTE_GATE.run_check = original
 
@@ -1485,7 +1601,8 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             )
             try:
                 ROUTE_GATE.run_check = fake_run_check
-                report = ROUTE_GATE.build_report(args)
+                with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                    report = ROUTE_GATE.build_report(args)
             finally:
                 ROUTE_GATE.run_check = original
 
@@ -1537,10 +1654,26 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             header_path = Path(temp_dir) / "ObeliskApi.h"
             header_path.write_text("/* fake clean header */\n", encoding="utf-8")
-            result = self.run_checker("--public-header", str(header_path), "--json", check=False)
+            args = SimpleNamespace(
+                query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+                player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+                public_sdk_surfaces=ROUTE_GATE.DEFAULT_PUBLIC_SDK_SURFACES,
+                player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+                public_header=header_path,
+                command_response_root=None,
+                command_response_readiness=None,
+                player_identity_artifact_root=None,
+                player_identity_snapshot_root=None,
+                player_identity_candidate_root=None,
+                player_identity_lifecycle_anchor_candidates_manifest=None,
+                player_identity_principal_invalidation_policy_manifest=None,
+                player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+                json=True,
+            )
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
 
-        report = json.loads(result.stdout)
-        self.assertEqual(1, result.returncode)
         self.assertFalse(report["valid"])
         self.assertIn("command_chat_response_public_readiness: child blockers not empty", report["blockers"])
         self.assertIn("commands_replies_public_readiness: child blockers not empty", report["blockers"])
@@ -1571,16 +1704,26 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                     break
             surfaces_path = root / "public_sdk_surfaces.json"
             surfaces_path.write_text(json.dumps(surfaces), encoding="utf-8")
-
-            result = self.run_checker(
-                "--public-sdk-surfaces",
-                str(surfaces_path),
-                "--json",
-                check=False,
+            args = SimpleNamespace(
+                query_failclosed_artifact=ROUTE_GATE.DEFAULT_QUERY_CONTRACT,
+                player_identity_decisions=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_DECISIONS,
+                public_sdk_surfaces=surfaces_path,
+                player_identity_private_candidate_contract=ROUTE_GATE.DEFAULT_PLAYER_IDENTITY_PRIVATE_CANDIDATE,
+                public_header=ROUTE_GATE.DEFAULT_PUBLIC_HEADER,
+                command_response_root=None,
+                command_response_readiness=None,
+                player_identity_artifact_root=None,
+                player_identity_snapshot_root=None,
+                player_identity_candidate_root=None,
+                player_identity_lifecycle_anchor_candidates_manifest=None,
+                player_identity_principal_invalidation_policy_manifest=None,
+                player_identity_runtime_principal_lifecycle_evidence_manifest=None,
+                player_identity_approved_runtime_principal_lifecycle_evidence_manifest=None,
+                json=True,
             )
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=identity_phase()):
+                report = ROUTE_GATE.build_report(args)
 
-        report = json.loads(result.stdout)
-        self.assertNotEqual(0, result.returncode)
         self.assertFalse(report["valid"])
         self.assertTrue(
             any("commands_replies_public_readiness" in blocker for blocker in report["blockers"]),

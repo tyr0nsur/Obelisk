@@ -724,6 +724,32 @@ class PluginManagerGuardrailTests(unittest.TestCase):
                             "until dispatcher owner cleanup is explicit.",
                         )
 
+    def test_non_promoted_copied_dispatcher_tokens_are_absent_from_public_abi(self) -> None:
+        api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
+
+        dispatcher_classes: set[str] = set()
+        for header in CORE_DIR.glob("*EventDispatcher.h"):
+            header_text = header.read_text(encoding="utf-8")
+            if "UnregisterCallbacksForOwner" not in header_text:
+                continue
+            match = re.search(r"class\s+(\w+EventDispatcher)\b", header_text)
+            self.assertIsNotNone(match, f"{header} has owner cleanup but no dispatcher class")
+            dispatcher_classes.add(match.group(1))
+
+        stale_token_sets = sorted(set(COPIED_DISPATCHER_PUBLIC_ABI_TOKENS) - dispatcher_classes)
+        self.assertEqual(stale_token_sets, [])
+
+        for dispatcher, blocked_tokens in COPIED_DISPATCHER_PUBLIC_ABI_TOKENS.items():
+            with self.subTest(dispatcher=dispatcher):
+                for token in blocked_tokens:
+                    with self.subTest(dispatcher=dispatcher, token=token):
+                        self.assertNotIn(
+                            token,
+                            api_header,
+                            "Non-promoted copied dispatcher public ABI tokens must stay absent "
+                            "until promotion adds ABI, lifecycle cleanup coverage, and SDK tests.",
+                        )
+
     def test_plugin_manager_does_not_wire_blocked_public_sdk_surfaces(self) -> None:
         api_header = strip_c_comments(OBELISK_API_HEADER.read_text(encoding="utf-8"))
         plugin_manager_text = strip_c_comments(PLUGIN_MANAGER.read_text(encoding="utf-8"))
