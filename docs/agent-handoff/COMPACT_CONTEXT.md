@@ -1529,6 +1529,25 @@ priorities, and do not use history files as the active source of truth.
   design, py_compile, and `git diff --check`. Route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
   `stable_claim_allowed=false`; no runtime/server operation.
+- 2026-06-03 supervised 4-agent runtime-evidence/downstream-route/SDK-isolation/
+  research-hygiene round: downstream permissions/admin, command response, and
+  commands/replies readiness now reject nested/secondary aliases for
+  `counts_toward_public_sdk`, `counts_toward_runtime`,
+  `counts_toward_v1_completion`, `public_or_runtime_accounting_allowed`,
+  route-ready variants, `stable_claim_allowed`, v1 completion aliases, runtime
+  authorization, and server operation claims. Runtime evidence audit made no edits and
+  confirmed request packs, receipts, preflight/window sidecars, copied logs, aliases, and
+  stale bundle checks still do not count as approved runtime evidence. SDK completion
+  route-gate current-blocker flakiness was not reproduced across focused, file-order,
+  reverse-order, discovery, and full SDK completion runs; no isolation patch was made.
+  Research hygiene made no edits and found current notes/index consistently route to
+  `approved_runtime_evidence_missing` without directing broad FName/GObjects/core scans,
+  admin snapshot regeneration, or runtime/live probes. Validations passed: downstream
+  route/readiness suite 200, full SDK completion suite 221, runtime/preflight suites 256
+  by delegated audit, route JSON valid/planning-only, SDK JSON blocked by design, and
+  `git diff --check`. Route/SDK remain fail-closed at
+  `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`; no runtime/server operation.
 
 ## Agent Coordination
 

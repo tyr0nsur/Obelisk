@@ -425,3 +425,30 @@ planning-smoke JSON ready/non-authorizing, SDK JSON blocked by design,
 py_compile, and `git diff --check`. The stable state remains
 `current_route_blocker=approved_runtime_evidence_missing`, SDK progress `0/12`,
 P0 progress `0/4`, and `stable_claim_allowed=false`.
+
+## Downstream Route And Accounting Alias Hardening
+
+The next supervised 4-agent round closed a downstream P0 structured-alias gap
+without changing the active blocker:
+
+- Permissions/admin, command response, and commands/replies readiness now reject
+  nested or secondary `counts_toward_public_sdk`, `counts_toward_runtime`,
+  `counts_toward_v1_completion`, `public_or_runtime_accounting_allowed`,
+  route-ready variants, `stable_claim_allowed`, and v1-completion aliases.
+- Permissions/admin additionally rejects nested runtime authorization and server
+  operation aliases such as `runtime_work_authorized` and
+  `server_operations_authorized`.
+- Runtime evidence audit confirmed request packs, receipts, preflight/window
+  sidecars, copied logs, aliases, and stale bundle checks still do not count as
+  approved runtime evidence.
+- SDK completion route-gate current-blocker flakiness was not reproduced across
+  focused, file-order, reverse-order, discovery, and full SDK completion runs.
+- Research hygiene found the current index and recent identity notes consistently
+  route to `approved_runtime_evidence_missing` and do not direct broad FName/
+  GObjects/core scans, admin snapshot regeneration, or runtime/live probes.
+
+Validated offline: downstream route/readiness suite 200, full SDK completion
+suite 221, runtime/preflight suites 256 by delegated audit, route JSON
+valid/planning-only, SDK JSON blocked by design, and `git diff --check`. The
+stable state remains `current_route_blocker=approved_runtime_evidence_missing`,
+SDK progress `0/12`, P0 progress `0/4`, and `stable_claim_allowed=false`.

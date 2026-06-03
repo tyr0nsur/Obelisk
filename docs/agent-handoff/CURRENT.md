@@ -445,3 +445,19 @@ This file is an active routing table only. Durable evidence belongs in
   JSON valid/planning-only, planning-smoke JSON ready/non-authorizing, SDK JSON blocked by
   design with SDK `0/12`, P0 `0/4`, `stable_claim_allowed=false`, py_compile, and
   `git diff --check`. No runtime/server operation. Agents closed.
+- Latest round delegated runtime evidence/preflight audit, downstream P0 readiness
+  guardrails, SDK completion test-isolation audit, and reversing research hygiene.
+  Integrated result: downstream permissions/admin, command response, and commands/replies
+  readiness now reject nested/secondary structured aliases for route readiness, public or
+  runtime accounting, stable claim, v1 completion, runtime authorization, and server
+  operation claims. Runtime evidence audit found no remaining offline path where request
+  packs, receipts, sidecars, copied logs, aliases, or stale bundle checks count as
+  approved runtime evidence. SDK completion route-gate flakiness was not reproduced across
+  focused, file-order, reverse-order, and full SDK completion runs; no isolation patch was
+  made. Research hygiene found current notes/index route correctly to
+  `approved_runtime_evidence_missing` and do not direct agents to rerun broad scans or live
+  probes. Validation passed: downstream route/readiness suite 200, full SDK completion
+  suite 221, runtime/preflight suites 256 by delegated audit, route JSON
+  valid/planning-only, SDK JSON blocked by design with SDK `0/12`, P0 `0/4`,
+  `stable_claim_allowed=false`, and `git diff --check`. No runtime/server operation.
+  Agents closed.

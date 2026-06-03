@@ -455,6 +455,34 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_nested_accounting_and_runtime_authorization_alias_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "counts_toward_public_sdk": True,
+                    "counts_toward_runtime": True,
+                    "counts_toward_v1_completion": True,
+                    "public_or_runtime_accounting_allowed": True,
+                    "runtime_work_authorized": True,
+                    "server_operations_authorized": True,
+                }
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.counts_toward_public_sdk"),
+                ("public_surface_overclaim", "$.secondary_report.counts_toward_runtime"),
+                ("public_surface_overclaim", "$.secondary_report.counts_toward_v1_completion"),
+                ("public_surface_overclaim", "$.secondary_report.public_or_runtime_accounting_allowed"),
+                ("public_surface_overclaim", "$.secondary_report.runtime_work_authorized"),
+                ("public_surface_overclaim", "$.secondary_report.server_operations_authorized"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims(

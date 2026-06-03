@@ -844,6 +844,38 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
         self.assertEqual(6, reasons.count("positive_public_surface_claim"))
         self.assertEqual(6, reasons.count("public_surface_overclaim"))
 
+    def test_rejects_nested_route_and_accounting_alias_overclaims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "routeReady": True,
+                    "public-route-ready": True,
+                    "counts_toward_public_sdk": True,
+                    "counts_toward_runtime": True,
+                    "counts_toward_v1_completion": True,
+                    "public_or_runtime_accounting_allowed": True,
+                    "stableClaimAllowed": True,
+                    "v1_completion_ready": True,
+                }
+            },
+            blockers,
+        )
+
+        self.assertEqual(
+            [
+                ("public_surface_overclaim", "$.secondary_report.routeReady"),
+                ("public_surface_overclaim", "$.secondary_report.public-route-ready"),
+                ("public_surface_overclaim", "$.secondary_report.counts_toward_public_sdk"),
+                ("public_surface_overclaim", "$.secondary_report.counts_toward_runtime"),
+                ("public_surface_overclaim", "$.secondary_report.counts_toward_v1_completion"),
+                ("public_surface_overclaim", "$.secondary_report.public_or_runtime_accounting_allowed"),
+                ("public_surface_overclaim", "$.secondary_report.stableClaimAllowed"),
+                ("public_surface_overclaim", "$.secondary_report.v1_completion_ready"),
+            ],
+            [(item["reason"], item["label"]) for item in blockers],
+        )
+
     def test_negative_reply_suffix_is_not_positive_claim(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims({"note": "reply API ready remains blocked"}, blockers)
