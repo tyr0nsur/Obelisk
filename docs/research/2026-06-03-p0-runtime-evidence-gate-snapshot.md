@@ -715,6 +715,58 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## SDK Guardrail Round: Replay, Route Transition, Static P0 Sources, And Secondary Reports
+
+Another supervised four-agent round plus lead integration closed offline shortcuts without
+changing the active P0 blocker or SDK completion state.
+
+Integrated findings:
+
+- Request/window replay: window-manifest replay no longer tolerates an expired nested
+  request-check failure. Replay now requires a successful request checker that explicitly
+  echoes `post_window_replay=true` and `post_window_replay_expiry_tolerated=true`, and the
+  bundle manifest check also requires a verified operator approval receipt.
+- Accepted runtime route transition: an approved runtime principal lifecycle report must
+  carry exact consume-mode metadata, `ready_scope=runtime_evidence_only`, empty blockers,
+  and `next_blocker=identity_public_contract_gate_missing`. Counting aliases such as
+  `countsTowardSdk`, complete-SDK claim fields, and route-gate non-counting overrides
+  remain false-only and cannot unlock downstream surfaces.
+- Static P0 planning sources: lifecycle planning manifests now fail closed on static
+  report schema/status/source-id/layout/static-orientation drift. Accepted lifecycle
+  anchors remain only `ShooterGameMode.HandleNewPlayer` and
+  `ShooterGameMode.OnLogout`; `ServerListPlayers` and `ServerKickPlayer` remain admin
+  targets only.
+- SDK secondary reports: completion checking now rejects identity/resource readiness
+  aliases, split claim key/value records such as stable-SDK claim descriptors with true
+  status values, release-statement bookkeeping progress aliases, and positive
+  complete/full/stable/production SDK wording inside `non_claim` containers.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`, and
+  public/runtime/v1 accounting false.
+- `check_public_sdk_v1_completion.py --json`: blocked by design with SDK `0/12`, P0
+  `0/4`, `stable_claim_allowed=false`, and missing release-statement outcomes without a
+  statement.
+- Generated scoped release statement validation: exits 0 with scoped bookkeeping `7/7`,
+  SDK `0/12`, P0 `0/4`, and `stable_claim_allowed=false`.
+
+Validation remained offline-only:
+
+- Request/window/bundle tests: 187 OK.
+- Route/first-evidence tests: 108 OK.
+- SDK completion tests: 238 OK.
+- Public SDK guardrails: 196 OK.
+
+Non-claims:
+
+- These changes do not create approved runtime evidence and do not authorize server
+  operations, marker/env changes, runtime observation, ReflectionScanner, ptrace/gcore,
+  broad tracing, Discord sends, GitHub publication, tag updates, Plugin Hub publication,
+  support-tier activation, stable SDK wording, public identity readiness, public ABI
+  readiness, or v1 SDK completion.
+
 ## Turbo SDK Delegation Checkpoint After Compaction
 
 The lead reconstructed the current route and SDK gates after memory compaction and

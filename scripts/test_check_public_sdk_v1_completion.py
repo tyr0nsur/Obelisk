@@ -1076,6 +1076,94 @@ class PublicSdkV1CompletionCheckTests(unittest.TestCase):
             ],
         )
 
+    def test_secondary_report_scanner_rejects_split_claim_key_value_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "records": [
+                {"claimKey": "stableSdk", "claimValue": True},
+                {"metric-name": "complete-sdk claim progress", "progressPercent": "25%"},
+                {"fieldName": "production-ready support", "allowed": "yes"},
+                {"claimScope": "v1Completion", "outcome": "satisfied"},
+            ],
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "records[0].claimValue",
+                "records[1].progressPercent",
+                "records[2].allowed",
+                "records[3].outcome",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_identity_resource_completion_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "identity": {
+                "playerIdentityAvailable": True,
+                "principal-handle-ready": "ready",
+                "identity-public-contract-ready": "yes",
+            },
+            "resources": {
+                "resourceHandleAvailable": "available",
+                "object-identity-public": True,
+                "objectLookupAllowed": "allowed",
+            },
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "identity.identity-public-contract-ready",
+                "identity.playerIdentityAvailable",
+                "identity.principal-handle-ready",
+                "resources.object-identity-public",
+                "resources.objectLookupAllowed",
+                "resources.resourceHandleAvailable",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_positive_non_claim_text(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "non_claim": "Stable SDK is ready for production plugin support.",
+            "non_claims": [
+                "This is bookkeeping only; it does not authorize stable SDK release wording.",
+                "Release statement bookkeeping counts 2/12 complete SDK progress.",
+            ],
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "non_claim:positive_completion_text",
+                "non_claims[1]:positive_completion_text",
+            ],
+        )
+
+    def test_secondary_report_scanner_rejects_release_statement_bookkeeping_progress_aliases(self) -> None:
+        payload = {
+            "schema": "obelisk.secondary-report.v1",
+            "blockers": [],
+            "releaseStatementScopedBookkeeping": {
+                "claimScope": "completeSDK",
+                "outcome": "counted",
+                "progressPercent": 50,
+            },
+        }
+
+        self.assertEqual(
+            secondary_report_completion_claims_without_blocker(payload),
+            [
+                "releaseStatementScopedBookkeeping.outcome",
+                "releaseStatementScopedBookkeeping.progressPercent",
+            ],
+        )
+
     def test_secondary_report_scanner_allows_positive_claim_when_report_has_blocker(self) -> None:
         payload = {
             "schema": "obelisk.secondary-report.v1",

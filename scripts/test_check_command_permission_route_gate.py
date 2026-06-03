@@ -79,6 +79,11 @@ def approved_runtime_diagnosis(path: Path, *, ready: bool = True) -> dict:
     return {
         "provided": True,
         "path": str(path),
+        "report_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+        "input_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+        "mode": "consume",
+        "ready_scope": "runtime_evidence_only",
+        "next_blocker": "identity_public_contract_gate_missing" if ready else "approved_runtime_evidence_missing",
         "ready": ready,
         "approved_runtime_evidence_present": ready,
         "runtime_evidence_ready": ready,
@@ -88,6 +93,13 @@ def approved_runtime_diagnosis(path: Path, *, ready: bool = True) -> dict:
         "public_abi_ready": False,
         "v1_completion_ready": False,
         "runtime_ready": False,
+        "counts_toward_complete_sdk": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_sdk": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
         "remaining_blockers": [] if ready else ["approved_runtime_evidence_missing"],
@@ -176,6 +188,28 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
 
         self.assertEqual([], blockers)
+
+    def test_lifecycle_provenance_lock_still_rejects_malformed_runtime_evidence_diagnosis(self) -> None:
+        approved_runtime = Path("approved-runtime.json")
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+        phase = {
+            "current_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+            "source_checker_primary_blocker": "lifecycle_anchor_first_evidence_provenance_unbound",
+            "source_checker_approved_runtime_evidence_manifest": {
+                **approved_runtime_diagnosis(approved_runtime),
+                "report_schema": "old.approved-runtime-check.v0",
+                "counts_toward_runtime": True,
+            },
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertIn("critical_path_approved_runtime_evidence_report_schema_mismatch", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_counts_toward_runtime_not_false", blockers)
 
     def test_lifecycle_provenance_route_lock_skips_downstream_p0_children(self) -> None:
         args = SimpleNamespace(
@@ -318,6 +352,40 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
 
         self.assertIn("critical_path_approved_runtime_evidence_promotion_ready_not_false", blockers)
         self.assertIn("critical_path_approved_runtime_evidence_public_capability_bits_now_not_empty", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_report_schema_mismatch", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_next_blocker_unexpected", blockers)
+        self.assertIn(
+            "critical_path_identity_gate_mode_unexpected_blocker:'identity_public_contract_gate_missing'!='approved_runtime_evidence_missing'",
+            blockers,
+        )
+
+    def test_identity_lock_mode_rejects_stale_runtime_report_shape_with_ready_flags(self) -> None:
+        approved_runtime = Path("approved-runtime.json")
+        args = SimpleNamespace(
+            player_identity_lifecycle_anchor_candidates_manifest=Path("bound-lifecycle.json"),
+            player_identity_principal_invalidation_policy_manifest=Path("bound-principal.json"),
+            player_identity_approved_runtime_principal_lifecycle_evidence_manifest=approved_runtime,
+        )
+        phase = {
+            "current_blocker": "identity_public_contract_gate_missing",
+            "source_checker_primary_blocker": "identity_public_contract_gate_missing",
+            "source_checker_approved_runtime_evidence_manifest": {
+                **approved_runtime_diagnosis(approved_runtime),
+                "report_schema": "old.approved-runtime-check.v0",
+                "mode": "public-readiness",
+                "ready_scope": "public_identity",
+                "next_blocker": "permissions_admin_gate_missing",
+                "counts_toward_public_sdk": True,
+            },
+        }
+
+        blockers = ROUTE_GATE.validate_identity_lock_mode(args, phase)
+
+        self.assertIn("critical_path_approved_runtime_evidence_report_schema_mismatch", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_mode_not_consume", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_ready_scope_not_runtime_evidence_only", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_next_blocker_unexpected", blockers)
+        self.assertIn("critical_path_approved_runtime_evidence_counts_toward_public_sdk_not_false", blockers)
         self.assertIn(
             "critical_path_identity_gate_mode_unexpected_blocker:'identity_public_contract_gate_missing'!='approved_runtime_evidence_missing'",
             blockers,
@@ -1544,6 +1612,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "countsTowardRuntime": True,
                 "counts_toward_v1_completion": True,
                 "public_or_runtime_accounting_allowed": True,
+                "countsTowardSdk": True,
+                "counts_as_public_sdk": True,
+                "counts_toward_complete_sdk_claim": True,
+                "route_gate_non_counting_counts_toward_public_sdk": True,
+                "route_gate_public_or_runtime_accounting_allowed": True,
+                "dependency_chain_unlocked": True,
             }
         )
 
@@ -1576,6 +1650,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertIn("countsTowardRuntime", claims)
         self.assertIn("counts_toward_v1_completion", claims)
         self.assertIn("public_or_runtime_accounting_allowed", claims)
+        self.assertIn("countsTowardSdk", claims)
+        self.assertIn("counts_as_public_sdk", claims)
+        self.assertIn("counts_toward_complete_sdk_claim", claims)
+        self.assertIn("route_gate_non_counting_counts_toward_public_sdk", claims)
+        self.assertIn("route_gate_public_or_runtime_accounting_allowed", claims)
+        self.assertIn("dependency_chain_unlocked", claims)
 
     def test_collect_public_or_runtime_claims_accepts_negated_runtime_ready_text(self) -> None:
         for text in ("runtime readiness remains blocked", "runtime ready remains blocked"):

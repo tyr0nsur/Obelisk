@@ -40,6 +40,9 @@ COMMAND_RESPONSE_DEFAULT_READINESS_NAME = "command-chat-response-route-planning-
 
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
 PLAYER_IDENTITY_FIRST_EVIDENCE_SCHEMA = "obelisk.player-identity-first-evidence-readiness.v1"
+APPROVED_RUNTIME_EVIDENCE_REPORT_SCHEMA = (
+    "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+)
 EXPECTED_ROUTE_CHECK_SCHEMAS = {
     "player_identity_public_contract_gap": "obelisk.player-identity-public-contract-gap-report.v1",
     "permissions_query_failclosed": "obelisk.permissions-admin-query-failclosed-contract-check.v1",
@@ -78,7 +81,14 @@ REQUIRED_CHILD_ACCOUNTING_FALSE_KEYS = (
     "public_or_runtime_accounting_allowed",
 )
 APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS = (
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_sdk",
+    "counts_toward_v1_completion",
     "promotion_ready",
+    "public_or_runtime_accounting_allowed",
     "public_header_allowed",
     "public_sdk_ready",
     "public_abi_ready",
@@ -117,6 +127,20 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "counts_toward_runtime",
     "counts_toward_v1_completion",
     "public_or_runtime_accounting_allowed",
+    "counts_as_public_sdk",
+    "counts_as_runtime",
+    "counts_as_v1_completion",
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_sdk",
+    "route_gate_counts_toward_public_sdk",
+    "route_gate_counts_toward_runtime",
+    "route_gate_counts_toward_v1_completion",
+    "route_gate_public_or_runtime_accounting_allowed",
+    "route_gate_non_counting_counts_toward_public_sdk",
+    "route_gate_non_counting_counts_toward_runtime",
+    "route_gate_non_counting_counts_toward_v1_completion",
+    "route_gate_non_counting_override",
     "public_header_allowed",
     "public_header_ready",
     "public_readiness_ready",
@@ -153,9 +177,14 @@ FORBIDDEN_PUBLIC_OR_RUNTIME_CLAIM_KEYS = {
     "runtime_approval_granted",
     "runtime_work_authorized",
     "server_operations_authorized",
+    "dependency_chain_unlocked",
+    "public_dependency_chain_unlocked",
+    "v1_dependency_chain_unlocked",
 }
 BROAD_PUBLIC_OR_RUNTIME_CLAIM_KEY_RE = re.compile(
     r"^(?:"
+    r"(?:.*_)?counts_(?:towards?|as)_(?:public_)?sdk(?:_claim)?|"
+    r"(?:.*_)?counts_(?:towards?|as)_(?:runtime|v1_completion|complete_sdk(?:_claim)?)|"
     r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
     r"(?:_(?:ready|allowed|supported|enabled|public))?|"
     r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
@@ -587,10 +616,15 @@ def approved_runtime_evidence_ready_for_identity_lock(
     if not isinstance(diagnosis, dict):
         return False
     return (
-        diagnosis.get("ready") is True
+        diagnosis.get("report_schema") == APPROVED_RUNTIME_EVIDENCE_REPORT_SCHEMA
+        and diagnosis.get("mode") == "consume"
+        and diagnosis.get("ready_scope") == "runtime_evidence_only"
+        and diagnosis.get("ready") is True
         and diagnosis.get("approved_runtime_evidence_present") is True
         and diagnosis.get("runtime_evidence_ready") is True
         and diagnosis.get("remaining_blockers") == []
+        and diagnosis.get("blockers") == []
+        and diagnosis.get("next_blocker") == "identity_public_contract_gate_missing"
         and all(diagnosis.get(key) is False for key in APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS)
         and all(diagnosis.get(key) == [] for key in APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS)
         and (args is None or approved_runtime_evidence_diagnosis_path_matches(args, diagnosis))
@@ -616,6 +650,18 @@ def approved_runtime_evidence_identity_lock_binding_blockers(
     blockers: list[str] = []
     if not approved_runtime_evidence_diagnosis_path_matches(args, diagnosis):
         blockers.append("critical_path_approved_runtime_evidence_path_unbound")
+    if diagnosis.get("report_schema") != APPROVED_RUNTIME_EVIDENCE_REPORT_SCHEMA:
+        blockers.append("critical_path_approved_runtime_evidence_report_schema_mismatch")
+    if diagnosis.get("mode") != "consume":
+        blockers.append("critical_path_approved_runtime_evidence_mode_not_consume")
+    if diagnosis.get("ready_scope") != "runtime_evidence_only":
+        blockers.append("critical_path_approved_runtime_evidence_ready_scope_not_runtime_evidence_only")
+    if diagnosis.get("next_blocker") != "identity_public_contract_gate_missing":
+        blockers.append("critical_path_approved_runtime_evidence_next_blocker_unexpected")
+    if diagnosis.get("blockers") != []:
+        blockers.append("critical_path_approved_runtime_evidence_blockers_not_empty")
+    if diagnosis.get("remaining_blockers") != []:
+        blockers.append("critical_path_approved_runtime_evidence_remaining_blockers_not_empty")
     for key in APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS:
         if diagnosis.get(key) is not False:
             blockers.append(f"critical_path_approved_runtime_evidence_{key}_not_false")
@@ -640,6 +686,7 @@ def validate_identity_lock_mode(args: argparse.Namespace, phase: dict[str, Any])
     source_observed = phase.get("source_checker_primary_blocker")
     blockers: list[str] = []
     if observed in UPSTREAM_IDENTITY_LOCK_BLOCKERS and source_observed == observed:
+        blockers.extend(approved_runtime_evidence_identity_lock_binding_blockers(args, phase))
         return blockers
     if observed != expected:
         blockers.append(f"critical_path_identity_gate_mode_unexpected_blocker:{observed!r}!={expected!r}")

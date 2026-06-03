@@ -217,4 +217,4 @@ This file is an active routing table only. Durable evidence belongs in
   SDK `0/12`, P0 `0/4`, generated scoped statement `ready=true` as non-complete
   bookkeeping only, `py_compile` and `git diff --check` OK. No runtime/server/Discord/
   GitHub operation.
-- Active turbo SDK round integrated: Huygens/Ampere/Banach/Kant hardened runtime evidence, identity contract, ResourceHandle, and ABI/build scopes; baseline remains route `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, stable false.
+- Active SDK guardrail round integrated: Anscombe/Godel/Sartre/Gauss hardened request replay, accepted-runtime route transition, SDK secondary reports, and static P0 manifests; baseline remains route `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, stable false.

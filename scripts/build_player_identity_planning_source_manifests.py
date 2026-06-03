@@ -35,6 +35,11 @@ LIFECYCLE_TARGETS = (
 )
 LIFECYCLE_TARGET_BY_NAME = {target: role for role, target in LIFECYCLE_TARGETS}
 ADMIN_TARGETS_NOT_LIFECYCLE_ANCHORS = lifecycle_checker.ADMIN_SNAPSHOT_TARGETS_NOT_LIFECYCLE_PROOF
+STATIC_REPORT_ARTIFACT_STATUS = "candidate_only"
+STATIC_REPORT_READINESS_CLASSIFICATION = "planning_only"
+STATIC_REPORT_BUILD_TYPE = "sanitized_snapshot_static_report"
+STATIC_REPORT_TARGET_SET_REVISION = "reflection_target_sets.py:players-lifecycle-anchor-candidates"
+STATIC_ORIENTATION_SCHEMA = "obelisk.player-identity-static-lifecycle-orientation-check.v1"
 NON_CLAIMS = [
     "offline deterministic planning-manifest build only",
     "no runtime or server operation was performed",
@@ -170,19 +175,60 @@ def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | No
     payload = load_json(path, "lifecycle-static-report")
     if payload.get("schema") != "obelisk.players-identity-lifecycle-anchor-static-report.v1":
         raise SystemExit("lifecycle-static-report schema mismatch")
+    if payload.get("artifact_status") != STATIC_REPORT_ARTIFACT_STATUS:
+        raise SystemExit("lifecycle-static-report artifact_status mismatch")
+    if payload.get("readiness_classification") != STATIC_REPORT_READINESS_CLASSIFICATION:
+        raise SystemExit("lifecycle-static-report readiness classification mismatch")
     if payload.get("ready") is not True or payload.get("accepted_for_lifecycle_anchor_binding") is not True:
         raise SystemExit("lifecycle-static-report is not accepted for lifecycle anchor binding")
     if payload.get("corroboration_status") != "static_accepted":
         raise SystemExit("lifecycle-static-report corroboration status mismatch")
-    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready"):
+    for key in ("promotion_ready", "public_sdk_ready", "runtime_ready", "runtime_work_authorized", "server_operations_authorized"):
         if payload.get(key) is not False:
             raise SystemExit(f"lifecycle-static-report {key} must be false")
+    blockers = payload.get("blockers")
+    if blockers != []:
+        raise SystemExit("lifecycle-static-report blockers must be empty for accepted static binding")
     artifact_identity = payload.get("artifact_identity")
     if not isinstance(artifact_identity, dict):
         raise SystemExit("lifecycle-static-report artifact_identity missing")
+    if artifact_identity.get("build_type") != STATIC_REPORT_BUILD_TYPE:
+        raise SystemExit("lifecycle-static-report artifact_identity build_type mismatch")
+    if artifact_identity.get("target_set_revision") != STATIC_REPORT_TARGET_SET_REVISION:
+        raise SystemExit("lifecycle-static-report artifact_identity target_set_revision mismatch")
+    if artifact_identity.get("path_redacted") is not True:
+        raise SystemExit("lifecycle-static-report artifact_identity path_redacted must be true")
+    if not isinstance(artifact_identity.get("ark_binary_sha256"), str) or lifecycle_checker.SHA256_RE.fullmatch(
+        artifact_identity["ark_binary_sha256"]
+    ) is None:
+        raise SystemExit("lifecycle-static-report artifact_identity ark_binary_sha256 invalid")
+    if not isinstance(artifact_identity.get("obelisk_commit"), str) or not artifact_identity["obelisk_commit"]:
+        raise SystemExit("lifecycle-static-report artifact_identity obelisk_commit missing")
     source_ids = artifact_identity.get("source_artifact_ids")
     if not isinstance(source_ids, list) or not source_ids:
         raise SystemExit("lifecycle-static-report source_artifact_ids missing")
+    source_id_blockers: list[dict[str, Any]] = []
+    lifecycle_checker.validate_source_artifact_ids(
+        source_ids,
+        source_id_blockers,
+        "$.artifact_identity.source_artifact_ids",
+    )
+    if source_id_blockers:
+        raise SystemExit("lifecycle-static-report source_artifact_ids invalid")
+    static_orientation = payload.get("static_orientation")
+    if not isinstance(static_orientation, dict):
+        raise SystemExit("lifecycle-static-report static_orientation missing")
+    if static_orientation.get("provided") is not True:
+        raise SystemExit("lifecycle-static-report static_orientation must be provided")
+    if static_orientation.get("schema") != STATIC_ORIENTATION_SCHEMA:
+        raise SystemExit("lifecycle-static-report static_orientation schema mismatch")
+    if static_orientation.get("accepted_for_orientation") is not True:
+        raise SystemExit("lifecycle-static-report static_orientation not accepted")
+    if static_orientation.get("binary_sha256") != artifact_identity.get("ark_binary_sha256"):
+        raise SystemExit("lifecycle-static-report static_orientation binary SHA mismatch")
+    static_orientation_sha = static_orientation.get("sha256")
+    if not isinstance(static_orientation_sha, str) or lifecycle_checker.SHA256_RE.fullmatch(static_orientation_sha) is None:
+        raise SystemExit("lifecycle-static-report static_orientation sha256 invalid")
     accepted_targets = payload.get("accepted_targets")
     if not isinstance(accepted_targets, list):
         raise SystemExit("lifecycle-static-report accepted_targets must be a list")
@@ -214,10 +260,21 @@ def load_lifecycle_static_report(path: Path | None) -> tuple[dict[str, Any] | No
         raise SystemExit("lifecycle-static-report missing accepted lifecycle targets: " + ", ".join(missing))
     for role, target in LIFECYCLE_TARGETS:
         row = targets_by_name[target]
+        expected = lifecycle_checker.LIFECYCLE_LAYOUT_CANDIDATE_TARGETS[target]
         if row.get("role") != role:
             raise SystemExit(f"lifecycle-static-report role mismatch for {target}")
         if row.get("status") != "static_accepted":
             raise SystemExit(f"lifecycle-static-report status mismatch for {target}")
+        if not isinstance(row.get("source_snapshot_sha256"), str) or lifecycle_checker.SHA256_RE.fullmatch(
+            row["source_snapshot_sha256"]
+        ) is None:
+            raise SystemExit(f"lifecycle-static-report source snapshot SHA invalid for {target}")
+        if row.get("num_parms") != expected["num_parms"]:
+            raise SystemExit(f"lifecycle-static-report num_parms mismatch for {target}")
+        if row.get("parms_size") != expected["parms_size"]:
+            raise SystemExit(f"lifecycle-static-report parms_size mismatch for {target}")
+        if row.get("property_order") != [field[0] for field in expected["fields"]]:
+            raise SystemExit(f"lifecycle-static-report property_order mismatch for {target}")
     return payload, lifecycle_static_report_hash(path)
 
 

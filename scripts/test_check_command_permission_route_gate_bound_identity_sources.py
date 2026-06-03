@@ -75,6 +75,11 @@ def approved_runtime_route_diagnosis(path: Path) -> dict:
     return {
         "provided": True,
         "path": str(path.resolve()),
+        "report_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+        "input_schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+        "mode": "consume",
+        "ready_scope": "runtime_evidence_only",
+        "next_blocker": "identity_public_contract_gate_missing",
         "ready": True,
         "approved_runtime_evidence_present": True,
         "runtime_evidence_ready": True,
@@ -84,6 +89,13 @@ def approved_runtime_route_diagnosis(path: Path) -> dict:
         "public_abi_ready": False,
         "v1_completion_ready": False,
         "runtime_ready": False,
+        "counts_toward_complete_sdk": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_sdk": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
         "remaining_blockers": [],
@@ -565,6 +577,9 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
                     "public_sdk_ready": True,
                     "runtimeReady": True,
                     "v1_completion_ready": True,
+                    "countsTowardSdk": True,
+                    "route_gate_non_counting_counts_toward_public_sdk": True,
+                    "dependency_chain_unlocked": True,
                 },
             }
         ]
@@ -576,6 +591,12 @@ class CheckCommandPermissionRouteGateBoundIdentitySourcesTests(unittest.TestCase
         self.assertIn("checks[0].nested.public_sdk_ready", report["route_gate"]["public_or_runtime_claims"])
         self.assertIn("checks[0].nested.runtimeReady", report["route_gate"]["public_or_runtime_claims"])
         self.assertIn("checks[0].nested.v1_completion_ready", report["route_gate"]["public_or_runtime_claims"])
+        self.assertIn("checks[0].nested.countsTowardSdk", report["route_gate"]["public_or_runtime_claims"])
+        self.assertIn(
+            "checks[0].nested.route_gate_non_counting_counts_toward_public_sdk",
+            report["route_gate"]["public_or_runtime_claims"],
+        )
+        self.assertIn("checks[0].nested.dependency_chain_unlocked", report["route_gate"]["public_or_runtime_claims"])
 
     def test_rejects_partial_manifest_inputs_before_binding(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

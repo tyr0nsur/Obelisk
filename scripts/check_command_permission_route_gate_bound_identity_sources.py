@@ -22,6 +22,28 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 REPORT_SCHEMA = "obelisk.command-permission-route-gate-bound-identity-sources-check.v1"
 ROUTE_GATE_SCHEMA = "obelisk.command-permission-route-gate-check.v1"
+APPROVED_RUNTIME_EVIDENCE_REPORT_SCHEMA = (
+    "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1"
+)
+APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS = (
+    "counts_toward_complete_sdk",
+    "counts_toward_complete_sdk_claim",
+    "counts_toward_public_sdk",
+    "counts_toward_runtime",
+    "counts_toward_sdk",
+    "counts_toward_v1_completion",
+    "promotion_ready",
+    "public_or_runtime_accounting_allowed",
+    "public_header_allowed",
+    "public_sdk_ready",
+    "public_abi_ready",
+    "runtime_ready",
+    "v1_completion_ready",
+)
+APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS = (
+    "public_capability_bits_now",
+    "public_callback_abi_now",
+)
 NON_CLAIMS = [
     "transient bound route gate check only",
     "no runtime or server operation was performed",
@@ -177,15 +199,17 @@ def check_approved_runtime_evidence_manifest(path: Path, temp_root: Path) -> tup
         result.returncode == 0
         and parse_error is None
         and isinstance(report, dict)
+        and report.get("schema") == APPROVED_RUNTIME_EVIDENCE_REPORT_SCHEMA
+        and report.get("mode") == "consume"
+        and report.get("ready_scope") == "runtime_evidence_only"
         and report.get("ready") is True
         and report.get("approved_runtime_evidence_present") is True
         and report.get("runtime_evidence_ready") is True
+        and report.get("remaining_blockers") == []
+        and report.get("blockers") == []
         and report.get("next_blocker") == "identity_public_contract_gate_missing"
-        and report.get("promotion_ready") is False
-        and report.get("public_sdk_ready") is False
-        and report.get("public_abi_ready") is False
-        and report.get("runtime_ready") is False
-        and report.get("v1_completion_ready") is False
+        and all(report.get(key, False) is False for key in APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS)
+        and all(report.get(key) == [] for key in APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS)
     )
     return accepted, report, result.returncode, result.stderr.strip(), parse_error
 
@@ -358,15 +382,17 @@ def approved_runtime_evidence_diagnosis_matches_path(diagnosis: dict[str, Any], 
 
 def approved_runtime_evidence_diagnosis_ready(diagnosis: dict[str, Any]) -> bool:
     return (
-        diagnosis.get("ready") is True
+        diagnosis.get("report_schema") == APPROVED_RUNTIME_EVIDENCE_REPORT_SCHEMA
+        and diagnosis.get("mode") == "consume"
+        and diagnosis.get("ready_scope") == "runtime_evidence_only"
+        and diagnosis.get("ready") is True
         and diagnosis.get("approved_runtime_evidence_present") is True
         and diagnosis.get("runtime_evidence_ready") is True
         and diagnosis.get("remaining_blockers") == []
-        and diagnosis.get("promotion_ready") is False
-        and diagnosis.get("public_sdk_ready") is False
-        and diagnosis.get("public_abi_ready") is False
-        and diagnosis.get("runtime_ready") is False
-        and diagnosis.get("v1_completion_ready") is False
+        and diagnosis.get("blockers") == []
+        and diagnosis.get("next_blocker") == "identity_public_contract_gate_missing"
+        and all(diagnosis.get(key) is False for key in APPROVED_RUNTIME_EVIDENCE_FALSE_KEYS)
+        and all(diagnosis.get(key) == [] for key in APPROVED_RUNTIME_EVIDENCE_EMPTY_KEYS)
     )
 
 

@@ -375,21 +375,6 @@ def write_sidecars(base: Path, fields: dict[str, str]) -> dict[str, str]:
 
 
 class WindowManifestCheckerTests(unittest.TestCase):
-    def test_post_window_replay_expiry_exception_is_exact(self) -> None:
-        self.assertTrue(CHECKER.request_check_failed_only_because_window_expired(["approved_window_expired"]))
-        self.assertFalse(CHECKER.request_check_failed_only_because_window_expired([]))
-        self.assertFalse(
-            CHECKER.request_check_failed_only_because_window_expired(
-                ["approved_window_expired", "approved_window_expired"]
-            )
-        )
-        self.assertFalse(
-            CHECKER.request_check_failed_only_because_window_expired(
-                ["approved_window_expired", "operator_markdown_drift"]
-            )
-        )
-        self.assertFalse(CHECKER.request_check_failed_only_because_window_expired("approved_window_expired"))
-
     def run_checker(
         self,
         lines: list[str],
@@ -1626,6 +1611,8 @@ class WindowManifestCheckerTests(unittest.TestCase):
             nested_payload = {
                 "ready": True,
                 "request_pack_ready": True,
+                "post_window_replay": True,
+                "post_window_replay_expiry_tolerated": True,
                 "blockers": [],
             }
             nested_result = subprocess.CompletedProcess(
@@ -1650,6 +1637,56 @@ class WindowManifestCheckerTests(unittest.TestCase):
         self.assertIn("--operator-approval-receipt", command)
         receipt_index = command.index("--operator-approval-receipt") + 1
         self.assertEqual(str(Path(fields["operator_approval_receipt_path"]).resolve()), command[receipt_index])
+
+    def test_validate_request_pack_post_window_replay_rejects_nested_expiry_failure_without_receipt_success(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved = root / "approved"
+            exact_dir = approved / "live-validation-logs" / RUN_ID
+            exact_log = exact_dir / "Obelisk.log"
+            exact_manifest = exact_dir / "window-manifest.env"
+            exact_dir.mkdir(parents=True)
+            lines = []
+            for line in manifest_lines():
+                if line == f"copied_log_path=live-validation-logs/{RUN_ID}/Obelisk.log":
+                    lines.append(f"copied_log_path={exact_log}")
+                else:
+                    lines.append(line)
+            fields = dict(line.split("=", 1) for line in lines if "=" in line)
+            fields = write_sidecars(exact_manifest.parent, fields)
+            exact_log.write_text(COPIED_LOG_TEXT, encoding="utf-8")
+            blockers: list[dict[str, object]] = []
+            original_server_root = CHECKER.SERVER_ROOT
+            original_approved_roots = CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS
+            nested_payload = {
+                "ready": False,
+                "request_pack_ready": False,
+                "post_window_replay": True,
+                "post_window_replay_expiry_tolerated": False,
+                "blockers": ["approved_window_expired"],
+            }
+            nested_result = subprocess.CompletedProcess(
+                args=[],
+                returncode=1,
+                stdout=json.dumps(nested_payload),
+                stderr="expired",
+            )
+
+            try:
+                CHECKER.SERVER_ROOT = root / "protected"
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = (approved,)
+                with mock.patch.object(CHECKER.subprocess, "run", return_value=nested_result):
+                    CHECKER.validate_request_pack(fields, exact_manifest, blockers, post_window_replay=True)
+            finally:
+                CHECKER.SERVER_ROOT = original_server_root
+                CHECKER.APPROVED_OFFLINE_WORKSPACE_ROOTS = original_approved_roots
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertIn("request_pack_window_request_check_failed", reasons)
+        details = [item for item in blockers if item["reason"] == "request_pack_window_request_check_failed"]
+        self.assertEqual(["approved_window_expired"], details[0]["request_check_blockers"])
 
     def test_accepts_legacy_users_policy_alias_and_split_target_fields(self) -> None:
         lines = manifest_lines(target=None, instance="arkserver2", map="TheIsland", user_policy=None)

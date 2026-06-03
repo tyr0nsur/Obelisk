@@ -1898,6 +1898,30 @@ priorities, and do not use history files as the active source of truth.
   planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`,
   P0 `0/4`, generated scoped statement `ready=true` as non-complete bookkeeping only,
   `py_compile` OK, and `git diff --check` OK. No runtime/server/Discord/GitHub operation.
+- 2026-06-03 SDK alias/runtime-evidence hardening checkpoint `1eeb3c1`: runtime principal
+  lifecycle bundle preflight now requires request-pack checker echoes for
+  `post_window_replay=true` and `post_window_replay_expiry_tolerated=true`; identity
+  public-contract gates carry false-only aliases for public principal/header/lookup/real
+  identity/redaction promotion; ResourceHandle readiness carries false-only aliases for
+  serial policy, lookup, post-callback handles, object identity, and runtime samples; and
+  install/public SDK guardrails reject blocked symbols plus public `CallProcessEvent`
+  escape-hatch use. Validation: P0 evidence/bundle 125 OK, identity contract 101 OK,
+  ResourceHandle 42 OK, release/plugin/static 90 OK, public SDK guardrails 196 OK, route
+  JSON valid/planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with
+  SDK `0/12`, P0 `0/4`, generated scoped statement bookkeeping `7/7` but non-complete,
+  and `git diff --check` OK. No runtime/server/Discord/GitHub operation.
+- 2026-06-03 SDK guardrail round after `1eeb3c1`: request/window replay now requires
+  successful nested request-check replay plus verified operator receipt; accepted runtime
+  evidence route transition requires exact consume-mode report metadata and false
+  public/runtime/v1 accounting aliases; SDK completion secondary reports reject split
+  claim key/value aliases, identity/resource readiness aliases, and positive completion
+  wording inside `non_claim` containers; source-bound P0 planning manifests reject stale
+  static report drift and keep only `ShooterGameMode.HandleNewPlayer`/`OnLogout` as
+  lifecycle anchors. Validation: request/window/bundle 187 OK, route/first-evidence 108
+  OK, SDK completion 238 OK, public SDK guardrails 196 OK, route JSON valid/planning-only
+  at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  generated scoped statement bookkeeping `7/7` but non-complete. No runtime/server/
+  Discord/GitHub operation.
 
 ## Agent Coordination
 

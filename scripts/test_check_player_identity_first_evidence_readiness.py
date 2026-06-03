@@ -2507,6 +2507,13 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 )
 
         self.assertTrue(diagnosis["ready"])
+        self.assertEqual(
+            diagnosis["report_schema"],
+            "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+        )
+        self.assertEqual(diagnosis["mode"], "consume")
+        self.assertEqual(diagnosis["ready_scope"], "runtime_evidence_only")
+        self.assertEqual(diagnosis["next_blocker"], "identity_public_contract_gate_missing")
         self.assertTrue(diagnosis["approved_runtime_evidence_present"])
         self.assertTrue(diagnosis["runtime_evidence_ready"])
         self.assertFalse(diagnosis["promotion_ready"])
@@ -2568,6 +2575,42 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
         self.assertIn("approved_runtime_report_v1_completion_ready_not_false", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_capability_bits_now_not_empty", diagnosis["blockers"])
         self.assertIn("approved_runtime_report_public_callback_abi_now_not_empty", diagnosis["blockers"])
+
+    def test_approved_runtime_manifest_diagnosis_rejects_accounting_alias_overclaim(self) -> None:
+        original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report
+
+        def accounting_overclaim_report(payload, validation, *, check_mode: str):
+            report = original_build_report(payload, validation, check_mode=check_mode)
+            report["counts_toward_public_sdk"] = True
+            report["counts_toward_runtime"] = True
+            report["counts_toward_v1_completion"] = True
+            report["counts_toward_complete_sdk_claim"] = True
+            report["public_or_runtime_accounting_allowed"] = True
+            return report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            approved_manifest = Path(tmp) / "approved-runtime-principal-lifecycle.json"
+            approved_manifest.write_text(
+                json.dumps(approved_runtime_principal_lifecycle_manifest()),
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                checker.approved_runtime_principal_lifecycle_evidence,
+                "build_report",
+                side_effect=accounting_overclaim_report,
+            ), mock.patch.dict(os.environ, {"OBELISK_ALLOW_TEST_WORKSPACE_PREFIXES": "1"}):
+                diagnosis = checker.approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(
+                    approved_manifest
+                )
+
+        self.assertFalse(diagnosis["ready"])
+        self.assertFalse(diagnosis["approved_runtime_evidence_present"])
+        self.assertEqual(diagnosis["remaining_blockers"], ["approved_runtime_evidence_missing"])
+        self.assertIn("approved_runtime_report_counts_toward_public_sdk_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_counts_toward_runtime_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_counts_toward_v1_completion_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_counts_toward_complete_sdk_claim_not_false", diagnosis["blockers"])
+        self.assertIn("approved_runtime_report_public_or_runtime_accounting_allowed_not_false", diagnosis["blockers"])
 
     def test_approved_runtime_manifest_diagnosis_rejects_legacy_public_contract_gate_alias(self) -> None:
         original_build_report = checker.approved_runtime_principal_lifecycle_evidence.build_report

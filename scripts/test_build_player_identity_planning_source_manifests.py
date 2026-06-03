@@ -153,6 +153,102 @@ class BuildPlayerIdentityPlanningSourceManifestsTests(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("lifecycle-static-report source snapshot SHA mismatch", result.stderr)
 
+    def test_build_rejects_static_lifecycle_report_artifact_status_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            static_report = root / "static-report.json"
+
+            def mutate(report: dict) -> None:
+                report["artifact_status"] = "promoted"
+
+            self.write_static_report(static_report, mutate)
+
+            result = self.run_tool(
+                [
+                    "--output-dir",
+                    str(root / "planning"),
+                    "--lifecycle-static-report",
+                    str(static_report),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("lifecycle-static-report artifact_status mismatch", result.stderr)
+
+    def test_build_rejects_static_lifecycle_report_source_id_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            static_report = root / "static-report.json"
+
+            def mutate(report: dict) -> None:
+                report["artifact_identity"]["source_artifact_ids"] = ["capture_id:base-identity-core"]
+
+            self.write_static_report(static_report, mutate)
+
+            result = self.run_tool(
+                [
+                    "--output-dir",
+                    str(root / "planning"),
+                    "--lifecycle-static-report",
+                    str(static_report),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("lifecycle-static-report source_artifact_ids invalid", result.stderr)
+
+    def test_build_rejects_static_lifecycle_report_layout_summary_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            static_report = root / "static-report.json"
+
+            def mutate(report: dict) -> None:
+                report["accepted_targets"][0]["property_order"] = ["NewPlayer"]
+
+            self.write_static_report(static_report, mutate)
+
+            result = self.run_tool(
+                [
+                    "--output-dir",
+                    str(root / "planning"),
+                    "--lifecycle-static-report",
+                    str(static_report),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("lifecycle-static-report property_order mismatch", result.stderr)
+
+    def test_build_rejects_static_lifecycle_report_static_orientation_schema_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            static_report = root / "static-report.json"
+
+            def mutate(report: dict) -> None:
+                report["static_orientation"]["schema"] = "obelisk.stale-static-shortcut.v1"
+
+            self.write_static_report(static_report, mutate)
+
+            result = self.run_tool(
+                [
+                    "--output-dir",
+                    str(root / "planning"),
+                    "--lifecycle-static-report",
+                    str(static_report),
+                    "--json",
+                ],
+                check=False,
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("lifecycle-static-report static_orientation schema mismatch", result.stderr)
+
     def test_build_rejects_admin_target_as_lifecycle_static_anchor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

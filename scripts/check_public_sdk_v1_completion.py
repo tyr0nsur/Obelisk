@@ -375,6 +375,28 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "p0_dependency_chain_promoted_for_claim_ratio",
     "promoted_for_claim_ratio",
     "api_ready",
+    "identity_contract_ready",
+    "identity_public_contract_ready",
+    "object_identity_allowed",
+    "object_identity_available",
+    "object_identity_public",
+    "object_identity_ready",
+    "object_lookup_allowed",
+    "object_lookup_available",
+    "object_lookup_public",
+    "object_lookup_ready",
+    "player_identity_allowed",
+    "player_identity_available",
+    "player_identity_public",
+    "player_identity_ready",
+    "player_principal_allowed",
+    "player_principal_available",
+    "player_principal_public",
+    "player_principal_ready",
+    "principal_handle_allowed",
+    "principal_handle_available",
+    "principal_handle_public",
+    "principal_handle_ready",
     "support_ready",
     "sdk_ready",
     "production_grade",
@@ -390,6 +412,10 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "release_grade_ready",
     "release_ready",
     "release_readiness_ready",
+    "resource_handle_allowed",
+    "resource_handle_available",
+    "resource_handle_public",
+    "resource_handle_ready",
     "route_ready",
     "route_readiness_ready",
     "runtime_v1_ready",
@@ -408,18 +434,32 @@ SECONDARY_REPORT_FORBIDDEN_COMPLETION_CLAIM_KEYS = (
     "v1_completion_progress_ratio",
 )
 SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS = {
+    "claim",
+    "claim_key",
+    "claim_name",
+    "claim_scope",
     "display_name",
+    "field",
+    "field_name",
     "heading",
     "label",
+    "metric",
+    "metric_name",
     "name",
+    "readiness_key",
     "section",
     "section_name",
+    "subject",
     "summary_name",
     "title",
 }
 SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS = {
+    "allowed",
     "availability",
+    "claim_value",
     "declared_support_tier",
+    "enabled",
+    "flag",
     "outcome",
     "publication",
     "readiness",
@@ -429,6 +469,15 @@ SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS = {
     "support_tier",
     "tier",
     "value",
+}
+SECONDARY_REPORT_COMPLETION_PROGRESS_VALUE_KEYS = {
+    "count",
+    "counted",
+    "progress",
+    "progress_count",
+    "progress_percent",
+    "progress_ratio",
+    "ratio",
 }
 SECONDARY_REPORT_SPLIT_COMPLETION_DESCRIPTOR_RE = re.compile(
     r"\b(?:complete|full|stable|public|production(?: ready| grade)?|release grade)\s+"
@@ -465,6 +514,35 @@ SECONDARY_REPORT_STANDALONE_COMPLETION_STATUS_VALUE_KEYS = {
 SECONDARY_REPORT_STANDALONE_COMPLETION_CONTEXT_RE = re.compile(
     r"\b(?:complete|full|stable|public|production|release|sdk|api|support|"
     r"v1|route|runtime|plugin\s+hub|pluginhub)\b",
+    re.IGNORECASE,
+)
+SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_RE = re.compile(
+    r"\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
+    r"(?:sdk|api|support)\b.{0,80}"
+    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
+    r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
+    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
+    r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b"
+    r".{0,80}\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
+    r"(?:sdk|api|support)\b|"
+    r"\bv1(?:\.0)?\s+(?:stable|completion|(?:sdk|api|support))\b.{0,80}"
+    r"\b(?:allow(?:ed)?|available|complete|count(?:ed|s)?|enabled|progress|"
+    r"promoted|public|ready|release(?:d)?|ship(?:ped|s)?|support(?:ed)?|"
+    r"satisf(?:y|ies|ied)|unlocked|[1-9][0-9]*(?:\.[0-9]+)?%?|[1-9][0-9]*\s*/\s*[1-9][0-9]*)\b|"
+    r"\b(?:complete|full|stable|production(?:[-_ ]?(?:ready|grade))?)\s+"
+    r"(?:sdk|api|support)\s+(?:claim\s+)?progress\b",
+    re.IGNORECASE,
+)
+SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_NEGATORS = re.compile(
+    r"\b(?:blocked|cannot|can't|does\s+not|do\s+not|false|insufficient|must\s+not|"
+    r"never|no|non[-_ ]?claim|non[-_ ]?promotional|not|planning[-_ ]?only|"
+    r"bookkeeping[-_ ]?only|without)\b",
+    re.IGNORECASE,
+)
+BROAD_CLAIM_TEXT_CLAUSE_SPLIT_RE = re.compile(
+    r"[.;:\n\r]|(?:\s+\b(?:and|but|however|yet)\b\s+)",
     re.IGNORECASE,
 )
 BROAD_ROUTE_GATE_CLAIM_KEY_RE = re.compile(
@@ -1813,6 +1891,10 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
         separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
         return re.sub(r"[^a-z0-9]+", " ", separated.casefold()).strip()
 
+    def claim_search_text(value: object) -> str:
+        separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
+        return re.sub(r"[_-]+", " ", separated.casefold())
+
     def is_split_claim_descriptor(value: Any) -> bool:
         return (
             isinstance(value, str)
@@ -1868,6 +1950,25 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             return True
         return is_positive_completion_claim_value(value) and path_has_completion_status_context(path)
 
+    def is_positive_completion_progress_claim(key_name: str, value: Any, path: str) -> bool:
+        if key_name not in SECONDARY_REPORT_COMPLETION_PROGRESS_VALUE_KEYS:
+            return False
+        return is_positive_completion_claim_value(value) and path_has_completion_status_context(path)
+
+    def path_is_non_claim_container(path: str) -> bool:
+        return any(part in {"non_claim", "non_claims"} for part in normalized_claim_path_parts(path))
+
+    def has_positive_completion_claim_text(value: str) -> bool:
+        for raw_clause in BROAD_CLAIM_TEXT_CLAUSE_SPLIT_RE.split(claim_search_text(value)):
+            clause = re.sub(r"\s+", " ", raw_clause).strip()
+            if not clause:
+                continue
+            if SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_RE.search(
+                clause
+            ) and not SECONDARY_REPORT_POSITIVE_COMPLETION_TEXT_NEGATORS.search(clause):
+                return True
+        return False
+
     def split_completion_claim_paths(value: dict[str, Any], path: str) -> list[str]:
         has_claim_descriptor = False
         positive_status_paths: list[str] = []
@@ -1876,6 +1977,9 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
             if key_name in SECONDARY_REPORT_SPLIT_CLAIM_DESCRIPTOR_KEYS and is_split_claim_descriptor(item):
                 has_claim_descriptor = True
             if key_name in SECONDARY_REPORT_SPLIT_CLAIM_STATUS_KEYS and is_positive_split_claim_status(item):
+                item_path = f"{path}.{key}" if path else str(key)
+                positive_status_paths.append(item_path)
+            if key_name in SECONDARY_REPORT_COMPLETION_PROGRESS_VALUE_KEYS and is_positive_completion_claim_value(item):
                 item_path = f"{path}.{key}" if path else str(key)
                 positive_status_paths.append(item_path)
         return positive_status_paths if has_claim_descriptor else []
@@ -1916,10 +2020,26 @@ def secondary_report_completion_claims_without_blocker(payload: dict[str, Any]) 
                     and not current_blocked_context
                 ):
                     claims.append(item_path)
+                if (
+                    is_positive_completion_progress_claim(
+                        normalized_completion_claim_key(key),
+                        item,
+                        item_path,
+                    )
+                    and not current_blocked_context
+                ):
+                    claims.append(item_path)
                 visit(item, item_path, current_blocked_context)
         elif isinstance(value, list):
             for index, item in enumerate(value):
                 visit(item, f"{path}[{index}]", blocked_report_context)
+        elif (
+            isinstance(value, str)
+            and path_is_non_claim_container(path)
+            and has_positive_completion_claim_text(value)
+            and not blocked_report_context
+        ):
+            claims.append(f"{path}:positive_completion_text")
 
     visit(payload, "", False)
     return sorted(set(claims))
@@ -1977,6 +2097,10 @@ def is_positive_completion_claim_value(value: Any) -> bool:
             "public",
             "published",
             "ready",
+            "counted",
+            "counts",
+            "satisfied",
+            "satisfies",
             "supported",
             "true",
             "unlocked",

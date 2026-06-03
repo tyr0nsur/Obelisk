@@ -1368,12 +1368,29 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
     base: dict[str, Any] = {
         "provided": path is not None,
         "path": str(path) if path is not None else None,
+        "report_schema": None,
+        "input_schema": None,
+        "mode": None,
+        "ready_scope": None,
+        "next_blocker": "approved_runtime_evidence_missing",
         "ready": False,
         "approved_runtime_evidence_present": False,
         "runtime_evidence_ready": False,
         "promotion_ready": False,
+        "public_header_allowed": False,
         "public_sdk_ready": False,
+        "public_abi_ready": False,
+        "v1_completion_ready": False,
         "runtime_ready": False,
+        "counts_toward_complete_sdk": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_sdk": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
+        "public_capability_bits_now": [],
+        "public_callback_abi_now": [],
         "blockers": [],
         "remaining_blockers": ["approved_runtime_evidence_missing"],
         "non_claims": [
@@ -1390,12 +1407,29 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
     report = approved_runtime_principal_lifecycle_evidence.build_report(payload, validation, check_mode="consume")
     blockers = [blocker["reason"] for blocker in validation.blockers]
     if not validation.blockers:
+        if report.get("schema") != approved_runtime_principal_lifecycle_evidence.REPORT_SCHEMA:
+            blockers.append("approved_runtime_report_schema_mismatch")
+        if report.get("mode") != "consume":
+            blockers.append("approved_runtime_report_mode_not_consume")
+        if report.get("ready_scope") != "runtime_evidence_only":
+            blockers.append("approved_runtime_report_ready_scope_not_runtime_evidence_only")
         if report.get("approved_runtime_evidence_present") is not True:
             blockers.append("approved_runtime_report_evidence_present_not_true")
         if report.get("runtime_evidence_ready") is not True:
             blockers.append("approved_runtime_report_runtime_evidence_ready_not_true")
+        if report.get("remaining_blockers") != []:
+            blockers.append("approved_runtime_report_remaining_blockers_not_empty")
+        if report.get("blockers") != []:
+            blockers.append("approved_runtime_report_blockers_not_empty")
         for key in (
+            "counts_toward_complete_sdk",
+            "counts_toward_complete_sdk_claim",
+            "counts_toward_public_sdk",
+            "counts_toward_runtime",
+            "counts_toward_sdk",
+            "counts_toward_v1_completion",
             "promotion_ready",
+            "public_or_runtime_accounting_allowed",
             "public_header_allowed",
             "public_sdk_ready",
             "public_abi_ready",
@@ -1412,6 +1446,11 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
     ready = not blockers
     return {
         **base,
+        "report_schema": report.get("schema"),
+        "input_schema": report.get("input_schema"),
+        "mode": report.get("mode"),
+        "ready_scope": report.get("ready_scope"),
+        "next_blocker": report.get("next_blocker") if ready else "approved_runtime_evidence_missing",
         "ready": ready,
         "approved_runtime_evidence_present": ready,
         "runtime_evidence_ready": ready,
@@ -1421,6 +1460,13 @@ def approved_runtime_principal_lifecycle_evidence_manifest_diagnosis(path: Path 
         "public_abi_ready": False,
         "v1_completion_ready": False,
         "runtime_ready": False,
+        "counts_toward_complete_sdk": False,
+        "counts_toward_complete_sdk_claim": False,
+        "counts_toward_public_sdk": False,
+        "counts_toward_runtime": False,
+        "counts_toward_sdk": False,
+        "counts_toward_v1_completion": False,
+        "public_or_runtime_accounting_allowed": False,
         "public_capability_bits_now": [],
         "public_callback_abi_now": [],
         "remaining_blockers": [] if ready else ["approved_runtime_evidence_missing"],

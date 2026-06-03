@@ -1512,10 +1512,6 @@ def read_preflight_checked_at_utc(
     return parse_utc_timestamp(checked_at_utc)
 
 
-def request_check_failed_only_because_window_expired(request_check_blockers: Any) -> bool:
-    return isinstance(request_check_blockers, list) and request_check_blockers == ["approved_window_expired"]
-
-
 def validate_request_pack_replay_contract(
     fields: dict[str, str],
     manifest_path: Path,
@@ -1814,19 +1810,13 @@ def validate_request_pack(
         except json.JSONDecodeError:
             payload_check = None
     request_check_blockers = (payload_check or {}).get("blockers", [])
-    replay_tolerated_expiry = (
-        post_window_replay
-        and result.returncode != 0
-        and isinstance(payload_check, dict)
-        and payload_check.get("ready") is not True
-        and payload_check.get("request_pack_ready") is not True
-        and request_check_failed_only_because_window_expired(request_check_blockers)
-    )
-    if not replay_tolerated_expiry and (
+    if (
         result.returncode != 0
         or not isinstance(payload_check, dict)
         or payload_check.get("ready") is not True
         or payload_check.get("request_pack_ready") is not True
+        or (post_window_replay and payload_check.get("post_window_replay") is not True)
+        or (post_window_replay and payload_check.get("post_window_replay_expiry_tolerated") is not True)
     ):
         add(
             blockers,

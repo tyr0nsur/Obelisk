@@ -369,10 +369,14 @@ def window_manifest_check_state(window_manifest: dict[str, Any], blockers: list[
     if isinstance(payload, dict):
         state["schema"] = payload.get("schema")
         state["checker_ready"] = payload.get("ready") is True
+        operator_receipt = payload.get("operator_approval_receipt")
         state["ready"] = (
             exit_code == 0
             and payload.get("ready") is True
             and payload.get("operational_window_manifest_ready") is True
+            and payload.get("post_window_replay") is True
+            and isinstance(operator_receipt, dict)
+            and operator_receipt.get("verified") is True
             and payload.get("blockers", []) == []
             and payload.get("remaining_blockers", []) == []
         )
@@ -834,6 +838,8 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
         raise SystemExit("window manifest check schema mismatch")
     if window.get("ready") is not True or window.get("operational_window_manifest_ready") is not True:
         raise SystemExit("window manifest check is not ready")
+    if window.get("post_window_replay") is not True:
+        raise SystemExit("window manifest check did not validate post-window replay")
     if window.get("blockers") not in (None, []) or window.get("remaining_blockers") not in (None, []):
         raise SystemExit("window manifest check reported blockers despite ready status")
     copied = window.get("copied_log")
