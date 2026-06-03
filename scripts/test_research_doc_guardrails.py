@@ -14,6 +14,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import evaluate_resource_handle_revalidation as resourcehandle_evaluator  # noqa: E402
+import build_player_identity_runtime_principal_lifecycle_evidence_bundle as identity_bundle_builder  # noqa: E402
 
 
 def normalized(text: str) -> str:
@@ -48,6 +49,57 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             route_audit,
         )
         self.assertIn("--post-window-replay", runtime_plan)
+
+    def test_player_identity_runtime_observer_brief_bundle_command_matches_builder_cli(self) -> None:
+        documented_flags = self._documented_identity_bundle_flags(
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md",
+            "## Post-Window Offline Acceptance",
+            "## Non-Claims",
+        )
+        self._assert_identity_bundle_flags_match_builder_cli(documented_flags)
+
+    def test_player_identity_offline_to_runtime_plan_bundle_command_matches_builder_cli(self) -> None:
+        documented_flags = self._documented_identity_bundle_flags(
+            REPO_ROOT / "docs/research/2026-06-01-player-principal-offline-to-runtime-plan.md",
+            "Validate the copied window manifest",
+            "## Runtime Handoff",
+        )
+        self._assert_identity_bundle_flags_match_builder_cli(documented_flags)
+
+    def _documented_identity_bundle_flags(
+        self, path: Path, section_start: str, section_end: str
+    ) -> set[str]:
+        text = path.read_text(encoding="utf-8")
+        section = text.split(section_start, 1)[1].split(section_end, 1)[0]
+        commands = re.findall(r"```bash\n(.*?)```", section, flags=re.DOTALL)
+        bundle_commands = [
+            command
+            for command in commands
+            if "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py" in command
+        ]
+        self.assertEqual(len(bundle_commands), 1)
+        bundle_command = bundle_commands[0].split(
+            "build_player_identity_runtime_principal_lifecycle_evidence_bundle.py", 1
+        )[1].split("\n\n", 1)[0]
+        return set(re.findall(r"(?m)(?<!<)--[a-z0-9-]+", bundle_command))
+
+    def _assert_identity_bundle_flags_match_builder_cli(self, documented_flags: set[str]) -> None:
+        parser = identity_bundle_builder.parse_args
+        parser_source = (REPO_ROOT / "scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py").read_text(
+            encoding="utf-8"
+        )
+        supported_flags = set(re.findall(r'add_argument\("([^"]+)"', parser_source))
+
+        self.assertIs(parser, identity_bundle_builder.parse_args)
+        self.assertTrue(documented_flags)
+        self.assertEqual(documented_flags - supported_flags, set())
+        self.assertIn("--copied-log", documented_flags)
+        self.assertIn("--window-manifest", documented_flags)
+        self.assertIn("--output-dir", documented_flags)
+        self.assertIn("--obelisk-commit", documented_flags)
+        self.assertIn("--reviewed-by", documented_flags)
+        self.assertNotIn("--post-window-replay", documented_flags)
+        self.assertNotIn("--json", documented_flags)
 
     def test_resourcehandle_research_and_handoff_do_not_claim_readiness(self) -> None:
         scanned_paths = [

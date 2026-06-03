@@ -489,6 +489,20 @@ def is_negative_context(trail: str) -> bool:
     return any(token in lowered for token in NEGATIVE_CONTEXT_TOKENS)
 
 
+def is_structural_claim_field(trail: str) -> bool:
+    if trail.endswith(".id"):
+        return True
+    return trail in {
+        "$.schema",
+        "$.surface",
+        "$.decisions.schema",
+        "$.decisions.surface",
+        "$.surfaces.schema",
+        "$.response_path_report.schema",
+        "$.response_path_report.surface",
+    }
+
+
 def strip_c_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     return re.sub(r"//.*", "", text)
@@ -567,9 +581,7 @@ def collect_overclaims(value: Any, blockers: list[dict[str, Any]], trail: str = 
     if (
         not isinstance(value, str)
         or is_negative_context(trail)
-        or trail.endswith(".schema")
-        or trail.endswith(".surface")
-        or trail.endswith(".id")
+        or is_structural_claim_field(trail)
     ):
         return
     if has_unnegated_positive_claim(value):
@@ -1043,18 +1055,31 @@ def validate_response_path_report(
             add(blockers, "response_path_report_expected_root_required", "$.response_path_root")
         else:
             resolved_expected_root = resolve_expected_path(expected_root, "response_path_root", blockers)
-            if resolved_expected_root is not None and payload.get("readiness_root") != str(resolved_expected_root):
-                add(
-                    blockers,
-                    "response_path_report_readiness_root_mismatch",
-                    "$.response_path_report.readiness_root",
-                    expected=str(resolved_expected_root),
-                    value=payload.get("readiness_root"),
-                )
+            if resolved_expected_root is not None:
+                observed_root = payload.get("readiness_root")
+                if observed_root != str(resolved_expected_root):
+                    add(
+                        blockers,
+                        "response_path_report_readiness_root_mismatch",
+                        "$.response_path_report.readiness_root",
+                        expected=str(resolved_expected_root),
+                        value=observed_root,
+                    )
+                if isinstance(observed_root, str) and resolved_source_artifacts.get("readiness_path") is not None:
+                    observed_source_root = resolved_source_artifacts["readiness_path"].parent
+                    if observed_source_root != resolved_expected_root:
+                        add(
+                            blockers,
+                            "response_path_report_source_readiness_root_mismatch",
+                            "$.response_path_report.readiness_path",
+                            expected=str(resolved_expected_root),
+                            value=str(observed_source_root),
+                        )
         if expected_readiness is None:
             add(blockers, "response_path_report_expected_readiness_required", "$.response_path_readiness")
         else:
             resolved_expected_readiness = resolve_expected_path(expected_readiness, "response_path_readiness", blockers)
+            observed_readiness = payload.get("readiness_path")
             if (
                 resolved_expected_readiness is not None
                 and resolved_source_artifacts.get("readiness_path") != resolved_expected_readiness
@@ -1065,6 +1090,14 @@ def validate_response_path_report(
                     "$.response_path_report.readiness_path",
                     expected=str(resolved_expected_readiness),
                     value=str(resolved_source_artifacts.get("readiness_path")),
+                )
+            if resolved_expected_readiness is not None and observed_readiness != str(resolved_expected_readiness):
+                add(
+                    blockers,
+                    "response_path_report_readiness_path_metadata_mismatch",
+                    "$.response_path_report.readiness_path",
+                    expected=str(resolved_expected_readiness),
+                    value=observed_readiness,
                 )
         if expected_surfaces is not None:
             resolved_expected_surfaces = resolve_expected_path(expected_surfaces, "surfaces", blockers)

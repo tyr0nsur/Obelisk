@@ -58,9 +58,24 @@ def bind_json_artifact(path: Path) -> dict[str, str]:
     }
 
 
-def write_identity_promotion_certificate(root: Path, identity_surface: dict | None = None) -> dict[str, str]:
+def reviewed_identity_artifact_hash(identity_surface: dict | None) -> str:
+    source = identity_surface if identity_surface is not None else {"surface": "obelisk.player_identity.v1"}
+    data = json.dumps(source, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def write_identity_promotion_certificate(
+    root: Path,
+    identity_surface: dict | None = None,
+    *,
+    reviewed_artifact_hash: str | None = None,
+) -> dict[str, str]:
     path = root / "player-identity-promotion-certificate.json"
-    evidence = {"reviewed_artifact_hash": "0" * 64}
+    evidence = {
+        "reviewed_artifact_hash": reviewed_artifact_hash
+        if reviewed_artifact_hash is not None
+        else reviewed_identity_artifact_hash(identity_surface)
+    }
     if identity_surface is not None:
         evidence["reviewed_surface_record_sha256"] = READINESS.player_identity_surface_record_sha256(
             identity_surface
@@ -803,6 +818,72 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
                 write_identity_promotion_certificate(root, identity_surface)
             )
             identity_surface["support_tier"] = "release-supported copied principal after certificate"
+            surfaces_path = write_json(root, "surfaces.json", surfaces)
+
+            result = run_checker("--surfaces", str(surfaces_path), check=False)
+            report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("player_identity_public_contract_not_promoted", report["blockers"])
+
+    def test_rejects_placeholder_player_identity_promotion_certificate_artifact_hash(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "tests" / "core", prefix="PermissionsAdminIdentity") as tmp:
+            root = Path(tmp)
+            surfaces = json.loads(SURFACES.read_text(encoding="utf-8"))
+            identity_surface = None
+            for surface in surfaces["surfaces"]:
+                if surface["id"] == "obelisk.player_identity.v1":
+                    surface["status"] = "promoted"
+                    surface["support_tier"] = "release-supported copied principal"
+                    surface["capabilities"] = ["OBELISK_API_CAPABILITY_PLAYER_IDENTITY"]
+                    surface["public_contract"] = [
+                        "ObeliskPlayerPrincipalEvent",
+                        "RegisterPlayerPrincipalEventWithOwnerTokenHandle",
+                        "UnregisterPlayerPrincipalEventWithOwnerToken",
+                    ]
+                    surface["public_fields"] = [
+                        "abi_version",
+                        "struct_size",
+                        "principal_handle",
+                        "principal_generation",
+                        "principal_scope_flags",
+                    ]
+                    surface["abi_contract"] = [
+                        "capability_gated",
+                        "append_only_abi",
+                        "owner_token_handle_registration",
+                        "owner_scoped_unregister",
+                        "plugin_owner_cleanup",
+                        "no_ue_internals_in_public_abi",
+                    ]
+                    surface["lifecycle_contract"] = [
+                        "plugin-owner cleanup",
+                        "owner-token cleanup on init failure",
+                        "owner-token cleanup on plugin unload",
+                        "owner-scoped unregister cleanup",
+                    ]
+                    surface["evidence"]["accepted_runtime_evidence"] = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence.v1",
+                        "result": "approved runtime principal lifecycle evidence",
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                    surface["evidence"]["sdk_consumer_tests"] = ["tests/sdk_consumer/player_identity_plugin.cpp"]
+                    surface["v1_decision_contract"]["current_decision"] = "promoted_public_contract"
+                    surface["v1_decision_contract"]["must_remain_without_public_contract_until_promotion"] = False
+                    surface["blockers"] = [
+                        blocker
+                        for blocker in surface["blockers"]
+                        if blocker != "No approved runtime principal lifecycle evidence."
+                    ]
+                    identity_surface = surface
+            assert identity_surface is not None
+            identity_surface["evidence"]["player_identity_promotion_certificate"] = (
+                write_identity_promotion_certificate(
+                    root,
+                    identity_surface,
+                    reviewed_artifact_hash="0" * 64,
+                )
+            )
             surfaces_path = write_json(root, "surfaces.json", surfaces)
 
             result = run_checker("--surfaces", str(surfaces_path), check=False)

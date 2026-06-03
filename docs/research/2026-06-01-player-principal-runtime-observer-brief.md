@@ -254,17 +254,12 @@ posture, and the log plus sibling sidecars have been copied into the approved of
 evidence directory, use the bundle builder as the single post-window handoff:
 
 ```bash
-python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py \
-  --window-request /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-request.json \
-  --observer-env /servidor/ark/workspace-offline/live-validation-logs/<run-id>/observer-window.env \
-  --operator-approval-receipt /servidor/ark/workspace-offline/live-validation-logs/<run-id>/operator-approval-receipt.json \
-  --preflight-pre /servidor/ark/workspace-offline/live-validation-logs/<run-id>/preflight-pre.json \
-  --preflight-post /servidor/ark/workspace-offline/live-validation-logs/<run-id>/preflight-post.json \
-  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_player_identity_runtime_principal_lifecycle_evidence_bundle.py \
   --copied-log /servidor/ark/workspace-offline/live-validation-logs/<run-id>/Obelisk.log \
+  --window-manifest /servidor/ark/workspace-offline/live-validation-logs/<run-id>/window-manifest.env \
   --output-dir /servidor/ark/workspace-offline/live-validation-logs/<run-id>/approved-bundle \
-  --post-window-replay \
-  --json
+  --obelisk-commit <reviewed-40-character-lowercase-git-sha> \
+  --reviewed-by <reviewer>
 ```
 
 Then run the generated approved-evidence checker output through consume-only route and

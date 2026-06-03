@@ -533,7 +533,9 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         report = json.loads(result.stdout)
         self.assertTrue(report["ready"])
         self.assertEqual(report["ready_scope"], "bundle_builder_inputs_only")
+        self.assertTrue(report["copied_log_and_window_manifest_ready"])
         self.assertTrue(report["bundle_inputs_ready"])
+        self.assertTrue(report["request_pack_ready"])
         self.assertFalse(report["request_pack_is_runtime_evidence"])
         self.assertFalse(report["approved_runtime_manifest_present"])
         self.assertFalse(report["approved_runtime_evidence_ready"])
@@ -555,7 +557,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertNotIn("copied_log_missing", report["blockers"])
         self.assertNotIn("window_manifest_missing", report["blockers"])
         self.assertIn(
-            "ready means the offline bundle builder has the copied inputs it needs; it does not mean approved runtime evidence already exists",
+            "bundle_inputs_ready requires the copied log, checked window manifest, completed receipt, preflight sidecars, and checked post-window replay request pack; it does not mean approved runtime evidence already exists",
             report["non_claims"],
         )
 
@@ -719,9 +721,38 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
         self.assertFalse(report["ready"])
-        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertTrue(report["copied_log_and_window_manifest_ready"])
+        self.assertFalse(report["bundle_inputs_ready"])
         self.assertFalse(report["request_pack_ready"])
+        self.assertEqual(report["next_blocker"], "checked_post_window_replay_sidecars_required")
         self.assertIn("request_pack_check_failed", report["blockers"])
+        self.assertIn("window_manifest_check_failed", report["blockers"])
+
+    def test_preflight_bundle_inputs_ready_requires_completed_receipt(self) -> None:
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            manifest = self.write_window_manifest(temp_dir, copied_log)
+            fields = dict(
+                line.split("=", 1)
+                for line in manifest.read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#")
+            )
+            Path(fields["operator_approval_receipt_path"]).unlink()
+
+            result = self.run_preflight(copied_log.parent)
+
+        self.assertEqual(result.returncode, 1)
+        report = json.loads(result.stdout)
+        self.assertFalse(report["ready"])
+        self.assertTrue(report["copied_log_and_window_manifest_ready"])
+        self.assertFalse(report["bundle_inputs_ready"])
+        self.assertFalse(report["request_pack_ready"])
+        self.assertFalse(report["approved_runtime_evidence_ready"])
+        self.assertEqual(report["next_blocker"], "checked_post_window_replay_sidecars_required")
+        self.assertIn("operator_approval_receipt_missing", report["blockers"])
         self.assertIn("window_manifest_check_failed", report["blockers"])
 
     def test_preflight_rejects_operator_markdown_drift_even_with_log_and_manifest_inputs(self) -> None:
@@ -748,8 +779,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
         self.assertFalse(report["ready"])
-        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertTrue(report["copied_log_and_window_manifest_ready"])
+        self.assertFalse(report["bundle_inputs_ready"])
         self.assertFalse(report["request_pack_ready"])
+        self.assertEqual(report["next_blocker"], "checked_post_window_replay_sidecars_required")
         self.assertIn("request_pack_check_failed", report["blockers"])
         self.assertIn("window_manifest_check_failed", report["blockers"])
 
@@ -780,8 +813,10 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
         self.assertFalse(report["ready"])
-        self.assertTrue(report["bundle_inputs_ready"])
+        self.assertTrue(report["copied_log_and_window_manifest_ready"])
+        self.assertFalse(report["bundle_inputs_ready"])
         self.assertFalse(report["request_pack_ready"])
+        self.assertEqual(report["next_blocker"], "checked_post_window_replay_sidecars_required")
         self.assertTrue(report["inputs"]["request_pack_check"]["ready"])
         self.assertFalse(report["inputs"]["window_manifest_check"]["ready"])
         self.assertIn("window_manifest_check_failed", report["blockers"])

@@ -355,6 +355,8 @@ REQUIRED_HEADER_ABSENT_PREFIXES = frozenset(
     )
 )
 REQUIRED_HEADER_ABSENT_EXACT_TOKENS = REQUIRED_HEADER_ABSENT_TOKENS - REQUIRED_HEADER_ABSENT_PREFIXES
+SHA256_RE = re.compile(r"[0-9a-fA-F]{64}")
+ZERO_SHA256 = "0" * 64
 QUERY_READY_FALSE_KEYS = (
     "promotion_ready",
     "public_header_allowed",
@@ -1048,9 +1050,17 @@ def player_identity_has_promotion_certificate(identity: dict[str, Any]) -> bool:
         return False
     if not isinstance(certificate, dict):
         return False
-    if not isinstance(certificate.get("evidence"), dict):
+    certificate_evidence = certificate.get("evidence")
+    if not isinstance(certificate_evidence, dict):
         return False
-    reviewed_surface_hash = certificate["evidence"].get("reviewed_surface_record_sha256")
+    reviewed_artifact_hash = certificate_evidence.get("reviewed_artifact_hash")
+    if (
+        not isinstance(reviewed_artifact_hash, str)
+        or SHA256_RE.fullmatch(reviewed_artifact_hash) is None
+        or reviewed_artifact_hash.lower() == ZERO_SHA256
+    ):
+        return False
+    reviewed_surface_hash = certificate_evidence.get("reviewed_surface_record_sha256")
     if (
         not isinstance(reviewed_surface_hash, str)
         or reviewed_surface_hash.lower() != player_identity_surface_record_sha256(identity)

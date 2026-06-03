@@ -335,7 +335,28 @@ class CheckCommandsRepliesPublicReadinessTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
+        self.assertIn("response_path_report_readiness_path_metadata_mismatch", report["blockers"])
         self.assertIn("response_path_report_source_artifact_identity_mismatch", report["blockers"])
+        self.assertFalse(report["public_readiness_ready"])
+        self.assertFalse(report["public_abi_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_nested_response_path_report_surface_overclaim(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report_path = self.write_response_report(root)
+            response_report = json.loads(report_path.read_text(encoding="utf-8"))
+            response_report["nested"] = {"surface": "public SDK is ready"}
+            report_path.write_text(json.dumps(response_report), encoding="utf-8")
+            result = self.run_checker(*self.response_path_args(report_path, root), "--json", check=False)
+
+        report = json.loads(result.stdout)
+        self.assertEqual(1, result.returncode)
+        self.assertIn("positive_public_surface_claim", report["blockers"])
+        detail = next(
+            item for item in report["blocker_details"] if item["reason"] == "positive_public_surface_claim"
+        )
+        self.assertEqual("$.response_path_report.nested.surface", detail["label"])
         self.assertFalse(report["public_readiness_ready"])
         self.assertFalse(report["public_abi_ready"])
         self.assertFalse(report["runtime_ready"])

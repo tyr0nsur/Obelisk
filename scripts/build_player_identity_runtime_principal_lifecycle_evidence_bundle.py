@@ -572,7 +572,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
     bundle_manifest = resolved / "approved-bundle" / "approved-runtime-principal-lifecycle-evidence.json"
     approved_bundle = file_state(bundle_manifest, "approved_runtime_manifest", blockers)
     approved_bundle_check = approved_runtime_manifest_check_state(approved_bundle, blockers)
-    bundle_inputs_ready = (
+    copied_log_and_window_manifest_ready = (
         copied_log["exists"]
         and window_manifest["exists"]
         and copied_log["approved_offline_workspace"]
@@ -580,7 +580,6 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         and not copied_log["protected"]
         and not window_manifest["protected"]
     )
-    input_ready = bundle_inputs_ready and window_check["ready"]
     request_pack_ready = (
         request_pack["exists"]
         and observer_env["exists"]
@@ -590,12 +589,14 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         and request_check["ready"]
         and window_check["ready"]
     )
+    bundle_inputs_ready = copied_log_and_window_manifest_ready and request_pack_ready
     approved_bundle["operator_approval_receipt"] = operator_approval_receipt
-    ready = bool(input_ready and not (approved_bundle["exists"] and not approved_bundle_check["ready"]))
+    ready = bool(bundle_inputs_ready and not (approved_bundle["exists"] and not approved_bundle_check["ready"]))
     return {
         "schema": "obelisk.players-identity-runtime-principal-lifecycle-evidence-bundle-preflight.v1",
         "ready": ready,
         "ready_scope": "bundle_builder_inputs_only",
+        "copied_log_and_window_manifest_ready": bool(copied_log_and_window_manifest_ready),
         "bundle_inputs_ready": bool(bundle_inputs_ready),
         "request_pack_ready": bool(request_pack_ready),
         "request_pack_is_runtime_evidence": False,
@@ -616,7 +617,9 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
             if approved_bundle["exists"]
             else
             "run_offline_evidence_bundle_builder"
-            if input_ready and not approved_bundle["exists"]
+            if bundle_inputs_ready and not approved_bundle["exists"]
+            else "checked_post_window_replay_sidecars_required"
+            if copied_log_and_window_manifest_ready
             else "copied_log_and_window_manifest_required"
         ),
         "run_id": run_id,
@@ -644,7 +647,7 @@ def classify_preflight_evidence_dir(evidence_dir: Path) -> dict[str, Any]:
         "non_claims": [
             "preflight-only filesystem classification; does not analyze logs, build approved evidence, authorize runtime capture, or promote player identity",
             "request-pack readiness is preparation only and does not satisfy approved runtime evidence",
-            "ready means the offline bundle builder has the copied inputs it needs; it does not mean approved runtime evidence already exists",
+            "bundle_inputs_ready requires the copied log, checked window manifest, completed receipt, preflight sidecars, and checked post-window replay request pack; it does not mean approved runtime evidence already exists",
         ],
     }
 
