@@ -418,6 +418,22 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
         self.assertEqual([], report["blockers"])
         self.assertEqual(sorted(TARGETS), report["target_filters"])
 
+    def test_default_root_is_repo_local_and_provenance_bound(self) -> None:
+        self.assertTrue(READINESS.DEFAULT_ROOT.is_relative_to(REPO_ROOT))
+        self.assertNotIn("/servidor/ark", str(READINESS.DEFAULT_ROOT))
+
+        result = self.run_checker("--json")
+        report = json.loads(result.stdout)
+
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["accepted_for_planning"])
+        self.assertTrue(report["planning_only"])
+        self.assertFalse(report["promotion_ready"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+        self.assertEqual(str(READINESS.DEFAULT_ROOT.resolve()), report["readiness_root"])
+        self.assertEqual([], report["blockers"])
+
     def test_rejects_readiness_without_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             readiness_path, decisions_path, public_header_path = self.write_inputs(Path(temp_dir))
@@ -438,6 +454,32 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
 
         report = json.loads(result.stdout)
         self.assertEqual(1, result.returncode)
+        self.assertFalse(report["valid"])
+        self.assertIn("readiness_provenance_missing", report["blockers"])
+        self.assertIn("readiness_producer_missing", report["blockers"])
+
+    def test_default_root_readiness_still_requires_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            readiness_path, decisions_path, public_header_path = self.write_inputs(root)
+            readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+            readiness.pop("source_root")
+            readiness.pop("producer")
+            readiness_path.write_text(json.dumps(readiness), encoding="utf-8")
+
+            old_default_root = READINESS.DEFAULT_ROOT
+            try:
+                READINESS.DEFAULT_ROOT = root
+                report = READINESS.build_report(
+                    root,
+                    readiness_path,
+                    decisions_path,
+                    public_header_path,
+                    SURFACES,
+                )
+            finally:
+                READINESS.DEFAULT_ROOT = old_default_root
+
         self.assertFalse(report["valid"])
         self.assertIn("readiness_provenance_missing", report["blockers"])
         self.assertIn("readiness_producer_missing", report["blockers"])

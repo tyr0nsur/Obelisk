@@ -1,0 +1,131 @@
+{
+  "schema": "obelisk.reflection-snapshot-readiness.v1",
+  "evidence_scope": "second_source_layout_evidence_only",
+  "gate_mode": "planning_layout_intake",
+  "source_root": "tests/fixtures/command_chat_response_route_planning_default",
+  "producer": {
+    "script": "scripts/compare_reflection_snapshots.py",
+    "argv": [
+      "scripts/compare_reflection_snapshots.py",
+      "--base-root",
+      "tests/fixtures/command_chat_response_route_planning_default",
+      "--target-set",
+      "command-chat-response-route-planning",
+      "--readiness-report",
+      "--json"
+    ],
+    "output_name": "command-chat-response-route-planning-readiness.json"
+  },
+  "modules": [
+    {
+      "block_reasons": {},
+      "blocked": 0,
+      "comparable": 3,
+      "module": "base-snapshots",
+      "schema": "ufunction",
+      "second_source": {
+        "accepted": 3,
+        "inconclusive": 0,
+        "missing": 0,
+        "rejected": 0
+      },
+      "target_details": [
+        {
+          "block_reasons": [],
+          "comparable": true,
+          "path": "tests/fixtures/command_chat_response_route_planning_default/base-snapshots/ShooterPlayerController.ClientChatMessage.snapshot.json",
+          "second_source_status": "accepted",
+          "target": "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientChatMessage"
+        },
+        {
+          "block_reasons": [],
+          "comparable": true,
+          "path": "tests/fixtures/command_chat_response_route_planning_default/base-snapshots/ShooterPlayerController.ClientServerChatDirectMessage.snapshot.json",
+          "second_source_status": "accepted",
+          "target": "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage"
+        },
+        {
+          "block_reasons": [],
+          "comparable": true,
+          "path": "tests/fixtures/command_chat_response_route_planning_default/base-snapshots/ShooterPlayerController.ClientServerChatMessage.snapshot.json",
+          "second_source_status": "accepted",
+          "target": "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage"
+        }
+      ],
+      "targets": 3
+    }
+  ],
+  "non_claims": [
+    "accepted second-source readiness is layout evidence only",
+    "does not promote public SDK, command response path, reply API, send-chat API, command router, permissions, player identity, raw FString access, mutation, return override, ResourceHandle, runtime hooks, or release readiness"
+  ],
+  "not_promoted_surfaces": [
+    "public_sdk",
+    "raw_params",
+    "runtime_hooks"
+  ],
+  "planning_layout_gate": {
+    "blockers": [],
+    "layout_ready": true,
+    "promotion_ready": false,
+    "public_sdk_ready": false,
+    "ready": true,
+    "ready_scope": "planning_only",
+    "runtime_ready": false
+  },
+  "promotion_gate": {
+    "blockers": [
+      {
+        "count": 1,
+        "reason": "planning_layout_intake_not_promotion_gate"
+      }
+    ],
+    "layout_ready": true,
+    "promotion_ready": false,
+    "ready": false,
+    "ready_scope": "planning_only"
+  },
+  "second_source_status": "compared",
+  "strict_identity_indices": false,
+  "target_filters": [
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientChatMessage",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
+    "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatMessage"
+  ],
+  "target_set_guidance": [
+    {
+      "classification": "command_chat_response_route_guidance_only_candidate",
+      "next_offline_input": "generate focal snapshots for response-path targets",
+      "non_claim": "does not promote command/chat response path, public reply/send-chat ABI, command router, permissions, player identity, raw FString access, mutation, return override, runtime hooks, or release readiness",
+      "snapshot_prep_checks": [
+        "ClientChatMessage.Chat remains redacted/recognition-only until separate ChatMessage ScriptStruct and privacy review",
+        "raw FString storage/data is forbidden, including ClientServerChatMessage.MessageText and ClientServerChatDirectMessage.MessageText",
+        "sender identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+        "directed recipient identity remains redacted: no player name, platform ID, Steam/EOS ID, controller/connection/object ref, UE pointer, object-array/FName identity",
+        "future targeting must use only a promoted copied principal handle/generation, not command text, operator config, raw params, or response UFunction layout"
+      ],
+      "target_set": "command-chat-response-route-planning",
+      "why_blocked": [
+        "planning_guidance_only",
+        "not_release_readiness_target",
+        "public_response_path_blocked",
+        "player_identity_principal_blocked",
+        "permissions_admin_blocked",
+        "command_router_blocked",
+        "runtime_observation_requires_separate_approval"
+      ]
+    }
+  ],
+  "target_sets": [
+    "command-chat-response-route-planning"
+  ],
+  "totals": {
+    "blocked": 0,
+    "comparable": 3,
+    "second_source_accepted": 3,
+    "second_source_inconclusive": 0,
+    "second_source_missing": 0,
+    "second_source_rejected": 0,
+    "targets": 3
+  }
+}

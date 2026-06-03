@@ -44,6 +44,11 @@ TEST_COMMIT = subprocess.check_output(
     cwd=SCRIPT_DIR.parents[0],
     text=True,
 ).strip()
+STALE_TEST_COMMIT = subprocess.check_output(
+    ["git", "rev-parse", "HEAD^"],
+    cwd=SCRIPT_DIR.parents[0],
+    text=True,
+).strip()
 OTHER_TEST_COMMIT = "abcdef1234567890abcdef1234567890abcdef12"
 
 
@@ -351,6 +356,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         output_dir: Path,
         *,
         window_manifest: Path | None = None,
+        obelisk_commit: str = TEST_COMMIT,
     ) -> subprocess.CompletedProcess[str]:
         if window_manifest is None:
             window_manifest = self.write_window_manifest(output_dir.parent, copied_log)
@@ -367,7 +373,7 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
                 "--output-dir",
                 str(output_dir),
                 "--obelisk-commit",
-                TEST_COMMIT,
+                obelisk_commit,
                 "--reviewed-by",
                 "runtime-reviewer",
                 "--review-note",
@@ -1311,6 +1317,29 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             with self.subTest(args=outcome.args):
                 self.assertNotEqual(outcome.returncode, 0)
                 self.assertIn("--obelisk-commit must be a reviewed 40-character lowercase Git SHA", outcome.stderr)
+
+    def test_rejects_stale_reviewed_commit_that_is_not_current_head(self) -> None:
+        old_commit = globals()["TEST_COMMIT"]
+        with self.temp_offline_workspace() as temp:
+            temp_dir = Path(temp)
+            copied_log = copied_log_path(temp_dir)
+            output_dir = temp_dir / "bundle"
+            copied_log.parent.mkdir(parents=True, exist_ok=True)
+            copied_log.write_text("\n".join(runtime_log_lines()) + "\n", encoding="utf-8")
+            try:
+                globals()["TEST_COMMIT"] = STALE_TEST_COMMIT
+                window_manifest = self.write_window_manifest(temp_dir, copied_log)
+                result = self.run_bundle(
+                    copied_log,
+                    output_dir,
+                    window_manifest=window_manifest,
+                    obelisk_commit=STALE_TEST_COMMIT,
+                )
+            finally:
+                globals()["TEST_COMMIT"] = old_commit
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime observer summary obelisk_commit does not match current repo HEAD", result.stderr)
 
     def test_builds_bundle_with_relative_window_manifest_log_path(self) -> None:
         with self.temp_offline_workspace() as temp:

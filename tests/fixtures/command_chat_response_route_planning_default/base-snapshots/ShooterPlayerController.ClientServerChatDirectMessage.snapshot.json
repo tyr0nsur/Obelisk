@@ -1,0 +1,6 @@
+{
+  "schema": "obelisk.ufunction-chain.snapshot.v1",
+  "target": "obelisk.ufunction-chain.snapshot.v1:ShooterPlayerController.ClientServerChatDirectMessage",
+  "status": "fixture-placeholder",
+  "non_claim": "Repo-local planning fixture only; not runtime, public ABI, public SDK, command router, reply API, or send-chat evidence."
+}

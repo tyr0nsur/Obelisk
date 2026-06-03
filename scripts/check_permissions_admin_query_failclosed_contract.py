@@ -365,11 +365,34 @@ FORBIDDEN_SURFACE_RE = re.compile(
 )
 READY_OVERCLAIM_KEYS = frozenset(
     (
+        "api_complete",
+        "api_full",
+        "api_production_grade",
+        "api_production_ready",
+        "api_stable",
         "command_router_allowed",
+        "complete_api",
+        "complete_sdk",
+        "complete_support",
+        "full_api",
+        "full_sdk",
+        "full_support",
         "permissions_admin_ready",
+        "production_grade_api",
+        "production_grade_sdk",
+        "production_grade_support",
+        "production_ready_api",
+        "production_ready_sdk",
+        "production_ready_support",
         "promoted",
         "promote_ready",
         "promotion_ready",
+        "public_api",
+        "public_api_allowed",
+        "public_api_enabled",
+        "public_api_public",
+        "public_api_ready",
+        "public_api_supported",
         "public_abi_ready",
         "public_bridge_abi_allowed",
         "public_reply_abi_ready",
@@ -377,15 +400,55 @@ READY_OVERCLAIM_KEYS = frozenset(
         "public_response_path_ready",
         "public_sdk_ready",
         "runtime_ready",
+        "sdk_complete",
+        "sdk_full",
+        "sdk_production_grade",
+        "sdk_production_ready",
+        "sdk_stable",
         "send_chat_ready",
         "stable_claim_allowed",
+        "stable_api",
+        "stable_sdk",
+        "stable_support",
+        "support_complete",
+        "support_full",
+        "support_production_grade",
+        "support_production_ready",
+        "support_stable",
         "v1_completion_ready",
+    )
+)
+BROAD_READY_OVERCLAIM_KEY_RE = re.compile(
+    r"^(?:"
+    r"(?:complete|full|stable|production(?:_ready|_grade)?)_(?:sdk|api|support)"
+    r"(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"(?:sdk|api|support)_(?:complete|full|stable|production(?:_ready|_grade)?)"
+    r"(?:_(?:ready|allowed|supported|enabled|public))?|"
+    r"public_api(?:_(?:ready|allowed|supported|enabled|public))?"
+    r")$"
+)
+POSITIVE_OVERCLAIM_VALUES = frozenset(
+    (
+        "allowed",
+        "available",
+        "enabled",
+        "live",
+        "operational",
+        "promoted",
+        "public",
+        "ready",
+        "supported",
+        "true",
+        "unlocked",
+        "yes",
     )
 )
 READY_OVERCLAIM_STRINGS = {
     "command response path is live": "public_response_path_ready",
+    "complete sdk support is enabled": "complete_sdk_support",
     "promoted": "promoted",
     "public abi is ready": "public_abi_ready",
+    "public api is ready": "public_api_ready",
     "public sdk ready": "public_sdk_ready",
     "permissions/admin is public and ready": "permissions_admin_ready",
     "reply endpoint is live": "public_reply_abi_ready",
@@ -400,6 +463,36 @@ OVERCLAIM_NEGATIVE_PREFIXES = (
     "$.non_claims",
     "$.promotion_gate.blockers",
 )
+POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE = re.compile(
+    r"\b(?:"
+    r"command[_ -]?(?:routing|router|response[_ -]?path)|"
+    r"permissions?/admin|permissions?|public[_ -]?abi|reply[_ -]?(?:endpoint|api|abi)|"
+    r"replies[_ -]?(?:api|abi)|send[_ -]?chat[_ -]?(?:api|abi)|runtime|"
+    r"runtime[_ -]?work|server[_ -]?operations?|operator[_ -]?approval|runtime[_ -]?approval|"
+    r"public[_ -]?(?:api|sdk|header)|v1[_ -]?completion|stable[_ -]?claim|"
+    r"(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?)[_ -]?(?:sdk|api|support)"
+    r")\b(?:\s+(?:is|are))?\s+"
+    r"\b(?:authorized|granted|public(?:\s+and\s+ready)?|ready|readiness|live|enabled|allowed|"
+    r"operational|supported)\b",
+    re.IGNORECASE,
+)
+POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED = re.compile(
+    r"\b(?:public[_ -]?(?:api|abi)|sdk|api|support)\b\s+"
+    r"(?:is|are|now|becomes?|became)\s+"
+    r"\b(?:complete|full|stable|production(?:[_ -]?(?:ready|grade))?|public|ready|supported)\b",
+    re.IGNORECASE,
+)
+NEGATED_CLAIM_PREFIX_RE = re.compile(
+    r"\b(?:blocked|cannot|does\s+not|do\s+not|excluded|excludes?|future|must\s+not|no|not|"
+    r"only|outside|post-v1|prevent|prevents|remain|remains|without)\b",
+    re.IGNORECASE,
+)
+NEGATED_CLAIM_SUFFIX_RE = re.compile(
+    r"^\s+(?:remains?|stays?|is|are)?\s*(?:blocked|not\s+(?:ready|enabled|authorized|allowed)|"
+    r"unauthorized|unsupported)\b",
+    re.IGNORECASE,
+)
+CLAIM_SCOPE_SPLIT_RE = re.compile(r"[,.;:\n\r]|\s+\b(?:and|but|then|however|unless)\b\s+", re.IGNORECASE)
 FORBIDDEN_PRE_RUNTIME_CLAIM_SOURCE_KEYS = frozenset(
     (
         "authority_claim_source",
@@ -602,6 +695,40 @@ def normalized_key(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
+def is_positive_overclaim_value(value: Any) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value != 0
+    if isinstance(value, str):
+        return normalized_key(value) in POSITIVE_OVERCLAIM_VALUES
+    return False
+
+
+def preceding_claim_scope(text: str, start: int) -> str:
+    parts = CLAIM_SCOPE_SPLIT_RE.split(text[:start])
+    return parts[-1] if parts else text[:start]
+
+
+def public_or_runtime_claim_is_negated(text: str, match: re.Match[str]) -> bool:
+    prefix = preceding_claim_scope(text, match.start())
+    if NEGATED_CLAIM_PREFIX_RE.search(prefix) and not re.search(
+        r"\b(?:claims?|reports?|says|states?)\b[^,.;:\n\r]*$",
+        prefix,
+        re.IGNORECASE,
+    ):
+        return True
+    return bool(NEGATED_CLAIM_SUFFIX_RE.match(text[match.end() :]))
+
+
+def contains_positive_public_or_runtime_claim(text: str) -> bool:
+    for pattern in (POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_RE, POSITIVE_PUBLIC_OR_RUNTIME_CLAIM_REVERSED):
+        for match in pattern.finditer(text):
+            if not public_or_runtime_claim_is_negated(text, match):
+                return True
+    return False
+
+
 def find_forbidden_coordinate(value: Any, trail: str = "$") -> tuple[str, str] | None:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -680,6 +807,8 @@ def collect_overclaim_fields(value: Any, trail: str = "$") -> list[dict[str, str
             key_name = normalized_key(key)
             if key_name in READY_OVERCLAIM_KEYS and child is True:
                 found.append({"reason": f"{key_name}_overclaim", "label": child_trail})
+            elif BROAD_READY_OVERCLAIM_KEY_RE.fullmatch(key_name) and is_positive_overclaim_value(child):
+                found.append({"reason": "public_or_runtime_readiness_overclaim", "label": child_trail})
             found.extend(collect_overclaim_fields(child, child_trail))
     elif isinstance(value, list):
         for index, child in enumerate(value):
@@ -689,6 +818,8 @@ def collect_overclaim_fields(value: Any, trail: str = "$") -> list[dict[str, str
         for needle, reason in READY_OVERCLAIM_STRINGS.items():
             if needle in text:
                 found.append({"reason": f"{reason}_string_overclaim", "label": trail})
+        if contains_positive_public_or_runtime_claim(value):
+            found.append({"reason": "positive_public_or_runtime_claim", "label": trail})
     return found
 
 

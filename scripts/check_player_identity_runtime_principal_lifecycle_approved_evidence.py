@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,7 @@ EXPECTED_PROCESS_EVENT_ADDRESS = "0x1d34e20"
 MODULE = "player_principal_lifecycle"
 NEXT_BLOCKER_AFTER_RUNTIME_EVIDENCE = "identity_public_contract_gate_missing"
 SERVER_ROOT = Path("/servidor/ark")
+REPO_ROOT = Path(__file__).resolve().parents[1]
 APPROVED_OFFLINE_WORKSPACE_ROOTS = (Path("/servidor/ark/workspace-offline"),)
 REQUIRED_TOP_LEVEL_KEYS = frozenset(
     (
@@ -123,6 +125,7 @@ FORBIDDEN_POSITIVE_FLAG_KEYS = frozenset(
     )
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 UTC_TIMESTAMP_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z$")
 ALLOWED_SOURCE_KEYS = frozenset(("path", "sha256", "line_count"))
 ALLOWED_APPROVAL_KEYS = frozenset(
@@ -520,6 +523,21 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def current_obelisk_commit() -> str | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=REPO_ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    commit = result.stdout.strip()
+    if result.returncode != 0 or GIT_COMMIT_RE.fullmatch(commit) is None:
+        return None
+    return commit
 
 
 def expected_output_artifact_sha256(payload: dict[str, Any], identity: dict[str, str]) -> str:
@@ -1641,6 +1659,22 @@ def validate_runtime_summary(summary: Any, blockers: list[dict[str, Any]]) -> li
             add(blockers, "source_summary_server_paths_allowed", "$.source_summary.evidence.server_paths_allowed")
         if not evidence.get("obelisk_commit"):
             add(blockers, "source_summary_obelisk_commit_missing", "$.source_summary.evidence.obelisk_commit")
+        else:
+            current_commit = current_obelisk_commit()
+            if current_commit is None:
+                add(
+                    blockers,
+                    "current_obelisk_commit_unavailable",
+                    "$.source_summary.evidence.obelisk_commit",
+                )
+            elif evidence.get("obelisk_commit") != current_commit:
+                add(
+                    blockers,
+                    "source_summary_obelisk_commit_not_current_head",
+                    "$.source_summary.evidence.obelisk_commit",
+                    expected=current_commit,
+                    actual=evidence.get("obelisk_commit"),
+                )
         sources = evidence.get("sources")
         if not isinstance(sources, list) or len(sources) != 1:
             add(blockers, "source_summary_sources_not_exactly_one", "$.source_summary.evidence.sources")

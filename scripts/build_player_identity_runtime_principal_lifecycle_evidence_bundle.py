@@ -50,6 +50,21 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def current_obelisk_commit() -> str | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=SCRIPT_DIR.parents[0],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    commit = result.stdout.strip()
+    if result.returncode != 0 or re.fullmatch(r"^[0-9a-f]{40}$", commit) is None:
+        return None
+    return commit
+
+
 def artifact(path: Path) -> dict[str, str]:
     return {"path": str(path), "sha256": sha256_file(path)}
 
@@ -793,6 +808,11 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
         raise SystemExit("window manifest obelisk_commit must be a reviewed 40-character lowercase Git SHA")
     if window.get("obelisk_commit") != evidence_commit:
         raise SystemExit("window manifest obelisk_commit does not match runtime observer summary")
+    current_commit = current_obelisk_commit()
+    if current_commit is None:
+        raise SystemExit("current Obelisk repo HEAD could not be resolved for runtime evidence review")
+    if evidence_commit != current_commit:
+        raise SystemExit("runtime observer summary obelisk_commit does not match current repo HEAD")
     receipt = window.get("operator_approval_receipt")
     if not isinstance(receipt, dict) or receipt.get("verified") is not True:
         raise SystemExit("window manifest check missing verified operator approval receipt")

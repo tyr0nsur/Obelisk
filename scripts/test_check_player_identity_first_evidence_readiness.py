@@ -32,6 +32,14 @@ import prepare_player_principal_lifecycle_window_request as prepare_window_reque
 from reflection_target_sets import schema_target_list  # noqa: E402
 
 
+def current_obelisk_commit() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=REPO_ROOT,
+        text=True,
+    ).strip()
+
+
 def lifecycle_manifest_bound_to_first_evidence(first_evidence: dict | None = None) -> dict:
     first_evidence = first_evidence or players_identity_first_evidence_manifest()
     payload = accepted_lifecycle_anchor_manifest()
@@ -1385,7 +1393,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 instance="arkserver2",
                 map_name="TheIsland",
                 run_id=run_id,
-                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                obelisk_commit=current_obelisk_commit(),
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
@@ -1480,7 +1488,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 instance="arkserver2",
                 map_name="TheIsland",
                 run_id=run_id,
-                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                obelisk_commit=current_obelisk_commit(),
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
@@ -1553,7 +1561,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 instance="arkserver2",
                 map_name="TheIsland",
                 run_id=run_id,
-                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                obelisk_commit=current_obelisk_commit(),
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,
@@ -1592,7 +1600,7 @@ class CheckPlayerIdentityFirstEvidenceReadinessTests(unittest.TestCase):
                 instance="arkserver2",
                 map_name="TheIsland",
                 run_id=run_id,
-                obelisk_commit="1234567890abcdef1234567890abcdef12345678",
+                obelisk_commit=current_obelisk_commit(),
                 approved_window_start_utc=start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 approved_window_end_utc=end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 binary_sha256=prepare_window_request.EXPECTED_BINARY_SHA256,

@@ -15,10 +15,7 @@ from snapshot_evidence_pack import reject_protected_input_path, reject_symlink_c
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
-DEFAULT_ROOT = Path(
-    "/servidor/ark/workspace-offline/"
-    "command-chat-response-route-planning-distinct-second-source-20260601"
-)
+DEFAULT_ROOT = REPO_ROOT / "tests" / "fixtures" / "command_chat_response_route_planning_default"
 DEFAULT_READINESS_NAME = "command-chat-response-route-planning-readiness.json"
 DEFAULT_DECISIONS = REPO_ROOT / "docs" / "command_chat_response_public_contract_decisions.json"
 DEFAULT_PUBLIC_HEADER = REPO_ROOT / "include" / "obelisk" / "ObeliskApi.h"
@@ -1138,15 +1135,11 @@ def build_report(
     surfaces = safe_load_json(surfaces_path, "surfaces", blockers)
     if readiness is not None:
         validation_root = resolved_root or root
-        try:
-            require_provenance = validation_root.resolve() != DEFAULT_ROOT.resolve()
-        except OSError:
-            require_provenance = True
         validate_readiness(
             readiness,
             blockers,
             root=validation_root,
-            require_provenance=require_provenance,
+            require_provenance=True,
         )
     if decisions is not None:
         validate_decisions(decisions, blockers, public_header_path)

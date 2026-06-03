@@ -1105,6 +1105,29 @@ class PermissionsAdminQueryFailClosedContractTests(unittest.TestCase):
         ):
             self.assertIn(blocker, report["blockers"])
 
+    def test_rejects_broad_public_runtime_or_sdk_completion_claims(self) -> None:
+        payload = manifest()
+        payload["nested_claim"] = {
+            "completeSdk": "enabled",
+            "publicApi": "supported",
+            "stable-support": 1,
+        }
+        payload["claim_texts"] = [
+            "permissions/admin runtime is allowed",
+            "complete SDK support is enabled",
+            "SDK is complete",
+            "public API is ready",
+        ]
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("public_or_runtime_readiness_overclaim", report["blockers"])
+        self.assertIn("positive_public_or_runtime_claim", report["blockers"])
+        self.assertIn("complete_sdk_support_string_overclaim", report["blockers"])
+        self.assertIn("public_api_ready_string_overclaim", report["blockers"])
+
     def test_rejects_ue_pointer_or_raw_coordinate_leakage(self) -> None:
         for key in ("ue_pointer", "fname_index", "object_address"):
             with self.subTest(key=key):

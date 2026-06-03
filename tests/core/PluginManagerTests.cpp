@@ -75,6 +75,7 @@ namespace
     };
 
     struct PlayerPrincipalUnloadFenceState;
+    struct CopiedDispatcherInitFailureFenceState;
 
     struct FakePlugin {
         std::string filename;
@@ -96,6 +97,7 @@ namespace
         bool registerItemReturnCallback = false;
         bool registerPlayerPrincipalCallback = false;
         bool startPlayerPrincipalDispatchDuringInit = false;
+        bool startCopiedDispatchesDuringInit = false;
         bool registerStructureCallback = false;
         bool registerGameplayPolicyCallback = false;
         bool registerChatMessageCallback = false;
@@ -121,7 +123,14 @@ namespace
         std::atomic<bool>* closeObserved = nullptr;
         TimerFenceState* timerFence = nullptr;
         PlayerPrincipalUnloadFenceState* initPlayerPrincipalFence = nullptr;
+        CopiedDispatcherInitFailureFenceState* initCopiedDispatchFence = nullptr;
         std::thread initPlayerPrincipalDispatchThread;
+        std::vector<std::thread> initCopiedDispatchThreads;
+        std::atomic<size_t> initChatDispatches{0};
+        std::atomic<size_t> initStructureDispatches{0};
+        std::atomic<size_t> initInventoryDispatches{0};
+        std::atomic<size_t> initItemReturnDispatches{0};
+        std::atomic<size_t> initCopiedPlayerPrincipalDispatches{0};
         std::atomic<size_t> initPlayerPrincipalDispatches{0};
         int getInfoCalls = 0;
         int initCalls = 0;
@@ -452,6 +461,27 @@ namespace
         bool Release = false;
     };
 
+    struct CopiedDispatcherInitFailureFenceState
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        int ChatCalls = 0;
+        int StructureCalls = 0;
+        int InventoryCalls = 0;
+        int ItemReturnCalls = 0;
+        int PlayerPrincipalCalls = 0;
+        bool ChatEntered = false;
+        bool StructureEntered = false;
+        bool InventoryEntered = false;
+        bool ItemReturnEntered = false;
+        bool PlayerPrincipalEntered = false;
+        bool ReleaseChat = false;
+        bool ReleaseStructure = false;
+        bool ReleaseInventory = false;
+        bool ReleaseItemReturn = false;
+        bool ReleasePlayerPrincipal = false;
+    };
+
     void GameplayPolicyShutdownCrossFamilyFenceCallback(
         const ObeliskGameplayPolicyEvent* event,
         void* userData)
@@ -542,6 +572,76 @@ namespace
         state->Entered = true;
         state->Cv.notify_all();
         state->Cv.wait(lock, [state]() { return state->Release; });
+    }
+
+    void InitFailureCopiedChatFenceCallback(
+        const Obelisk::Core::ChatMessageView& message,
+        void* userData)
+    {
+        Require(message.Message == "init copied dispatch",
+                "init-failure copied chat callback received unexpected message");
+        auto* state = static_cast<CopiedDispatcherInitFailureFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->ChatCalls;
+        state->ChatEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseChat; });
+    }
+
+    void InitFailureCopiedStructureFenceCallback(
+        const Obelisk::Core::StructureEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::StructureEventKind::AllowStructureAccess,
+                "init-failure copied structure callback received unexpected event kind");
+        auto* state = static_cast<CopiedDispatcherInitFailureFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->StructureCalls;
+        state->StructureEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseStructure; });
+    }
+
+    void InitFailureCopiedInventoryFenceCallback(
+        const Obelisk::Core::InventoryPolicyEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::InventoryPolicyEventKind::CanUse,
+                "init-failure copied inventory callback received unexpected event kind");
+        auto* state = static_cast<CopiedDispatcherInitFailureFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->InventoryCalls;
+        state->InventoryEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseInventory; });
+    }
+
+    void InitFailureCopiedItemReturnFenceCallback(
+        const Obelisk::Core::ItemReturnEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                "init-failure copied item-return callback received unexpected event kind");
+        auto* state = static_cast<CopiedDispatcherInitFailureFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->ItemReturnCalls;
+        state->ItemReturnEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleaseItemReturn; });
+    }
+
+    void InitFailureCopiedPlayerPrincipalFenceCallback(
+        const Obelisk::Core::PlayerPrincipalEventView& event,
+        void* userData)
+    {
+        Require(event.Kind == Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                "init-failure copied player-principal callback received unexpected event kind");
+        auto* state = static_cast<CopiedDispatcherInitFailureFenceState*>(userData);
+        std::unique_lock<std::mutex> lock(state->Mutex);
+        ++state->PlayerPrincipalCalls;
+        state->PlayerPrincipalEntered = true;
+        state->Cv.notify_all();
+        state->Cv.wait(lock, [state]() { return state->ReleasePlayerPrincipal; });
     }
 
     void FakeChatMessageEventCallback(const ObeliskChatMessageEvent* event, void* userData)
@@ -939,6 +1039,123 @@ namespace
                     "fake init player-principal callback did not enter during init");
         }
 
+        if (g_CurrentFakePlugin->startCopiedDispatchesDuringInit)
+        {
+            Require(g_CurrentFakePlugin->chatDispatcher != nullptr,
+                    "fake plugin requested init copied dispatches without chat dispatcher");
+            Require(g_CurrentFakePlugin->initCopiedDispatchFence != nullptr,
+                    "fake plugin requested init copied dispatches without fence");
+            auto* plugin = g_CurrentFakePlugin;
+            auto* fence = plugin->initCopiedDispatchFence;
+
+            Require(plugin->chatDispatcher->Register(
+                        plugin->owner,
+                        Obelisk::Core::ChatMessageSubscription{
+                            InitFailureCopiedChatFenceCallback,
+                            fence,
+                        }) != 0,
+                    "fake init copied chat callback registration failed");
+            Require(Obelisk::Core::StructureEventDispatcher::Get().Register(
+                        plugin->owner,
+                        Obelisk::Core::StructureEventSubscription{
+                            InitFailureCopiedStructureFenceCallback,
+                            fence,
+                        }) != 0,
+                    "fake init copied structure callback registration failed");
+            Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().Register(
+                        plugin->owner,
+                        Obelisk::Core::InventoryPolicyEventSubscription{
+                            InitFailureCopiedInventoryFenceCallback,
+                            fence,
+                        }) != 0,
+                    "fake init copied inventory callback registration failed");
+            Require(Obelisk::Core::ItemReturnEventDispatcher::Get().Register(
+                        plugin->owner,
+                        Obelisk::Core::ItemReturnEventSubscription{
+                            InitFailureCopiedItemReturnFenceCallback,
+                            fence,
+                        }) != 0,
+                    "fake init copied item-return callback registration failed");
+            Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Register(
+                        plugin->owner,
+                        Obelisk::Core::PlayerPrincipalEventSubscription{
+                            InitFailureCopiedPlayerPrincipalFenceCallback,
+                            fence,
+                        }) != 0,
+                    "fake init copied player-principal callback registration failed");
+
+            plugin->initCopiedDispatchThreads.emplace_back([plugin]() {
+                const Obelisk::Core::ChatMessageView message{
+                    .Message = "init copied dispatch",
+                    .SenderName = "tester",
+                    .SenderPlatformId = "0",
+                    .SendMode = Obelisk::Core::ChatSendMode::Global,
+                    .SenderNameIndex = 1,
+                };
+                plugin->initChatDispatches.store(
+                    plugin->chatDispatcher->Dispatch(message),
+                    std::memory_order_release);
+            });
+            plugin->initCopiedDispatchThreads.emplace_back([plugin]() {
+                const auto scalars = MakeStructureScalars();
+                const auto event = MakeStructureEvent(scalars);
+                plugin->initStructureDispatches.store(
+                    Obelisk::Core::StructureEventDispatcher::Get().Dispatch(event),
+                    std::memory_order_release);
+            });
+            plugin->initCopiedDispatchThreads.emplace_back([plugin]() {
+                const auto scalars = MakeInventoryCanUseScalars();
+                const auto event = MakeInventoryCanUseEvent(scalars);
+                plugin->initInventoryDispatches.store(
+                    Obelisk::Core::InventoryPolicyEventDispatcher::Get().Dispatch(event),
+                    std::memory_order_release);
+            });
+            plugin->initCopiedDispatchThreads.emplace_back([plugin]() {
+                const auto scalars = MakeItemReturnScalars(true);
+                const auto event = MakeItemReturnEvent(
+                    Obelisk::Core::ItemReturnEventKind::AllowEquipItem,
+                    scalars);
+                plugin->initItemReturnDispatches.store(
+                    Obelisk::Core::ItemReturnEventDispatcher::Get().Dispatch(event),
+                    std::memory_order_release);
+            });
+            plugin->initCopiedDispatchThreads.emplace_back([plugin]() {
+                const std::vector<Obelisk::Core::PlayerPrincipalBoolValue> bools{
+                    {
+                        .Field = Obelisk::Core::PlayerPrincipalBoolField::BIsFromLogin,
+                        .Value = true,
+                    },
+                    {
+                        .Field = Obelisk::Core::PlayerPrincipalBoolField::ReturnValue,
+                        .Value = true,
+                    },
+                };
+                const Obelisk::Core::PlayerPrincipalEventView event{
+                    .Kind = Obelisk::Core::PlayerPrincipalEventKind::SessionStart,
+                    .Action = Obelisk::Core::PlayerPrincipalAction::CandidateCreated,
+                    .EventSequence = 1,
+                    .ServerProcessEpoch = 1,
+                    .Bools = bools,
+                };
+                plugin->initCopiedPlayerPrincipalDispatches.store(
+                    Obelisk::Core::PlayerPrincipalEventDispatcher::Get().Dispatch(event),
+                    std::memory_order_release);
+            });
+
+            std::unique_lock<std::mutex> lock(fence->Mutex);
+            Require(fence->Cv.wait_for(
+                        lock,
+                        std::chrono::seconds(2),
+                        [fence]() {
+                            return fence->ChatEntered &&
+                                fence->StructureEntered &&
+                                fence->InventoryEntered &&
+                                fence->ItemReturnEntered &&
+                                fence->PlayerPrincipalEntered;
+                        }),
+                    "fake init copied dispatcher callbacks did not all enter during init");
+        }
+
         if (g_CurrentFakePlugin->registerStructureCallback)
         {
             const uint64_t registrationId = Obelisk::Core::StructureEventDispatcher::Get().Register(
@@ -1283,6 +1500,11 @@ namespace
     {
         if (plugin.initPlayerPrincipalDispatchThread.joinable())
             plugin.initPlayerPrincipalDispatchThread.join();
+        for (std::thread& thread : plugin.initCopiedDispatchThreads)
+        {
+            if (thread.joinable())
+                thread.join();
+        }
         Obelisk::Core::EventManager::Get().UnregisterCallbacksForOwner(plugin.owner);
         if (plugin.chatDispatcher)
             plugin.chatDispatcher->UnregisterCallbacksForOwner(plugin.owner);
@@ -3784,6 +4006,166 @@ namespace
         Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
                 "in-flight player-principal callback survived init-failure cleanup");
 
+        fs::remove_all(root);
+    }
+
+    void TestInitFailureWaitsForInFlightCopiedDispatchersBeforeClose()
+    {
+        const fs::path root = MakeTempRoot("obelisk_plugin_manager_copied_dispatch_init_fail_in_flight");
+        ConfigureEnvironment(root);
+
+        TimerFenceState lifecycleState;
+        CopiedDispatcherInitFailureFenceState callbackState;
+        Obelisk::Core::ChatEventDispatcher chatDispatcher;
+        FakePlugin plugin{
+            .filename = "copied_dispatch_init_fail_in_flight.so",
+            .pluginId = "copied_dispatch_init_fail_in_flight",
+            .initResult = false,
+            .timerFence = &lifecycleState,
+        };
+        plugin.chatDispatcher = &chatDispatcher;
+        plugin.startCopiedDispatchesDuringInit = true;
+        plugin.initCopiedDispatchFence = &callbackState;
+
+        FakeLoader loader;
+        loader.Add(plugin);
+        TouchPlugin(root, plugin.filename);
+        WritePluginConfig(root, plugin.pluginId, R"({"enabled":true,"instance_allowlist":["arkserver"]})");
+
+        Obelisk::Core::PluginManager manager(loader, chatDispatcher);
+        std::atomic<bool> loadReturned{false};
+        std::thread loadThread([&]() {
+            manager.LoadPlugins((root / "plugins").string());
+            loadReturned.store(true, std::memory_order_release);
+            lifecycleState.Cv.notify_all();
+        });
+
+        {
+            std::unique_lock<std::mutex> lock(callbackState.Mutex);
+            Require(callbackState.Cv.wait_for(
+                        lock,
+                        std::chrono::seconds(2),
+                        [&callbackState]() {
+                            return callbackState.ChatEntered &&
+                                callbackState.StructureEntered &&
+                                callbackState.InventoryEntered &&
+                                callbackState.ItemReturnEntered &&
+                                callbackState.PlayerPrincipalEntered;
+                        }),
+                    "init-failure copied dispatcher callbacks did not all enter");
+        }
+
+        bool shutdownEntered = false;
+        {
+            std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
+            shutdownEntered = lifecycleState.Cv.wait_for(lock, std::chrono::seconds(2), [&lifecycleState]() {
+                return lifecycleState.ShutdownEntered;
+            });
+        }
+
+        auto releaseAllAndJoin = [&]() {
+            {
+                std::lock_guard<std::mutex> lock(callbackState.Mutex);
+                callbackState.ReleaseChat = true;
+                callbackState.ReleaseStructure = true;
+                callbackState.ReleaseInventory = true;
+                callbackState.ReleaseItemReturn = true;
+                callbackState.ReleasePlayerPrincipal = true;
+            }
+            callbackState.Cv.notify_all();
+            if (loadThread.joinable())
+                loadThread.join();
+            CleanupPlugin(plugin);
+            fs::remove_all(root);
+        };
+
+        if (!shutdownEntered)
+        {
+            releaseAllAndJoin();
+            Require(false, "init-failure cleanup did not call plugin shutdown while copied callbacks were in flight");
+        }
+
+        auto requireNotClosed = [&](const char* message) {
+            bool closedOrReturned = false;
+            {
+                std::unique_lock<std::mutex> lock(lifecycleState.Mutex);
+                closedOrReturned =
+                    lifecycleState.Cv.wait_for(lock, std::chrono::milliseconds(100), [&]() {
+                        return lifecycleState.CloseEntered || loadReturned.load(std::memory_order_acquire);
+                    });
+            }
+            Require(!closedOrReturned, message);
+        };
+
+        requireNotClosed("init-failure cleanup closed plugin while copied dispatcher callbacks were in flight");
+
+        {
+            std::lock_guard<std::mutex> lock(callbackState.Mutex);
+            callbackState.ReleaseChat = true;
+        }
+        callbackState.Cv.notify_all();
+        requireNotClosed("init-failure cleanup closed plugin before non-chat copied callbacks completed");
+
+        {
+            std::lock_guard<std::mutex> lock(callbackState.Mutex);
+            callbackState.ReleaseStructure = true;
+        }
+        callbackState.Cv.notify_all();
+        requireNotClosed("init-failure cleanup closed plugin before inventory/item-return/player-principal callbacks completed");
+
+        {
+            std::lock_guard<std::mutex> lock(callbackState.Mutex);
+            callbackState.ReleaseInventory = true;
+        }
+        callbackState.Cv.notify_all();
+        requireNotClosed("init-failure cleanup closed plugin before item-return/player-principal callbacks completed");
+
+        {
+            std::lock_guard<std::mutex> lock(callbackState.Mutex);
+            callbackState.ReleaseItemReturn = true;
+        }
+        callbackState.Cv.notify_all();
+        requireNotClosed("init-failure cleanup closed plugin before player-principal callback completed");
+
+        {
+            std::lock_guard<std::mutex> lock(callbackState.Mutex);
+            callbackState.ReleasePlayerPrincipal = true;
+        }
+        callbackState.Cv.notify_all();
+
+        loadThread.join();
+
+        Require(plugin.initCalls == 1, "copied-dispatch init-fail plugin Init was not called");
+        Require(plugin.shutdownCalls == 1, "copied-dispatch init-fail plugin shutdown was not called");
+        Require(plugin.closeCalls == 1, "copied-dispatch init-fail plugin was not closed once");
+        Require(plugin.initChatDispatches.load(std::memory_order_acquire) == 1,
+                "init-failure copied chat dispatch did not complete exactly one callback");
+        Require(plugin.initStructureDispatches.load(std::memory_order_acquire) == 1,
+                "init-failure copied structure dispatch did not complete exactly one callback");
+        Require(plugin.initInventoryDispatches.load(std::memory_order_acquire) == 1,
+                "init-failure copied inventory dispatch did not complete exactly one callback");
+        Require(plugin.initItemReturnDispatches.load(std::memory_order_acquire) == 1,
+                "init-failure copied item-return dispatch did not complete exactly one callback");
+        Require(plugin.initCopiedPlayerPrincipalDispatches.load(std::memory_order_acquire) == 1,
+                "init-failure copied player-principal dispatch did not complete exactly one callback");
+        Require(callbackState.ChatCalls == 1, "init-failure copied chat call count mismatch");
+        Require(callbackState.StructureCalls == 1, "init-failure copied structure call count mismatch");
+        Require(callbackState.InventoryCalls == 1, "init-failure copied inventory call count mismatch");
+        Require(callbackState.ItemReturnCalls == 1, "init-failure copied item-return call count mismatch");
+        Require(callbackState.PlayerPrincipalCalls == 1,
+                "init-failure copied player-principal call count mismatch");
+        Require(chatDispatcher.SubscriptionCount() == 0,
+                "init-failure copied chat callback survived cleanup");
+        Require(Obelisk::Core::StructureEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure copied structure callback survived cleanup");
+        Require(Obelisk::Core::InventoryPolicyEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure copied inventory callback survived cleanup");
+        Require(Obelisk::Core::ItemReturnEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure copied item-return callback survived cleanup");
+        Require(Obelisk::Core::PlayerPrincipalEventDispatcher::Get().SubscriptionCount() == 0,
+                "init-failure copied player-principal callback survived cleanup");
+
+        CleanupPlugin(plugin);
         fs::remove_all(root);
     }
 
@@ -7457,6 +7839,7 @@ int main()
     TestTimerCallbackCleansOnInitFailure();
     TestInitFailureWaitsForInFlightPluginTimerBeforeClose();
     TestInitFailureWaitsForInFlightDirectPlayerPrincipalDispatchBeforeClose();
+    TestInitFailureWaitsForInFlightCopiedDispatchersBeforeClose();
     TestOwnerTokenTimerRegistrationRejectedDuringShutdown();
     TestOwnerTokenTimerRegistrationRejectedDuringInitFailureShutdown();
     TestOwnerTokenTimerUnregisterAllowedDuringShutdown();

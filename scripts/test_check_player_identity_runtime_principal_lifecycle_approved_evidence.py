@@ -683,6 +683,18 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
             ["malformed_or_unsupported_evidence", "stale_after_logout"],
         )
 
+    def test_rejects_runtime_summary_commit_that_is_not_current_head(self) -> None:
+        checker = load_script_module(SCRIPT, "test_player_principal_approved_checker_current_head")
+        payload = manifest()
+
+        with mock.patch.object(checker, "current_obelisk_commit", return_value="f" * 40):
+            validation = checker.validate_manifest(payload, check_mode="consume")
+
+        self.assertIn(
+            "source_summary_obelisk_commit_not_current_head",
+            [blocker["reason"] for blocker in validation.blockers],
+        )
+
     def test_rejects_runtime_summary_process_event_candidate_address_drift(self) -> None:
         lines = [
             line.replace("ProcessEvent candidate[0] = 0x1d34e20", "ProcessEvent candidate[0] = 0x1d34e21")
