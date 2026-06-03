@@ -110,6 +110,22 @@ class ResearchDocGuardrailTests(unittest.TestCase):
         self.assertIn("Historical/superseded for player identity", readme_compact)
         self.assertIn("current identity blocker is `approved_runtime_evidence_missing`", readme_compact)
 
+    def test_static_demand_shortest_offline_identity_path_is_marked_superseded(self) -> None:
+        static_demand = (
+            REPO_ROOT / "docs/research/2026-05-31-v1-sdk-round-identity-static-demand-audit.md"
+        ).read_text(encoding="utf-8")
+        section = static_demand.split("## Shortest Offline Identity Path", 1)[1].split(
+            "## Demand Dictionary", 1
+        )[0]
+        compact = normalized(section)
+
+        self.assertIn("Historical/superseded for player identity", compact)
+        self.assertIn("do not execute this section for the current blocker", compact)
+        self.assertIn("approved_runtime_evidence_missing", compact)
+        self.assertIn("ShooterGameMode.HandleNewPlayer", compact)
+        self.assertIn("ShooterGameMode.OnLogout", compact)
+        self.assertIn("candidate/internal planning guidance only", compact)
+
     def test_player_identity_runtime_observer_brief_bundle_command_matches_builder_cli(self) -> None:
         documented_flags = self._documented_identity_bundle_flags(
             REPO_ROOT / "docs/research/2026-06-01-player-principal-runtime-observer-brief.md",

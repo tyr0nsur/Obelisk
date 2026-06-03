@@ -359,6 +359,28 @@ int main()
     static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
         sizeof(ObeliskApi::UnregisterTimerWithOwnerToken) == sizeof(ObeliskApi));
 
+    static_assert(offsetof(ObeliskApi, RegisterPostProcessEventForNameIndexWithOwnerToken) +
+        sizeof(ObeliskApi::RegisterPostProcessEventForNameIndexWithOwnerToken) <= sizeof(ObeliskApi),
+        "owner-token callback capability requires the owner-token registration prefix");
+    static_assert(offsetof(ObeliskApi, UnregisterProcessEventCallbackWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterProcessEventCallbackWithOwnerToken) <= sizeof(ObeliskApi),
+        "ProcessEvent callback handle capability requires the unregister slot");
+    static_assert(offsetof(ObeliskApi, UnregisterGameplayPolicyEventWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterGameplayPolicyEventWithOwnerToken) <= sizeof(ObeliskApi),
+        "gameplay policy event capability requires register and unregister slots");
+    static_assert(offsetof(ObeliskApi, DescribeResourceKind) +
+        sizeof(ObeliskApi::DescribeResourceKind) <= sizeof(ObeliskApi),
+        "resource kind descriptor capability requires the descriptor slot");
+    static_assert(offsetof(ObeliskApi, DescribeGameplayPolicyEventKind) +
+        sizeof(ObeliskApi::DescribeGameplayPolicyEventKind) <= sizeof(ObeliskApi),
+        "gameplay policy event descriptor capability requires the descriptor slot");
+    static_assert(offsetof(ObeliskApi, UnregisterChatMessageEventWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterChatMessageEventWithOwnerToken) <= sizeof(ObeliskApi),
+        "chat event capability requires register and unregister slots");
+    static_assert(offsetof(ObeliskApi, UnregisterTimerWithOwnerToken) +
+        sizeof(ObeliskApi::UnregisterTimerWithOwnerToken) <= sizeof(ObeliskApi),
+        "timer capability requires register and unregister slots");
+
     RuntimeNoOp();
     return 0;
 }

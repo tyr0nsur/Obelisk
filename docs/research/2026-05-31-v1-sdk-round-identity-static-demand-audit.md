@@ -44,6 +44,12 @@ No agent touched `/servidor/ark`, Discord, GitHub publication, or live servers.
 
 ## Shortest Offline Identity Path
 
+Historical/superseded for player identity: do not execute this section for the current
+blocker. The active route is `approved_runtime_evidence_missing` via approved copied
+runtime principal lifecycle evidence for `ShooterGameMode.HandleNewPlayer` and
+`ShooterGameMode.OnLogout`; the offline pack route below is earlier candidate/internal
+planning guidance only.
+
 Required inputs:
 
 - Offline `ShooterGameServer` with the current hash above.

@@ -33,6 +33,10 @@ COMMAND_RESPONSE_SURFACE = "obelisk.command_chat_response_path.v1"
 COMMANDS_REPLIES_SURFACE = "obelisk.commands_replies.v1"
 REQUIRED_P0_CHAIN = [IDENTITY_SURFACE, SURFACE, COMMAND_RESPONSE_SURFACE, COMMANDS_REPLIES_SURFACE]
 CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
+ALLOWED_ROUTE_BLOCKERS = (
+    "approved_runtime_evidence_missing",
+    "identity_public_contract_gate_missing",
+)
 PLAYER_IDENTITY_PROMOTION_CERTIFICATE_SCHEMA = "obelisk.player-identity-promotion-certificate.v1"
 
 REQUIRED_DECISION_IDS = frozenset(
@@ -469,6 +473,12 @@ def parse_args() -> argparse.Namespace:
         "--query-failclosed-artifact",
         type=Path,
         help="Optional candidate-only permissions/admin query manifest.",
+    )
+    parser.add_argument(
+        "--current-route-blocker",
+        choices=ALLOWED_ROUTE_BLOCKERS,
+        default=CURRENT_ROUTE_BLOCKER,
+        help="Parent identity-route blocker to mirror while this surface remains locked.",
     )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
@@ -1215,6 +1225,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         validate_surfaces(surfaces, blockers, args.public_header)
     validate_header(args.public_header, blockers)
     query_artifact_schema = validate_query_artifact(args.query_failclosed_artifact, blockers)
+    current_route_blocker = getattr(args, "current_route_blocker", CURRENT_ROUTE_BLOCKER)
     return {
         "schema": REPORT_SCHEMA,
         "surface": SURFACE,
@@ -1223,8 +1234,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "planning_only": True,
         "dependency_chain": REQUIRED_P0_CHAIN,
         "dependency_chain_locked": True,
-        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
-        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": [current_route_blocker],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1237,7 +1248,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "dependency": IDENTITY_SURFACE,
         "non_claim": (
             "valid planning output does not count permissions/admin while player identity remains blocked "
-            "on approved_runtime_evidence_missing"
+            f"on {current_route_blocker}"
         ),
         "query_failclosed_artifact_schema": query_artifact_schema,
         "blockers": [blocker["reason"] for blocker in blockers],

@@ -4972,6 +4972,9 @@ class PublicSdkGuardrailTests(unittest.TestCase):
     def test_installed_sdk_target_exports_only_public_header_include_dir(self) -> None:
         root_cmake = (REPO_ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         package_config = (REPO_ROOT / "cmake" / "ObeliskConfig.cmake.in").read_text(encoding="utf-8")
+        installed_consumer_cmake = (
+            REPO_ROOT / "tests" / "sdk_installed_consumer" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
         offenders: list[str] = []
 
         self.assertIn("add_library(obelisk_sdk INTERFACE)", root_cmake)
@@ -5033,6 +5036,22 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             with self.subTest(cmake_false_claim_variable=cmake_false_claim_variable):
                 self.assertIn(f"set({cmake_false_claim_variable} FALSE)", package_config)
         self.assertEqual(offenders, [])
+
+        for required_consumer_guard in (
+            "get_target_property(",
+            "Obelisk::obelisk_sdk",
+            "INTERFACE_INCLUDE_DIRECTORIES",
+            "OBELISK_EXPECTED_SDK_INCLUDE_DIR",
+            "INTERFACE_COMPILE_DEFINITIONS",
+            "INTERFACE_COMPILE_OPTIONS",
+            "INTERFACE_LINK_LIBRARIES",
+            "INTERFACE_SOURCES",
+            "INTERFACE_SYSTEM_INCLUDE_DIRECTORIES",
+            "Installed Obelisk SDK target must expose only the installed public include root",
+            "Installed Obelisk SDK target must not export ${interface_property}",
+        ):
+            with self.subTest(path="tests/sdk_installed_consumer/CMakeLists.txt", token=required_consumer_guard):
+                self.assertIn(required_consumer_guard, installed_consumer_cmake)
 
     def test_creator_facing_sdk_examples_do_not_depend_on_private_headers_or_repo_deps(self) -> None:
         forbidden_include_prefixes = (

@@ -210,11 +210,11 @@ This file is an active routing table only. Durable evidence belongs in
   structured evidence to carry the full blocker set, `blockers=[]`, and
   `resolved_inputs=[runtime.lifecycle_evidence]`; P0 accounting explicitly keeps
   `identity_public_contract_gate_missing` non-counting.
-- Latest supervised round delegated route/planning lock alignment, SDK install-layout
-  compile-command hardening, C ABI timer-slot lifecycle coverage, and ProcessEvent triage.
-  Integrated locked child-route blocker drift rejection, SDK private-root leak checks, C ABI
-  short-timer-unregister regression coverage, stale direct-offset fallback docs/tests,
-  no-candidate hook guardrails, and explicit rejected `0x1d11cb0` evidence tests.
-  Agents closed; route/SDK remain fail-closed at
+- Latest supervised round delegated route-transition alignment, SDK package-shape
+  private-leak checks, C ABI capability/struct-size guardrails, and read-only identity
+  research triage. Integrated child P0 blocker propagation for
+  `identity_public_contract_gate_missing`, imported `Obelisk::obelisk_sdk` target export
+  checks, ABI capability slot-fit assertions, timer cleanup in the plugin-manager fake
+  helper, and superseded the old shortest-offline-identity path. Agents closed; route/SDK remain fail-closed at
   `approved_runtime_evidence_missing`, SDK `0/12`, P0 `0/4`, public/runtime false,
   `stable_claim_allowed=false`. No runtime/server op.

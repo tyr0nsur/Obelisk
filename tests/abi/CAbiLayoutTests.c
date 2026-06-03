@@ -45,6 +45,10 @@
     _Static_assert( \
         offsetof(type, field) + sizeof(((type*)0)->field) == sizeof(type), \
         #type "." #field " must remain the final ABI field")
+#define ASSERT_CAPABILITY_FIELD_FITS(type, capability, field) \
+    _Static_assert( \
+        (capability) != 0 && offsetof(type, field) + sizeof(((type*)0)->field) <= sizeof(type), \
+        #capability " requires " #type "." #field " inside the advertised struct_size")
 #define ASSERT_U64(name, expected) _Static_assert((name) == (expected), #name " value changed")
 #define ASSERT_ENUM(name, expected) _Static_assert((uint32_t)(name) == (expected), #name " value changed")
 
@@ -247,6 +251,34 @@ ASSERT_OFFSET(ObeliskApi, UnregisterTimerWithOwnerToken, 208);
 ASSERT_FIELD_AFTER(ObeliskApi, RegisterTimerWithOwnerTokenHandle, UnregisterChatMessageEventWithOwnerToken);
 ASSERT_FIELD_AFTER(ObeliskApi, UnregisterTimerWithOwnerToken, RegisterTimerWithOwnerTokenHandle);
 ASSERT_FIELD_ENDS_STRUCT(ObeliskApi, UnregisterTimerWithOwnerToken);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_OWNER_TOKEN_CALLBACKS,
+    RegisterPostProcessEventForNameIndexWithOwnerToken);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_PROCESS_EVENT_CALLBACK_HANDLES,
+    UnregisterProcessEventCallbackWithOwnerToken);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENTS,
+    UnregisterGameplayPolicyEventWithOwnerToken);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_RESOURCE_KIND_DESCRIPTORS,
+    DescribeResourceKind);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_GAMEPLAY_POLICY_EVENT_DESCRIPTORS,
+    DescribeGameplayPolicyEventKind);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_CHAT_EVENTS,
+    UnregisterChatMessageEventWithOwnerToken);
+ASSERT_CAPABILITY_FIELD_FITS(
+    ObeliskApi,
+    OBELISK_API_CAPABILITY_TIMERS,
+    UnregisterTimerWithOwnerToken);
 
 int main(void)
 {

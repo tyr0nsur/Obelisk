@@ -36,6 +36,10 @@ PERMISSIONS_SURFACE = "obelisk.permissions_admin.v1"
 COMMANDS_REPLIES_SURFACE = "obelisk.commands_replies.v1"
 DEPENDENCY_CHAIN = [IDENTITY_SURFACE, PERMISSIONS_SURFACE, SURFACE, COMMANDS_REPLIES_SURFACE]
 CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
+ALLOWED_ROUTE_BLOCKERS = (
+    "approved_runtime_evidence_missing",
+    "identity_public_contract_gate_missing",
+)
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 TARGET_SET = "command-chat-response-route-planning"
 TARGETS = frozenset(
@@ -359,6 +363,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SURFACES,
         help="Public SDK surfaces manifest to verify response path remains planning/post-v1.",
+    )
+    parser.add_argument(
+        "--current-route-blocker",
+        choices=ALLOWED_ROUTE_BLOCKERS,
+        default=CURRENT_ROUTE_BLOCKER,
+        help="Parent identity-route blocker to mirror while this surface remains locked.",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON. The checker always emits JSON.")
     return parser.parse_args()
@@ -1119,6 +1129,7 @@ def build_report(
     decisions_path: Path,
     public_header_path: Path,
     surfaces_path: Path,
+    current_route_blocker: str = CURRENT_ROUTE_BLOCKER,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     resolved_root = validate_readiness_path_bound_to_root(root=root, readiness_path=readiness_path, blockers=blockers)
@@ -1151,8 +1162,8 @@ def build_report(
         "planning_only": valid,
         "dependency_chain": DEPENDENCY_CHAIN,
         "dependency_chain_locked": True,
-        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
-        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": [current_route_blocker],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1165,7 +1176,7 @@ def build_report(
         "runtime_ready": False,
         "non_claim": (
             "valid planning output does not count command/chat response while player identity remains "
-            "blocked on approved_runtime_evidence_missing"
+            f"blocked on {current_route_blocker}"
         ),
         "surface": SURFACE,
         "target_set": TARGET_SET,
@@ -1198,7 +1209,14 @@ def main() -> int:
     args = parse_args()
     root = args.readiness.parent if args.readiness is not None and args.root == DEFAULT_ROOT else args.root
     readiness_path = args.readiness if args.readiness is not None else root / DEFAULT_READINESS_NAME
-    report = build_report(root, readiness_path, args.decisions, args.public_header, args.surfaces)
+    report = build_report(
+        root,
+        readiness_path,
+        args.decisions,
+        args.public_header,
+        args.surfaces,
+        current_route_blocker=args.current_route_blocker,
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1
 

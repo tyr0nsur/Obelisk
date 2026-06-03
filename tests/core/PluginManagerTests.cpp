@@ -1239,6 +1239,7 @@ namespace
         Obelisk::Core::ItemReturnEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         Obelisk::Core::PlayerPrincipalEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
         Obelisk::Core::StructureEventDispatcher::Get().UnregisterCallbacksForOwner(plugin.owner);
+        Obelisk::Core::TimerManager::Get().UnregisterCallbacksForOwner(plugin.owner);
         g_CurrentFakePlugin = nullptr;
     }
 

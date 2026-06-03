@@ -236,15 +236,6 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             self.assertEqual(check["expected_schema"], check["report_schema"], check)
 
     def test_approved_runtime_evidence_routes_to_identity_public_contract_gate_without_unlocking_p0(self) -> None:
-        original_run_check = ROUTE_GATE.run_check
-
-        def aligned_child_route_lock(name: str, argv: list[str]) -> dict[str, object]:
-            result = original_run_check(name, argv)
-            if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
-                result["current_route_blocker"] = "identity_public_contract_gate_missing"
-                result["remaining_route_blockers"] = ["identity_public_contract_gate_missing"]
-            return result
-
         with tempfile.TemporaryDirectory() as temp_dir:
             approved_runtime = Path(temp_dir) / "approved-runtime-principal-lifecycle.json"
             approved_runtime.write_text(
@@ -292,10 +283,7 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 "public_abi_ready": False,
                 "runtime_ready": False,
             }
-            with (
-                mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase),
-                mock.patch.object(ROUTE_GATE, "run_check", side_effect=aligned_child_route_lock),
-            ):
+            with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase):
                 report = ROUTE_GATE.build_report(args)
         phase = report["critical_path_phase"]
 
@@ -310,6 +298,20 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         self.assertEqual("identity_public_contract_gate_missing", phase["current_blocker"])
         self.assertEqual("identity_public_contract_gate_missing", phase["source_checker_primary_blocker"])
         self.assertEqual(["identity_public_contract_gate_missing"], phase["source_checker_blockers"])
+        for check_name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+            child = next(check for check in report["checks"] if check["name"] == check_name)
+            self.assertIn("--current-route-blocker", child["argv"])
+            self.assertEqual(
+                "identity_public_contract_gate_missing",
+                child["argv"][child["argv"].index("--current-route-blocker") + 1],
+                child,
+            )
+            self.assertEqual("identity_public_contract_gate_missing", child["current_route_blocker"], child)
+            self.assertEqual(["identity_public_contract_gate_missing"], child["remaining_route_blockers"], child)
+            self.assertFalse(child["counts_toward_public_sdk"], child)
+            self.assertFalse(child["counts_toward_runtime"], child)
+            self.assertFalse(child["counts_toward_v1_completion"], child)
+            self.assertFalse(child["public_or_runtime_accounting_allowed"], child)
         self.assertFalse(phase["permissions_admin_unlocked"])
         self.assertFalse(phase["command_response_unlocked"])
         self.assertFalse(phase["commands_replies_unlocked"])
@@ -328,6 +330,15 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
         )
 
     def test_approved_runtime_evidence_rejects_stale_child_route_locks(self) -> None:
+        original_run_check = ROUTE_GATE.run_check
+
+        def stale_child_route_lock(name: str, argv: list[str]) -> dict[str, object]:
+            result = original_run_check(name, argv)
+            if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+                result["current_route_blocker"] = "approved_runtime_evidence_missing"
+                result["remaining_route_blockers"] = ["approved_runtime_evidence_missing"]
+            return result
+
         args = SimpleNamespace(
             query_failclosed_artifact=QUERY_CONTRACT,
             player_identity_decisions=IDENTITY_DECISIONS,
@@ -370,7 +381,10 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             "runtime_ready": False,
         }
 
-        with mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase):
+        with (
+            mock.patch.object(ROUTE_GATE, "build_critical_path_phase", return_value=phase),
+            mock.patch.object(ROUTE_GATE, "run_check", side_effect=stale_child_route_lock),
+        ):
             report = ROUTE_GATE.build_report(args)
 
         self.assertFalse(report["valid"])
@@ -1473,7 +1487,13 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
             json=True,
         )
 
-        by_name = {name: argv for name, argv in ROUTE_GATE.route_checks(args)}
+        by_name = {
+            name: argv
+            for name, argv in ROUTE_GATE.route_checks(
+                args,
+                current_route_blocker="identity_public_contract_gate_missing",
+            )
+        }
         for name in (
             "player_identity_public_contract_gap",
             "permissions_admin_public_readiness",
@@ -1485,6 +1505,12 @@ class CommandPermissionRouteGateTests(unittest.TestCase):
                 self.assertEqual("/tmp/route-surfaces.json", by_name[name][by_name[name].index("--surfaces") + 1])
                 self.assertIn("--public-header", by_name[name])
                 self.assertEqual("/tmp/ObeliskApi.h", by_name[name][by_name[name].index("--public-header") + 1])
+                if name in ROUTE_GATE.REQUIRED_LOCKED_CHILD_CHECKS:
+                    self.assertIn("--current-route-blocker", by_name[name])
+                    self.assertEqual(
+                        "identity_public_contract_gate_missing",
+                        by_name[name][by_name[name].index("--current-route-blocker") + 1],
+                    )
 
     def test_route_gate_rejects_fake_public_header_in_downstream_p0_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

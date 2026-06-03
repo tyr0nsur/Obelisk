@@ -42,6 +42,10 @@ DEPENDENCY_CHAIN = (
     SURFACE,
 )
 CURRENT_ROUTE_BLOCKER = "approved_runtime_evidence_missing"
+ALLOWED_ROUTE_BLOCKERS = (
+    "approved_runtime_evidence_missing",
+    "identity_public_contract_gate_missing",
+)
 REQUIRED_DEPENDS_ON = list(DEPENDENCY_CHAIN[:-1])
 MANIFEST_PROMOTION_STATUSES = frozenset(("promoted", "promoted-experimental-only"))
 REQUIRED_DECISION_IDS = frozenset(
@@ -352,6 +356,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--response-path-root", type=Path)
     parser.add_argument("--response-path-readiness", type=Path)
     parser.add_argument("--response-path-report-root", type=Path)
+    parser.add_argument(
+        "--current-route-blocker",
+        choices=ALLOWED_ROUTE_BLOCKERS,
+        default=CURRENT_ROUTE_BLOCKER,
+        help="Parent identity-route blocker to mirror while this surface remains locked.",
+    )
     parser.add_argument("--json", action="store_true", help="Compatibility flag; output is always JSON.")
     return parser.parse_args()
 
@@ -1019,6 +1029,7 @@ def validate_response_path_report(
     expected_readiness: Path | None = None,
     expected_surfaces: Path | None = None,
     expected_public_header: Path | None = None,
+    expected_route_blocker: str = CURRENT_ROUTE_BLOCKER,
 ) -> None:
     schema = payload.get("schema")
     if schema == RESPONSE_PATH_REPORT_SCHEMA:
@@ -1142,20 +1153,20 @@ def validate_response_path_report(
                 "$.response_path_report.dependency_chain_locked",
                 value=payload.get("dependency_chain_locked"),
             )
-        if payload.get("current_route_blocker") != CURRENT_ROUTE_BLOCKER:
+        if payload.get("current_route_blocker") != expected_route_blocker:
             add(
                 blockers,
                 "response_path_report_route_blocker_mismatch",
                 "$.response_path_report.current_route_blocker",
-                expected=CURRENT_ROUTE_BLOCKER,
+                expected=expected_route_blocker,
                 value=payload.get("current_route_blocker"),
             )
-        if payload.get("remaining_route_blockers") != [CURRENT_ROUTE_BLOCKER]:
+        if payload.get("remaining_route_blockers") != [expected_route_blocker]:
             add(
                 blockers,
                 "response_path_report_remaining_route_blockers_mismatch",
                 "$.response_path_report.remaining_route_blockers",
-                expected=[CURRENT_ROUTE_BLOCKER],
+                expected=[expected_route_blocker],
                 value=payload.get("remaining_route_blockers"),
             )
         if payload.get("surface") not in (RESPONSE_PATH_SURFACE, None):
@@ -1247,6 +1258,7 @@ def validate_response_path_report(
                 resolved_source_artifacts["decisions_path"],
                 resolved_source_artifacts["public_header_path"],
                 resolved_source_artifacts["surfaces_path"],
+                current_route_blocker=expected_route_blocker,
             )
             if rebuilt.get("valid") is not True or rebuilt.get("accepted_for_planning") is not True:
                 add(
@@ -1294,6 +1306,7 @@ def build_report(
     response_path_root: Path | None = None,
     response_path_readiness: Path | None = None,
     response_path_report_root: Path | None = None,
+    current_route_blocker: str = CURRENT_ROUTE_BLOCKER,
 ) -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     expected_report_root = response_path_report_root if response_path_report_root is not None else response_path_root
@@ -1325,6 +1338,7 @@ def build_report(
             expected_readiness=response_path_readiness,
             expected_surfaces=surfaces_path,
             expected_public_header=public_header_path,
+            expected_route_blocker=current_route_blocker,
         )
 
     valid = not blockers
@@ -1336,8 +1350,8 @@ def build_report(
         "surface": SURFACE,
         "dependency_chain": list(DEPENDENCY_CHAIN),
         "dependency_chain_locked": True,
-        "current_route_blocker": CURRENT_ROUTE_BLOCKER,
-        "remaining_route_blockers": [CURRENT_ROUTE_BLOCKER],
+        "current_route_blocker": current_route_blocker,
+        "remaining_route_blockers": [current_route_blocker],
         "counts_toward_public_sdk": False,
         "counts_toward_runtime": False,
         "counts_toward_v1_completion": False,
@@ -1351,7 +1365,7 @@ def build_report(
         "public_header_allowed": False,
         "non_claim": (
             "valid planning output does not count commands/replies while player identity remains "
-            "blocked on approved_runtime_evidence_missing"
+            f"blocked on {current_route_blocker}"
         ),
         "decisions_path": str(decisions_path),
         "surfaces_path": str(surfaces_path),
@@ -1386,6 +1400,7 @@ def main() -> int:
         response_path_root=args.response_path_root,
         response_path_readiness=args.response_path_readiness,
         response_path_report_root=args.response_path_report_root,
+        current_route_blocker=args.current_route_blocker,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["valid"] else 1

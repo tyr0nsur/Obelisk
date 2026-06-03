@@ -347,13 +347,15 @@ def identity_readiness_argv(args: argparse.Namespace | None) -> list[str]:
     return argv
 
 
-def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
+def route_checks(args: argparse.Namespace, *, current_route_blocker: str) -> list[tuple[str, list[str]]]:
     shared_surface_args = ["--surfaces", str(args.public_sdk_surfaces)]
     shared_header_args = ["--public-header", str(args.public_header)]
+    route_blocker_args = ["--current-route-blocker", current_route_blocker]
     command_response_args = [
         "check_command_chat_response_public_readiness.py",
         *shared_surface_args,
         *shared_header_args,
+        *route_blocker_args,
         "--json",
     ]
     if args.command_response_root is not None:
@@ -390,6 +392,7 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
                 query_artifact,
                 *shared_surface_args,
                 *shared_header_args,
+                *route_blocker_args,
                 "--json",
             ],
         ),
@@ -417,6 +420,7 @@ def route_checks(args: argparse.Namespace) -> list[tuple[str, list[str]]]:
                 "check_commands_replies_public_readiness.py",
                 *shared_surface_args,
                 *shared_header_args,
+                *route_blocker_args,
                 "--json",
             ],
         ),
@@ -801,12 +805,19 @@ def validate_locked_child_route_alignment(
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
+    critical_path_phase = build_critical_path_phase(args)
+    current_route_blocker = critical_path_phase.get("current_blocker")
+    child_route_blocker = (
+        current_route_blocker
+        if current_route_blocker in ALLOWED_IDENTITY_LOCK_BLOCKERS
+        else "approved_runtime_evidence_missing"
+    )
     checks = []
     response_path_report: dict[str, Any] | None = None
     with tempfile.TemporaryDirectory(prefix="obelisk-command-route-gate-") as tmp:
         response_path_report_root = Path(tmp) / "command-chat-response-public-readiness"
         response_path_report_path = response_path_report_root / "command-chat-response-public-readiness.json"
-        for name, argv in route_checks(args):
+        for name, argv in route_checks(args, current_route_blocker=str(child_route_blocker)):
             effective_argv = list(argv)
             if name == "commands_replies_public_readiness":
                 if response_path_report is not None:
@@ -866,10 +877,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                     blockers.append(f"{check['name']}: {key} must stay false")
         if not check["valid"]:
             blockers.append(f"{check['name']}: invalid route prerequisite")
-    critical_path_phase = build_critical_path_phase(args)
     blockers.extend(validate_critical_path_phase(critical_path_phase))
     blockers.extend(validate_identity_lock_mode(args, critical_path_phase))
-    current_route_blocker = critical_path_phase.get("current_blocker")
     remaining_route_blockers = [current_route_blocker] if current_route_blocker is not None else []
     route_blocked = bool(remaining_route_blockers)
     route_lock_blockers = route_lock_blocked_until(current_route_blocker)

@@ -73,6 +73,39 @@ if(NOT Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION EQUAL 1)
     message(FATAL_ERROR "Unexpected Obelisk chat message event ABI version: ${Obelisk_CHAT_MESSAGE_EVENT_ABI_VERSION}")
 endif()
 
+get_filename_component(OBELISK_INSTALLED_PACKAGE_ROOT "${Obelisk_DIR}/../../.." ABSOLUTE)
+set(OBELISK_EXPECTED_SDK_INCLUDE_DIR "${OBELISK_INSTALLED_PACKAGE_ROOT}/include")
+get_target_property(
+    OBELISK_SDK_INTERFACE_INCLUDE_DIRECTORIES
+    Obelisk::obelisk_sdk
+    INTERFACE_INCLUDE_DIRECTORIES
+)
+if(NOT OBELISK_SDK_INTERFACE_INCLUDE_DIRECTORIES STREQUAL OBELISK_EXPECTED_SDK_INCLUDE_DIR)
+    message(FATAL_ERROR
+        "Installed Obelisk SDK target must expose only the installed public include root; "
+        "expected ${OBELISK_EXPECTED_SDK_INCLUDE_DIR}, got "
+        "${OBELISK_SDK_INTERFACE_INCLUDE_DIRECTORIES}")
+endif()
+
+foreach(interface_property IN ITEMS
+    INTERFACE_COMPILE_DEFINITIONS
+    INTERFACE_COMPILE_OPTIONS
+    INTERFACE_LINK_LIBRARIES
+    INTERFACE_SOURCES
+    INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+)
+    get_target_property(
+        OBELISK_SDK_INTERFACE_PROPERTY_VALUE
+        Obelisk::obelisk_sdk
+        ${interface_property}
+    )
+    if(OBELISK_SDK_INTERFACE_PROPERTY_VALUE)
+        message(FATAL_ERROR
+            "Installed Obelisk SDK target must not export ${interface_property}: "
+            "${OBELISK_SDK_INTERFACE_PROPERTY_VALUE}")
+    endif()
+endforeach()
+
 set(OBELISK_INSTALLED_PACKAGE_ABI_DEFINITIONS
     OBELISK_CMAKE_API_ABI_VERSION=${Obelisk_API_ABI_VERSION}
     OBELISK_CMAKE_PLUGIN_METADATA_ABI_VERSION=${Obelisk_PLUGIN_METADATA_ABI_VERSION}
