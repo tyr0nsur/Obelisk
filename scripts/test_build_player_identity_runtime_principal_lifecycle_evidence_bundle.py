@@ -1072,6 +1072,52 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
         self.assertTrue(state["checker_ready"])
         self.assertIn("approved_runtime_manifest_check_failed", [blocker["reason"] for blocker in blockers])
 
+    def test_approved_runtime_manifest_check_requires_exact_report_contract(self) -> None:
+        cases = (
+            ("wrong_schema", {"schema": "obelisk.wrong-check.v1"}),
+            ("wrong_mode", {"mode": "public_readiness"}),
+            ("wrong_ready_scope", {"ready_scope": "public_sdk"}),
+        )
+        for name, overrides in cases:
+            with self.subTest(name=name):
+                original = bundle_builder.run_json_check
+                blockers: list[dict] = []
+
+                def fake_run_json_check(_command: list[str]) -> tuple[int, dict, str]:
+                    payload = {
+                        "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+                        "mode": "consume",
+                        "ready_scope": "runtime_evidence_only",
+                        "ready": True,
+                        "approved_runtime_evidence_present": True,
+                        "runtime_evidence_ready": True,
+                        "promotion_ready": False,
+                        "public_header_allowed": False,
+                        "public_sdk_ready": False,
+                        "public_abi_ready": False,
+                        "v1_completion_ready": False,
+                        "runtime_ready": False,
+                        "public_capability_bits_now": [],
+                        "public_callback_abi_now": [],
+                        "blockers": [],
+                        "next_blocker": "identity_public_contract_gate_missing",
+                    }
+                    payload.update(overrides)
+                    return 0, payload, ""
+
+                try:
+                    bundle_builder.run_json_check = fake_run_json_check
+                    state = bundle_builder.approved_runtime_manifest_check_state(
+                        {"exists": True, "path": Path("approved-runtime-principal-lifecycle-evidence.json")},
+                        blockers,
+                    )
+                finally:
+                    bundle_builder.run_json_check = original
+
+                self.assertTrue(state["checked"])
+                self.assertFalse(state["ready"])
+                self.assertIn("approved_runtime_manifest_check_failed", [blocker["reason"] for blocker in blockers])
+
     def test_request_pack_check_requires_exit_zero_even_when_checker_payload_ready(self) -> None:
         original = bundle_builder.run_json_check
         blockers: list[dict] = []
@@ -2047,6 +2093,63 @@ class BuildRuntimePrincipalLifecycleEvidenceBundleTests(unittest.TestCase):
             )
 
         self.assertIn("overclaims readiness alias $.nested.publicReady", str(raised.exception))
+
+    def test_rejects_check_reports_with_wrong_schema_mode_or_ready_scope(self) -> None:
+        base = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "mode": "consume",
+            "ready_scope": "runtime_evidence_only",
+            "ready": True,
+            "approved_runtime_evidence_present": True,
+            "runtime_evidence_ready": True,
+            "promotion_ready": False,
+            "public_header_allowed": False,
+            "public_sdk_ready": False,
+            "public_abi_ready": False,
+            "v1_completion_ready": False,
+            "runtime_ready": False,
+            "public_capability_bits_now": [],
+            "public_callback_abi_now": [],
+            "blockers": [],
+            "next_blocker": "identity_public_contract_gate_missing",
+        }
+        for key, value, expected in (
+            ("schema", "obelisk.wrong-check.v1", "schema mismatch"),
+            ("mode", "promote", "mode mismatch"),
+            ("ready_scope", "public_sdk", "ready_scope mismatch"),
+        ):
+            with self.subTest(key=key):
+                payload = dict(base)
+                payload[key] = value
+                with self.assertRaises(SystemExit) as raised:
+                    bundle_builder.require_consume_only_check_report(
+                        payload,
+                        "consume approved runtime principal lifecycle evidence check",
+                    )
+                self.assertIn(expected, str(raised.exception))
+
+    def test_rejects_negative_check_report_with_wrong_mode_or_scope(self) -> None:
+        payload = {
+            "schema": "obelisk.players-identity-runtime-principal-lifecycle-approved-evidence-check.v1",
+            "mode": "consume",
+            "ready_scope": "runtime_evidence_only",
+            "ready": False,
+            "approved_runtime_evidence_present": True,
+            "runtime_evidence_ready": True,
+            "promotion_ready": False,
+            "public_sdk_ready": False,
+            "runtime_ready": False,
+            "blockers": ["promote_blocked_until_identity_public_contract_gate"],
+            "next_blocker": "identity_public_contract_gate_missing",
+        }
+        with self.assertRaises(SystemExit) as raised:
+            bundle_builder.require_negative_readiness_report(
+                payload,
+                "promote approved runtime principal lifecycle evidence check",
+                "promote_blocked_until_identity_public_contract_gate",
+            )
+
+        self.assertIn("mode mismatch", str(raised.exception))
 
     def test_rejects_negative_readiness_report_with_wrong_blocker(self) -> None:
         with self.assertRaises(SystemExit) as raised:

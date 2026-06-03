@@ -604,6 +604,38 @@ class CheckCommandChatResponsePublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_downstream_identity_permission_capability_and_route_gate_claims(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_surface_overclaims(
+            {
+                "secondary_report": {
+                    "adminAuthorityReady": True,
+                    "identityPublicContractReviewed": True,
+                    "permissionHeaderAllowed": True,
+                    "permissionsQueryReady": True,
+                    "playerIdentityPromotionCertificateReady": True,
+                    "publicCapabilityAdvertised": True,
+                    "publicContractReady": True,
+                    "routeGateUnlocked": True,
+                },
+                "claims": [
+                    "accepted runtime evidence is accepted",
+                    "identity public contract is reviewed",
+                    "permission header allowed",
+                    "permissions query ready",
+                    "public ABI is ready",
+                    "public capability is advertised",
+                    "route gate opened for command response",
+                    "ready route gate",
+                ],
+            },
+            blockers,
+        )
+
+        reasons = [item["reason"] for item in blockers]
+        self.assertEqual(8, reasons.count("public_surface_overclaim"))
+        self.assertEqual(8, reasons.count("positive_public_surface_claim"))
+
     def test_default_root_is_repo_local_and_provenance_bound(self) -> None:
         self.assertTrue(READINESS.DEFAULT_ROOT.is_relative_to(REPO_ROOT))
         self.assertNotIn("/servidor/ark", str(READINESS.DEFAULT_ROOT))

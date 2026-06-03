@@ -2817,15 +2817,30 @@ class PublicSdkGuardrailTests(unittest.TestCase):
                 self.assertEqual(surfaces[surface_id].get("public_contract", []), [])
 
         forbidden_public_header_tokens = (
+            "OBELISK_API_CAPABILITY_RESOURCE_ID_LOOKUP",
+            "OBELISK_API_CAPABILITY_OBJECT_IDENTITY",
+            "OBELISK_API_CAPABILITY_OBJECT_LOOKUP",
             "OBELISK_API_CAPABILITY_PERMISSION_CHECKS",
+            "OBELISK_API_CAPABILITY_AUTHZ_CHECKS",
             "OBELISK_API_CAPABILITY_PERMISSIONS_ADMIN",
             "OBELISK_API_CAPABILITY_COMMANDS",
             "OBELISK_API_CAPABILITY_COMMAND_REPLIES",
             "OBELISK_API_CAPABILITY_CHAT_RESPONSES",
+            "OBELISK_API_CAPABILITY_SEND_CHAT",
+            "OBELISK_API_CAPABILITY_CHAT_MODERATION",
             "OBELISK_API_CAPABILITY_INVENTORY_MUTATION",
             "OBELISK_API_CAPABILITY_ITEM_MUTATION",
+            "OBELISK_API_CAPABILITY_ITEM_ID_LOOKUP",
             "OBELISK_API_CAPABILITY_PLAYER_IDENTITY",
+            "OBELISK_API_CAPABILITY_PLAYER_ID",
+            "OBELISK_API_CAPABILITY_PLAYER_LOOKUP",
             "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL_LIFECYCLE",
+            "ObeliskResourceID",
+            "ObeliskObjectID",
+            "ObeliskItemNetID",
+            "ObeliskPlayerID",
+            "ObeliskSteamID",
+            "ObeliskAuthZDecision",
             "ObeliskPermissionQuery",
             "ObeliskPermissionDecision",
             "ObeliskCommand",
@@ -2836,11 +2851,14 @@ class PublicSdkGuardrailTests(unittest.TestCase):
             "ObeliskItemMutation",
             "ObeliskPlayerPrincipalLifecycleEvent",
             "RegisterCommand",
+            "RegisterCommandHandler",
             "RegisterPlayerPrincipalLifecycleEvent",
             "UnregisterCommand",
             "UnregisterPlayerPrincipalLifecycleEvent",
             "ReplyToCommand",
             "SendChat",
+            "SendChatMessage",
+            "BroadcastChat",
             "GrantPermission",
             "RevokePermission",
             "GiveItem",
@@ -2852,6 +2870,53 @@ class PublicSdkGuardrailTests(unittest.TestCase):
         for token in forbidden_public_header_tokens:
             with self.subTest(token=token):
                 self.assertNotIn(token, header)
+
+    def test_package_shape_and_release_gate_wording_stay_non_claiming(self) -> None:
+        release_gate = (REPO_ROOT / "scripts" / "check_release_readiness.sh").read_text(
+            encoding="utf-8"
+        )
+        layout_test = (REPO_ROOT / "scripts" / "test_install_obelisk_layout.sh").read_text(
+            encoding="utf-8"
+        )
+        examples_index = (REPO_ROOT / "examples" / "README.md").read_text(encoding="utf-8")
+        compact_gate = normalized(release_gate)
+        compact_examples = normalized(examples_index)
+
+        for phrase in (
+            "runtime readiness",
+            "stable production readiness",
+            "stable SDK claims",
+            "v1 SDK completion",
+            "support-tier activation",
+            "Plugin Hub readiness/publication",
+        ):
+            with self.subTest(surface="release gate", phrase=phrase):
+                self.assertIn(normalized(phrase), compact_gate)
+
+        for phrase in (
+            "runtime/live-ops approval",
+            "Plugin Hub readiness/publication",
+            "support-tier activation",
+            "stable SDK claim",
+            "v1 SDK completion",
+        ):
+            with self.subTest(surface="install layout dry-run", phrase=phrase):
+                self.assertIn(phrase, layout_test)
+
+        self.assertIn("package-shape and current-C-ABI hygiene templates only", compact_examples)
+        self.assertIn("do not promise Plugin Hub identity", compact_examples)
+        self.assertIn("Obelisk SDK v1 completion", examples_index)
+
+        for example_name, support_tier in INSTALLED_SDK_EXAMPLE_SUPPORT_TIERS.items():
+            readme = (REPO_ROOT / "examples" / example_name / "README.md").read_text(
+                encoding="utf-8"
+            )
+            compact_readme = normalized(readme)
+            declarations = plugin_hub_support_tier_declarations(readme)
+            with self.subTest(example=example_name, support_tier=support_tier):
+                self.assertEqual(declarations, [support_tier])
+                self.assertIn("not a complete SDK claim", compact_readme)
+                self.assertIn("not Obelisk SDK v1 evidence", compact_readme)
 
     def test_completion_checker_human_report_surfaces_installed_sdk_non_claim(self) -> None:
         checker = runpy.run_path(

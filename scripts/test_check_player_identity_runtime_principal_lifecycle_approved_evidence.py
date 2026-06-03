@@ -1178,6 +1178,18 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
                 lambda sidecar: sidecar.update({"countsTowardSdk": True}),
                 "operational_window_sidecar_authorization_or_readiness_key_overclaim",
             ),
+            (
+                "preflight_route_support_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"routeSupport": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
+            (
+                "preflight_sdk_accounting_alias",
+                lambda payload: payload["operational_window"]["preflight"]["pre"],
+                lambda sidecar: sidecar.update({"sdkAccountingReady": True}),
+                "operational_window_sidecar_authorization_or_readiness_key_overclaim",
+            ),
         )
         for name, artifact_for_payload, mutate, expected in cases:
             with self.subTest(name=name):
@@ -2064,6 +2076,39 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operational_window_copied_log_path_not_live_validation_run_log", report["blockers"])
 
+    def test_rejects_source_summary_path_drift_from_operational_copied_log(self) -> None:
+        payload = manifest()
+        source = payload["source_summary"]["evidence"]["sources"][0]
+        source_path = Path(source["path"])
+        alias_path = source_path.parent.parent / "source-aliases" / RUN_ID / "Obelisk.log"
+        alias_path.parent.mkdir(parents=True, exist_ok=True)
+        alias_path.write_bytes(source_path.read_bytes())
+        source["path"] = str(alias_path)
+        source["sha256"] = hashlib.sha256(alias_path.read_bytes()).hexdigest()
+        payload.pop("output_artifact_identity")
+        add_output_artifact_identity(payload)
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_copied_log_path_mismatch", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_missing_source_summary_source_path_without_local_alias_resolution(self) -> None:
+        payload = manifest()
+        payload["source_summary"]["evidence"]["sources"][0].pop("path")
+        payload.pop("output_artifact_identity")
+        add_output_artifact_identity(payload)
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source_summary_source_path_not_copied_or_offline", report["blockers"])
+        self.assertIn("operational_window_source_summary_source_path_missing", report["blockers"])
+
     def test_rejects_sidecar_alias_not_exact_copied_log_sibling(self) -> None:
         payload = manifest()
         request_artifact = payload["operational_window"]["request_pack"]
@@ -2081,6 +2126,27 @@ class ApprovedRuntimePrincipalLifecycleEvidenceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("operational_window_sidecar_not_exact_copied_log_sibling", report["blockers"])
+        self.assertFalse(report["public_sdk_ready"])
+        self.assertFalse(report["runtime_ready"])
+
+    def test_rejects_window_request_run_id_drift_even_when_artifact_sha_is_refreshed(self) -> None:
+        payload = manifest()
+        request_artifact = payload["operational_window"]["request_pack"]
+        request_path = Path(request_artifact["path"])
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        request["run_id"] = "20260601T121500Z-player-principal-lifecycle"
+        self.rewrite_sidecar_and_refresh_identity(
+            payload,
+            request_artifact,
+            json.dumps(request, sort_keys=True) + "\n",
+        )
+
+        result = self.run_checker(payload, check=False)
+        report = json.loads(result.stdout)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("operational_window_request_pack_run_id_mismatch", report["blockers"])
+        self.assertIn("operational_window_manifest_check_failed", report["blockers"])
         self.assertFalse(report["public_sdk_ready"])
         self.assertFalse(report["runtime_ready"])
 

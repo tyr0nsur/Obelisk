@@ -1579,6 +1579,9 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
                 self.assertIn("support-tier activation", compact)
             with self.subTest(surface=label, claim="live ops"):
                 self.assertIn("live-ops approval", compact)
+            with self.subTest(surface=label, claim="stable production readiness"):
+                if label == "release gate":
+                    self.assertIn("stable production readiness", compact)
             with self.subTest(surface=label, claim="v1 SDK"):
                 self.assertIn("v1 SDK completion", text)
 
@@ -1602,17 +1605,31 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
             layout_test,
         )
         self.assertIn("Installed SDK public header exposes blocked symbols", layout_test)
+        self.assertIn("python3 - \"${header_path}\"", layout_test)
+        self.assertIn("require_no_call_process_event_escape_hatch", layout_test)
         self.assertIn('OBELISK_RELEASE_SCOPE_PLUGIN_SOURCE_ROOT="${REPO_DIR}/plugins"', layout_test)
         self.assertIn('OBELISK_RELEASE_SCOPE_EXTERN_ROOT="${REPO_DIR}/extern"', layout_test)
         for blocked_header_symbol in (
             "OBELISK_API_CAPABILITY_RESOURCE_HANDLES",
+            "OBELISK_API_CAPABILITY_RESOURCE_ID_LOOKUP",
+            "OBELISK_API_CAPABILITY_OBJECT_IDENTITY",
             "ObeliskResourceHandle",
+            "ObeliskResourceID",
+            "ObeliskObjectID",
+            "ObeliskItemNetID",
             "RegisterInventoryAction",
+            "OBELISK_API_CAPABILITY_INVENTORY_MUTATION",
             "MissionCopiedBool",
             "TransferBAccept",
             "ObeliskPlayerPrincipal",
+            "ObeliskPlayerIdentity",
+            "ObeliskSteamID",
             "ObeliskCommandContext",
+            "ObeliskCommandReply",
+            "SendChatMessage",
+            "BroadcastChat",
             "ObeliskPermissionQuery",
+            "ObeliskAuthZDecision",
             "ObeliskMutation",
             "ReturnOverride",
         ):
@@ -1648,6 +1665,10 @@ class ReleaseScopeGuardrailTests(unittest.TestCase):
         for label, example_dir_var, plugin_path_var, source_dir, plugin_so, plugin_id in external_examples:
             with self.subTest(example=label):
                 self.assertIn(f'cp -R "${{REPO_DIR}}/{source_dir}/."', layout_test)
+                self.assertIn(
+                    f'require_no_call_process_event_escape_hatch "${{{example_dir_var}}}"',
+                    layout_test,
+                )
                 cmake_match = re.search(
                     rf'cmake -S "\$\{{{example_dir_var}\}}" -B "\$\{{{example_dir_var}\}}/build"'
                     rf'(?P<body>.*?)\ncmake --build "\$\{{{example_dir_var}\}}/build"',

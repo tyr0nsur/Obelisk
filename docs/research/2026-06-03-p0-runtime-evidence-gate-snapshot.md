@@ -715,6 +715,62 @@ Non-claims:
   Plugin Hub publication, support-tier activation, stable SDK wording, or v1 SDK
   completion.
 
+## Runtime Evidence Provenance And SDK Package Guardrail Follow-Up
+
+The next delegated hardening round kept the route blocked while closing more
+offline false-positive paths around approved runtime evidence, downstream P0
+surfaces, installed SDK shape, and source-bound research notes.
+
+Integrated findings:
+
+- Runtime principal lifecycle evidence bundle checks now require the approved
+  evidence checker report contract to match exact `schema`, `mode=consume`, and
+  `ready_scope=runtime_evidence_only`. Negative readiness reports must also
+  keep the expected mode and scope for their blocker path.
+- Approved evidence validation fails closed when copied-log/source-summary path
+  bindings are missing, non-string, or drift apart, and rejects request run-id
+  drift even when sidecar hashes are refreshed. Route and SDK-accounting alias
+  wording cannot make the consume-only evidence count as public/runtime/v1
+  readiness.
+- Permissions/admin, command chat response, and commands/replies public-readiness
+  checks carry additional false-only aliases and positive-claim detectors so
+  downstream surfaces cannot unlock before promoted identity public contract and
+  certificate evidence.
+- Installed public SDK/header guardrails use identifier-aware blocked-symbol
+  extraction, cover ResourceHandle/object/player/item/command/chat/permission
+  aliases, and reject public example use of `CallProcessEvent` as an escape
+  hatch before package-shape validation.
+- The research index now pins the four source-boundary notes, including the v1
+  SDK demand-chain note, and keeps ArkServerApi/AseApi/NextGenPlugins as names
+  and demand signals only.
+
+Observed unchanged route and SDK state:
+
+- `check_command_permission_route_gate.py --json`: `valid=true`,
+  `planning_only=true`, `current_route_blocker=approved_runtime_evidence_missing`,
+  `counts_toward_public_sdk=false`, `counts_toward_runtime=false`, and
+  `counts_toward_v1_completion=false`.
+- `python3 scripts/check_public_sdk_v1_completion.py --json`: exits blocked by
+  design with SDK completion `0/12`, P0 dependency chain `0/4`,
+  `stable_claim_allowed=false`, and current route blocker
+  `approved_runtime_evidence_missing`.
+
+Validation stayed offline-only: downstream public-readiness suites, release and
+public SDK guardrails, research doc guardrails, agent handoff guardrails,
+safe focused runtime-evidence bundle contract tests, `py_compile`, and
+`git diff --check`. Full runtime principal lifecycle approved-evidence suites
+that construct fixtures under `/servidor/ark/workspace-offline` were not run in
+this round because the active hard rule prohibited writing anywhere under
+`/servidor/ark`.
+
+Non-claims:
+
+- This round does not produce approved runtime evidence, does not promote
+  identity, permissions/admin, command response, commands/replies, ResourceHandle,
+  items, or chat surfaces, and does not authorize server operations, marker/env
+  changes, runtime probes, Discord sends, GitHub publication, tags, stable SDK
+  wording, or v1 SDK completion.
+
 ## SDK Guardrail Round: Replay, Route Transition, Static P0 Sources, And Secondary Reports
 
 Another supervised four-agent round plus lead integration closed offline shortcuts without
@@ -1390,7 +1446,7 @@ Findings:
   schema, command parser, return semantic, algorithm, runtime evidence, or
   portable implementation sources.
 - A focused research-doc guardrail now locks the ArkServerApi/AseApi/
-  NextGenPlugins source-boundary wording in the README and the three reference
+  NextGenPlugins source-boundary wording in the README and the four reference
   notes so future audits do not rely on chat-only memory for this rule.
 
 This was an offline documentation/test audit only. It did not run runtime tools,

@@ -337,8 +337,8 @@ are allowed. Gameplay/module second-source promotion gates run only when
 --require-second-source-readiness is supplied.
 The v1 complete-SDK claim gate runs only when --require-v1-sdk-completion is supplied.
 Passing this gate is not live-ops approval, Plugin Hub readiness/publication,
-support-tier activation, runtime readiness, a stable SDK claim, or v1 SDK completion
-unless the exact additional gate says so.
+support-tier activation, runtime readiness, stable production readiness, a stable SDK
+claim, or v1 SDK completion unless the exact additional gate says so.
 
 Options:
   --allow-dirty                     Permit a dirty worktree while developing the release gate itself.
@@ -860,4 +860,4 @@ if [[ "${REQUIRE_V1_SDK_COMPLETION}" == "1" ]]; then
 else
     printf 'Public SDK v1 stable claim gate was not run.\n'
 fi
-printf 'Release gate output is evidence for this exact gate only; it does not grant live-ops approval, Plugin Hub readiness/publication, support-tier activation, runtime readiness, stable SDK claims, or v1 SDK completion.\n'
+printf 'Release gate output is evidence for this exact gate only; it does not grant live-ops approval, Plugin Hub readiness/publication, support-tier activation, runtime readiness, stable production readiness, stable SDK claims, or v1 SDK completion.\n'

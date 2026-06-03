@@ -433,6 +433,8 @@ POSITIVE_CAPABILITY_CLAIM_RE = re.compile(
     r"(?:sdk|runtime|lookup|permissions?|admin|command(?:s|[_ -]?(?:reply|response|routing|support))?|"
     r"plugin[_ -]?delivery|mutation|return[_ -]?override|resourcehandle)[_ -]?"
     r"(?:ready|readiness|enabled|allowed|supported|promoted|delivered)|"
+    r"(?:route|routing|sdk[_ -]?accounting|sdk[_ -]?route[_ -]?accounting)[_ -]?"
+    r"(?:ready|readiness|enabled|allowed|support(?:ed)?|promoted|delivered|accepted|count(?:s|ed)?)|"
     r"command[_ -]?(?:reply|response|routing|support)|"
     r"(?:lookup|mutation|return[_ -]?override)[_ -]?allowed)",
     re.IGNORECASE,
@@ -2146,12 +2148,25 @@ def validate_operational_window(window: Any, summary: Any, blockers: list[dict[s
         add(blockers, "operational_window_source_summary_source_missing", "$.source_summary.evidence.sources")
         return
     source = sources[0]
-    copied_path = Path(str(copied.get("path", ""))).expanduser()
-    source_path = Path(str(source.get("path", ""))).expanduser()
-    if copied_path.resolve() != source_path.resolve():
-        add(blockers, "operational_window_copied_log_path_mismatch", f"{label}.copied_log.path")
+    copied_path_text = copied.get("path")
+    source_path_text = source.get("path")
+    copied_path: Path | None = None
+    if not isinstance(copied_path_text, str) or not copied_path_text:
+        add(blockers, "operational_window_copied_log_path_missing", f"{label}.copied_log.path")
+    else:
+        copied_path = Path(copied_path_text).expanduser()
+    if not isinstance(source_path_text, str) or not source_path_text:
+        add(
+            blockers,
+            "operational_window_source_summary_source_path_missing",
+            "$.source_summary.evidence.sources[0].path",
+        )
+    elif copied_path is not None:
+        source_path = Path(source_path_text).expanduser()
+        if copied_path.resolve() != source_path.resolve():
+            add(blockers, "operational_window_copied_log_path_mismatch", f"{label}.copied_log.path")
     run_id = window.get("run_id")
-    if isinstance(run_id, str):
+    if isinstance(run_id, str) and copied_path is not None:
         expected_tail = (EXPECTED_COPIED_LOG_PARENT, run_id, "Obelisk.log")
         if copied_path.parts[-3:] != expected_tail:
             add(

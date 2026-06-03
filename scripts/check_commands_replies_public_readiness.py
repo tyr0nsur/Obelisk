@@ -286,16 +286,31 @@ FALSE_ONLY_KEYS = frozenset(
         "counts_toward_runtime",
         "counts_toward_v1_completion",
         "accepted_runtime_evidence_ready",
+        "admin_authority_ready",
+        "capability_advertised",
+        "capability_allowed",
+        "capability_ready",
         "full_sdk_claim_allowed",
         "full_sdk_ready",
+        "identity_contract_reviewed",
+        "identity_public_contract_allowed",
+        "identity_public_contract_ready",
+        "identity_public_contract_reviewed",
         "operator_approval_granted",
         "parser_allowed",
+        "permission_header_allowed",
         "permission_ready",
         "permissions_admin_ready",
         "permissions_admin_route_ready",
+        "permissions_query_ready",
         "permissions_ready",
+        "permissions_unlocked",
+        "player_identity_public_contract_ready",
+        "player_identity_promotion_certificate_ready",
+        "principal_ready",
         "production_sdk_claim_allowed",
         "production_sdk_ready",
+        "promotion_certificate_ready",
         "promotion_ready",
         "public_abi_allowed",
         "public_abi_ready",
@@ -303,9 +318,15 @@ FALSE_ONLY_KEYS = frozenset(
         "public_broadcast_api",
         "public_broadcast_api_allowed",
         "public_bridge_abi_allowed",
+        "public_capability_advertised",
+        "public_capability_allowed",
+        "public_capability_ready",
         "public_or_runtime_accounting_allowed",
         "public_command_parser_allowed",
         "public_command_router_allowed",
+        "public_contract_allowed",
+        "public_contract_ready",
+        "public_contract_reviewed",
         "public_header_allowed",
         "public_header_ready",
         "public_moderation_api",
@@ -317,6 +338,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_notices_abi_allowed",
         "public_notices_api",
         "public_notices_api_allowed",
+        "public_route_gate_ready",
         "public_route_ready",
         "public_reply_api",
         "public_readiness_ready",
@@ -337,6 +359,8 @@ FALSE_ONLY_KEYS = frozenset(
         "reply_allowed",
         "reply_path_ready",
         "route_ready",
+        "route_gate_ready",
+        "route_gate_unlocked",
         "route_readiness_ready",
         "response_header_allowed",
         "moderation_allowed",
@@ -402,28 +426,36 @@ NEGATED_CLAIM_SUFFIX_RE = re.compile(
 )
 POSITIVE_CLAIM_RE = re.compile(
     r"\b("
+    r"accepted\s+runtime\s+evidence|admin\s+authority|"
+    r"identity\s+(?:public\s+)?contract|player\s+identity\s+public\s+contract|promotion\s+certificate|"
+    r"capability\s+bits?|public[_ -]?(?:abi|capabilit(?:y|ies)|contract)|permission[_ -]?headers?|"
+    r"permissions?[_ -]?quer(?:y|ies)|permissions?/admin|"
     r"arkapi\s+(?:command\s+)?parser|aseapi\s+(?:command\s+)?parser|"
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
     r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
     r"(?:complete|full|production|stable)[_ -]?sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
-    r"release[_ -]?readiness|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
+    r"release[_ -]?readiness|route[_ -]?gate|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
     r"v1[_ -]?(?:sdk[_ -]?)?completion|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
     r"broadcast(?:[/_ -]?notices?)?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|"
     r"notices?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|moderation(?:[_ -]?(?:abi|api|path|request|authority))?"
-    r")\b.{0,100}\b(allowed|available|copied|enabled|established|implemented|promoted|public|ready|supported)\b",
+    r")\b.{0,100}\b(accepted|advertised|allowed|available|copied|enabled|established|implemented|opened|promoted|public|ready|reviewed|supported|unlocked)\b",
     re.IGNORECASE,
 )
 POSITIVE_CLAIM_REVERSED_RE = re.compile(
-    r"\b(allowed|available|copied|enabled|established|implemented|promoted|public|ready|supported)\b"
+    r"\b(accepted|advertised|allowed|available|copied|enabled|established|implemented|opened|promoted|public|ready|reviewed|supported|unlocked)\b"
     r".{0,100}\b("
+    r"accepted\s+runtime\s+evidence|admin\s+authority|"
+    r"identity\s+(?:public\s+)?contract|player\s+identity\s+public\s+contract|promotion\s+certificate|"
+    r"capability\s+bits?|public[_ -]?(?:abi|capabilit(?:y|ies)|contract)|permission[_ -]?headers?|"
+    r"permissions?[_ -]?quer(?:y|ies)|permissions?/admin|"
     r"arkapi\s+(?:command\s+)?parser|aseapi\s+(?:command\s+)?parser|"
     r"callprocessevent\s+(?:command|reply|response)|"
     r"command[_ -]?chat[_ -]?response[_ -]?path|"
     r"command[_ -]?parser|command[_ -]?rout(?:e|er|ing)|chat[_ -]?rout(?:e|er|ing)|router|"
     r"(?:complete|full|production|stable)[_ -]?sdk|public[_ -]?(?:command[_ -]?)?sdk(?:[_ -]?readiness)?|"
-    r"release[_ -]?readiness|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
+    r"release[_ -]?readiness|route[_ -]?gate|runtime[_ -]?readiness|v1(?:\.0)?[_ -]?stable|"
     r"v1[_ -]?(?:sdk[_ -]?)?completion|"
     r"repl(?:y|ies)(?:[_ -]?(?:abi|api|path|request))?|send[_ -]?chat(?:[_ -]?(?:abi|api|path|request))?|"
     r"broadcast(?:[/_ -]?notices?)?(?:[_ -]?(?:abi|api|path|request|scheduler|service))?|"

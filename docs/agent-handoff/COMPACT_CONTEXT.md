@@ -1910,7 +1910,7 @@ priorities, and do not use history files as the active source of truth.
   JSON valid/planning-only at `approved_runtime_evidence_missing`, SDK JSON blocked with
   SDK `0/12`, P0 `0/4`, generated scoped statement bookkeeping `7/7` but non-complete,
   and `git diff --check` OK. No runtime/server/Discord/GitHub operation.
-- 2026-06-03 SDK guardrail round after `1eeb3c1`: request/window replay now requires
+- 2026-06-03 SDK guardrail checkpoint `371734e` after `1eeb3c1`: request/window replay now requires
   successful nested request-check replay plus verified operator receipt; accepted runtime
   evidence route transition requires exact consume-mode report metadata and false
   public/runtime/v1 accounting aliases; SDK completion secondary reports reject split
@@ -1922,6 +1922,20 @@ priorities, and do not use history files as the active source of truth.
   at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
   generated scoped statement bookkeeping `7/7` but non-complete. No runtime/server/
   Discord/GitHub operation.
+- 2026-06-03 SDK guardrail follow-up after `371734e`: runtime principal lifecycle
+  evidence bundle/report checks require exact approved-evidence checker schema,
+  `mode=consume`, and `ready_scope=runtime_evidence_only`; approved evidence rejects
+  copied-log/source-summary path drift, missing source paths, request run-id drift, and
+  route/SDK-accounting aliases; downstream permissions/admin, command response, and
+  commands/replies gates carry extra false-only aliases; installed SDK/header guardrails
+  use identifier-aware blocked-symbol checks and reject public example `CallProcessEvent`
+  escape hatches; research guardrails pin the four source-boundary notes. Validation:
+  downstream P0 public-readiness 152 OK, release/public-SDK/research guardrails 284 OK,
+  safe runtime-evidence bundle contract 3 OK, handoff 15 OK, route JSON valid/planning-only
+  at `approved_runtime_evidence_missing`, SDK JSON blocked with SDK `0/12`, P0 `0/4`,
+  `py_compile` and `git diff --check` OK. Full approved-evidence suites writing under
+  `/servidor/ark/workspace-offline` intentionally not run. No runtime/server/Discord/
+  GitHub operation.
 
 ## Agent Coordination
 

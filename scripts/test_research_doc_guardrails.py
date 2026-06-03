@@ -1027,6 +1027,9 @@ class ResearchDocGuardrailTests(unittest.TestCase):
 
     def test_arkapi_aseapi_nextgen_references_remain_names_demand_only(self) -> None:
         readme = (REPO_ROOT / "docs/research/README.md").read_text(encoding="utf-8")
+        p0_snapshot = (
+            REPO_ROOT / "docs/research/2026-06-03-p0-runtime-evidence-gate-snapshot.md"
+        ).read_text(encoding="utf-8")
         reference_notes = {
             path.name: path.read_text(encoding="utf-8")
             for path in sorted((REPO_ROOT / "docs/research").glob("*.md"))
@@ -1053,9 +1056,21 @@ class ResearchDocGuardrailTests(unittest.TestCase):
             "Allows ArkServerApi/AseApi as names/demand evidence only while banning copied architecture, ergonomics, behavior, offsets, vtables, MSVC ABI, Windows libs, direct UE pointer APIs, and direct memory access patterns.",
             "Records the local ArkApi plugin-source clone as a future Plugin Hub demand signal only, not as runtime evidence or portable implementation source.",
             "Maps high-demand dictionary-only plugin capability families to candidate Obelisk surfaces and likely UE4 names without promoting SDK, runtime, mutation, or Plugin Hub work.",
+            "Condenses dictionary-only demand into blocker ordering without promoting compatibility, public SDK completion, runtime observers, command replies, storage, mutation, or porting work.",
         ):
             with self.subTest(file="docs/research/README.md", phrase=phrase):
                 self.assertIn(phrase, readme_compact)
+
+        p0_compact = normalized(p0_snapshot)
+        for phrase in (
+            "source-boundary wording in the README and the four reference notes",
+            "ArkServerApi/AseApi/NextGenPlugins notes remain names/demand dictionaries only.",
+            "do not restart broad FName, GObjects, core, serial, ReflectionScanner, or decompiler discovery unless a new binary hash or contradictory artifact evidence invalidates the accepted inputs.",
+            "Historical FName/GObjects/core/admin/lifecycle-layout notes are evidence trails only",
+        ):
+            with self.subTest(file="p0-runtime-evidence-gate-snapshot", phrase=phrase):
+                self.assertIn(phrase, p0_compact)
+        self.assertNotIn("the three reference notes", p0_compact)
 
         authority_boundary = (
             "never authority for porting targets, API ergonomics, wrapper semantics, "

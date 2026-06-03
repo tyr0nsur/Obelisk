@@ -159,6 +159,12 @@ def require_no_truthy_readiness_alias_keys(value: Any, label: str, trail: str = 
 
 
 def require_consume_only_check_report(payload: dict[str, Any], label: str) -> None:
+    if payload.get("schema") != approved_evidence_checker.REPORT_SCHEMA:
+        raise SystemExit(f"{label} schema mismatch")
+    if payload.get("mode") != "consume":
+        raise SystemExit(f"{label} mode mismatch")
+    if payload.get("ready_scope") != "runtime_evidence_only":
+        raise SystemExit(f"{label} ready_scope mismatch")
     if payload.get("ready") is not True:
         raise SystemExit(f"{label} did not accept consume-only runtime evidence")
     if payload.get("approved_runtime_evidence_present") is not True:
@@ -171,6 +177,13 @@ def require_consume_only_check_report(payload: dict[str, Any], label: str) -> No
 
 
 def require_negative_readiness_report(payload: dict[str, Any], label: str, expected_blocker: str) -> None:
+    expected_mode = expected_blocker.removesuffix("_blocked_until_identity_public_contract_gate")
+    if payload.get("schema") != approved_evidence_checker.REPORT_SCHEMA:
+        raise SystemExit(f"{label} schema mismatch")
+    if payload.get("mode") != expected_mode:
+        raise SystemExit(f"{label} mode mismatch")
+    if payload.get("ready_scope") != "runtime_evidence_only":
+        raise SystemExit(f"{label} ready_scope mismatch")
     if payload.get("ready") is not False:
         raise SystemExit(f"{label} did not fail closed")
     if payload.get("approved_runtime_evidence_present") is not True:
@@ -425,9 +438,14 @@ def approved_runtime_manifest_check_state(
     state["stderr"] = stderr
     if isinstance(payload, dict):
         state["schema"] = payload.get("schema")
+        state["mode"] = payload.get("mode")
+        state["ready_scope"] = payload.get("ready_scope")
         state["checker_ready"] = payload.get("ready") is True
         state["ready"] = (
             exit_code == 0
+            and payload.get("schema") == approved_evidence_checker.REPORT_SCHEMA
+            and payload.get("mode") == "consume"
+            and payload.get("ready_scope") == "runtime_evidence_only"
             and payload.get("ready") is True
             and payload.get("approved_runtime_evidence_present") is True
             and payload.get("runtime_evidence_ready") is True
@@ -845,7 +863,10 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
     copied = window.get("copied_log")
     if not isinstance(copied, dict):
         raise SystemExit("window manifest check missing copied_log")
-    window_path = Path(str(copied.get("path", ""))).expanduser().resolve()
+    copied_path_text = copied.get("path")
+    if not isinstance(copied_path_text, str) or not copied_path_text:
+        raise SystemExit("window manifest check copied_log.path missing")
+    window_path = Path(copied_path_text).expanduser().resolve()
     requested_path = copied_log.expanduser().resolve()
     if window_path != requested_path:
         raise SystemExit("window manifest copied_log.path does not match --copied-log")
@@ -854,7 +875,10 @@ def require_window_matches_summary(window: dict[str, Any], summary: dict[str, An
     if not isinstance(sources, list) or not sources or not isinstance(sources[0], dict):
         raise SystemExit("runtime observer summary missing evidence.sources[0]")
     source = sources[0]
-    source_path = Path(str(source.get("path", ""))).expanduser().resolve()
+    source_path_text = source.get("path")
+    if not isinstance(source_path_text, str) or not source_path_text:
+        raise SystemExit("runtime observer summary source path missing")
+    source_path = Path(source_path_text).expanduser().resolve()
     if source_path != requested_path:
         raise SystemExit("runtime observer summary source path does not match --copied-log")
     if copied.get("sha256") != source.get("sha256"):

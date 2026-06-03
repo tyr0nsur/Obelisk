@@ -270,28 +270,46 @@ FALSE_ONLY_KEYS = frozenset(
         "counts_toward_runtime",
         "counts_toward_v1_completion",
         "accepted_runtime_evidence_ready",
+        "admin_authority_ready",
+        "capability_advertised",
+        "capability_allowed",
+        "capability_ready",
         "commands_unlocked",
         "full_sdk_claim_allowed",
         "full_sdk_ready",
         "generic_chat_router",
         "generic_chat_routing",
+        "identity_contract_reviewed",
+        "identity_public_contract_allowed",
+        "identity_public_contract_ready",
+        "identity_public_contract_reviewed",
         "identity_ready",
         "permission_admin_contract",
+        "permission_header_allowed",
         "permission_ready",
         "permissions_admin_ready",
+        "permissions_query_ready",
         "permissions_ready",
+        "permissions_unlocked",
         "player_identity_contract",
+        "player_identity_public_contract_ready",
+        "player_identity_promotion_certificate_ready",
         "player_identity_ready",
         "principal_identity_ready",
+        "principal_ready",
         "operator_approval_granted",
         "permissions_admin_route_ready",
         "production_sdk_claim_allowed",
         "production_sdk_ready",
+        "promotion_certificate_ready",
         "promotion_ready",
         "public_or_runtime_accounting_allowed",
         "public_abi_allowed",
         "public_abi_ready",
         "public_bridge_abi_allowed",
+        "public_capability_advertised",
+        "public_capability_allowed",
+        "public_capability_ready",
         "public_broadcast_abi_allowed",
         "public_broadcast_api",
         "public_broadcast_api_allowed",
@@ -299,6 +317,9 @@ FALSE_ONLY_KEYS = frozenset(
         "public_chat_routing",
         "public_command_router",
         "public_command_router_allowed",
+        "public_contract_allowed",
+        "public_contract_ready",
+        "public_contract_reviewed",
         "public_readiness_ready",
         "public_reply_or_send_chat_abi_allowed",
         "public_header_allowed",
@@ -313,6 +334,7 @@ FALSE_ONLY_KEYS = frozenset(
         "public_notices_abi_allowed",
         "public_notices_api",
         "public_notices_api_allowed",
+        "public_route_gate_ready",
         "public_route_ready",
         "public_response_path_allowed",
         "public_reply_abi_ready",
@@ -338,6 +360,8 @@ FALSE_ONLY_KEYS = frozenset(
         "reply_api_allowed",
         "reply_abi_allowed",
         "route_ready",
+        "route_gate_ready",
+        "route_gate_unlocked",
         "route_readiness_ready",
         "router_ready",
         "moderation_allowed",
@@ -375,6 +399,8 @@ FALSE_ONLY_KEYS = frozenset(
 NEGATIVE_CONTEXT_TOKENS = (
     "block",
     "claim_requires",
+    "exclusion",
+    "exclusions",
     "forbid",
     "guidance",
     "negative",
@@ -382,6 +408,7 @@ NEGATIVE_CONTEXT_TOKENS = (
     "not_promoted",
     "not_sufficient",
     "promotion_requires",
+    "required_exclusions",
     "required_evidence",
     "stable_release_contract",
     "snapshot_prep_checks",
@@ -389,6 +416,10 @@ NEGATIVE_CONTEXT_TOKENS = (
 )
 POSITIVE_SURFACE_RE = re.compile(
     r"\b("
+    r"accepted\s+runtime\s+evidence|admin\s+authority|"
+    r"identity\s+(?:public\s+)?contract|player\s+identity\s+public\s+contract|promotion\s+certificate|"
+    r"capability\s+bits?|public\s+(?:abi|capabilit(?:y|ies)|contract)|permission\s+headers?|"
+    r"permissions?\s+quer(?:y|ies)|"
     r"public\s+headers?|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
     r"(?:complete|full|production|stable)\s+sdk|public\s+(?:command\s+)?sdk(?:\s+readiness)?|"
     r"release\s+readiness|v1(?:\.0)?\s+stable|v1\s+(?:sdk\s+)?completion|"
@@ -396,8 +427,27 @@ POSITIVE_SURFACE_RE = re.compile(
     r"broadcast(?:/notices?|[- ]?notices?)?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|"
     r"notices?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|moderation(?:\s+(?:api|abi|endpoint|path|request|authority))?|"
     r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|router|"
+    r"route\s+gate|"
     r"player\s+identity|principal\s+identity|permissions?(?:/admin)?"
-    r")\b.{0,80}\b(allowed|available|enabled|established|live|operational|promoted|public|ready|supported)\b",
+    r")\b.{0,80}\b(accepted|advertised|allowed|available|enabled|established|live|opened|operational|promoted|public|ready|reviewed|supported|unlocked)\b",
+    re.IGNORECASE,
+)
+POSITIVE_SURFACE_REVERSED = re.compile(
+    r"\b(accepted|advertised|allowed|available|enabled|established|live|opened|operational|promoted|public|ready|reviewed|supported|unlocked)\b"
+    r".{0,80}\b("
+    r"accepted\s+runtime\s+evidence|admin\s+authority|"
+    r"identity\s+(?:public\s+)?contract|player\s+identity\s+public\s+contract|promotion\s+certificate|"
+    r"capability\s+bits?|public\s+(?:abi|capabilit(?:y|ies)|contract|headers?|sdk)|permission\s+headers?|"
+    r"permissions?\s+quer(?:y|ies)|runtime\s+(?:delivery|readiness|response\s+path|hooks?)|"
+    r"(?:complete|full|production|stable)\s+sdk|release\s+readiness|v1(?:\.0)?\s+stable|"
+    r"v1\s+(?:sdk\s+)?completion|repl(?:y|ies)(?:\s+(?:api|abi|endpoint|path|request))?|"
+    r"send[- ]?chat(?:\s+(?:api|abi|endpoint|path|request))?|"
+    r"broadcast(?:/notices?|[- ]?notices?)?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|"
+    r"notices?(?:\s+(?:api|abi|endpoint|path|request|scheduler|service))?|"
+    r"moderation(?:\s+(?:api|abi|endpoint|path|request|authority))?|"
+    r"command\s+response\s+path|command\s+rout(?:e|er|ing)|chat\s+rout(?:e|er|ing)|generic\s+chat\s+rout(?:e|er|ing)|"
+    r"router|route\s+gate|player\s+identity|principal\s+identity|permissions?(?:/admin)?"
+    r")\b",
     re.IGNORECASE,
 )
 NEGATED_CLAIM_RE = re.compile(
@@ -575,9 +625,10 @@ def claim_match_is_negated(text: str, match: re.Match[str]) -> bool:
 
 def has_unnegated_positive_surface_claim(text: str) -> bool:
     for clause in CLAIM_SCOPE_SPLIT_RE.split(text):
-        for match in POSITIVE_SURFACE_RE.finditer(clause):
-            if not claim_match_is_negated(clause, match):
-                return True
+        for regex in (POSITIVE_SURFACE_RE, POSITIVE_SURFACE_REVERSED):
+            for match in regex.finditer(clause):
+                if not claim_match_is_negated(clause, match):
+                    return True
     return False
 
 

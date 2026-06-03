@@ -94,44 +94,119 @@ require_installed_public_header_has_no_blocked_symbols() {
     local forbidden_symbols=(
         "OBELISK_API_CAPABILITY_RESOURCE_HANDLE"
         "OBELISK_API_CAPABILITY_RESOURCE_HANDLES"
+        "OBELISK_API_CAPABILITY_RESOURCE_ID"
+        "OBELISK_API_CAPABILITY_RESOURCE_ID_LOOKUP"
+        "OBELISK_API_CAPABILITY_RESOURCE_LOOKUP"
+        "OBELISK_API_CAPABILITY_OBJECT_ID"
+        "OBELISK_API_CAPABILITY_OBJECT_IDENTITY"
+        "OBELISK_API_CAPABILITY_OBJECT_LOOKUP"
         "OBELISK_RESOURCE_HANDLE_ABI_VERSION"
         "ObeliskResourceHandle"
+        "ObeliskResourceId"
+        "ObeliskResourceID"
+        "ObeliskObjectId"
+        "ObeliskObjectID"
         "ResourceHandle"
         "GetResource"
         "ResolveResource"
+        "LookupResource"
+        "ResolveObject"
+        "LookupObject"
         "GObjects"
         "GUObjectArray"
         "GNames"
         "OBELISK_API_CAPABILITY_INVENTORY_ACTIONS"
+        "OBELISK_API_CAPABILITY_INVENTORY_ACTION_OBSERVERS"
+        "OBELISK_API_CAPABILITY_INVENTORY_MUTATION"
+        "OBELISK_API_CAPABILITY_ITEM_MUTATION"
+        "OBELISK_API_CAPABILITY_ITEM_ID_LOOKUP"
         "ObeliskInventoryAction"
+        "ObeliskInventoryMutation"
+        "ObeliskItemMutation"
+        "ObeliskItemNetId"
+        "ObeliskItemNetID"
         "RegisterInventoryAction"
+        "RegisterInventoryActionObserver"
+        "GiveItem"
+        "RemoveItem"
         "OBELISK_API_CAPABILITY_MISSION_COPIED_BOOL"
         "MissionCopiedBool"
         "OBELISK_API_CAPABILITY_TRANSFER_BACCEPT"
         "TransferBAccept"
         "OBELISK_API_CAPABILITY_PLAYER_PRINCIPAL"
+        "OBELISK_API_CAPABILITY_PLAYER_IDENTITY"
+        "OBELISK_API_CAPABILITY_PLAYER_ID"
+        "OBELISK_API_CAPABILITY_PLAYER_LOOKUP"
         "ObeliskPlayerPrincipal"
+        "ObeliskPlayerIdentity"
+        "ObeliskPlayerId"
+        "ObeliskPlayerID"
+        "ObeliskSteamId"
+        "ObeliskSteamID"
         "RegisterPlayerPrincipal"
+        "ResolvePlayerIdentity"
         "OBELISK_API_CAPABILITY_COMMANDS"
+        "OBELISK_API_CAPABILITY_COMMAND_REPLIES"
+        "OBELISK_API_CAPABILITY_CHAT_RESPONSES"
+        "OBELISK_API_CAPABILITY_SEND_CHAT"
+        "OBELISK_API_CAPABILITY_CHAT_MODERATION"
         "ObeliskCommandContext"
+        "ObeliskCommandReply"
+        "ObeliskChatResponse"
         "RegisterCommand"
+        "RegisterCommandHandler"
+        "ReplyToCommand"
+        "SendChat"
+        "SendChatMessage"
+        "BroadcastChat"
         "OBELISK_API_CAPABILITY_PERMISSION"
+        "OBELISK_API_CAPABILITY_PERMISSION_CHECKS"
+        "OBELISK_API_CAPABILITY_AUTHZ_CHECKS"
         "ObeliskPermissionQuery"
+        "ObeliskAuthZDecision"
         "OBELISK_API_CAPABILITY_RESOURCE_MUTATION"
         "ObeliskMutation"
         "ReturnOverride"
     )
-    local symbol
-    local offenders=""
 
-    for symbol in "${forbidden_symbols[@]}"; do
-        if grep -F "${symbol}" "${header_path}" >/dev/null; then
-            offenders+="${symbol}"$'\n'
-        fi
-    done
+    python3 - "${header_path}" "${forbidden_symbols[@]}" <<'PY'
+import re
+import sys
+
+header_path = sys.argv[1]
+forbidden = sys.argv[2:]
+
+with open(header_path, "r", encoding="utf-8") as handle:
+    text = handle.read()
+
+text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+text = re.sub(r"//.*", "", text)
+identifiers = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", text))
+offenders = [symbol for symbol in forbidden if symbol in identifiers]
+
+if offenders:
+    print("Installed SDK public header exposes blocked symbols:", file=sys.stderr)
+    for offender in offenders:
+        print(offender, file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
+require_no_call_process_event_escape_hatch() {
+    local scan_root="$1"
+    local label="$2"
+    local offenders
+
+    offenders="$(
+        grep -RInE \
+            --include='*.c' --include='*.cpp' --include='*.h' --include='*.hpp' \
+            'OBELISK_API_CAPABILITY_CALL_PROCESS_EVENT|([.]|->)[[:space:]]*CallProcessEvent' \
+            "${scan_root}" || true
+    )"
 
     if [[ -n "${offenders}" ]]; then
-        printf 'Installed SDK public header exposes blocked symbols:\n%s' "${offenders}" >&2
+        echo "${label} used the public CallProcessEvent debug escape hatch" >&2
+        printf '%s\n' "${offenders}" >&2
         exit 1
     fi
 }
@@ -191,6 +266,7 @@ require_external_sdk_compile_commands() {
 }
 
 require_cmd "${CXX_BIN}"
+require_cmd python3
 require_cmd nm
 require_cmd readelf
 
@@ -702,6 +778,7 @@ fi
 SDK_MINIMAL_EXAMPLE_DIR="${WORK_DIR}/sdk_minimal_plugin"
 mkdir -p "${SDK_MINIMAL_EXAMPLE_DIR}"
 cp -R "${REPO_DIR}/examples/sdk_minimal_plugin/." "${SDK_MINIMAL_EXAMPLE_DIR}/"
+require_no_call_process_event_escape_hatch "${SDK_MINIMAL_EXAMPLE_DIR}" "Minimal SDK example"
 cmake -S "${SDK_MINIMAL_EXAMPLE_DIR}" -B "${SDK_MINIMAL_EXAMPLE_DIR}/build" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
@@ -728,6 +805,7 @@ require_external_sdk_compile_commands \
 SDK_DESCRIPTOR_EXAMPLE_DIR="${WORK_DIR}/sdk_descriptor_catalog"
 mkdir -p "${SDK_DESCRIPTOR_EXAMPLE_DIR}"
 cp -R "${REPO_DIR}/examples/sdk_descriptor_catalog/." "${SDK_DESCRIPTOR_EXAMPLE_DIR}/"
+require_no_call_process_event_escape_hatch "${SDK_DESCRIPTOR_EXAMPLE_DIR}" "Descriptor catalog SDK example"
 cmake -S "${SDK_DESCRIPTOR_EXAMPLE_DIR}" -B "${SDK_DESCRIPTOR_EXAMPLE_DIR}/build" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \
@@ -756,6 +834,7 @@ require_external_sdk_compile_commands \
 SDK_TIMER_EXAMPLE_DIR="${WORK_DIR}/sdk_timer_plugin"
 mkdir -p "${SDK_TIMER_EXAMPLE_DIR}"
 cp -R "${REPO_DIR}/examples/sdk_timer_plugin/." "${SDK_TIMER_EXAMPLE_DIR}/"
+require_no_call_process_event_escape_hatch "${SDK_TIMER_EXAMPLE_DIR}" "Timer SDK example"
 cmake -S "${SDK_TIMER_EXAMPLE_DIR}" -B "${SDK_TIMER_EXAMPLE_DIR}/build" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_PREFIX_PATH="${INSTALL_ROOT}" \

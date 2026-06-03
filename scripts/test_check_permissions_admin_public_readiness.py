@@ -561,6 +561,33 @@ class PermissionsAdminPublicReadinessTests(unittest.TestCase):
             [(item["reason"], item["label"]) for item in blockers],
         )
 
+    def test_rejects_identity_contract_capability_certificate_and_route_gate_aliases(self) -> None:
+        blockers: list[dict[str, object]] = []
+        READINESS.collect_overclaims(
+            {
+                "secondary_report": {
+                    "identityPublicContractReady": True,
+                    "playerIdentityPublicContractReady": True,
+                    "playerIdentityPromotionCertificateReady": True,
+                    "publicCapabilityAdvertised": True,
+                    "publicContractReviewed": True,
+                    "routeGateUnlocked": True,
+                },
+                "claims": [
+                    "accepted runtime evidence is accepted",
+                    "player identity public contract is ready",
+                    "promotion certificate is promoted",
+                    "public capability is advertised",
+                    "route gate opened for permissions/admin",
+                    "ready route gate",
+                ],
+            },
+            blockers,
+        )
+
+        self.assertEqual(6, [item["reason"] for item in blockers].count("public_surface_overclaim"))
+        self.assertEqual(6, [item["reason"] for item in blockers].count("positive_public_surface_claim"))
+
     def test_rejects_broad_release_sdk_wording_overclaims(self) -> None:
         blockers: list[dict[str, object]] = []
         READINESS.collect_overclaims(
